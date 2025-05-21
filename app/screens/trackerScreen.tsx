@@ -35,8 +35,6 @@ const addTransactionScreen = () => {
 
 	const router = useRouter();
 
-	const [successMessage, setSuccessMessage] = useState('');
-
 	const amountInputRef = useRef<TextInput>(null);
 
 	const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -55,7 +53,7 @@ const addTransactionScreen = () => {
 	const handleMadeSubmit = async () => {
 		try {
 			const response = await axios.post(
-				'http://localhost:4000/api/transactions',
+				'http://localhost:3000/api/transactions',
 				transaction
 			);
 			console.log('Transaction saved:', response.data);
@@ -66,8 +64,7 @@ const addTransactionScreen = () => {
 				category: '',
 				date: new Date().toISOString().split('T')[0],
 			});
-			setSuccessMessage('Transaction saved successfully!');
-			setTimeout(() => setSuccessMessage(''), 3000);
+			Alert.alert('Success', 'Transaction saved successfully!');
 		} catch (error) {
 			console.error('Error saving transaction:', error);
 			Alert.alert('Error', 'Failed to save transaction');
@@ -76,7 +73,7 @@ const addTransactionScreen = () => {
 	const handleSpentSubmit = async () => {
 		try {
 			const response = await axios.post(
-				'http://localhost:4000/api/transactions',
+				'http://localhost:3000/api/transactions',
 				transaction
 			);
 			console.log('Transaction saved:', response.data);
@@ -87,8 +84,7 @@ const addTransactionScreen = () => {
 				category: '',
 				date: new Date().toISOString().split('T')[0],
 			});
-			setSuccessMessage('Transaction saved successfully!');
-			setTimeout(() => setSuccessMessage(''), 3000);
+			Alert.alert('Success', 'Transaction saved successfully!');
 		} catch (error) {
 			console.error('Error saving transaction:', error);
 			Alert.alert('Error', 'Failed to save transaction');
@@ -114,13 +110,6 @@ const addTransactionScreen = () => {
 	// MAIN COMPONENT===============================================
 	return (
 		<SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-			{/* <Stack.Screen
-				options={{
-					headerShown: false,
-
-					animation: 'slide_from_left',
-				}}
-			/> */}
 			<View style={styles.mainContainer}>
 				<View style={styles.topContainer}>
 					{/* Profile button as a Link */}

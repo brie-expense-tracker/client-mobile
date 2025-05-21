@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Link, Stack } from 'expo-router';
+import { Link, router, Stack } from 'expo-router';
 
 type RootStackParamList = {
 	Tracker: undefined;
@@ -69,7 +69,7 @@ const dummyData: Transaction[] = [
 ];
 
 const months = [
-	{ label: 'All Months', value: '' },
+	{ label: '2025', value: '' },
 	{ label: 'January', value: '01' },
 	{ label: 'February', value: '02' },
 	{ label: 'March', value: '03' },
@@ -109,29 +109,20 @@ export default function TransactionScreen() {
 
 	return (
 		<SafeAreaView style={styles.safeArea}>
-			<Stack.Screen
-				options={{
-					headerShown: false,
-
-					animation: 'slide_from_left',
-				}}
-			/>
 			<View style={styles.container}>
 				{/* Header */}
 				<View style={styles.headerContainer}>
-					<Link replace href="./trackerScreen">
-						<Ionicons
-							name="add-circle-outline"
-							size={36}
-							color="#555"
-							style={{ marginTop: 2 }}
-						/>
-					</Link>
+					<TouchableOpacity onPress={() => router.back()}>
+						<Ionicons name="chevron-back-outline" size={36} color="#555" />
+					</TouchableOpacity>
 					<View style={styles.headerSpacer} />
 					<TouchableOpacity
 						style={styles.filterButton}
 						onPress={() => setShowPicker(!showPicker)}
 					>
+						<Text style={styles.filterButtonText}>
+							{months[selectedMonth.length].label}
+						</Text>
 						<Ionicons name="filter" size={36} color="#555" />
 					</TouchableOpacity>
 				</View>
@@ -261,12 +252,13 @@ const styles = StyleSheet.create({
 		borderBottomWidth: 1,
 		borderColor: '#f0f0f0',
 		alignItems: 'center',
+		backgroundColor: '#f9f9f9',
 	},
 	txDesc: { fontSize: 16, fontWeight: '500' },
 	txTags: { fontSize: 12, color: '#666', marginTop: 4 },
 	txRight: { alignItems: 'flex-end' },
 	txAmount: { fontSize: 16, fontWeight: '600' },
-	txDate: { fontSize: 12, color: '#999', marginTop: 4 },
+	txDate: { fontSize: 12, color: '#999999', marginTop: 4 },
 
 	empty: {
 		flex: 1,
@@ -276,8 +268,8 @@ const styles = StyleSheet.create({
 
 	headerContainer: {
 		flexDirection: 'row',
-		justifyContent: 'flex-end',
-		paddingHorizontal: 16,
+		paddingRight: 16,
+		paddingLeft: 8,
 	},
 	headerSpacer: {
 		flex: 1,
@@ -286,11 +278,12 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 	},
-	// filterButtonText: {
-	// 	color: '#007AFF',
-	// 	marginLeft: 4,
-	// 	fontSize: 14,
-	// },
+	filterButtonText: {
+		marginRight: 10,
+		fontSize: 28,
+		fontWeight: 'bold',
+		color: '#7a7a7a',
+	},
 	addButton: {
 		padding: 8,
 	},
