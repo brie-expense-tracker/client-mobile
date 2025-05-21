@@ -3,21 +3,27 @@ import {
 	View,
 	Text,
 	TextInput,
-	Button,
 	StyleSheet,
 	Alert,
 	TouchableOpacity,
 	ScrollView,
+	Image,
+	Pressable,
 } from 'react-native';
 import axios from 'axios';
 import MonthYearDayPickerModal from '../components/MonthYearDayPickerModal';
 import { Ionicons, FontAwesome } from '@expo/vector-icons';
+import { Link, useRouter, Stack } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 interface FloatingActionButtonProps {
 	color: string;
 	name: string;
 	onPress?: () => void;
 }
 
+//
+//  FUNCTIONS START===============================================
 const addTransactionScreen = () => {
 	const [transaction, setTransaction] = useState({
 		type: 'income',
@@ -26,6 +32,8 @@ const addTransactionScreen = () => {
 		category: '',
 		date: new Date().toISOString().split('T')[0],
 	});
+
+	const router = useRouter();
 
 	const [successMessage, setSuccessMessage] = useState('');
 
@@ -102,100 +110,120 @@ const addTransactionScreen = () => {
 		setTransaction({ ...transaction, category: category });
 	};
 
+	//
+	// MAIN COMPONENT===============================================
 	return (
-		<View style={styles.mainContainer}>
-			<View style={styles.topContainer}>
-				<TouchableOpacity
-					style={styles.topLeftFab}
-					onPress={() => console.log('Top Left FAB Pressed')}
-				>
-					<Ionicons name="list-outline" size={36} color="grey" />
-				</TouchableOpacity>
-				<TouchableOpacity
-					style={styles.topRightFab}
-					onPress={() => console.log('Top Right FAB Pressed')}
-				>
-					<Ionicons name="person-circle-outline" size={36} color="grey" />
-				</TouchableOpacity>
-				<View style={styles.inputAmountContainer}>
-					<FontAwesome
-						name="dollar"
-						size={24}
-						color="black"
-						style={styles.dollarIcon}
-					/>
-					<TextInput
-						ref={amountInputRef}
-						style={styles.inputAmount}
-						placeholder="0"
-						placeholderTextColor={'#000000'}
-						value={transaction.amount}
-						onChangeText={(text) =>
-							setTransaction({ ...transaction, amount: text })
-						}
-						showSoftInputOnFocus={false} // no iOS keyboard
-					/>
-				</View>
-				<View style={styles.carouselContainer}>
-					<ScrollView horizontal showsHorizontalScrollIndicator={false}>
-						{mockTags.map((category, index) => (
-							<TouchableOpacity
-								key={index}
-								onPress={() => toggleCategorySelection(category)}
-								style={[
-									styles.carouselText,
-									selectedCategory === category && styles.selectedTag,
-								]}
-							>
-								<Text>{category}</Text>
-							</TouchableOpacity>
-						))}
-						<TouchableOpacity
-							onPress={() => console.log('Add Category Pressed')}
-							style={styles.addCategoryButton}
-						>
-							<Ionicons name="add-circle-outline" size={24} color="grey" />
-						</TouchableOpacity>
-					</ScrollView>
-				</View>
-				<TextInput
-					style={styles.inputDescription}
-					placeholder="What's this for?"
-					placeholderTextColor={'#a3a3a3'}
-					value={transaction.description}
-					onChangeText={(text) =>
-						setTransaction({ ...transaction, description: text })
-					}
-				/>
+		<SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+			{/* <Stack.Screen
+				options={{
+					headerShown: false,
 
-				<View style={styles.fabsContainer}>
-					<View style={styles.fabContainer}>
-						<FloatingActionButton
-							name="Spent"
-							color="#d13737"
-							onPress={handleSpentSubmit}
+					animation: 'slide_from_left',
+				}}
+			/> */}
+			<View style={styles.mainContainer}>
+				<View style={styles.topContainer}>
+					{/* Profile button as a Link */}
+					<Link href="./profileScreen" asChild>
+						<TouchableOpacity style={styles.topRightFab}>
+							<Image
+								source={require('../../assets/images/profile.jpg')}
+								style={{ width: 40, height: 46, borderRadius: 23 }}
+							/>
+						</TouchableOpacity>
+					</Link>
+
+					<TouchableOpacity
+						style={styles.topRightFab2}
+						onPress={() => {
+							router.push('./transactionScreen');
+						}}
+					>
+						<Ionicons name="list-outline" size={40} color="#555" />
+					</TouchableOpacity>
+
+					<View style={styles.inputAmountContainer}>
+						<FontAwesome
+							name="dollar"
+							size={24}
+							color="black"
+							style={styles.dollarIcon}
+						/>
+						<TextInput
+							ref={amountInputRef}
+							style={styles.inputAmount}
+							placeholder="0"
+							placeholderTextColor={'#000000'}
+							value={transaction.amount}
+							onChangeText={(text) =>
+								setTransaction({ ...transaction, amount: text })
+							}
+							showSoftInputOnFocus={false} // no iOS keyboard
 						/>
 					</View>
-					<View style={styles.fabContainer}>
-						<FloatingActionButton
-							name="Made"
-							color="#14b943"
-							onPress={handleMadeSubmit}
-						/>
+					<View style={styles.carouselContainer}>
+						<ScrollView horizontal showsHorizontalScrollIndicator={false}>
+							{mockTags.map((category, index) => (
+								<TouchableOpacity
+									key={index}
+									onPress={() => toggleCategorySelection(category)}
+									style={[
+										styles.carouselText,
+										selectedCategory === category && styles.selectedTag,
+									]}
+								>
+									<Text>{category}</Text>
+								</TouchableOpacity>
+							))}
+							<TouchableOpacity
+								onPress={() => console.log('Add Category Pressed')}
+								style={styles.addCategoryButton}
+							>
+								<Ionicons name="add-circle-outline" size={24} color="grey" />
+							</TouchableOpacity>
+						</ScrollView>
+					</View>
+					<TextInput
+						style={styles.inputDescription}
+						placeholder="What's this for?"
+						placeholderTextColor={'#a3a3a3'}
+						value={transaction.description}
+						onChangeText={(text) =>
+							setTransaction({ ...transaction, description: text })
+						}
+					/>
+
+					<View style={styles.fabsContainer}>
+						<View style={styles.fabContainer}>
+							<FloatingActionButton
+								name="Spent"
+								color="#4fa166"
+								onPress={handleSpentSubmit}
+							/>
+						</View>
+						<View style={styles.fabContainer}>
+							<FloatingActionButton
+								name="Made"
+								color="#429c5b"
+								onPress={handleMadeSubmit}
+							/>
+						</View>
 					</View>
 				</View>
+				<View style={styles.topNumPadContainer}>
+					<NumberPad
+						onValueChange={(value: string) =>
+							setTransaction((prev) => ({ ...prev, amount: value }))
+						}
+					/>
+				</View>
 			</View>
-			<View style={styles.topNumPadContainer}>
-				<NumberPad
-					onValueChange={(value: string) =>
-						setTransaction((prev) => ({ ...prev, amount: value }))
-					}
-				/>
-			</View>
-		</View>
+		</SafeAreaView>
 	);
 };
 
+//
+// FAB COMPONENT===============================================
 const FloatingActionButton: React.FC<
 	FloatingActionButtonProps & { onPress?: () => void }
 > = ({ color, name, onPress = () => console.log(`${name} FAB Pressed`) }) => (
@@ -209,6 +237,8 @@ const FloatingActionButton: React.FC<
 	</TouchableOpacity>
 );
 
+//
+// NUMBER PAD COMPONENT===============================================
 const NumberPad: React.FC<{ onValueChange: (value: string) => void }> = ({
 	onValueChange,
 }) => {
@@ -295,10 +325,14 @@ const NumberPad: React.FC<{ onValueChange: (value: string) => void }> = ({
 };
 
 const styles = StyleSheet.create({
+	safeArea: {
+		flex: 1,
+		backgroundColor: '#f9f9f9',
+	},
 	mainContainer: {
 		flex: 1,
 		justifyContent: 'space-between',
-		backgroundColor: '#ffffff',
+		backgroundColor: '#f9f9f9',
 	},
 	topContainer: {
 		flex: 1,
@@ -390,17 +424,17 @@ const styles = StyleSheet.create({
 	},
 	topRightFab: {
 		position: 'absolute',
-		top: 50,
+		top: 0,
 		right: 20,
 		borderRadius: 25,
 		alignItems: 'center',
 		justifyContent: 'center',
 		zIndex: 1,
 	},
-	topLeftFab: {
+	topRightFab2: {
 		position: 'absolute',
-		top: 50,
-		left: 20,
+		top: 60,
+		right: 20,
 		borderRadius: 25,
 		alignItems: 'center',
 		justifyContent: 'center',
