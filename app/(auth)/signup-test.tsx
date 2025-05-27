@@ -110,7 +110,7 @@ export default function Signup() {
 
 					<View className="flex-row gap-x-1 w-full my-10 justify-center">
 						<Text className="text-gray-500">Already have account?</Text>
-						<Link replace className="text-black" href={'/login'}>
+						<Link replace className="text-black" href={'/login-test'}>
 							<Text className=" text-green-800 opacity-70 font-bold">
 								Log In
 							</Text>
@@ -118,32 +118,8 @@ export default function Signup() {
 					</View>
 				</View>
 			</View>
-			<Pressable
-				style={styles.addButton}
-				onPress={() => Alert.alert('Add button pressed')}
-			>
-				<Ionicons name="add" size={24} color="white" />
-			</Pressable>
+
 			<Stack.Screen options={{ headerShown: false }} />
 		</View>
 	);
 }
-
-const styles = StyleSheet.create({
-	addButton: {
-		position: 'absolute',
-		bottom: 30,
-		alignSelf: 'center',
-		width: 60,
-		height: 60,
-		borderRadius: 30,
-		backgroundColor: '#379C54',
-		justifyContent: 'center',
-		alignItems: 'center',
-		elevation: 5, // for Android
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.3,
-		shadowRadius: 3,
-	},
-});

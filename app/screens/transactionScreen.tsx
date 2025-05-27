@@ -7,13 +7,15 @@ import {
 	FlatList,
 	TouchableOpacity,
 	Dimensions,
+	Modal,
+	TouchableWithoutFeedback,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Link, router, Stack } from 'expo-router';
+import { router } from 'expo-router';
 
 type RootStackParamList = {
 	Tracker: undefined;
@@ -68,8 +70,15 @@ const dummyData: Transaction[] = [
 	// …add more as needed
 ];
 
+const years = [
+	{ label: 'All Years', value: '' },
+	{ label: '2025', value: '2025' },
+	{ label: '2024', value: '2024' },
+	{ label: '2023', value: '2023' },
+];
+
 const months = [
-	{ label: '2025', value: '' },
+	{ label: 'All Months', value: '' },
 	{ label: 'January', value: '01' },
 	{ label: 'February', value: '02' },
 	{ label: 'March', value: '03' },
@@ -86,8 +95,13 @@ const months = [
 
 export default function TransactionScreen() {
 	const [selectedTag, setSelectedTag] = useState<string>('');
+	const [selectedYear, setSelectedYear] = useState<string>('');
 	const [selectedMonth, setSelectedMonth] = useState<string>('');
-	const [showPicker, setShowPicker] = useState(false);
+	const [modalVisible, setModalVisible] = useState(false);
+	const [activePicker, setActivePicker] = useState<'year' | 'month' | null>(
+		null
+	);
+	const [tempSelection, setTempSelection] = useState<string>('');
 	const navigation = useNavigation<NavigationProp>();
 
 	// derive unique tags from data
@@ -100,12 +114,58 @@ export default function TransactionScreen() {
 	// filter transactions
 	const filtered = useMemo(() => {
 		return dummyData.filter((tx) => {
-			const txMonth = tx.date.slice(5, 7); // "YYYY-MM-DD"
+			const txYear = tx.date.slice(0, 4);
+			const txMonth = tx.date.slice(5, 7);
 			const tagMatch = selectedTag === '' || tx.tags.includes(selectedTag);
+			const yearMatch = selectedYear === '' || txYear === selectedYear;
 			const monthMatch = selectedMonth === '' || txMonth === selectedMonth;
-			return tagMatch && monthMatch;
+			return tagMatch && yearMatch && monthMatch;
 		});
-	}, [selectedTag, selectedMonth]);
+	}, [selectedTag, selectedYear, selectedMonth]);
+
+	const handlePickerPress = (picker: 'year' | 'month') => {
+		setActivePicker(picker);
+		setTempSelection(picker === 'year' ? selectedYear : selectedMonth);
+		setModalVisible(true);
+	};
+
+	const handlePickerSelect = (value: string) => {
+		setTempSelection(value);
+	};
+
+	const handleModalClose = () => {
+		if (activePicker === 'year') {
+			setSelectedYear(tempSelection);
+		} else if (activePicker === 'month') {
+			setSelectedMonth(tempSelection);
+		}
+		setModalVisible(false);
+		setActivePicker(null);
+	};
+
+	const renderPickerContent = () => {
+		if (!activePicker) return null;
+
+		const data = activePicker === 'year' ? years : months;
+
+		return (
+			<View style={styles.pickerContent}>
+				<Picker
+					selectedValue={tempSelection}
+					onValueChange={handlePickerSelect}
+					style={styles.picker}
+				>
+					{data.map((item) => (
+						<Picker.Item
+							key={item.value}
+							label={item.label}
+							value={item.value}
+						/>
+					))}
+				</Picker>
+			</View>
+		);
+	};
 
 	return (
 		<SafeAreaView style={styles.safeArea}>
@@ -116,31 +176,57 @@ export default function TransactionScreen() {
 						<Ionicons name="chevron-back-outline" size={36} color="#555" />
 					</TouchableOpacity>
 					<View style={styles.headerSpacer} />
-					<TouchableOpacity
-						style={styles.filterButton}
-						onPress={() => setShowPicker(!showPicker)}
-					>
-						<Text style={styles.filterButtonText}>
-							{months[selectedMonth.length].label}
-						</Text>
-						<Ionicons name="filter" size={36} color="#555" />
-					</TouchableOpacity>
+					<View style={styles.filterButtonsContainer}>
+						<TouchableOpacity
+							style={styles.filterButton}
+							onPress={() => handlePickerPress('year')}
+						>
+							<Text style={styles.filterButtonText}>
+								{selectedYear || 'All Years'}
+							</Text>
+							<Ionicons name="calendar" size={24} color="#555" />
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={styles.filterButton}
+							onPress={() => handlePickerPress('month')}
+						>
+							<Text style={styles.filterButtonText}>
+								{months.find((m) => m.value === selectedMonth)?.label ||
+									'All Months'}
+							</Text>
+							<Ionicons name="calendar" size={24} color="#555" />
+						</TouchableOpacity>
+					</View>
 				</View>
 
-				{/* Month Picker */}
-				{showPicker && (
-					<View style={styles.pickerWrapper}>
-						<Picker
-							selectedValue={selectedMonth}
-							onValueChange={setSelectedMonth}
-							mode="dropdown"
-						>
-							{months.map((m) => (
-								<Picker.Item key={m.value} label={m.label} value={m.value} />
-							))}
-						</Picker>
-					</View>
-				)}
+				{/* Modal Picker */}
+				<Modal
+					visible={modalVisible}
+					transparent
+					animationType="fade"
+					onRequestClose={handleModalClose}
+				>
+					<TouchableWithoutFeedback onPress={handleModalClose}>
+						<View style={styles.modalOverlay}>
+							<TouchableWithoutFeedback>
+								<View style={styles.modalContent}>
+									<View style={styles.modalHeader}>
+										<Text style={styles.modalTitle}>
+											{activePicker === 'year' ? 'Select Year' : 'Select Month'}
+										</Text>
+										<TouchableOpacity
+											onPress={handleModalClose}
+											style={styles.closeButton}
+										>
+											<Ionicons name="close" size={24} color="#666" />
+										</TouchableOpacity>
+									</View>
+									{renderPickerContent()}
+								</View>
+							</TouchableWithoutFeedback>
+						</View>
+					</TouchableWithoutFeedback>
+				</Modal>
 
 				{/* Tag Chips */}
 				<View style={styles.filtersContainer}>
@@ -203,7 +289,7 @@ export default function TransactionScreen() {
 	);
 }
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 const styles = StyleSheet.create({
 	safeArea: {
 		flex: 1,
@@ -274,17 +360,58 @@ const styles = StyleSheet.create({
 	headerSpacer: {
 		flex: 1,
 	},
+	filterButtonsContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 12,
+	},
 	filterButton: {
 		flexDirection: 'row',
 		alignItems: 'center',
+		paddingHorizontal: 8,
 	},
 	filterButtonText: {
-		marginRight: 10,
-		fontSize: 28,
-		fontWeight: 'bold',
+		marginRight: 6,
+		fontSize: 16,
+		fontWeight: '600',
 		color: '#7a7a7a',
 	},
 	addButton: {
 		padding: 8,
+	},
+	modalOverlay: {
+		flex: 1,
+		backgroundColor: 'rgba(0, 0, 0, 0.5)',
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	modalContent: {
+		backgroundColor: 'white',
+		borderRadius: 12,
+		width: width * 0.8,
+		maxHeight: height * 0.4,
+	},
+	modalHeader: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		padding: 16,
+		borderBottomWidth: 1,
+		borderBottomColor: '#eee',
+	},
+	modalTitle: {
+		fontSize: 18,
+		fontWeight: '600',
+		color: '#333',
+	},
+	closeButton: {
+		padding: 4,
+	},
+	pickerContent: {
+		width: '100%',
+	},
+	picker: {
+		width: '100%',
+		height: 200,
 	},
 });

@@ -31,10 +31,10 @@ export default function Login() {
 			return;
 		}
 
-		if (!isValidEmail(email)) {
-			Alert.alert('Error', 'Please enter a valid email address.');
-			return;
-		}
+		// if (!isValidEmail(email)) {
+		// 	Alert.alert('Error', 'Please enter a valid email address.');
+		// 	return;
+		// }
 
 		if (!isValidPassword(password)) {
 			Alert.alert('Error', 'Password must be at least 6 characters long.');
@@ -42,10 +42,10 @@ export default function Login() {
 		}
 
 		// Fake login logic
-		if (email === 'test@example.com' && password === 'password123') {
+		if (email === 'test' && password === 'password') {
 			Alert.alert('Success', `Logged in with ${email}`);
 			console.log('201: Successfully logged in.');
-			router.replace('/dashboard');
+			router.replace('/screens/trackerScreen');
 		} else {
 			Alert.alert('Error', 'Invalid email or password.');
 		}
@@ -105,7 +105,7 @@ export default function Login() {
 					</View>
 
 					<View className="flex-row gap-x-2 w-full my-10 justify-center">
-						<Link replace className="text-black" href={'/signup'}>
+						<Link replace className="text-black" href={'/signup-test'}>
 							<Text className=" text-green-800 opacity-70 font-bold">
 								Create An Account
 							</Text>
