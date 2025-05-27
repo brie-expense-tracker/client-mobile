@@ -10,8 +10,7 @@ import {
 	Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LineChart, PieChart } from 'react-native-chart-kit';
-import { Link, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -89,25 +88,7 @@ export default function ProfileScreen() {
 			{/* Charts */}
 			<View style={styles.charts}>
 				<Text style={styles.chartTitle}>Spending Over Time</Text>
-				<LineChart
-					data={lineData}
-					width={screenWidth - 40}
-					height={220}
-					chartConfig={chartConfig}
-					style={styles.chart}
-				/>
-
 				<Text style={styles.chartTitle}>Category Breakdown</Text>
-				<PieChart
-					data={pieData}
-					width={screenWidth - 40}
-					height={180}
-					chartConfig={chartConfig}
-					accessor="population"
-					backgroundColor="transparent"
-					paddingLeft="15"
-					style={{ marginVertical: 8 }}
-				/>
 			</View>
 
 			{/* Floating "+" button */}
