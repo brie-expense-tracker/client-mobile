@@ -18,80 +18,13 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { router } from 'expo-router';
 import { Calendar } from 'react-native-calendars';
+import { Transaction, transactions as dummyData } from '../data/transactions';
 
 type RootStackParamList = {
 	Tracker: undefined;
 };
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
-
-interface Transaction {
-	id: string;
-	description: string;
-	amount: number;
-	date: string; // ISO string
-	tags: string[];
-}
-
-const dummyData: Transaction[] = [
-	{
-		id: '1',
-		description: 'Groceries',
-		amount: 76.23,
-		date: '2025-05-03',
-		tags: ['Food'],
-	},
-	{
-		id: '2',
-		description: 'Electric Bill',
-		amount: 120.5,
-		date: '2025-05-01',
-		tags: ['Utilities'],
-	},
-	{
-		id: '3',
-		description: 'Coffee',
-		amount: 4.75,
-		date: '2025-04-27',
-		tags: ['Food', 'Cafe'],
-	},
-	{
-		id: '4',
-		description: 'Netflix',
-		amount: 15.99,
-		date: '2025-05-02',
-		tags: ['Entertainment'],
-	},
-	{
-		id: '5',
-		description: 'Gym Renewal',
-		amount: 45,
-		date: '2025-05-28',
-		tags: ['Health'],
-	},
-	{
-		id: '6',
-		description: 'Gym Membership',
-		amount: 45,
-		date: '2025-03-15',
-		tags: ['Health'],
-	},
-	{
-		id: '7',
-		description: 'Funko Pop',
-		amount: 45,
-		date: '2025-04-30',
-		tags: ['Health'],
-	},
-	{
-		id: '8',
-		description: 'Funko Pop',
-		amount: 45,
-		date: '2025-04-31',
-		tags: ['Health'],
-	},
-	// …add more as needed
-];
 
 const dateFilterModes = [
 	{ label: 'Day', value: 'day', icon: 'calendar-outline' },
@@ -272,7 +205,7 @@ export default function TransactionScreen() {
 				<View style={styles.sidebarBackground} />
 				<SafeAreaView style={styles.sidebarContent}>
 					<View style={styles.sidebarHeader}>
-						<Text style={styles.sidebarTitle}>Filter Mode</Text>
+						<Text style={styles.sidebarTitle}>Filters</Text>
 						<TouchableOpacity
 							onPress={toggleSidebar}
 							style={styles.closeButton}
@@ -382,7 +315,14 @@ export default function TransactionScreen() {
 				<Text style={styles.txTags}>{item.tags.join(', ')}</Text>
 			</View>
 			<View style={styles.txRight}>
-				<Text style={styles.txAmount}>${item.amount.toFixed(2)}</Text>
+				<Text
+					style={[
+						styles.txAmount,
+						item.type === 'income' ? styles.incomeAmount : styles.expenseAmount,
+					]}
+				>
+					{item.type === 'income' ? '+' : '-'}${item.amount.toFixed(2)}
+				</Text>
 				<Text style={styles.txDate}>{item.date.slice(5)}</Text>
 			</View>
 		</View>
@@ -395,6 +335,11 @@ export default function TransactionScreen() {
 				backgroundColor="transparent"
 				translucent
 			/>
+			{isSidebarVisible && (
+				<TouchableWithoutFeedback onPress={toggleSidebar}>
+					<View style={styles.overlay} />
+				</TouchableWithoutFeedback>
+			)}
 			<SafeAreaView style={styles.safeArea}>
 				<View style={styles.container}>
 					{/* Header */}
@@ -599,7 +544,16 @@ const styles = StyleSheet.create({
 	txDesc: { fontSize: 16, fontWeight: '500' },
 	txTags: { fontSize: 12, color: '#666', marginTop: 4 },
 	txRight: { alignItems: 'flex-end' },
-	txAmount: { fontSize: 16, fontWeight: '600' },
+	txAmount: {
+		fontSize: 16,
+		fontWeight: '600',
+	},
+	incomeAmount: {
+		color: '#0ba000',
+	},
+	expenseAmount: {
+		color: '#d50b00',
+	},
 	txDate: { fontSize: 12, color: '#999999', marginTop: 4 },
 
 	empty: {
@@ -612,8 +566,11 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		paddingRight: 16,
 		paddingLeft: 8,
+		paddingVertical: 8,
 		alignItems: 'center',
 		justifyContent: 'space-between',
+		borderBottomWidth: 1,
+		borderBottomColor: '#e0e0e0',
 	},
 	headerLeft: {
 		width: 36,
@@ -804,5 +761,14 @@ const styles = StyleSheet.create({
 	},
 	tagTextSelected: {
 		color: '#fff',
+	},
+	overlay: {
+		position: 'absolute',
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
+		backgroundColor: 'rgba(0, 0, 0, 0.5)',
+		zIndex: 999,
 	},
 });
