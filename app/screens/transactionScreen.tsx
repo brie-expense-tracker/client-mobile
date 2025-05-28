@@ -70,10 +70,24 @@ const dummyData: Transaction[] = [
 		tags: ['Health'],
 	},
 	{
-		id: '5',
+		id: '6',
 		description: 'Gym Membership',
 		amount: 45,
 		date: '2025-03-15',
+		tags: ['Health'],
+	},
+	{
+		id: '7',
+		description: 'Funko Pop',
+		amount: 45,
+		date: '2025-04-30',
+		tags: ['Health'],
+	},
+	{
+		id: '8',
+		description: 'Funko Pop',
+		amount: 45,
+		date: '2025-04-31',
 		tags: ['Health'],
 	},
 	// …add more as needed
@@ -109,12 +123,26 @@ const formatDate = (
 	return date.toLocaleDateString(locale, options);
 };
 
-const formatMonthHeader = (dateString: string) => {
-	const date = new Date(dateString);
-	return date.toLocaleDateString('en-US', {
-		month: 'long',
-		year: 'numeric',
-	});
+const monthNames = [
+	'January',
+	'February',
+	'March',
+	'April',
+	'May',
+	'June',
+	'July',
+	'August',
+	'September',
+	'October',
+	'November',
+	'December',
+];
+
+const formatMonthHeader = (monthKey: string) => {
+	// monthKey is "YYYY-MM"
+	const [year, mm] = monthKey.split('-');
+	const monthIndex = Number(mm) - 1; // 0-based
+	return `${monthNames[monthIndex]} ${year}`; // e.g. "May 2025"
 };
 
 const getLocalIsoDate = (): string => {
@@ -343,9 +371,7 @@ export default function TransactionScreen() {
 
 	const renderMonthHeader = ({ monthKey }: { monthKey: string }) => (
 		<View style={styles.monthHeader}>
-			<Text style={styles.monthHeaderText}>
-				{formatMonthHeader(monthKey + '-01')}
-			</Text>
+			<Text style={styles.monthHeaderText}>{formatMonthHeader(monthKey)}</Text>
 		</View>
 	);
 
@@ -384,10 +410,21 @@ export default function TransactionScreen() {
 						<Text style={styles.headerTitle}>History</Text>
 						<View style={styles.headerRight}>
 							<TouchableOpacity
-								style={styles.filterButton}
-								onPress={() => handlePickerPress('calendar')}
+								style={[
+									styles.filterButton,
+									dateFilterMode === 'month' && styles.filterButtonDisabled,
+								]}
+								onPress={() => {
+									if (dateFilterMode !== 'month') {
+										handlePickerPress('calendar');
+									}
+								}}
 							>
-								<Ionicons name="calendar" size={24} color="#555" />
+								<Ionicons
+									name="calendar"
+									size={24}
+									color={dateFilterMode === 'month' ? '#616161' : '#555'}
+								/>
 							</TouchableOpacity>
 							<TouchableOpacity
 								style={styles.filterButton}
@@ -600,11 +637,8 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		paddingHorizontal: 8,
 	},
-	filterButtonText: {
-		marginRight: 6,
-		fontSize: 16,
-		fontWeight: '600',
-		color: '#7a7a7a',
+	filterButtonDisabled: {
+		opacity: 0.5,
 	},
 	addButton: {
 		padding: 8,
