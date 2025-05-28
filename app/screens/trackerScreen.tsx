@@ -22,6 +22,11 @@ interface FloatingActionButtonProps {
 	onPress?: () => void;
 }
 
+interface AddTransactionScreenProps {
+	visible: boolean;
+	onClose: () => void;
+}
+
 //
 //  FUNCTIONS START===============================================
 const addTransactionScreen = () => {
@@ -34,9 +39,7 @@ const addTransactionScreen = () => {
 	});
 
 	const router = useRouter();
-
 	const amountInputRef = useRef<TextInput>(null);
-
 	const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
 	useEffect(() => {
@@ -65,11 +68,13 @@ const addTransactionScreen = () => {
 				date: new Date().toISOString().split('T')[0],
 			});
 			Alert.alert('Success', 'Transaction saved successfully!');
+			router.back();
 		} catch (error) {
 			console.error('Error saving transaction:', error);
 			Alert.alert('Error', 'Failed to save transaction');
 		}
 	};
+
 	const handleSpentSubmit = async () => {
 		try {
 			const response = await axios.post(
@@ -85,6 +90,7 @@ const addTransactionScreen = () => {
 				date: new Date().toISOString().split('T')[0],
 			});
 			Alert.alert('Success', 'Transaction saved successfully!');
+			router.back();
 		} catch (error) {
 			console.error('Error saving transaction:', error);
 			Alert.alert('Error', 'Failed to save transaction');
@@ -109,105 +115,106 @@ const addTransactionScreen = () => {
 	//
 	// MAIN COMPONENT===============================================
 	return (
-		<SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-			<View style={styles.mainContainer}>
-				<View style={styles.topContainer}>
-					{/* Profile button as a Link */}
-					<Link href="./profileScreen" asChild>
-						<TouchableOpacity style={styles.topRightFab}>
-							<Image
-								source={require('../../assets/images/profile.jpg')}
-								style={{ width: 40, height: 46, borderRadius: 23 }}
-							/>
+		<View style={styles.container}>
+			<Stack.Screen
+				options={{
+					headerShown: false,
+					presentation: 'modal',
+					animation: 'slide_from_bottom',
+					gestureEnabled: true,
+					gestureDirection: 'vertical',
+					contentStyle: {
+						backgroundColor: 'transparent',
+					},
+				}}
+			/>
+			<SafeAreaView style={styles.safeArea} edges={['top']}>
+				<View style={styles.mainContainer}>
+					<View style={styles.topContainer}>
+						<TouchableOpacity
+							style={styles.closeButton}
+							onPress={() => router.replace('/')}
+						>
+							<Ionicons name="close" size={24} color="#000" />
 						</TouchableOpacity>
-					</Link>
-
-					<TouchableOpacity
-						style={styles.topRightFab2}
-						onPress={() => {
-							router.push('./transactionScreen');
-						}}
-					>
-						<Ionicons name="list-outline" size={40} color="#555" />
-					</TouchableOpacity>
-
-					<View style={styles.inputAmountContainer}>
-						<FontAwesome
-							name="dollar"
-							size={24}
-							color="black"
-							style={styles.dollarIcon}
-						/>
-						<TextInput
-							ref={amountInputRef}
-							style={styles.inputAmount}
-							placeholder="0"
-							placeholderTextColor={'#000000'}
-							value={transaction.amount}
-							onChangeText={(text) =>
-								setTransaction({ ...transaction, amount: text })
-							}
-							showSoftInputOnFocus={false} // no iOS keyboard
-						/>
-					</View>
-					<View style={styles.carouselContainer}>
-						<ScrollView horizontal showsHorizontalScrollIndicator={false}>
-							{mockTags.map((category, index) => (
+						<View style={styles.inputAmountContainer}>
+							<FontAwesome
+								name="dollar"
+								size={24}
+								color="black"
+								style={styles.dollarIcon}
+							/>
+							<TextInput
+								ref={amountInputRef}
+								style={styles.inputAmount}
+								placeholder="0"
+								placeholderTextColor={'#000000'}
+								value={transaction.amount}
+								onChangeText={(text) =>
+									setTransaction({ ...transaction, amount: text })
+								}
+								showSoftInputOnFocus={false}
+							/>
+						</View>
+						<View style={styles.carouselContainer}>
+							<ScrollView horizontal showsHorizontalScrollIndicator={false}>
+								{mockTags.map((category, index) => (
+									<TouchableOpacity
+										key={index}
+										onPress={() => toggleCategorySelection(category)}
+										style={[
+											styles.carouselText,
+											selectedCategory === category && styles.selectedTag,
+										]}
+									>
+										<Text>{category}</Text>
+									</TouchableOpacity>
+								))}
 								<TouchableOpacity
-									key={index}
-									onPress={() => toggleCategorySelection(category)}
-									style={[
-										styles.carouselText,
-										selectedCategory === category && styles.selectedTag,
-									]}
+									onPress={() => console.log('Add Category Pressed')}
+									style={styles.addCategoryButton}
 								>
-									<Text>{category}</Text>
+									<Ionicons name="add-circle-outline" size={24} color="grey" />
 								</TouchableOpacity>
-							))}
-							<TouchableOpacity
-								onPress={() => console.log('Add Category Pressed')}
-								style={styles.addCategoryButton}
-							>
-								<Ionicons name="add-circle-outline" size={24} color="grey" />
-							</TouchableOpacity>
-						</ScrollView>
-					</View>
-					<TextInput
-						style={styles.inputDescription}
-						placeholder="What's this for?"
-						placeholderTextColor={'#a3a3a3'}
-						value={transaction.description}
-						onChangeText={(text) =>
-							setTransaction({ ...transaction, description: text })
-						}
-					/>
+							</ScrollView>
+						</View>
+						<TextInput
+							style={styles.inputDescription}
+							placeholder="What's this for?"
+							placeholderTextColor={'#a3a3a3'}
+							value={transaction.description}
+							onChangeText={(text) =>
+								setTransaction({ ...transaction, description: text })
+							}
+						/>
 
-					<View style={styles.fabsContainer}>
-						<View style={styles.fabContainer}>
-							<FloatingActionButton
-								name="Spent"
-								color="#4fa166"
-								onPress={handleSpentSubmit}
-							/>
-						</View>
-						<View style={styles.fabContainer}>
-							<FloatingActionButton
-								name="Made"
-								color="#429c5b"
-								onPress={handleMadeSubmit}
-							/>
+						<View style={styles.fabsContainer}>
+							<View style={styles.fabContainer}>
+								<FloatingActionButton
+									name="Spent"
+									color="#4fa166"
+									onPress={handleSpentSubmit}
+								/>
+							</View>
+							<View style={styles.fabContainer}>
+								<FloatingActionButton
+									name="Made"
+									color="#429c5b"
+									onPress={handleMadeSubmit}
+								/>
+							</View>
 						</View>
 					</View>
+					<View style={styles.topNumPadContainer}>
+						<NumberPad
+							onValueChange={(value: string) =>
+								setTransaction((prev) => ({ ...prev, amount: value }))
+							}
+						/>
+					</View>
 				</View>
-				<View style={styles.topNumPadContainer}>
-					<NumberPad
-						onValueChange={(value: string) =>
-							setTransaction((prev) => ({ ...prev, amount: value }))
-						}
-					/>
-				</View>
-			</View>
-		</SafeAreaView>
+			</SafeAreaView>
+		</View>
 	);
 };
 
@@ -314,6 +321,10 @@ const NumberPad: React.FC<{ onValueChange: (value: string) => void }> = ({
 };
 
 const styles = StyleSheet.create({
+	container: {
+		flex: 1,
+		backgroundColor: '#f9f9f9',
+	},
 	safeArea: {
 		flex: 1,
 		backgroundColor: '#f9f9f9',
@@ -328,6 +339,13 @@ const styles = StyleSheet.create({
 		justifyContent: 'flex-end',
 		padding: 20,
 		paddingBottom: 10,
+	},
+	closeButton: {
+		position: 'absolute',
+		top: 0,
+		right: 20,
+		zIndex: 1,
+		padding: 8,
 	},
 	inputAmountContainer: {
 		flexDirection: 'row',
@@ -410,24 +428,6 @@ const styles = StyleSheet.create({
 	numPadRow: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
-	},
-	topRightFab: {
-		position: 'absolute',
-		top: 0,
-		right: 20,
-		borderRadius: 25,
-		alignItems: 'center',
-		justifyContent: 'center',
-		zIndex: 1,
-	},
-	topRightFab2: {
-		position: 'absolute',
-		top: 60,
-		right: 20,
-		borderRadius: 25,
-		alignItems: 'center',
-		justifyContent: 'center',
-		zIndex: 1,
 	},
 	carouselContainer: {
 		marginBottom: 10,
