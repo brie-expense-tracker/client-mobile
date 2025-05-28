@@ -64,6 +64,13 @@ const dummyData: Transaction[] = [
 	},
 	{
 		id: '5',
+		description: 'Gym Renewal',
+		amount: 45,
+		date: '2025-05-28',
+		tags: ['Health'],
+	},
+	{
+		id: '5',
 		description: 'Gym Membership',
 		amount: 45,
 		date: '2025-03-15',
@@ -75,18 +82,31 @@ const dummyData: Transaction[] = [
 const dateFilterModes = [
 	{ label: 'Day', value: 'day', icon: 'calendar-outline' },
 	{ label: 'Month', value: 'month', icon: 'calendar' },
-	{ label: 'Year', value: 'year', icon: 'calendar-number' },
 ];
 
-const formatDate = (dateString: string) => {
-	if (!dateString) return 'All Dates';
-	const date = new Date(dateString);
-	return date.toLocaleDateString('en-US', {
+type DateInput = string | Date;
+
+const formatDate = (
+	input: DateInput,
+	locale = 'en-US',
+	options: Intl.DateTimeFormatOptions = {
 		weekday: 'long',
 		month: 'long',
 		day: 'numeric',
 		year: 'numeric',
-	});
+	}
+): string => {
+	// if you ever pass an empty string or nullish, treat as "All Dates"
+	if (!input) return 'All Dates';
+
+	// avoid reparsing a Date
+	const date =
+		typeof input === 'string' ? new Date(input + 'T00:00:00') : input;
+
+	// guard invalid parses (shouldn't happen with your ISO getter, but just in case)
+	if (isNaN(date.getTime())) return 'Invalid date';
+
+	return date.toLocaleDateString(locale, options);
 };
 
 const formatMonthHeader = (dateString: string) => {
@@ -97,11 +117,20 @@ const formatMonthHeader = (dateString: string) => {
 	});
 };
 
+const getLocalIsoDate = (): string => {
+	const today = new Date();
+	// Adjust for timezone offset to ensure we get the correct local date
+	const offset = today.getTimezoneOffset();
+	const localDate = new Date(today.getTime() - offset * 60 * 1000);
+	return localDate.toISOString().split('T')[0];
+};
+
 export default function TransactionScreen() {
 	const [selectedTag, setSelectedTag] = useState<string>('');
-	const [selectedDate, setSelectedDate] = useState<string>(
-		new Date().toISOString().split('T')[0]
-	);
+	const [selectedDate, setSelectedDate] = useState<string>(() => {
+		const today = getLocalIsoDate();
+		return today;
+	});
 	const [dateFilterMode, setDateFilterMode] = useState<string>('month');
 	const [modalVisible, setModalVisible] = useState(false);
 	const [activePicker, setActivePicker] = useState<
@@ -122,7 +151,6 @@ export default function TransactionScreen() {
 	// filter transactions
 	const filtered = useMemo(() => {
 		const filteredData = dummyData.filter((tx) => {
-			const txYear = tx.date.slice(0, 4);
 			const txMonth = tx.date.slice(5, 7);
 			const txDate = tx.date.slice(0, 10);
 			const tagMatch = selectedTag === '' || tx.tags.includes(selectedTag);
@@ -133,8 +161,6 @@ export default function TransactionScreen() {
 				dateMatch = txDate === selectedDate;
 			} else if (dateFilterMode === 'month' && txMonth) {
 				dateMatch = txMonth === txMonth;
-			} else if (dateFilterMode === 'year' && txYear) {
-				dateMatch = txYear === txYear;
 			}
 
 			return tagMatch && dateMatch;
@@ -348,7 +374,10 @@ export default function TransactionScreen() {
 					{/* Header */}
 					<View style={styles.headerContainer}>
 						<View style={styles.headerLeft}>
-							<TouchableOpacity onPress={() => router.back()}>
+							<TouchableOpacity
+								onPress={() => router.back()}
+								style={{ zIndex: 1000 }}
+							>
 								<Ionicons name="chevron-back-outline" size={36} color="#555" />
 							</TouchableOpacity>
 						</View>
