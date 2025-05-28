@@ -1,15 +1,15 @@
 {
 	"expo": {
-		"name": "clientMobile",
+		"name": "brie",
 		"slug": "clientMobile",
 		"version": "1.0.0",
 		"orientation": "portrait",
 		"scheme": "myapp",
 		"userInterfaceStyle": "automatic",
 		"newArchEnabled": true,
-		"icon": "./assets/images/splash-icon.png",
+		"icon": "./assets/images/brie-icon.svg",
 		"splash": {
-			"image": "./assets/images/brie-icon.png",
+			"image": "./assets/images/brie-icon.svg",
 			"resizeMode": "contain",
 			"backgroundColor": "#2BB252"
 		},
@@ -17,8 +17,8 @@
 			"supportsTablet": true,
 			"bundleIdentifier": "com.xamata.brie",
 			"icon": {
-				"dark": "./assets/images/brie-icon.png",
-				"light": "./assets/images/brie-icon.png"
+				"dark": "./assets/images/brie-icon.svg",
+				"light": "./assets/images/brie-icon.svg"
 			},
 			"infoPlist": {
 				"ITSAppUsesNonExemptEncryption": false
@@ -26,7 +26,7 @@
 		},
 		"android": {
 			"adaptiveIcon": {
-				"foregroundImage": "./assets/images/splash-icon.png",
+				"foregroundImage": "./assets/images/brie-icon.svg",
 				"backgroundColor": "#ffffff"
 			},
 			"package": "com.xamata.brie"
@@ -34,19 +34,19 @@
 		"web": {
 			"bundler": "metro",
 			"output": "static",
-			"favicon": "./assets/images/favicon.png"
+			"favicon": "./assets/images/brie-icon.svg"
 		},
 		"plugins": [
 			"expo-router",
 			[
 				"expo-splash-screen",
 				{
-					"image": "./assets/images/brie-icon.png",
+					"image": "./assets/images/brie-icon.svg",
 					"imageWidth": 150,
 					"resizeMode": "contain",
 					"backgroundColor": "#59A671",
 					"dark": {
-						"image": "./assets/images/splash-icon.png",
+						"image": "./assets/images/brie-icon.svg",
 						"imageWidth": 150,
 						"resizeMode": "contain",
 						"backgroundColor": "#000"
