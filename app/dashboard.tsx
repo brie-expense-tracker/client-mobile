@@ -33,68 +33,49 @@ const BalanceWidget = () => {
 	const totalBalance = totalIncome - totalExpense;
 
 	return (
-		<View
-			className="bg-green-700 p-6 h-52 rounded-3xl flex-col"
-			style={{
-				shadowColor: '#0f8a32',
-				shadowOffset: { width: 0, height: 4 },
-				shadowOpacity: 0.6,
-				shadowRadius: 15,
-				elevation: 5,
-			}}
-		>
+		<View style={styles.balanceContainer}>
 			{/* First Row */}
-			<View className="flex-row h-10">
-				<Text className="text-white font-semibold text-2xl self-start">
-					Total Profit
-				</Text>
-				<Text className="text-white text-2xl ml-auto">...</Text>
+			<View style={styles.headerRow}>
+				<Text style={styles.headerText}>Total Profit</Text>
+				{/* <Text style={styles.headerText}>...</Text> */}
 			</View>
 
 			{/* Second Row */}
-			<View className="flex-1">
-				<Text className="text-white font-semibold text-3xl text-left">
-					${totalBalance.toFixed(2)}
-				</Text>
+			<View style={styles.balanceRow}>
+				<Text style={styles.balanceText}>${totalBalance.toFixed(2)}</Text>
 			</View>
 			{/* Third Row */}
-			<View className="flex-row">
-				<View className="h-16 flex-col">
+			<View style={styles.statsRow}>
+				<View style={styles.statColumn}>
 					<View>
-						<View className="flex-row">
-							<View className="rounded-full bg-white/15 w-8 justify-center mr-1">
+						<View style={styles.statHeader}>
+							<View style={styles.iconContainer}>
 								<AntDesign
 									name="arrowup"
 									size={16}
 									color="white"
-									className="self-center"
+									style={styles.icon}
 								/>
 							</View>
-							<Text className="text-white/85 text-2xl font-semibold">
-								Income
-							</Text>
+							<Text style={styles.statLabel}>Income</Text>
 						</View>
-						<Text className="text-white font-semibold text-2xl">
-							${totalIncome.toFixed(2)}
-						</Text>
+						<Text style={styles.statValue}>${totalIncome.toFixed(2)}</Text>
 					</View>
 				</View>
-				<View className="h-16 flex-col ml-auto">
+				<View style={styles.statColumn}>
 					<View>
-						<View className="flex-row">
-							<View className="rounded-full bg-white/15 w-8 justify-center mr-1">
+						<View style={styles.statHeader}>
+							<View style={styles.iconContainer}>
 								<AntDesign
 									name="arrowdown"
 									size={16}
 									color="white"
-									className="self-center"
+									style={styles.icon}
 								/>
 							</View>
-							<Text className="text-white/85 text-2xl font-semibold">
-								Expense
-							</Text>
+							<Text style={styles.statLabel}>Expense</Text>
 						</View>
-						<Text className="text-white font-semibold text-2xl text-right">
+						<Text style={[styles.statValue, styles.statValueRight]}>
 							${totalExpense.toFixed(2)}
 						</Text>
 					</View>
@@ -157,7 +138,6 @@ const Dashboard = () => {
 		}
 	};
 
-	// Load dummy data
 	useEffect(() => {
 		setTransactions(dummyTransactions);
 	}, []);
@@ -167,57 +147,54 @@ const Dashboard = () => {
 	};
 
 	return (
-		// Main container
-		<View className="h-screen w-screen overflow-hidden">
-			{/* Background */}
-			<View className="w-[200%] h-[400px] -top-20 absolute bg-green-500 rounded-[50%] overflow-hidden self-center">
+		<View style={styles.mainContainer}>
+			<View style={styles.backgroundContainer}>
 				<LinearGradient
-					colors={['#59c076', '#36a255']}
+					colors={['#59c076', '#0a5b21']}
 					start={{ x: 0.1, y: 0 }}
 					end={{ x: 0.5, y: 0.9 }}
 				>
-					<View className="w-full h-full" />
+					<View style={styles.gradientContainer} />
 				</LinearGradient>
 			</View>
-			{/* Screen View */}
-			<SafeAreaView className="flex-1">
-				<ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-					<View className="justify-start w-full h-full p-6">
-						{/* Header */}
-						<View className="flex-row mb-4 justify-between items-center">
-							<View className="flex-col">
-								<Text className="text-white text-xl">Welcome back,</Text>
-								<Text className="text-white text-3xl font-bold">Max</Text>
+			<SafeAreaView style={styles.safeArea}>
+				<ScrollView
+					style={styles.scrollView}
+					showsVerticalScrollIndicator={false}
+				>
+					<View style={styles.contentContainer}>
+						<View style={styles.headerContainer}>
+							<View style={styles.headerTextContainer}>
+								<Text style={styles.welcomeText}>Welcome back,</Text>
+								<Text style={styles.nameText}>Max</Text>
 							</View>
 							<TouchableOpacity
 								onPress={() => router.push('/screens/profileScreen')}
-								className="w-12 h-12 rounded-full bg-white/20 items-center justify-center overflow-hidden"
+								style={styles.profileButton}
 							>
 								<Image
 									source={require('../assets/images/profile.jpg')}
-									className="w-12 h-12"
+									style={styles.profileImage}
 									resizeMode="cover"
 								/>
 							</TouchableOpacity>
 						</View>
 
-						{/* Main Content */}
-						<View className="w-full">
-							{/* Balance Widget */}
+						<View style={styles.mainContent}>
 							<BalanceWidget />
 
 							{/* <ProfitLossWidget /> */}
 
 							{/* Transactions History */}
-							<View className="mt-6 px-4">
-								<View className="flex-row justify-between items-center mb-4">
-									<Text className="text-lg font-semibold">
+							<View style={styles.transactionsContainer}>
+								<View style={styles.transactionsHeader}>
+									<Text style={styles.transactionsTitle}>
 										Transactions History
 									</Text>
 									<TouchableOpacity
 										onPress={() => router.push('/screens/transactionScreen')}
 									>
-										<Text className="text-green-600">See all</Text>
+										<Text style={styles.seeAllText}>See all</Text>
 									</TouchableOpacity>
 								</View>
 
@@ -228,24 +205,22 @@ const Dashboard = () => {
 									)
 									.slice(0, 6)
 									.map((transaction) => (
-										<View
-											key={transaction.id}
-											className="flex-row justify-between items-center bg-white p-4 rounded-lg mb-3 shadow-sm"
-										>
+										<View key={transaction.id} style={styles.transactionItem}>
 											<View>
-												<Text className="text-gray-800 font-semibold">
+												<Text style={styles.transactionDescription}>
 													{transaction.description}
 												</Text>
-												<Text className="text-gray-400">
+												<Text style={styles.transactionDate}>
 													{new Date(transaction.date).toLocaleDateString()}
 												</Text>
 											</View>
 											<Text
-												className={`font-semibold ${
+												style={[
+													styles.transactionAmount,
 													transaction.type === 'income'
-														? 'text-green-600'
-														: 'text-red-600'
-												}`}
+														? styles.incomeAmount
+														: styles.expenseAmount,
+												]}
 											>
 												{transaction.type === 'income' ? '+' : '-'} $
 												{transaction.amount.toFixed(2)}
@@ -257,22 +232,13 @@ const Dashboard = () => {
 					</View>
 				</ScrollView>
 
-				{/* Floating Action Button */}
 				<TouchableOpacity
 					onPress={() => setIsAddTransactionVisible(true)}
-					className="absolute bottom-6 left-1/2 bg-green-600 w-24 h-24 rounded-full items-center justify-center shadow-lg border-4 border-white"
-					style={{
-						shadowColor: '#000',
-						shadowOffset: { width: 0, height: 4 },
-						shadowOpacity: 0.3,
-						shadowRadius: 8,
-						elevation: 8,
-						transform: [{ translateX: -40 }], // Half of the width to center
-					}}
+					style={styles.fab}
 				>
 					<Image
 						source={require('../assets/images/brie-cheesecon.png')}
-						className="w-16 h-12"
+						style={styles.fabImage}
 						resizeMode="contain"
 					/>
 				</TouchableOpacity>
@@ -291,6 +257,141 @@ const Dashboard = () => {
 export default Dashboard;
 
 const styles = StyleSheet.create({
+	mainContainer: {
+		height: '100%',
+		width: '100%',
+		overflow: 'hidden',
+	},
+	backgroundContainer: {
+		width: '200%',
+		height: 400,
+		position: 'absolute',
+		top: -20,
+		backgroundColor: '#22c55e',
+		borderRadius: 50,
+		overflow: 'hidden',
+		alignSelf: 'center',
+	},
+	gradientContainer: {
+		width: '100%',
+		height: '100%',
+	},
+	safeArea: {
+		flex: 1,
+	},
+	scrollView: {
+		flex: 1,
+	},
+	contentContainer: {
+		justifyContent: 'flex-start',
+		width: '100%',
+		height: '100%',
+		padding: 24,
+	},
+	headerContainer: {
+		flexDirection: 'row',
+		marginBottom: 16,
+		justifyContent: 'space-between',
+		alignItems: 'center',
+	},
+	headerTextContainer: {
+		flexDirection: 'column',
+	},
+	welcomeText: {
+		color: 'white',
+		fontSize: 20,
+	},
+	nameText: {
+		color: 'white',
+		fontSize: 30,
+		fontWeight: 'bold',
+	},
+	profileButton: {
+		width: 48,
+		height: 48,
+		borderRadius: 24,
+		backgroundColor: 'rgba(255, 255, 255, 0.2)',
+		alignItems: 'center',
+		justifyContent: 'center',
+		overflow: 'hidden',
+	},
+	profileImage: {
+		width: 48,
+		height: 48,
+	},
+	mainContent: {
+		width: '100%',
+	},
+	transactionsContainer: {
+		marginTop: 24,
+		paddingHorizontal: 16,
+	},
+	transactionsHeader: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		marginBottom: 16,
+	},
+	transactionsTitle: {
+		fontSize: 18,
+		fontWeight: '600',
+	},
+	seeAllText: {
+		color: '#16a34a',
+	},
+	transactionItem: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		backgroundColor: 'white',
+		padding: 16,
+		borderRadius: 8,
+		marginBottom: 12,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.1,
+		shadowRadius: 2,
+		elevation: 2,
+	},
+	transactionDescription: {
+		color: '#1f2937',
+		fontWeight: '600',
+	},
+	transactionDate: {
+		color: '#9ca3af',
+	},
+	transactionAmount: {
+		fontWeight: '600',
+	},
+	incomeAmount: {
+		color: '#16a34a',
+	},
+	expenseAmount: {
+		color: '#dc2626',
+	},
+	fab: {
+		position: 'absolute',
+		bottom: 24,
+		left: '50%',
+		backgroundColor: '#16a34a',
+		width: 96,
+		height: 96,
+		borderRadius: 48,
+		alignItems: 'center',
+		justifyContent: 'center',
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.3,
+		shadowRadius: 8,
+		elevation: 8,
+		borderWidth: 4,
+		borderColor: 'white',
+		transform: [{ translateX: -40 }],
+	},
+	fabImage: {
+		width: 64,
+		height: 48,
+	},
 	modalOverlay: {
 		flex: 1,
 		backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -301,5 +402,71 @@ const styles = StyleSheet.create({
 		right: 0,
 		bottom: 0,
 		zIndex: 1,
+	},
+	balanceContainer: {
+		backgroundColor: '#0cac47', // green-700
+		padding: 24,
+		height: 208, // h-52
+		borderRadius: 24, // rounded-3xl
+		flexDirection: 'column',
+		shadowColor: '#0f8a32',
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.6,
+		shadowRadius: 15,
+		elevation: 5,
+	},
+	headerRow: {
+		flexDirection: 'row',
+		height: 40,
+	},
+	headerText: {
+		color: 'white',
+		fontWeight: '600',
+		fontSize: 24,
+	},
+	balanceRow: {
+		flex: 1,
+	},
+	balanceText: {
+		color: 'white',
+		fontWeight: '600',
+		fontSize: 30,
+		textAlign: 'left',
+	},
+	statsRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+	},
+	statColumn: {
+		height: 64,
+		flexDirection: 'column',
+	},
+	statHeader: {
+		flexDirection: 'row',
+	},
+	iconContainer: {
+		backgroundColor: 'rgba(255, 255, 255, 0.15)',
+		width: 32,
+		justifyContent: 'center',
+		marginRight: 4,
+		borderRadius: 9999,
+	},
+	icon: {
+		alignSelf: 'center',
+	},
+	statLabel: {
+		color: 'rgba(255, 255, 255, 0.85)',
+		fontSize: 20,
+		fontWeight: '600',
+		marginBottom: 4,
+		paddingVertical: 2,
+	},
+	statValue: {
+		color: 'white',
+		// fontWeight: '6',
+		fontSize: 24,
+	},
+	statValueRight: {
+		textAlign: 'right',
 	},
 });
