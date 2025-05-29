@@ -6,7 +6,7 @@ const Index = () => {
 	if (!isOnboardingCompleted) {
 		return <Redirect href="/onboardingTwo" />;
 	}
-	return <Redirect href="/dashboard" />;
+	return <Redirect href="/(tabs)/dashboard" />;
 };
 
 export default Index;

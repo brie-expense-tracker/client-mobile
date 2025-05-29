@@ -345,12 +345,12 @@ export default function TransactionScreen() {
 					{/* Header */}
 					<View style={styles.headerContainer}>
 						<View style={styles.headerLeft}>
-							<TouchableOpacity
+							{/* <TouchableOpacity
 								onPress={() => router.back()}
 								style={{ zIndex: 1000 }}
 							>
 								<Ionicons name="chevron-back-outline" size={36} color="#555" />
-							</TouchableOpacity>
+							</TouchableOpacity> */}
 						</View>
 						<Text style={styles.headerTitle}>History</Text>
 						<View style={styles.headerRight}>
