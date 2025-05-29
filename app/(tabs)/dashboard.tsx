@@ -232,7 +232,7 @@ const Dashboard = () => {
 					</View>
 				</ScrollView>
 
-				<TouchableOpacity
+				{/* <TouchableOpacity
 					onPress={() => setIsAddTransactionVisible(true)}
 					style={styles.fab}
 				>
@@ -241,7 +241,7 @@ const Dashboard = () => {
 						style={styles.fabImage}
 						resizeMode="contain"
 					/>
-				</TouchableOpacity>
+				</TouchableOpacity> */}
 
 				{isAddTransactionVisible && <View style={styles.modalOverlay} />}
 

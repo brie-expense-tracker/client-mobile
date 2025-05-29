@@ -130,12 +130,12 @@ const addTransactionScreen = () => {
 			<SafeAreaView style={styles.safeArea} edges={['top']}>
 				<View style={styles.mainContainer}>
 					<View style={styles.topContainer}>
-						<TouchableOpacity
+						{/* <TouchableOpacity
 							style={styles.closeButton}
 							onPress={() => router.back()}
 						>
 							<Ionicons name="close" size={24} color="#000" />
-						</TouchableOpacity>
+						</TouchableOpacity> */}
 						<View style={styles.inputAmountContainer}>
 							<FontAwesome
 								name="dollar"
@@ -393,10 +393,10 @@ const styles = StyleSheet.create({
 	},
 
 	topNumPadContainer: {
-		backgroundColor: '#d0d3da',
+		// backgroundColor: '#000000',
 		padding: 5,
 		paddingTop: 10,
-		paddingBottom: 40,
+		// paddingBottom: 40,
 	},
 
 	numPadContainer: {
@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 		alignItems: 'center',
 		margin: 5,
-		backgroundColor: '#ffffff',
+		// backgroundColor: '#ffffff',
 		borderRadius: 5,
 	},
 	buttonNumDark: {
@@ -417,12 +417,12 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 		alignItems: 'center',
 		margin: 5,
-		backgroundColor: '#a8b1ba',
+		// backgroundColor: '#a8b1ba',
 		borderRadius: 5,
 	},
 	buttonText: {
-		fontSize: 24,
-		color: '#333',
+		fontSize: 28,
+		color: '#212121',
 	},
 	numPadRow: {
 		flexDirection: 'row',
