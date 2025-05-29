@@ -7,6 +7,7 @@ import {
 	Platform,
 	SafeAreaView,
 	Image,
+	StyleSheet,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, Stack } from 'expo-router';
@@ -17,6 +18,7 @@ import {
 import ProfitLossGraph from './components/ProfitLossGraph';
 import ProfitGraph from './components/ProfitGraph';
 import AntDesign from '@expo/vector-icons/AntDesign';
+import AddTransaction from './components/AddTransaction';
 
 const BalanceWidget = () => {
 	// Calculate totals from dummy transactions
@@ -132,6 +134,7 @@ const ProfitLossWidget = () => {
 
 const Dashboard = () => {
 	const [transactions, setTransactions] = useState<Transaction[]>([]);
+	const [isAddTransactionVisible, setIsAddTransactionVisible] = useState(false);
 	const [formData, setFormData] = useState({
 		category: '',
 		amount: '',
@@ -256,12 +259,7 @@ const Dashboard = () => {
 
 				{/* Floating Action Button */}
 				<TouchableOpacity
-					onPress={() =>
-						router.replace({
-							pathname: '/screens/trackerScreen',
-							params: { presentation: 'modal' },
-						})
-					}
+					onPress={() => setIsAddTransactionVisible(true)}
 					className="absolute bottom-6 left-1/2 bg-green-600 w-24 h-24 rounded-full items-center justify-center shadow-lg border-4 border-white"
 					style={{
 						shadowColor: '#000',
@@ -278,9 +276,30 @@ const Dashboard = () => {
 						resizeMode="contain"
 					/>
 				</TouchableOpacity>
+
+				{isAddTransactionVisible && <View style={styles.modalOverlay} />}
+
+				<AddTransaction
+					visible={isAddTransactionVisible}
+					onClose={() => setIsAddTransactionVisible(false)}
+				/>
 			</SafeAreaView>
 		</View>
 	);
 };
 
 export default Dashboard;
+
+const styles = StyleSheet.create({
+	modalOverlay: {
+		flex: 1,
+		backgroundColor: 'rgba(0, 0, 0, 0.5)',
+		justifyContent: 'flex-end',
+		position: 'absolute',
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
+		zIndex: 1,
+	},
+});
