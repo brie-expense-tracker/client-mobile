@@ -7,14 +7,17 @@ import {
 	Alert,
 	TouchableOpacity,
 	ScrollView,
-	Image,
+	Modal,
 	Pressable,
 } from 'react-native';
 import axios from 'axios';
-import MonthYearDayPickerModal from '../components/MonthYearDayPickerModal';
 import { Ionicons, FontAwesome } from '@expo/vector-icons';
-import { Link, useRouter, Stack } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+
+interface AddTransactionProps {
+	visible: boolean;
+	onClose: () => void;
+}
 
 interface FloatingActionButtonProps {
 	color: string;
@@ -22,14 +25,10 @@ interface FloatingActionButtonProps {
 	onPress?: () => void;
 }
 
-interface AddTransactionScreenProps {
-	visible: boolean;
-	onClose: () => void;
-}
-
-//
-//  FUNCTIONS START===============================================
-const addTransactionScreen = () => {
+const AddTransaction: React.FC<AddTransactionProps> = ({
+	visible,
+	onClose,
+}) => {
 	const [transaction, setTransaction] = useState({
 		type: 'income',
 		description: '',
@@ -68,7 +67,7 @@ const addTransactionScreen = () => {
 				date: new Date().toISOString().split('T')[0],
 			});
 			Alert.alert('Success', 'Transaction saved successfully!');
-			router.back();
+			onClose();
 		} catch (error) {
 			console.error('Error saving transaction:', error);
 			Alert.alert('Error', 'Failed to save transaction');
@@ -90,7 +89,7 @@ const addTransactionScreen = () => {
 				date: new Date().toISOString().split('T')[0],
 			});
 			Alert.alert('Success', 'Transaction saved successfully!');
-			router.back();
+			onClose();
 		} catch (error) {
 			console.error('Error saving transaction:', error);
 			Alert.alert('Error', 'Failed to save transaction');
@@ -112,113 +111,107 @@ const addTransactionScreen = () => {
 		setTransaction({ ...transaction, category: category });
 	};
 
-	//
-	// MAIN COMPONENT===============================================
 	return (
-		<View style={styles.container}>
-			<Stack.Screen
-				options={{
-					headerShown: false,
-					// presentation: 'modal',
-					gestureEnabled: true,
-					// gestureDirection: 'vertical',
-					contentStyle: {
-						backgroundColor: 'transparent',
-					},
-				}}
-			/>
-			<SafeAreaView style={styles.safeArea} edges={['top']}>
-				<View style={styles.mainContainer}>
-					<View style={styles.topContainer}>
-						<TouchableOpacity
-							style={styles.closeButton}
-							onPress={() => router.back()}
-						>
-							<Ionicons name="close" size={24} color="#000" />
-						</TouchableOpacity>
-						<View style={styles.inputAmountContainer}>
-							<FontAwesome
-								name="dollar"
-								size={24}
-								color="black"
-								style={styles.dollarIcon}
-							/>
-							<TextInput
-								ref={amountInputRef}
-								style={styles.inputAmount}
-								placeholder="0"
-								placeholderTextColor={'#000000'}
-								value={transaction.amount}
-								onChangeText={(text) =>
-									setTransaction({ ...transaction, amount: text })
-								}
-								showSoftInputOnFocus={false}
-							/>
-						</View>
-						<View style={styles.carouselContainer}>
-							<ScrollView horizontal showsHorizontalScrollIndicator={false}>
-								{mockTags.map((category, index) => (
+		<Modal
+			visible={visible}
+			animationType="slide"
+			transparent={true}
+			onRequestClose={onClose}
+		>
+			<View style={styles.modalOverlay}>
+				<View style={styles.modalContent}>
+					<View style={styles.handle} />
+					<View style={styles.mainContainer}>
+						<View style={styles.topContainer}>
+							<TouchableOpacity style={styles.closeButton} onPress={onClose}>
+								<Ionicons name="close" size={24} color="#000" />
+							</TouchableOpacity>
+							<View style={styles.inputAmountContainer}>
+								<FontAwesome
+									name="dollar"
+									size={24}
+									color="black"
+									style={styles.dollarIcon}
+								/>
+								<TextInput
+									ref={amountInputRef}
+									style={styles.inputAmount}
+									placeholder="0"
+									placeholderTextColor={'#000000'}
+									value={transaction.amount}
+									onChangeText={(text) =>
+										setTransaction({ ...transaction, amount: text })
+									}
+									showSoftInputOnFocus={false}
+								/>
+							</View>
+							<View style={styles.carouselContainer}>
+								<ScrollView horizontal showsHorizontalScrollIndicator={false}>
+									{mockTags.map((category, index) => (
+										<TouchableOpacity
+											key={index}
+											onPress={() => toggleCategorySelection(category)}
+											style={[
+												styles.carouselText,
+												selectedCategory === category && styles.selectedTag,
+											]}
+										>
+											<Text>{category}</Text>
+										</TouchableOpacity>
+									))}
 									<TouchableOpacity
-										key={index}
-										onPress={() => toggleCategorySelection(category)}
-										style={[
-											styles.carouselText,
-											selectedCategory === category && styles.selectedTag,
-										]}
+										onPress={() => console.log('Add Category Pressed')}
+										style={styles.addCategoryButton}
 									>
-										<Text>{category}</Text>
+										<Ionicons
+											name="add-circle-outline"
+											size={24}
+											color="grey"
+										/>
 									</TouchableOpacity>
-								))}
-								<TouchableOpacity
-									onPress={() => console.log('Add Category Pressed')}
-									style={styles.addCategoryButton}
-								>
-									<Ionicons name="add-circle-outline" size={24} color="grey" />
-								</TouchableOpacity>
-							</ScrollView>
-						</View>
-						<TextInput
-							style={styles.inputDescription}
-							placeholder="What's this for?"
-							placeholderTextColor={'#a3a3a3'}
-							value={transaction.description}
-							onChangeText={(text) =>
-								setTransaction({ ...transaction, description: text })
-							}
-						/>
+								</ScrollView>
+							</View>
+							<TextInput
+								style={styles.inputDescription}
+								placeholder="What's this for?"
+								placeholderTextColor={'#a3a3a3'}
+								value={transaction.description}
+								onChangeText={(text) =>
+									setTransaction({ ...transaction, description: text })
+								}
+							/>
 
-						<View style={styles.fabsContainer}>
-							<View style={styles.fabContainer}>
-								<FloatingActionButton
-									name="Spent"
-									color="#4fa166"
-									onPress={handleSpentSubmit}
-								/>
-							</View>
-							<View style={styles.fabContainer}>
-								<FloatingActionButton
-									name="Made"
-									color="#429c5b"
-									onPress={handleMadeSubmit}
-								/>
+							<View style={styles.fabsContainer}>
+								<View style={styles.fabContainer}>
+									<FloatingActionButton
+										name="Spent"
+										color="#4fa166"
+										onPress={handleSpentSubmit}
+									/>
+								</View>
+								<View style={styles.fabContainer}>
+									<FloatingActionButton
+										name="Made"
+										color="#429c5b"
+										onPress={handleMadeSubmit}
+									/>
+								</View>
 							</View>
 						</View>
-					</View>
-					<View style={styles.topNumPadContainer}>
-						<NumberPad
-							onValueChange={(value: string) =>
-								setTransaction((prev) => ({ ...prev, amount: value }))
-							}
-						/>
+						<View style={styles.topNumPadContainer}>
+							<NumberPad
+								onValueChange={(value: string) =>
+									setTransaction((prev) => ({ ...prev, amount: value }))
+								}
+							/>
+						</View>
 					</View>
 				</View>
-			</SafeAreaView>
-		</View>
+			</View>
+		</Modal>
 	);
 };
 
-//
-// FAB COMPONENT===============================================
 const FloatingActionButton: React.FC<
 	FloatingActionButtonProps & { onPress?: () => void }
 > = ({ color, name, onPress = () => console.log(`${name} FAB Pressed`) }) => (
@@ -232,8 +225,6 @@ const FloatingActionButton: React.FC<
 	</TouchableOpacity>
 );
 
-//
-// NUMBER PAD COMPONENT===============================================
 const NumberPad: React.FC<{ onValueChange: (value: string) => void }> = ({
 	onValueChange,
 }) => {
@@ -244,9 +235,9 @@ const NumberPad: React.FC<{ onValueChange: (value: string) => void }> = ({
 			let newValue = prev + num;
 			if (newValue.includes('.')) {
 				const [integer, decimal] = newValue.split('.');
-				newValue = integer + '.' + decimal.slice(0, 2); // Limit to 2 decimal places
+				newValue = integer + '.' + decimal.slice(0, 2);
 			}
-			newValue = newValue.slice(-9); // Limit to 9 characters total
+			newValue = newValue.slice(-9);
 			onValueChange(newValue);
 			return newValue;
 		});
@@ -320,11 +311,26 @@ const NumberPad: React.FC<{ onValueChange: (value: string) => void }> = ({
 };
 
 const styles = StyleSheet.create({
-	container: {
+	modalOverlay: {
 		flex: 1,
-		backgroundColor: '#f9f9f9',
+		justifyContent: 'flex-end',
 	},
-	safeArea: {
+	modalContent: {
+		backgroundColor: '#f9f9f9',
+		borderTopLeftRadius: 20,
+		borderTopRightRadius: 20,
+		height: '90%',
+	},
+	handle: {
+		width: 40,
+		height: 5,
+		backgroundColor: '#d0d3da',
+		borderRadius: 3,
+		alignSelf: 'center',
+		marginTop: 10,
+		marginBottom: 10,
+	},
+	container: {
 		flex: 1,
 		backgroundColor: '#f9f9f9',
 	},
@@ -360,7 +366,6 @@ const styles = StyleSheet.create({
 		fontSize: 80,
 		fontWeight: 'bold',
 		textAlign: 'left',
-		// minWidth: 160,
 	},
 	inputDescription: {
 		height: 50,
@@ -371,10 +376,6 @@ const styles = StyleSheet.create({
 		borderWidth: 1,
 		marginBottom: 10,
 		paddingLeft: 8,
-	},
-	success: {
-		color: 'green',
-		marginTop: 10,
 	},
 	fabsContainer: {
 		flexDirection: 'row',
@@ -391,14 +392,12 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 		borderRadius: 24,
 	},
-
 	topNumPadContainer: {
 		backgroundColor: '#d0d3da',
 		padding: 5,
 		paddingTop: 10,
 		paddingBottom: 40,
 	},
-
 	numPadContainer: {
 		justifyContent: 'center',
 	},
@@ -450,4 +449,4 @@ const styles = StyleSheet.create({
 	},
 });
 
-export default addTransactionScreen;
+export default AddTransaction;
