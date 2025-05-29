@@ -14,11 +14,11 @@ import { router, Stack } from 'expo-router';
 import {
 	Transaction,
 	transactions as dummyTransactions,
-} from './data/transactions';
-import ProfitLossGraph from './components/ProfitLossGraph';
-import ProfitGraph from './components/ProfitGraph';
+} from '../data/transactions';
+import ProfitLossGraph from '../components/ProfitLossGraph';
+import ProfitGraph from '../components/ProfitGraph';
 import AntDesign from '@expo/vector-icons/AntDesign';
-import AddTransaction from './components/AddTransaction';
+import AddTransaction from '../components/AddTransaction';
 
 const BalanceWidget = () => {
 	// Calculate totals from dummy transactions
@@ -169,11 +169,11 @@ const Dashboard = () => {
 								<Text style={styles.nameText}>Max</Text>
 							</View>
 							<TouchableOpacity
-								onPress={() => router.push('/screens/profileScreen')}
+								onPress={() => router.push('/(tabs)/profileScreen')}
 								style={styles.profileButton}
 							>
 								<Image
-									source={require('../assets/images/profile.jpg')}
+									source={require('../../assets/images/profile.jpg')}
 									style={styles.profileImage}
 									resizeMode="cover"
 								/>
@@ -192,7 +192,7 @@ const Dashboard = () => {
 										Transactions History
 									</Text>
 									<TouchableOpacity
-										onPress={() => router.push('/screens/transactionScreen')}
+										onPress={() => router.push('/(tabs)/transactionScreen')}
 									>
 										<Text style={styles.seeAllText}>See all</Text>
 									</TouchableOpacity>
@@ -237,7 +237,7 @@ const Dashboard = () => {
 					style={styles.fab}
 				>
 					<Image
-						source={require('../assets/images/brie-cheesecon.png')}
+						source={require('../../assets/images/brie-cheesecon.png')}
 						style={styles.fabImage}
 						resizeMode="contain"
 					/>
