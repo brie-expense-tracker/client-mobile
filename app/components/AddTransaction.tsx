@@ -10,6 +10,17 @@ import {
 	Modal,
 	Pressable,
 } from 'react-native';
+import {
+	GestureHandlerRootView,
+	PanGestureHandler,
+} from 'react-native-gesture-handler';
+import Animated, {
+	useAnimatedGestureHandler,
+	useAnimatedStyle,
+	useSharedValue,
+	withSpring,
+	runOnJS,
+} from 'react-native-reanimated';
 import axios from 'axios';
 import { Ionicons, FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -29,6 +40,7 @@ const AddTransaction: React.FC<AddTransactionProps> = ({
 	visible,
 	onClose,
 }) => {
+	const translateY = useSharedValue(0);
 	const [transaction, setTransaction] = useState({
 		type: 'income',
 		description: '',
@@ -42,6 +54,12 @@ const AddTransaction: React.FC<AddTransactionProps> = ({
 	const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
 	useEffect(() => {
+		if (visible) {
+			translateY.value = 0;
+		}
+	}, [visible]);
+
+	useEffect(() => {
 		if (amountInputRef.current) {
 			amountInputRef.current.setNativeProps({
 				selection: {
@@ -51,6 +69,29 @@ const AddTransaction: React.FC<AddTransactionProps> = ({
 			});
 		}
 	}, [transaction.amount]);
+
+	const gestureHandler = useAnimatedGestureHandler({
+		onStart: (_, ctx: any) => {
+			ctx.startY = translateY.value;
+		},
+		onActive: (event, ctx) => {
+			translateY.value = ctx.startY + event.translationY;
+		},
+		onEnd: (event) => {
+			if (event.velocityY > 500 || event.translationY > 100) {
+				translateY.value = withSpring(1000);
+				runOnJS(onClose)();
+			} else {
+				translateY.value = withSpring(0);
+			}
+		},
+	});
+
+	const animatedStyle = useAnimatedStyle(() => {
+		return {
+			transform: [{ translateY: translateY.value }],
+		};
+	});
 
 	const handleMadeSubmit = async () => {
 		try {
@@ -118,96 +159,106 @@ const AddTransaction: React.FC<AddTransactionProps> = ({
 			transparent={true}
 			onRequestClose={onClose}
 		>
-			<View style={styles.modalOverlay}>
-				<View style={styles.modalContent}>
-					<View style={styles.handle} />
-					<View style={styles.mainContainer}>
-						<View style={styles.topContainer}>
-							<TouchableOpacity style={styles.closeButton} onPress={onClose}>
-								<Ionicons name="close" size={24} color="#000" />
-							</TouchableOpacity>
-							<View style={styles.inputAmountContainer}>
-								<FontAwesome
-									name="dollar"
-									size={24}
-									color="black"
-									style={styles.dollarIcon}
-								/>
-								<TextInput
-									ref={amountInputRef}
-									style={styles.inputAmount}
-									placeholder="0"
-									placeholderTextColor={'#000000'}
-									value={transaction.amount}
-									onChangeText={(text) =>
-										setTransaction({ ...transaction, amount: text })
-									}
-									showSoftInputOnFocus={false}
-								/>
-							</View>
-							<View style={styles.carouselContainer}>
-								<ScrollView horizontal showsHorizontalScrollIndicator={false}>
-									{mockTags.map((category, index) => (
-										<TouchableOpacity
-											key={index}
-											onPress={() => toggleCategorySelection(category)}
-											style={[
-												styles.carouselText,
-												selectedCategory === category && styles.selectedTag,
-											]}
-										>
-											<Text>{category}</Text>
-										</TouchableOpacity>
-									))}
+			<GestureHandlerRootView style={{ flex: 1 }}>
+				<View style={styles.modalOverlay}>
+					<PanGestureHandler onGestureEvent={gestureHandler}>
+						<Animated.View style={[styles.modalContent, animatedStyle]}>
+							<View style={styles.handle} />
+							<View style={styles.mainContainer}>
+								<View style={styles.topContainer}>
 									<TouchableOpacity
-										onPress={() => console.log('Add Category Pressed')}
-										style={styles.addCategoryButton}
+										style={styles.closeButton}
+										onPress={onClose}
 									>
-										<Ionicons
-											name="add-circle-outline"
-											size={24}
-											color="grey"
-										/>
+										<Ionicons name="close" size={24} color="#000" />
 									</TouchableOpacity>
-								</ScrollView>
-							</View>
-							<TextInput
-								style={styles.inputDescription}
-								placeholder="What's this for?"
-								placeholderTextColor={'#a3a3a3'}
-								value={transaction.description}
-								onChangeText={(text) =>
-									setTransaction({ ...transaction, description: text })
-								}
-							/>
+									<View style={styles.inputAmountContainer}>
+										<FontAwesome
+											name="dollar"
+											size={24}
+											color="black"
+											style={styles.dollarIcon}
+										/>
+										<TextInput
+											ref={amountInputRef}
+											style={styles.inputAmount}
+											placeholder="0"
+											placeholderTextColor={'#000000'}
+											value={transaction.amount}
+											onChangeText={(text) =>
+												setTransaction({ ...transaction, amount: text })
+											}
+											showSoftInputOnFocus={false}
+										/>
+									</View>
+									<View style={styles.carouselContainer}>
+										<ScrollView
+											horizontal
+											showsHorizontalScrollIndicator={false}
+										>
+											{mockTags.map((category, index) => (
+												<TouchableOpacity
+													key={index}
+													onPress={() => toggleCategorySelection(category)}
+													style={[
+														styles.carouselText,
+														selectedCategory === category && styles.selectedTag,
+													]}
+												>
+													<Text>{category}</Text>
+												</TouchableOpacity>
+											))}
+											<TouchableOpacity
+												onPress={() => console.log('Add Category Pressed')}
+												style={styles.addCategoryButton}
+											>
+												<Ionicons
+													name="add-circle-outline"
+													size={24}
+													color="grey"
+												/>
+											</TouchableOpacity>
+										</ScrollView>
+									</View>
+									<TextInput
+										style={styles.inputDescription}
+										placeholder="What's this for?"
+										placeholderTextColor={'#a3a3a3'}
+										value={transaction.description}
+										onChangeText={(text) =>
+											setTransaction({ ...transaction, description: text })
+										}
+									/>
 
-							<View style={styles.fabsContainer}>
-								<View style={styles.fabContainer}>
-									<FloatingActionButton
-										name="Spent"
-										color="#4fa166"
-										onPress={handleSpentSubmit}
-									/>
+									<View style={styles.fabsContainer}>
+										<View style={styles.fabContainer}>
+											<FloatingActionButton
+												name="Spent"
+												color="#4fa166"
+												onPress={handleSpentSubmit}
+											/>
+										</View>
+										<View style={styles.fabContainer}>
+											<FloatingActionButton
+												name="Made"
+												color="#429c5b"
+												onPress={handleMadeSubmit}
+											/>
+										</View>
+									</View>
 								</View>
-								<View style={styles.fabContainer}>
-									<FloatingActionButton
-										name="Made"
-										color="#429c5b"
-										onPress={handleMadeSubmit}
+								<View style={styles.topNumPadContainer}>
+									<NumberPad
+										onValueChange={(value: string) =>
+											setTransaction((prev) => ({ ...prev, amount: value }))
+										}
 									/>
 								</View>
 							</View>
-						</View>
-						<View style={styles.topNumPadContainer}>
-							<NumberPad
-								onValueChange={(value: string) =>
-									setTransaction((prev) => ({ ...prev, amount: value }))
-								}
-							/>
-						</View>
-					</View>
+						</Animated.View>
+					</PanGestureHandler>
 				</View>
-			</View>
+			</GestureHandlerRootView>
 		</Modal>
 	);
 };
