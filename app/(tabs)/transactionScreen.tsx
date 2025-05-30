@@ -1,5 +1,5 @@
 // transactionScreen.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
 	View,
 	Text,
@@ -9,7 +9,6 @@ import {
 	Dimensions,
 	Modal,
 	TouchableWithoutFeedback,
-	Animated,
 	StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +21,11 @@ import { Transaction, transactions as dummyData } from '../data/transactions';
 
 type RootStackParamList = {
 	Tracker: undefined;
+	historyFilterScreen: {
+		selectedTag: string;
+		dateFilterMode: string;
+		allTags: string[];
+	};
 };
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -87,42 +91,107 @@ const getLocalIsoDate = (): string => {
 };
 
 export default function TransactionScreen() {
-	const [selectedTag, setSelectedTag] = useState<string>('');
-	const [selectedDate, setSelectedDate] = useState<string>(() => {
-		const today = getLocalIsoDate();
-		return today;
-	});
+	const [selectedTags, setSelectedTags] = useState<string[]>([]);
 	const [dateFilterMode, setDateFilterMode] = useState<string>('month');
+	const [selectedDate, setSelectedDate] = useState<string>(() => {
+		// Get the most recent transaction date instead of today
+		const dates = dummyData.map((tx) => tx.date);
+		return dates.sort().reverse()[0]; // Get the most recent date
+	});
 	const [modalVisible, setModalVisible] = useState(false);
 	const [activePicker, setActivePicker] = useState<
 		'calendar' | 'dateMode' | null
 	>(null);
 	const [tempSelection, setTempSelection] = useState<string>('');
 	const navigation = useNavigation<NavigationProp>();
-	const [isDropdownVisible, setIsDropdownVisible] = useState(false);
-	const dropdownAnimation = useState(new Animated.Value(0))[0];
 
 	// derive unique tags from data
 	const allTags = useMemo(() => {
 		const tagSet = new Set<string>();
-		dummyData.forEach((tx) => tx.tags.forEach((t) => tagSet.add(t)));
-		return Array.from(tagSet);
+		dummyData.forEach((tx) => {
+			// Make sure tx.tags exists and is an array
+			if (tx.tags && Array.isArray(tx.tags)) {
+				tx.tags.forEach((tag) => {
+					if (typeof tag === 'string' && tag.trim()) {
+						tagSet.add(tag.trim());
+					}
+				});
+			}
+		});
+		// Convert to array and sort alphabetically
+		return Array.from(tagSet).sort((a, b) => a.localeCompare(b));
 	}, []);
+
+	const handleFilterPress = () => {
+		router.push({
+			pathname: '/screens/historyFilterScreen',
+			params: {
+				selectedTags: JSON.stringify(selectedTags),
+				dateFilterMode,
+				allTags: JSON.stringify(allTags),
+			},
+		});
+	};
+
+	// Add this effect to handle filter changes
+	useEffect(() => {
+		const unsubscribe = navigation.addListener('focus', () => {
+			const params = navigation
+				.getState()
+				.routes.find((r) => r.name === 'historyFilterScreen')?.params as
+				| {
+						selectedTags?: string;
+						dateFilterMode?: string;
+						allTags?: string;
+				  }
+				| undefined;
+
+			if (params) {
+				if (params.selectedTags !== undefined) {
+					setSelectedTags(JSON.parse(params.selectedTags));
+				}
+				if (params.dateFilterMode !== undefined) {
+					setDateFilterMode(params.dateFilterMode);
+				}
+				// If we have a date filter mode, we should update the selected date
+				if (params.dateFilterMode === 'month') {
+					// Get the most recent transaction date for the current month
+					const dates = dummyData
+						.filter((tx) =>
+							tx.date.startsWith(new Date().toISOString().slice(0, 7))
+						)
+						.map((tx) => tx.date);
+					if (dates.length > 0) {
+						setSelectedDate(dates.sort().reverse()[0]);
+					}
+				}
+			}
+		});
+
+		return unsubscribe;
+	}, [navigation]);
 
 	// filter transactions
 	const filtered = useMemo(() => {
 		const filteredData = dummyData.filter((tx) => {
-			const txMonth = tx.date.slice(5, 7);
-			const txDate = tx.date.slice(0, 10);
-			const tagMatch = selectedTag === '' || tx.tags.includes(selectedTag);
+			const txDate = tx.date.slice(0, 10); // YYYY-MM-DD
+			const txMonth = tx.date.slice(0, 7); // YYYY-MM
+
+			// Check if transaction has any of the selected tags
+			// If no tags are selected, show all transactions
+			const tagMatch =
+				selectedTags.length === 0 ||
+				(tx.tags && tx.tags.some((tag) => selectedTags.includes(tag)));
 
 			// Apply date filtering based on mode
 			let dateMatch = true;
 			if (dateFilterMode === 'day' && selectedDate) {
 				dateMatch = txDate === selectedDate;
-			} else if (dateFilterMode === 'month' && txMonth) {
-				dateMatch = txMonth === txMonth;
 			}
+			// Remove month filtering when in month mode to show all months
+			// else if (dateFilterMode === 'month' && selectedDate) {
+			// 	dateMatch = txMonth === selectedDate.slice(0, 7);
+			// }
 
 			return tagMatch && dateMatch;
 		});
@@ -131,7 +200,7 @@ export default function TransactionScreen() {
 		return filteredData.sort(
 			(a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
 		);
-	}, [selectedTag, selectedDate, dateFilterMode]);
+	}, [selectedTags, selectedDate, dateFilterMode]);
 
 	// Group transactions by month
 	const groupedTransactions = useMemo(() => {
@@ -145,10 +214,13 @@ export default function TransactionScreen() {
 			groups[monthKey].push(transaction);
 		});
 
-		return Object.entries(groups).map(([monthKey, transactions]) => ({
-			monthKey,
-			transactions,
-		}));
+		// Sort months in descending order
+		return Object.entries(groups)
+			.sort(([a], [b]) => b.localeCompare(a))
+			.map(([monthKey, transactions]) => ({
+				monthKey,
+				transactions,
+			}));
 	}, [filtered]);
 
 	const handlePickerPress = (picker: 'calendar' | 'dateMode') => {
@@ -161,136 +233,14 @@ export default function TransactionScreen() {
 		}
 	};
 
-	const toggleDropdown = () => {
-		const toValue = isDropdownVisible ? 0 : 1;
-		Animated.timing(dropdownAnimation, {
-			toValue,
-			duration: 300,
-			useNativeDriver: true,
-		}).start();
-		setIsDropdownVisible(!isDropdownVisible);
-		StatusBar.setHidden(!isDropdownVisible);
-	};
-
-	const handleFilterPress = () => {
-		toggleDropdown();
-	};
-
 	const handleDateModeSelect = (value: string) => {
 		setDateFilterMode(value);
-		toggleDropdown();
 	};
 
 	const handleCalendarDayPress = (day: { dateString: string }) => {
 		setSelectedDate(day.dateString);
 		setModalVisible(false);
 		setActivePicker(null);
-	};
-
-	const renderDropdown = () => {
-		const translateY = dropdownAnimation.interpolate({
-			inputRange: [0, 1],
-			outputRange: [-400, 0],
-		});
-
-		return (
-			<Animated.View
-				style={[
-					styles.dropdown,
-					{
-						transform: [{ translateY }],
-					},
-				]}
-			>
-				<View style={styles.dropdownBackground} />
-				<SafeAreaView style={styles.dropdownContent}>
-					<View style={styles.dropdownHeader}>
-						<Text style={styles.dropdownTitle}>Filters</Text>
-						<TouchableOpacity
-							onPress={toggleDropdown}
-							style={styles.closeButton}
-						>
-							<Ionicons name="close" size={24} color="#666" />
-						</TouchableOpacity>
-					</View>
-					<View style={styles.filterModeList}>
-						{dateFilterModes.map((mode) => (
-							<TouchableOpacity
-								key={mode.value}
-								style={[
-									styles.filterModeItem,
-									dateFilterMode === mode.value &&
-										styles.filterModeItemSelected,
-								]}
-								onPress={() => handleDateModeSelect(mode.value)}
-							>
-								<Ionicons
-									name={mode.icon as any}
-									size={24}
-									color={dateFilterMode === mode.value ? '#fff' : '#555'}
-								/>
-								<Text
-									style={[
-										styles.filterModeText,
-										dateFilterMode === mode.value &&
-											styles.filterModeTextSelected,
-									]}
-								>
-									{mode.label}
-								</Text>
-							</TouchableOpacity>
-						))}
-					</View>
-
-					<View style={styles.dropdownDivider} />
-
-					<View style={styles.dropdownSection}>
-						<Text style={styles.dropdownSectionTitle}>Filter by Tags</Text>
-						<View style={styles.tagList}>
-							<TouchableOpacity
-								style={[
-									styles.tagItem,
-									selectedTag === '' && styles.tagItemSelected,
-								]}
-								onPress={() => {
-									setSelectedTag('');
-								}}
-							>
-								<Text
-									style={[
-										styles.tagText,
-										selectedTag === '' && styles.tagTextSelected,
-									]}
-								>
-									All Tags
-								</Text>
-							</TouchableOpacity>
-							{allTags.map((tag) => (
-								<TouchableOpacity
-									key={tag}
-									style={[
-										styles.tagItem,
-										selectedTag === tag && styles.tagItemSelected,
-									]}
-									onPress={() => {
-										setSelectedTag(tag);
-									}}
-								>
-									<Text
-										style={[
-											styles.tagText,
-											selectedTag === tag && styles.tagTextSelected,
-										]}
-									>
-										{tag}
-									</Text>
-								</TouchableOpacity>
-							))}
-						</View>
-					</View>
-				</SafeAreaView>
-			</Animated.View>
-		);
 	};
 
 	const renderDateHeader = () => {
@@ -335,11 +285,6 @@ export default function TransactionScreen() {
 				backgroundColor="transparent"
 				translucent
 			/>
-			{isDropdownVisible && (
-				<TouchableWithoutFeedback onPress={toggleDropdown}>
-					<View style={styles.overlay} />
-				</TouchableWithoutFeedback>
-			)}
 			<SafeAreaView style={styles.safeArea} edges={['top']}>
 				<View style={styles.container}>
 					{/* Header */}
@@ -408,9 +353,6 @@ export default function TransactionScreen() {
 					/>
 				</View>
 			</SafeAreaView>
-
-			{/* Dropdown Menu */}
-			{isDropdownVisible && renderDropdown()}
 
 			{/* Calendar Modal */}
 			<Modal
@@ -509,7 +451,6 @@ const styles = StyleSheet.create({
 		borderRadius: 6,
 		overflow: 'hidden',
 	},
-
 	txRow: {
 		flexDirection: 'row',
 		padding: 16,
@@ -532,13 +473,11 @@ const styles = StyleSheet.create({
 		color: '#d50b00',
 	},
 	txDate: { fontSize: 12, color: '#999999', marginTop: 4 },
-
 	empty: {
 		flex: 1,
 		marginTop: 80,
 		alignItems: 'center',
 	},
-
 	headerContainer: {
 		flexDirection: 'row',
 		paddingRight: 16,
@@ -618,29 +557,6 @@ const styles = StyleSheet.create({
 		maxHeight: height * 0.7,
 		backgroundColor: '#fff',
 	},
-	filterModeList: {
-		width: '100%',
-		padding: 8,
-	},
-	filterModeItem: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		padding: 16,
-		borderRadius: 8,
-		marginBottom: 8,
-		gap: 12,
-	},
-	filterModeItemSelected: {
-		backgroundColor: '#32af29',
-	},
-	filterModeText: {
-		fontSize: 16,
-		color: '#333',
-	},
-	filterModeTextSelected: {
-		color: '#fff',
-		fontWeight: '600',
-	},
 	monthHeader: {
 		backgroundColor: '#f9f9f9',
 		padding: 16,
@@ -664,88 +580,5 @@ const styles = StyleSheet.create({
 		fontSize: 20,
 		fontWeight: '600',
 		color: '#000000',
-	},
-	dropdown: {
-		position: 'absolute',
-		top: 0,
-		left: 0,
-		right: 0,
-		zIndex: 1000,
-	},
-	dropdownBackground: {
-		position: 'absolute',
-		top: 0,
-		left: 0,
-		right: 0,
-		bottom: 0,
-		backgroundColor: 'white',
-		shadowColor: '#000',
-		shadowOffset: {
-			width: 0,
-			height: 2,
-		},
-		shadowOpacity: 0.25,
-		shadowRadius: 3.84,
-		elevation: 5,
-	},
-	dropdownContent: {
-		backgroundColor: 'white',
-	},
-	dropdownHeader: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		padding: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: '#eee',
-	},
-	dropdownTitle: {
-		fontSize: 20,
-		fontWeight: '600',
-		color: '#333',
-	},
-	dropdownDivider: {
-		height: 1,
-		backgroundColor: '#eee',
-		marginVertical: 16,
-	},
-	dropdownSection: {
-		padding: 16,
-	},
-	dropdownSectionTitle: {
-		fontSize: 16,
-		fontWeight: '600',
-		color: '#333',
-		marginBottom: 12,
-	},
-	tagList: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
-		gap: 8,
-	},
-	tagItem: {
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		borderRadius: 16,
-		backgroundColor: '#f0f0f0',
-	},
-	tagItemSelected: {
-		backgroundColor: '#32af29',
-	},
-	tagText: {
-		fontSize: 14,
-		color: '#333',
-	},
-	tagTextSelected: {
-		color: '#fff',
-	},
-	overlay: {
-		position: 'absolute',
-		top: 0,
-		left: 0,
-		right: 0,
-		bottom: 0,
-		backgroundColor: 'rgba(0, 0, 0, 0.5)',
-		zIndex: 999,
 	},
 });
