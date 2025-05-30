@@ -340,7 +340,7 @@ export default function TransactionScreen() {
 					<View style={styles.overlay} />
 				</TouchableWithoutFeedback>
 			)}
-			<SafeAreaView style={styles.safeArea}>
+			<SafeAreaView style={styles.safeArea} edges={['top']}>
 				<View style={styles.container}>
 					{/* Header */}
 					<View style={styles.headerContainer}>
@@ -387,7 +387,7 @@ export default function TransactionScreen() {
 					<FlatList
 						data={groupedTransactions}
 						keyExtractor={(item) => item.monthKey}
-						contentContainerStyle={{ paddingBottom: 80 }}
+						contentContainerStyle={{ paddingBottom: 0 }}
 						renderItem={({ item }) => (
 							<View>
 								{dateFilterMode !== 'day' &&
@@ -466,15 +466,16 @@ const { width, height } = Dimensions.get('window');
 const styles = StyleSheet.create({
 	mainContainer: {
 		flex: 1,
-		backgroundColor: '#E6F0FF',
+		backgroundColor: '#fff',
 	},
 	safeArea: {
 		flex: 1,
-		backgroundColor: '#653535',
+		backgroundColor: '#fff',
 	},
 	container: {
 		flex: 1,
-		backgroundColor: '#00ff95',
+		backgroundColor: '#fff',
+		paddingBottom: 0,
 	},
 	filtersContainer: {
 		paddingVertical: 12,
@@ -515,7 +516,7 @@ const styles = StyleSheet.create({
 		borderBottomWidth: 1,
 		borderColor: '#f0f0f0',
 		alignItems: 'center',
-		backgroundColor: '#f9f9f9',
+		backgroundColor: '#fff',
 	},
 	txDesc: { fontSize: 16, fontWeight: '500' },
 	txTags: { fontSize: 12, color: '#666', marginTop: 4 },
@@ -547,6 +548,7 @@ const styles = StyleSheet.create({
 		justifyContent: 'space-between',
 		borderBottomWidth: 1,
 		borderBottomColor: '#e0e0e0',
+		backgroundColor: '#fff',
 	},
 	headerLeft: {
 		width: 36,

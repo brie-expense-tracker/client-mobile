@@ -27,16 +27,16 @@ export default function TabLayout() {
 					shadowRadius: 3.5,
 					elevation: 5,
 					paddingTop: 10,
-					height: 100,
+					height: 80,
 				},
 
 				tabBarLabelStyle: {
-					fontWeight: 'bold',
+					// fontWeight: 'bold',
 					fontSize: 16,
 					paddingBottom: 10,
 					paddingTop: 2,
 				},
-				tabBarInactiveTintColor: '#0095FF',
+				tabBarInactiveTintColor: '#000',
 				tabBarActiveTintColor: '#007ACC',
 				tabBarItemStyle: {
 					padding: 0,
@@ -51,6 +51,7 @@ export default function TabLayout() {
 						<Ionicons name="home-outline" color={color} size={size} />
 					),
 					headerShown: false,
+					tabBarShowLabel: false,
 					tabBarLabel: 'Home',
 				}}
 			/>
@@ -61,6 +62,7 @@ export default function TabLayout() {
 						<Ionicons name="timer-outline" color={color} size={size} />
 					),
 					headerShown: false,
+					tabBarShowLabel: false,
 					tabBarLabel: 'History',
 				}}
 			/>
@@ -71,6 +73,7 @@ export default function TabLayout() {
 						<Ionicons name="add-circle-outline" color={color} size={size} />
 					),
 					headerShown: false,
+					tabBarShowLabel: false,
 					tabBarLabel: 'Add',
 				}}
 			/>
@@ -85,6 +88,7 @@ export default function TabLayout() {
 						/>
 					),
 					headerShown: false,
+					tabBarShowLabel: false,
 					tabBarLabel: 'Chat',
 				}}
 			/>
@@ -95,6 +99,7 @@ export default function TabLayout() {
 						<Ionicons name="person-outline" color={color} size={size} />
 					),
 					headerShown: false,
+					tabBarShowLabel: false,
 					tabBarLabel: 'Me',
 				}}
 			/>

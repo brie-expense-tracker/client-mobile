@@ -11,7 +11,7 @@ import {
 	Pressable,
 } from 'react-native';
 import axios from 'axios';
-import MonthYearDayPickerModal from '../components/MonthYearDayPickerModal';
+import { useForm, Controller, Control } from 'react-hook-form';
 import { Ionicons, FontAwesome } from '@expo/vector-icons';
 import { Link, useRouter, Stack } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,73 +22,52 @@ interface FloatingActionButtonProps {
 	onPress?: () => void;
 }
 
-interface AddTransactionScreenProps {
-	visible: boolean;
-	onClose: () => void;
+interface TransactionFormData {
+	type: 'income' | 'expense';
+	description: string;
+	amount: string;
+	category: string;
+	date: string;
 }
 
 //
 //  FUNCTIONS START===============================================
 const addTransactionScreen = () => {
-	const [transaction, setTransaction] = useState({
-		type: 'income',
-		description: '',
-		amount: '',
-		category: '',
-		date: new Date().toISOString().split('T')[0],
-	});
-
 	const router = useRouter();
 	const amountInputRef = useRef<TextInput>(null);
 	const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-	useEffect(() => {
-		if (amountInputRef.current) {
-			amountInputRef.current.setNativeProps({
-				selection: {
-					start: transaction.amount.length,
-					end: transaction.amount.length,
-				},
-			});
-		}
-	}, [transaction.amount]);
-
-	const handleMadeSubmit = async () => {
-		try {
-			const response = await axios.post(
-				'http://localhost:3000/api/transactions',
-				transaction
-			);
-			console.log('Transaction saved:', response.data);
-			setTransaction({
+	const { control, handleSubmit, setValue, watch } =
+		useForm<TransactionFormData>({
+			defaultValues: {
 				type: 'income',
 				description: '',
 				amount: '',
 				category: '',
 				date: new Date().toISOString().split('T')[0],
-			});
-			Alert.alert('Success', 'Transaction saved successfully!');
-			router.back();
-		} catch (error) {
-			console.error('Error saving transaction:', error);
-			Alert.alert('Error', 'Failed to save transaction');
-		}
-	};
+			},
+		});
 
-	const handleSpentSubmit = async () => {
+	const amount = watch('amount');
+
+	useEffect(() => {
+		if (amountInputRef.current) {
+			amountInputRef.current.setNativeProps({
+				selection: {
+					start: amount.length,
+					end: amount.length,
+				},
+			});
+		}
+	}, [amount]);
+
+	const onSubmit = async (data: TransactionFormData) => {
 		try {
 			const response = await axios.post(
 				'http://localhost:3000/api/transactions',
-				transaction
+				data
 			);
 			console.log('Transaction saved:', response.data);
-			setTransaction({
-				type: 'expense',
-				description: '',
-				amount: '',
-				category: '',
-				date: new Date().toISOString().split('T')[0],
-			});
 			Alert.alert('Success', 'Transaction saved successfully!');
 			router.back();
 		} catch (error) {
@@ -109,7 +88,7 @@ const addTransactionScreen = () => {
 		setSelectedCategory((prevSelectedCategory) =>
 			prevSelectedCategory === category ? null : category
 		);
-		setTransaction({ ...transaction, category: category });
+		setValue('category', category);
 	};
 
 	//
@@ -143,18 +122,27 @@ const addTransactionScreen = () => {
 								color="black"
 								style={styles.dollarIcon}
 							/>
-							<TextInput
-								ref={amountInputRef}
-								style={styles.inputAmount}
-								placeholder="0"
-								placeholderTextColor={'#000000'}
-								value={transaction.amount}
-								onChangeText={(text) =>
-									setTransaction({ ...transaction, amount: text })
-								}
-								showSoftInputOnFocus={false}
+							<Controller
+								control={control}
+								name="amount"
+								render={({
+									field: { value, onChange },
+								}: {
+									field: { value: string; onChange: (value: string) => void };
+								}) => (
+									<TextInput
+										ref={amountInputRef}
+										style={styles.inputAmount}
+										placeholder="0"
+										placeholderTextColor={'#000000'}
+										value={value}
+										onChangeText={onChange}
+										showSoftInputOnFocus={false}
+									/>
+								)}
 							/>
 						</View>
+						{/* Carousel */}
 						<View style={styles.carouselContainer}>
 							<ScrollView horizontal showsHorizontalScrollIndicator={false}>
 								{mockTags.map((category, index) => (
@@ -166,7 +154,13 @@ const addTransactionScreen = () => {
 											selectedCategory === category && styles.selectedTag,
 										]}
 									>
-										<Text>{category}</Text>
+										<Text
+											style={
+												selectedCategory === category && styles.selectedTagText
+											}
+										>
+											{category}
+										</Text>
 									</TouchableOpacity>
 								))}
 								<TouchableOpacity
@@ -177,38 +171,50 @@ const addTransactionScreen = () => {
 								</TouchableOpacity>
 							</ScrollView>
 						</View>
-						<TextInput
-							style={styles.inputDescription}
-							placeholder="What's this for?"
-							placeholderTextColor={'#a3a3a3'}
-							value={transaction.description}
-							onChangeText={(text) =>
-								setTransaction({ ...transaction, description: text })
-							}
+						<Controller
+							control={control}
+							name="description"
+							render={({
+								field: { value, onChange },
+							}: {
+								field: { value: string; onChange: (value: string) => void };
+							}) => (
+								<TextInput
+									style={styles.inputDescription}
+									placeholder="What's this for?"
+									placeholderTextColor={'#a3a3a3'}
+									value={value}
+									onChangeText={onChange}
+								/>
+							)}
 						/>
 
 						<View style={styles.fabsContainer}>
 							<View style={styles.fabContainer}>
 								<FloatingActionButton
 									name="Spent"
-									color="#0050EF"
-									onPress={handleSpentSubmit}
+									color="#0095FF"
+									onPress={() => {
+										setValue('type', 'expense');
+										handleSubmit(onSubmit)();
+									}}
 								/>
 							</View>
 							<View style={styles.fabContainer}>
 								<FloatingActionButton
 									name="Made"
-									color="#0050EF"
-									onPress={handleMadeSubmit}
+									color="#0095FF"
+									onPress={() => {
+										setValue('type', 'income');
+										handleSubmit(onSubmit)();
+									}}
 								/>
 							</View>
 						</View>
 					</View>
 					<View style={styles.topNumPadContainer}>
 						<NumberPad
-							onValueChange={(value: string) =>
-								setTransaction((prev) => ({ ...prev, amount: value }))
-							}
+							onValueChange={(value: string) => setValue('amount', value)}
 						/>
 					</View>
 				</View>
@@ -441,9 +447,12 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 	},
 	selectedTag: {
-		backgroundColor: '#d0d3da',
+		backgroundColor: '#007ACC',
 		borderRadius: 8,
 		padding: 8,
+	},
+	selectedTagText: {
+		color: 'white',
 	},
 	addCategoryButton: {
 		padding: 8,
