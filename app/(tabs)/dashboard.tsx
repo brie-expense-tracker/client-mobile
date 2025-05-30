@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
 	View,
 	Text,
@@ -8,6 +8,7 @@ import {
 	SafeAreaView,
 	Image,
 	StyleSheet,
+	RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, Stack } from 'expo-router';
@@ -116,6 +117,7 @@ const ProfitLossWidget = () => {
 const Dashboard = () => {
 	const [transactions, setTransactions] = useState<Transaction[]>([]);
 	const [isAddTransactionVisible, setIsAddTransactionVisible] = useState(false);
+	const [refreshing, setRefreshing] = useState(false);
 	const [formData, setFormData] = useState({
 		category: '',
 		amount: '',
@@ -123,6 +125,20 @@ const Dashboard = () => {
 		date: new Date(),
 	});
 	const [showDatePicker, setShowDatePicker] = useState(false);
+
+	const onRefresh = useCallback(async () => {
+		setRefreshing(true);
+		try {
+			// Here you would typically fetch new data from your API
+			// For now, we'll just simulate a refresh with the dummy data
+			await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate network delay
+			setTransactions(dummyTransactions);
+		} catch (error) {
+			console.error('Error refreshing data:', error);
+		} finally {
+			setRefreshing(false);
+		}
+	}, []);
 
 	const handleInputChange = (field: string, value: string) => {
 		setFormData((prev) => ({ ...prev, [field]: value }));
@@ -161,6 +177,15 @@ const Dashboard = () => {
 				<ScrollView
 					style={styles.scrollView}
 					showsVerticalScrollIndicator={false}
+					refreshControl={
+						<RefreshControl
+							refreshing={refreshing}
+							onRefresh={onRefresh}
+							tintColor="#0095FF"
+							colors={['#0095FF']}
+							progressBackgroundColor="#ffffff"
+						/>
+					}
 				>
 					<View style={styles.contentContainer}>
 						<View style={styles.headerContainer}>
@@ -261,6 +286,7 @@ const styles = StyleSheet.create({
 		height: '100%',
 		width: '100%',
 		overflow: 'hidden',
+		backgroundColor: '#fff',
 	},
 	backgroundContainer: {
 		width: '200%',
