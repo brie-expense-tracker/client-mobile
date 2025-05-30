@@ -48,18 +48,7 @@ export default function ProfileScreen() {
 	return (
 		<SafeAreaView style={styles.container}>
 			{/* Header icons */}
-			<TouchableOpacity
-				style={styles.headerLeft}
-				onPress={() => {
-					router.back();
-				}}
-			>
-				<Ionicons name="chevron-back-outline" size={32} color="#555" />
-			</TouchableOpacity>
 			<View style={styles.headerRight}>
-				<TouchableOpacity style={styles.iconButton}>
-					<Ionicons name="notifications-outline" size={32} color="#555" />
-				</TouchableOpacity>
 				<TouchableOpacity style={styles.iconButton}>
 					<Ionicons name="settings-outline" size={32} color="#555" />
 				</TouchableOpacity>
@@ -90,11 +79,6 @@ export default function ProfileScreen() {
 				<Text style={styles.chartTitle}>Spending Over Time</Text>
 				<Text style={styles.chartTitle}>Category Breakdown</Text>
 			</View>
-
-			{/* Floating "+" button */}
-			{/* <TouchableOpacity style={styles.fab}>
-				<Ionicons name="add" size={32} color="#fff" />
-			</TouchableOpacity> */}
 		</SafeAreaView>
 	);
 }

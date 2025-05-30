@@ -69,6 +69,16 @@ const addTransactionScreen = () => {
 			);
 			console.log('Transaction saved:', response.data);
 			Alert.alert('Success', 'Transaction saved successfully!');
+
+			// Reset form values
+			setValue('description', '');
+			setValue('amount', '');
+			setValue('category', '');
+			setValue('date', new Date().toISOString().split('T')[0]);
+
+			// Reset selected category
+			setSelectedCategory(null);
+
 			router.back();
 		} catch (error) {
 			console.error('Error saving transaction:', error);

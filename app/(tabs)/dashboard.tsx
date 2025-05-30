@@ -197,11 +197,22 @@ const Dashboard = () => {
 								onPress={() => router.push('/(tabs)/profileScreen')}
 								style={styles.profileButton}
 							>
-								<Image
-									source={require('../../assets/images/profile.jpg')}
-									style={styles.profileImage}
-									resizeMode="cover"
-								/>
+								<View style={{ position: 'relative' }}>
+									<AntDesign name="bells" size={24} color="#212121" />
+									<View
+										style={{
+											position: 'absolute',
+											top: -2,
+											right: -2,
+											width: 8,
+											height: 8,
+											borderRadius: 4,
+											backgroundColor: '#FF6A00',
+											borderWidth: 1,
+											borderColor: 'white',
+										}}
+									/>
+								</View>
 							</TouchableOpacity>
 						</View>
 
