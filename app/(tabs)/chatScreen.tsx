@@ -178,7 +178,7 @@ const ChatScreen = () => {
 const styles = StyleSheet.create({
 	safeArea: {
 		flex: 1,
-		backgroundColor: '#FFFFFF',
+		backgroundColor: '#bc0000',
 	},
 	container: {
 		flex: 1,

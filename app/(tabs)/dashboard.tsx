@@ -149,13 +149,13 @@ const Dashboard = () => {
 	return (
 		<View style={styles.mainContainer}>
 			<View style={styles.backgroundContainer}>
-				<LinearGradient
+				{/* <LinearGradient
 					colors={['#59c076', '#0a5b21']}
 					start={{ x: 0.1, y: 0 }}
 					end={{ x: 0.5, y: 0.9 }}
 				>
 					<View style={styles.gradientContainer} />
-				</LinearGradient>
+				</LinearGradient> */}
 			</View>
 			<SafeAreaView style={styles.safeArea}>
 				<ScrollView
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
 		height: 400,
 		position: 'absolute',
 		top: -20,
-		backgroundColor: '#22c55e',
+		backgroundColor: 'white',
 		borderRadius: 50,
 		overflow: 'hidden',
 		alignSelf: 'center',
@@ -287,6 +287,7 @@ const styles = StyleSheet.create({
 		width: '100%',
 		height: '100%',
 		padding: 24,
+		backgroundColor: '#fff',
 	},
 	headerContainer: {
 		flexDirection: 'row',
@@ -298,12 +299,12 @@ const styles = StyleSheet.create({
 		flexDirection: 'column',
 	},
 	welcomeText: {
-		color: 'white',
+		color: '#212121',
 		fontSize: 20,
 	},
 	nameText: {
-		color: 'white',
-		fontSize: 30,
+		color: '#212121',
+		fontSize: 32,
 		fontWeight: 'bold',
 	},
 	profileButton: {
@@ -324,7 +325,6 @@ const styles = StyleSheet.create({
 	},
 	transactionsContainer: {
 		marginTop: 24,
-		paddingHorizontal: 16,
 	},
 	transactionsHeader: {
 		flexDirection: 'row',
@@ -335,9 +335,10 @@ const styles = StyleSheet.create({
 	transactionsTitle: {
 		fontSize: 18,
 		fontWeight: '600',
+		color: '#212121',
 	},
 	seeAllText: {
-		color: '#16a34a',
+		color: '#546E7A',
 	},
 	transactionItem: {
 		flexDirection: 'row',
@@ -346,6 +347,8 @@ const styles = StyleSheet.create({
 		backgroundColor: 'white',
 		padding: 16,
 		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: '#E6F0FF',
 		marginBottom: 12,
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 1 },
@@ -354,7 +357,7 @@ const styles = StyleSheet.create({
 		elevation: 2,
 	},
 	transactionDescription: {
-		color: '#1f2937',
+		color: '#212121',
 		fontWeight: '600',
 	},
 	transactionDate: {
@@ -404,15 +407,15 @@ const styles = StyleSheet.create({
 		zIndex: 1,
 	},
 	balanceContainer: {
-		backgroundColor: '#0cac47', // green-700
+		backgroundColor: '#0095FF',
 		padding: 24,
 		height: 208, // h-52
 		borderRadius: 24, // rounded-3xl
 		flexDirection: 'column',
-		shadowColor: '#0f8a32',
+		shadowColor: '#1D4ED8',
+		shadowOpacity: 0.3,
+		// shadowRadius: 15,
 		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.6,
-		shadowRadius: 15,
 		elevation: 5,
 	},
 	headerRow: {
