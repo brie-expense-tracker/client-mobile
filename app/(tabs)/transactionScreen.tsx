@@ -99,8 +99,8 @@ export default function TransactionScreen() {
 	>(null);
 	const [tempSelection, setTempSelection] = useState<string>('');
 	const navigation = useNavigation<NavigationProp>();
-	const [isSidebarVisible, setIsSidebarVisible] = useState(false);
-	const sidebarAnimation = useState(new Animated.Value(0))[0];
+	const [isDropdownVisible, setIsDropdownVisible] = useState(false);
+	const dropdownAnimation = useState(new Animated.Value(0))[0];
 
 	// derive unique tags from data
 	const allTags = useMemo(() => {
@@ -161,24 +161,24 @@ export default function TransactionScreen() {
 		}
 	};
 
-	const toggleSidebar = () => {
-		const toValue = isSidebarVisible ? 0 : 1;
-		Animated.timing(sidebarAnimation, {
+	const toggleDropdown = () => {
+		const toValue = isDropdownVisible ? 0 : 1;
+		Animated.timing(dropdownAnimation, {
 			toValue,
 			duration: 300,
 			useNativeDriver: true,
 		}).start();
-		setIsSidebarVisible(!isSidebarVisible);
-		StatusBar.setHidden(!isSidebarVisible);
+		setIsDropdownVisible(!isDropdownVisible);
+		StatusBar.setHidden(!isDropdownVisible);
 	};
 
 	const handleFilterPress = () => {
-		toggleSidebar();
+		toggleDropdown();
 	};
 
 	const handleDateModeSelect = (value: string) => {
 		setDateFilterMode(value);
-		toggleSidebar();
+		toggleDropdown();
 	};
 
 	const handleCalendarDayPress = (day: { dateString: string }) => {
@@ -187,27 +187,27 @@ export default function TransactionScreen() {
 		setActivePicker(null);
 	};
 
-	const renderSidebar = () => {
-		const translateX = sidebarAnimation.interpolate({
+	const renderDropdown = () => {
+		const translateY = dropdownAnimation.interpolate({
 			inputRange: [0, 1],
-			outputRange: [300, 0],
+			outputRange: [-400, 0],
 		});
 
 		return (
 			<Animated.View
 				style={[
-					styles.sidebar,
+					styles.dropdown,
 					{
-						transform: [{ translateX }],
+						transform: [{ translateY }],
 					},
 				]}
 			>
-				<View style={styles.sidebarBackground} />
-				<SafeAreaView style={styles.sidebarContent}>
-					<View style={styles.sidebarHeader}>
-						<Text style={styles.sidebarTitle}>Filters</Text>
+				<View style={styles.dropdownBackground} />
+				<SafeAreaView style={styles.dropdownContent}>
+					<View style={styles.dropdownHeader}>
+						<Text style={styles.dropdownTitle}>Filters</Text>
 						<TouchableOpacity
-							onPress={toggleSidebar}
+							onPress={toggleDropdown}
 							style={styles.closeButton}
 						>
 							<Ionicons name="close" size={24} color="#666" />
@@ -242,10 +242,10 @@ export default function TransactionScreen() {
 						))}
 					</View>
 
-					<View style={styles.sidebarDivider} />
+					<View style={styles.dropdownDivider} />
 
-					<View style={styles.sidebarSection}>
-						<Text style={styles.sidebarSectionTitle}>Filter by Tags</Text>
+					<View style={styles.dropdownSection}>
+						<Text style={styles.dropdownSectionTitle}>Filter by Tags</Text>
 						<View style={styles.tagList}>
 							<TouchableOpacity
 								style={[
@@ -335,8 +335,8 @@ export default function TransactionScreen() {
 				backgroundColor="transparent"
 				translucent
 			/>
-			{isSidebarVisible && (
-				<TouchableWithoutFeedback onPress={toggleSidebar}>
+			{isDropdownVisible && (
+				<TouchableWithoutFeedback onPress={toggleDropdown}>
 					<View style={styles.overlay} />
 				</TouchableWithoutFeedback>
 			)}
@@ -383,36 +383,6 @@ export default function TransactionScreen() {
 					{/* Date Header */}
 					{renderDateHeader()}
 
-					{/* Tag Chips */}
-					{/* <View style={styles.filtersContainer}>
-						<FlatList
-							data={['All Tags', ...allTags]}
-							horizontal
-							keyExtractor={(item) => item}
-							showsHorizontalScrollIndicator={false}
-							renderItem={({ item }) => {
-								const isAll = item === 'All Tags';
-								const tagValue = isAll ? '' : item;
-								const selected = tagValue === selectedTag;
-								return (
-									<TouchableOpacity
-										style={[styles.chip, selected && styles.chipSelected]}
-										onPress={() => setSelectedTag(tagValue)}
-									>
-										<Text
-											style={[
-												styles.chipText,
-												selected && styles.chipTextSelected,
-											]}
-										>
-											{item}
-										</Text>
-									</TouchableOpacity>
-								);
-							}}
-						/>
-					</View> */}
-
 					{/* Transaction List */}
 					<FlatList
 						data={groupedTransactions}
@@ -439,8 +409,8 @@ export default function TransactionScreen() {
 				</View>
 			</SafeAreaView>
 
-			{/* Sidebar */}
-			{renderSidebar()}
+			{/* Dropdown Menu */}
+			{isDropdownVisible && renderDropdown()}
 
 			{/* Calendar Modal */}
 			<Modal
@@ -467,14 +437,20 @@ export default function TransactionScreen() {
 									markedDates={{
 										[selectedDate]: {
 											selected: true,
-											selectedColor: '#32af29',
+											selectedColor: '#007ACC',
 										},
 									}}
 									theme={{
-										todayTextColor: '#32af29',
-										arrowColor: '#32af29',
-										dotColor: '#32af29',
-										selectedDayBackgroundColor: '#32af29',
+										todayTextColor: '#007ACC',
+										arrowColor: '#007ACC',
+										dotColor: '#007ACC',
+										selectedDayBackgroundColor: '#007ACC',
+										textDayFontSize: 16,
+										textMonthFontSize: 16,
+										textDayHeaderFontSize: 16,
+										textDayFontWeight: 'bold',
+										textMonthFontWeight: 'bold',
+										textDayHeaderFontWeight: 'bold',
 									}}
 								/>
 							</View>
@@ -490,15 +466,15 @@ const { width, height } = Dimensions.get('window');
 const styles = StyleSheet.create({
 	mainContainer: {
 		flex: 1,
-		backgroundColor: '#f9f9f9',
+		backgroundColor: '#E6F0FF',
 	},
 	safeArea: {
 		flex: 1,
-		backgroundColor: '#f9f9f9',
+		backgroundColor: '#653535',
 	},
 	container: {
 		flex: 1,
-		backgroundColor: '#f9f9f9',
+		backgroundColor: '#00ff95',
 	},
 	filtersContainer: {
 		paddingVertical: 12,
@@ -638,6 +614,7 @@ const styles = StyleSheet.create({
 	calendarModalContent: {
 		width: width * 0.9,
 		maxHeight: height * 0.7,
+		backgroundColor: '#fff',
 	},
 	filterModeList: {
 		width: '100%',
@@ -686,15 +663,14 @@ const styles = StyleSheet.create({
 		fontWeight: '600',
 		color: '#000000',
 	},
-	sidebar: {
+	dropdown: {
 		position: 'absolute',
 		top: 0,
+		left: 0,
 		right: 0,
-		width: 300,
-		height: '100%',
 		zIndex: 1000,
 	},
-	sidebarBackground: {
+	dropdownBackground: {
 		position: 'absolute',
 		top: 0,
 		left: 0,
@@ -703,18 +679,17 @@ const styles = StyleSheet.create({
 		backgroundColor: 'white',
 		shadowColor: '#000',
 		shadowOffset: {
-			width: -2,
-			height: 0,
+			width: 0,
+			height: 2,
 		},
 		shadowOpacity: 0.25,
 		shadowRadius: 3.84,
 		elevation: 5,
 	},
-	sidebarContent: {
-		flex: 1,
+	dropdownContent: {
 		backgroundColor: 'white',
 	},
-	sidebarHeader: {
+	dropdownHeader: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
@@ -722,20 +697,20 @@ const styles = StyleSheet.create({
 		borderBottomWidth: 1,
 		borderBottomColor: '#eee',
 	},
-	sidebarTitle: {
+	dropdownTitle: {
 		fontSize: 20,
 		fontWeight: '600',
 		color: '#333',
 	},
-	sidebarDivider: {
+	dropdownDivider: {
 		height: 1,
 		backgroundColor: '#eee',
 		marginVertical: 16,
 	},
-	sidebarSection: {
+	dropdownSection: {
 		padding: 16,
 	},
-	sidebarSectionTitle: {
+	dropdownSectionTitle: {
 		fontSize: 16,
 		fontWeight: '600',
 		color: '#333',

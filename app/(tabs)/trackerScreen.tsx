@@ -191,14 +191,14 @@ const addTransactionScreen = () => {
 							<View style={styles.fabContainer}>
 								<FloatingActionButton
 									name="Spent"
-									color="#4fa166"
+									color="#0050EF"
 									onPress={handleSpentSubmit}
 								/>
 							</View>
 							<View style={styles.fabContainer}>
 								<FloatingActionButton
 									name="Made"
-									color="#429c5b"
+									color="#0050EF"
 									onPress={handleMadeSubmit}
 								/>
 							</View>
@@ -396,6 +396,8 @@ const styles = StyleSheet.create({
 		// backgroundColor: '#000000',
 		padding: 5,
 		paddingTop: 10,
+		borderTopWidth: 1,
+		borderColor: '#ebebeb',
 		// paddingBottom: 40,
 	},
 

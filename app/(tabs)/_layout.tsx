@@ -34,10 +34,10 @@ export default function TabLayout() {
 					fontWeight: 'bold',
 					fontSize: 16,
 					paddingBottom: 10,
-					paddingTop: 6,
+					paddingTop: 2,
 				},
-				tabBarInactiveTintColor: '#2f5ae9',
-				tabBarActiveTintColor: '#3719ca',
+				tabBarInactiveTintColor: '#0095FF',
+				tabBarActiveTintColor: '#007ACC',
 				tabBarItemStyle: {
 					padding: 0,
 					margin: 0,
@@ -48,67 +48,54 @@ export default function TabLayout() {
 				name="dashboard"
 				options={{
 					tabBarIcon: ({ color, size }) => (
-						<Ionicons name="home" color={color} size={size} />
+						<Ionicons name="home-outline" color={color} size={size} />
 					),
 					headerShown: false,
-					// tabBarShowLabel: false,
 					tabBarLabel: 'Home',
-					// tabBarItemStyle: {
-					// 	marginRight: -10,
-					// },
 				}}
 			/>
 			<Tabs.Screen
 				name="transactionScreen"
 				options={{
 					tabBarIcon: ({ color, size }) => (
-						<Ionicons name="timer" color={color} size={size} />
+						<Ionicons name="timer-outline" color={color} size={size} />
 					),
 					headerShown: false,
-					// tabBarShowLabel: false,
 					tabBarLabel: 'History',
-					// tabBarItemStyle: {
-					// 	marginLeft: -10,
-					// },
 				}}
 			/>
 			<Tabs.Screen
 				name="trackerScreen"
 				options={{
 					tabBarIcon: ({ color, size }) => (
-						<Ionicons name="add-circle" color={color} size={size} />
+						<Ionicons name="add-circle-outline" color={color} size={size} />
 					),
 					headerShown: false,
 					tabBarLabel: 'Add',
-					// tabBarButton: (props) => <NonInteractiveButton {...props} />,
 				}}
 			/>
 			<Tabs.Screen
 				name="chatScreen"
 				options={{
 					tabBarIcon: ({ color, size }) => (
-						<Ionicons name="chatbox" color={color} size={size} />
+						<Ionicons
+							name="chatbox-ellipses-outline"
+							color={color}
+							size={size}
+						/>
 					),
 					headerShown: false,
-					// tabBarShowLabel: false,
 					tabBarLabel: 'Chat',
-					// tabBarItemStyle: {
-					// 	marginRight: -10,
-					// },
 				}}
 			/>
 			<Tabs.Screen
 				name="profileScreen"
 				options={{
 					tabBarIcon: ({ color, size }) => (
-						<Ionicons name="person" color={color} size={size} />
+						<Ionicons name="person-outline" color={color} size={size} />
 					),
 					headerShown: false,
-					// tabBarShowLabel: false,
 					tabBarLabel: 'Me',
-					// tabBarItemStyle: {
-					// 	marginLeft: -10,
-					// },
 				}}
 			/>
 		</Tabs>
