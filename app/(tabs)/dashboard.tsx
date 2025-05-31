@@ -20,16 +20,21 @@ import ProfitLossGraph from '../components/ProfitLossGraph';
 import ProfitGraph from '../components/ProfitGraph';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import AddTransaction from '../components/AddTransaction';
+import axios from 'axios';
 
-const BalanceWidget = () => {
-	// Calculate totals from dummy transactions
-	const totalIncome = dummyTransactions
-		.filter((t) => t.type === 'income')
-		.reduce((sum, t) => sum + t.amount, 0);
+interface BalanceWidgetProps {
+	transactions: Transaction[];
+}
 
-	const totalExpense = dummyTransactions
-		.filter((t) => t.type === 'expense')
-		.reduce((sum, t) => sum + t.amount, 0);
+const BalanceWidget: React.FC<BalanceWidgetProps> = ({ transactions }) => {
+	// Calculate totals from transactions
+	const totalIncome = transactions
+		.filter((t: Transaction) => t?.type === 'income')
+		.reduce((sum: number, t: Transaction) => sum + (t?.amount || 0), 0);
+
+	const totalExpense = transactions
+		.filter((t: Transaction) => t?.type === 'expense')
+		.reduce((sum: number, t: Transaction) => sum + (t?.amount || 0), 0);
 
 	const totalBalance = totalIncome - totalExpense;
 
@@ -126,13 +131,32 @@ const Dashboard = () => {
 	});
 	const [showDatePicker, setShowDatePicker] = useState(false);
 
+	const fetchTransactions = async () => {
+		try {
+			const response = await axios.get(
+				'http://localhost:3000/api/transactions'
+			);
+			// Ensure the response data matches our Transaction type
+			const formattedTransactions = response.data.map((t: any) => ({
+				id: t._id || t.id,
+				description: t.description || '',
+				amount: Number(t.amount) || 0,
+				date: t.date || new Date().toISOString(),
+				tags: t.tags || [],
+				type: t.type || 'expense',
+			}));
+			setTransactions(formattedTransactions);
+		} catch (error) {
+			console.error('Error fetching transactions:', error);
+			// Fallback to dummy data if API call fails
+			setTransactions(dummyTransactions);
+		}
+	};
+
 	const onRefresh = useCallback(async () => {
 		setRefreshing(true);
 		try {
-			// Here you would typically fetch new data from your API
-			// For now, we'll just simulate a refresh with the dummy data
-			await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate network delay
-			setTransactions(dummyTransactions);
+			await fetchTransactions();
 		} catch (error) {
 			console.error('Error refreshing data:', error);
 		} finally {
@@ -155,7 +179,7 @@ const Dashboard = () => {
 	};
 
 	useEffect(() => {
-		setTransactions(dummyTransactions);
+		fetchTransactions();
 	}, []);
 
 	const handleSubmit = () => {
@@ -217,7 +241,7 @@ const Dashboard = () => {
 						</View>
 
 						<View style={styles.mainContent}>
-							<BalanceWidget />
+							<BalanceWidget transactions={transactions} />
 
 							{/* <ProfitLossWidget /> */}
 
@@ -227,9 +251,7 @@ const Dashboard = () => {
 									<Text style={styles.transactionsTitle}>
 										Transactions History
 									</Text>
-									<TouchableOpacity
-										onPress={() => router.push('/(tabs)/transactionScreen')}
-									>
+									<TouchableOpacity onPress={() => router.push('/transaction')}>
 										<Text style={styles.seeAllText}>See all</Text>
 									</TouchableOpacity>
 								</View>
@@ -267,24 +289,6 @@ const Dashboard = () => {
 						</View>
 					</View>
 				</ScrollView>
-
-				{/* <TouchableOpacity
-					onPress={() => setIsAddTransactionVisible(true)}
-					style={styles.fab}
-				>
-					<Image
-						source={require('../../assets/images/brie-cheesecon.png')}
-						style={styles.fabImage}
-						resizeMode="contain"
-					/>
-				</TouchableOpacity> */}
-
-				{isAddTransactionVisible && <View style={styles.modalOverlay} />}
-
-				<AddTransaction
-					visible={isAddTransactionVisible}
-					onClose={() => setIsAddTransactionVisible(false)}
-				/>
 			</SafeAreaView>
 		</View>
 	);

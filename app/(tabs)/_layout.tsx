@@ -56,7 +56,7 @@ export default function TabLayout() {
 				}}
 			/>
 			<Tabs.Screen
-				name="transactionScreen"
+				name="transaction"
 				options={{
 					tabBarIcon: ({ color, size }) => (
 						<Ionicons name="timer-outline" color={color} size={size} />

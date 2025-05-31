@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
 	View,
 	Text,
@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams, router, Stack } from 'expo-router';
 
 const dateFilterModes = [
 	{ label: 'Day', value: 'day', icon: 'calendar-outline' },
@@ -22,48 +22,42 @@ export default function HistoryFilterScreen() {
 		allTags: string;
 	}>();
 
-	const selectedTags = params?.selectedTags
-		? JSON.parse(params.selectedTags)
-		: [];
-	const dateFilterMode = params?.dateFilterMode ?? 'month';
-	const allTags = params?.allTags ? JSON.parse(params.allTags) : [];
+	// Initialize local state from params
+	const [localSelectedTags, setLocalSelectedTags] = useState<string[]>(
+		params?.selectedTags ? JSON.parse(params.selectedTags) : []
+	);
+	const [localDateFilterMode, setLocalDateFilterMode] = useState<string>(
+		params?.dateFilterMode ?? 'month'
+	);
+	const availableTags = params?.allTags ? JSON.parse(params.allTags) : [];
 
 	const handleTagSelect = (tag: string) => {
-		let newSelectedTags;
 		if (tag === '') {
 			// If "All Tags" is selected, clear all selections
-			newSelectedTags = [];
+			setLocalSelectedTags([]);
 		} else {
 			// Toggle the selected tag
-			if (selectedTags.includes(tag)) {
-				newSelectedTags = selectedTags.filter((t: string) => t !== tag);
+			if (localSelectedTags.includes(tag)) {
+				setLocalSelectedTags(localSelectedTags.filter((t) => t !== tag));
 			} else {
-				newSelectedTags = [...selectedTags, tag];
+				setLocalSelectedTags([...localSelectedTags, tag]);
 			}
 		}
-
-		router.setParams({
-			selectedTags: JSON.stringify(newSelectedTags),
-			dateFilterMode,
-			allTags: JSON.stringify(allTags),
-		});
 	};
 
 	const handleDateModeSelect = (mode: string) => {
-		router.setParams({
-			selectedTags: JSON.stringify(selectedTags),
-			dateFilterMode: mode,
-			allTags: JSON.stringify(allTags),
-		});
+		setLocalDateFilterMode(mode);
 	};
 
 	const handleBackPress = () => {
-		router.setParams({
-			selectedTags: JSON.stringify(selectedTags),
-			dateFilterMode,
-			allTags: JSON.stringify(allTags),
+		router.replace({
+			pathname: '/transaction',
+			params: {
+				selectedTags: JSON.stringify(localSelectedTags),
+				dateFilterMode: localDateFilterMode,
+				allTags: JSON.stringify(availableTags),
+			},
 		});
-		router.back();
 	};
 
 	return (
@@ -93,7 +87,7 @@ export default function HistoryFilterScreen() {
 								key={mode.value}
 								style={[
 									styles.filterModeItem,
-									dateFilterMode === mode.value &&
+									localDateFilterMode === mode.value &&
 										styles.filterModeItemSelected,
 								]}
 								onPress={() => handleDateModeSelect(mode.value)}
@@ -101,12 +95,12 @@ export default function HistoryFilterScreen() {
 								<Ionicons
 									name={mode.icon as any}
 									size={24}
-									color={dateFilterMode === mode.value ? '#fff' : '#555'}
+									color={localDateFilterMode === mode.value ? '#fff' : '#555'}
 								/>
 								<Text
 									style={[
 										styles.filterModeText,
-										dateFilterMode === mode.value &&
+										localDateFilterMode === mode.value &&
 											styles.filterModeTextSelected,
 									]}
 								>
@@ -125,33 +119,34 @@ export default function HistoryFilterScreen() {
 							<TouchableOpacity
 								style={[
 									styles.tagItem,
-									selectedTags.length === 0 && styles.tagItemSelected,
+									localSelectedTags.length === 0 && styles.tagItemSelected,
 								]}
 								onPress={() => handleTagSelect('')}
 							>
 								<Text
 									style={[
 										styles.tagText,
-										selectedTags.length === 0 && styles.tagTextSelected,
+										localSelectedTags.length === 0 && styles.tagTextSelected,
 									]}
 								>
 									All Tags
 								</Text>
 							</TouchableOpacity>
-							{allTags.length > 0 ? (
-								allTags.map((tag: string) => (
+							{availableTags.length > 0 ? (
+								availableTags.map((tag: string) => (
 									<TouchableOpacity
 										key={tag}
 										style={[
 											styles.tagItem,
-											selectedTags.includes(tag) && styles.tagItemSelected,
+											localSelectedTags.includes(tag) && styles.tagItemSelected,
 										]}
 										onPress={() => handleTagSelect(tag)}
 									>
 										<Text
 											style={[
 												styles.tagText,
-												selectedTags.includes(tag) && styles.tagTextSelected,
+												localSelectedTags.includes(tag) &&
+													styles.tagTextSelected,
 											]}
 										>
 											{tag}
@@ -226,7 +221,7 @@ const styles = StyleSheet.create({
 		color: '#333',
 	},
 	filterModeItemSelected: {
-		backgroundColor: '#007ACC',
+		backgroundColor: '#0095FF',
 	},
 	filterModeTextSelected: {
 		color: '#fff',
@@ -261,7 +256,7 @@ const styles = StyleSheet.create({
 		color: '#333',
 	},
 	tagItemSelected: {
-		backgroundColor: '#007ACC',
+		backgroundColor: '#0095FF',
 	},
 	tagTextSelected: {
 		color: '#fff',
