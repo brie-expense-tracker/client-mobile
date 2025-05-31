@@ -3,7 +3,7 @@ export interface Transaction {
 	description: string;
 	amount: number;
 	date: string; // ISO string
-	tags: string[];
+	category: string[];
 	type: 'income' | 'expense';
 }
 
@@ -14,7 +14,7 @@ export const transactions: Transaction[] = [
 		description: 'Monthly Salary',
 		amount: 3200,
 		date: '2024-03-01',
-		tags: ['Work', 'Salary'],
+		category: ['Work', 'Salary'],
 		type: 'income',
 	},
 	{
@@ -22,7 +22,7 @@ export const transactions: Transaction[] = [
 		description: 'Monthly Salary',
 		amount: 3200,
 		date: '2024-02-01',
-		tags: ['Work', 'Salary'],
+		category: ['Work', 'Salary'],
 		type: 'income',
 	},
 	{
@@ -30,7 +30,7 @@ export const transactions: Transaction[] = [
 		description: 'Monthly Salary',
 		amount: 3200,
 		date: '2024-01-01',
-		tags: ['Work', 'Salary'],
+		category: ['Work', 'Salary'],
 		type: 'income',
 	},
 	{
@@ -38,7 +38,7 @@ export const transactions: Transaction[] = [
 		description: 'Freelance Project',
 		amount: 750,
 		date: '2024-02-15',
-		tags: ['Work', 'Freelance'],
+		category: ['Work', 'Freelance'],
 		type: 'income',
 	},
 	{
@@ -46,7 +46,7 @@ export const transactions: Transaction[] = [
 		description: 'Consulting Work',
 		amount: 1200,
 		date: '2024-01-20',
-		tags: ['Work', 'Consulting'],
+		category: ['Work', 'Consulting'],
 		type: 'income',
 	},
 	{
@@ -54,7 +54,7 @@ export const transactions: Transaction[] = [
 		description: 'Tax Refund',
 		amount: 850,
 		date: '2024-02-28',
-		tags: ['Tax'],
+		category: ['Tax'],
 		type: 'income',
 	},
 
@@ -64,7 +64,7 @@ export const transactions: Transaction[] = [
 		description: 'Rent',
 		amount: 1200,
 		date: '2024-03-01',
-		tags: ['Housing'],
+		category: ['Housing'],
 		type: 'expense',
 	},
 	{
@@ -72,7 +72,7 @@ export const transactions: Transaction[] = [
 		description: 'Rent',
 		amount: 1200,
 		date: '2024-02-01',
-		tags: ['Housing'],
+		category: ['Housing'],
 		type: 'expense',
 	},
 	{
@@ -80,7 +80,7 @@ export const transactions: Transaction[] = [
 		description: 'Rent',
 		amount: 1200,
 		date: '2024-01-01',
-		tags: ['Housing'],
+		category: ['Housing'],
 		type: 'expense',
 	},
 	{
@@ -88,7 +88,7 @@ export const transactions: Transaction[] = [
 		description: 'Electric Bill',
 		amount: 85,
 		date: '2024-03-05',
-		tags: ['Utilities'],
+		category: ['Utilities'],
 		type: 'expense',
 	},
 	{
@@ -96,7 +96,7 @@ export const transactions: Transaction[] = [
 		description: 'Electric Bill',
 		amount: 95,
 		date: '2024-02-05',
-		tags: ['Utilities'],
+		category: ['Utilities'],
 		type: 'expense',
 	},
 	{
@@ -104,7 +104,7 @@ export const transactions: Transaction[] = [
 		description: 'Electric Bill',
 		amount: 110,
 		date: '2024-01-05',
-		tags: ['Utilities'],
+		category: ['Utilities'],
 		type: 'expense',
 	},
 	{
@@ -112,7 +112,7 @@ export const transactions: Transaction[] = [
 		description: 'Internet Bill',
 		amount: 65,
 		date: '2024-03-10',
-		tags: ['Utilities'],
+		category: ['Utilities'],
 		type: 'expense',
 	},
 	{
@@ -120,7 +120,7 @@ export const transactions: Transaction[] = [
 		description: 'Internet Bill',
 		amount: 65,
 		date: '2024-02-10',
-		tags: ['Utilities'],
+		category: ['Utilities'],
 		type: 'expense',
 	},
 	{
@@ -128,7 +128,7 @@ export const transactions: Transaction[] = [
 		description: 'Internet Bill',
 		amount: 65,
 		date: '2024-01-10',
-		tags: ['Utilities'],
+		category: ['Utilities'],
 		type: 'expense',
 	},
 
@@ -138,7 +138,7 @@ export const transactions: Transaction[] = [
 		description: 'Weekly Groceries',
 		amount: 85.5,
 		date: '2024-03-15',
-		tags: ['Food', 'Groceries'],
+		category: ['Food', 'Groceries'],
 		type: 'expense',
 	},
 	{
@@ -146,7 +146,7 @@ export const transactions: Transaction[] = [
 		description: 'Weekly Groceries',
 		amount: 92.75,
 		date: '2024-03-08',
-		tags: ['Food', 'Groceries'],
+		category: ['Food', 'Groceries'],
 		type: 'expense',
 	},
 	{
@@ -154,7 +154,7 @@ export const transactions: Transaction[] = [
 		description: 'Weekly Groceries',
 		amount: 78.25,
 		date: '2024-03-01',
-		tags: ['Food', 'Groceries'],
+		category: ['Food', 'Groceries'],
 		type: 'expense',
 	},
 	{
@@ -162,7 +162,7 @@ export const transactions: Transaction[] = [
 		description: 'Restaurant Dinner',
 		amount: 45.8,
 		date: '2024-03-20',
-		tags: ['Food', 'Dining'],
+		category: ['Food', 'Dining'],
 		type: 'expense',
 	},
 	{
@@ -170,7 +170,7 @@ export const transactions: Transaction[] = [
 		description: 'Coffee Shop',
 		amount: 4.75,
 		date: '2024-03-19',
-		tags: ['Food', 'Coffee'],
+		category: ['Food', 'Coffee'],
 		type: 'expense',
 	},
 
@@ -180,7 +180,7 @@ export const transactions: Transaction[] = [
 		description: 'Gas Station',
 		amount: 45.0,
 		date: '2024-03-18',
-		tags: ['Transportation', 'Gas'],
+		category: ['Transportation', 'Gas'],
 		type: 'expense',
 	},
 	{
@@ -188,7 +188,7 @@ export const transactions: Transaction[] = [
 		description: 'Gas Station',
 		amount: 42.5,
 		date: '2024-03-04',
-		tags: ['Transportation', 'Gas'],
+		category: ['Transportation', 'Gas'],
 		type: 'expense',
 	},
 	{
@@ -196,7 +196,7 @@ export const transactions: Transaction[] = [
 		description: 'Uber Ride',
 		amount: 25.75,
 		date: '2024-03-17',
-		tags: ['Transportation', 'Ride Share'],
+		category: ['Transportation', 'Ride Share'],
 		type: 'expense',
 	},
 
@@ -206,7 +206,7 @@ export const transactions: Transaction[] = [
 		description: 'Netflix Subscription',
 		amount: 15.99,
 		date: '2024-03-01',
-		tags: ['Entertainment', 'Streaming'],
+		category: ['Entertainment', 'Streaming'],
 		type: 'expense',
 	},
 	{
@@ -214,7 +214,7 @@ export const transactions: Transaction[] = [
 		description: 'Spotify Premium',
 		amount: 9.99,
 		date: '2024-03-01',
-		tags: ['Entertainment', 'Music'],
+		category: ['Entertainment', 'Music'],
 		type: 'expense',
 	},
 	{
@@ -222,7 +222,7 @@ export const transactions: Transaction[] = [
 		description: 'Movie Tickets',
 		amount: 28.5,
 		date: '2024-03-16',
-		tags: ['Entertainment', 'Movies'],
+		category: ['Entertainment', 'Movies'],
 		type: 'expense',
 	},
 
@@ -232,7 +232,7 @@ export const transactions: Transaction[] = [
 		description: 'Amazon Purchase',
 		amount: 65.99,
 		date: '2024-03-14',
-		tags: ['Shopping', 'Online'],
+		category: ['Shopping', 'Online'],
 		type: 'expense',
 	},
 	{
@@ -240,7 +240,7 @@ export const transactions: Transaction[] = [
 		description: 'Clothing Store',
 		amount: 89.99,
 		date: '2024-03-12',
-		tags: ['Shopping', 'Clothing'],
+		category: ['Shopping', 'Clothing'],
 		type: 'expense',
 	},
 
@@ -250,7 +250,7 @@ export const transactions: Transaction[] = [
 		description: 'Gym Membership',
 		amount: 45.0,
 		date: '2024-03-01',
-		tags: ['Health', 'Fitness'],
+		category: ['Health', 'Fitness'],
 		type: 'expense',
 	},
 	{
@@ -258,7 +258,7 @@ export const transactions: Transaction[] = [
 		description: 'Pharmacy',
 		amount: 32.5,
 		date: '2024-03-10',
-		tags: ['Health', 'Medical'],
+		category: ['Health', 'Medical'],
 		type: 'expense',
 	},
 
@@ -268,7 +268,7 @@ export const transactions: Transaction[] = [
 		description: 'Side Project Payment',
 		amount: 500,
 		date: '2024-03-15',
-		tags: ['Work', 'Freelance'],
+		category: ['Work', 'Freelance'],
 		type: 'income',
 	},
 	{
@@ -276,7 +276,7 @@ export const transactions: Transaction[] = [
 		description: 'Investment Dividend',
 		amount: 120.75,
 		date: '2024-03-20',
-		tags: ['Investment'],
+		category: ['Investment'],
 		type: 'income',
 	},
 
@@ -286,7 +286,7 @@ export const transactions: Transaction[] = [
 		description: 'Haircut',
 		amount: 35.0,
 		date: '2024-03-11',
-		tags: ['Personal Care'],
+		category: ['Personal Care'],
 		type: 'expense',
 	},
 	{
@@ -294,7 +294,7 @@ export const transactions: Transaction[] = [
 		description: 'Phone Bill',
 		amount: 75.0,
 		date: '2024-03-01',
-		tags: ['Utilities', 'Phone'],
+		category: ['Utilities', 'Phone'],
 		type: 'expense',
 	},
 	{
@@ -302,7 +302,7 @@ export const transactions: Transaction[] = [
 		description: 'Car Insurance',
 		amount: 120.0,
 		date: '2024-03-01',
-		tags: ['Insurance', 'Transportation'],
+		category: ['Insurance', 'Transportation'],
 		type: 'expense',
 	},
 	{
@@ -310,7 +310,7 @@ export const transactions: Transaction[] = [
 		description: 'Home Insurance',
 		amount: 85.0,
 		date: '2024-03-01',
-		tags: ['Insurance', 'Housing'],
+		category: ['Insurance', 'Housing'],
 		type: 'expense',
 	},
 	{
@@ -318,7 +318,7 @@ export const transactions: Transaction[] = [
 		description: 'Gift Purchase',
 		amount: 45.99,
 		date: '2024-03-18',
-		tags: ['Shopping', 'Gifts'],
+		category: ['Shopping', 'Gifts'],
 		type: 'expense',
 	},
 	{
@@ -326,7 +326,7 @@ export const transactions: Transaction[] = [
 		description: 'Book Purchase',
 		amount: 24.99,
 		date: '2024-03-16',
-		tags: ['Shopping', 'Books'],
+		category: ['Shopping', 'Books'],
 		type: 'expense',
 	},
 	{
@@ -334,7 +334,7 @@ export const transactions: Transaction[] = [
 		description: 'Charity Donation',
 		amount: 50.0,
 		date: '2024-03-15',
-		tags: ['Charity'],
+		category: ['Charity'],
 		type: 'expense',
 	},
 	{
@@ -342,7 +342,7 @@ export const transactions: Transaction[] = [
 		description: 'Software Subscription',
 		amount: 29.99,
 		date: '2024-03-01',
-		tags: ['Software', 'Subscription'],
+		category: ['Software', 'Subscription'],
 		type: 'expense',
 	},
 	{
@@ -350,7 +350,7 @@ export const transactions: Transaction[] = [
 		description: 'Concert Tickets',
 		amount: 89.99,
 		date: '2024-03-13',
-		tags: ['Entertainment', 'Music'],
+		category: ['Entertainment', 'Music'],
 		type: 'expense',
 	},
 	{
@@ -358,7 +358,7 @@ export const transactions: Transaction[] = [
 		description: 'Home Maintenance',
 		amount: 150.0,
 		date: '2024-03-09',
-		tags: ['Housing', 'Maintenance'],
+		category: ['Housing', 'Maintenance'],
 		type: 'expense',
 	},
 	{
@@ -366,7 +366,7 @@ export const transactions: Transaction[] = [
 		description: 'Monthly Salary',
 		amount: 3400,
 		date: '2025-05-01',
-		tags: ['Work', 'Salary'],
+		category: ['Work', 'Salary'],
 		type: 'income',
 	},
 	{
@@ -374,7 +374,7 @@ export const transactions: Transaction[] = [
 		description: 'Monthly Salary',
 		amount: 3400,
 		date: '2025-04-01',
-		tags: ['Work', 'Salary'],
+		category: ['Work', 'Salary'],
 		type: 'income',
 	},
 	{
@@ -382,7 +382,7 @@ export const transactions: Transaction[] = [
 		description: 'Freelance Project',
 		amount: 1200,
 		date: '2025-04-15',
-		tags: ['Work', 'Freelance'],
+		category: ['Work', 'Freelance'],
 		type: 'income',
 	},
 	{
@@ -390,7 +390,7 @@ export const transactions: Transaction[] = [
 		description: 'Investment Dividend',
 		amount: 150.25,
 		date: '2025-05-20',
-		tags: ['Investment'],
+		category: ['Investment'],
 		type: 'income',
 	},
 	{
@@ -398,7 +398,7 @@ export const transactions: Transaction[] = [
 		description: 'Rent',
 		amount: 1250,
 		date: '2025-05-01',
-		tags: ['Housing'],
+		category: ['Housing'],
 		type: 'expense',
 	},
 	{
@@ -406,7 +406,7 @@ export const transactions: Transaction[] = [
 		description: 'Rent',
 		amount: 1250,
 		date: '2025-04-01',
-		tags: ['Housing'],
+		category: ['Housing'],
 		type: 'expense',
 	},
 	{
@@ -414,7 +414,7 @@ export const transactions: Transaction[] = [
 		description: 'Electric Bill',
 		amount: 95,
 		date: '2025-05-05',
-		tags: ['Utilities'],
+		category: ['Utilities'],
 		type: 'expense',
 	},
 	{
@@ -422,7 +422,7 @@ export const transactions: Transaction[] = [
 		description: 'Electric Bill',
 		amount: 88,
 		date: '2025-04-05',
-		tags: ['Utilities'],
+		category: ['Utilities'],
 		type: 'expense',
 	},
 	{
@@ -430,7 +430,7 @@ export const transactions: Transaction[] = [
 		description: 'Internet Bill',
 		amount: 70,
 		date: '2025-05-10',
-		tags: ['Utilities'],
+		category: ['Utilities'],
 		type: 'expense',
 	},
 	{
@@ -438,7 +438,7 @@ export const transactions: Transaction[] = [
 		description: 'Internet Bill',
 		amount: 70,
 		date: '2025-04-10',
-		tags: ['Utilities'],
+		category: ['Utilities'],
 		type: 'expense',
 	},
 	{
@@ -446,7 +446,7 @@ export const transactions: Transaction[] = [
 		description: 'Weekly Groceries',
 		amount: 92.5,
 		date: '2025-05-15',
-		tags: ['Food', 'Groceries'],
+		category: ['Food', 'Groceries'],
 		type: 'expense',
 	},
 	{
@@ -454,7 +454,7 @@ export const transactions: Transaction[] = [
 		description: 'Weekly Groceries',
 		amount: 88.75,
 		date: '2025-04-15',
-		tags: ['Food', 'Groceries'],
+		category: ['Food', 'Groceries'],
 		type: 'expense',
 	},
 	{
@@ -462,7 +462,7 @@ export const transactions: Transaction[] = [
 		description: 'Restaurant Dinner',
 		amount: 52.4,
 		date: '2025-05-20',
-		tags: ['Food', 'Dining'],
+		category: ['Food', 'Dining'],
 		type: 'expense',
 	},
 	{
@@ -470,7 +470,7 @@ export const transactions: Transaction[] = [
 		description: 'Gas Station',
 		amount: 48.5,
 		date: '2025-05-18',
-		tags: ['Transportation', 'Gas'],
+		category: ['Transportation', 'Gas'],
 		type: 'expense',
 	},
 	{
@@ -478,7 +478,7 @@ export const transactions: Transaction[] = [
 		description: 'Netflix Subscription',
 		amount: 16.99,
 		date: '2025-05-01',
-		tags: ['Entertainment', 'Streaming'],
+		category: ['Entertainment', 'Streaming'],
 		type: 'expense',
 	},
 	{
@@ -486,7 +486,7 @@ export const transactions: Transaction[] = [
 		description: 'Spotify Premium',
 		amount: 10.99,
 		date: '2025-05-01',
-		tags: ['Entertainment', 'Music'],
+		category: ['Entertainment', 'Music'],
 		type: 'expense',
 	},
 	{
@@ -494,7 +494,7 @@ export const transactions: Transaction[] = [
 		description: 'Gym Membership',
 		amount: 47.5,
 		date: '2025-05-01',
-		tags: ['Health', 'Fitness'],
+		category: ['Health', 'Fitness'],
 		type: 'expense',
 	},
 	{
@@ -502,7 +502,7 @@ export const transactions: Transaction[] = [
 		description: 'Phone Bill',
 		amount: 78.5,
 		date: '2025-05-01',
-		tags: ['Utilities', 'Phone'],
+		category: ['Utilities', 'Phone'],
 		type: 'expense',
 	},
 	{
@@ -510,7 +510,7 @@ export const transactions: Transaction[] = [
 		description: 'Car Insurance',
 		amount: 125.0,
 		date: '2025-05-01',
-		tags: ['Insurance', 'Transportation'],
+		category: ['Insurance', 'Transportation'],
 		type: 'expense',
 	},
 	{
@@ -518,7 +518,7 @@ export const transactions: Transaction[] = [
 		description: 'Home Insurance',
 		amount: 88.0,
 		date: '2025-05-01',
-		tags: ['Insurance', 'Housing'],
+		category: ['Insurance', 'Housing'],
 		type: 'expense',
 	},
 ];

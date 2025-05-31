@@ -33,9 +33,9 @@ import axios from 'axios';
 type RootStackParamList = {
 	Tracker: undefined;
 	historyFilterScreen: {
-		selectedTag: string;
+		selectedCategory: string;
 		dateFilterMode: string;
-		allTags: string[];
+		allCategories: string[];
 	};
 };
 
@@ -141,7 +141,7 @@ const TransactionRow = ({
 				<Animated.View style={[styles.txRow, animatedStyle]}>
 					<View style={{ flex: 1 }}>
 						<Text style={styles.txDesc}>{item.description}</Text>
-						<Text style={styles.txTags}>{item.tags.join(', ')}</Text>
+						<Text style={styles.txCategory}>{item.category.join(', ')}</Text>
 					</View>
 					<View style={styles.txRight}>
 						<Text
@@ -175,12 +175,12 @@ export default function TransactionScreen() {
 	const [isLoading, setIsLoading] = useState(true);
 	const navigation = useNavigation<NavigationProp>();
 	const params = useLocalSearchParams<{
-		selectedTags?: string;
+		selectedCategory?: string;
 		dateFilterMode?: string;
-		allTags?: string;
+		allCategories?: string;
 	}>();
-	const [selectedTags, setSelectedTags] = useState<string[]>(() =>
-		params.selectedTags ? JSON.parse(params.selectedTags) : []
+	const [selectedCategories, setSelectedCategories] = useState<string[]>(() =>
+		params.selectedCategory ? JSON.parse(params.selectedCategory) : []
 	);
 	const [dateFilterMode, setDateFilterMode] = useState<string>(
 		params.dateFilterMode ?? 'month'
@@ -198,7 +198,9 @@ export default function TransactionScreen() {
 				description: t.description || '',
 				amount: Number(t.amount) || 0,
 				date: new Date(t.date).toISOString().split('T')[0], // Format as YYYY-MM-DD
-				tags: Array.isArray(t.tags) ? t.tags : [t.category || 'Uncategorized'], // Use category as tag if no tags
+				category: Array.isArray(t.category)
+					? t.category
+					: [t.category || 'Uncategorized'], // Use category if no category array
 				type: t.type === 'income' ? 'income' : 'expense', // Ensure type is either 'income' or 'expense'
 			}));
 			setTransactions(formattedTransactions);
@@ -215,28 +217,28 @@ export default function TransactionScreen() {
 		fetchTransactions();
 	}, []);
 
-	// derive unique tags from data
-	const allTags = useMemo(() => {
-		const tagSet = new Set<string>();
+	// derive unique categories from data
+	const allCategories = useMemo(() => {
+		const categorySet = new Set<string>();
 		transactions.forEach((tx) => {
-			if (tx.tags && Array.isArray(tx.tags)) {
-				tx.tags.forEach((tag) => {
-					if (typeof tag === 'string' && tag.trim()) {
-						tagSet.add(tag.trim());
+			if (tx.category && Array.isArray(tx.category)) {
+				tx.category.forEach((cat) => {
+					if (typeof cat === 'string' && cat.trim()) {
+						categorySet.add(cat.trim());
 					}
 				});
 			}
 		});
-		return Array.from(tagSet).sort((a, b) => a.localeCompare(b));
+		return Array.from(categorySet).sort((a, b) => a.localeCompare(b));
 	}, [transactions]);
 
 	const handleFilterPress = () => {
 		router.push({
 			pathname: './transaction/historyFilter',
 			params: {
-				selectedTags: JSON.stringify(selectedTags),
+				selectedCategory: JSON.stringify(selectedCategories),
 				dateFilterMode,
-				allTags: JSON.stringify(allTags),
+				allCategories: JSON.stringify(allCategories),
 			},
 		});
 	};
@@ -247,10 +249,11 @@ export default function TransactionScreen() {
 			const txDate = tx.date.slice(0, 10); // YYYY-MM-DD
 			const txMonth = tx.date.slice(0, 7); // YYYY-MM
 
-			// Check if transaction has any of the selected tags
-			const tagMatch =
-				selectedTags.length === 0 ||
-				(tx.tags && tx.tags.some((tag) => selectedTags.includes(tag)));
+			// Check if transaction has any of the selected categories
+			const categoryMatch =
+				selectedCategories.length === 0 ||
+				(tx.category &&
+					tx.category.some((cat) => selectedCategories.includes(cat)));
 
 			// Apply date filtering based on mode
 			let dateMatch = true;
@@ -260,14 +263,14 @@ export default function TransactionScreen() {
 				dateMatch = true;
 			}
 
-			return tagMatch && dateMatch;
+			return categoryMatch && dateMatch;
 		});
 
 		// Sort by date in descending order (newest first)
 		return filteredData.sort(
 			(a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
 		);
-	}, [transactions, selectedTags, selectedDate, dateFilterMode]);
+	}, [transactions, selectedCategories, selectedDate, dateFilterMode]);
 
 	// Group transactions by month
 	const groupedTransactions = useMemo(() => {
@@ -536,7 +539,7 @@ const styles = StyleSheet.create({
 		backgroundColor: '#fff',
 	},
 	txDesc: { fontSize: 16, fontWeight: '500' },
-	txTags: { fontSize: 12, color: '#666', marginTop: 4 },
+	txCategory: { fontSize: 12, color: '#666', marginTop: 4 },
 	txRight: { alignItems: 'flex-end' },
 	txAmount: {
 		fontSize: 16,
