@@ -10,14 +10,25 @@ import {
 	Modal,
 	TouchableWithoutFeedback,
 	StatusBar,
+	Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { router } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Calendar } from 'react-native-calendars';
-import { Transaction, transactions as dummyData } from '../data/transactions';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+	useAnimatedStyle,
+	useSharedValue,
+	withSpring,
+} from 'react-native-reanimated';
+import {
+	Transaction,
+	transactions as dummyData,
+} from '../../data/transactions';
+import axios from 'axios';
 
 type RootStackParamList = {
 	Tracker: undefined;
@@ -90,26 +101,124 @@ const getLocalIsoDate = (): string => {
 	return localDate.toISOString().split('T')[0];
 };
 
+const TransactionRow = ({
+	item,
+	onDelete,
+}: {
+	item: Transaction;
+	onDelete: (id: string) => void;
+}) => {
+	const translateX = useSharedValue(0);
+	const context = useSharedValue({ x: 0 });
+
+	const gesture = Gesture.Pan()
+		.onStart(() => {
+			context.value = { x: translateX.value };
+		})
+		.onUpdate((event) => {
+			translateX.value = event.translationX + context.value.x;
+		})
+		.onEnd(() => {
+			if (translateX.value < -50) {
+				translateX.value = withSpring(-80);
+			} else {
+				translateX.value = withSpring(0);
+			}
+		});
+
+	const animatedStyle = useAnimatedStyle(() => ({
+		transform: [{ translateX: translateX.value }],
+	}));
+
+	return (
+		<View style={styles.txRowContainer}>
+			<View style={styles.deleteAction}>
+				<TouchableOpacity onPress={() => onDelete(item.id)}>
+					<Ionicons name="trash-outline" size={24} color="#fff" />
+				</TouchableOpacity>
+			</View>
+			<GestureDetector gesture={gesture}>
+				<Animated.View style={[styles.txRow, animatedStyle]}>
+					<View style={{ flex: 1 }}>
+						<Text style={styles.txDesc}>{item.description}</Text>
+						<Text style={styles.txTags}>{item.tags.join(', ')}</Text>
+					</View>
+					<View style={styles.txRight}>
+						<Text
+							style={[
+								styles.txAmount,
+								item.type === 'income'
+									? styles.incomeAmount
+									: styles.expenseAmount,
+							]}
+						>
+							{item.type === 'income' ? '+' : '-'}${item.amount.toFixed(2)}
+						</Text>
+						<Text style={styles.txDate}>{item.date.slice(5)}</Text>
+					</View>
+				</Animated.View>
+			</GestureDetector>
+		</View>
+	);
+};
+
 export default function TransactionScreen() {
-	const [selectedTags, setSelectedTags] = useState<string[]>([]);
-	const [dateFilterMode, setDateFilterMode] = useState<string>('month');
 	const [selectedDate, setSelectedDate] = useState<string>(() => {
-		// Get the most recent transaction date instead of today
-		const dates = dummyData.map((tx) => tx.date);
-		return dates.sort().reverse()[0]; // Get the most recent date
+		return getLocalIsoDate();
 	});
 	const [modalVisible, setModalVisible] = useState(false);
 	const [activePicker, setActivePicker] = useState<
 		'calendar' | 'dateMode' | null
 	>(null);
 	const [tempSelection, setTempSelection] = useState<string>('');
+	const [transactions, setTransactions] = useState<Transaction[]>([]);
+	const [isLoading, setIsLoading] = useState(true);
 	const navigation = useNavigation<NavigationProp>();
+	const params = useLocalSearchParams<{
+		selectedTags?: string;
+		dateFilterMode?: string;
+		allTags?: string;
+	}>();
+	const [selectedTags, setSelectedTags] = useState<string[]>(() =>
+		params.selectedTags ? JSON.parse(params.selectedTags) : []
+	);
+	const [dateFilterMode, setDateFilterMode] = useState<string>(
+		params.dateFilterMode ?? 'month'
+	);
+
+	const fetchTransactions = async () => {
+		setIsLoading(true);
+		try {
+			const response = await axios.get(
+				'http://localhost:3000/api/transactions'
+			);
+			// Format the response data to match our Transaction type exactly
+			const formattedTransactions = response.data.map((t: any) => ({
+				id: t._id, // Use the API's ID
+				description: t.description || '',
+				amount: Number(t.amount) || 0,
+				date: new Date(t.date).toISOString().split('T')[0], // Format as YYYY-MM-DD
+				tags: Array.isArray(t.tags) ? t.tags : [t.category || 'Uncategorized'], // Use category as tag if no tags
+				type: t.type === 'income' ? 'income' : 'expense', // Ensure type is either 'income' or 'expense'
+			}));
+			setTransactions(formattedTransactions);
+		} catch (error) {
+			console.error('Error fetching transactions:', error);
+			// Fallback to dummy data if API call fails
+			setTransactions(dummyData);
+		} finally {
+			setIsLoading(false);
+		}
+	};
+
+	useEffect(() => {
+		fetchTransactions();
+	}, []);
 
 	// derive unique tags from data
 	const allTags = useMemo(() => {
 		const tagSet = new Set<string>();
-		dummyData.forEach((tx) => {
-			// Make sure tx.tags exists and is an array
+		transactions.forEach((tx) => {
 			if (tx.tags && Array.isArray(tx.tags)) {
 				tx.tags.forEach((tag) => {
 					if (typeof tag === 'string' && tag.trim()) {
@@ -118,13 +227,12 @@ export default function TransactionScreen() {
 				});
 			}
 		});
-		// Convert to array and sort alphabetically
 		return Array.from(tagSet).sort((a, b) => a.localeCompare(b));
-	}, []);
+	}, [transactions]);
 
 	const handleFilterPress = () => {
 		router.push({
-			pathname: '/screens/historyFilterScreen',
+			pathname: './transaction/historyFilter',
 			params: {
 				selectedTags: JSON.stringify(selectedTags),
 				dateFilterMode,
@@ -133,52 +241,13 @@ export default function TransactionScreen() {
 		});
 	};
 
-	// Add this effect to handle filter changes
-	useEffect(() => {
-		const unsubscribe = navigation.addListener('focus', () => {
-			const params = navigation
-				.getState()
-				.routes.find((r) => r.name === 'historyFilterScreen')?.params as
-				| {
-						selectedTags?: string;
-						dateFilterMode?: string;
-						allTags?: string;
-				  }
-				| undefined;
-
-			if (params) {
-				if (params.selectedTags !== undefined) {
-					setSelectedTags(JSON.parse(params.selectedTags));
-				}
-				if (params.dateFilterMode !== undefined) {
-					setDateFilterMode(params.dateFilterMode);
-				}
-				// If we have a date filter mode, we should update the selected date
-				if (params.dateFilterMode === 'month') {
-					// Get the most recent transaction date for the current month
-					const dates = dummyData
-						.filter((tx) =>
-							tx.date.startsWith(new Date().toISOString().slice(0, 7))
-						)
-						.map((tx) => tx.date);
-					if (dates.length > 0) {
-						setSelectedDate(dates.sort().reverse()[0]);
-					}
-				}
-			}
-		});
-
-		return unsubscribe;
-	}, [navigation]);
-
 	// filter transactions
 	const filtered = useMemo(() => {
-		const filteredData = dummyData.filter((tx) => {
+		const filteredData = transactions.filter((tx) => {
 			const txDate = tx.date.slice(0, 10); // YYYY-MM-DD
 			const txMonth = tx.date.slice(0, 7); // YYYY-MM
 
 			// Check if transaction has any of the selected tags
-			// If no tags are selected, show all transactions
 			const tagMatch =
 				selectedTags.length === 0 ||
 				(tx.tags && tx.tags.some((tag) => selectedTags.includes(tag)));
@@ -187,11 +256,9 @@ export default function TransactionScreen() {
 			let dateMatch = true;
 			if (dateFilterMode === 'day' && selectedDate) {
 				dateMatch = txDate === selectedDate;
+			} else if (dateFilterMode === 'month') {
+				dateMatch = true;
 			}
-			// Remove month filtering when in month mode to show all months
-			// else if (dateFilterMode === 'month' && selectedDate) {
-			// 	dateMatch = txMonth === selectedDate.slice(0, 7);
-			// }
 
 			return tagMatch && dateMatch;
 		});
@@ -200,7 +267,7 @@ export default function TransactionScreen() {
 		return filteredData.sort(
 			(a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
 		);
-	}, [selectedTags, selectedDate, dateFilterMode]);
+	}, [transactions, selectedTags, selectedDate, dateFilterMode]);
 
 	// Group transactions by month
 	const groupedTransactions = useMemo(() => {
@@ -243,6 +310,39 @@ export default function TransactionScreen() {
 		setActivePicker(null);
 	};
 
+	const handleDeleteTransaction = async (id: string) => {
+		try {
+			await axios.delete(`http://localhost:3000/api/transactions/${id}`);
+			setTransactions(transactions.filter((tx) => tx.id !== id));
+		} catch (error) {
+			console.error('Error deleting transaction:', error);
+			Alert.alert('Error', 'Failed to delete transaction');
+		}
+	};
+
+	const renderTransaction = ({ item }: { item: Transaction }) => (
+		<TransactionRow
+			item={item}
+			onDelete={(id) => {
+				Alert.alert(
+					'Delete Transaction',
+					'Are you sure you want to delete this transaction?',
+					[
+						{
+							text: 'Cancel',
+							style: 'cancel',
+						},
+						{
+							text: 'Delete',
+							style: 'destructive',
+							onPress: () => handleDeleteTransaction(id),
+						},
+					]
+				);
+			}}
+		/>
+	);
+
 	const renderDateHeader = () => {
 		if (dateFilterMode !== 'day' || !selectedDate) return null;
 		return (
@@ -258,26 +358,6 @@ export default function TransactionScreen() {
 		</View>
 	);
 
-	const renderTransaction = ({ item }: { item: Transaction }) => (
-		<View style={styles.txRow}>
-			<View style={{ flex: 1 }}>
-				<Text style={styles.txDesc}>{item.description}</Text>
-				<Text style={styles.txTags}>{item.tags.join(', ')}</Text>
-			</View>
-			<View style={styles.txRight}>
-				<Text
-					style={[
-						styles.txAmount,
-						item.type === 'income' ? styles.incomeAmount : styles.expenseAmount,
-					]}
-				>
-					{item.type === 'income' ? '+' : '-'}${item.amount.toFixed(2)}
-				</Text>
-				<Text style={styles.txDate}>{item.date.slice(5)}</Text>
-			</View>
-		</View>
-	);
-
 	return (
 		<View style={styles.mainContainer}>
 			<StatusBar
@@ -289,14 +369,7 @@ export default function TransactionScreen() {
 				<View style={styles.container}>
 					{/* Header */}
 					<View style={styles.headerContainer}>
-						<View style={styles.headerLeft}>
-							{/* <TouchableOpacity
-								onPress={() => router.back()}
-								style={{ zIndex: 1000 }}
-							>
-								<Ionicons name="chevron-back-outline" size={36} color="#555" />
-							</TouchableOpacity> */}
-						</View>
+						<View style={styles.headerLeft} />
 						<Text style={styles.headerTitle}>History</Text>
 						<View style={styles.headerRight}>
 							<TouchableOpacity
@@ -346,7 +419,7 @@ export default function TransactionScreen() {
 							<View style={styles.empty}>
 								<Ionicons name="document-outline" size={48} color="#ccc" />
 								<Text style={{ color: '#888', marginTop: 8 }}>
-									No transactions
+									{isLoading ? 'Loading...' : 'No transactions'}
 								</Text>
 							</View>
 						}
@@ -450,6 +523,9 @@ const styles = StyleSheet.create({
 		borderColor: '#ddd',
 		borderRadius: 6,
 		overflow: 'hidden',
+	},
+	txRowContainer: {
+		position: 'relative',
 	},
 	txRow: {
 		flexDirection: 'row',
@@ -580,5 +656,15 @@ const styles = StyleSheet.create({
 		fontSize: 20,
 		fontWeight: '600',
 		color: '#000000',
+	},
+	deleteAction: {
+		position: 'absolute',
+		right: 0,
+		top: 0,
+		bottom: 0,
+		width: 80,
+		backgroundColor: '#ff3b30',
+		justifyContent: 'center',
+		alignItems: 'center',
 	},
 });
