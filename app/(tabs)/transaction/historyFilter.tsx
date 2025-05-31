@@ -17,30 +17,34 @@ const dateFilterModes = [
 
 export default function HistoryFilterScreen() {
 	const params = useLocalSearchParams<{
-		selectedTags: string;
+		selectedCategory: string;
 		dateFilterMode: string;
-		allTags: string;
+		allCategories: string;
 	}>();
 
 	// Initialize local state from params
-	const [localSelectedTags, setLocalSelectedTags] = useState<string[]>(
-		params?.selectedTags ? JSON.parse(params.selectedTags) : []
-	);
+	const [localSelectedCategories, setLocalSelectedCategories] = useState<
+		string[]
+	>(params?.selectedCategory ? JSON.parse(params.selectedCategory) : []);
 	const [localDateFilterMode, setLocalDateFilterMode] = useState<string>(
 		params?.dateFilterMode ?? 'month'
 	);
-	const availableTags = params?.allTags ? JSON.parse(params.allTags) : [];
+	const availableCategories = params?.allCategories
+		? JSON.parse(params.allCategories)
+		: [];
 
-	const handleTagSelect = (tag: string) => {
-		if (tag === '') {
-			// If "All Tags" is selected, clear all selections
-			setLocalSelectedTags([]);
+	const handleCategorySelect = (category: string) => {
+		if (category === '') {
+			// If "All Categories" is selected, clear all selections
+			setLocalSelectedCategories([]);
 		} else {
-			// Toggle the selected tag
-			if (localSelectedTags.includes(tag)) {
-				setLocalSelectedTags(localSelectedTags.filter((t) => t !== tag));
+			// Toggle the selected category
+			if (localSelectedCategories.includes(category)) {
+				setLocalSelectedCategories(
+					localSelectedCategories.filter((c) => c !== category)
+				);
 			} else {
-				setLocalSelectedTags([...localSelectedTags, tag]);
+				setLocalSelectedCategories([...localSelectedCategories, category]);
 			}
 		}
 	};
@@ -53,9 +57,9 @@ export default function HistoryFilterScreen() {
 		router.replace({
 			pathname: '/transaction',
 			params: {
-				selectedTags: JSON.stringify(localSelectedTags),
+				selectedCategory: JSON.stringify(localSelectedCategories),
 				dateFilterMode: localDateFilterMode,
-				allTags: JSON.stringify(availableTags),
+				allCategories: JSON.stringify(availableCategories),
 			},
 		});
 	};
@@ -112,49 +116,56 @@ export default function HistoryFilterScreen() {
 
 					<View style={styles.dropdownDivider} />
 
-					{/* Tags Section */}
+					{/* Categories Section */}
 					<View style={styles.dropdownSection}>
-						<Text style={styles.dropdownSectionTitle}>Filter by Tags</Text>
-						<View style={styles.tagList}>
+						<Text style={styles.dropdownSectionTitle}>
+							Filter by Categories
+						</Text>
+						<View style={styles.categoryList}>
 							<TouchableOpacity
 								style={[
-									styles.tagItem,
-									localSelectedTags.length === 0 && styles.tagItemSelected,
+									styles.categoryItem,
+									localSelectedCategories.length === 0 &&
+										styles.categoryItemSelected,
 								]}
-								onPress={() => handleTagSelect('')}
+								onPress={() => handleCategorySelect('')}
 							>
 								<Text
 									style={[
-										styles.tagText,
-										localSelectedTags.length === 0 && styles.tagTextSelected,
+										styles.categoryText,
+										localSelectedCategories.length === 0 &&
+											styles.categoryTextSelected,
 									]}
 								>
-									All Tags
+									All Categories
 								</Text>
 							</TouchableOpacity>
-							{availableTags.length > 0 ? (
-								availableTags.map((tag: string) => (
+							{availableCategories.length > 0 ? (
+								availableCategories.map((category: string) => (
 									<TouchableOpacity
-										key={tag}
+										key={category}
 										style={[
-											styles.tagItem,
-											localSelectedTags.includes(tag) && styles.tagItemSelected,
+											styles.categoryItem,
+											localSelectedCategories.includes(category) &&
+												styles.categoryItemSelected,
 										]}
-										onPress={() => handleTagSelect(tag)}
+										onPress={() => handleCategorySelect(category)}
 									>
 										<Text
 											style={[
-												styles.tagText,
-												localSelectedTags.includes(tag) &&
-													styles.tagTextSelected,
+												styles.categoryText,
+												localSelectedCategories.includes(category) &&
+													styles.categoryTextSelected,
 											]}
 										>
-											{tag}
+											{category}
 										</Text>
 									</TouchableOpacity>
 								))
 							) : (
-								<Text style={styles.noTagsText}>No tags available</Text>
+								<Text style={styles.noCategoriesText}>
+									No categories available
+								</Text>
 							)}
 						</View>
 					</View>
@@ -240,28 +251,28 @@ const styles = StyleSheet.create({
 		color: '#333',
 		marginBottom: 12,
 	},
-	tagList: {
+	categoryList: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',
 		gap: 8,
 	},
-	tagItem: {
+	categoryItem: {
 		paddingHorizontal: 12,
 		paddingVertical: 6,
 		borderRadius: 16,
 		backgroundColor: '#f0f0f0',
 	},
-	tagText: {
+	categoryText: {
 		fontSize: 14,
 		color: '#333',
 	},
-	tagItemSelected: {
+	categoryItemSelected: {
 		backgroundColor: '#0095FF',
 	},
-	tagTextSelected: {
+	categoryTextSelected: {
 		color: '#fff',
 	},
-	noTagsText: {
+	noCategoriesText: {
 		color: '#666',
 		fontStyle: 'italic',
 		marginTop: 8,
