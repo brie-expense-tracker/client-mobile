@@ -63,6 +63,13 @@ const addTransactionScreen = () => {
 
 	const onSubmit = async (data: TransactionFormData) => {
 		try {
+			// Validate amount
+			const amount = parseFloat(data.amount);
+			if (isNaN(amount) || amount <= 0) {
+				Alert.alert('Error', 'Please enter a valid amount greater than 0');
+				return;
+			}
+
 			const response = await axios.post(
 				'http://localhost:3000/api/transactions',
 				data
@@ -255,14 +262,45 @@ const NumberPad: React.FC<{ onValueChange: (value: string) => void }> = ({
 }) => {
 	const [value, setValue] = useState('');
 
+	const validateAmount = (newValue: string): boolean => {
+		// Check if empty
+		if (!newValue) return true;
+
+		// Convert to number for validation
+		const numValue = parseFloat(newValue);
+
+		// Check if greater than 0
+		if (numValue <= 0) return false;
+
+		// Check if less than 1 million
+		if (numValue > 1000000) return false;
+
+		// Check decimal places
+		if (newValue.includes('.')) {
+			const decimalPlaces = newValue.split('.')[1].length;
+			if (decimalPlaces > 2) return false;
+		}
+
+		return true;
+	};
+
 	const handlePress = (num: string) => {
 		setValue((prev) => {
 			let newValue = prev + num;
-			if (newValue.includes('.')) {
-				const [integer, decimal] = newValue.split('.');
-				newValue = integer + '.' + decimal.slice(0, 2); // Limit to 2 decimal places
+
+			// If trying to add decimal point
+			if (num === '.') {
+				// If already has decimal point, don't add another
+				if (prev.includes('.')) return prev;
+				// If empty, add '0.' instead of just '.'
+				if (!prev) newValue = '0.';
 			}
-			newValue = newValue.slice(-9); // Limit to 9 characters total
+
+			// Validate the new value
+			if (!validateAmount(newValue)) return prev;
+
+			// Limit to 9 characters total
+			newValue = newValue.slice(-9);
 			onValueChange(newValue);
 			return newValue;
 		});
