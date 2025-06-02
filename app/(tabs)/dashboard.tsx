@@ -218,7 +218,7 @@ const Dashboard = () => {
 								<Text style={styles.nameText}>Max</Text>
 							</View>
 							<TouchableOpacity
-								onPress={() => router.push('/(tabs)/profileScreen')}
+								onPress={() => router.push('/screens/notifications')}
 								style={styles.profileButton}
 							>
 								<View style={{ position: 'relative' }}>
