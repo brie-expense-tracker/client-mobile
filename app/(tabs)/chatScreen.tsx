@@ -9,16 +9,40 @@ import {
 	TouchableOpacity,
 	SafeAreaView,
 	Image,
+	ActivityIndicator,
+	ScrollView,
+	Alert,
 } from 'react-native';
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
+import axios from 'axios';
+import { Transaction } from '../data/transactions';
+import {
+	analyzeTransactions,
+	getFinancialInsights,
+} from '../services/aiService';
+import Constants from 'expo-constants';
+
+// Define API URL based on environment
+const API_URL = __DEV__
+	? 'http://192.168.1.65:3000' // Development
+	: 'https://api.brie.com'; // Production
 
 interface Message {
 	id: string;
 	text: string;
-	sender: 'user' | 'other';
+	sender: 'user' | 'other' | 'ai';
 	timestamp: Date;
+	analysis?: {
+		insights?: string[];
+		recommendations?: string[];
+		trends?: {
+			category: string;
+			amount: number;
+			trend: 'up' | 'down' | 'stable';
+		}[];
+	};
 }
 
 const GreetingHeader = () => (
@@ -26,7 +50,7 @@ const GreetingHeader = () => (
 		<View style={styles.greetingTextContainer}>
 			<Text style={styles.greetingTitle}>Welcome to Brie!</Text>
 			<Text style={styles.greetingSubtitle}>
-				Your AI assistant is here to help
+				Your AI financial assistant is here to help
 			</Text>
 		</View>
 		<TouchableOpacity style={styles.greetingMenuButton}>
@@ -36,28 +60,91 @@ const GreetingHeader = () => (
 );
 
 const ChatScreen = () => {
-	const [messages, setMessages] = useState<Message[]>([
-		{
-			id: '1',
-			text: 'Hello! How can I help you today?',
-			sender: 'other',
-			timestamp: new Date(),
-		},
-	]);
+	const [messages, setMessages] = useState<Message[]>([]);
 	const [inputText, setInputText] = useState('');
+	const [transactions, setTransactions] = useState<Transaction[]>([]);
+	const [isLoading, setIsLoading] = useState(false);
+	const [isAnalyzing, setIsAnalyzing] = useState(false);
+	const scrollViewRef = useRef<ScrollView>(null);
+	const flatListRef = useRef<FlatList<Message>>(null);
 
-	const sendMessage = () => {
-		if (inputText.trim() === '') return;
+	useEffect(() => {
+		loadChatHistory();
+		fetchTransactions();
+	}, []);
 
-		const newMessage: Message = {
+	const loadChatHistory = async () => {
+		try {
+			const response = await axios.get(`${API_URL}/api/messages`);
+			if (response.data.success) {
+				setMessages(
+					response.data.messages.map((msg: any) => ({
+						...msg,
+						timestamp: new Date(msg.timestamp),
+					}))
+				);
+			}
+		} catch (error) {
+			console.error('Error loading chat history:', error);
+		}
+	};
+
+	const fetchTransactions = async () => {
+		try {
+			const response = await axios.get(`${API_URL}/api/transactions`);
+			setTransactions(response.data);
+		} catch (error) {
+			console.error('Error fetching transactions:', error);
+		}
+	};
+
+	const saveMessage = async (message: Message) => {
+		try {
+			await axios.post(`${API_URL}/api/messages`, message);
+		} catch (error) {
+			console.error('Error saving message:', error);
+		}
+	};
+
+	const handleSend = async () => {
+		if (!inputText.trim()) return;
+
+		const userMessage: Message = {
 			id: Date.now().toString(),
 			text: inputText,
 			sender: 'user',
 			timestamp: new Date(),
 		};
 
-		setMessages([...messages, newMessage]);
+		setMessages((prev) => [...prev, userMessage]);
 		setInputText('');
+		setIsLoading(true);
+
+		try {
+			// Save user message
+			await saveMessage(userMessage);
+
+			// Get AI response
+			const response = await getFinancialInsights(inputText, transactions);
+
+			const aiMessage: Message = {
+				id: (Date.now() + 1).toString(),
+				text: response.text,
+				sender: 'ai',
+				timestamp: new Date(),
+				analysis: response.analysis,
+			};
+
+			setMessages((prev) => [...prev, aiMessage]);
+
+			// Save AI message
+			await saveMessage(aiMessage);
+		} catch (error) {
+			console.error('Error:', error);
+			Alert.alert('Error', 'Failed to get AI response. Please try again.');
+		} finally {
+			setIsLoading(false);
+		}
 	};
 
 	const renderMessage = ({ item }: { item: Message }) => (
@@ -66,6 +153,8 @@ const ChatScreen = () => {
 				styles.messageWrapper,
 				item.sender === 'user'
 					? styles.userMessageWrapper
+					: item.sender === 'ai'
+					? styles.aiMessageWrapper
 					: styles.otherMessageWrapper,
 			]}
 		>
@@ -78,10 +167,23 @@ const ChatScreen = () => {
 					defaultSource={require('../../assets/images/default-avatar.jpg')}
 				/>
 			)}
+			{item.sender === 'ai' && (
+				<Image
+					source={{
+						uri: 'https://ui-avatars.com/api/?name=AI&background=007AFF&color=fff',
+					}}
+					style={styles.avatar}
+					defaultSource={require('../../assets/images/default-avatar.jpg')}
+				/>
+			)}
 			<View
 				style={[
 					styles.messageContainer,
-					item.sender === 'user' ? styles.userMessage : styles.otherMessage,
+					item.sender === 'user'
+						? styles.userMessage
+						: item.sender === 'ai'
+						? styles.aiMessage
+						: styles.otherMessage,
 				]}
 			>
 				<Text
@@ -89,16 +191,45 @@ const ChatScreen = () => {
 						styles.messageText,
 						item.sender === 'user'
 							? styles.userMessageText
+							: item.sender === 'ai'
+							? styles.aiMessageText
 							: styles.otherMessageText,
 					]}
 				>
 					{item.text}
 				</Text>
+				{item.analysis && (
+					<View style={styles.analysisContainer}>
+						{item.analysis.insights && item.analysis.insights.length > 0 && (
+							<View style={styles.insightsContainer}>
+								<Text style={styles.analysisTitle}>Insights:</Text>
+								{item.analysis.insights.map((insight, index) => (
+									<Text key={index} style={styles.insightText}>
+										• {insight}
+									</Text>
+								))}
+							</View>
+						)}
+						{item.analysis.recommendations &&
+							item.analysis.recommendations.length > 0 && (
+								<View style={styles.recommendationsContainer}>
+									<Text style={styles.analysisTitle}>Recommendations:</Text>
+									{item.analysis.recommendations.map((rec, index) => (
+										<Text key={index} style={styles.recommendationText}>
+											• {rec}
+										</Text>
+									))}
+								</View>
+							)}
+					</View>
+				)}
 				<Text
 					style={[
 						styles.timestamp,
 						item.sender === 'user'
 							? styles.userTimestamp
+							: item.sender === 'ai'
+							? styles.aiTimestamp
 							: styles.otherTimestamp,
 					]}
 				>
@@ -108,15 +239,6 @@ const ChatScreen = () => {
 					})}
 				</Text>
 			</View>
-			{item.sender === 'user' && (
-				<Image
-					source={{
-						uri: 'https://ui-avatars.com/api/?name=User&background=666666&color=fff',
-					}}
-					style={styles.avatar}
-					defaultSource={require('../../assets/images/default-avatar.jpg')}
-				/>
-			)}
 		</View>
 	);
 
@@ -157,17 +279,26 @@ const ChatScreen = () => {
 					keyExtractor={(item) => item.id}
 					contentContainerStyle={styles.messageList}
 					inverted={false}
+					ref={flatListRef}
 				/>
 				<View style={styles.inputContainer}>
 					<TextInput
 						style={styles.input}
 						value={inputText}
 						onChangeText={setInputText}
-						placeholder="Type a message..."
+						placeholder="Ask about your finances..."
 						multiline
 					/>
-					<TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
-						<Ionicons name="send" size={24} color="#007AFF" />
+					<TouchableOpacity
+						style={styles.sendButton}
+						onPress={handleSend}
+						disabled={isLoading}
+					>
+						{isLoading ? (
+							<ActivityIndicator color="#007AFF" />
+						) : (
+							<Ionicons name="send" size={24} color="#007AFF" />
+						)}
 					</TouchableOpacity>
 				</View>
 			</KeyboardAvoidingView>
@@ -192,12 +323,6 @@ const styles = StyleSheet.create({
 		backgroundColor: '#FFFFFF',
 		borderBottomWidth: 1,
 		borderBottomColor: '#E5E5EA',
-	},
-	greetingAvatar: {
-		width: 48,
-		height: 48,
-		borderRadius: 24,
-		marginRight: 12,
 	},
 	greetingTextContainer: {
 		flex: 1,
@@ -237,6 +362,9 @@ const styles = StyleSheet.create({
 	userMessageWrapper: {
 		justifyContent: 'flex-end',
 	},
+	aiMessageWrapper: {
+		justifyContent: 'flex-start',
+	},
 	otherMessageWrapper: {
 		justifyContent: 'flex-start',
 	},
@@ -255,6 +383,10 @@ const styles = StyleSheet.create({
 		backgroundColor: '#007AFF',
 		borderBottomRightRadius: 4,
 	},
+	aiMessage: {
+		backgroundColor: '#007AFF',
+		borderBottomLeftRadius: 4,
+	},
 	otherMessage: {
 		backgroundColor: '#E5E5EA',
 		borderBottomLeftRadius: 4,
@@ -263,6 +395,9 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 	},
 	userMessageText: {
+		color: '#FFFFFF',
+	},
+	aiMessageText: {
 		color: '#FFFFFF',
 	},
 	otherMessageText: {
@@ -274,6 +409,10 @@ const styles = StyleSheet.create({
 		alignSelf: 'flex-end',
 	},
 	userTimestamp: {
+		color: '#FFFFFF',
+		opacity: 0.8,
+	},
+	aiTimestamp: {
 		color: '#FFFFFF',
 		opacity: 0.8,
 	},
@@ -299,6 +438,34 @@ const styles = StyleSheet.create({
 	},
 	sendButton: {
 		padding: 8,
+	},
+	analysisContainer: {
+		marginTop: 8,
+		padding: 8,
+		backgroundColor: 'rgba(255, 255, 255, 0.1)',
+		borderRadius: 8,
+	},
+	analysisTitle: {
+		fontSize: 14,
+		fontWeight: '600',
+		marginBottom: 4,
+		color: '#007AFF',
+	},
+	insightsContainer: {
+		marginBottom: 8,
+	},
+	insightText: {
+		fontSize: 13,
+		color: '#000000',
+		marginBottom: 2,
+	},
+	recommendationsContainer: {
+		marginTop: 8,
+	},
+	recommendationText: {
+		fontSize: 13,
+		color: '#000000',
+		marginBottom: 2,
 	},
 });
 
