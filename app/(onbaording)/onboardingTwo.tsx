@@ -1,44 +1,46 @@
-import { View, Text, Image, Pressable, ImageBackground } from 'react-native';
+import {
+	View,
+	Text,
+	Image,
+	Pressable,
+	ImageBackground,
+	StyleSheet,
+} from 'react-native';
 import React from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link, Stack } from 'expo-router';
 
 export default function OnboardingTwo() {
 	return (
-		<View className="w-screen h-screen bg-white">
-			<ImageBackground
-				className="w-screen h-3/4 absolute"
-				source={require('../../assets/images/bg_onboarding.png')}
-			/>
-			<View className="w-full h-full justify-center items-center">
-				<Text className="font-bold text-5xl text-green-600 text-center my-32">
-					Create Your Expense Tracker Account
-				</Text>
-				<View
-					className="w-4/5 self-center"
-					style={{
-						shadowColor: '#3ea15a',
-						shadowOffset: { width: 0, height: 8 }, // Shift shadow down the Y-axis
-						shadowOpacity: 0.6,
-						shadowRadius: 15,
-						elevation: 5, // for Android
-					}}
-				>
+		<View style={styles.container}>
+			<View style={styles.contentContainer}>
+				<Image
+					style={styles.logoImage}
+					source={require('../../assets/images/brie-logos.png')}
+				/>
+				<View style={styles.titleContainer}>
+					<Text style={styles.title}>Create Your Tracker Account</Text>
+					<Text style={styles.subtitle}>
+						Join Brie to start tracking your expenses and saving money.
+					</Text>
+				</View>
+				<View style={styles.buttonContainer}>
 					<Link replace asChild href={'/signup-test'}>
-						<Pressable className="w-full rounded-full overflow-hidden self-center">
-							<LinearGradient colors={['#89D6A0', '#379C54']}>
-								<Text className="text-white text-2xl text-center font-bold my-4">
-									Sign Up
-								</Text>
+						<Pressable style={styles.button}>
+							<LinearGradient
+								colors={['#0095FF', '#0095FF']}
+								style={styles.gradient}
+							>
+								<Text style={styles.buttonText}>Create Account</Text>
 							</LinearGradient>
 						</Pressable>
 					</Link>
 				</View>
 
-				<View className="flex-row gap-x-2 w-full my-10 justify-center">
-					<Text className="text-gray-500">Already have account?</Text>
-					<Link replace className="text-black" href={'/login-test'}>
-						<Text className=" text-green-800 opacity-70 font-bold">Log In</Text>
+				<View style={styles.loginContainer}>
+					<Text style={styles.loginText}>Already have account?</Text>
+					<Link replace href={'/onboardingThree'}>
+						<Text style={styles.loginLink}>Log In</Text>
 					</Link>
 				</View>
 			</View>
@@ -46,3 +48,85 @@ export default function OnboardingTwo() {
 		</View>
 	);
 }
+
+const styles = StyleSheet.create({
+	container: {
+		width: '100%',
+		height: '100%',
+		backgroundColor: '#fff',
+	},
+	contentContainer: {
+		width: '100%',
+		height: '100%',
+		justifyContent: 'center',
+		alignItems: 'center',
+		paddingTop: 10,
+	},
+	logoImage: {
+		width: 100,
+		height: 40,
+		marginBottom: 40,
+		resizeMode: 'contain',
+	},
+	titleContainer: {
+		width: '100%',
+		paddingHorizontal: 30,
+	},
+	title: {
+		fontWeight: '600',
+		marginHorizontal: 'auto',
+		width: '80%',
+		fontSize: 36,
+		textAlign: 'center',
+		marginTop: 20,
+	},
+	subtitle: {
+		marginHorizontal: 'auto',
+		width: '100%',
+		fontSize: 16,
+		textAlign: 'center',
+		marginVertical: 10,
+		color: '#6b7280',
+	},
+	buttonContainer: {
+		width: '80%',
+		shadowColor: '#0095FF',
+		shadowOffset: { width: 0, height: 8 },
+		shadowOpacity: 0.3,
+		shadowRadius: 15,
+		elevation: 5,
+		marginTop: 30,
+	},
+	button: {
+		width: '100%',
+		borderRadius: 9999,
+		overflow: 'hidden',
+		alignSelf: 'center',
+	},
+	gradient: {
+		width: '100%',
+	},
+	buttonText: {
+		color: 'white',
+		fontSize: 20,
+		textAlign: 'center',
+		fontWeight: 'bold',
+		marginVertical: 18,
+	},
+	loginContainer: {
+		flexDirection: 'row',
+		gap: 8,
+		width: '100%',
+		position: 'absolute',
+		bottom: 40,
+		justifyContent: 'center',
+	},
+	loginText: {
+		color: '#6b7280',
+	},
+	loginLink: {
+		color: '#0e5475',
+		opacity: 0.7,
+		fontWeight: 'bold',
+	},
+});

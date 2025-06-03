@@ -146,9 +146,7 @@ export default function NotificationsScreen() {
 	};
 
 	return (
-		<SafeAreaView
-			style={[styles.container, { backgroundColor: colors.background }]}
-		>
+		<SafeAreaView style={[styles.container, { backgroundColor: '#fff' }]}>
 			<View style={styles.header}>
 				<TouchableOpacity
 					style={styles.backButton}
@@ -221,7 +219,7 @@ const styles = StyleSheet.create({
 	},
 	notificationItem: {
 		padding: 16,
-		borderRadius: 8,
+		borderRadius: 8, 
 		marginBottom: 12,
 		shadowColor: '#000',
 		shadowOffset: {
