@@ -51,9 +51,9 @@ export default function ProfileScreen() {
 		<SafeAreaView style={styles.container}>
 			{/* Header icons */}
 			<View style={styles.headerRight}>
-				<TouchableOpacity style={styles.iconButton}>
+				{/* <TouchableOpacity style={styles.iconButton}>
 					<Ionicons name="settings-outline" size={32} color="#555" />
-				</TouchableOpacity>
+				</TouchableOpacity> */}
 			</View>
 
 			{/* Profile picture and name */}
@@ -95,19 +95,24 @@ export default function ProfileScreen() {
 					<Text style={styles.settingText}>Notifications</Text>
 					<Ionicons name="chevron-forward" size={24} color="#555" />
 				</TouchableOpacity>
-
-				<TouchableOpacity style={styles.settingItem}>
-					<Ionicons name="color-palette-outline" size={24} color="#555" />
-					<Text style={styles.settingText}>Appearance</Text>
+				<TouchableOpacity
+					style={styles.settingItem}
+					onPress={() => router.push('/screens/fixedExpenses')}
+				>
+					<Ionicons name="cube-outline" size={24} color="#555" />
+					<Text style={styles.settingText}>Fixed Expenses</Text>
 					<Ionicons name="chevron-forward" size={24} color="#555" />
 				</TouchableOpacity>
-
 				<TouchableOpacity style={styles.settingItem}>
 					<Ionicons name="language-outline" size={24} color="#555" />
 					<Text style={styles.settingText}>Language</Text>
 					<Ionicons name="chevron-forward" size={24} color="#555" />
 				</TouchableOpacity>
-
+				<TouchableOpacity style={styles.settingItem}>
+					<Ionicons name="color-palette-outline" size={24} color="#555" />
+					<Text style={styles.settingText}>Appearance</Text>
+					<Ionicons name="chevron-forward" size={24} color="#555" />
+				</TouchableOpacity>
 				<TouchableOpacity style={styles.settingItem}>
 					<Ionicons name="shield-checkmark-outline" size={24} color="#555" />
 					<Text style={styles.settingText}>Privacy & Security</Text>
