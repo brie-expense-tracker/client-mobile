@@ -18,13 +18,6 @@ export default function TabLayout() {
 		<Tabs
 			screenOptions={{
 				tabBarStyle: {
-					shadowColor: '#888888',
-					shadowOffset: {
-						width: 0,
-						height: -1,
-					},
-					shadowOpacity: 0.25,
-					shadowRadius: 3.5,
 					elevation: 5,
 					paddingTop: 10,
 					height: 80,
