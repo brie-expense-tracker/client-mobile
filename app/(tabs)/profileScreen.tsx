@@ -90,7 +90,10 @@ export default function ProfileScreen() {
 
 			{/* Settings List */}
 			<View style={styles.settingsContainer}>
-				<TouchableOpacity style={styles.settingItem}>
+				<TouchableOpacity
+					style={styles.settingItem}
+					onPress={() => router.push('/screens/notifications')}
+				>
 					<Ionicons name="notifications-outline" size={24} color="#555" />
 					<Text style={styles.settingText}>Notifications</Text>
 					<Ionicons name="chevron-forward" size={24} color="#555" />
