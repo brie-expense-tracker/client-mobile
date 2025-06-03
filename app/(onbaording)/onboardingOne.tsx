@@ -18,13 +18,13 @@ export default function OnboardingOne() {
 					</Text>
 				</View>
 				<View style={styles.buttonContainer}>
-					<Link replace asChild href={'./onboardingTwo'}>
+					<Link replace asChild href={'../signup-test'}>
 						<Pressable style={styles.button}>
 							<LinearGradient
-								colors={['#0095FF', '#0095FF']}
+								colors={['#0095FF', '#008cff']}
 								style={styles.gradient}
 							>
-								<Text style={styles.buttonText}>Get Started</Text>
+								<Text style={styles.buttonText}>Create Account</Text>
 							</LinearGradient>
 						</Pressable>
 					</Link>
