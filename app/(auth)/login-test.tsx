@@ -6,10 +6,13 @@ import {
 	Alert,
 	StyleSheet,
 	Image,
+	Platform,
+	SafeAreaView,
 } from 'react-native';
 import React, { useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link, router, Stack } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function Login() {
 	const [email, setEmail] = useState('');
@@ -37,8 +40,13 @@ export default function Login() {
 			return;
 		}
 
+		if (!isValidEmail(email)) {
+			Alert.alert('Error', 'Please enter a valid email address.');
+			return;
+		}
+
 		// Fake login logic
-		if (email === 'test' && password === 'password') {
+		if (email === 'test@test.com' && password === 'password') {
 			Alert.alert('Success', `Logged in with ${email}`);
 			console.log('201: Successfully logged in.');
 			router.replace('/onboardingThree');
@@ -48,7 +56,7 @@ export default function Login() {
 	};
 
 	return (
-		<View style={styles.container}>
+		<SafeAreaView style={styles.container}>
 			<View style={styles.contentContainer}>
 				<Image
 					source={require('../../assets/images/brie-logos.png')}
@@ -56,7 +64,7 @@ export default function Login() {
 					resizeMode="contain"
 				/>
 				<View style={styles.formContainer}>
-					<Text style={styles.title}>Login</Text>
+					<Text style={styles.title}>Welcome Back!</Text>
 					<Text style={styles.label}>Email</Text>
 					<TextInput
 						style={styles.input}
@@ -77,7 +85,7 @@ export default function Login() {
 					<View style={styles.buttonContainer}>
 						<Pressable style={styles.button} onPress={handleLogin}>
 							<LinearGradient
-								colors={['#0095FF', '#0095FF']}
+								colors={['#0095FF', '#008cff']}
 								style={styles.gradient}
 							>
 								<Text style={styles.buttonText}>Sign In</Text>
@@ -85,40 +93,75 @@ export default function Login() {
 						</Pressable>
 					</View>
 
-					<View style={styles.signupContainer}>
-						<Link replace href={'/signup-test'}>
-							<Text style={styles.signupLink}>Create An Account</Text>
-						</Link>
+					<View style={styles.dividerContainer}>
+						<View style={styles.divider} />
+						<Text style={styles.dividerText}>or sign in with</Text>
+						<View style={styles.divider} />
+					</View>
+
+					<View style={styles.socialButtonsContainer}>
+						<Pressable
+							style={styles.socialButton}
+							onPress={() =>
+								Alert.alert(
+									'Coming Soon',
+									'Google Sign In will be available soon!'
+								)
+							}
+						>
+							<Ionicons name="logo-google" size={24} color="#0051ff" />
+							<Text style={styles.socialButtonText}>Continue with Google</Text>
+						</Pressable>
+
+						<Pressable
+							style={styles.socialButton}
+							onPress={() =>
+								Alert.alert(
+									'Coming Soon',
+									'Apple Sign In will be available soon!'
+								)
+							}
+						>
+							<Ionicons name="logo-apple" size={24} color="#000000" />
+							<Text style={styles.socialButtonText}>Continue with Apple</Text>
+						</Pressable>
 					</View>
 				</View>
+				<View style={styles.signupContainer}>
+					<Text style={styles.signupText}>Don't have an account?</Text>
+					<Link replace href={'/signup-test'}>
+						<Text style={styles.signupLink}>Sign Up</Text>
+					</Link>
+				</View>
 			</View>
+
 			<Stack.Screen options={{ headerShown: false }} />
-		</View>
+		</SafeAreaView>
 	);
 }
 
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: '#F0F7FF',
+		backgroundColor: '#fff',
 	},
 	contentContainer: {
 		flex: 1,
-		paddingHorizontal: 32,
-		justifyContent: 'center',
+		paddingHorizontal: 10,
+		justifyContent: 'flex-start',
 		alignItems: 'center',
 	},
 	logo: {
 		width: 100,
 		height: 40,
-		marginBottom: 40,
+		marginVertical: 40,
 		resizeMode: 'contain',
 	},
 	formContainer: {
 		width: '100%',
 		height: '50%',
-		justifyContent: 'center',
-		alignItems: 'center',
+		justifyContent: 'flex-start',
+		alignItems: 'flex-start',
 		backgroundColor: 'white',
 		alignSelf: 'center',
 		shadowRadius: 3,
@@ -129,11 +172,11 @@ const styles = StyleSheet.create({
 	title: {
 		fontSize: 24,
 		color: '#000000',
-		fontWeight: '600',
+		fontWeight: '500',
 		marginVertical: 10,
 	},
 	label: {
-		fontWeight: 'bold',
+		fontWeight: '500',
 		fontSize: 14,
 		color: '#4A5568',
 		textAlign: 'left',
@@ -141,24 +184,32 @@ const styles = StyleSheet.create({
 		marginBottom: 8,
 	},
 	input: {
-		borderWidth: 2,
-		borderColor: '#0095FF',
 		width: '100%',
 		padding: 16,
 		marginBottom: 16,
-		borderRadius: 12,
-	},
-	buttonContainer: {
-		width: '80%',
-		alignSelf: 'center',
-		shadowColor: '#0095FF',
+		borderRadius: 8,
+		backgroundColor: '#fff',
+		shadowColor: '#b9b9b9',
 		shadowOffset: {
 			width: 0,
-			height: 8,
+			height: 2,
 		},
 		shadowOpacity: 0.3,
-		shadowRadius: 15,
+		shadowRadius: 4,
 		elevation: 5,
+	},
+	buttonContainer: {
+		width: '100%',
+		alignSelf: 'center',
+		shadowColor: '#000000',
+		shadowOffset: {
+			width: 0,
+			height: 4,
+		},
+		shadowOpacity: 0.2,
+		shadowRadius: 6,
+		elevation: 5,
+		marginTop: 10,
 	},
 	button: {
 		width: '100%',
@@ -173,18 +224,67 @@ const styles = StyleSheet.create({
 		color: 'white',
 		fontSize: 20,
 		textAlign: 'center',
-		fontWeight: 'bold',
+		fontWeight: '500',
 		marginVertical: 18,
 	},
 	signupContainer: {
+		flexDirection: 'row',
+		gap: 4,
 		width: '100%',
-		marginVertical: 40,
+		position: 'absolute',
+		bottom: 0,
 		justifyContent: 'center',
-		alignItems: 'center',
+	},
+	signupText: {
+		color: '#4A5568',
 	},
 	signupLink: {
 		color: '#2C5282',
 		opacity: 0.7,
 		fontWeight: 'bold',
+	},
+	dividerContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		width: '100%',
+		marginVertical: 40,
+	},
+	divider: {
+		flex: 1,
+		height: 1,
+		backgroundColor: '#E2E8F0',
+	},
+	dividerText: {
+		marginHorizontal: 10,
+		color: '#4A5568',
+		fontSize: 14,
+	},
+	socialButtonsContainer: {
+		width: '100%',
+		gap: 12,
+	},
+	socialButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		padding: 16,
+		borderRadius: 12,
+		marginBottom: 10,
+		borderColor: '#E2E8F0',
+		backgroundColor: 'white',
+		gap: 12,
+		shadowColor: '#afafaf',
+		shadowOffset: {
+			width: 0,
+			height: 2,
+		},
+		shadowOpacity: 0.3,
+		shadowRadius: 6,
+		elevation: 5,
+	},
+	socialButtonText: {
+		fontSize: 16,
+		color: '#4A5568',
+		fontWeight: '500',
 	},
 });

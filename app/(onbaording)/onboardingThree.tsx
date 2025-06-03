@@ -198,7 +198,7 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 
 						<Pressable onPress={handleSubmit} style={styles.submitButton}>
 							<LinearGradient
-								colors={['#0286e3', '#0095FF']}
+								colors={['#0095FF', '#008cff']}
 								style={styles.gradient}
 							>
 								<Text style={styles.submitButtonText}>Finish Setup</Text>
@@ -256,7 +256,10 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 						key={index}
 						style={[
 							styles.paginationDot,
-							index === currentIndex && styles.paginationDotActive,
+							(index === currentIndex ||
+								(currentIndex > 0 && index === currentIndex - 1) ||
+								(index === currentIndex - 2 && currentIndex === 2)) &&
+								styles.paginationDotActive,
 						]}
 					/>
 				))}
@@ -395,7 +398,7 @@ const styles = StyleSheet.create({
 		paddingVertical: 16,
 	},
 	paginationDot: {
-		width: 8,
+		width: '30%',
 		height: 8,
 		borderRadius: 4,
 		backgroundColor: '#e5e7eb',
@@ -403,8 +406,8 @@ const styles = StyleSheet.create({
 	},
 	paginationDotActive: {
 		backgroundColor: '#0095FF',
-		width: 12,
-		height: 12,
+		width: '30%',
+		height: 8,
 		borderRadius: 6,
 	},
 	navigationButtons: {
@@ -416,22 +419,22 @@ const styles = StyleSheet.create({
 	navButton: {
 		padding: 12,
 		borderRadius: 20,
-		backgroundColor: '#f3f4f6',
+		backgroundColor: '#fff',
 		width: 100,
 		alignItems: 'center',
 	},
 	nextButton: {
-		backgroundColor: '#0095FF',
+		backgroundColor: '#fff',
 	},
 	navButtonBackText: {
 		color: '#444444',
 		fontWeight: '600',
-		fontSize: 16,
+		fontSize: 18,
 	},
 	navButtonText: {
-		color: '#ffffff',
+		color: '#0095FF',
 		fontWeight: '600',
-		fontSize: 16,
+		fontSize: 18,
 	},
 });
 
