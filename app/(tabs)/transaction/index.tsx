@@ -372,8 +372,9 @@ export default function TransactionScreen() {
 				<View style={styles.container}>
 					{/* Header */}
 					<View style={styles.headerContainer}>
-						<View style={styles.headerLeft} />
-						<Text style={styles.headerTitle}>History</Text>
+						<View style={styles.headerTextContainer}>
+							<Text style={styles.nameText}>History</Text>
+						</View>
 						<View style={styles.headerRight}>
 							<TouchableOpacity
 								style={[
@@ -389,14 +390,14 @@ export default function TransactionScreen() {
 								<Ionicons
 									name="calendar"
 									size={24}
-									color={dateFilterMode === 'month' ? '#616161' : '#555'}
+									color={dateFilterMode === 'month' ? '#616161' : '#212121'}
 								/>
 							</TouchableOpacity>
 							<TouchableOpacity
 								style={styles.filterButton}
 								onPress={handleFilterPress}
 							>
-								<Ionicons name="reorder-three" size={32} color="#555" />
+								<Ionicons name="reorder-three" size={32} color="#212121" />
 							</TouchableOpacity>
 						</View>
 					</View>
@@ -408,7 +409,6 @@ export default function TransactionScreen() {
 					<FlatList
 						data={groupedTransactions}
 						keyExtractor={(item) => item.monthKey}
-						contentContainerStyle={{ paddingBottom: 0 }}
 						renderItem={({ item }) => (
 							<View>
 								{dateFilterMode !== 'day' &&
@@ -420,8 +420,8 @@ export default function TransactionScreen() {
 						)}
 						ListEmptyComponent={
 							<View style={styles.empty}>
-								<Ionicons name="document-outline" size={48} color="#ccc" />
-								<Text style={{ color: '#888', marginTop: 8 }}>
+								<Ionicons name="document-outline" size={48} color="#e5e7eb" />
+								<Text style={{ color: '#9ca3af', marginTop: 8 }}>
 									{isLoading ? 'Loading...' : 'No transactions'}
 								</Text>
 							</View>
@@ -447,7 +447,7 @@ export default function TransactionScreen() {
 										onPress={() => setModalVisible(false)}
 										style={styles.closeButton}
 									>
-										<Ionicons name="close" size={24} color="#666" />
+										<Ionicons name="close" size={24} color="#9ca3af" />
 									</TouchableOpacity>
 								</View>
 								<Calendar
@@ -455,20 +455,20 @@ export default function TransactionScreen() {
 									markedDates={{
 										[selectedDate]: {
 											selected: true,
-											selectedColor: '#007ACC',
+											selectedColor: '#0095FF',
 										},
 									}}
 									theme={{
-										todayTextColor: '#007ACC',
-										arrowColor: '#007ACC',
-										dotColor: '#007ACC',
-										selectedDayBackgroundColor: '#007ACC',
+										todayTextColor: '#0095FF',
+										arrowColor: '#0095FF',
+										dotColor: '#0095FF',
+										selectedDayBackgroundColor: '#0095FF',
 										textDayFontSize: 16,
 										textMonthFontSize: 16,
 										textDayHeaderFontSize: 16,
-										textDayFontWeight: 'bold',
-										textMonthFontWeight: 'bold',
-										textDayHeaderFontWeight: 'bold',
+										textDayFontWeight: '500',
+										textMonthFontWeight: '500',
+										textDayHeaderFontWeight: '500',
 									}}
 								/>
 							</View>
@@ -494,64 +494,51 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: '#fff',
 		paddingBottom: 0,
-	},
-	filtersContainer: {
-		paddingVertical: 12,
-		borderBottomWidth: 1,
-		borderColor: '#eee',
-		backgroundColor: '#fafafa',
-	},
-	chip: {
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		borderRadius: 20,
-		backgroundColor: '#eee',
-		marginHorizontal: 6,
-	},
-	chipSelected: {
-		backgroundColor: '#32af29',
-	},
-	chipText: {
-		fontSize: 14,
-		color: '#333',
-	},
-	chipTextSelected: {
-		color: '#fff',
-	},
-	pickerWrapper: {
-		width: width * 0.5,
-		alignSelf: 'center',
-		marginTop: 8,
-		borderWidth: 1,
-		borderColor: '#ddd',
-		borderRadius: 6,
-		overflow: 'hidden',
+		padding: 24,
 	},
 	txRowContainer: {
 		position: 'relative',
+		marginHorizontal: 0,
+		borderRadius: 12,
+		overflow: 'hidden',
 	},
 	txRow: {
 		flexDirection: 'row',
 		padding: 16,
+		paddingVertical: 16,
 		borderBottomWidth: 1,
-		borderColor: '#f0f0f0',
+		borderBottomColor: '#e5e7eb',
 		alignItems: 'center',
 		backgroundColor: '#fff',
 	},
-	txDesc: { fontSize: 16, fontWeight: '500' },
-	txCategory: { fontSize: 12, color: '#666', marginTop: 4 },
-	txRight: { alignItems: 'flex-end' },
+	txDesc: {
+		// fontSize: 16,
+		fontWeight: '500',
+		color: '#212121',
+	},
+	txCategory: {
+		fontSize: 12,
+		color: '#9ca3af',
+		marginTop: 4,
+	},
+	txRight: {
+		alignItems: 'flex-end',
+	},
 	txAmount: {
-		fontSize: 16,
+		fontSize: 14,
 		fontWeight: '600',
 	},
 	incomeAmount: {
-		color: '#0ba000',
+		color: '#16a34a',
 	},
 	expenseAmount: {
-		color: '#d50b00',
+		color: '#dc2626',
 	},
-	txDate: { fontSize: 12, color: '#999999', marginTop: 4 },
+	txDate: {
+		fontSize: 12,
+		color: '#9ca3af',
+		marginTop: 4,
+	},
 	empty: {
 		flex: 1,
 		marginTop: 80,
@@ -559,31 +546,22 @@ const styles = StyleSheet.create({
 	},
 	headerContainer: {
 		flexDirection: 'row',
-		paddingRight: 16,
-		paddingLeft: 8,
-		paddingVertical: 8,
-		alignItems: 'center',
+		marginBottom: 16,
 		justifyContent: 'space-between',
-		borderBottomWidth: 1,
-		borderBottomColor: '#e0e0e0',
-		backgroundColor: '#fff',
+		alignItems: 'center',
 	},
-	headerLeft: {
-		width: 36,
+	headerTextContainer: {
+		flexDirection: 'column',
+	},
+	nameText: {
+		color: '#212121',
+		fontSize: 28,
+		fontWeight: '500',
 	},
 	headerRight: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 12,
-	},
-	headerTitle: {
-		fontSize: 20,
-		fontWeight: '600',
-		color: '#000000',
-		position: 'absolute',
-		left: 0,
-		right: 0,
-		textAlign: 'center',
 	},
 	filterButton: {
 		flexDirection: 'row',
@@ -604,7 +582,7 @@ const styles = StyleSheet.create({
 	},
 	modalContent: {
 		backgroundColor: 'white',
-		borderRadius: 12,
+		borderRadius: 24,
 		width: width * 0.8,
 		maxHeight: height * 0.4,
 	},
@@ -614,12 +592,12 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		padding: 16,
 		borderBottomWidth: 1,
-		borderBottomColor: '#eee',
+		borderBottomColor: '#e5e7eb',
 	},
 	modalTitle: {
 		fontSize: 18,
 		fontWeight: '600',
-		color: '#333',
+		color: '#212121',
 	},
 	closeButton: {
 		padding: 4,
@@ -635,30 +613,30 @@ const styles = StyleSheet.create({
 		width: width * 0.9,
 		maxHeight: height * 0.7,
 		backgroundColor: '#fff',
+		borderRadius: 24,
+		overflow: 'hidden',
 	},
 	monthHeader: {
-		backgroundColor: '#f9f9f9',
-		padding: 16,
+		backgroundColor: '#fff',
+		paddingHorizontal: 0,
+		paddingVertical: 16,
 		paddingBottom: 10,
-		borderBottomWidth: 1,
-		borderBottomColor: '#e0e0e0',
+		marginTop: 8,
 	},
 	monthHeaderText: {
-		fontSize: 20,
+		fontSize: 18,
 		fontWeight: '600',
-		color: '#000000',
+		color: '#212121',
 	},
 	dateHeader: {
-		backgroundColor: '#f9f9f9',
-		padding: 16,
+		backgroundColor: '#fff',
+		padding: 0,
 		paddingBottom: 10,
-		borderBottomWidth: 1,
-		borderBottomColor: '#e0e0e0',
 	},
 	dateHeaderText: {
 		fontSize: 20,
 		fontWeight: '600',
-		color: '#000000',
+		color: '#212121',
 	},
 	deleteAction: {
 		position: 'absolute',
@@ -666,8 +644,10 @@ const styles = StyleSheet.create({
 		top: 0,
 		bottom: 0,
 		width: 80,
-		backgroundColor: '#ff3b30',
+		backgroundColor: '#dc2626',
 		justifyContent: 'center',
 		alignItems: 'center',
+		borderTopRightRadius: 12,
+		borderBottomRightRadius: 12,
 	},
 });

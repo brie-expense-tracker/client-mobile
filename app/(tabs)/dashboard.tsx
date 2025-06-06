@@ -16,18 +16,69 @@ import {
 	Transaction,
 	transactions as dummyTransactions,
 } from '../data/transactions';
-import ProfitLossGraph from '../components/ProfitLossGraph';
 import ProfitGraph from '../components/ProfitGraph';
-import AntDesign from '@expo/vector-icons/AntDesign';
 import AddTransaction from '../components/AddTransaction';
 import axios from 'axios';
+import { Ionicons } from '@expo/vector-icons';
 
 interface BalanceWidgetProps {
 	transactions: Transaction[];
 }
 
+const ProgressBar = ({
+	value,
+	total,
+	color,
+}: {
+	value: number;
+	total: number;
+	color: string;
+}) => {
+	const percentage = Math.min((value / total) * 100, 100);
+	return (
+		<View style={styles.progressBarContainer}>
+			<View
+				style={[
+					styles.progressBar,
+					{ width: `${percentage}%`, backgroundColor: color },
+				]}
+			/>
+		</View>
+	);
+};
+
+const StatWidget = ({
+	label,
+	value,
+	icon,
+	color,
+	progressValue,
+	totalValue,
+}: {
+	label: string;
+	value: number;
+	icon: keyof typeof Ionicons.glyphMap;
+	color: string;
+	progressValue: number;
+	totalValue: number;
+}) => {
+	return (
+		<View style={styles.statWidget}>
+			<View style={styles.statContent}>
+				<View style={styles.statHeader}>
+					<View style={[styles.iconContainer, { backgroundColor: color }]}>
+						<Ionicons name={icon} size={16} color="white" style={styles.icon} />
+					</View>
+					<Text style={styles.statLabel}>{label}</Text>
+				</View>
+				<Text style={styles.statValue}>${value.toFixed(2)}</Text>
+			</View>
+			<ProgressBar value={progressValue} total={totalValue} color={color} />
+		</View>
+	);
+};
+
 const BalanceWidget: React.FC<BalanceWidgetProps> = ({ transactions }) => {
-	// Calculate totals from transactions
 	const totalIncome = transactions
 		.filter((t: Transaction) => t?.type === 'income')
 		.reduce((sum: number, t: Transaction) => sum + (t?.amount || 0), 0);
@@ -37,54 +88,46 @@ const BalanceWidget: React.FC<BalanceWidgetProps> = ({ transactions }) => {
 		.reduce((sum: number, t: Transaction) => sum + (t?.amount || 0), 0);
 
 	const totalBalance = totalIncome - totalExpense;
+	const maxValue = Math.max(totalIncome, totalExpense, Math.abs(totalBalance));
 
 	return (
 		<View style={styles.balanceContainer}>
-			{/* First Row */}
-			<View style={styles.headerRow}>
-				<Text style={styles.headerText}>Total Profit</Text>
-				{/* <Text style={styles.headerText}>...</Text> */}
-			</View>
-
-			{/* Second Row */}
-			<View style={styles.balanceRow}>
-				<Text style={styles.balanceText}>${totalBalance.toFixed(2)}</Text>
-			</View>
-			{/* Third Row */}
-			<View style={styles.statsRow}>
-				<View style={styles.statColumn}>
-					<View>
-						<View style={styles.statHeader}>
-							<View style={styles.iconContainer}>
-								<AntDesign
-									name="arrowup"
-									size={16}
-									color="white"
-									style={styles.icon}
-								/>
-							</View>
-							<Text style={styles.statLabel}>Income</Text>
-						</View>
-						<Text style={styles.statValue}>${totalIncome.toFixed(2)}</Text>
-					</View>
+			<View style={styles.statsContainer}>
+				<View style={styles.column}>
+					<StatWidget
+						label="Total Profit"
+						value={totalBalance}
+						icon="wallet-outline"
+						color="#0095FF"
+						progressValue={Math.abs(totalBalance)}
+						totalValue={maxValue}
+					/>
+					<StatWidget
+						label="Income"
+						value={totalIncome}
+						icon="arrow-up-outline"
+						color="#16a34a"
+						progressValue={totalIncome}
+						totalValue={maxValue}
+					/>
 				</View>
-				<View style={styles.statColumn}>
-					<View>
-						<View style={styles.statHeader}>
-							<View style={styles.iconContainer}>
-								<AntDesign
-									name="arrowdown"
-									size={16}
-									color="white"
-									style={styles.icon}
-								/>
-							</View>
-							<Text style={styles.statLabel}>Expense</Text>
-						</View>
-						<Text style={[styles.statValue, styles.statValueRight]}>
-							${totalExpense.toFixed(2)}
-						</Text>
-					</View>
+				<View style={styles.column}>
+					<StatWidget
+						label="Expense"
+						value={totalExpense}
+						icon="arrow-down-outline"
+						color="#dc2626"
+						progressValue={totalExpense}
+						totalValue={maxValue}
+					/>
+					<StatWidget
+						label="Expense"
+						value={totalExpense}
+						icon="arrow-down-outline"
+						color="#dc2626"
+						progressValue={totalExpense}
+						totalValue={maxValue}
+					/>
 				</View>
 			</View>
 		</View>
@@ -188,15 +231,6 @@ const Dashboard = () => {
 
 	return (
 		<View style={styles.mainContainer}>
-			<View style={styles.backgroundContainer}>
-				{/* <LinearGradient
-					colors={['#59c076', '#0a5b21']}
-					start={{ x: 0.1, y: 0 }}
-					end={{ x: 0.5, y: 0.9 }}
-				>
-					<View style={styles.gradientContainer} />
-				</LinearGradient> */}
-			</View>
 			<SafeAreaView style={styles.safeArea}>
 				<ScrollView
 					style={styles.scrollView}
@@ -214,15 +248,19 @@ const Dashboard = () => {
 					<View style={styles.contentContainer}>
 						<View style={styles.headerContainer}>
 							<View style={styles.headerTextContainer}>
-								<Text style={styles.welcomeText}>Welcome back,</Text>
-								<Text style={styles.nameText}>Max</Text>
+								{/* <Text style={styles.welcomeText}>Welcome back,</Text> */}
+								<Text style={styles.nameText}>Dashboard</Text>
 							</View>
 							<TouchableOpacity
 								onPress={() => router.push('/screens/notifications')}
 								style={styles.profileButton}
 							>
 								<View style={{ position: 'relative' }}>
-									<AntDesign name="bells" size={24} color="#212121" />
+									<Ionicons
+										name="notifications-outline"
+										color="#212121"
+										size={24}
+									/>
 									<View
 										style={{
 											position: 'absolute',
@@ -303,20 +341,6 @@ const styles = StyleSheet.create({
 		overflow: 'hidden',
 		backgroundColor: '#fff',
 	},
-	backgroundContainer: {
-		width: '200%',
-		height: 400,
-		position: 'absolute',
-		top: -20,
-		backgroundColor: 'white',
-		borderRadius: 50,
-		overflow: 'hidden',
-		alignSelf: 'center',
-	},
-	gradientContainer: {
-		width: '100%',
-		height: '100%',
-	},
 	safeArea: {
 		flex: 1,
 	},
@@ -335,9 +359,11 @@ const styles = StyleSheet.create({
 		marginBottom: 16,
 		justifyContent: 'space-between',
 		alignItems: 'center',
+		position: 'relative',
 	},
 	headerTextContainer: {
 		flexDirection: 'column',
+		alignItems: 'center',
 	},
 	welcomeText: {
 		color: '#212121',
@@ -345,8 +371,8 @@ const styles = StyleSheet.create({
 	},
 	nameText: {
 		color: '#212121',
-		fontSize: 32,
-		fontWeight: 'bold',
+		fontSize: 28,
+		fontWeight: '500',
 	},
 	profileButton: {
 		width: 48,
@@ -356,6 +382,8 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 		overflow: 'hidden',
+		position: 'absolute',
+		right: 0,
 	},
 	profileImage: {
 		width: 48,
@@ -363,9 +391,13 @@ const styles = StyleSheet.create({
 	},
 	mainContent: {
 		width: '100%',
+		gap: 24,
 	},
 	transactionsContainer: {
-		marginTop: 24,
+		marginTop: 8,
+		paddingTop: 16,
+		borderTopWidth: 1,
+		borderTopColor: 'rgba(0, 0, 0, 0.1)',
 	},
 	transactionsHeader: {
 		flexDirection: 'row',
@@ -386,20 +418,17 @@ const styles = StyleSheet.create({
 		justifyContent: 'space-between',
 		alignItems: 'center',
 		backgroundColor: 'white',
-		padding: 16,
-		borderRadius: 8,
+		padding: 12,
+		borderRadius: 12,
 		borderWidth: 1,
-		borderColor: '#E6F0FF',
+		borderColor: '#e5e7eb',
 		marginBottom: 12,
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.1,
-		shadowRadius: 2,
 		elevation: 2,
 	},
 	transactionDescription: {
 		color: '#212121',
-		fontWeight: '600',
+		fontWeight: '500',
+		marginBottom: 4,
 	},
 	transactionDate: {
 		color: '#9ca3af',
@@ -447,70 +476,83 @@ const styles = StyleSheet.create({
 		bottom: 0,
 		zIndex: 1,
 	},
-	balanceContainer: {
-		backgroundColor: '#0095FF',
-		padding: 24,
-		height: 208, // h-52
-		borderRadius: 24, // rounded-3xl
-		flexDirection: 'column',
-		shadowColor: '#1D4ED8',
-		shadowOpacity: 0.3,
-		// shadowRadius: 15,
-		shadowOffset: { width: 0, height: 4 },
-		elevation: 5,
-	},
-	headerRow: {
-		flexDirection: 'row',
-		height: 40,
-	},
-	headerText: {
-		color: 'white',
-		fontWeight: '600',
-		fontSize: 24,
-	},
-	balanceRow: {
-		flex: 1,
+	totalProfitContainer: {
+		backgroundColor: 'rgba(0, 149, 255, 0.1)',
+		padding: 16,
+		borderRadius: 16,
+		borderWidth: 1,
+		borderColor: 'rgba(0, 149, 255, 0.2)',
+		marginBottom: 16,
 	},
 	balanceText: {
-		color: 'white',
+		color: '#212121',
 		fontWeight: '600',
-		fontSize: 30,
+		fontSize: 36,
 		textAlign: 'left',
+		marginTop: 8,
 	},
-	statsRow: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-	},
-	statColumn: {
-		height: 64,
+	balanceContainer: {
+		minHeight: 280,
+		borderRadius: 24,
 		flexDirection: 'column',
+		backgroundColor: 'transparent',
+		marginBottom: 8,
+	},
+	statsContainer: {
+		flexDirection: 'row',
+		justifyContent: 'flex-start',
+		gap: 16,
+	},
+	column: {
+		width: '48%',
+		gap: 16,
+	},
+	statWidget: {
+		borderRadius: 16,
+		borderWidth: 1,
+		borderColor: '#e5e7eb',
+		aspectRatio: 1,
+		padding: 16,
+		justifyContent: 'flex-start',
+	},
+	statContent: {
+		flex: 1,
+		marginBottom: 16,
 	},
 	statHeader: {
 		flexDirection: 'row',
+		alignItems: 'center',
+		marginBottom: 12,
 	},
 	iconContainer: {
-		backgroundColor: 'rgba(255, 255, 255, 0.15)',
-		width: 32,
+		width: 36,
+		height: 36,
 		justifyContent: 'center',
-		marginRight: 4,
-		borderRadius: 9999,
+		alignItems: 'center',
+		marginRight: 8,
+		borderRadius: 18,
 	},
 	icon: {
 		alignSelf: 'center',
 	},
 	statLabel: {
-		color: 'rgba(255, 255, 255, 0.85)',
-		fontSize: 20,
+		color: '#212121',
+		fontSize: 16,
 		fontWeight: '600',
-		marginBottom: 4,
-		paddingVertical: 2,
 	},
 	statValue: {
-		color: 'white',
-		// fontWeight: '6',
+		color: '#212121',
 		fontSize: 24,
+		fontWeight: '600',
 	},
-	statValueRight: {
-		textAlign: 'right',
+	progressBarContainer: {
+		height: 6,
+		backgroundColor: 'rgba(0, 149, 255, 0.1)',
+		borderRadius: 3,
+		overflow: 'hidden',
+	},
+	progressBar: {
+		height: '100%',
+		borderRadius: 4,
 	},
 });
