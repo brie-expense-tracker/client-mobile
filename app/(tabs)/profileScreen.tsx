@@ -1,5 +1,5 @@
 // ProfileScreen.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
 	SafeAreaView,
 	View,
@@ -21,6 +21,31 @@ export default function ProfileScreen() {
 	const [profileImage, setProfileImage] = useState(
 		require('../../assets/images/profile.jpg')
 	);
+	const [userProfile, setUserProfile] = useState({
+		firstName: '',
+		lastName: '',
+		monthlyIncome: 0,
+		savings: 0,
+		debt: 0,
+	});
+
+	useEffect(() => {
+		fetchProfile();
+	}, []);
+
+	const fetchProfile = async () => {
+		try {
+			const response = await fetch(
+				'http://localhost:3000/api/profiles/68431f0b700221021c84552a'
+			);
+			if (response.ok) {
+				const data = await response.json();
+				setUserProfile(data.data);
+			}
+		} catch (error) {
+			console.error('Error fetching profile:', error);
+		}
+	};
 
 	const pickImage = async () => {
 		// Request permission
@@ -51,9 +76,12 @@ export default function ProfileScreen() {
 		<SafeAreaView style={styles.container}>
 			{/* Header icons */}
 			<View style={styles.headerRight}>
-				{/* <TouchableOpacity style={styles.iconButton}>
+				<TouchableOpacity
+					style={styles.iconButton}
+					onPress={() => router.push('/screens/profileSettings')}
+				>
 					<Ionicons name="settings-outline" size={32} color="#555" />
-				</TouchableOpacity> */}
+				</TouchableOpacity>
 			</View>
 
 			{/* Profile picture and name */}
@@ -73,18 +101,24 @@ export default function ProfileScreen() {
 						</View>
 					</TouchableOpacity>
 				</View>
-				<Text style={styles.userName}>John Doe</Text>
+				<Text style={styles.userName}>
+					{userProfile.firstName} {userProfile.lastName}
+				</Text>
 			</View>
 
 			{/* Stats cards */}
 			<View style={styles.statsContainer}>
 				<View style={styles.statCard}>
-					<Text style={styles.statValue}>$1,250</Text>
-					<Text style={styles.statLabel}>This Month</Text>
+					<Text style={styles.statValue}>
+						${(userProfile?.savings || 0).toLocaleString()}
+					</Text>
+					<Text style={styles.statLabel}>Total Savings</Text>
 				</View>
 				<View style={styles.statCard}>
-					<Text style={styles.statValue}>$6,400</Text>
-					<Text style={styles.statLabel}>Year to Date</Text>
+					<Text style={styles.statValue}>
+						${(userProfile?.debt || 0).toLocaleString()}
+					</Text>
+					<Text style={styles.statLabel}>Total Debt</Text>
 				</View>
 			</View>
 
@@ -104,6 +138,14 @@ export default function ProfileScreen() {
 				>
 					<Ionicons name="cube-outline" size={24} color="#555" />
 					<Text style={styles.settingText}>Fixed Expenses</Text>
+					<Ionicons name="chevron-forward" size={24} color="#555" />
+				</TouchableOpacity>
+				<TouchableOpacity
+					style={styles.settingItem}
+					onPress={() => router.push('/screens/preferences')}
+				>
+					<Ionicons name="settings-outline" size={24} color="#555" />
+					<Text style={styles.settingText}>Preferences</Text>
 					<Ionicons name="chevron-forward" size={24} color="#555" />
 				</TouchableOpacity>
 				<TouchableOpacity style={styles.settingItem}>
@@ -210,5 +252,14 @@ const styles = StyleSheet.create({
 		marginLeft: 12,
 		fontSize: 16,
 		color: '#333',
+	},
+	settingValue: {
+		flexDirection: 'row',
+		alignItems: 'center',
+	},
+	settingValueText: {
+		fontSize: 14,
+		color: '#666',
+		marginRight: 8,
 	},
 });

@@ -79,7 +79,7 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 				},
 			},
 		};
-		fetch('https://yourapi.com/api/profile/setup', {
+		fetch('http://localhost:3000/api/profile/', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(profileData),
