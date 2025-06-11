@@ -111,6 +111,33 @@ const TransactionRow = ({
 	const translateX = useSharedValue(0);
 	const context = useSharedValue({ x: 0 });
 
+	const getCategoryIcon = (categories: string[]) => {
+		const categoryMap: {
+			[key: string]: { name: keyof typeof Ionicons.glyphMap; color: string };
+		} = {
+			Groceries: { name: 'cart-outline', color: '#4CAF50' },
+			Utilities: { name: 'flash-outline', color: '#FFC107' },
+			Entertainment: { name: 'game-controller-outline', color: '#9C27B0' },
+			Travel: { name: 'airplane-outline', color: '#2196F3' },
+			Health: { name: 'fitness-outline', color: '#F44336' },
+			Dining: { name: 'restaurant-outline', color: '#FF9800' },
+			Shopping: { name: 'bag-outline', color: '#E91E63' },
+			Transportation: { name: 'car-outline', color: '#607D8B' },
+			Housing: { name: 'home-outline', color: '#795548' },
+			Education: { name: 'school-outline', color: '#3F51B5' },
+			Salary: { name: 'cash-outline', color: '#4CAF50' },
+			Investment: { name: 'trending-up-outline', color: '#009688' },
+			Gifts: { name: 'gift-outline', color: '#E91E63' },
+			Other: { name: 'ellipsis-horizontal-outline', color: '#9E9E9E' },
+		};
+
+		// Get the first category from the array
+		const primaryCategory = categories[0];
+		return categoryMap[primaryCategory] || categoryMap['Other'];
+	};
+
+	const categoryIcon = getCategoryIcon(item.category);
+
 	const gesture = Gesture.Pan()
 		.onStart(() => {
 			context.value = { x: translateX.value };
@@ -139,9 +166,23 @@ const TransactionRow = ({
 			</View>
 			<GestureDetector gesture={gesture}>
 				<Animated.View style={[styles.txRow, animatedStyle]}>
-					<View style={{ flex: 1 }}>
-						<Text style={styles.txDesc}>{item.description}</Text>
-						<Text style={styles.txCategory}>{item.category.join(', ')}</Text>
+					<View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+						<View
+							style={[
+								styles.iconContainer,
+								{ backgroundColor: `${categoryIcon.color}20` },
+							]}
+						>
+							<Ionicons
+								name={categoryIcon.name}
+								size={20}
+								color={categoryIcon.color}
+							/>
+						</View>
+						<View style={{ marginLeft: 12 }}>
+							<Text style={styles.txDesc}>{item.description}</Text>
+							<Text style={styles.txCategory}>{item.category.join(', ')}</Text>
+						</View>
 					</View>
 					<View style={styles.txRight}>
 						<Text
@@ -649,5 +690,12 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		borderTopRightRadius: 12,
 		borderBottomRightRadius: 12,
+	},
+	iconContainer: {
+		width: 36,
+		height: 36,
+		borderRadius: 8,
+		justifyContent: 'center',
+		alignItems: 'center',
 	},
 });

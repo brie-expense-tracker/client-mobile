@@ -63,7 +63,7 @@ export default function TabLayout() {
 				name="trackerScreen"
 				options={{
 					tabBarIcon: ({ color, size }) => (
-						<Ionicons name="add-circle-outline" color={color} size={size} />
+						<Ionicons name="add-circle" color={'#007bff'} size={size} />
 					),
 					headerShown: false,
 					tabBarShowLabel: false,
