@@ -149,11 +149,6 @@ export default function ProfileScreen() {
 					<Ionicons name="chevron-forward" size={24} color="#555" />
 				</TouchableOpacity>
 				<TouchableOpacity style={styles.settingItem}>
-					<Ionicons name="language-outline" size={24} color="#555" />
-					<Text style={styles.settingText}>Language</Text>
-					<Ionicons name="chevron-forward" size={24} color="#555" />
-				</TouchableOpacity>
-				<TouchableOpacity style={styles.settingItem}>
 					<Ionicons name="color-palette-outline" size={24} color="#555" />
 					<Text style={styles.settingText}>Appearance</Text>
 					<Ionicons name="chevron-forward" size={24} color="#555" />
@@ -162,6 +157,11 @@ export default function ProfileScreen() {
 					<Ionicons name="shield-checkmark-outline" size={24} color="#555" />
 					<Text style={styles.settingText}>Privacy & Security</Text>
 					<Ionicons name="chevron-forward" size={24} color="#555" />
+				</TouchableOpacity>
+				<TouchableOpacity style={styles.settingItem}>
+					<Ionicons name="chatbox-ellipses-outline" size={24} color="#555" />
+					<Text style={styles.settingText}>Ai Chat</Text>
+					<Text style={{ color: '#717171' }}>Coming Soon</Text>
 				</TouchableOpacity>
 			</View>
 		</SafeAreaView>

@@ -66,111 +66,87 @@ export default function HistoryFilterScreen() {
 
 	return (
 		<View style={styles.mainContainer}>
-			<StatusBar
-				barStyle="dark-content"
-				backgroundColor="transparent"
-				translucent
-			/>
-			<SafeAreaView style={styles.safeArea} edges={['top']}>
-				<View style={styles.container}>
-					{/* Header */}
-					<View style={styles.headerContainer}>
-						<View style={styles.headerLeft}>
-							<TouchableOpacity onPress={handleBackPress}>
-								<Ionicons name="chevron-back-outline" size={36} color="#555" />
-							</TouchableOpacity>
-						</View>
-						<Text style={styles.headerTitle}>Filters</Text>
-						<View style={styles.headerRight} />
-					</View>
-
-					{/* Filter Modes */}
-					<View style={styles.filterModeList}>
-						{dateFilterModes.map((mode) => (
-							<TouchableOpacity
-								key={mode.value}
-								style={[
-									styles.filterModeItem,
-									localDateFilterMode === mode.value &&
-										styles.filterModeItemSelected,
-								]}
-								onPress={() => handleDateModeSelect(mode.value)}
-							>
-								<Ionicons
-									name={mode.icon as any}
-									size={24}
-									color={localDateFilterMode === mode.value ? '#fff' : '#555'}
-								/>
-								<Text
-									style={[
-										styles.filterModeText,
-										localDateFilterMode === mode.value &&
-											styles.filterModeTextSelected,
-									]}
-								>
-									{mode.label}
-								</Text>
-							</TouchableOpacity>
-						))}
-					</View>
-
-					<View style={styles.dropdownDivider} />
-
-					{/* Categories Section */}
-					<View style={styles.dropdownSection}>
-						<Text style={styles.dropdownSectionTitle}>
-							Filter by Categories
+			{/* Filter Modes */}
+			<View style={styles.filterModeList}>
+				{dateFilterModes.map((mode) => (
+					<TouchableOpacity
+						key={mode.value}
+						style={[
+							styles.filterModeItem,
+							localDateFilterMode === mode.value &&
+								styles.filterModeItemSelected,
+						]}
+						onPress={() => handleDateModeSelect(mode.value)}
+					>
+						<Ionicons
+							name={mode.icon as any}
+							size={24}
+							color={localDateFilterMode === mode.value ? '#fff' : '#555'}
+						/>
+						<Text
+							style={[
+								styles.filterModeText,
+								localDateFilterMode === mode.value &&
+									styles.filterModeTextSelected,
+							]}
+						>
+							{mode.label}
 						</Text>
-						<View style={styles.categoryList}>
+					</TouchableOpacity>
+				))}
+			</View>
+
+			<View style={styles.dropdownDivider} />
+
+			{/* Categories Section */}
+			<View style={styles.dropdownSection}>
+				<Text style={styles.dropdownSectionTitle}>Filter by Categories</Text>
+				<View style={styles.categoryList}>
+					<TouchableOpacity
+						style={[
+							styles.categoryItem,
+							localSelectedCategories.length === 0 &&
+								styles.categoryItemSelected,
+						]}
+						onPress={() => handleCategorySelect('')}
+					>
+						<Text
+							style={[
+								styles.categoryText,
+								localSelectedCategories.length === 0 &&
+									styles.categoryTextSelected,
+							]}
+						>
+							All Categories
+						</Text>
+					</TouchableOpacity>
+					{availableCategories.length > 0 ? (
+						availableCategories.map((category: string) => (
 							<TouchableOpacity
+								key={category}
 								style={[
 									styles.categoryItem,
-									localSelectedCategories.length === 0 &&
+									localSelectedCategories.includes(category) &&
 										styles.categoryItemSelected,
 								]}
-								onPress={() => handleCategorySelect('')}
+								onPress={() => handleCategorySelect(category)}
 							>
 								<Text
 									style={[
 										styles.categoryText,
-										localSelectedCategories.length === 0 &&
+										localSelectedCategories.includes(category) &&
 											styles.categoryTextSelected,
 									]}
 								>
-									All Categories
+									{category}
 								</Text>
 							</TouchableOpacity>
-							{availableCategories.length > 0 ? (
-								availableCategories.map((category: string) => (
-									<TouchableOpacity
-										key={category}
-										style={[
-											styles.categoryItem,
-											localSelectedCategories.includes(category) &&
-												styles.categoryItemSelected,
-										]}
-										onPress={() => handleCategorySelect(category)}
-									>
-										<Text
-											style={[
-												styles.categoryText,
-												localSelectedCategories.includes(category) &&
-													styles.categoryTextSelected,
-											]}
-										>
-											{category}
-										</Text>
-									</TouchableOpacity>
-								))
-							) : (
-								<Text style={styles.noCategoriesText}>
-									No categories available
-								</Text>
-							)}
-						</View>
-					</View>
+						))
+					) : (
+						<Text style={styles.noCategoriesText}>No categories available</Text>
+					)}
 				</View>
-			</SafeAreaView>
+			</View>
 		</View>
 	);
 }
@@ -178,45 +154,9 @@ export default function HistoryFilterScreen() {
 const styles = StyleSheet.create({
 	mainContainer: {
 		flex: 1,
-		backgroundColor: '#fff',
-	},
-	safeArea: {
-		flex: 1,
-		backgroundColor: '#fff',
-	},
-	container: {
-		flex: 1,
-		backgroundColor: '#fff',
-	},
-	headerContainer: {
-		flexDirection: 'row',
-		paddingRight: 16,
-		paddingLeft: 8,
-		paddingVertical: 8,
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		borderBottomWidth: 1,
-		borderBottomColor: '#e0e0e0',
-		backgroundColor: '#fff',
-	},
-	headerLeft: {
-		width: 36,
-		zIndex: 1000,
-	},
-	headerRight: {
-		width: 36,
-	},
-	headerTitle: {
-		fontSize: 20,
-		fontWeight: '600',
-		color: '#000000',
-		position: 'absolute',
-		left: 0,
-		right: 0,
-		textAlign: 'center',
+		backgroundColor: '#f9fafb',
 	},
 	filterModeList: {
-		width: '100%',
 		padding: 8,
 	},
 	filterModeItem: {
@@ -239,7 +179,7 @@ const styles = StyleSheet.create({
 	},
 	dropdownDivider: {
 		height: 1,
-		backgroundColor: '#eee',
+		backgroundColor: '#e2e2e2',
 		marginVertical: 16,
 	},
 	dropdownSection: {

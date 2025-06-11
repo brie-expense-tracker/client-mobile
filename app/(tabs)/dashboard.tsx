@@ -206,7 +206,9 @@ const Dashboard = () => {
 			}));
 			setTransactions(formattedTransactions);
 		} catch (error) {
-			console.error('Error fetching transactions:', error);
+			// UNCOMMENT WHILE TESTING AXIOS
+			// console.error('Error fetching transactions:', error);
+
 			// Fallback to dummy data if API call fails
 			setTransactions(dummyTransactions);
 		}
@@ -246,148 +248,140 @@ const Dashboard = () => {
 	};
 
 	return (
-		<View style={styles.mainContainer}>
-			<SafeAreaView style={styles.safeArea}>
-				<ScrollView
-					style={styles.scrollView}
-					showsVerticalScrollIndicator={false}
-					refreshControl={
-						<RefreshControl
-							refreshing={refreshing}
-							onRefresh={onRefresh}
-							tintColor="#0095FF"
-							colors={['#0095FF']}
-							progressBackgroundColor="#ffffff"
-						/>
-					}
-				>
-					<View style={styles.contentContainer}>
-						<View style={styles.headerContainer}>
-							<View style={styles.headerTextContainer}>
-								<Text style={styles.nameText}>Dashboard</Text>
-							</View>
-
-							<TouchableOpacity
-								onPress={() => router.push('/screens/notifications')}
-								style={styles.profileButton}
-							>
-								<View style={{ position: 'relative' }}>
-									<Ionicons
-										name="notifications-outline"
-										color="#212121"
-										size={24}
-									/>
-									<View style={styles.notificationButton} />
-								</View>
-							</TouchableOpacity>
-						</View>
-						<AISuggestionBox />
-
-						<View style={styles.header}>
-							<Text style={styles.balanceLabel}>Total Value</Text>
-							<View style={{ flexDirection: 'row', alignItems: 'center' }}>
-								<Text style={styles.balanceAmount}>$</Text>
-								<Text style={styles.balanceAmount}>
-									{totalBalance?.toFixed(2)}
-								</Text>
-							</View>
+		<SafeAreaView style={styles.safeArea}>
+			<ScrollView
+				style={styles.scrollView}
+				showsVerticalScrollIndicator={false}
+				refreshControl={
+					<RefreshControl
+						refreshing={refreshing}
+						onRefresh={onRefresh}
+						tintColor="#0095FF"
+						colors={['#0095FF']}
+						progressBackgroundColor="#ffffff"
+					/>
+				}
+			>
+				<View style={styles.contentContainer}>
+					<View style={styles.headerContainer}>
+						<View style={styles.headerTextContainer}>
+							<Text style={styles.nameText}>Dashboard</Text>
 						</View>
 
-						<View style={styles.carouselWrapper}>
-							<ScrollView
-								horizontal
-								showsHorizontalScrollIndicator={false}
-								contentContainerStyle={styles.carouselContainer}
-								pagingEnabled
-								snapToInterval={styles.statWidget.width + 12} // width + gap
-								decelerationRate="fast"
-							>
-								<BalanceWidget transactions={transactions} />
-							</ScrollView>
-						</View>
-
-						{/* Transactions History */}
-						<View style={styles.transactionsContainer}>
-							<View style={styles.transactionsHeader}>
-								<Text style={styles.transactionsTitle}>
-									Transactions History
-								</Text>
-								<TouchableOpacity onPress={() => router.push('/transaction')}>
-									<Text style={styles.seeAllText}>See all</Text>
-								</TouchableOpacity>
-							</View>
-
-							{transactions
-								.sort(
-									(a, b) =>
-										new Date(b.date).getTime() - new Date(a.date).getTime()
-								)
-								.slice(0, 6)
-								.map((transaction) => (
-									<View key={transaction.id} style={styles.transactionItem}>
-										<View>
-											<Text style={styles.transactionDescription}>
-												{transaction.description}
-											</Text>
-											<Text style={styles.transactionDate}>
-												{new Date(transaction.date).toLocaleDateString()}
-											</Text>
-										</View>
-										<Text
-											style={[
-												styles.transactionAmount,
-												transaction.type === 'income'
-													? styles.incomeAmount
-													: styles.expenseAmount,
-											]}
-										>
-											{transaction.type === 'income' ? '+' : '-'} $
-											{transaction.amount.toFixed(2)}
-										</Text>
-									</View>
-								))}
-						</View>
-
-						{/* --- Quick Action Buttons --- */}
-						<View style={styles.quickActionsContainer}>
-							<TouchableOpacity
-								style={styles.quickActionButton}
-								onPress={() => handleQuickAction('View Budgets')}
-							>
-								<MaterialCommunityIcons
-									name="wallet-outline"
+						<TouchableOpacity
+							onPress={() => router.push('/screens/notifications')}
+							style={styles.profileButton}
+						>
+							<View style={{ position: 'relative' }}>
+								<Ionicons
+									name="notifications-outline"
+									color="#212121"
 									size={24}
-									color="#333"
 								/>
-								<Text style={styles.quickActionButtonText}>Budgets</Text>
-							</TouchableOpacity>
-							<TouchableOpacity
-								style={styles.quickActionButton}
-								onPress={() => handleQuickAction('Reports')}
-							>
-								<MaterialCommunityIcons
-									name="chart-bar"
-									size={24}
-									color="#333"
-								/>
-								<Text style={styles.quickActionButtonText}>Reports</Text>
-							</TouchableOpacity>
-							<TouchableOpacity
-								style={styles.quickActionButton}
-								onPress={() => handleQuickAction('Settings')}
-							>
-								<MaterialCommunityIcons
-									name="cog-outline"
-									size={24}
-									color="#333"
-								/>
-								<Text style={styles.quickActionButtonText}>Settings</Text>
-							</TouchableOpacity>
+								<View style={styles.notificationButton} />
+							</View>
+						</TouchableOpacity>
+					</View>
+					<AISuggestionBox />
+
+					<View style={styles.header}>
+						<Text style={styles.balanceLabel}>Total Value</Text>
+						<View style={{ flexDirection: 'row', alignItems: 'center' }}>
+							<Text style={styles.balanceAmount}>$</Text>
+							<Text style={styles.balanceAmount}>
+								{totalBalance?.toFixed(2)}
+							</Text>
 						</View>
 					</View>
-				</ScrollView>
-			</SafeAreaView>
-		</View>
+
+					<View style={styles.carouselWrapper}>
+						<ScrollView
+							horizontal
+							showsHorizontalScrollIndicator={false}
+							contentContainerStyle={styles.carouselContainer}
+							pagingEnabled
+							snapToInterval={styles.statWidget.width + 12} // width + gap
+							decelerationRate="fast"
+						>
+							<BalanceWidget transactions={transactions} />
+						</ScrollView>
+					</View>
+
+					{/* Transactions History */}
+					<View style={styles.transactionsContainer}>
+						<View style={styles.transactionsHeader}>
+							<Text style={styles.transactionsTitle}>Transactions History</Text>
+							<TouchableOpacity onPress={() => router.push('/transaction')}>
+								<Text style={styles.seeAllText}>See all</Text>
+							</TouchableOpacity>
+						</View>
+
+						{transactions
+							.sort(
+								(a, b) =>
+									new Date(b.date).getTime() - new Date(a.date).getTime()
+							)
+							.slice(0, 6)
+							.map((transaction) => (
+								<View key={transaction.id} style={styles.transactionItem}>
+									<View>
+										<Text style={styles.transactionDescription}>
+											{transaction.description}
+										</Text>
+										<Text style={styles.transactionDate}>
+											{new Date(transaction.date).toLocaleDateString()}
+										</Text>
+									</View>
+									<Text
+										style={[
+											styles.transactionAmount,
+											transaction.type === 'income'
+												? styles.incomeAmount
+												: styles.expenseAmount,
+										]}
+									>
+										{transaction.type === 'income' ? '+' : '-'} $
+										{transaction.amount.toFixed(2)}
+									</Text>
+								</View>
+							))}
+					</View>
+
+					{/* --- Quick Action Buttons --- */}
+					<View style={styles.quickActionsContainer}>
+						<TouchableOpacity
+							style={styles.quickActionButton}
+							onPress={() => handleQuickAction('View Budgets')}
+						>
+							<MaterialCommunityIcons
+								name="wallet-outline"
+								size={24}
+								color="#333"
+							/>
+							<Text style={styles.quickActionButtonText}>Budgets</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={styles.quickActionButton}
+							onPress={() => handleQuickAction('Reports')}
+						>
+							<MaterialCommunityIcons name="chart-bar" size={24} color="#333" />
+							<Text style={styles.quickActionButtonText}>Reports</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={styles.quickActionButton}
+							onPress={() => handleQuickAction('Settings')}
+						>
+							<MaterialCommunityIcons
+								name="cog-outline"
+								size={24}
+								color="#333"
+							/>
+							<Text style={styles.quickActionButtonText}>Settings</Text>
+						</TouchableOpacity>
+					</View>
+				</View>
+			</ScrollView>
+		</SafeAreaView>
 	);
 };
 
@@ -395,30 +389,28 @@ export default Dashboard;
 
 const styles = StyleSheet.create({
 	mainContainer: {
-		height: '100%',
-		width: '100%',
+		flex: 1,
 		overflow: 'hidden',
-		backgroundColor: '#fff',
+		backgroundColor: '#f9fafb',
 	},
 	safeArea: {
 		flex: 1,
+		backgroundColor: '#f9fafb',
 	},
 	scrollView: {
 		flex: 1,
 	},
 	contentContainer: {
 		justifyContent: 'flex-start',
-		width: '100%',
-		height: '100%',
-		padding: 24,
-		backgroundColor: '#fff',
+		flex: 1,
+		paddingHorizontal: 24,
+		backgroundColor: '#f9fafb',
 	},
 	headerContainer: {
 		flexDirection: 'row',
 		marginBottom: 16,
 		justifyContent: 'space-between',
 		alignItems: 'center',
-		position: 'relative',
 	},
 	headerTextContainer: {
 		flexDirection: 'column',
