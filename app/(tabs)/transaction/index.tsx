@@ -248,7 +248,9 @@ export default function TransactionScreen() {
 			}));
 			setTransactions(formattedTransactions);
 		} catch (error) {
-			console.error('Error fetching transactions:', error);
+			// UNCOMMENT WHILE TESTING AXIOS
+			// console.error('Error fetching transactions:', error);
+
 			// Fallback to dummy data if API call fails
 			setTransactions(dummyData);
 		} finally {
@@ -420,11 +422,6 @@ export default function TransactionScreen() {
 
 	return (
 		<View style={styles.mainContainer}>
-			<StatusBar
-				barStyle="dark-content"
-				backgroundColor="transparent"
-				translucent
-			/>
 			<SafeAreaView style={styles.safeArea} edges={['top']}>
 				<View style={styles.container}>
 					{/* Header */}
@@ -566,17 +563,17 @@ const { width, height } = Dimensions.get('window');
 const styles = StyleSheet.create({
 	mainContainer: {
 		flex: 1,
-		backgroundColor: '#fff',
+		backgroundColor: '#f9fafb',
 	},
 	safeArea: {
 		flex: 1,
-		backgroundColor: '#fff',
+		backgroundColor: '#f9fafb',
 	},
 	container: {
 		flex: 1,
-		backgroundColor: '#fff',
+		backgroundColor: '#f9fafb',
 		paddingBottom: 0,
-		padding: 24,
+		paddingHorizontal: 24,
 	},
 	txRowContainer: {
 		position: 'relative',
@@ -589,7 +586,7 @@ const styles = StyleSheet.create({
 		borderBottomWidth: 1,
 		borderBottomColor: '#e5e7eb',
 		alignItems: 'center',
-		backgroundColor: '#fff',
+		backgroundColor: '#f9fafb',
 	},
 	txDesc: {
 		// fontSize: 16,
@@ -697,7 +694,7 @@ const styles = StyleSheet.create({
 		overflow: 'hidden',
 	},
 	monthHeader: {
-		backgroundColor: '#fff',
+		backgroundColor: '#f9fafb',
 		paddingHorizontal: 0,
 		paddingVertical: 16,
 		paddingBottom: 10,

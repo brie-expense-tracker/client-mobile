@@ -82,14 +82,10 @@ export default function TabLayout() {
 				}}
 			/>
 			<Tabs.Screen
-				name="chatScreen"
+				name="budgets"
 				options={{
 					tabBarIcon: ({ color, size }) => (
-						<Ionicons
-							name="chatbox-ellipses-outline"
-							color={color}
-							size={size}
-						/>
+						<Ionicons name="wallet-outline" color={color} size={size} />
 					),
 					headerShown: false,
 					tabBarShowLabel: false,
