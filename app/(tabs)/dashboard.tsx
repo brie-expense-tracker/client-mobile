@@ -303,50 +303,6 @@ const Dashboard = () => {
 								decelerationRate="fast"
 							>
 								<BalanceWidget transactions={transactions} />
-								<View
-									style={[styles.statWidget, { backgroundColor: '#f8fafc' }]}
-								>
-									<View style={styles.statContent}>
-										<View style={styles.statHeader}>
-											<View style={styles.iconContainer}>
-												<Ionicons
-													name="trending-up"
-													size={16}
-													color="#0095FF"
-													style={styles.icon}
-												/>
-											</View>
-											<Text style={[styles.statLabel, { color: '#0095FF' }]}>
-												Trends
-											</Text>
-										</View>
-										<Text style={[styles.statValue, { color: '#0095FF' }]}>
-											Coming Soon
-										</Text>
-									</View>
-								</View>
-								<View
-									style={[styles.statWidget, { backgroundColor: '#f8fafc' }]}
-								>
-									<View style={styles.statContent}>
-										<View style={styles.statHeader}>
-											<View style={styles.iconContainer}>
-												<Ionicons
-													name="analytics"
-													size={16}
-													color="#0095FF"
-													style={styles.icon}
-												/>
-											</View>
-											<Text style={[styles.statLabel, { color: '#0095FF' }]}>
-												Analytics
-											</Text>
-										</View>
-										<Text style={[styles.statValue, { color: '#0095FF' }]}>
-											Coming Soon
-										</Text>
-									</View>
-								</View>
 							</ScrollView>
 						</View>
 
@@ -728,7 +684,7 @@ const styles = StyleSheet.create({
 		fontSize: 18,
 	},
 	suggestionBox: {
-		backgroundColor: '#F8FAFC',
+		backgroundColor: '#F0F7FF',
 		borderRadius: 16,
 		padding: 16,
 		marginBottom: 16,
