@@ -62,8 +62,19 @@ export default function TabLayout() {
 			<Tabs.Screen
 				name="trackerScreen"
 				options={{
-					tabBarIcon: ({ color, size }) => (
-						<Ionicons name="add-circle" color={'#007bff'} size={size} />
+					tabBarIcon: ({ color, size, focused }) => (
+						<View
+							style={{
+								backgroundColor: focused ? '#007bff' : '#09a1ff',
+								borderRadius: 15,
+								width: 50,
+								height: 50,
+								justifyContent: 'center',
+								alignItems: 'center',
+							}}
+						>
+							<Ionicons name="contract-outline" color="white" size={32} />
+						</View>
 					),
 					headerShown: false,
 					tabBarShowLabel: false,

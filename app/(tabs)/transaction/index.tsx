@@ -11,6 +11,7 @@ import {
 	TouchableWithoutFeedback,
 	StatusBar,
 	Alert,
+	TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -226,6 +227,7 @@ export default function TransactionScreen() {
 	const [dateFilterMode, setDateFilterMode] = useState<string>(
 		params.dateFilterMode ?? 'month'
 	);
+	const [searchQuery, setSearchQuery] = useState('');
 
 	const fetchTransactions = async () => {
 		setIsLoading(true);
@@ -304,14 +306,28 @@ export default function TransactionScreen() {
 				dateMatch = true;
 			}
 
-			return categoryMatch && dateMatch;
+			// Apply search filtering
+			const searchMatch = searchQuery
+				? tx.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+				  tx.category.some((cat) =>
+						cat.toLowerCase().includes(searchQuery.toLowerCase())
+				  )
+				: true;
+
+			return categoryMatch && dateMatch && searchMatch;
 		});
 
 		// Sort by date in descending order (newest first)
 		return filteredData.sort(
 			(a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
 		);
-	}, [transactions, selectedCategories, selectedDate, dateFilterMode]);
+	}, [
+		transactions,
+		selectedCategories,
+		selectedDate,
+		dateFilterMode,
+		searchQuery,
+	]);
 
 	// Group transactions by month
 	const groupedTransactions = useMemo(() => {
@@ -443,6 +459,31 @@ export default function TransactionScreen() {
 						</View>
 					</View>
 
+					{/* Search Bar */}
+					<View style={styles.searchContainer}>
+						<Ionicons
+							name="search"
+							size={20}
+							color="#9ca3af"
+							style={styles.searchIcon}
+						/>
+						<TextInput
+							style={styles.searchInput}
+							placeholder="Search transactions..."
+							value={searchQuery}
+							onChangeText={setSearchQuery}
+							placeholderTextColor="#9ca3af"
+						/>
+						{searchQuery ? (
+							<TouchableOpacity
+								onPress={() => setSearchQuery('')}
+								style={styles.clearButton}
+							>
+								<Ionicons name="close-circle" size={20} color="#9ca3af" />
+							</TouchableOpacity>
+						) : null}
+					</View>
+
 					{/* Date Header */}
 					{renderDateHeader()}
 
@@ -539,13 +580,11 @@ const styles = StyleSheet.create({
 	},
 	txRowContainer: {
 		position: 'relative',
-		marginHorizontal: 0,
 		borderRadius: 12,
 		overflow: 'hidden',
 	},
 	txRow: {
 		flexDirection: 'row',
-		padding: 16,
 		paddingVertical: 16,
 		borderBottomWidth: 1,
 		borderBottomColor: '#e5e7eb',
@@ -697,5 +736,25 @@ const styles = StyleSheet.create({
 		borderRadius: 8,
 		justifyContent: 'center',
 		alignItems: 'center',
+	},
+	searchContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#f3f4f6',
+		borderRadius: 12,
+		paddingHorizontal: 12,
+		height: 44,
+	},
+	searchIcon: {
+		marginRight: 8,
+	},
+	searchInput: {
+		flex: 1,
+		fontSize: 16,
+		color: '#212121',
+		paddingVertical: 8,
+	},
+	clearButton: {
+		padding: 4,
 	},
 });
