@@ -19,7 +19,7 @@ import {
 import ProfitGraph from '../components/ProfitGraph';
 import AddTransaction from '../components/AddTransaction';
 import axios from 'axios';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface BalanceWidgetProps {
 	transactions: Transaction[];
@@ -66,12 +66,14 @@ const StatWidget = ({
 		<View style={styles.statWidget}>
 			<View style={styles.statContent}>
 				<View style={styles.statHeader}>
-					<View style={[styles.iconContainer, { backgroundColor: color }]}>
-						<Ionicons name={icon} size={16} color="white" style={styles.icon} />
+					<View style={styles.iconContainer}>
+						<Ionicons name={icon} size={16} color={color} style={styles.icon} />
 					</View>
-					<Text style={styles.statLabel}>{label}</Text>
+					<Text style={[styles.statLabel, { color: color }]}>{label}</Text>
 				</View>
-				<Text style={styles.statValue}>${value.toFixed(2)}</Text>
+				<Text style={[styles.statValue, { color: color }]}>
+					${value.toFixed(2)}
+				</Text>
 			</View>
 			<ProgressBar value={progressValue} total={totalValue} color={color} />
 		</View>
@@ -93,38 +95,29 @@ const BalanceWidget: React.FC<BalanceWidgetProps> = ({ transactions }) => {
 	return (
 		<View style={styles.balanceContainer}>
 			<View style={styles.statsContainer}>
-				<View style={styles.column}>
-					<StatWidget
-						label="Total Profit"
-						value={totalBalance}
-						icon="wallet-outline"
-						color="#0095FF"
-						progressValue={Math.abs(totalBalance)}
-						totalValue={maxValue}
-					/>
+				<View style={styles.statsRow}>
 					<StatWidget
 						label="Income"
 						value={totalIncome}
-						icon="arrow-up-outline"
+						icon="arrow-up"
 						color="#16a34a"
 						progressValue={totalIncome}
 						totalValue={maxValue}
 					/>
-				</View>
-				<View style={styles.column}>
+
 					<StatWidget
 						label="Expense"
 						value={totalExpense}
-						icon="arrow-down-outline"
+						icon="arrow-down"
 						color="#dc2626"
 						progressValue={totalExpense}
 						totalValue={maxValue}
 					/>
 					<StatWidget
-						label="Expense"
+						label="Budget"
 						value={totalExpense}
-						icon="arrow-down-outline"
-						color="#dc2626"
+						icon="bar-chart"
+						color="#000000"
 						progressValue={totalExpense}
 						totalValue={maxValue}
 					/>
@@ -162,6 +155,21 @@ const ProfitLossWidget = () => {
 	);
 };
 
+const AISuggestionBox = () => {
+	return (
+		<View style={styles.suggestionBox}>
+			<View style={styles.suggestionHeader}>
+				<Ionicons name="bulb-outline" size={20} color="#0095FF" />
+				<Text style={styles.suggestionTitle}>AI Insights</Text>
+			</View>
+			<Text style={styles.suggestionText}>
+				Based on your spending patterns, consider setting aside 20% of your
+				income for savings this month.
+			</Text>
+		</View>
+	);
+};
+
 const Dashboard = () => {
 	const [transactions, setTransactions] = useState<Transaction[]>([]);
 	const [isAddTransactionVisible, setIsAddTransactionVisible] = useState(false);
@@ -173,6 +181,14 @@ const Dashboard = () => {
 		date: new Date(),
 	});
 	const [showDatePicker, setShowDatePicker] = useState(false);
+
+	const totalBalance = transactions.reduce((sum, t) => {
+		return sum + (t.type === 'income' ? t.amount : -t.amount);
+	}, 0);
+
+	const handleQuickAction = (action: string) => {
+		console.log(`Action: ${action} button pressed!`);
+	};
 
 	const fetchTransactions = async () => {
 		try {
@@ -248,9 +264,9 @@ const Dashboard = () => {
 					<View style={styles.contentContainer}>
 						<View style={styles.headerContainer}>
 							<View style={styles.headerTextContainer}>
-								{/* <Text style={styles.welcomeText}>Welcome back,</Text> */}
 								<Text style={styles.nameText}>Dashboard</Text>
 							</View>
+
 							<TouchableOpacity
 								onPress={() => router.push('/screens/notifications')}
 								style={styles.profileButton}
@@ -261,69 +277,156 @@ const Dashboard = () => {
 										color="#212121"
 										size={24}
 									/>
-									<View
-										style={{
-											position: 'absolute',
-											top: -2,
-											right: -2,
-											width: 8,
-											height: 8,
-											borderRadius: 4,
-											backgroundColor: '#FF6A00',
-											borderWidth: 1,
-											borderColor: 'white',
-										}}
-									/>
+									<View style={styles.notificationButton} />
 								</View>
 							</TouchableOpacity>
 						</View>
+						<AISuggestionBox />
 
-						<View style={styles.mainContent}>
-							<BalanceWidget transactions={transactions} />
+						<View style={styles.header}>
+							<Text style={styles.balanceLabel}>Total Value</Text>
+							<View style={{ flexDirection: 'row', alignItems: 'center' }}>
+								<Text style={styles.balanceAmount}>$</Text>
+								<Text style={styles.balanceAmount}>
+									{totalBalance?.toFixed(2)}
+								</Text>
+							</View>
+						</View>
 
-							{/* <ProfitLossWidget /> */}
-
-							{/* Transactions History */}
-							<View style={styles.transactionsContainer}>
-								<View style={styles.transactionsHeader}>
-									<Text style={styles.transactionsTitle}>
-										Transactions History
-									</Text>
-									<TouchableOpacity onPress={() => router.push('/transaction')}>
-										<Text style={styles.seeAllText}>See all</Text>
-									</TouchableOpacity>
-								</View>
-
-								{transactions
-									.sort(
-										(a, b) =>
-											new Date(b.date).getTime() - new Date(a.date).getTime()
-									)
-									.slice(0, 6)
-									.map((transaction) => (
-										<View key={transaction.id} style={styles.transactionItem}>
-											<View>
-												<Text style={styles.transactionDescription}>
-													{transaction.description}
-												</Text>
-												<Text style={styles.transactionDate}>
-													{new Date(transaction.date).toLocaleDateString()}
-												</Text>
+						<View style={styles.carouselWrapper}>
+							<ScrollView
+								horizontal
+								showsHorizontalScrollIndicator={false}
+								contentContainerStyle={styles.carouselContainer}
+								pagingEnabled
+								snapToInterval={styles.statWidget.width + 12} // width + gap
+								decelerationRate="fast"
+							>
+								<BalanceWidget transactions={transactions} />
+								<View
+									style={[styles.statWidget, { backgroundColor: '#f8fafc' }]}
+								>
+									<View style={styles.statContent}>
+										<View style={styles.statHeader}>
+											<View style={styles.iconContainer}>
+												<Ionicons
+													name="trending-up"
+													size={16}
+													color="#0095FF"
+													style={styles.icon}
+												/>
 											</View>
-											<Text
-												style={[
-													styles.transactionAmount,
-													transaction.type === 'income'
-														? styles.incomeAmount
-														: styles.expenseAmount,
-												]}
-											>
-												{transaction.type === 'income' ? '+' : '-'} $
-												{transaction.amount.toFixed(2)}
+											<Text style={[styles.statLabel, { color: '#0095FF' }]}>
+												Trends
 											</Text>
 										</View>
-									))}
+										<Text style={[styles.statValue, { color: '#0095FF' }]}>
+											Coming Soon
+										</Text>
+									</View>
+								</View>
+								<View
+									style={[styles.statWidget, { backgroundColor: '#f8fafc' }]}
+								>
+									<View style={styles.statContent}>
+										<View style={styles.statHeader}>
+											<View style={styles.iconContainer}>
+												<Ionicons
+													name="analytics"
+													size={16}
+													color="#0095FF"
+													style={styles.icon}
+												/>
+											</View>
+											<Text style={[styles.statLabel, { color: '#0095FF' }]}>
+												Analytics
+											</Text>
+										</View>
+										<Text style={[styles.statValue, { color: '#0095FF' }]}>
+											Coming Soon
+										</Text>
+									</View>
+								</View>
+							</ScrollView>
+						</View>
+
+						{/* Transactions History */}
+						<View style={styles.transactionsContainer}>
+							<View style={styles.transactionsHeader}>
+								<Text style={styles.transactionsTitle}>
+									Transactions History
+								</Text>
+								<TouchableOpacity onPress={() => router.push('/transaction')}>
+									<Text style={styles.seeAllText}>See all</Text>
+								</TouchableOpacity>
 							</View>
+
+							{transactions
+								.sort(
+									(a, b) =>
+										new Date(b.date).getTime() - new Date(a.date).getTime()
+								)
+								.slice(0, 6)
+								.map((transaction) => (
+									<View key={transaction.id} style={styles.transactionItem}>
+										<View>
+											<Text style={styles.transactionDescription}>
+												{transaction.description}
+											</Text>
+											<Text style={styles.transactionDate}>
+												{new Date(transaction.date).toLocaleDateString()}
+											</Text>
+										</View>
+										<Text
+											style={[
+												styles.transactionAmount,
+												transaction.type === 'income'
+													? styles.incomeAmount
+													: styles.expenseAmount,
+											]}
+										>
+											{transaction.type === 'income' ? '+' : '-'} $
+											{transaction.amount.toFixed(2)}
+										</Text>
+									</View>
+								))}
+						</View>
+
+						{/* --- Quick Action Buttons --- */}
+						<View style={styles.quickActionsContainer}>
+							<TouchableOpacity
+								style={styles.quickActionButton}
+								onPress={() => handleQuickAction('View Budgets')}
+							>
+								<MaterialCommunityIcons
+									name="wallet-outline"
+									size={24}
+									color="#333"
+								/>
+								<Text style={styles.quickActionButtonText}>Budgets</Text>
+							</TouchableOpacity>
+							<TouchableOpacity
+								style={styles.quickActionButton}
+								onPress={() => handleQuickAction('Reports')}
+							>
+								<MaterialCommunityIcons
+									name="chart-bar"
+									size={24}
+									color="#333"
+								/>
+								<Text style={styles.quickActionButtonText}>Reports</Text>
+							</TouchableOpacity>
+							<TouchableOpacity
+								style={styles.quickActionButton}
+								onPress={() => handleQuickAction('Settings')}
+							>
+								<MaterialCommunityIcons
+									name="cog-outline"
+									size={24}
+									color="#333"
+								/>
+								<Text style={styles.quickActionButtonText}>Settings</Text>
+							</TouchableOpacity>
 						</View>
 					</View>
 				</ScrollView>
@@ -374,6 +477,17 @@ const styles = StyleSheet.create({
 		fontSize: 28,
 		fontWeight: '500',
 	},
+	notificationButton: {
+		position: 'absolute',
+		top: -2,
+		right: -2,
+		width: 8,
+		height: 8,
+		borderRadius: 4,
+		backgroundColor: '#FF6A00',
+		borderWidth: 1,
+		borderColor: 'white',
+	},
 	profileButton: {
 		width: 48,
 		height: 48,
@@ -389,15 +503,9 @@ const styles = StyleSheet.create({
 		width: 48,
 		height: 48,
 	},
-	mainContent: {
-		width: '100%',
-		gap: 24,
-	},
+
 	transactionsContainer: {
-		marginTop: 8,
 		paddingTop: 16,
-		borderTopWidth: 1,
-		borderTopColor: 'rgba(0, 0, 0, 0.1)',
 	},
 	transactionsHeader: {
 		flexDirection: 'row',
@@ -406,9 +514,9 @@ const styles = StyleSheet.create({
 		marginBottom: 16,
 	},
 	transactionsTitle: {
-		fontSize: 18,
+		fontSize: 16,
 		fontWeight: '600',
-		color: '#212121',
+		color: '#535353',
 	},
 	seeAllText: {
 		color: '#546E7A',
@@ -492,7 +600,6 @@ const styles = StyleSheet.create({
 		marginTop: 8,
 	},
 	balanceContainer: {
-		minHeight: 280,
 		borderRadius: 24,
 		flexDirection: 'column',
 		backgroundColor: 'transparent',
@@ -501,48 +608,50 @@ const styles = StyleSheet.create({
 	statsContainer: {
 		flexDirection: 'row',
 		justifyContent: 'flex-start',
-		gap: 16,
 	},
-	column: {
-		width: '48%',
-		gap: 16,
+	statsRow: {
+		width: '100%',
+		gap: 12,
+		flexDirection: 'row',
 	},
 	statWidget: {
+		width: 160,
 		borderRadius: 16,
-		borderWidth: 1,
-		borderColor: '#e5e7eb',
-		aspectRatio: 1,
+		backgroundColor: '#ffffff',
 		padding: 16,
 		justifyContent: 'flex-start',
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.2,
+		shadowRadius: 2,
+		elevation: 5,
 	},
 	statContent: {
 		flex: 1,
-		marginBottom: 16,
+		marginBottom: 26,
 	},
 	statHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		marginBottom: 12,
+		justifyContent: 'flex-start',
+		marginBottom: 8,
 	},
 	iconContainer: {
-		width: 36,
-		height: 36,
 		justifyContent: 'center',
 		alignItems: 'center',
-		marginRight: 8,
-		borderRadius: 18,
+		marginRight: 4,
 	},
 	icon: {
 		alignSelf: 'center',
 	},
 	statLabel: {
-		color: '#212121',
-		fontSize: 16,
-		fontWeight: '600',
+		color: '#353535',
+		fontSize: 20,
+		fontWeight: '400',
 	},
 	statValue: {
-		color: '#212121',
-		fontSize: 24,
+		color: '#fff',
+		fontSize: 20,
 		fontWeight: '600',
 	},
 	progressBarContainer: {
@@ -554,5 +663,125 @@ const styles = StyleSheet.create({
 	progressBar: {
 		height: '100%',
 		borderRadius: 4,
+	},
+	header: {
+		flex: 1,
+		marginBottom: 16,
+	},
+	balanceLabel: {
+		color: '#535353',
+		fontSize: 14,
+	},
+	balanceAmount: {
+		color: '#212121',
+		fontSize: 36,
+		fontWeight: '600',
+	},
+	profitLabel: {
+		color: '#16a34a',
+		fontSize: 16,
+		fontWeight: '500',
+	},
+	card: {
+		backgroundColor: 'white',
+		borderRadius: 16,
+		marginBottom: 16,
+	},
+	chartCard: {
+		marginTop: 16,
+	},
+	cardTitle: {
+		fontSize: 18,
+		fontWeight: '600',
+		color: '#212121',
+		marginBottom: 16,
+	},
+	summaryRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+	},
+	summaryItem: {
+		flex: 1,
+	},
+	summaryLabel: {
+		fontSize: 14,
+		color: '#535353',
+		marginBottom: 4,
+		textAlign: 'center',
+	},
+	incomeText: {
+		textAlign: 'center',
+		color: '#16a34a',
+		fontWeight: '600',
+		fontSize: 18,
+	},
+	expenseText: {
+		textAlign: 'center',
+		color: '#dc2626',
+		fontWeight: '600',
+		fontSize: 18,
+	},
+	budgetAmount: {
+		textAlign: 'center',
+		color: '#212121',
+		fontWeight: '600',
+		fontSize: 18,
+	},
+	suggestionBox: {
+		backgroundColor: '#F8FAFC',
+		borderRadius: 16,
+		padding: 16,
+		marginBottom: 16,
+		borderWidth: 1,
+		borderColor: '#E2E8F0',
+	},
+	suggestionHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginBottom: 8,
+	},
+	suggestionTitle: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#1E293B',
+		marginLeft: 8,
+	},
+	suggestionText: {
+		fontSize: 14,
+		color: '#475569',
+		lineHeight: 20,
+	},
+	carouselWrapper: {
+		marginHorizontal: -24, // Negate parent padding
+		marginBottom: 16,
+	},
+	carouselContainer: {
+		paddingHorizontal: 24, // Add padding back to the content
+		gap: 12,
+	},
+	quickActionsContainer: {
+		flexDirection: 'row',
+		justifyContent: 'space-around',
+		marginTop: 20,
+		marginBottom: 10,
+	},
+	quickActionButton: {
+		alignItems: 'center',
+		padding: 10,
+		borderRadius: 10,
+		backgroundColor: '#FFFFFF',
+		flex: 1,
+		marginHorizontal: 5,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.08,
+		shadowRadius: 3,
+		elevation: 2,
+	},
+	quickActionButtonText: {
+		marginTop: 5,
+		fontSize: 13,
+		fontWeight: '500',
+		color: '#555555',
 	},
 });

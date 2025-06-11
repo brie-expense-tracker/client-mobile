@@ -7,518 +7,145 @@ export interface Transaction {
 	type: 'income' | 'expense';
 }
 
-export const transactions: Transaction[] = [
-	// Income entries
-	{
-		id: '1',
-		description: 'Monthly Salary',
-		amount: 3200,
-		date: '2024-03-01',
-		category: ['Work', 'Salary'],
-		type: 'income',
-	},
-	{
-		id: '2',
-		description: 'Monthly Salary',
-		amount: 3200,
-		date: '2024-02-01',
-		category: ['Work', 'Salary'],
-		type: 'income',
-	},
-	{
-		id: '3',
-		description: 'Monthly Salary',
-		amount: 3200,
-		date: '2024-01-01',
-		category: ['Work', 'Salary'],
-		type: 'income',
-	},
-	{
-		id: '4',
-		description: 'Freelance Project',
-		amount: 750,
-		date: '2024-02-15',
-		category: ['Work', 'Freelance'],
-		type: 'income',
-	},
-	{
-		id: '5',
-		description: 'Consulting Work',
-		amount: 1200,
-		date: '2024-01-20',
-		category: ['Work', 'Consulting'],
-		type: 'income',
-	},
-	{
-		id: '6',
-		description: 'Tax Refund',
-		amount: 850,
-		date: '2024-02-28',
-		category: ['Tax'],
-		type: 'income',
-	},
+// Function to generate dummy transactions for the last 6 months
+const generateDummyTransactions = (): Transaction[] => {
+	const transactions: Transaction[] = [];
+	const endDate = new Date();
+	const startDate = new Date();
+	startDate.setMonth(startDate.getMonth() - 6);
 
-	// Regular Expenses
-	{
-		id: '7',
-		description: 'Rent',
-		amount: 1200,
-		date: '2024-03-01',
-		category: ['Housing'],
-		type: 'expense',
-	},
-	{
-		id: '8',
-		description: 'Rent',
-		amount: 1200,
-		date: '2024-02-01',
-		category: ['Housing'],
-		type: 'expense',
-	},
-	{
-		id: '9',
-		description: 'Rent',
-		amount: 1200,
-		date: '2024-01-01',
-		category: ['Housing'],
-		type: 'expense',
-	},
-	{
-		id: '10',
-		description: 'Electric Bill',
-		amount: 85,
-		date: '2024-03-05',
-		category: ['Utilities'],
-		type: 'expense',
-	},
-	{
-		id: '11',
-		description: 'Electric Bill',
-		amount: 95,
-		date: '2024-02-05',
-		category: ['Utilities'],
-		type: 'expense',
-	},
-	{
-		id: '12',
-		description: 'Electric Bill',
-		amount: 110,
-		date: '2024-01-05',
-		category: ['Utilities'],
-		type: 'expense',
-	},
-	{
-		id: '13',
-		description: 'Internet Bill',
-		amount: 65,
-		date: '2024-03-10',
-		category: ['Utilities'],
-		type: 'expense',
-	},
-	{
-		id: '14',
-		description: 'Internet Bill',
-		amount: 65,
-		date: '2024-02-10',
-		category: ['Utilities'],
-		type: 'expense',
-	},
-	{
-		id: '15',
-		description: 'Internet Bill',
-		amount: 65,
-		date: '2024-01-10',
-		category: ['Utilities'],
-		type: 'expense',
-	},
+	// Regular monthly transactions
+	const regularTransactions = [
+		{
+			description: 'Monthly Salary',
+			amount: 3200,
+			category: ['Work', 'Salary'],
+			type: 'income' as const,
+		},
+		{
+			description: 'Rent',
+			amount: 1200,
+			category: ['Housing'],
+			type: 'expense' as const,
+		},
+		{
+			description: 'Internet Bill',
+			amount: 65,
+			category: ['Utilities'],
+			type: 'expense' as const,
+		},
+		{
+			description: 'Phone Bill',
+			amount: 75,
+			category: ['Utilities', 'Phone'],
+			type: 'expense' as const,
+		},
+		{
+			description: 'Gym Membership',
+			amount: 45,
+			category: ['Health', 'Fitness'],
+			type: 'expense' as const,
+		},
+	];
 
-	// Groceries and Food
-	{
-		id: '16',
-		description: 'Weekly Groceries',
-		amount: 85.5,
-		date: '2024-03-15',
-		category: ['Food', 'Groceries'],
-		type: 'expense',
-	},
-	{
-		id: '17',
-		description: 'Weekly Groceries',
-		amount: 92.75,
-		date: '2024-03-08',
-		category: ['Food', 'Groceries'],
-		type: 'expense',
-	},
-	{
-		id: '18',
-		description: 'Weekly Groceries',
-		amount: 78.25,
-		date: '2024-03-01',
-		category: ['Food', 'Groceries'],
-		type: 'expense',
-	},
-	{
-		id: '19',
-		description: 'Restaurant Dinner',
-		amount: 45.8,
-		date: '2024-03-20',
-		category: ['Food', 'Dining'],
-		type: 'expense',
-	},
-	{
-		id: '20',
-		description: 'Coffee Shop',
-		amount: 4.75,
-		date: '2024-03-19',
-		category: ['Food', 'Coffee'],
-		type: 'expense',
-	},
+	// Generate regular monthly transactions
+	const currentDate = new Date(startDate);
+	while (currentDate <= endDate) {
+		// Add regular monthly transactions on the 1st of each month
+		if (currentDate.getDate() === 1) {
+			regularTransactions.forEach((transaction, index) => {
+				transactions.push({
+					id: `regular-${currentDate.toISOString()}-${index}`,
+					...transaction,
+					date: currentDate.toISOString().split('T')[0],
+				});
+			});
+		}
 
-	// Transportation
-	{
-		id: '21',
-		description: 'Gas Station',
-		amount: 45.0,
-		date: '2024-03-18',
-		category: ['Transportation', 'Gas'],
-		type: 'expense',
-	},
-	{
-		id: '22',
-		description: 'Gas Station',
-		amount: 42.5,
-		date: '2024-03-04',
-		category: ['Transportation', 'Gas'],
-		type: 'expense',
-	},
-	{
-		id: '23',
-		description: 'Uber Ride',
-		amount: 25.75,
-		date: '2024-03-17',
-		category: ['Transportation', 'Ride Share'],
-		type: 'expense',
-	},
+		// Add random daily transactions
+		if (Math.random() < 0.3) {
+			// 30% chance of a transaction each day
+			const transactionTypes = [
+				{
+					description: 'Coffee Shop',
+					amount: 4.75,
+					category: ['Food', 'Coffee'],
+					type: 'expense' as const,
+				},
+				{
+					description: 'Restaurant Dinner',
+					amount: 45.8,
+					category: ['Food', 'Dining'],
+					type: 'expense' as const,
+				},
+				{
+					description: 'Grocery Shopping',
+					amount: 85.5,
+					category: ['Food', 'Groceries'],
+					type: 'expense' as const,
+				},
+				{
+					description: 'Gas Station',
+					amount: 45.0,
+					category: ['Transportation', 'Gas'],
+					type: 'expense' as const,
+				},
+				{
+					description: 'Uber Ride',
+					amount: 25.75,
+					category: ['Transportation', 'Ride Share'],
+					type: 'expense' as const,
+				},
+			];
 
-	// Entertainment
-	{
-		id: '24',
-		description: 'Netflix Subscription',
-		amount: 15.99,
-		date: '2024-03-01',
-		category: ['Entertainment', 'Streaming'],
-		type: 'expense',
-	},
-	{
-		id: '25',
-		description: 'Spotify Premium',
-		amount: 9.99,
-		date: '2024-03-01',
-		category: ['Entertainment', 'Music'],
-		type: 'expense',
-	},
-	{
-		id: '26',
-		description: 'Movie Tickets',
-		amount: 28.5,
-		date: '2024-03-16',
-		category: ['Entertainment', 'Movies'],
-		type: 'expense',
-	},
+			const randomTransaction =
+				transactionTypes[Math.floor(Math.random() * transactionTypes.length)];
+			transactions.push({
+				id: `daily-${currentDate.toISOString()}`,
+				...randomTransaction,
+				date: currentDate.toISOString().split('T')[0],
+			});
+		}
 
-	// Shopping
-	{
-		id: '27',
-		description: 'Amazon Purchase',
-		amount: 65.99,
-		date: '2024-03-14',
-		category: ['Shopping', 'Online'],
-		type: 'expense',
-	},
-	{
-		id: '28',
-		description: 'Clothing Store',
-		amount: 89.99,
-		date: '2024-03-12',
-		category: ['Shopping', 'Clothing'],
-		type: 'expense',
-	},
+		// Add occasional income (freelance, consulting, etc.)
+		if (Math.random() < 0.05) {
+			// 5% chance of additional income
+			const incomeTypes = [
+				{
+					description: 'Freelance Project',
+					amount: 750,
+					category: ['Work', 'Freelance'],
+					type: 'income' as const,
+				},
+				{
+					description: 'Consulting Work',
+					amount: 1200,
+					category: ['Work', 'Consulting'],
+					type: 'income' as const,
+				},
+				{
+					description: 'Investment Dividend',
+					amount: 120.75,
+					category: ['Investment'],
+					type: 'income' as const,
+				},
+			];
 
-	// Health & Fitness
-	{
-		id: '29',
-		description: 'Gym Membership',
-		amount: 45.0,
-		date: '2024-03-01',
-		category: ['Health', 'Fitness'],
-		type: 'expense',
-	},
-	{
-		id: '30',
-		description: 'Pharmacy',
-		amount: 32.5,
-		date: '2024-03-10',
-		category: ['Health', 'Medical'],
-		type: 'expense',
-	},
+			const randomIncome =
+				incomeTypes[Math.floor(Math.random() * incomeTypes.length)];
+			transactions.push({
+				id: `income-${currentDate.toISOString()}`,
+				...randomIncome,
+				date: currentDate.toISOString().split('T')[0],
+			});
+		}
 
-	// Additional Income
-	{
-		id: '31',
-		description: 'Side Project Payment',
-		amount: 500,
-		date: '2024-03-15',
-		category: ['Work', 'Freelance'],
-		type: 'income',
-	},
-	{
-		id: '32',
-		description: 'Investment Dividend',
-		amount: 120.75,
-		date: '2024-03-20',
-		category: ['Investment'],
-		type: 'income',
-	},
+		// Move to next day
+		currentDate.setDate(currentDate.getDate() + 1);
+	}
 
-	// Additional Expenses
-	{
-		id: '33',
-		description: 'Haircut',
-		amount: 35.0,
-		date: '2024-03-11',
-		category: ['Personal Care'],
-		type: 'expense',
-	},
-	{
-		id: '34',
-		description: 'Phone Bill',
-		amount: 75.0,
-		date: '2024-03-01',
-		category: ['Utilities', 'Phone'],
-		type: 'expense',
-	},
-	{
-		id: '35',
-		description: 'Car Insurance',
-		amount: 120.0,
-		date: '2024-03-01',
-		category: ['Insurance', 'Transportation'],
-		type: 'expense',
-	},
-	{
-		id: '36',
-		description: 'Home Insurance',
-		amount: 85.0,
-		date: '2024-03-01',
-		category: ['Insurance', 'Housing'],
-		type: 'expense',
-	},
-	{
-		id: '37',
-		description: 'Gift Purchase',
-		amount: 45.99,
-		date: '2024-03-18',
-		category: ['Shopping', 'Gifts'],
-		type: 'expense',
-	},
-	{
-		id: '38',
-		description: 'Book Purchase',
-		amount: 24.99,
-		date: '2024-03-16',
-		category: ['Shopping', 'Books'],
-		type: 'expense',
-	},
-	{
-		id: '39',
-		description: 'Charity Donation',
-		amount: 50.0,
-		date: '2024-03-15',
-		category: ['Charity'],
-		type: 'expense',
-	},
-	{
-		id: '40',
-		description: 'Software Subscription',
-		amount: 29.99,
-		date: '2024-03-01',
-		category: ['Software', 'Subscription'],
-		type: 'expense',
-	},
-	{
-		id: '41',
-		description: 'Concert Tickets',
-		amount: 89.99,
-		date: '2024-03-13',
-		category: ['Entertainment', 'Music'],
-		type: 'expense',
-	},
-	{
-		id: '42',
-		description: 'Home Maintenance',
-		amount: 150.0,
-		date: '2024-03-09',
-		category: ['Housing', 'Maintenance'],
-		type: 'expense',
-	},
-	{
-		id: '43',
-		description: 'Monthly Salary',
-		amount: 3400,
-		date: '2025-05-01',
-		category: ['Work', 'Salary'],
-		type: 'income',
-	},
-	{
-		id: '44',
-		description: 'Monthly Salary',
-		amount: 3400,
-		date: '2025-04-01',
-		category: ['Work', 'Salary'],
-		type: 'income',
-	},
-	{
-		id: '45',
-		description: 'Freelance Project',
-		amount: 1200,
-		date: '2025-04-15',
-		category: ['Work', 'Freelance'],
-		type: 'income',
-	},
-	{
-		id: '46',
-		description: 'Investment Dividend',
-		amount: 150.25,
-		date: '2025-05-20',
-		category: ['Investment'],
-		type: 'income',
-	},
-	{
-		id: '47',
-		description: 'Rent',
-		amount: 1250,
-		date: '2025-05-01',
-		category: ['Housing'],
-		type: 'expense',
-	},
-	{
-		id: '48',
-		description: 'Rent',
-		amount: 1250,
-		date: '2025-04-01',
-		category: ['Housing'],
-		type: 'expense',
-	},
-	{
-		id: '49',
-		description: 'Electric Bill',
-		amount: 95,
-		date: '2025-05-05',
-		category: ['Utilities'],
-		type: 'expense',
-	},
-	{
-		id: '50',
-		description: 'Electric Bill',
-		amount: 88,
-		date: '2025-04-05',
-		category: ['Utilities'],
-		type: 'expense',
-	},
-	{
-		id: '51',
-		description: 'Internet Bill',
-		amount: 70,
-		date: '2025-05-10',
-		category: ['Utilities'],
-		type: 'expense',
-	},
-	{
-		id: '52',
-		description: 'Internet Bill',
-		amount: 70,
-		date: '2025-04-10',
-		category: ['Utilities'],
-		type: 'expense',
-	},
-	{
-		id: '53',
-		description: 'Weekly Groceries',
-		amount: 92.5,
-		date: '2025-05-15',
-		category: ['Food', 'Groceries'],
-		type: 'expense',
-	},
-	{
-		id: '54',
-		description: 'Weekly Groceries',
-		amount: 88.75,
-		date: '2025-04-15',
-		category: ['Food', 'Groceries'],
-		type: 'expense',
-	},
-	{
-		id: '55',
-		description: 'Restaurant Dinner',
-		amount: 52.4,
-		date: '2025-05-20',
-		category: ['Food', 'Dining'],
-		type: 'expense',
-	},
-	{
-		id: '56',
-		description: 'Gas Station',
-		amount: 48.5,
-		date: '2025-05-18',
-		category: ['Transportation', 'Gas'],
-		type: 'expense',
-	},
-	{
-		id: '57',
-		description: 'Netflix Subscription',
-		amount: 16.99,
-		date: '2025-05-01',
-		category: ['Entertainment', 'Streaming'],
-		type: 'expense',
-	},
-	{
-		id: '58',
-		description: 'Spotify Premium',
-		amount: 10.99,
-		date: '2025-05-01',
-		category: ['Entertainment', 'Music'],
-		type: 'expense',
-	},
-	{
-		id: '59',
-		description: 'Gym Membership',
-		amount: 47.5,
-		date: '2025-05-01',
-		category: ['Health', 'Fitness'],
-		type: 'expense',
-	},
-	{
-		id: '60',
-		description: 'Phone Bill',
-		amount: 78.5,
-		date: '2025-05-01',
-		category: ['Utilities', 'Phone'],
-		type: 'expense',
-	},
-	{
-		id: '61',
-		description: 'Car Insurance',
-		amount: 125.0,
-		date: '2025-05-01',
-		category: ['Insurance', 'Transportation'],
-		type: 'expense',
-	},
-	{
-		id: '62',
-		description: 'Home Insurance',
-		amount: 88.0,
-		date: '2025-05-01',
-		category: ['Insurance', 'Housing'],
-		type: 'expense',
-	},
-];
+	return transactions;
+};
+
+// Replace the existing transactions array with generated data
+export const transactions: Transaction[] = generateDummyTransactions();
