@@ -340,18 +340,18 @@ export default function BudgetScreen() {
 	// ==========================================
 	return (
 		<SafeAreaView style={styles.safeArea}>
-			<ScrollView style={styles.scrollView}>
-				<View style={styles.headerContainer}>
-					<View style={styles.cardHeaderLeft}>
-						<Text style={styles.headerText}>Budgets</Text>
-					</View>
-				</View>
+			<View style={styles.mainContainer}>
 				<FlatList
 					data={budgets}
 					keyExtractor={(item) => item.id}
 					renderItem={renderItem}
 					contentContainerStyle={styles.listContent}
 					showsVerticalScrollIndicator={false}
+					ListHeaderComponent={() => (
+						<View style={styles.headerContainer}>
+							<Text style={styles.headerText}>Budgets</Text>
+						</View>
+					)}
 				/>
 
 				{/* Add Budget Modal */}
@@ -439,7 +439,7 @@ export default function BudgetScreen() {
 						</KeyboardAvoidingView>
 					</TouchableOpacity>
 				</Modal>
-			</ScrollView>
+			</View>
 		</SafeAreaView>
 	);
 }
@@ -452,8 +452,9 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: '#f9fafb',
 	},
-	scrollView: {
+	mainContainer: {
 		flex: 1,
+		backgroundColor: '#f9fafb',
 		paddingHorizontal: 24,
 	},
 	headerContainer: {
