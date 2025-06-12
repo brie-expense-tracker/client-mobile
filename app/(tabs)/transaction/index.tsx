@@ -24,6 +24,8 @@ import Animated, {
 	useAnimatedStyle,
 	useSharedValue,
 	withSpring,
+	withTiming,
+	runOnJS,
 } from 'react-native-reanimated';
 import {
 	Transaction,
@@ -107,10 +109,11 @@ const TransactionRow = ({
 	onDelete,
 }: {
 	item: Transaction;
-	onDelete: (id: string) => void;
+	onDelete: (id: string, resetAnimation: () => void) => void;
 }) => {
 	const translateX = useSharedValue(0);
 	const context = useSharedValue({ x: 0 });
+	const hasCrossedThreshold = useSharedValue(false);
 
 	const getCategoryIcon = (categories: string[]) => {
 		const categoryMap: {
@@ -139,18 +142,34 @@ const TransactionRow = ({
 
 	const categoryIcon = getCategoryIcon(item.category);
 
+	const handleDelete = () => {
+		onDelete(item.id, resetAnimation);
+	};
+
+	const resetAnimation = () => {
+		translateX.value = 0;
+	};
+
 	const gesture = Gesture.Pan()
 		.onStart(() => {
 			context.value = { x: translateX.value };
+			hasCrossedThreshold.value = false;
 		})
 		.onUpdate((event) => {
-			translateX.value = event.translationX + context.value.x;
+			// Only allow left swipes by clamping the translation to not exceed 0
+			translateX.value = Math.min(0, event.translationX + context.value.x);
+
+			// Track if we've crossed the threshold
+			if (translateX.value < -70) {
+				hasCrossedThreshold.value = true;
+			}
 		})
 		.onEnd(() => {
-			if (translateX.value < -50) {
-				translateX.value = withSpring(-80);
+			if (hasCrossedThreshold.value) {
+				runOnJS(handleDelete)();
+				translateX.value = withTiming(-60, { duration: 500 });
 			} else {
-				translateX.value = withSpring(0);
+				translateX.value = withTiming(0);
 			}
 		});
 
@@ -161,7 +180,7 @@ const TransactionRow = ({
 	return (
 		<View style={styles.txRowContainer}>
 			<View style={styles.deleteAction}>
-				<TouchableOpacity onPress={() => onDelete(item.id)}>
+				<TouchableOpacity onPress={() => onDelete(item.id, resetAnimation)}>
 					<Ionicons name="trash-outline" size={24} color="#fff" />
 				</TouchableOpacity>
 			</View>
@@ -385,7 +404,7 @@ export default function TransactionScreen() {
 	const renderTransaction = ({ item }: { item: Transaction }) => (
 		<TransactionRow
 			item={item}
-			onDelete={(id) => {
+			onDelete={(id, resetAnimation) => {
 				Alert.alert(
 					'Delete Transaction',
 					'Are you sure you want to delete this transaction?',
@@ -393,6 +412,7 @@ export default function TransactionScreen() {
 						{
 							text: 'Cancel',
 							style: 'cancel',
+							onPress: resetAnimation,
 						},
 						{
 							text: 'Delete',
@@ -573,11 +593,10 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: '#f9fafb',
 		paddingBottom: 0,
-		paddingHorizontal: 24,
 	},
 	txRowContainer: {
-		position: 'relative',
-		borderRadius: 12,
+		// position: 'relative',
+
 		overflow: 'hidden',
 	},
 	txRow: {
@@ -587,6 +606,7 @@ const styles = StyleSheet.create({
 		borderBottomColor: '#e5e7eb',
 		alignItems: 'center',
 		backgroundColor: '#f9fafb',
+		paddingHorizontal: 24,
 	},
 	txDesc: {
 		// fontSize: 16,
@@ -626,6 +646,7 @@ const styles = StyleSheet.create({
 		marginBottom: 16,
 		justifyContent: 'space-between',
 		alignItems: 'center',
+		paddingHorizontal: 24,
 	},
 	headerTextContainer: {
 		flexDirection: 'column',
@@ -695,7 +716,6 @@ const styles = StyleSheet.create({
 	},
 	monthHeader: {
 		backgroundColor: '#f9fafb',
-		paddingHorizontal: 0,
 		paddingVertical: 16,
 		paddingBottom: 10,
 		marginTop: 8,
@@ -704,28 +724,30 @@ const styles = StyleSheet.create({
 		fontSize: 18,
 		fontWeight: '600',
 		color: '#212121',
+		paddingHorizontal: 24,
 	},
 	dateHeader: {
 		backgroundColor: '#fff',
 		padding: 0,
 		paddingBottom: 10,
+		paddingHorizontal: 24,
 	},
 	dateHeaderText: {
 		fontSize: 20,
 		fontWeight: '600',
 		color: '#212121',
+		paddingHorizontal: 24,
 	},
 	deleteAction: {
 		position: 'absolute',
 		right: 0,
 		top: 0,
 		bottom: 0,
-		width: 80,
+		width: '100%',
 		backgroundColor: '#dc2626',
 		justifyContent: 'center',
-		alignItems: 'center',
-		borderTopRightRadius: 12,
-		borderBottomRightRadius: 12,
+		alignItems: 'flex-end',
+		paddingRight: 18,
 	},
 	iconContainer: {
 		width: 36,
@@ -741,6 +763,7 @@ const styles = StyleSheet.create({
 		borderRadius: 12,
 		paddingHorizontal: 12,
 		height: 44,
+		marginHorizontal: 24,
 	},
 	searchIcon: {
 		marginRight: 8,
