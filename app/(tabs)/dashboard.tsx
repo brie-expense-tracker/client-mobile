@@ -182,6 +182,31 @@ const Dashboard = () => {
 	});
 	const [showDatePicker, setShowDatePicker] = useState(false);
 
+	const getCategoryIcon = (categories: string[]) => {
+		const categoryMap: {
+			[key: string]: { name: keyof typeof Ionicons.glyphMap; color: string };
+		} = {
+			Groceries: { name: 'cart-outline', color: '#4CAF50' },
+			Utilities: { name: 'flash-outline', color: '#FFC107' },
+			Entertainment: { name: 'game-controller-outline', color: '#9C27B0' },
+			Travel: { name: 'airplane-outline', color: '#2196F3' },
+			Health: { name: 'fitness-outline', color: '#F44336' },
+			Dining: { name: 'restaurant-outline', color: '#FF9800' },
+			Shopping: { name: 'bag-outline', color: '#E91E63' },
+			Transportation: { name: 'car-outline', color: '#2196F3' },
+			Housing: { name: 'home-outline', color: '#795548' },
+			Education: { name: 'school-outline', color: '#3F51B5' },
+			Salary: { name: 'cash-outline', color: '#4CAF50' },
+			Investment: { name: 'trending-up-outline', color: '#009688' },
+			Gifts: { name: 'gift-outline', color: '#E91E63' },
+			Other: { name: 'ellipsis-horizontal-outline', color: '#2196F3' },
+		};
+
+		// Get the first category from the array
+		const primaryCategory = categories[0];
+		return categoryMap[primaryCategory] || categoryMap['Other'];
+	};
+
 	const totalBalance = transactions.reduce((sum, t) => {
 		return sum + (t.type === 'income' ? t.amount : -t.amount);
 	}, 0);
@@ -308,47 +333,85 @@ const Dashboard = () => {
 					</View>
 
 					{/* Transactions History */}
-					<View style={styles.transactionsContainer}>
+					<View style={styles.transactionsSectionContainer}>
 						<View style={styles.transactionsHeader}>
 							<Text style={styles.transactionsTitle}>Transactions History</Text>
-							<TouchableOpacity onPress={() => router.push('/transaction')}>
-								<Text style={styles.seeAllText}>See all</Text>
-							</TouchableOpacity>
 						</View>
+						<View style={styles.transactionsListContainerShadow}>
+							<View style={styles.transactionsListContainer}>
+								{/* <Text style={styles.seeAllText}>See all</Text> */}
 
-						{transactions
-							.sort(
-								(a, b) =>
-									new Date(b.date).getTime() - new Date(a.date).getTime()
-							)
-							.slice(0, 6)
-							.map((transaction) => (
-								<View key={transaction.id} style={styles.transactionItem}>
-									<View>
-										<Text style={styles.transactionDescription}>
-											{transaction.description}
-										</Text>
-										<Text style={styles.transactionDate}>
-											{new Date(transaction.date).toLocaleDateString()}
-										</Text>
-									</View>
-									<Text
-										style={[
-											styles.transactionAmount,
-											transaction.type === 'income'
-												? styles.incomeAmount
-												: styles.expenseAmount,
-										]}
-									>
-										{transaction.type === 'income' ? '+' : '-'} $
-										{transaction.amount.toFixed(2)}
-									</Text>
-								</View>
-							))}
+								{transactions
+									.sort(
+										(a, b) =>
+											new Date(b.date).getTime() - new Date(a.date).getTime()
+									)
+									.slice(0, 6)
+									.map((transaction) => {
+										const categoryIcon = getCategoryIcon(
+											transaction.category || ['Other']
+										);
+										return (
+											<View key={transaction.id} style={styles.transactionItem}>
+												<TouchableOpacity
+													onPress={() => router.push('/transaction')}
+													style={{
+														flex: 1,
+														flexDirection: 'row',
+														justifyContent: 'space-between',
+														alignItems: 'center',
+													}}
+												>
+													<View
+														style={{
+															flexDirection: 'row',
+															alignItems: 'center',
+														}}
+													>
+														<View
+															style={[
+																styles.iconContainer,
+																{ backgroundColor: `${categoryIcon.color}20` },
+															]}
+														>
+															<Ionicons
+																name={categoryIcon.name}
+																size={20}
+																color={categoryIcon.color}
+															/>
+														</View>
+														<View style={{ marginLeft: 12 }}>
+															<Text style={styles.transactionDescription}>
+																{transaction.description}
+															</Text>
+															<Text style={styles.transactionDate}>
+																{new Date(
+																	transaction.date
+																).toLocaleDateString()}
+															</Text>
+														</View>
+													</View>
+													<Text
+														style={[
+															styles.transactionAmount,
+															transaction.type === 'income'
+																? styles.incomeAmount
+																: styles.expenseAmount,
+														]}
+													>
+														{transaction.type === 'income' ? '+' : '-'} $
+														{transaction.amount.toFixed(2)}
+													</Text>
+												</TouchableOpacity>
+											</View>
+										);
+									})}
+							</View>
+						</View>
 					</View>
 
 					{/* --- Quick Action Buttons --- */}
-					<View style={styles.quickActionsContainer}>
+					{/* <View style={styles.quickActionsContainer}>
 						<TouchableOpacity
 							style={styles.quickActionButton}
 							onPress={() => handleQuickAction('View Budgets')}
@@ -378,7 +441,7 @@ const Dashboard = () => {
 							/>
 							<Text style={styles.quickActionButtonText}>Settings</Text>
 						</TouchableOpacity>
-					</View>
+					</View> */}
 				</View>
 			</ScrollView>
 		</SafeAreaView>
@@ -452,9 +515,7 @@ const styles = StyleSheet.create({
 		height: 48,
 	},
 
-	transactionsContainer: {
-		paddingTop: 16,
-	},
+	transactionsSectionContainer: {},
 	transactionsHeader: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
@@ -462,24 +523,35 @@ const styles = StyleSheet.create({
 		marginBottom: 16,
 	},
 	transactionsTitle: {
-		fontSize: 16,
+		fontSize: 18,
 		fontWeight: '600',
-		color: '#535353',
+		color: '#212121',
 	},
 	seeAllText: {
 		color: '#546E7A',
+	},
+	transactionsListContainer: {
+		flex: 1,
+		backgroundColor: '#ffffff',
+		borderRadius: 12,
+		paddingVertical: 8,
+		overflow: 'hidden',
+	},
+	transactionsListContainerShadow: {
+		shadowColor: '#b1b1b1',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.2,
+		shadowRadius: 2,
+		elevation: 5,
 	},
 	transactionItem: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
-		backgroundColor: 'white',
-		padding: 12,
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: '#e5e7eb',
-		marginBottom: 12,
-		elevation: 2,
+		backgroundColor: '#fff',
+		padding: 16,
+		borderBottomWidth: 1,
+		borderColor: '#ffffff',
 	},
 	transactionDescription: {
 		color: '#212121',
@@ -497,29 +569,6 @@ const styles = StyleSheet.create({
 	},
 	expenseAmount: {
 		color: '#dc2626',
-	},
-	fab: {
-		position: 'absolute',
-		bottom: 24,
-		left: '50%',
-		backgroundColor: '#16a34a',
-		width: 96,
-		height: 96,
-		borderRadius: 48,
-		alignItems: 'center',
-		justifyContent: 'center',
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.3,
-		shadowRadius: 8,
-		elevation: 8,
-		borderWidth: 4,
-		borderColor: 'white',
-		transform: [{ translateX: -40 }],
-	},
-	fabImage: {
-		width: 64,
-		height: 48,
 	},
 	modalOverlay: {
 		flex: 1,
@@ -570,7 +619,7 @@ const styles = StyleSheet.create({
 		justifyContent: 'flex-start',
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.2,
+		shadowOpacity: 0.1,
 		shadowRadius: 2,
 		elevation: 5,
 	},
@@ -585,9 +634,11 @@ const styles = StyleSheet.create({
 		marginBottom: 8,
 	},
 	iconContainer: {
+		width: 36,
+		height: 36,
+		borderRadius: 8,
 		justifyContent: 'center',
 		alignItems: 'center',
-		marginRight: 4,
 	},
 	icon: {
 		alignSelf: 'center',
