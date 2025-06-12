@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
 	View,
 	Text,
@@ -7,12 +7,21 @@ import {
 	SafeAreaView,
 	TouchableOpacity,
 	Alert,
-	Animated,
 } from 'react-native';
 import { useTheme } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Swipeable } from 'react-native-gesture-handler';
+import {
+	Gesture,
+	GestureDetector,
+	GestureHandlerRootView,
+} from 'react-native-gesture-handler';
+import Animated, {
+	useAnimatedStyle,
+	useSharedValue,
+	withTiming,
+	runOnJS,
+} from 'react-native-reanimated';
 
 interface Notification {
 	id: string;
@@ -41,47 +50,57 @@ const NotificationItem = ({
 	onDelete,
 }: {
 	item: Notification;
-	onDelete: (id: string) => void;
+	onDelete: (id: string, resetAnimation: () => void) => void;
 }) => {
 	const { colors } = useTheme();
-	const swipeableRef = useRef<Swipeable>(null);
+	const translateX = useSharedValue(0);
+	const context = useSharedValue({ x: 0 });
+	const hasCrossedThreshold = useSharedValue(false);
 
-	const renderRightActions = (
-		progress: Animated.AnimatedInterpolation<number>
-	) => {
-		const trans = progress.interpolate({
-			inputRange: [0, 1],
-			outputRange: [64, 0],
-		});
-
-		return (
-			<Animated.View
-				style={[styles.deleteAction, { transform: [{ translateX: trans }] }]}
-			>
-				<TouchableOpacity
-					style={[
-						styles.deleteButton,
-						{ backgroundColor: colors.notification },
-					]}
-					onPress={() => {
-						swipeableRef.current?.close();
-						onDelete(item.id);
-					}}
-				>
-					<Ionicons name="trash-outline" size={24} color="white" />
-				</TouchableOpacity>
-			</Animated.View>
-		);
+	const handleDelete = () => {
+		onDelete(item.id, resetAnimation);
 	};
 
+	const resetAnimation = () => {
+		translateX.value = 0;
+	};
+
+	const gesture = Gesture.Pan()
+		.onStart(() => {
+			context.value = { x: translateX.value };
+			hasCrossedThreshold.value = false;
+		})
+		.onUpdate((event) => {
+			// Only allow left swipes by clamping the translation to not exceed 0
+			translateX.value = Math.min(0, event.translationX + context.value.x);
+
+			// Track if we've crossed the threshold
+			if (translateX.value < -70) {
+				hasCrossedThreshold.value = true;
+			}
+		})
+		.onEnd(() => {
+			if (hasCrossedThreshold.value) {
+				runOnJS(handleDelete)();
+				translateX.value = withTiming(-60, { duration: 500 });
+			} else {
+				translateX.value = withTiming(0);
+			}
+		});
+
+	const animatedStyle = useAnimatedStyle(() => ({
+		transform: [{ translateX: translateX.value }],
+	}));
+
 	return (
-		<Swipeable
-			ref={swipeableRef}
-			renderRightActions={renderRightActions}
-			rightThreshold={40}
-		>
-			<View style={[styles.notificationItem, { backgroundColor: colors.card }]}>
-				<View style={styles.notificationContent}>
+		<View style={styles.txRowContainer}>
+			<View style={styles.deleteAction}>
+				<TouchableOpacity onPress={() => onDelete(item.id, resetAnimation)}>
+					<Ionicons name="trash-outline" size={24} color="#fff" />
+				</TouchableOpacity>
+			</View>
+			<GestureDetector gesture={gesture}>
+				<Animated.View style={[styles.notificationItem, animatedStyle]}>
 					<Text style={[styles.title, { color: colors.text }]}>
 						{item.title}
 					</Text>
@@ -91,9 +110,9 @@ const NotificationItem = ({
 					<Text style={[styles.timestamp, { color: colors.text }]}>
 						{item.timestamp}
 					</Text>
-				</View>
-			</View>
-		</Swipeable>
+				</Animated.View>
+			</GestureDetector>
+		</View>
 	);
 };
 
@@ -103,7 +122,7 @@ export default function NotificationsScreen() {
 	const [notifications, setNotifications] =
 		useState<Notification[]>(mockNotifications);
 
-	const handleDelete = (id: string) => {
+	const handleDelete = (id: string, resetAnimation: () => void) => {
 		Alert.alert(
 			'Delete Notification',
 			'Are you sure you want to delete this notification?',
@@ -111,15 +130,13 @@ export default function NotificationsScreen() {
 				{
 					text: 'Cancel',
 					style: 'cancel',
+					onPress: resetAnimation,
 				},
 				{
 					text: 'Delete',
 					style: 'destructive',
-					onPress: () => {
-						setNotifications((prev) =>
-							prev.filter((notification) => notification.id !== id)
-						);
-					},
+					onPress: () =>
+						setNotifications((prev) => prev.filter((n) => n.id !== id)),
 				},
 			]
 		);
@@ -130,121 +147,78 @@ export default function NotificationsScreen() {
 			'Clear All Notifications',
 			'Are you sure you want to delete all notifications?',
 			[
-				{
-					text: 'Cancel',
-					style: 'cancel',
-				},
+				{ text: 'Cancel', style: 'cancel' },
 				{
 					text: 'Clear All',
 					style: 'destructive',
-					onPress: () => {
-						setNotifications([]);
-					},
+					onPress: () => setNotifications([]),
 				},
 			]
 		);
 	};
 
 	return (
-		<SafeAreaView style={[styles.container, { backgroundColor: '#fff' }]}>
-			<View style={styles.header}>
-				<TouchableOpacity
-					style={styles.backButton}
-					onPress={() => router.back()}
-				>
-					<Ionicons name="chevron-back" size={24} color={colors.text} />
-				</TouchableOpacity>
-				<Text style={[styles.headerTitle, { color: colors.text }]}>
-					Notifications
-				</Text>
-				{notifications.length > 0 && (
-					<TouchableOpacity
-						style={styles.clearAllButton}
-						onPress={handleClearAll}
-					>
-						<Text style={[styles.clearAllText, { color: colors.notification }]}>
-							Clear All
-						</Text>
-					</TouchableOpacity>
-				)}
-			</View>
-			<FlatList
-				data={notifications}
-				renderItem={({ item }) => (
-					<NotificationItem item={item} onDelete={handleDelete} />
-				)}
-				keyExtractor={(item) => item.id}
-				contentContainerStyle={styles.listContainer}
-				ListEmptyComponent={() => (
-					<View style={styles.emptyContainer}>
-						<Text style={[styles.emptyText, { color: colors.text }]}>
-							No notifications
-						</Text>
-					</View>
-				)}
-			/>
-		</SafeAreaView>
+		<GestureHandlerRootView style={{ flex: 1 }}>
+			<SafeAreaView style={styles.container}>
+				<FlatList
+					data={notifications}
+					renderItem={({ item }) => (
+						<NotificationItem item={item} onDelete={handleDelete} />
+					)}
+					keyExtractor={(item) => item.id}
+					contentContainerStyle={styles.listContainer}
+					ListEmptyComponent={() => (
+						<View style={styles.emptyContainer}>
+							<Text style={[styles.emptyText, { color: colors.text }]}>
+								No notifications
+							</Text>
+						</View>
+					)}
+				/>
+
+				<Stack.Screen
+					options={{
+						headerShown: true,
+						title: 'Notifications',
+						headerRight: () => (
+							<TouchableOpacity onPress={handleClearAll}>
+								<Text style={{ color: colors.notification }}>Clear All</Text>
+							</TouchableOpacity>
+						),
+						headerStyle: { backgroundColor: '#f9fafb' },
+						headerTintColor: '#333',
+						headerBackTitle: 'History',
+						headerShadowVisible: false,
+						headerBackButtonDisplayMode: 'minimal',
+					}}
+				/>
+			</SafeAreaView>
+		</GestureHandlerRootView>
 	);
 }
 
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-	},
-	header: {
-		padding: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: '#e0e0e0',
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-	backButton: {
-		marginRight: 16,
-	},
-	headerTitle: {
-		fontSize: 24,
-		fontWeight: 'bold',
-		flex: 1,
-	},
-	clearAllButton: {
-		padding: 8,
-	},
-	clearAllText: {
-		fontSize: 16,
-		fontWeight: '600',
-	},
-	listContainer: {
-		padding: 16,
+	container: { flex: 1, backgroundColor: '#f9fafb' },
+	listContainer: { paddingVertical: 8 },
+	txRowContainer: {
+		overflow: 'hidden',
 	},
 	notificationItem: {
 		padding: 16,
-		borderRadius: 8, 
-		marginBottom: 12,
-		shadowColor: '#000',
-		shadowOffset: {
-			width: 0,
-			height: 2,
-		},
-		shadowOpacity: 0.1,
-		shadowRadius: 3,
-		elevation: 3,
-	},
-	notificationContent: {
-		flex: 1,
+		backgroundColor: '#f9fafb',
+		borderBottomWidth: 1,
+		borderBottomColor: '#e5e7eb',
 	},
 	deleteAction: {
+		position: 'absolute',
+		right: 0,
+		top: 0,
+		bottom: 0,
+		width: '100%',
+		backgroundColor: '#dc2626',
 		justifyContent: 'center',
-		alignItems: 'center',
-		width: 64,
-	},
-	deleteButton: {
-		width: 64,
-		height: '100%',
-		justifyContent: 'center',
-		alignItems: 'center',
-		borderTopRightRadius: 8,
-		borderBottomRightRadius: 8,
+		alignItems: 'flex-end',
+		paddingRight: 18,
 	},
 	emptyContainer: {
 		flex: 1,
@@ -252,21 +226,8 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		paddingVertical: 32,
 	},
-	emptyText: {
-		fontSize: 16,
-		opacity: 0.7,
-	},
-	title: {
-		fontSize: 16,
-		fontWeight: 'bold',
-		marginBottom: 4,
-	},
-	message: {
-		fontSize: 14,
-		marginBottom: 8,
-	},
-	timestamp: {
-		fontSize: 12,
-		opacity: 0.7,
-	},
+	emptyText: { fontSize: 16, opacity: 0.7 },
+	title: { fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
+	message: { fontSize: 14, marginBottom: 8 },
+	timestamp: { fontSize: 12, opacity: 0.7 },
 });
