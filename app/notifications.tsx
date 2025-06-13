@@ -187,7 +187,7 @@ export default function NotificationsScreen() {
 						),
 						headerStyle: { backgroundColor: '#f9fafb' },
 						headerTintColor: '#333',
-						headerBackTitle: 'History',
+						headerBackTitle: 'Back',
 						headerShadowVisible: false,
 						headerBackButtonDisplayMode: 'minimal',
 					}}
