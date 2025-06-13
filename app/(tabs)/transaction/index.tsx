@@ -1,4 +1,3 @@
-// transactionScreen.tsx
 import React, { useState, useMemo, useEffect } from 'react';
 import {
 	View,
@@ -9,7 +8,6 @@ import {
 	Dimensions,
 	Modal,
 	TouchableWithoutFeedback,
-	StatusBar,
 	Alert,
 	TextInput,
 } from 'react-native';
@@ -17,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Calendar } from 'react-native-calendars';
 import {
 	Gesture,
@@ -27,16 +25,18 @@ import {
 import Animated, {
 	useAnimatedStyle,
 	useSharedValue,
-	withSpring,
 	withTiming,
 	runOnJS,
 } from 'react-native-reanimated';
 import {
 	Transaction,
 	transactions as dummyData,
-} from '../../data/transactions';
+} from '../../../data/transactions';
 import axios from 'axios';
 
+// =============================================
+// Type Definitions
+// =============================================
 type RootStackParamList = {
 	Tracker: undefined;
 	historyFilterScreen: {
@@ -48,13 +48,11 @@ type RootStackParamList = {
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-const dateFilterModes = [
-	{ label: 'Day', value: 'day', icon: 'calendar-outline' },
-	{ label: 'Month', value: 'month', icon: 'calendar' },
-];
-
 type DateInput = string | Date;
 
+// =============================================
+// Utility Functions
+// =============================================
 const formatDate = (
 	input: DateInput,
 	locale = 'en-US',
@@ -108,6 +106,9 @@ const getLocalIsoDate = (): string => {
 	return localDate.toISOString().split('T')[0];
 };
 
+// =============================================
+// Transaction Row Component
+// =============================================
 const TransactionRow = ({
 	item,
 	onDelete,
@@ -227,6 +228,9 @@ const TransactionRow = ({
 	);
 };
 
+// =============================================
+// Main Transaction Screen Component
+// =============================================
 export default function TransactionScreen() {
 	const [selectedDate, setSelectedDate] = useState<string>(() => {
 		return getLocalIsoDate();
@@ -448,7 +452,7 @@ export default function TransactionScreen() {
 		<GestureHandlerRootView style={{ flex: 1 }}>
 			<View style={styles.mainContainer}>
 				<SafeAreaView style={styles.safeArea} edges={['top']}>
-					<View style={styles.container}>
+					<View style={styles.topContainer}>
 						{/* Header */}
 						<View style={styles.headerContainer}>
 							<View style={styles.headerTextContainer}>
@@ -585,52 +589,23 @@ export default function TransactionScreen() {
 	);
 }
 
+// =============================================
+// Styles
+// =============================================
 const { width, height } = Dimensions.get('window');
 const styles = StyleSheet.create({
 	mainContainer: {
 		flex: 1,
-		backgroundColor: '#f9fafb',
+		backgroundColor: '#fff',
 	},
 	safeArea: {
 		flex: 1,
-		backgroundColor: '#f9fafb',
 	},
-	container: {
+	topContainer: {
 		flex: 1,
-		backgroundColor: '#f9fafb',
 		paddingBottom: 0,
 	},
-	txRowContainer: {
-		// position: 'relative',
 
-		overflow: 'hidden',
-	},
-	txRow: {
-		flexDirection: 'row',
-		paddingVertical: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: '#e5e7eb',
-		alignItems: 'center',
-		backgroundColor: '#f9fafb',
-		paddingHorizontal: 24,
-	},
-	txDesc: {
-		// fontSize: 16,
-		fontWeight: '500',
-		color: '#212121',
-	},
-	txCategory: {
-		fontSize: 12,
-		color: '#9ca3af',
-		marginTop: 4,
-	},
-	txRight: {
-		alignItems: 'flex-end',
-	},
-	txAmount: {
-		fontSize: 14,
-		fontWeight: '600',
-	},
 	incomeAmount: {
 		color: '#16a34a',
 	},
@@ -721,15 +696,14 @@ const styles = StyleSheet.create({
 		overflow: 'hidden',
 	},
 	monthHeader: {
-		backgroundColor: '#f9fafb',
 		paddingVertical: 16,
 		paddingBottom: 10,
 		marginTop: 8,
 	},
 	monthHeaderText: {
-		fontSize: 18,
-		fontWeight: '600',
-		color: '#212121',
+		fontSize: 16,
+		fontWeight: '800',
+		color: '#4b4b4b',
 		paddingHorizontal: 24,
 	},
 	dateHeader: {
@@ -743,6 +717,36 @@ const styles = StyleSheet.create({
 		fontWeight: '600',
 		color: '#212121',
 		paddingHorizontal: 24,
+	},
+	txRowContainer: {
+		// position: 'relative',
+		overflow: 'hidden',
+	},
+	txRow: {
+		flexDirection: 'row',
+		paddingVertical: 16,
+		borderBottomWidth: 1,
+		borderBottomColor: '#e5e7eb',
+		alignItems: 'center',
+		backgroundColor: '#fff',
+		paddingHorizontal: 24,
+	},
+	txDesc: {
+		// fontSize: 16,
+		fontWeight: '500',
+		color: '#212121',
+	},
+	txCategory: {
+		fontSize: 12,
+		color: '#9ca3af',
+		marginTop: 4,
+	},
+	txRight: {
+		alignItems: 'flex-end',
+	},
+	txAmount: {
+		fontSize: 14,
+		fontWeight: '600',
 	},
 	deleteAction: {
 		position: 'absolute',

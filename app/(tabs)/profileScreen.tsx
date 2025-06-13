@@ -72,48 +72,48 @@ export default function ProfileScreen() {
 
 	return (
 		<View style={styles.mainContainer}>
-			<LinearGradient
+			{/* <LinearGradient
 				colors={['#005fe4', '#0095ff']}
 				style={styles.gradient}
 				start={{ x: 0, y: 1 }}
 				end={{ x: 1, y: 0 }}
-			>
-				<SafeAreaView style={styles.container}>
-					<View style={styles.topContentContainer}>
-						{/* Header*/}
-						<View style={styles.headerContainer}>
-							<Text style={styles.headerText}>Profile</Text>
-							{/* <TouchableOpacity
+			> */}
+			<SafeAreaView style={styles.container}>
+				<View style={styles.topContentContainer}>
+					{/* Header*/}
+					<View style={styles.headerContainer}>
+						<Text style={styles.headerText}>Profile</Text>
+						{/* <TouchableOpacity
 								onPress={() => router.push('/screens/profileSettings')}
 							>
 								<Ionicons name="settings-outline" size={32} color="#f0f0f0" />
 							</TouchableOpacity> */}
-						</View>
-
-						{/* Profile picture and name */}
-						<View style={styles.profilePicWrapper}>
-							<View style={styles.profilePicContainer}>
-								<Image
-									source={profileImage}
-									style={styles.profilePic}
-									contentFit="cover"
-								/>
-								<TouchableOpacity
-									style={styles.editIconContainer}
-									onPress={pickImage}
-								>
-									<View style={styles.editIconBackground}>
-										<Ionicons name="pencil" size={16} color="#fff" />
-									</View>
-								</TouchableOpacity>
-							</View>
-							<Text style={styles.userName}>
-								{userProfile.firstName} {userProfile.lastName}
-							</Text>
-						</View>
 					</View>
-				</SafeAreaView>
-			</LinearGradient>
+
+					{/* Profile picture and name */}
+					<View style={styles.profilePicWrapper}>
+						<View style={styles.profilePicContainer}>
+							<Image
+								source={profileImage}
+								style={styles.profilePic}
+								contentFit="cover"
+							/>
+							<TouchableOpacity
+								style={styles.editIconContainer}
+								onPress={pickImage}
+							>
+								<View style={styles.editIconBackground}>
+									<Ionicons name="pencil" size={16} color="#fff" />
+								</View>
+							</TouchableOpacity>
+						</View>
+						<Text style={styles.userName}>
+							{userProfile.firstName} {userProfile.lastName}
+						</Text>
+					</View>
+				</View>
+			</SafeAreaView>
+			{/* </LinearGradient> */}
 
 			{/* Stats cards */}
 			<View style={styles.statsContainer}>
@@ -135,7 +135,7 @@ export default function ProfileScreen() {
 			<View style={styles.settingsContainer}>
 				<TouchableOpacity
 					style={styles.settingItem}
-					onPress={() => router.push('/screens/notifications')}
+					onPress={() => router.push('/notifications')}
 				>
 					<Ionicons name="notifications-outline" size={24} color="#555" />
 					<Text style={styles.settingText}>Notifications</Text>
@@ -180,7 +180,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
 	mainContainer: {
 		flex: 1,
-		backgroundColor: '#f9fafb',
+		backgroundColor: '#fff',
 	},
 	container: {
 		backgroundColor: 'transparent',
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 24,
 	},
 	headerText: {
-		color: '#f0f0f0',
+		color: '#222222',
 		fontSize: 28,
 		fontWeight: '500',
 	},
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
 	userName: {
 		fontSize: 24,
 		fontWeight: '600',
-		color: '#f0f0f0',
+		color: '#222222',
 	},
 	statsContainer: {
 		flexDirection: 'row',
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
 		elevation: 2,
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.25,
+		shadowOpacity: 0.1,
 		shadowRadius: 3.84,
 	},
 	statValue: { fontSize: 20, fontWeight: 'bold' },
@@ -268,7 +268,6 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		backgroundColor: '#fff',
 		padding: 16,
-		borderRadius: 12,
 		marginBottom: 12,
 		elevation: 2,
 	},
