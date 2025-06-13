@@ -1,7 +1,7 @@
 import React from 'react';
 import { LineChart, LineChartBicolor } from 'react-native-gifted-charts';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
-import { Transaction } from '../data/transactions';
+import { Transaction } from '../../data/transactions';
 
 interface ProfitGraphProps {
 	transactions: Transaction[];
