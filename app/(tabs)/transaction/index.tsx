@@ -163,7 +163,7 @@ const TransactionRow = ({
 		.failOffsetY([-10, 10]) // fail if vertical movement is more than 5px
 		.onUpdate(({ translationX }) => {
 			// Only process horizontal movements
-			translateX.value = translationX;
+			translateX.value = Math.min(0, translationX);
 		})
 		.onEnd(() => {
 			if (translateX.value < TRANSLATE_THRESHOLD) {
