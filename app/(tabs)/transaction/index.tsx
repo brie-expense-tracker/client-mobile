@@ -27,6 +27,9 @@ import Animated, {
 	useSharedValue,
 	withTiming,
 	runOnJS,
+	clamp,
+	withSpring,
+	Easing,
 } from 'react-native-reanimated';
 import {
 	Transaction,
@@ -95,7 +98,7 @@ const formatMonthHeader = (monthKey: string) => {
 	// monthKey is "YYYY-MM"
 	const [year, mm] = monthKey.split('-');
 	const monthIndex = Number(mm) - 1; // 0-based
-	return `${monthNames[monthIndex]} ${year}`; // e.g. "May 2025"
+	return `${monthNames[monthIndex].toUpperCase()} ${year}`; // e.g. "May 2025"
 };
 
 const getLocalIsoDate = (): string => {
@@ -117,8 +120,8 @@ const TransactionRow = ({
 	onDelete: (id: string, resetAnimation: () => void) => void;
 }) => {
 	const translateX = useSharedValue(0);
-	const context = useSharedValue({ x: 0 });
-	const hasCrossedThreshold = useSharedValue(false);
+	const TRANSLATE_THRESHOLD = -70;
+	const DELETE_WIDTH = 60;
 
 	const getCategoryIcon = (categories: string[]) => {
 		const categoryMap: {
@@ -155,26 +158,24 @@ const TransactionRow = ({
 		translateX.value = 0;
 	};
 
-	const gesture = Gesture.Pan()
-		.onStart(() => {
-			context.value = { x: translateX.value };
-			hasCrossedThreshold.value = false;
-		})
-		.onUpdate((event) => {
-			// Only allow left swipes by clamping the translation to not exceed 0
-			translateX.value = Math.min(0, event.translationX + context.value.x);
-
-			// Track if we've crossed the threshold
-			if (translateX.value < -70) {
-				hasCrossedThreshold.value = true;
-			}
+	const panGesture = Gesture.Pan()
+		.activeOffsetX([-15, 15]) // only start after 10px horizontal
+		.failOffsetY([-10, 10]) // fail if vertical movement is more than 5px
+		.onUpdate(({ translationX }) => {
+			// Only process horizontal movements
+			translateX.value = translationX;
 		})
 		.onEnd(() => {
-			if (hasCrossedThreshold.value) {
-				runOnJS(handleDelete)();
-				translateX.value = withTiming(-60, { duration: 500 });
+			if (translateX.value < TRANSLATE_THRESHOLD) {
+				// snap to full delete width, then notify JS
+				translateX.value = withTiming(
+					-DELETE_WIDTH,
+					{ duration: 400, easing: Easing.bezier(0.25, 0.1, 0.25, 1) },
+					() => runOnJS(handleDelete)()
+				);
 			} else {
-				translateX.value = withTiming(0);
+				// bounce back
+				translateX.value = withSpring(0, { damping: 20 });
 			}
 		});
 
@@ -189,7 +190,7 @@ const TransactionRow = ({
 					<Ionicons name="trash-outline" size={24} color="#fff" />
 				</TouchableOpacity>
 			</View>
-			<GestureDetector gesture={gesture}>
+			<GestureDetector gesture={panGesture}>
 				<Animated.View style={[styles.txRow, animatedStyle]}>
 					<View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
 						<View
@@ -456,7 +457,7 @@ export default function TransactionScreen() {
 						{/* Header */}
 						<View style={styles.headerContainer}>
 							<View style={styles.headerTextContainer}>
-								<Text style={styles.nameText}>History</Text>
+								<Text style={styles.headerText}>History</Text>
 							</View>
 							<View style={styles.headerRight}>
 								<TouchableOpacity
@@ -632,7 +633,7 @@ const styles = StyleSheet.create({
 	headerTextContainer: {
 		flexDirection: 'column',
 	},
-	nameText: {
+	headerText: {
 		color: '#212121',
 		fontSize: 28,
 		fontWeight: '500',
@@ -696,14 +697,13 @@ const styles = StyleSheet.create({
 		overflow: 'hidden',
 	},
 	monthHeader: {
-		paddingVertical: 16,
-		paddingBottom: 10,
+		paddingTop: 8,
 		marginTop: 8,
 	},
 	monthHeaderText: {
-		fontSize: 16,
-		fontWeight: '800',
-		color: '#4b4b4b',
+		fontSize: 14,
+		fontWeight: '600',
+		color: '#363636',
 		paddingHorizontal: 24,
 	},
 	dateHeader: {
@@ -715,7 +715,7 @@ const styles = StyleSheet.create({
 	dateHeaderText: {
 		fontSize: 20,
 		fontWeight: '600',
-		color: '#212121',
+		color: '#464646',
 		paddingHorizontal: 24,
 	},
 	txRowContainer: {
@@ -725,8 +725,6 @@ const styles = StyleSheet.create({
 	txRow: {
 		flexDirection: 'row',
 		paddingVertical: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: '#e5e7eb',
 		alignItems: 'center',
 		backgroundColor: '#fff',
 		paddingHorizontal: 24,
