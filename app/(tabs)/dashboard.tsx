@@ -20,6 +20,7 @@ import ProfitGraph from '../components/ProfitGraph';
 import AddTransaction from '../components/AddTransaction';
 import axios from 'axios';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 interface BalanceWidgetProps {
 	transactions: Transaction[];
@@ -274,144 +275,152 @@ const Dashboard = () => {
 
 	return (
 		<SafeAreaView style={styles.safeArea}>
-			<ScrollView
-				style={styles.scrollView}
-				showsVerticalScrollIndicator={false}
-				refreshControl={
-					<RefreshControl
-						refreshing={refreshing}
-						onRefresh={onRefresh}
-						tintColor="#0095FF"
-						colors={['#0095FF']}
-						progressBackgroundColor="#ffffff"
-					/>
-				}
-			>
-				<View style={styles.contentContainer}>
-					<View style={styles.headerContainer}>
-						<View style={styles.headerTextContainer}>
-							<Text style={styles.nameText}>Dashboard</Text>
-						</View>
-
-						<TouchableOpacity
-							onPress={() => router.push('/screens/notifications')}
-							style={styles.profileButton}
-						>
-							<View style={{ position: 'relative' }}>
-								<Ionicons
-									name="notifications-outline"
-									color="#212121"
-									size={24}
-								/>
-								<View style={styles.notificationButton} />
+			<GestureHandlerRootView style={{ flex: 1 }}>
+				<ScrollView
+					style={styles.scrollView}
+					showsVerticalScrollIndicator={false}
+					refreshControl={
+						<RefreshControl
+							refreshing={refreshing}
+							onRefresh={onRefresh}
+							tintColor="#0095FF"
+							colors={['#0095FF']}
+							progressBackgroundColor="#ffffff"
+						/>
+					}
+				>
+					<View style={styles.contentContainer}>
+						<View style={styles.headerContainer}>
+							<View style={styles.headerTextContainer}>
+								<Text style={styles.headerText}>Dashboard</Text>
 							</View>
-						</TouchableOpacity>
-					</View>
-					<AISuggestionBox />
 
-					<View style={styles.header}>
-						<Text style={styles.balanceLabel}>Total Value</Text>
-						<View style={{ flexDirection: 'row', alignItems: 'center' }}>
-							<Text style={styles.balanceAmount}>$</Text>
-							<Text style={styles.balanceAmount}>
-								{totalBalance?.toFixed(2)}
-							</Text>
+							<TouchableOpacity
+								onPress={() => router.push('/notifications')}
+								style={styles.profileButton}
+							>
+								<View style={{ position: 'relative' }}>
+									<Ionicons
+										name="notifications-outline"
+										color="#212121"
+										size={24}
+									/>
+									<View style={styles.notificationButton} />
+								</View>
+							</TouchableOpacity>
 						</View>
-					</View>
+						<AISuggestionBox />
 
-					<View style={styles.carouselWrapper}>
-						<ScrollView
-							horizontal
-							showsHorizontalScrollIndicator={false}
-							contentContainerStyle={styles.carouselContainer}
-							pagingEnabled
-							snapToInterval={styles.statWidget.width + 12} // width + gap
-							decelerationRate="fast"
-						>
-							<BalanceWidget transactions={transactions} />
-						</ScrollView>
-					</View>
-
-					{/* Transactions History */}
-					<View style={styles.transactionsSectionContainer}>
-						<View style={styles.transactionsHeader}>
-							<Text style={styles.transactionsTitle}>Transactions History</Text>
+						<View style={styles.header}>
+							<Text style={styles.balanceLabel}>Total Value</Text>
+							<View style={{ flexDirection: 'row', alignItems: 'center' }}>
+								<Text style={styles.balanceAmount}>$</Text>
+								<Text style={styles.balanceAmount}>
+									{totalBalance?.toFixed(2)}
+								</Text>
+							</View>
 						</View>
-						<View style={styles.transactionsListContainerShadow}>
-							<View style={styles.transactionsListContainer}>
-								{/* <Text style={styles.seeAllText}>See all</Text> */}
 
-								{transactions
-									.sort(
-										(a, b) =>
-											new Date(b.date).getTime() - new Date(a.date).getTime()
-									)
-									.slice(0, 6)
-									.map((transaction) => {
-										const categoryIcon = getCategoryIcon(
-											transaction.category || ['Other']
-										);
-										return (
-											<View key={transaction.id} style={styles.transactionItem}>
-												<TouchableOpacity
-													onPress={() => router.push('/transaction')}
-													style={{
-														flex: 1,
-														flexDirection: 'row',
-														justifyContent: 'space-between',
-														alignItems: 'center',
-													}}
+						<View style={styles.carouselWrapper}>
+							<ScrollView
+								horizontal
+								showsHorizontalScrollIndicator={false}
+								contentContainerStyle={styles.carouselContainer}
+								pagingEnabled
+								snapToInterval={styles.statWidget.width + 12} // width + gap
+								decelerationRate="fast"
+							>
+								<BalanceWidget transactions={transactions} />
+							</ScrollView>
+						</View>
+
+						{/* Transactions History */}
+						<View style={styles.transactionsSectionContainer}>
+							<View style={styles.transactionsHeader}>
+								<Text style={styles.transactionsTitle}>
+									Transactions History
+								</Text>
+							</View>
+							<View style={styles.transactionsListContainerShadow}>
+								<View style={styles.transactionsListContainer}>
+									{/* <Text style={styles.seeAllText}>See all</Text> */}
+
+									{transactions
+										.sort(
+											(a, b) =>
+												new Date(b.date).getTime() - new Date(a.date).getTime()
+										)
+										.slice(0, 6)
+										.map((transaction) => {
+											const categoryIcon = getCategoryIcon(
+												transaction.category || ['Other']
+											);
+											return (
+												<View
+													key={transaction.id}
+													style={styles.transactionItem}
 												>
-													<View
+													<TouchableOpacity
+														onPress={() => router.push('/transaction')}
 														style={{
+															flex: 1,
 															flexDirection: 'row',
+															justifyContent: 'space-between',
 															alignItems: 'center',
 														}}
 													>
 														<View
+															style={{
+																flexDirection: 'row',
+																alignItems: 'center',
+															}}
+														>
+															<View
+																style={[
+																	styles.iconContainer,
+																	{
+																		backgroundColor: `${categoryIcon.color}20`,
+																	},
+																]}
+															>
+																<Ionicons
+																	name={categoryIcon.name}
+																	size={20}
+																	color={categoryIcon.color}
+																/>
+															</View>
+															<View style={{ marginLeft: 12 }}>
+																<Text style={styles.transactionDescription}>
+																	{transaction.description}
+																</Text>
+																<Text style={styles.transactionDate}>
+																	{new Date(
+																		transaction.date
+																	).toLocaleDateString()}
+																</Text>
+															</View>
+														</View>
+														<Text
 															style={[
-																styles.iconContainer,
-																{ backgroundColor: `${categoryIcon.color}20` },
+																styles.transactionAmount,
+																transaction.type === 'income'
+																	? styles.incomeAmount
+																	: styles.expenseAmount,
 															]}
 														>
-															<Ionicons
-																name={categoryIcon.name}
-																size={20}
-																color={categoryIcon.color}
-															/>
-														</View>
-														<View style={{ marginLeft: 12 }}>
-															<Text style={styles.transactionDescription}>
-																{transaction.description}
-															</Text>
-															<Text style={styles.transactionDate}>
-																{new Date(
-																	transaction.date
-																).toLocaleDateString()}
-															</Text>
-														</View>
-													</View>
-													<Text
-														style={[
-															styles.transactionAmount,
-															transaction.type === 'income'
-																? styles.incomeAmount
-																: styles.expenseAmount,
-														]}
-													>
-														{transaction.type === 'income' ? '+' : '-'} $
-														{transaction.amount.toFixed(2)}
-													</Text>
-												</TouchableOpacity>
-											</View>
-										);
-									})}
+															{transaction.type === 'income' ? '+' : '-'} $
+															{transaction.amount.toFixed(2)}
+														</Text>
+													</TouchableOpacity>
+												</View>
+											);
+										})}
+								</View>
 							</View>
 						</View>
-					</View>
 
-					{/* --- Quick Action Buttons --- */}
-					{/* <View style={styles.quickActionsContainer}>
+						{/* --- Quick Action Buttons --- */}
+						{/* <View style={styles.quickActionsContainer}>
 						<TouchableOpacity
 							style={styles.quickActionButton}
 							onPress={() => handleQuickAction('View Budgets')}
@@ -442,8 +451,9 @@ const Dashboard = () => {
 							<Text style={styles.quickActionButtonText}>Settings</Text>
 						</TouchableOpacity>
 					</View> */}
-				</View>
-			</ScrollView>
+					</View>
+				</ScrollView>
+			</GestureHandlerRootView>
 		</SafeAreaView>
 	);
 };
@@ -479,11 +489,7 @@ const styles = StyleSheet.create({
 		flexDirection: 'column',
 		alignItems: 'center',
 	},
-	welcomeText: {
-		color: '#212121',
-		fontSize: 20,
-	},
-	nameText: {
+	headerText: {
 		color: '#212121',
 		fontSize: 28,
 		fontWeight: '500',

@@ -5,14 +5,8 @@ import './global.css';
 
 export default function RootLayout() {
 	return (
-		<GestureHandlerRootView style={styles.container}>
-			<Stack screenOptions={{ headerShown: false }} />
-		</GestureHandlerRootView>
+		<Stack screenOptions={{ headerShown: false }}>
+			<Stack.Screen name="notifications" />
+		</Stack>
 	);
 }
-
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-	},
-});

@@ -6,15 +6,13 @@ import {
 	Text,
 	StyleSheet,
 	TouchableOpacity,
-	Dimensions,
 	Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-
-const screenWidth = Dimensions.get('window').width;
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function ProfileScreen() {
 	const router = useRouter();
@@ -22,11 +20,11 @@ export default function ProfileScreen() {
 		require('../../assets/images/profile.jpg')
 	);
 	const [userProfile, setUserProfile] = useState({
-		firstName: '',
-		lastName: '',
-		monthlyIncome: 0,
-		savings: 0,
-		debt: 0,
+		firstName: 'Max',
+		lastName: 'Mustermann',
+		monthlyIncome: 1000,
+		savings: 100,
+		debt: 100,
 	});
 
 	useEffect(() => {
@@ -73,38 +71,49 @@ export default function ProfileScreen() {
 	};
 
 	return (
-		<SafeAreaView style={styles.container}>
-			{/* Header icons */}
-			<View style={styles.headerRight}>
-				<TouchableOpacity
-					style={styles.iconButton}
-					onPress={() => router.push('/screens/profileSettings')}
-				>
-					<Ionicons name="settings-outline" size={32} color="#555" />
-				</TouchableOpacity>
-			</View>
-
-			{/* Profile picture and name */}
-			<View style={styles.profilePicWrapper}>
-				<View style={styles.profilePicContainer}>
-					<Image
-						source={profileImage}
-						style={styles.profilePic}
-						contentFit="cover"
-					/>
-					<TouchableOpacity
-						style={styles.editIconContainer}
-						onPress={pickImage}
-					>
-						<View style={styles.editIconBackground}>
-							<Ionicons name="pencil" size={16} color="#fff" />
+		<View style={styles.mainContainer}>
+			<LinearGradient
+				colors={['#005fe4', '#0095ff']}
+				style={styles.gradient}
+				start={{ x: 0, y: 1 }}
+				end={{ x: 1, y: 0 }}
+			>
+				<SafeAreaView style={styles.container}>
+					<View style={styles.topContentContainer}>
+						{/* Header*/}
+						<View style={styles.headerContainer}>
+							<Text style={styles.headerText}>Profile</Text>
+							{/* <TouchableOpacity
+								onPress={() => router.push('/screens/profileSettings')}
+							>
+								<Ionicons name="settings-outline" size={32} color="#f0f0f0" />
+							</TouchableOpacity> */}
 						</View>
-					</TouchableOpacity>
-				</View>
-				<Text style={styles.userName}>
-					{userProfile.firstName} {userProfile.lastName}
-				</Text>
-			</View>
+
+						{/* Profile picture and name */}
+						<View style={styles.profilePicWrapper}>
+							<View style={styles.profilePicContainer}>
+								<Image
+									source={profileImage}
+									style={styles.profilePic}
+									contentFit="cover"
+								/>
+								<TouchableOpacity
+									style={styles.editIconContainer}
+									onPress={pickImage}
+								>
+									<View style={styles.editIconBackground}>
+										<Ionicons name="pencil" size={16} color="#fff" />
+									</View>
+								</TouchableOpacity>
+							</View>
+							<Text style={styles.userName}>
+								{userProfile.firstName} {userProfile.lastName}
+							</Text>
+						</View>
+					</View>
+				</SafeAreaView>
+			</LinearGradient>
 
 			{/* Stats cards */}
 			<View style={styles.statsContainer}>
@@ -164,27 +173,40 @@ export default function ProfileScreen() {
 					<Text style={{ color: '#717171' }}>Coming Soon</Text>
 				</TouchableOpacity>
 			</View>
-		</SafeAreaView>
+		</View>
 	);
 }
 
 const styles = StyleSheet.create({
-	container: { flex: 1, backgroundColor: '#f9f9f9' },
-	headerLeft: {
-		position: 'absolute',
-		top: 60,
-		left: 16,
+	mainContainer: {
+		flex: 1,
+		backgroundColor: '#f9fafb',
 	},
-	headerRight: {
-		position: 'absolute',
-		top: 60,
-		right: 16,
+	container: {
+		backgroundColor: 'transparent',
+	},
+	topContentContainer: {
+		paddingTop: 12,
+		paddingBottom: 24,
+	},
+	gradient: {
+		borderBottomLeftRadius: 0,
+		borderBottomRightRadius: 0,
+	},
+	headerContainer: {
 		flexDirection: 'row',
-	},
-	iconButton: { marginLeft: 12 },
-	profilePicWrapper: {
-		marginTop: 60,
+		justifyContent: 'space-between',
 		alignItems: 'center',
+		paddingHorizontal: 24,
+	},
+	headerText: {
+		color: '#f0f0f0',
+		fontSize: 28,
+		fontWeight: '500',
+	},
+	profilePicWrapper: {
+		alignItems: 'center',
+		gap: 12,
 	},
 	profilePicContainer: {
 		position: 'relative',
@@ -212,16 +234,16 @@ const styles = StyleSheet.create({
 		borderColor: '#fff',
 	},
 	userName: {
-		marginTop: 12,
 		fontSize: 24,
 		fontWeight: '600',
-		color: '#333',
+		color: '#f0f0f0',
 	},
 	statsContainer: {
 		flexDirection: 'row',
-		justifyContent: 'space-around',
-		marginTop: 24,
+		justifyContent: 'space-between',
+		marginTop: 12,
 		paddingHorizontal: 16,
+		gap: 12,
 	},
 	statCard: {
 		backgroundColor: '#fff',
@@ -229,13 +251,16 @@ const styles = StyleSheet.create({
 		borderRadius: 12,
 		alignItems: 'center',
 		flex: 1,
-		marginHorizontal: 8,
 		elevation: 2,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.25,
+		shadowRadius: 3.84,
 	},
 	statValue: { fontSize: 20, fontWeight: 'bold' },
 	statLabel: { fontSize: 12, color: '#666', marginTop: 4 },
 	settingsContainer: {
-		marginTop: 32,
+		marginTop: 20,
 		paddingHorizontal: 16,
 	},
 	settingItem: {

@@ -19,7 +19,11 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Calendar } from 'react-native-calendars';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import {
+	Gesture,
+	GestureDetector,
+	GestureHandlerRootView,
+} from 'react-native-gesture-handler';
 import Animated, {
 	useAnimatedStyle,
 	useSharedValue,
@@ -441,141 +445,143 @@ export default function TransactionScreen() {
 	);
 
 	return (
-		<View style={styles.mainContainer}>
-			<SafeAreaView style={styles.safeArea} edges={['top']}>
-				<View style={styles.container}>
-					{/* Header */}
-					<View style={styles.headerContainer}>
-						<View style={styles.headerTextContainer}>
-							<Text style={styles.nameText}>History</Text>
-						</View>
-						<View style={styles.headerRight}>
-							<TouchableOpacity
-								style={[
-									styles.filterButton,
-									dateFilterMode === 'month' && styles.filterButtonDisabled,
-								]}
-								onPress={() => {
-									if (dateFilterMode !== 'month') {
-										handlePickerPress('calendar');
-									}
-								}}
-							>
-								<Ionicons
-									name="calendar"
-									size={24}
-									color={dateFilterMode === 'month' ? '#616161' : '#212121'}
-								/>
-							</TouchableOpacity>
-							<TouchableOpacity
-								style={styles.filterButton}
-								onPress={handleFilterPress}
-							>
-								<Ionicons name="reorder-three" size={32} color="#212121" />
-							</TouchableOpacity>
-						</View>
-					</View>
-
-					{/* Search Bar */}
-					<View style={styles.searchContainer}>
-						<Ionicons
-							name="search"
-							size={20}
-							color="#9ca3af"
-							style={styles.searchIcon}
-						/>
-						<TextInput
-							style={styles.searchInput}
-							placeholder="Search transactions..."
-							value={searchQuery}
-							onChangeText={setSearchQuery}
-							placeholderTextColor="#9ca3af"
-						/>
-						{searchQuery ? (
-							<TouchableOpacity
-								onPress={() => setSearchQuery('')}
-								style={styles.clearButton}
-							>
-								<Ionicons name="close-circle" size={20} color="#9ca3af" />
-							</TouchableOpacity>
-						) : null}
-					</View>
-
-					{/* Date Header */}
-					{renderDateHeader()}
-
-					{/* Transaction List */}
-					<FlatList
-						data={groupedTransactions}
-						keyExtractor={(item) => item.monthKey}
-						renderItem={({ item }) => (
-							<View>
-								{dateFilterMode !== 'day' &&
-									renderMonthHeader({ monthKey: item.monthKey })}
-								{item.transactions.map((tx) => (
-									<View key={tx.id}>{renderTransaction({ item: tx })}</View>
-								))}
+		<GestureHandlerRootView style={{ flex: 1 }}>
+			<View style={styles.mainContainer}>
+				<SafeAreaView style={styles.safeArea} edges={['top']}>
+					<View style={styles.container}>
+						{/* Header */}
+						<View style={styles.headerContainer}>
+							<View style={styles.headerTextContainer}>
+								<Text style={styles.nameText}>History</Text>
 							</View>
-						)}
-						ListEmptyComponent={
-							<View style={styles.empty}>
-								<Ionicons name="document-outline" size={48} color="#e5e7eb" />
-								<Text style={{ color: '#9ca3af', marginTop: 8 }}>
-									{isLoading ? 'Loading...' : 'No transactions'}
-								</Text>
+							<View style={styles.headerRight}>
+								<TouchableOpacity
+									style={[
+										styles.filterButton,
+										dateFilterMode === 'month' && styles.filterButtonDisabled,
+									]}
+									onPress={() => {
+										if (dateFilterMode !== 'month') {
+											handlePickerPress('calendar');
+										}
+									}}
+								>
+									<Ionicons
+										name="calendar"
+										size={24}
+										color={dateFilterMode === 'month' ? '#616161' : '#212121'}
+									/>
+								</TouchableOpacity>
+								<TouchableOpacity
+									style={styles.filterButton}
+									onPress={handleFilterPress}
+								>
+									<Ionicons name="reorder-three" size={32} color="#212121" />
+								</TouchableOpacity>
 							</View>
-						}
-					/>
-				</View>
-			</SafeAreaView>
+						</View>
 
-			{/* Calendar Modal */}
-			<Modal
-				visible={modalVisible}
-				transparent
-				animationType="fade"
-				onRequestClose={() => setModalVisible(false)}
-			>
-				<TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
-					<View style={styles.modalOverlay}>
-						<TouchableWithoutFeedback>
-							<View style={styles.calendarModalContent}>
-								<View style={styles.modalHeader}>
-									<Text style={styles.modalTitle}>Select Date</Text>
-									<TouchableOpacity
-										onPress={() => setModalVisible(false)}
-										style={styles.closeButton}
-									>
-										<Ionicons name="close" size={24} color="#9ca3af" />
-									</TouchableOpacity>
+						{/* Search Bar */}
+						<View style={styles.searchContainer}>
+							<Ionicons
+								name="search"
+								size={20}
+								color="#9ca3af"
+								style={styles.searchIcon}
+							/>
+							<TextInput
+								style={styles.searchInput}
+								placeholder="Search transactions..."
+								value={searchQuery}
+								onChangeText={setSearchQuery}
+								placeholderTextColor="#9ca3af"
+							/>
+							{searchQuery ? (
+								<TouchableOpacity
+									onPress={() => setSearchQuery('')}
+									style={styles.clearButton}
+								>
+									<Ionicons name="close-circle" size={20} color="#9ca3af" />
+								</TouchableOpacity>
+							) : null}
+						</View>
+
+						{/* Date Header */}
+						{renderDateHeader()}
+
+						{/* Transaction List */}
+						<FlatList
+							data={groupedTransactions}
+							keyExtractor={(item) => item.monthKey}
+							renderItem={({ item }) => (
+								<View>
+									{dateFilterMode !== 'day' &&
+										renderMonthHeader({ monthKey: item.monthKey })}
+									{item.transactions.map((tx) => (
+										<View key={tx.id}>{renderTransaction({ item: tx })}</View>
+									))}
 								</View>
-								<Calendar
-									onDayPress={handleCalendarDayPress}
-									markedDates={{
-										[selectedDate]: {
-											selected: true,
-											selectedColor: '#0095FF',
-										},
-									}}
-									theme={{
-										todayTextColor: '#0095FF',
-										arrowColor: '#0095FF',
-										dotColor: '#0095FF',
-										selectedDayBackgroundColor: '#0095FF',
-										textDayFontSize: 16,
-										textMonthFontSize: 16,
-										textDayHeaderFontSize: 16,
-										textDayFontWeight: '500',
-										textMonthFontWeight: '500',
-										textDayHeaderFontWeight: '500',
-									}}
-								/>
-							</View>
-						</TouchableWithoutFeedback>
+							)}
+							ListEmptyComponent={
+								<View style={styles.empty}>
+									<Ionicons name="document-outline" size={48} color="#e5e7eb" />
+									<Text style={{ color: '#9ca3af', marginTop: 8 }}>
+										{isLoading ? 'Loading...' : 'No transactions'}
+									</Text>
+								</View>
+							}
+						/>
 					</View>
-				</TouchableWithoutFeedback>
-			</Modal>
-		</View>
+				</SafeAreaView>
+
+				{/* Calendar Modal */}
+				<Modal
+					visible={modalVisible}
+					transparent
+					animationType="fade"
+					onRequestClose={() => setModalVisible(false)}
+				>
+					<TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
+						<View style={styles.modalOverlay}>
+							<TouchableWithoutFeedback>
+								<View style={styles.calendarModalContent}>
+									<View style={styles.modalHeader}>
+										<Text style={styles.modalTitle}>Select Date</Text>
+										<TouchableOpacity
+											onPress={() => setModalVisible(false)}
+											style={styles.closeButton}
+										>
+											<Ionicons name="close" size={24} color="#9ca3af" />
+										</TouchableOpacity>
+									</View>
+									<Calendar
+										onDayPress={handleCalendarDayPress}
+										markedDates={{
+											[selectedDate]: {
+												selected: true,
+												selectedColor: '#0095FF',
+											},
+										}}
+										theme={{
+											todayTextColor: '#0095FF',
+											arrowColor: '#0095FF',
+											dotColor: '#0095FF',
+											selectedDayBackgroundColor: '#0095FF',
+											textDayFontSize: 16,
+											textMonthFontSize: 16,
+											textDayHeaderFontSize: 16,
+											textDayFontWeight: '500',
+											textMonthFontWeight: '500',
+											textDayHeaderFontWeight: '500',
+										}}
+									/>
+								</View>
+							</TouchableWithoutFeedback>
+						</View>
+					</TouchableWithoutFeedback>
+				</Modal>
+			</View>
+		</GestureHandlerRootView>
 	);
 }
 
