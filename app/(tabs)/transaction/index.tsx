@@ -17,6 +17,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Calendar } from 'react-native-calendars';
+import * as Haptics from 'expo-haptics';
 import {
 	Gesture,
 	GestureDetector,
@@ -27,7 +28,6 @@ import Animated, {
 	useSharedValue,
 	withTiming,
 	runOnJS,
-	clamp,
 	withSpring,
 	Easing,
 } from 'react-native-reanimated';
@@ -122,6 +122,8 @@ const TransactionRow = ({
 	const translateX = useSharedValue(0);
 	const TRANSLATE_THRESHOLD = -70;
 	const DELETE_WIDTH = 60;
+	const hasTriggeredHaptic = useSharedValue(false);
+	const iconScale = useSharedValue(1);
 
 	const getCategoryIcon = (categories: string[]) => {
 		const categoryMap: {
@@ -156,26 +158,56 @@ const TransactionRow = ({
 
 	const resetAnimation = () => {
 		translateX.value = 0;
+		hasTriggeredHaptic.value = false;
+		iconScale.value = withSpring(1, {
+			damping: 15,
+			stiffness: 150,
+		});
+	};
+
+	const triggerHaptic = () => {
+		try {
+			Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+		} catch (error) {
+			console.log('Haptic feedback not available');
+		}
 	};
 
 	const panGesture = Gesture.Pan()
-		.activeOffsetX([-15, 15]) // only start after 10px horizontal
-		.failOffsetY([-10, 10]) // fail if vertical movement is more than 5px
+		.activeOffsetX([-15, 15])
+		.failOffsetY([-10, 10])
 		.onUpdate(({ translationX }) => {
-			// Only process horizontal movements
 			translateX.value = Math.min(0, translationX);
+
+			// Trigger haptic and scale animation when crossing threshold
+			if (translateX.value < TRANSLATE_THRESHOLD && !hasTriggeredHaptic.value) {
+				hasTriggeredHaptic.value = true;
+				iconScale.value = withSpring(1.5, {
+					damping: 15,
+					stiffness: 150,
+				});
+				runOnJS(triggerHaptic)();
+			} else if (translateX.value >= TRANSLATE_THRESHOLD) {
+				hasTriggeredHaptic.value = false;
+				iconScale.value = withSpring(1, {
+					damping: 15,
+					stiffness: 150,
+				});
+			}
 		})
 		.onEnd(() => {
 			if (translateX.value < TRANSLATE_THRESHOLD) {
-				// snap to full delete width, then notify JS
 				translateX.value = withTiming(
 					-DELETE_WIDTH,
 					{ duration: 400, easing: Easing.bezier(0.25, 0.1, 0.25, 1) },
 					() => runOnJS(handleDelete)()
 				);
 			} else {
-				// bounce back
 				translateX.value = withSpring(0, { damping: 20 });
+				iconScale.value = withSpring(1, {
+					damping: 15,
+					stiffness: 150,
+				});
 			}
 		});
 
@@ -183,12 +215,18 @@ const TransactionRow = ({
 		transform: [{ translateX: translateX.value }],
 	}));
 
+	const trashIconStyle = useAnimatedStyle(() => ({
+		transform: [{ scale: iconScale.value }],
+	}));
+
 	return (
 		<View style={styles.txRowContainer}>
 			<View style={styles.deleteAction}>
-				<TouchableOpacity onPress={() => onDelete(item.id, resetAnimation)}>
-					<Ionicons name="trash-outline" size={24} color="#fff" />
-				</TouchableOpacity>
+				<Animated.View style={trashIconStyle}>
+					<TouchableOpacity onPress={() => onDelete(item.id, resetAnimation)}>
+						<Ionicons name="trash-outline" size={18} color="#fff" />
+					</TouchableOpacity>
+				</Animated.View>
 			</View>
 			<GestureDetector gesture={panGesture}>
 				<Animated.View style={[styles.txRow, animatedStyle]}>
