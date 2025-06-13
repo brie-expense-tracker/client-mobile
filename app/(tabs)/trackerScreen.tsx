@@ -7,13 +7,11 @@ import {
 	Alert,
 	TouchableOpacity,
 	ScrollView,
-	Image,
-	Pressable,
 } from 'react-native';
 import axios from 'axios';
-import { useForm, Controller, Control } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { Ionicons, FontAwesome } from '@expo/vector-icons';
-import { Link, useRouter, Stack } from 'expo-router';
+import { useRouter, Stack } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface FloatingActionButtonProps {
@@ -115,9 +113,7 @@ const addTransactionScreen = () => {
 			<Stack.Screen
 				options={{
 					headerShown: false,
-					// presentation: 'modal',
 					gestureEnabled: true,
-					// gestureDirection: 'vertical',
 					contentStyle: {
 						backgroundColor: 'transparent',
 					},
@@ -460,7 +456,6 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 		alignItems: 'center',
 		margin: 5,
-		// backgroundColor: '#ffffff',
 		borderRadius: 5,
 	},
 	buttonNumDark: {
@@ -469,7 +464,6 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 		alignItems: 'center',
 		margin: 5,
-		// backgroundColor: '#a8b1ba',
 		borderRadius: 5,
 	},
 	buttonText: {
