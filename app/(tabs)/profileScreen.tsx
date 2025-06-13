@@ -12,7 +12,6 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { LinearGradient } from 'expo-linear-gradient';
 
 export default function ProfileScreen() {
 	const router = useRouter();
@@ -72,107 +71,93 @@ export default function ProfileScreen() {
 
 	return (
 		<View style={styles.mainContainer}>
-			{/* <LinearGradient
-				colors={['#005fe4', '#0095ff']}
-				style={styles.gradient}
-				start={{ x: 0, y: 1 }}
-				end={{ x: 1, y: 0 }}
-			> */}
-			<SafeAreaView style={styles.container}>
-				<View style={styles.topContentContainer}>
-					{/* Header*/}
-					<View style={styles.headerContainer}>
-						<Text style={styles.headerText}>Profile</Text>
-						{/* <TouchableOpacity
-								onPress={() => router.push('/screens/profileSettings')}
-							>
-								<Ionicons name="settings-outline" size={32} color="#f0f0f0" />
-							</TouchableOpacity> */}
-					</View>
+			<SafeAreaView>
+				{/* Header*/}
+				<View style={styles.headerContainer}>
+					<Text style={styles.headerText}>Profile</Text>
+				</View>
 
-					{/* Profile picture and name */}
-					<View style={styles.profilePicWrapper}>
-						<View style={styles.profilePicContainer}>
-							<Image
-								source={profileImage}
-								style={styles.profilePic}
-								contentFit="cover"
-							/>
-							<TouchableOpacity
-								style={styles.editIconContainer}
-								onPress={pickImage}
-							>
-								<View style={styles.editIconBackground}>
-									<Ionicons name="pencil" size={16} color="#fff" />
-								</View>
-							</TouchableOpacity>
-						</View>
-						<Text style={styles.userName}>
-							{userProfile.firstName} {userProfile.lastName}
-						</Text>
+				{/* Profile picture and name */}
+				<View style={styles.profilePicWrapper}>
+					<View style={styles.profilePicContainer}>
+						<Image
+							source={profileImage}
+							style={styles.profilePic}
+							contentFit="cover"
+						/>
+						<TouchableOpacity
+							style={styles.editIconContainer}
+							onPress={pickImage}
+						>
+							<View style={styles.editIconBackground}>
+								<Ionicons name="pencil" size={16} color="#fff" />
+							</View>
+						</TouchableOpacity>
 					</View>
+					<Text style={styles.userName}>
+						{userProfile.firstName} {userProfile.lastName}
+					</Text>
+				</View>
+
+				{/* Stats cards */}
+				<View style={styles.statsContainer}>
+					<View style={styles.statCard}>
+						<Text style={styles.statValue}>
+							${(userProfile?.savings || 0).toLocaleString()}
+						</Text>
+						<Text style={styles.statLabel}>Total Savings</Text>
+					</View>
+					<View style={styles.statCard}>
+						<Text style={styles.statValue}>
+							${(userProfile?.debt || 0).toLocaleString()}
+						</Text>
+						<Text style={styles.statLabel}>Total Debt</Text>
+					</View>
+				</View>
+
+				{/* Settings List */}
+				<View style={styles.settingsContainer}>
+					<TouchableOpacity
+						style={styles.settingItem}
+						onPress={() => router.push('/notifications')}
+					>
+						<Ionicons name="notifications-outline" size={24} color="#555" />
+						<Text style={styles.settingText}>Notifications</Text>
+						<Ionicons name="chevron-forward" size={24} color="#555" />
+					</TouchableOpacity>
+					<TouchableOpacity
+						style={styles.settingItem}
+						onPress={() => router.push('/screens/fixedExpenses')}
+					>
+						<Ionicons name="cube-outline" size={24} color="#555" />
+						<Text style={styles.settingText}>Fixed Expenses</Text>
+						<Ionicons name="chevron-forward" size={24} color="#555" />
+					</TouchableOpacity>
+					<TouchableOpacity
+						style={styles.settingItem}
+						onPress={() => router.push('/screens/preferences')}
+					>
+						<Ionicons name="settings-outline" size={24} color="#555" />
+						<Text style={styles.settingText}>Preferences</Text>
+						<Ionicons name="chevron-forward" size={24} color="#555" />
+					</TouchableOpacity>
+					<TouchableOpacity style={styles.settingItem}>
+						<Ionicons name="color-palette-outline" size={24} color="#555" />
+						<Text style={styles.settingText}>Appearance</Text>
+						<Ionicons name="chevron-forward" size={24} color="#555" />
+					</TouchableOpacity>
+					<TouchableOpacity style={styles.settingItem}>
+						<Ionicons name="shield-checkmark-outline" size={24} color="#555" />
+						<Text style={styles.settingText}>Privacy & Security</Text>
+						<Ionicons name="chevron-forward" size={24} color="#555" />
+					</TouchableOpacity>
+					<TouchableOpacity style={styles.settingItem}>
+						<Ionicons name="chatbox-ellipses-outline" size={24} color="#555" />
+						<Text style={styles.settingText}>Ai Chat</Text>
+						<Text style={{ color: '#717171' }}>Coming Soon</Text>
+					</TouchableOpacity>
 				</View>
 			</SafeAreaView>
-			{/* </LinearGradient> */}
-
-			{/* Stats cards */}
-			<View style={styles.statsContainer}>
-				<View style={styles.statCard}>
-					<Text style={styles.statValue}>
-						${(userProfile?.savings || 0).toLocaleString()}
-					</Text>
-					<Text style={styles.statLabel}>Total Savings</Text>
-				</View>
-				<View style={styles.statCard}>
-					<Text style={styles.statValue}>
-						${(userProfile?.debt || 0).toLocaleString()}
-					</Text>
-					<Text style={styles.statLabel}>Total Debt</Text>
-				</View>
-			</View>
-
-			{/* Settings List */}
-			<View style={styles.settingsContainer}>
-				<TouchableOpacity
-					style={styles.settingItem}
-					onPress={() => router.push('/notifications')}
-				>
-					<Ionicons name="notifications-outline" size={24} color="#555" />
-					<Text style={styles.settingText}>Notifications</Text>
-					<Ionicons name="chevron-forward" size={24} color="#555" />
-				</TouchableOpacity>
-				<TouchableOpacity
-					style={styles.settingItem}
-					onPress={() => router.push('/screens/fixedExpenses')}
-				>
-					<Ionicons name="cube-outline" size={24} color="#555" />
-					<Text style={styles.settingText}>Fixed Expenses</Text>
-					<Ionicons name="chevron-forward" size={24} color="#555" />
-				</TouchableOpacity>
-				<TouchableOpacity
-					style={styles.settingItem}
-					onPress={() => router.push('/screens/preferences')}
-				>
-					<Ionicons name="settings-outline" size={24} color="#555" />
-					<Text style={styles.settingText}>Preferences</Text>
-					<Ionicons name="chevron-forward" size={24} color="#555" />
-				</TouchableOpacity>
-				<TouchableOpacity style={styles.settingItem}>
-					<Ionicons name="color-palette-outline" size={24} color="#555" />
-					<Text style={styles.settingText}>Appearance</Text>
-					<Ionicons name="chevron-forward" size={24} color="#555" />
-				</TouchableOpacity>
-				<TouchableOpacity style={styles.settingItem}>
-					<Ionicons name="shield-checkmark-outline" size={24} color="#555" />
-					<Text style={styles.settingText}>Privacy & Security</Text>
-					<Ionicons name="chevron-forward" size={24} color="#555" />
-				</TouchableOpacity>
-				<TouchableOpacity style={styles.settingItem}>
-					<Ionicons name="chatbox-ellipses-outline" size={24} color="#555" />
-					<Text style={styles.settingText}>Ai Chat</Text>
-					<Text style={{ color: '#717171' }}>Coming Soon</Text>
-				</TouchableOpacity>
-			</View>
 		</View>
 	);
 }
@@ -181,13 +166,6 @@ const styles = StyleSheet.create({
 	mainContainer: {
 		flex: 1,
 		backgroundColor: '#fff',
-	},
-	container: {
-		backgroundColor: 'transparent',
-	},
-	topContentContainer: {
-		paddingTop: 12,
-		paddingBottom: 24,
 	},
 	gradient: {
 		borderBottomLeftRadius: 0,
