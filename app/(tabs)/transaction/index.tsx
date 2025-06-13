@@ -12,7 +12,7 @@ import {
 	TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -167,7 +167,7 @@ const TransactionRow = ({
 
 	const triggerHaptic = () => {
 		try {
-			Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+			Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 		} catch (error) {
 			console.log('Haptic feedback not available');
 		}
@@ -187,12 +187,16 @@ const TransactionRow = ({
 					stiffness: 150,
 				});
 				runOnJS(triggerHaptic)();
-			} else if (translateX.value >= TRANSLATE_THRESHOLD) {
+			} else if (
+				translateX.value >= TRANSLATE_THRESHOLD &&
+				hasTriggeredHaptic.value
+			) {
 				hasTriggeredHaptic.value = false;
 				iconScale.value = withSpring(1, {
 					damping: 15,
 					stiffness: 150,
 				});
+				runOnJS(triggerHaptic)();
 			}
 		})
 		.onEnd(() => {
@@ -271,6 +275,7 @@ const TransactionRow = ({
 // Main Transaction Screen Component
 // =============================================
 export default function TransactionScreen() {
+	const insets = useSafeAreaInsets();
 	const [selectedDate, setSelectedDate] = useState<string>(() => {
 		return getLocalIsoDate();
 	});
@@ -281,6 +286,7 @@ export default function TransactionScreen() {
 	const [tempSelection, setTempSelection] = useState<string>('');
 	const [transactions, setTransactions] = useState<Transaction[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
+	const [isInitialLoad, setIsInitialLoad] = useState(true);
 	const navigation = useNavigation<NavigationProp>();
 	const params = useLocalSearchParams<{
 		selectedCategory?: string;
@@ -296,7 +302,6 @@ export default function TransactionScreen() {
 	const [searchQuery, setSearchQuery] = useState('');
 
 	const fetchTransactions = async () => {
-		setIsLoading(true);
 		try {
 			const response = await axios.get(
 				'http://localhost:3000/api/transactions'
@@ -314,13 +319,11 @@ export default function TransactionScreen() {
 			}));
 			setTransactions(formattedTransactions);
 		} catch (error) {
-			// UNCOMMENT WHILE TESTING AXIOS
-			// console.error('Error fetching transactions:', error);
-
 			// Fallback to dummy data if API call fails
 			setTransactions(dummyData);
 		} finally {
 			setIsLoading(false);
+			setIsInitialLoad(false);
 		}
 	};
 
@@ -428,10 +431,6 @@ export default function TransactionScreen() {
 		}
 	};
 
-	const handleDateModeSelect = (value: string) => {
-		setDateFilterMode(value);
-	};
-
 	const handleCalendarDayPress = (day: { dateString: string }) => {
 		setSelectedDate(day.dateString);
 		setModalVisible(false);
@@ -488,71 +487,71 @@ export default function TransactionScreen() {
 	);
 
 	return (
-		<GestureHandlerRootView style={{ flex: 1 }}>
-			<View style={styles.mainContainer}>
-				<SafeAreaView style={styles.safeArea} edges={['top']}>
-					<View style={styles.topContainer}>
-						{/* Header */}
-						<View style={styles.headerContainer}>
-							<View style={styles.headerTextContainer}>
-								<Text style={styles.headerText}>History</Text>
-							</View>
-							<View style={styles.headerRight}>
-								<TouchableOpacity
-									style={[
-										styles.filterButton,
-										dateFilterMode === 'month' && styles.filterButtonDisabled,
-									]}
-									onPress={() => {
-										if (dateFilterMode !== 'month') {
-											handlePickerPress('calendar');
-										}
-									}}
-								>
-									<Ionicons
-										name="calendar"
-										size={24}
-										color={dateFilterMode === 'month' ? '#616161' : '#212121'}
-									/>
-								</TouchableOpacity>
-								<TouchableOpacity
-									style={styles.filterButton}
-									onPress={handleFilterPress}
-								>
-									<Ionicons name="reorder-three" size={32} color="#212121" />
-								</TouchableOpacity>
-							</View>
+		<GestureHandlerRootView style={styles.rootContainer}>
+			<View style={[styles.safeArea, { paddingTop: insets.top }]}>
+				<View style={styles.mainContainer}>
+					{/* Header */}
+					<View style={styles.headerContainer}>
+						<View style={styles.headerTextContainer}>
+							<Text style={styles.headerText}>History</Text>
 						</View>
-
-						{/* Search Bar */}
-						<View style={styles.searchContainer}>
-							<Ionicons
-								name="search"
-								size={20}
-								color="#9ca3af"
-								style={styles.searchIcon}
-							/>
-							<TextInput
-								style={styles.searchInput}
-								placeholder="Search transactions..."
-								value={searchQuery}
-								onChangeText={setSearchQuery}
-								placeholderTextColor="#9ca3af"
-							/>
-							{searchQuery ? (
-								<TouchableOpacity
-									onPress={() => setSearchQuery('')}
-									style={styles.clearButton}
-								>
-									<Ionicons name="close-circle" size={20} color="#9ca3af" />
-								</TouchableOpacity>
-							) : null}
+						<View style={styles.headerRight}>
+							<TouchableOpacity
+								style={[
+									styles.filterButton,
+									dateFilterMode === 'month' && styles.filterButtonDisabled,
+								]}
+								onPress={() => {
+									if (dateFilterMode !== 'month') {
+										handlePickerPress('calendar');
+									}
+								}}
+							>
+								<Ionicons
+									name="calendar"
+									size={24}
+									color={dateFilterMode === 'month' ? '#616161' : '#212121'}
+								/>
+							</TouchableOpacity>
+							<TouchableOpacity
+								style={styles.filterButton}
+								onPress={handleFilterPress}
+							>
+								<Ionicons name="reorder-three" size={32} color="#212121" />
+							</TouchableOpacity>
 						</View>
+					</View>
 
-						{/* Date Header */}
-						{renderDateHeader()}
+					{/* Search Bar */}
+					<View style={styles.searchContainer}>
+						<Ionicons
+							name="search"
+							size={20}
+							color="#9ca3af"
+							style={styles.searchIcon}
+						/>
+						<TextInput
+							style={styles.searchInput}
+							placeholder="Search transactions..."
+							value={searchQuery}
+							onChangeText={setSearchQuery}
+							placeholderTextColor="#9ca3af"
+						/>
+						{searchQuery ? (
+							<TouchableOpacity
+								onPress={() => setSearchQuery('')}
+								style={styles.clearButton}
+							>
+								<Ionicons name="close-circle" size={20} color="#9ca3af" />
+							</TouchableOpacity>
+						) : null}
+					</View>
 
-						{/* Transaction List */}
+					{/* Date Header */}
+					{renderDateHeader()}
+
+					{/* Transaction List */}
+					<View style={styles.listContainer}>
 						<FlatList
 							data={groupedTransactions}
 							keyExtractor={(item) => item.monthKey}
@@ -566,64 +565,81 @@ export default function TransactionScreen() {
 								</View>
 							)}
 							ListEmptyComponent={
-								<View style={styles.empty}>
-									<Ionicons name="document-outline" size={48} color="#e5e7eb" />
-									<Text style={{ color: '#9ca3af', marginTop: 8 }}>
-										{isLoading ? 'Loading...' : 'No transactions'}
-									</Text>
+								<View style={styles.emptyContainer}>
+									{isLoading ? (
+										<View style={styles.loadingContainer}>
+											<Text style={styles.loadingText}>Loading...</Text>
+										</View>
+									) : (
+										<View style={styles.empty}>
+											<Ionicons
+												name="document-outline"
+												size={48}
+												color="#e5e7eb"
+											/>
+											<Text style={{ color: '#9ca3af', marginTop: 8 }}>
+												No transactions
+											</Text>
+										</View>
+									)}
 								</View>
 							}
+							contentContainerStyle={[
+								styles.listContentContainer,
+								isLoading && styles.listContentContainerLoading,
+							]}
 						/>
 					</View>
-				</SafeAreaView>
-
-				{/* Calendar Modal */}
-				<Modal
-					visible={modalVisible}
-					transparent
-					animationType="fade"
-					onRequestClose={() => setModalVisible(false)}
-				>
-					<TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
-						<View style={styles.modalOverlay}>
-							<TouchableWithoutFeedback>
-								<View style={styles.calendarModalContent}>
-									<View style={styles.modalHeader}>
-										<Text style={styles.modalTitle}>Select Date</Text>
-										<TouchableOpacity
-											onPress={() => setModalVisible(false)}
-											style={styles.closeButton}
-										>
-											<Ionicons name="close" size={24} color="#9ca3af" />
-										</TouchableOpacity>
-									</View>
-									<Calendar
-										onDayPress={handleCalendarDayPress}
-										markedDates={{
-											[selectedDate]: {
-												selected: true,
-												selectedColor: '#0095FF',
-											},
-										}}
-										theme={{
-											todayTextColor: '#0095FF',
-											arrowColor: '#0095FF',
-											dotColor: '#0095FF',
-											selectedDayBackgroundColor: '#0095FF',
-											textDayFontSize: 16,
-											textMonthFontSize: 16,
-											textDayHeaderFontSize: 16,
-											textDayFontWeight: '500',
-											textMonthFontWeight: '500',
-											textDayHeaderFontWeight: '500',
-										}}
-									/>
-								</View>
-							</TouchableWithoutFeedback>
-						</View>
-					</TouchableWithoutFeedback>
-				</Modal>
+				</View>
 			</View>
+
+			{/* Calendar Modal */}
+			<Modal
+				visible={modalVisible}
+				transparent
+				animationType="none"
+				onRequestClose={() => setModalVisible(false)}
+				statusBarTranslucent
+			>
+				<TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
+					<View style={styles.modalOverlay}>
+						<TouchableWithoutFeedback>
+							<View style={styles.calendarModalContent}>
+								<View style={styles.modalHeader}>
+									<Text style={styles.modalTitle}>Select Date</Text>
+									<TouchableOpacity
+										onPress={() => setModalVisible(false)}
+										style={styles.closeButton}
+									>
+										<Ionicons name="close" size={24} color="#9ca3af" />
+									</TouchableOpacity>
+								</View>
+								<Calendar
+									onDayPress={handleCalendarDayPress}
+									markedDates={{
+										[selectedDate]: {
+											selected: true,
+											selectedColor: '#0095FF',
+										},
+									}}
+									theme={{
+										todayTextColor: '#0095FF',
+										arrowColor: '#0095FF',
+										dotColor: '#0095FF',
+										selectedDayBackgroundColor: '#0095FF',
+										textDayFontSize: 16,
+										textMonthFontSize: 16,
+										textDayHeaderFontSize: 16,
+										textDayFontWeight: '500',
+										textMonthFontWeight: '500',
+										textDayHeaderFontWeight: '500',
+									}}
+								/>
+							</View>
+						</TouchableWithoutFeedback>
+					</View>
+				</TouchableWithoutFeedback>
+			</Modal>
 		</GestureHandlerRootView>
 	);
 }
@@ -633,18 +649,52 @@ export default function TransactionScreen() {
 // =============================================
 const { width, height } = Dimensions.get('window');
 const styles = StyleSheet.create({
+	rootContainer: {
+		flex: 1,
+	},
+	safeArea: {
+		flex: 1,
+		backgroundColor: '#fff',
+	},
 	mainContainer: {
 		flex: 1,
 		backgroundColor: '#fff',
 	},
-	safeArea: {
-		flex: 1,
+	headerContainer: {
+		flexDirection: 'row',
+		marginBottom: 16,
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		paddingHorizontal: 24,
+		backgroundColor: '#fff',
 	},
-	topContainer: {
+	listContainer: {
 		flex: 1,
-		paddingBottom: 0,
+		backgroundColor: '#fff',
 	},
-
+	listContentContainer: {
+		flexGrow: 1,
+	},
+	listContentContainerLoading: {
+		justifyContent: 'center',
+	},
+	emptyContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	loadingContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	loadingText: {
+		color: '#9ca3af',
+		fontSize: 16,
+	},
+	empty: {
+		alignItems: 'center',
+	},
 	incomeAmount: {
 		color: '#16a34a',
 	},
@@ -655,18 +705,6 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		color: '#9ca3af',
 		marginTop: 4,
-	},
-	empty: {
-		flex: 1,
-		marginTop: 80,
-		alignItems: 'center',
-	},
-	headerContainer: {
-		flexDirection: 'row',
-		marginBottom: 16,
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		paddingHorizontal: 24,
 	},
 	headerTextContainer: {
 		flexDirection: 'column',
@@ -697,6 +735,11 @@ const styles = StyleSheet.create({
 		backgroundColor: 'rgba(0, 0, 0, 0.5)',
 		justifyContent: 'center',
 		alignItems: 'center',
+		position: 'absolute',
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
 	},
 	modalContent: {
 		backgroundColor: 'white',
@@ -733,6 +776,10 @@ const styles = StyleSheet.create({
 		backgroundColor: '#fff',
 		borderRadius: 24,
 		overflow: 'hidden',
+		position: 'absolute',
+		top: '50%',
+		left: '50%',
+		transform: [{ translateX: -width * 0.45 }, { translateY: -height * 0.35 }],
 	},
 	monthHeader: {
 		paddingTop: 8,

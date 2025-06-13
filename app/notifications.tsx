@@ -21,7 +21,10 @@ import Animated, {
 	useSharedValue,
 	withTiming,
 	runOnJS,
+	withSpring,
+	Easing,
 } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 
 interface Notification {
 	id: string;
@@ -54,8 +57,10 @@ const NotificationItem = ({
 }) => {
 	const { colors } = useTheme();
 	const translateX = useSharedValue(0);
-	const context = useSharedValue({ x: 0 });
-	const hasCrossedThreshold = useSharedValue(false);
+	const TRANSLATE_THRESHOLD = -70;
+	const DELETE_WIDTH = 60;
+	const hasTriggeredHaptic = useSharedValue(false);
+	const iconScale = useSharedValue(1);
 
 	const handleDelete = () => {
 		onDelete(item.id, resetAnimation);
@@ -63,28 +68,60 @@ const NotificationItem = ({
 
 	const resetAnimation = () => {
 		translateX.value = 0;
+		hasTriggeredHaptic.value = false;
+		iconScale.value = withSpring(1, {
+			damping: 15,
+			stiffness: 150,
+		});
 	};
 
-	const gesture = Gesture.Pan()
-		.onStart(() => {
-			context.value = { x: translateX.value };
-			hasCrossedThreshold.value = false;
-		})
-		.onUpdate((event) => {
-			// Only allow left swipes by clamping the translation to not exceed 0
-			translateX.value = Math.min(0, event.translationX + context.value.x);
+	const triggerHaptic = () => {
+		try {
+			Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+		} catch (error) {
+			console.log('Haptic feedback not available');
+		}
+	};
 
-			// Track if we've crossed the threshold
-			if (translateX.value < -70) {
-				hasCrossedThreshold.value = true;
+	const panGesture = Gesture.Pan()
+		.activeOffsetX([-15, 15])
+		.failOffsetY([-10, 10])
+		.onUpdate(({ translationX }) => {
+			translateX.value = Math.min(0, translationX);
+
+			// Trigger haptic and scale animation when crossing threshold
+			if (translateX.value < TRANSLATE_THRESHOLD && !hasTriggeredHaptic.value) {
+				hasTriggeredHaptic.value = true;
+				iconScale.value = withSpring(1.5, {
+					damping: 15,
+					stiffness: 150,
+				});
+				runOnJS(triggerHaptic)();
+			} else if (
+				translateX.value >= TRANSLATE_THRESHOLD &&
+				hasTriggeredHaptic.value
+			) {
+				hasTriggeredHaptic.value = false;
+				iconScale.value = withSpring(1, {
+					damping: 15,
+					stiffness: 150,
+				});
+				runOnJS(triggerHaptic)();
 			}
 		})
 		.onEnd(() => {
-			if (hasCrossedThreshold.value) {
-				runOnJS(handleDelete)();
-				translateX.value = withTiming(-60, { duration: 500 });
+			if (translateX.value < TRANSLATE_THRESHOLD) {
+				translateX.value = withTiming(
+					-DELETE_WIDTH,
+					{ duration: 400, easing: Easing.bezier(0.25, 0.1, 0.25, 1) },
+					() => runOnJS(handleDelete)()
+				);
 			} else {
-				translateX.value = withTiming(0);
+				translateX.value = withSpring(0, { damping: 20 });
+				iconScale.value = withSpring(1, {
+					damping: 15,
+					stiffness: 150,
+				});
 			}
 		});
 
@@ -92,14 +129,20 @@ const NotificationItem = ({
 		transform: [{ translateX: translateX.value }],
 	}));
 
+	const trashIconStyle = useAnimatedStyle(() => ({
+		transform: [{ scale: iconScale.value }],
+	}));
+
 	return (
 		<View style={styles.txRowContainer}>
 			<View style={styles.deleteAction}>
-				<TouchableOpacity onPress={() => onDelete(item.id, resetAnimation)}>
-					<Ionicons name="trash-outline" size={24} color="#fff" />
-				</TouchableOpacity>
+				<Animated.View style={trashIconStyle}>
+					<TouchableOpacity onPress={() => onDelete(item.id, resetAnimation)}>
+						<Ionicons name="trash-outline" size={18} color="#fff" />
+					</TouchableOpacity>
+				</Animated.View>
 			</View>
-			<GestureDetector gesture={gesture}>
+			<GestureDetector gesture={panGesture}>
 				<Animated.View style={[styles.notificationItem, animatedStyle]}>
 					<Text style={[styles.title, { color: colors.text }]}>
 						{item.title}
