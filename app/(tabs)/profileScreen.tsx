@@ -40,7 +40,8 @@ export default function ProfileScreen() {
 				setUserProfile(data.data);
 			}
 		} catch (error) {
-			console.error('Error fetching profile:', error);
+			// UNCOMMENT WHILE TESTING AXIOS
+			// console.error('Error fetching profile:', error);
 		}
 	};
 
