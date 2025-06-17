@@ -450,12 +450,11 @@ export default function BudgetScreen() {
 const styles = StyleSheet.create({
 	safeArea: {
 		flex: 1,
-		backgroundColor: '#f9fafb',
+		backgroundColor: '#fff',
 	},
 	mainContainer: {
 		flex: 1,
-		backgroundColor: '#f9fafb',
-		paddingHorizontal: 24,
+		backgroundColor: '#fff',
 	},
 	headerContainer: {
 		marginBottom: 24,
@@ -468,7 +467,9 @@ const styles = StyleSheet.create({
 		fontSize: 28,
 		fontWeight: '500',
 	},
-	listContent: {},
+	listContent: {
+		paddingHorizontal: 24,
+	},
 	card: {
 		width: CARD_WIDTH,
 		backgroundColor: '#ffffff',
@@ -478,8 +479,8 @@ const styles = StyleSheet.create({
 		// iOS shadow
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.05,
-		shadowRadius: 8,
+		shadowOpacity: 0.1,
+		shadowRadius: 4,
 		// Android shadow
 		elevation: 3,
 	},
