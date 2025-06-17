@@ -9,7 +9,7 @@ import {
 	Alert,
 } from 'react-native';
 import { useTheme } from '@react-navigation/native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
 	Gesture,
@@ -161,7 +161,6 @@ const NotificationItem = ({
 
 export default function NotificationsScreen() {
 	const { colors } = useTheme();
-	const router = useRouter();
 	const [notifications, setNotifications] =
 		useState<Notification[]>(mockNotifications);
 
@@ -218,7 +217,7 @@ export default function NotificationsScreen() {
 						</View>
 					)}
 				/>
-
+				{/* 
 				<Stack.Screen
 					options={{
 						headerShown: true,
@@ -232,7 +231,12 @@ export default function NotificationsScreen() {
 						headerTintColor: '#333',
 						headerBackTitle: 'Back',
 						headerShadowVisible: false,
-						headerBackButtonDisplayMode: 'minimal',
+					}}
+				/> */}
+				<Stack.Screen
+					options={{
+						headerShown: true,
+						title: 'Notifications',
 					}}
 				/>
 			</SafeAreaView>

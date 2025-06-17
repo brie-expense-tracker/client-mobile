@@ -16,7 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 export default function ProfileScreen() {
 	const router = useRouter();
 	const [profileImage, setProfileImage] = useState(
-		require('../../assets/images/profile.jpg')
+		require('../../../assets/images/profile.jpg')
 	);
 	const [userProfile, setUserProfile] = useState({
 		firstName: 'Max',
@@ -75,7 +75,7 @@ export default function ProfileScreen() {
 			<SafeAreaView>
 				{/* Header*/}
 				<View style={styles.headerContainer}>
-					<Text style={styles.headerText}>Profile</Text>
+					<Text style={styles.headerText}>Settings</Text>
 				</View>
 
 				{/* Profile picture and name */}
@@ -91,7 +91,7 @@ export default function ProfileScreen() {
 							onPress={pickImage}
 						>
 							<View style={styles.editIconBackground}>
-								<Ionicons name="pencil" size={16} color="#fff" />
+								<Ionicons name="camera" size={16} color="#fff" />
 							</View>
 						</TouchableOpacity>
 					</View>
@@ -120,7 +120,9 @@ export default function ProfileScreen() {
 				<View style={styles.settingsContainer}>
 					<TouchableOpacity
 						style={styles.settingItem}
-						onPress={() => router.push('/notifications')}
+						onPress={() =>
+							router.push('./settings/notification/notificationSettings')
+						}
 					>
 						<Ionicons name="notifications-outline" size={24} color="#555" />
 						<Text style={styles.settingText}>Notifications</Text>
@@ -184,16 +186,19 @@ const styles = StyleSheet.create({
 		fontWeight: '500',
 	},
 	profilePicWrapper: {
+		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 12,
+		paddingHorizontal: 24,
+		marginTop: 12,
+		gap: 16,
 	},
 	profilePicContainer: {
 		position: 'relative',
 	},
 	profilePic: {
-		width: 100,
-		height: 100,
-		borderRadius: 50,
+		width: 80,
+		height: 80,
+		borderRadius: 40,
 		borderWidth: 2,
 		borderColor: '#ddd',
 	},
@@ -204,9 +209,9 @@ const styles = StyleSheet.create({
 	},
 	editIconBackground: {
 		backgroundColor: '#0095FF',
-		width: 32,
-		height: 32,
-		borderRadius: 16,
+		width: 28,
+		height: 28,
+		borderRadius: 14,
 		justifyContent: 'center',
 		alignItems: 'center',
 		borderWidth: 2,
@@ -239,7 +244,7 @@ const styles = StyleSheet.create({
 	statValue: { fontSize: 20, fontWeight: 'bold' },
 	statLabel: { fontSize: 12, color: '#666', marginTop: 4 },
 	settingsContainer: {
-		marginTop: 20,
+		marginTop: 24,
 		paddingHorizontal: 16,
 	},
 	settingItem: {

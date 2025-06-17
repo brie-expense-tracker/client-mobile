@@ -1,19 +1,9 @@
-import React, { useState } from 'react';
-import {
-	View,
-	Text,
-	StyleSheet,
-	TouchableOpacity,
-	StatusBar,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useState, useContext, useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
-
-const dateFilterModes = [
-	{ label: 'Day', value: 'day', icon: 'calendar-outline' },
-	{ label: 'Month', value: 'month', icon: 'calendar' },
-];
+import { dateFilterModes, FilterContext } from './_layout';
+import { transactions as dummyTransactions } from '../../../data/transactions';
 
 export default function HistoryFilterScreen() {
 	const params = useLocalSearchParams<{
@@ -22,6 +12,9 @@ export default function HistoryFilterScreen() {
 		allCategories: string;
 	}>();
 
+	const { setSelectedCategories, setDateFilterMode } =
+		useContext(FilterContext);
+
 	// Initialize local state from params
 	const [localSelectedCategories, setLocalSelectedCategories] = useState<
 		string[]
@@ -29,9 +22,19 @@ export default function HistoryFilterScreen() {
 	const [localDateFilterMode, setLocalDateFilterMode] = useState<string>(
 		params?.dateFilterMode ?? 'month'
 	);
-	const availableCategories = params?.allCategories
-		? JSON.parse(params.allCategories)
-		: [];
+
+	// Derive available categories from transactions data
+	const availableCategories = useMemo(() => {
+		const categorySet = new Set<string>();
+		dummyTransactions.forEach((tx) => {
+			tx.category.forEach((cat) => {
+				if (typeof cat === 'string' && cat.trim()) {
+					categorySet.add(cat.trim());
+				}
+			});
+		});
+		return Array.from(categorySet).sort((a, b) => a.localeCompare(b));
+	}, []);
 
 	const handleCategorySelect = (category: string) => {
 		if (category === '') {
@@ -54,6 +57,8 @@ export default function HistoryFilterScreen() {
 	};
 
 	const handleBackPress = () => {
+		setSelectedCategories(localSelectedCategories);
+		setDateFilterMode(localDateFilterMode);
 		router.replace({
 			pathname: '/transaction',
 			params: {
@@ -147,6 +152,15 @@ export default function HistoryFilterScreen() {
 					)}
 				</View>
 			</View>
+			<Stack.Screen
+				options={{
+					headerLeft: () => (
+						<TouchableOpacity onPress={handleBackPress} style={{}}>
+							<Ionicons name="chevron-back" size={24} color="#212121" />
+						</TouchableOpacity>
+					),
+				}}
+			/>
 		</View>
 	);
 }

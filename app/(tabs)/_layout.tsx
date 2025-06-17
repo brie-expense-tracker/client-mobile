@@ -24,7 +24,6 @@ export default function TabLayout() {
 				},
 
 				tabBarLabelStyle: {
-					// fontWeight: 'bold',
 					fontSize: 16,
 					paddingBottom: 10,
 					paddingTop: 2,
@@ -35,6 +34,7 @@ export default function TabLayout() {
 					padding: 0,
 					margin: 0,
 				},
+				headerShown: false,
 			}}
 		>
 			<Tabs.Screen
@@ -43,18 +43,16 @@ export default function TabLayout() {
 					tabBarIcon: ({ color, size }) => (
 						<Ionicons name="home-outline" color={color} size={size} />
 					),
-					headerShown: false,
 					tabBarShowLabel: false,
 					tabBarLabel: 'Home',
 				}}
 			/>
 			<Tabs.Screen
-				name="transaction"
+				name="transactions"
 				options={{
 					tabBarIcon: ({ color, size }) => (
 						<Ionicons name="timer-outline" color={color} size={size} />
 					),
-					headerShown: false,
 					tabBarShowLabel: false,
 					tabBarLabel: 'History',
 				}}
@@ -76,7 +74,6 @@ export default function TabLayout() {
 							<Ionicons name="contract-outline" color="white" size={32} />
 						</View>
 					),
-					headerShown: false,
 					tabBarShowLabel: false,
 					tabBarLabel: 'Add',
 				}}
@@ -87,18 +84,16 @@ export default function TabLayout() {
 					tabBarIcon: ({ color, size }) => (
 						<Ionicons name="wallet-outline" color={color} size={size} />
 					),
-					headerShown: false,
 					tabBarShowLabel: false,
 					tabBarLabel: 'Chat',
 				}}
 			/>
 			<Tabs.Screen
-				name="profileScreen"
+				name="settings"
 				options={{
 					tabBarIcon: ({ color, size }) => (
-						<Ionicons name="person-outline" color={color} size={size} />
+						<Ionicons name="settings-outline" color={color} size={size} />
 					),
-					headerShown: false,
 					tabBarShowLabel: false,
 					tabBarLabel: 'Me',
 				}}
