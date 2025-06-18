@@ -217,26 +217,18 @@ export default function NotificationsScreen() {
 						</View>
 					)}
 				/>
-				{/* 
 				<Stack.Screen
 					options={{
-						headerShown: true,
 						title: 'Notifications',
-						headerRight: () => (
-							<TouchableOpacity onPress={handleClearAll}>
-								<Text style={{ color: colors.notification }}>Clear All</Text>
-							</TouchableOpacity>
-						),
+						// headerShadowVisible: false,
 						headerStyle: { backgroundColor: '#f9fafb' },
 						headerTintColor: '#333',
+						headerBackButtonDisplayMode: 'minimal',
 						headerBackTitle: 'Back',
-						headerShadowVisible: false,
-					}}
-				/> */}
-				<Stack.Screen
-					options={{
-						headerShown: true,
-						title: 'Notifications',
+						headerTitleStyle: {
+							fontSize: 24,
+							fontWeight: '500',
+						},
 					}}
 				/>
 			</SafeAreaView>

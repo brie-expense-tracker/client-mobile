@@ -6,11 +6,13 @@ export default function _layout() {
 		<Stack>
 			<Stack.Screen name="index" options={{ headerShown: false }} />
 			<Stack.Screen
-				name="notification/notificationSettings"
+				name="privacyandsecurity"
 				options={{
 					headerShown: true,
-					headerTitle: 'Notifications',
-					headerBackTitle: 'Settings',
+					headerBackButtonDisplayMode: 'minimal',
+					headerBackTitle: '',
+					headerTitle: 'Privacy & Security',
+					headerShadowVisible: false,
 				}}
 			/>
 		</Stack>
