@@ -378,7 +378,7 @@ export default function TransactionScreen() {
 
 	const handleFilterPress = () => {
 		router.push({
-			pathname: './transaction/historyFilter',
+			pathname: './transactions/historyFilter',
 			params: {
 				selectedCategory: JSON.stringify(selectedCategories),
 				dateFilterMode,
@@ -525,7 +525,7 @@ export default function TransactionScreen() {
 					{/* Header */}
 					<View style={styles.headerContainer}>
 						<View style={styles.headerTextContainer}>
-							<Text style={styles.headerText}>History</Text>
+							<Text style={styles.headerText}></Text>
 						</View>
 						<View style={styles.headerRight}>
 							<TouchableOpacity

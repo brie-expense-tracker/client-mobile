@@ -1,4 +1,3 @@
-// BudgetScreen.tsx
 import React, { useState } from 'react';
 import {
 	View,
@@ -349,7 +348,7 @@ export default function BudgetScreen() {
 					showsVerticalScrollIndicator={false}
 					ListHeaderComponent={() => (
 						<View style={styles.headerContainer}>
-							<Text style={styles.headerText}>Budgets</Text>
+							<Text style={styles.headerText}></Text>
 						</View>
 					)}
 				/>

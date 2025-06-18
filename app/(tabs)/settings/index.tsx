@@ -21,6 +21,7 @@ export default function ProfileScreen() {
 	const [userProfile, setUserProfile] = useState({
 		firstName: 'Max',
 		lastName: 'Mustermann',
+		username: 'maxmustermann',
 		monthlyIncome: 1000,
 		savings: 100,
 		debt: 100,
@@ -75,7 +76,7 @@ export default function ProfileScreen() {
 			<SafeAreaView>
 				{/* Header*/}
 				<View style={styles.headerContainer}>
-					<Text style={styles.headerText}>Settings</Text>
+					<Text style={styles.headerText}></Text>
 				</View>
 
 				{/* Profile picture and name */}
@@ -95,9 +96,11 @@ export default function ProfileScreen() {
 							</View>
 						</TouchableOpacity>
 					</View>
-					<Text style={styles.userName}>
-						{userProfile.firstName} {userProfile.lastName}
+					<Text style={styles.userName}>@{userProfile.username}</Text>
+					<Text style={styles.totalValue}>
+						${(userProfile?.monthlyIncome || 0).toLocaleString()}
 					</Text>
+					<Text style={styles.totalValueLabel}>Total Amount Inputted</Text>
 				</View>
 
 				{/* Stats cards */}
@@ -136,7 +139,7 @@ export default function ProfileScreen() {
 						<Text style={styles.settingText}>Fixed Expenses</Text>
 						<Ionicons name="chevron-forward" size={24} color="#555" />
 					</TouchableOpacity>
-					<TouchableOpacity
+					{/* <TouchableOpacity
 						style={styles.settingItem}
 						onPress={() => router.push('/screens/preferences')}
 					>
@@ -148,8 +151,13 @@ export default function ProfileScreen() {
 						<Ionicons name="color-palette-outline" size={24} color="#555" />
 						<Text style={styles.settingText}>Appearance</Text>
 						<Ionicons name="chevron-forward" size={24} color="#555" />
-					</TouchableOpacity>
-					<TouchableOpacity style={styles.settingItem}>
+					</TouchableOpacity> */}
+					<TouchableOpacity
+						style={styles.settingItem}
+						onPress={() => {
+							router.push('/settings/privacyandsecurity');
+						}}
+					>
 						<Ionicons name="shield-checkmark-outline" size={24} color="#555" />
 						<Text style={styles.settingText}>Privacy & Security</Text>
 						<Ionicons name="chevron-forward" size={24} color="#555" />
@@ -186,14 +194,13 @@ const styles = StyleSheet.create({
 		fontWeight: '500',
 	},
 	profilePicWrapper: {
-		flexDirection: 'row',
 		alignItems: 'center',
 		paddingHorizontal: 24,
 		marginTop: 12,
-		gap: 16,
 	},
 	profilePicContainer: {
 		position: 'relative',
+		marginBottom: 12,
 	},
 	profilePic: {
 		width: 80,
@@ -218,9 +225,20 @@ const styles = StyleSheet.create({
 		borderColor: '#fff',
 	},
 	userName: {
+		fontSize: 18,
+		fontWeight: '500',
+		color: '#666666',
+		marginBottom: 4,
+	},
+	totalValue: {
 		fontSize: 24,
 		fontWeight: '600',
 		color: '#222222',
+	},
+	totalValueLabel: {
+		fontSize: 14,
+		color: '#828282',
+		marginBottom: 4,
 	},
 	statsContainer: {
 		flexDirection: 'row',

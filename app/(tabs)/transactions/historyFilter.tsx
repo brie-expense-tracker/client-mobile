@@ -60,7 +60,7 @@ export default function HistoryFilterScreen() {
 		setSelectedCategories(localSelectedCategories);
 		setDateFilterMode(localDateFilterMode);
 		router.replace({
-			pathname: '/transaction',
+			pathname: '/transactions',
 			params: {
 				selectedCategory: JSON.stringify(localSelectedCategories),
 				dateFilterMode: localDateFilterMode,
