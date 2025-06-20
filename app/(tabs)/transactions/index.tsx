@@ -166,7 +166,7 @@ const TransactionRow = ({
 	const resetAnimation = () => {
 		translateX.value = 0;
 		hasTriggeredHaptic.value = false;
-		iconScale.value = withSpring(1, {
+		iconScale.value = withSpring(0, {
 			damping: 15,
 			stiffness: 150,
 		});

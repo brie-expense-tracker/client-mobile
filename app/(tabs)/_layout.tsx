@@ -85,7 +85,7 @@ export default function TabLayout() {
 						<Ionicons name="wallet-outline" color={color} size={size} />
 					),
 					tabBarShowLabel: false,
-					tabBarLabel: 'Chat',
+					tabBarLabel: 'Budgets',
 				}}
 			/>
 			<Tabs.Screen
@@ -95,7 +95,7 @@ export default function TabLayout() {
 						<Ionicons name="settings-outline" color={color} size={size} />
 					),
 					tabBarShowLabel: false,
-					tabBarLabel: 'Me',
+					tabBarLabel: 'Settings',
 				}}
 			/>
 		</Tabs>
