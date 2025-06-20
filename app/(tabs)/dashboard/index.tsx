@@ -493,7 +493,7 @@ const styles = StyleSheet.create({
 	},
 	headerText: {
 		color: '#212121',
-		fontSize: 28,
+		fontSize: 20,
 		fontWeight: '500',
 	},
 	notificationAlertButton: {

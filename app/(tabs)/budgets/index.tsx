@@ -338,108 +338,101 @@ export default function BudgetScreen() {
 	// Main Render
 	// ==========================================
 	return (
-		<SafeAreaView style={styles.safeArea}>
-			<View style={styles.mainContainer}>
-				<FlatList
-					data={budgets}
-					keyExtractor={(item) => item.id}
-					renderItem={renderItem}
-					contentContainerStyle={styles.listContent}
-					showsVerticalScrollIndicator={false}
-					ListHeaderComponent={() => (
-						<View style={styles.headerContainer}>
-							<Text style={styles.headerText}></Text>
-						</View>
-					)}
-				/>
+		<View style={styles.mainContainer}>
+			<FlatList
+				data={budgets}
+				keyExtractor={(item) => item.id}
+				renderItem={renderItem}
+				contentContainerStyle={styles.listContent}
+				showsVerticalScrollIndicator={false}
+			/>
 
-				{/* Add Budget Modal */}
-				<Modal
-					visible={isModalVisible}
-					transparent
-					animationType="fade"
-					onRequestClose={hideModal}
+			{/* Add Budget Modal */}
+			<Modal
+				visible={isModalVisible}
+				transparent
+				animationType="fade"
+				onRequestClose={hideModal}
+			>
+				<TouchableOpacity
+					style={styles.modalOverlay}
+					activeOpacity={1}
+					onPress={hideModal}
 				>
-					<TouchableOpacity
-						style={styles.modalOverlay}
-						activeOpacity={1}
-						onPress={hideModal}
+					<KeyboardAvoidingView
+						behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+						style={styles.modalContainer}
 					>
-						<KeyboardAvoidingView
-							behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-							style={styles.modalContainer}
+						<TouchableOpacity
+							activeOpacity={1}
+							onPress={(e) => e.stopPropagation()}
 						>
-							<TouchableOpacity
-								activeOpacity={1}
-								onPress={(e) => e.stopPropagation()}
+							<Animated.View
+								style={[
+									styles.modalContent,
+									{
+										transform: [
+											{
+												translateY: slideAnim.interpolate({
+													inputRange: [0, 1],
+													outputRange: [600, 0],
+												}),
+											},
+										],
+									},
+								]}
 							>
-								<Animated.View
-									style={[
-										styles.modalContent,
-										{
-											transform: [
-												{
-													translateY: slideAnim.interpolate({
-														inputRange: [0, 1],
-														outputRange: [600, 0],
-													}),
-												},
-											],
-										},
-									]}
-								>
-									<View style={styles.modalHeader}>
-										<Text style={styles.modalTitle}>Add New Budget</Text>
-										<TouchableOpacity onPress={hideModal}>
-											<Ionicons name="close" size={24} color="#757575" />
-										</TouchableOpacity>
-									</View>
-
-									<View style={styles.formGroup}>
-										<Text style={styles.label}>Category Name</Text>
-										<TextInput
-											style={styles.input}
-											value={newBudget.category}
-											onChangeText={(text) =>
-												setNewBudget({ ...newBudget, category: text })
-											}
-											placeholder="e.g., Groceries"
-											placeholderTextColor="#9E9E9E"
-										/>
-									</View>
-
-									<View style={styles.formGroup}>
-										<Text style={styles.label}>Budget Amount</Text>
-										<TextInput
-											style={styles.input}
-											value={newBudget.allocated}
-											onChangeText={(text) =>
-												setNewBudget({ ...newBudget, allocated: text })
-											}
-											placeholder="e.g., 500"
-											keyboardType="numeric"
-											placeholderTextColor="#9E9E9E"
-										/>
-									</View>
-
-									<ColorPicker />
-
-									<TouchableOpacity
-										style={[
-											styles.addButton,
-											{ backgroundColor: newBudget.color },
-										]}
-										onPress={handleAddBudget}
-									>
-										<Text style={styles.addButtonText}>Add Budget</Text>
+								<View style={styles.modalHeader}>
+									<Text style={styles.modalTitle}>Add New Budget</Text>
+									<TouchableOpacity onPress={hideModal}>
+										<Ionicons name="close" size={24} color="#757575" />
 									</TouchableOpacity>
-								</Animated.View>
-							</TouchableOpacity>
-						</KeyboardAvoidingView>
-					</TouchableOpacity>
-				</Modal>
-			</View>
-		</SafeAreaView>
+								</View>
+
+								<View style={styles.formGroup}>
+									<Text style={styles.label}>Category Name</Text>
+									<TextInput
+										style={styles.input}
+										value={newBudget.category}
+										onChangeText={(text) =>
+											setNewBudget({ ...newBudget, category: text })
+										}
+										placeholder="e.g., Groceries"
+										placeholderTextColor="#9E9E9E"
+									/>
+								</View>
+
+								<View style={styles.formGroup}>
+									<Text style={styles.label}>Budget Amount</Text>
+									<TextInput
+										style={styles.input}
+										value={newBudget.allocated}
+										onChangeText={(text) =>
+											setNewBudget({ ...newBudget, allocated: text })
+										}
+										placeholder="e.g., 500"
+										keyboardType="numeric"
+										placeholderTextColor="#9E9E9E"
+									/>
+								</View>
+
+								<ColorPicker />
+
+								<TouchableOpacity
+									style={[
+										styles.addButton,
+										{ backgroundColor: newBudget.color },
+									]}
+									onPress={handleAddBudget}
+								>
+									<Text style={styles.addButtonText}>Add Budget</Text>
+								</TouchableOpacity>
+							</Animated.View>
+						</TouchableOpacity>
+					</KeyboardAvoidingView>
+				</TouchableOpacity>
+			</Modal>
+		</View>
 	);
 }
 
@@ -447,34 +440,20 @@ export default function BudgetScreen() {
 // Styles
 // ==========================================
 const styles = StyleSheet.create({
-	safeArea: {
-		flex: 1,
-		backgroundColor: '#fff',
-	},
 	mainContainer: {
 		flex: 1,
 		backgroundColor: '#fff',
 	},
-	headerContainer: {
-		marginBottom: 24,
-	},
-	cardHeaderLeft: {
-		flex: 1,
-	},
-	headerText: {
-		color: '#212121',
-		fontSize: 28,
-		fontWeight: '500',
-	},
 	listContent: {
 		paddingHorizontal: 24,
+		marginTop: 8,
 	},
 	card: {
 		width: CARD_WIDTH,
 		backgroundColor: '#ffffff',
 		borderRadius: 16,
 		padding: CARD_PADDING,
-		marginBottom: 16,
+		marginVertical: 8,
 		// iOS shadow
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 2 },

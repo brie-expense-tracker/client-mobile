@@ -120,26 +120,35 @@ export default function ProfileScreen() {
 				</View>
 
 				{/* Settings List */}
-				<View style={styles.settingsContainer}>
-					<TouchableOpacity
-						style={styles.settingItem}
-						onPress={() =>
-							router.push('./settings/notification/notificationSettings')
-						}
-					>
-						<Ionicons name="notifications-outline" size={24} color="#555" />
-						<Text style={styles.settingText}>Notifications</Text>
-						<Ionicons name="chevron-forward" size={24} color="#555" />
-					</TouchableOpacity>
-					<TouchableOpacity
-						style={styles.settingItem}
-						onPress={() => router.push('/screens/fixedExpenses')}
-					>
-						<Ionicons name="cube-outline" size={24} color="#555" />
-						<Text style={styles.settingText}>Fixed Expenses</Text>
-						<Ionicons name="chevron-forward" size={24} color="#555" />
-					</TouchableOpacity>
-					{/* <TouchableOpacity
+				<View style={styles.settingsContainerWrapper}>
+					<View style={styles.settingsContainer}>
+						<TouchableOpacity
+							style={styles.settingItem}
+							onPress={() =>
+								router.push('./settings/notification/notificationSettings')
+							}
+						>
+							<Ionicons name="notifications-outline" size={24} color="#555" />
+							<Text style={styles.settingText}>Notifications</Text>
+							<Ionicons
+								name="chevron-forward"
+								size={18}
+								style={styles.chevronIcon}
+							/>
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={styles.settingItem}
+							onPress={() => router.push('/screens/fixedExpenses')}
+						>
+							<Ionicons name="cube-outline" size={24} color="#555" />
+							<Text style={styles.settingText}>Fixed Expenses</Text>
+							<Ionicons
+								name="chevron-forward"
+								size={18}
+								style={styles.chevronIcon}
+							/>
+						</TouchableOpacity>
+						{/* <TouchableOpacity
 						style={styles.settingItem}
 						onPress={() => router.push('/screens/preferences')}
 					>
@@ -152,21 +161,34 @@ export default function ProfileScreen() {
 						<Text style={styles.settingText}>Appearance</Text>
 						<Ionicons name="chevron-forward" size={24} color="#555" />
 					</TouchableOpacity> */}
-					<TouchableOpacity
-						style={styles.settingItem}
-						onPress={() => {
-							router.push('/settings/privacyandsecurity');
-						}}
-					>
-						<Ionicons name="shield-checkmark-outline" size={24} color="#555" />
-						<Text style={styles.settingText}>Privacy & Security</Text>
-						<Ionicons name="chevron-forward" size={24} color="#555" />
-					</TouchableOpacity>
-					<TouchableOpacity style={styles.settingItem}>
-						<Ionicons name="chatbox-ellipses-outline" size={24} color="#555" />
-						<Text style={styles.settingText}>Ai Chat</Text>
-						<Text style={{ color: '#717171' }}>Coming Soon</Text>
-					</TouchableOpacity>
+						<TouchableOpacity
+							style={styles.settingItem}
+							onPress={() => {
+								router.push('/settings/privacyandsecurity');
+							}}
+						>
+							<Ionicons
+								name="shield-checkmark-outline"
+								size={24}
+								color="#555"
+							/>
+							<Text style={styles.settingText}>Privacy & Security</Text>
+							<Ionicons
+								name="chevron-forward"
+								size={18}
+								style={styles.chevronIcon}
+							/>
+						</TouchableOpacity>
+						<TouchableOpacity style={styles.settingItem}>
+							<Ionicons
+								name="chatbox-ellipses-outline"
+								size={24}
+								color="#555"
+							/>
+							<Text style={styles.settingText}>Ai Chat</Text>
+							<Text style={styles.chevronIcon}>Coming Soon</Text>
+						</TouchableOpacity>
+					</View>
 				</View>
 			</SafeAreaView>
 		</View>
@@ -176,7 +198,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
 	mainContainer: {
 		flex: 1,
-		backgroundColor: '#fff',
+		backgroundColor: '#f7f7f7',
 	},
 	gradient: {
 		borderBottomLeftRadius: 0,
@@ -261,17 +283,25 @@ const styles = StyleSheet.create({
 	},
 	statValue: { fontSize: 20, fontWeight: 'bold' },
 	statLabel: { fontSize: 12, color: '#666', marginTop: 4 },
-	settingsContainer: {
+	settingsContainerWrapper: {
 		marginTop: 24,
-		paddingHorizontal: 16,
+		padding: 16,
+		borderRadius: 12,
+	},
+	settingsContainer: {
+		backgroundColor: '#ffffff',
+		borderRadius: 12,
 	},
 	settingItem: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		backgroundColor: '#fff',
 		padding: 16,
-		marginBottom: 12,
 		elevation: 2,
+		borderBottomWidth: 1,
+		borderBottomColor: '#efefef',
+	},
+	chevronIcon: {
+		color: '#BEBEBE',
 	},
 	settingText: {
 		flex: 1,
