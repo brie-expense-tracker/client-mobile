@@ -2,22 +2,49 @@ import {
 	View,
 	Text,
 	Pressable,
-	ImageBackground,
 	TextInput,
 	Alert,
 	StyleSheet,
 	Image,
-	Platform,
 	SafeAreaView,
 } from 'react-native';
 import React, { useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Link, router, Stack } from 'expo-router';
+import { Link, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import {
+	getAuth,
+	createUserWithEmailAndPassword,
+} from '@react-native-firebase/auth';
 
 export default function Signup() {
 	const [email, setEmail] = useState('');
 	const [password, setPassword] = useState('');
+	const [isLoading, setIsLoading] = useState(false);
+
+	// const signUp = async () => {
+	// 	setIsLoading(true);
+	// 	try {
+	// 		await auth().createUserWithEmailAndPassword(email, password);
+	// 	} catch (error) {
+	// 		console.log(error);
+	// 		Alert.alert('Error', 'Please fill in all fields.');
+	// 	} finally {
+	// 		setIsLoading(false);
+	// 	}
+	// };
+
+	// const signIn = async () => {
+	// 	setIsLoading(true);
+	// 	try {
+	// 		await auth().signInWithEmailAndPassword(email, password);
+	// 	} catch (error) {
+	// 		console.log(error);
+	// 		Alert.alert('Error', 'Please fill in all fields.');
+	// 	} finally {
+	// 		setIsLoading(false);
+	// 	}
+	// };
 
 	// Email validator function
 	const isValidEmail = (email: string) => {
@@ -30,7 +57,7 @@ export default function Signup() {
 		return password.length >= 6; // Minimum 6 characters for this example
 	};
 
-	const handleSignup = () => {
+	const handleSignup = async () => {
 		if (!email || !password) {
 			Alert.alert('Error', 'Please fill in all fields.');
 			return;
@@ -47,12 +74,26 @@ export default function Signup() {
 		}
 
 		// Fake signup logic
-		if (email === 'user@email.com' && password === 'Password123') {
+		// if (email === 'user@email.com' && password === 'Password123') {
+		// 	Alert.alert('Success', `Account created for ${email}`);
+		// 	console.log('201: Successfully created User.');
+		// 	router.replace('/onboardingThree');
+		// } else {
+		// 	Alert.alert('Error', 'Email already in use or invalid password.');
+		// }
+		// setIsLoading(true);
+
+		// Real signup logic
+		try {
+			// await auth().createUserWithEmailAndPassword(email, password);
 			Alert.alert('Success', `Account created for ${email}`);
 			console.log('201: Successfully created User.');
-			router.replace('/onboardingThree');
-		} else {
-			Alert.alert('Error', 'Email already in use or invalid password.');
+			createUserWithEmailAndPassword(getAuth(), email, password);
+		} catch (error) {
+			console.log(error);
+			Alert.alert('Error', 'Please fill in all fields.');
+		} finally {
+			setIsLoading(false);
 		}
 	};
 

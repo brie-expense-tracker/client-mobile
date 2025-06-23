@@ -7,11 +7,14 @@ import {
 	StyleSheet,
 	TouchableOpacity,
 	Alert,
+	ScrollView,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { getAuth, signOut } from '@react-native-firebase/auth';
+import { OnboardingService } from '../../../services/onboardingService';
 
 export default function ProfileScreen() {
 	const router = useRouter();
@@ -71,84 +74,108 @@ export default function ProfileScreen() {
 		}
 	};
 
+	const handleSignOut = async () => {
+		Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+			{
+				text: 'Cancel',
+				style: 'cancel',
+			},
+			{
+				text: 'Sign Out',
+				style: 'destructive',
+				onPress: async () => {
+					try {
+						// Sign out from Firebase
+						signOut(getAuth());
+						Alert.alert('Signed Out', 'You have been signed out.');
+					} catch (error) {
+						console.error('Error signing out:', error);
+						Alert.alert('Error', 'Failed to sign out. Please try again.');
+					}
+				},
+			},
+		]);
+	};
+
 	return (
 		<View style={styles.mainContainer}>
-			<SafeAreaView>
-				{/* Header*/}
-				<View style={styles.headerContainer}>
-					<Text style={styles.headerText}></Text>
-				</View>
-
-				{/* Profile picture and name */}
-				<View style={styles.profilePicWrapper}>
-					<View style={styles.profilePicContainer}>
-						<Image
-							source={profileImage}
-							style={styles.profilePic}
-							contentFit="cover"
-						/>
-						<TouchableOpacity
-							style={styles.editIconContainer}
-							onPress={pickImage}
-						>
-							<View style={styles.editIconBackground}>
-								<Ionicons name="camera" size={16} color="#fff" />
-							</View>
-						</TouchableOpacity>
-					</View>
-					<Text style={styles.userName}>@{userProfile.username}</Text>
-					<Text style={styles.totalValue}>
-						${(userProfile?.monthlyIncome || 0).toLocaleString()}
-					</Text>
-					<Text style={styles.totalValueLabel}>Total Amount Inputted</Text>
-				</View>
-
-				{/* Stats cards */}
-				<View style={styles.statsContainer}>
-					<View style={styles.statCard}>
-						<Text style={styles.statValue}>
-							${(userProfile?.savings || 0).toLocaleString()}
-						</Text>
-						<Text style={styles.statLabel}>Total Savings</Text>
-					</View>
-					<View style={styles.statCard}>
-						<Text style={styles.statValue}>
-							${(userProfile?.debt || 0).toLocaleString()}
-						</Text>
-						<Text style={styles.statLabel}>Total Debt</Text>
-					</View>
-				</View>
-
-				{/* Settings List */}
-				<View style={styles.settingsContainerWrapper}>
-					<View style={styles.settingsContainer}>
-						<TouchableOpacity
-							style={styles.settingItem}
-							onPress={() =>
-								router.push('./settings/notification/notificationSettings')
-							}
-						>
-							<Ionicons name="notifications-outline" size={24} color="#555" />
-							<Text style={styles.settingText}>Notifications</Text>
-							<Ionicons
-								name="chevron-forward"
-								size={18}
-								style={styles.chevronIcon}
+			<ScrollView>
+				<SafeAreaView style={styles.safeArea}>
+					{/* Profile picture and name */}
+					<View style={styles.profilePicWrapper}>
+						<View style={styles.profilePicContainer}>
+							<Image
+								source={profileImage}
+								style={styles.profilePic}
+								contentFit="cover"
 							/>
-						</TouchableOpacity>
-						<TouchableOpacity
-							style={styles.settingItem}
-							onPress={() => router.push('/screens/fixedExpenses')}
-						>
-							<Ionicons name="cube-outline" size={24} color="#555" />
-							<Text style={styles.settingText}>Fixed Expenses</Text>
-							<Ionicons
-								name="chevron-forward"
-								size={18}
-								style={styles.chevronIcon}
-							/>
-						</TouchableOpacity>
-						{/* <TouchableOpacity
+						</View>
+						<Text style={styles.userName}>@{userProfile.username}</Text>
+						<Text style={styles.totalValue}>
+							${(userProfile?.monthlyIncome || 0).toLocaleString()}
+						</Text>
+						<Text style={styles.totalValueLabel}>Total Amount Inputted</Text>
+					</View>
+
+					{/* Stats cards */}
+					<View style={styles.statsContainer}>
+						<View style={styles.statCard}>
+							<Text style={styles.statValue}>
+								${(userProfile?.savings || 0).toLocaleString()}
+							</Text>
+							<Text style={styles.statLabel}>Total Savings</Text>
+						</View>
+						<View style={styles.statCard}>
+							<Text style={styles.statValue}>
+								${(userProfile?.debt || 0).toLocaleString()}
+							</Text>
+							<Text style={styles.statLabel}>Total Debt</Text>
+						</View>
+					</View>
+
+					{/* Settings List */}
+					<View style={styles.settingsContainerWrapper}>
+						<View style={styles.settingsContainer}>
+							<TouchableOpacity
+								style={styles.settingItem}
+								onPress={() => router.push('./settings/account')}
+							>
+								<Ionicons name="person-outline" size={24} color="#555" />
+								<Text style={styles.settingText}>Account</Text>
+								<Ionicons
+									name="chevron-forward"
+									size={18}
+									style={styles.chevronIcon}
+								/>
+							</TouchableOpacity>
+							<TouchableOpacity
+								style={styles.settingItem}
+								onPress={() =>
+									router.push('./settings/notification/notificationSettings')
+								}
+							>
+								<Ionicons name="notifications-outline" size={24} color="#555" />
+								<Text style={styles.settingText}>Notifications</Text>
+								<Ionicons
+									name="chevron-forward"
+									size={18}
+									style={styles.chevronIcon}
+								/>
+							</TouchableOpacity>
+							{/* <TouchableOpacity
+								style={styles.settingItem}
+								onPress={() => router.push('/screens/fixedExpenses')}
+							>
+								<Ionicons name="cube-outline" size={24} color="#555" />
+								<Text style={styles.settingText}>Fixed Expenses</Text>
+								<Ionicons
+									name="chevron-forward"
+									size={18}
+									style={styles.chevronIcon}
+								/>
+							</TouchableOpacity> */}
+
+							{/* <TouchableOpacity
 						style={styles.settingItem}
 						onPress={() => router.push('/screens/preferences')}
 					>
@@ -161,36 +188,76 @@ export default function ProfileScreen() {
 						<Text style={styles.settingText}>Appearance</Text>
 						<Ionicons name="chevron-forward" size={24} color="#555" />
 					</TouchableOpacity> */}
+							<TouchableOpacity
+								style={styles.settingItem}
+								onPress={() => {
+									router.push('/settings/privacyandsecurity');
+								}}
+							>
+								<Ionicons
+									name="shield-checkmark-outline"
+									size={24}
+									color="#555"
+								/>
+								<Text style={styles.settingText}>Privacy & Security</Text>
+								<Ionicons
+									name="chevron-forward"
+									size={18}
+									style={styles.chevronIcon}
+								/>
+							</TouchableOpacity>
+							<TouchableOpacity
+								style={styles.settingItem}
+								onPress={() => router.push('./settings/help')}
+							>
+								<Ionicons name="help-circle-outline" size={24} color="#555" />
+								<Text style={styles.settingText}>Help & Support</Text>
+								<Ionicons
+									name="chevron-forward"
+									size={18}
+									style={styles.chevronIcon}
+								/>
+							</TouchableOpacity>
+							<TouchableOpacity
+								style={styles.settingItem}
+								onPress={() => router.push('./settings/about')}
+							>
+								<Ionicons
+									name="information-circle-outline"
+									size={24}
+									color="#555"
+								/>
+								<Text style={styles.settingText}>About</Text>
+								<Ionicons
+									name="chevron-forward"
+									size={18}
+									style={styles.chevronIcon}
+								/>
+							</TouchableOpacity>
+							<TouchableOpacity style={styles.settingItem}>
+								<Ionicons
+									name="chatbox-ellipses-outline"
+									size={24}
+									color="#555"
+								/>
+								<Text style={styles.settingText}>Ai Chat</Text>
+								<Text style={styles.chevronIcon}>Coming Soon</Text>
+							</TouchableOpacity>
+						</View>
+					</View>
+
+					{/* Sign Out Button */}
+					<View style={styles.signOutContainer}>
 						<TouchableOpacity
-							style={styles.settingItem}
-							onPress={() => {
-								router.push('/settings/privacyandsecurity');
-							}}
+							style={styles.signOutButton}
+							onPress={handleSignOut}
 						>
-							<Ionicons
-								name="shield-checkmark-outline"
-								size={24}
-								color="#555"
-							/>
-							<Text style={styles.settingText}>Privacy & Security</Text>
-							<Ionicons
-								name="chevron-forward"
-								size={18}
-								style={styles.chevronIcon}
-							/>
-						</TouchableOpacity>
-						<TouchableOpacity style={styles.settingItem}>
-							<Ionicons
-								name="chatbox-ellipses-outline"
-								size={24}
-								color="#555"
-							/>
-							<Text style={styles.settingText}>Ai Chat</Text>
-							<Text style={styles.chevronIcon}>Coming Soon</Text>
+							<Ionicons name="log-out-outline" size={24} color="#FF3B30" />
+							<Text style={styles.signOutText}>Sign Out</Text>
 						</TouchableOpacity>
 					</View>
-				</View>
-			</SafeAreaView>
+				</SafeAreaView>
+			</ScrollView>
 		</View>
 	);
 }
@@ -198,11 +265,10 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
 	mainContainer: {
 		flex: 1,
-		backgroundColor: '#f7f7f7',
+		backgroundColor: '#fff',
 	},
-	gradient: {
-		borderBottomLeftRadius: 0,
-		borderBottomRightRadius: 0,
+	safeArea: {
+		flex: 1,
 	},
 	headerContainer: {
 		flexDirection: 'row',
@@ -317,5 +383,30 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		color: '#666',
 		marginRight: 8,
+	},
+	signOutContainer: {
+		marginTop: 'auto',
+		padding: 16,
+	},
+	signOutButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#fff',
+		padding: 16,
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#FF3B30',
+		elevation: 2,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.1,
+		shadowRadius: 3.84,
+	},
+	signOutText: {
+		marginLeft: 8,
+		fontSize: 16,
+		fontWeight: '500',
+		color: '#FF3B30',
 	},
 });
