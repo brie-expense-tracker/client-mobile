@@ -15,6 +15,7 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { useOnboarding } from '../../context/OnboardingContext';
 
 type RootStackParamList = {
 	Home: undefined;
@@ -53,7 +54,9 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 	const flatListRef = useRef<FlatList>(null);
 	const [currentIndex, setCurrentIndex] = useState(0);
 
-	const handleSubmit = () => {
+	const { markOnboardingComplete } = useOnboarding();
+
+	const handleSubmit = async () => {
 		const profileData = {
 			firstName,
 			lastName,
@@ -79,11 +82,39 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 				},
 			},
 		};
-		fetch('http://localhost:3000/api/profile/', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(profileData),
-		}).then(() => router.replace('/dashboard'));
+
+		try {
+			await fetch('http://localhost:3000/api/profile/', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(profileData),
+			});
+
+			// Mark onboarding as complete and navigate to main app
+			await markOnboardingComplete();
+			router.replace('/(tabs)/dashboard');
+		} catch (error) {
+			console.error('Error submitting profile:', error);
+			// Even if profile submission fails, mark onboarding as complete
+			try {
+				await markOnboardingComplete();
+				router.replace('/(tabs)/dashboard');
+			} catch (onboardingError) {
+				console.error('Error marking onboarding complete:', onboardingError);
+				router.replace('/(tabs)/dashboard');
+			}
+		}
+	};
+
+	const handleSkip = async () => {
+		try {
+			await markOnboardingComplete();
+			router.replace('/(tabs)/dashboard');
+		} catch (error) {
+			console.error('Error skipping onboarding:', error);
+			// Even if there's an error, try to navigate to dashboard
+			router.replace('/(tabs)/dashboard');
+		}
 	};
 
 	const renderItem = ({ item, index }: { item: any; index: number }) => {
@@ -416,10 +447,7 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 						source={require('../../assets/images/brie-logos.png')}
 					/>
 				</View>
-				<Pressable
-					onPress={() => router.replace('/dashboard')}
-					style={styles.skipButton}
-				>
+				<Pressable onPress={handleSkip} style={styles.skipButton}>
 					<Text style={styles.skipButtonText}>Skip</Text>
 				</Pressable>
 			</View>

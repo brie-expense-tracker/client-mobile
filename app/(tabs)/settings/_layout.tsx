@@ -110,6 +110,24 @@ export default function _layout() {
 				}}
 			/>
 			<Stack.Screen
+				name="account/index"
+				options={{
+					headerShown: false,
+				}}
+			/>
+			<Stack.Screen
+				name="about/index"
+				options={{
+					headerShown: false,
+				}}
+			/>
+			<Stack.Screen
+				name="help/index"
+				options={{
+					headerShown: false,
+				}}
+			/>
+			<Stack.Screen
 				name="notification/notificationSettings"
 				options={{
 					title: 'Notification Settings',

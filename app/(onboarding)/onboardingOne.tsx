@@ -1,7 +1,7 @@
 import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import React from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Link, Stack } from 'expo-router';
+import { Link, Stack, router } from 'expo-router';
 
 export default function OnboardingOne() {
 	return (
@@ -18,21 +18,22 @@ export default function OnboardingOne() {
 					</Text>
 				</View>
 				<View style={styles.buttonContainer}>
-					<Link replace asChild href={'../signup-test'}>
-						<Pressable style={styles.button}>
-							<LinearGradient
-								colors={['#0095FF', '#008cff']}
-								style={styles.gradient}
-							>
-								<Text style={styles.buttonText}>Create Account</Text>
-							</LinearGradient>
-						</Pressable>
-					</Link>
+					<Pressable
+						style={styles.button}
+						onPress={() => router.push('/(onboarding)/onboardingTwo')}
+					>
+						<LinearGradient
+							colors={['#0095FF', '#008cff']}
+							style={styles.gradient}
+						>
+							<Text style={styles.buttonText}>Get Started</Text>
+						</LinearGradient>
+					</Pressable>
 				</View>
 
 				<View style={styles.loginContainer}>
 					<Text style={styles.loginText}>Already have account?</Text>
-					<Link replace href={'/login-test'}>
+					<Link replace href={'/(auth)/login-test'}>
 						<Text style={styles.loginLink}>Log In</Text>
 					</Link>
 				</View>

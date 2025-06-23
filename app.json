@@ -7,31 +7,39 @@
 		"scheme": "myapp",
 		"userInterfaceStyle": "automatic",
 		"newArchEnabled": true,
-		"icon": "./assets/images/brie-logo.png",
 		"ios": {
 			"supportsTablet": true,
-			"bundleIdentifier": "com.xamata.brie",
+			"bundleIdentifier": "com.brie.mobile",
+			"googleServicesFile": "./GoogleService-Info.plist",
 			"infoPlist": {
 				"ITSAppUsesNonExemptEncryption": false
 			}
 		},
 		"android": {
-			"adaptiveIcon": {
-				"foregroundImage": "./assets/images/brie-logo.png",
-				"backgroundColor": "#ffffff"
-			},
-			"package": "com.xamata.brie"
+			"package": "com.brie.mobile",
+			"googleServicesFile": "./google-services.json"
 		},
 		"web": {
 			"bundler": "metro",
-			"output": "static",
-			"favicon": "./assets/images/brie-logo.png"
+			"output": "static"
 		},
 		"plugins": [
+			"expo-router",
+			[
+				"expo-build-properties",
+				{
+					"ios": {
+						"useFrameworks": "static"
+					},
+					"android": {
+						"compileSdkVersion": 34,
+						"targetSdkVersion": 34,
+						"buildToolsVersion": "34.0.0"
+					}
+				}
+			],
 			"@react-native-firebase/app",
-			"@react-native-firebase/auth",
-			"@react-native-firebase/crashlytics",
-			"expo-router"
+			"@react-native-firebase/auth"
 		],
 		"experiments": {
 			"typedRoutes": true
