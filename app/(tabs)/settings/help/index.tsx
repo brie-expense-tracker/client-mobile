@@ -6,7 +6,6 @@ import {
 	TouchableOpacity,
 	ScrollView,
 	Linking,
-	Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -90,154 +89,140 @@ export default function HelpScreen() {
 	};
 
 	return (
-		<View style={styles.mainContainer}>
-			<ScrollView
-				style={styles.scrollView}
-				showsVerticalScrollIndicator={false}
-			>
-				{/* Header */}
-				<View style={styles.headerContainer}>
+		<ScrollView
+			style={styles.scrollView}
+			showsVerticalScrollIndicator={false}
+			contentContainerStyle={styles.scrollContent}
+			contentInsetAdjustmentBehavior="automatic"
+		>
+			{/* Quick Actions */}
+			<View style={styles.section}>
+				<Text style={styles.sectionTitle}>Quick Actions</Text>
+				<View style={styles.quickActionsContainer}>
 					<TouchableOpacity
-						style={styles.backButton}
-						onPress={() => router.back()}
+						style={styles.quickActionCard}
+						onPress={handleEmailSupport}
 					>
-						<Ionicons name="arrow-back" size={24} color="#333" />
+						<Ionicons name="mail-outline" size={32} color="#0095FF" />
+						<Text style={styles.quickActionText}>Email Support</Text>
 					</TouchableOpacity>
-					<Text style={styles.headerText}>Help & Support</Text>
-					<View style={styles.placeholder} />
+
+					<TouchableOpacity
+						style={styles.quickActionCard}
+						onPress={handleOpenWebsite}
+					>
+						<Ionicons name="globe-outline" size={32} color="#0095FF" />
+						<Text style={styles.quickActionText}>Visit Website</Text>
+					</TouchableOpacity>
+
+					<TouchableOpacity
+						style={styles.quickActionCard}
+						onPress={handleCallSupport}
+					>
+						<Ionicons name="call-outline" size={32} color="#0095FF" />
+						<Text style={styles.quickActionText}>Call Support</Text>
+					</TouchableOpacity>
 				</View>
+			</View>
 
-				{/* Quick Actions */}
-				<View style={styles.section}>
-					<Text style={styles.sectionTitle}>Quick Actions</Text>
-					<View style={styles.quickActionsContainer}>
-						<TouchableOpacity
-							style={styles.quickActionCard}
-							onPress={handleEmailSupport}
-						>
-							<Ionicons name="mail-outline" size={32} color="#0095FF" />
-							<Text style={styles.quickActionText}>Email Support</Text>
-						</TouchableOpacity>
-
-						<TouchableOpacity
-							style={styles.quickActionCard}
-							onPress={handleOpenWebsite}
-						>
-							<Ionicons name="globe-outline" size={32} color="#0095FF" />
-							<Text style={styles.quickActionText}>Visit Website</Text>
-						</TouchableOpacity>
-
-						<TouchableOpacity
-							style={styles.quickActionCard}
-							onPress={handleCallSupport}
-						>
-							<Ionicons name="call-outline" size={32} color="#0095FF" />
-							<Text style={styles.quickActionText}>Call Support</Text>
-						</TouchableOpacity>
+			{/* Contact Information */}
+			<View style={styles.section}>
+				<Text style={styles.sectionTitle}>Contact Information</Text>
+				<View style={styles.settingsContainer}>
+					<View style={styles.settingItem}>
+						<Ionicons name="mail-outline" size={24} color="#555" />
+						<View style={styles.settingContent}>
+							<Text style={styles.settingText}>Email</Text>
+							<Text style={styles.settingValue}>{supportInfo.email}</Text>
+						</View>
 					</View>
-				</View>
 
-				{/* Contact Information */}
-				<View style={styles.section}>
-					<Text style={styles.sectionTitle}>Contact Information</Text>
-					<View style={styles.settingsContainer}>
-						<View style={styles.settingItem}>
-							<Ionicons name="mail-outline" size={24} color="#555" />
-							<View style={styles.settingContent}>
-								<Text style={styles.settingText}>Email</Text>
-								<Text style={styles.settingValue}>{supportInfo.email}</Text>
-							</View>
+					<View style={styles.settingItem}>
+						<Ionicons name="call-outline" size={24} color="#555" />
+						<View style={styles.settingContent}>
+							<Text style={styles.settingText}>Phone</Text>
+							<Text style={styles.settingValue}>{supportInfo.phone}</Text>
 						</View>
+					</View>
 
-						<View style={styles.settingItem}>
-							<Ionicons name="call-outline" size={24} color="#555" />
-							<View style={styles.settingContent}>
-								<Text style={styles.settingText}>Phone</Text>
-								<Text style={styles.settingValue}>{supportInfo.phone}</Text>
-							</View>
-						</View>
-
-						<View style={styles.settingItem}>
-							<Ionicons name="time-outline" size={24} color="#555" />
-							<View style={styles.settingContent}>
-								<Text style={styles.settingText}>Support Hours</Text>
-								<Text style={styles.settingValue}>{supportInfo.hours}</Text>
-							</View>
+					<View style={styles.settingItem}>
+						<Ionicons name="time-outline" size={24} color="#555" />
+						<View style={styles.settingContent}>
+							<Text style={styles.settingText}>Support Hours</Text>
+							<Text style={styles.settingValue}>{supportInfo.hours}</Text>
 						</View>
 					</View>
 				</View>
+			</View>
 
-				{/* FAQ Section */}
-				<View style={styles.section}>
-					<Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
-					<View style={styles.settingsContainer}>
-						{faqData.map((faq) => (
-							<TouchableOpacity
-								key={faq.id}
-								style={styles.faqItem}
-								onPress={() => toggleFAQ(faq.id)}
-							>
-								<View style={styles.faqHeader}>
-									<Text style={styles.faqQuestion}>{faq.question}</Text>
-									<Ionicons
-										name={
-											expandedFAQ === faq.id ? 'chevron-up' : 'chevron-down'
-										}
-										size={20}
-										color="#BEBEBE"
-									/>
-								</View>
-								{expandedFAQ === faq.id && (
-									<Text style={styles.faqAnswer}>{faq.answer}</Text>
-								)}
-							</TouchableOpacity>
-						))}
-					</View>
+			{/* FAQ Section */}
+			<View style={styles.section}>
+				<Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
+				<View style={styles.settingsContainer}>
+					{faqData.map((faq) => (
+						<TouchableOpacity
+							key={faq.id}
+							style={styles.faqItem}
+							onPress={() => toggleFAQ(faq.id)}
+						>
+							<View style={styles.faqHeader}>
+								<Text style={styles.faqQuestion}>{faq.question}</Text>
+								<Ionicons
+									name={expandedFAQ === faq.id ? 'chevron-up' : 'chevron-down'}
+									size={20}
+									color="#BEBEBE"
+								/>
+							</View>
+							{expandedFAQ === faq.id && (
+								<Text style={styles.faqAnswer}>{faq.answer}</Text>
+							)}
+						</TouchableOpacity>
+					))}
 				</View>
+			</View>
 
-				{/* Troubleshooting */}
-				<View style={styles.section}>
-					<Text style={styles.sectionTitle}>Troubleshooting</Text>
-					<View style={styles.settingsContainer}>
-						<TouchableOpacity style={styles.settingItem}>
-							<Ionicons name="refresh-outline" size={24} color="#555" />
-							<Text style={styles.settingText}>Reset App Data</Text>
-							<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
-						</TouchableOpacity>
+			{/* Troubleshooting */}
+			<View style={styles.section}>
+				<Text style={styles.sectionTitle}>Troubleshooting</Text>
+				<View style={styles.settingsContainer}>
+					<TouchableOpacity style={styles.settingItem}>
+						<Ionicons name="refresh-outline" size={24} color="#555" />
+						<Text style={styles.settingText}>Reset App Data</Text>
+						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
+					</TouchableOpacity>
 
-						<TouchableOpacity style={styles.settingItem}>
-							<Ionicons name="sync-outline" size={24} color="#555" />
-							<Text style={styles.settingText}>Sync Data</Text>
-							<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
-						</TouchableOpacity>
+					<TouchableOpacity style={styles.settingItem}>
+						<Ionicons name="sync-outline" size={24} color="#555" />
+						<Text style={styles.settingText}>Sync Data</Text>
+						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
+					</TouchableOpacity>
 
-						<TouchableOpacity style={styles.settingItem}>
-							<Ionicons name="bug-outline" size={24} color="#555" />
-							<Text style={styles.settingText}>Report a Bug</Text>
-							<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
-						</TouchableOpacity>
-					</View>
+					<TouchableOpacity style={styles.settingItem}>
+						<Ionicons name="bug-outline" size={24} color="#555" />
+						<Text style={styles.settingText}>Report a Bug</Text>
+						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
+					</TouchableOpacity>
 				</View>
+			</View>
 
-				{/* Feedback */}
-				<View style={styles.section}>
-					<Text style={styles.sectionTitle}>Feedback</Text>
-					<View style={styles.settingsContainer}>
-						<TouchableOpacity style={styles.settingItem}>
-							<Ionicons name="star-outline" size={24} color="#555" />
-							<Text style={styles.settingText}>Rate the App</Text>
-							<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
-						</TouchableOpacity>
+			{/* Feedback */}
+			<View style={styles.section}>
+				<Text style={styles.sectionTitle}>Feedback</Text>
+				<View style={styles.settingsContainer}>
+					<TouchableOpacity style={styles.settingItem}>
+						<Ionicons name="star-outline" size={24} color="#555" />
+						<Text style={styles.settingText}>Rate the App</Text>
+						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
+					</TouchableOpacity>
 
-						<TouchableOpacity style={styles.settingItem}>
-							<Ionicons name="chatbubble-outline" size={24} color="#555" />
-							<Text style={styles.settingText}>Send Feedback</Text>
-							<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
-						</TouchableOpacity>
-					</View>
+					<TouchableOpacity style={styles.settingItem}>
+						<Ionicons name="chatbubble-outline" size={24} color="#555" />
+						<Text style={styles.settingText}>Send Feedback</Text>
+						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
+					</TouchableOpacity>
 				</View>
-			</ScrollView>
-		</View>
+			</View>
+		</ScrollView>
 	);
 }
 
@@ -245,23 +230,31 @@ const styles = StyleSheet.create({
 	mainContainer: {
 		flex: 1,
 		backgroundColor: '#ffffff',
+		borderTopWidth: 1,
+		borderTopColor: '#efefef',
 	},
-	scrollView: {
-		flex: 1,
-	},
-	headerContainer: {
+	stickyHeader: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
-		paddingHorizontal: 24,
+		paddingHorizontal: 16,
 		paddingVertical: 16,
 		backgroundColor: '#fff',
 		borderBottomWidth: 1,
 		borderBottomColor: '#efefef',
-		marginTop: 50,
+		// marginTop: 50,
+		zIndex: 1000,
+	},
+	scrollView: {
+		flex: 1,
+		backgroundColor: '#ffffff',
+	},
+	scrollContent: {
+		paddingBottom: 20,
 	},
 	backButton: {
-		padding: 4,
+		width: 50,
+		alignItems: 'flex-start',
 	},
 	headerText: {
 		fontSize: 20,
@@ -269,7 +262,8 @@ const styles = StyleSheet.create({
 		color: '#333',
 	},
 	placeholder: {
-		width: 32,
+		width: 50,
+		alignItems: 'flex-end',
 	},
 	section: {
 		marginTop: 24,

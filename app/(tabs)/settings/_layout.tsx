@@ -20,12 +20,17 @@ export default function _layout() {
 					headerStyle: {
 						backgroundColor: '#ffffff',
 					},
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
 					headerLeft: () => (
 						<TouchableOpacity
 							onPress={() => router.back()}
 							style={{ width: 50 }}
 						>
-							<Ionicons name="chevron-back" size={24} color="#0a5cea" />
+							<Ionicons name="chevron-back" size={24} color="#333" />
 						</TouchableOpacity>
 					),
 				}}
@@ -45,7 +50,7 @@ export default function _layout() {
 							onPress={() => router.back()}
 							style={{ width: 50 }}
 						>
-							<Ionicons name="chevron-back" size={24} color="#0a5cea" />
+							<Ionicons name="chevron-back" size={24} color="#333" />
 						</TouchableOpacity>
 					),
 				}}
@@ -65,7 +70,7 @@ export default function _layout() {
 							onPress={() => router.back()}
 							style={{ width: 50 }}
 						>
-							<Ionicons name="chevron-back" size={24} color="#0a5cea" />
+							<Ionicons name="chevron-back" size={24} color="#333" />
 						</TouchableOpacity>
 					),
 				}}
@@ -82,7 +87,7 @@ export default function _layout() {
 							onPress={() => router.back()}
 							style={{ width: 50 }}
 						>
-							<Ionicons name="chevron-back" size={24} color="#0a5cea" />
+							<Ionicons name="chevron-back" size={24} color="#333" />
 						</TouchableOpacity>
 					),
 					headerStyle: {
@@ -100,7 +105,7 @@ export default function _layout() {
 							onPress={() => router.back()}
 							style={{ width: 50 }}
 						>
-							<Ionicons name="chevron-back" size={24} color="#0a5cea" />
+							<Ionicons name="chevron-back" size={24} color="#333" />
 						</TouchableOpacity>
 					),
 					headerStyle: {
@@ -110,29 +115,345 @@ export default function _layout() {
 				}}
 			/>
 			<Stack.Screen
-				name="account/index"
+				name="profile/index"
 				options={{
-					headerShown: false,
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Profile',
+					headerShadowVisible: false,
+					headerLargeTitle: true,
+					headerLargeStyle: {
+						backgroundColor: '#ffffff',
+					},
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+
+					headerLeft: () => (
+						<TouchableOpacity
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</TouchableOpacity>
+					),
+				}}
+			/>
+			<Stack.Screen
+				name="profile/editName"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Edit Name',
+					headerShadowVisible: false,
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+
+					headerLeft: () => (
+						<TouchableOpacity
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</TouchableOpacity>
+					),
+				}}
+			/>
+			<Stack.Screen
+				name="profile/editPhone"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Edit Phone',
+					headerShadowVisible: false,
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+
+					headerLeft: () => (
+						<TouchableOpacity
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</TouchableOpacity>
+					),
+				}}
+			/>
+			<Stack.Screen
+				name="profile/editPassword"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Edit Password',
+					headerShadowVisible: false,
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+
+					headerLeft: () => (
+						<TouchableOpacity
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</TouchableOpacity>
+					),
+				}}
+			/>
+			<Stack.Screen
+				name="profile/forgotPassword"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Forgot Password',
+				}}
+			/>
+			<Stack.Screen
+				name="security/index"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Password & Login',
+					headerShadowVisible: false,
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+
+					headerLeft: () => (
+						<TouchableOpacity
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</TouchableOpacity>
+					),
 				}}
 			/>
 			<Stack.Screen
 				name="about/index"
 				options={{
-					headerShown: false,
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'About',
+					headerShadowVisible: false,
+					headerLargeTitle: true,
+					headerLargeStyle: {
+						backgroundColor: '#ffffff',
+					},
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+
+					headerLeft: () => (
+						<TouchableOpacity
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</TouchableOpacity>
+					),
+				}}
+			/>
+			<Stack.Screen
+				name="about/terms"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Terms of Service',
+					headerShadowVisible: false,
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+
+					headerLeft: () => (
+						<TouchableOpacity
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</TouchableOpacity>
+					),
+				}}
+			/>
+			<Stack.Screen
+				name="about/privacyPolicy"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Privacy Policy',
+					headerShadowVisible: false,
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+
+					headerLeft: () => (
+						<TouchableOpacity
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</TouchableOpacity>
+					),
+				}}
+			/>
+			<Stack.Screen
+				name="about/licenseAgreement"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'License Agreement',
+					headerShadowVisible: false,
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+
+					headerLeft: () => (
+						<TouchableOpacity
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</TouchableOpacity>
+					),
 				}}
 			/>
 			<Stack.Screen
 				name="help/index"
 				options={{
-					headerShown: false,
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Help & Support',
+					headerShadowVisible: false,
+					headerLargeTitle: true,
+					headerLargeStyle: {
+						backgroundColor: '#ffffff',
+					},
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+
+					headerLeft: () => (
+						<TouchableOpacity
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</TouchableOpacity>
+					),
 				}}
 			/>
 			<Stack.Screen
-				name="notification/notificationSettings"
+				name="incomeBudget/index"
 				options={{
-					title: 'Notification Settings',
+					headerShown: true,
+					headerTitle: 'Income & Budgets',
+				}}
+			/>
+			<Stack.Screen
+				name="goals/index"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Goals',
+					headerShadowVisible: false,
+					headerLargeTitle: true,
+					headerLargeStyle: {
+						backgroundColor: '#ffffff',
+					},
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+
+					headerLeft: () => (
+						<TouchableOpacity
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</TouchableOpacity>
+					),
+				}}
+			/>
+			<Stack.Screen
+				name="notification/index"
+				options={{
+					title: 'Notifications',
 					headerShown: true, // or false if you want to hide it
 					headerBackTitle: 'Settings',
+					headerShadowVisible: false,
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerLeft: () => (
+						<TouchableOpacity
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</TouchableOpacity>
+					),
 				}}
 			/>
 		</Stack>
