@@ -3,17 +3,18 @@ import {
 	View,
 	Text,
 	StyleSheet,
-	TouchableOpacity,
 	TextInput,
 	Alert,
 	ScrollView,
 } from 'react-native';
+import { RectButton } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 export default function EditPhoneScreen() {
 	const router = useRouter();
 	const [phone, setPhone] = useState('');
+	const [currentPhone, setCurrentPhone] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
 
 	useEffect(() => {
@@ -27,7 +28,10 @@ export default function EditPhoneScreen() {
 			);
 			if (response.ok) {
 				const data = await response.json();
-				setPhone(data.data.phone || '');
+				const phoneNumber = data.data.phone || '';
+				console.log('Current phone number:', phoneNumber);
+				setCurrentPhone(phoneNumber);
+				// Don't set phone initially so placeholder shows current phone number
 			}
 		} catch (error) {
 			console.error('Error fetching profile:', error);
@@ -43,7 +47,12 @@ export default function EditPhoneScreen() {
 
 	const formatPhoneNumber = (text: string) => {
 		// Remove all non-digit characters
-		const digitsOnly = text.replace(/\D/g, '');
+		let digitsOnly = text.replace(/\D/g, '');
+
+		// Limit to 15 digits (international standard)
+		if (digitsOnly.length > 15) {
+			digitsOnly = digitsOnly.slice(0, 15);
+		}
 
 		// Format based on length
 		if (digitsOnly.length <= 3) {
@@ -62,6 +71,12 @@ export default function EditPhoneScreen() {
 	};
 
 	const handlePhoneChange = (text: string) => {
+		// Check if input exceeds 15 digits
+		const digitsOnly = text.replace(/\D/g, '');
+		if (digitsOnly.length > 15) {
+			return; // Don't update state if more than 15 digits
+		}
+
 		const formatted = formatPhoneNumber(text);
 		setPhone(formatted);
 	};
@@ -110,19 +125,47 @@ export default function EditPhoneScreen() {
 		}
 	};
 
+	// Check if the save button should be enabled
+	const isSaveButtonEnabled = () => {
+		const trimmedPhone = phone.trim();
+		const trimmedCurrentPhone = currentPhone.trim();
+
+		// Button is enabled if:
+		// 1. Phone number is not empty
+		// 2. Phone number is valid
+		// 3. Phone number is different from current phone number
+		// 4. Not currently loading
+		return (
+			trimmedPhone.length > 0 &&
+			validatePhone(trimmedPhone) &&
+			trimmedPhone !== trimmedCurrentPhone &&
+			!isLoading
+		);
+	};
+
 	return (
 		<View style={styles.container}>
 			<ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
 				<View style={styles.formContainer}>
 					<Text style={styles.sectionTitle}>Phone Number</Text>
 
+					{/* Current Phone Number Section */}
+					<View style={styles.currentPhoneContainer}>
+						<Text style={styles.currentPhoneLabel}>Current Phone Number</Text>
+						<View style={styles.currentPhoneDisplay}>
+							<Text style={styles.currentPhoneText}>
+								{currentPhone || 'No phone number set'}
+							</Text>
+						</View>
+					</View>
+
 					<View style={styles.inputContainer}>
-						<Text style={styles.label}>Phone Number</Text>
+						<Text style={styles.label}>New Phone Number</Text>
 						<TextInput
 							style={styles.input}
 							value={phone}
 							onChangeText={handlePhoneChange}
-							placeholder="Enter your phone number"
+							placeholder={currentPhone || 'Enter your phone number'}
 							placeholderTextColor="#999"
 							keyboardType="phone-pad"
 							autoComplete="tel"
@@ -141,20 +184,23 @@ export default function EditPhoneScreen() {
 						</Text>
 					</View>
 
-					<TouchableOpacity
-						style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
+					<RectButton
+						style={[
+							styles.saveButton,
+							!isSaveButtonEnabled() && styles.saveButtonDisabled,
+						]}
 						onPress={handleSave}
-						disabled={isLoading}
+						enabled={isSaveButtonEnabled()}
 					>
 						<Text
 							style={[
 								styles.saveButtonText,
-								isLoading && styles.saveButtonTextDisabled,
+								!isSaveButtonEnabled() && styles.saveButtonTextDisabled,
 							]}
 						>
 							{isLoading ? 'Saving...' : 'Save Changes'}
 						</Text>
-					</TouchableOpacity>
+					</RectButton>
 				</View>
 			</ScrollView>
 		</View>
@@ -229,5 +275,25 @@ const styles = StyleSheet.create({
 	},
 	saveButtonTextDisabled: {
 		color: '#999',
+	},
+	currentPhoneContainer: {
+		marginBottom: 20,
+	},
+	currentPhoneLabel: {
+		fontSize: 16,
+		fontWeight: '500',
+		color: '#333',
+		marginBottom: 8,
+	},
+	currentPhoneDisplay: {
+		borderWidth: 1,
+		borderColor: '#ddd',
+		borderRadius: 8,
+		padding: 12,
+		backgroundColor: '#f8f9fa',
+	},
+	currentPhoneText: {
+		fontSize: 16,
+		color: '#333',
 	},
 });

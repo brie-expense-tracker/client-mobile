@@ -35,26 +35,7 @@ export default function _layout() {
 					),
 				}}
 			/>
-			<Stack.Screen
-				name="privacyandsecurity/changePassword"
-				options={{
-					headerShown: true,
-					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: '',
-					headerShadowVisible: false,
-					headerStyle: {
-						backgroundColor: '#ffffff',
-					},
-					headerLeft: () => (
-						<TouchableOpacity
-							onPress={() => router.back()}
-							style={{ width: 50 }}
-						>
-							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
-					),
-				}}
-			/>
+
 			<Stack.Screen
 				name="privacyandsecurity/privacyPolicy"
 				options={{
@@ -95,25 +76,7 @@ export default function _layout() {
 					},
 				}}
 			/>
-			<Stack.Screen
-				name="privacyandsecurity/downloadData"
-				options={{
-					headerShown: true,
-					headerTitle: '',
-					headerLeft: () => (
-						<TouchableOpacity
-							onPress={() => router.back()}
-							style={{ width: 50 }}
-						>
-							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
-					),
-					headerStyle: {
-						backgroundColor: '#f7f7f7',
-					},
-					headerShadowVisible: false,
-				}}
-			/>
+
 			<Stack.Screen
 				name="profile/index"
 				options={{
@@ -223,11 +186,56 @@ export default function _layout() {
 				}}
 			/>
 			<Stack.Screen
+				name="profile/deleteAccount"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Delete Account',
+					headerShadowVisible: false,
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+
+					headerLeft: () => (
+						<TouchableOpacity
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</TouchableOpacity>
+					),
+				}}
+			/>
+			<Stack.Screen
 				name="profile/forgotPassword"
 				options={{
 					headerShown: true,
 					headerBackButtonDisplayMode: 'minimal',
 					headerTitle: 'Forgot Password',
+				}}
+			/>
+			<Stack.Screen
+				name="profile/exportData"
+				options={{
+					headerShown: true,
+					headerTitle: '',
+					headerLeft: () => (
+						<TouchableOpacity
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</TouchableOpacity>
+					),
+					headerStyle: {
+						backgroundColor: '#f7f7f7',
+					},
+					headerShadowVisible: false,
 				}}
 			/>
 			<Stack.Screen

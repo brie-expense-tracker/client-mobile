@@ -216,13 +216,21 @@ export default function AccountScreen() {
 			<View style={styles.section}>
 				<Text style={styles.sectionTitle}>Account Management</Text>
 				<View style={styles.settingsContainer}>
-					<TouchableOpacity style={styles.settingItem}>
+					<TouchableOpacity
+						style={styles.settingItem}
+						onPress={() => {
+							router.push('/settings/profile/exportData');
+						}}
+					>
 						<Ionicons name="download-outline" size={24} color="#555" />
 						<Text style={styles.settingIconText}>Export Data</Text>
 						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
 					</TouchableOpacity>
 
-					<TouchableOpacity style={styles.settingItem}>
+					<TouchableOpacity
+						style={styles.settingItem}
+						onPress={() => router.push('/settings/profile/deleteAccount')}
+					>
 						<Ionicons name="trash-outline" size={24} color="#555" />
 						<Text style={styles.settingIconText}>Delete Account</Text>
 						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
