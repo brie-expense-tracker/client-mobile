@@ -18,6 +18,7 @@ function RootLayoutContent() {
 	}
 
 	useEffect(() => {
+		
 		const subscriber = onAuthStateChanged(getAuth(), handleAuthStateChanged);
 		return subscriber; // unsubscribe on unmount
 	}, []);

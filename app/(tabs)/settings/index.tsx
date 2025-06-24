@@ -80,14 +80,14 @@ export default function ProfileScreen() {
 							/>
 						</View>
 						<Text style={styles.userName}>@{userProfile.username}</Text>
-						<Text style={styles.totalValue}>
+						{/* <Text style={styles.totalValue}>
 							${(userProfile?.monthlyIncome || 0).toLocaleString()}
 						</Text>
-						<Text style={styles.totalValueLabel}>Total Amount Inputted</Text>
+						<Text style={styles.totalValueLabel}>Total Amount Inputted</Text> */}
 					</View>
 
 					{/* ——— Savings / Debt cards ——— */}
-					<View style={styles.statsContainer}>
+					{/* <View style={styles.statsContainer}>
 						<View style={styles.statCard}>
 							<Text style={styles.statValue}>
 								${(userProfile?.savings || 0).toLocaleString()}
@@ -100,7 +100,7 @@ export default function ProfileScreen() {
 							</Text>
 							<Text style={styles.statLabel}>Total Debt</Text>
 						</View>
-					</View>
+					</View> */}
 
 					{/* ——— Settings ——— */}
 					<View style={styles.settingsContainerWrapper}>
@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
 	statLabel: { fontSize: 12, fontWeight: '700', color: '#fff', marginTop: 4 },
 
 	/***** settings *****/
-	settingsContainerWrapper: { marginTop: 24, padding: 16 },
+	settingsContainerWrapper: { paddingHorizontal: 16 },
 	settingsContainer: { backgroundColor: '#fff', borderRadius: 12 },
 	settingsHeader: {
 		fontSize: 12,

@@ -9,7 +9,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { RectButton } from 'react-native-gesture-handler';
+import {
+	RectButton,
+	BorderlessButton,
+	BaseButton,
+} from 'react-native-gesture-handler';
 
 export default function EditPasswordScreen() {
 	const router = useRouter();
@@ -19,6 +23,7 @@ export default function EditPasswordScreen() {
 	const [showCurrentPassword, setShowCurrentPassword] = useState(false);
 	const [showNewPassword, setShowNewPassword] = useState(false);
 	const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+	const [pressed, setPressed] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
 
 	const validatePassword = (password: string) => {
@@ -151,7 +156,7 @@ export default function EditPasswordScreen() {
 								autoCapitalize="none"
 								autoCorrect={false}
 							/>
-							<RectButton
+							<BorderlessButton
 								style={styles.eyeButton}
 								onPress={() => setShowNewPassword(!showNewPassword)}
 							>
@@ -162,7 +167,7 @@ export default function EditPasswordScreen() {
 										color="#666"
 									/>
 								</View>
-							</RectButton>
+							</BorderlessButton>
 						</View>
 					</View>
 
@@ -192,6 +197,16 @@ export default function EditPasswordScreen() {
 								</View>
 							</RectButton>
 						</View>
+
+						<BorderlessButton
+							style={styles.forgotPasswordLink}
+							onPress={() => router.push('/settings/profile/forgotPassword')}
+							onActiveStateChange={() => setPressed(!pressed)}
+						>
+							<View accessible accessibilityRole="button">
+								<Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+							</View>
+						</BorderlessButton>
 					</View>
 
 					<View style={styles.infoContainer}>
@@ -213,7 +228,7 @@ export default function EditPasswordScreen() {
 						]}
 						onPress={isSaveButtonEnabled() ? handleSave : undefined}
 						enabled={isSaveButtonEnabled()}
-						underlayColor={isSaveButtonEnabled() ? '#0077CC' : '#F5F5F5'}
+						underlayColor={'#0077CC'}
 					>
 						<View accessible accessibilityRole="button">
 							<Text
@@ -283,9 +298,10 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'flex-start',
 		backgroundColor: '#f8f9fa',
-		padding: 16,
+		paddingHorizontal: 16,
 		borderRadius: 8,
 		marginTop: 8,
+		marginBottom: 16,
 	},
 	infoText: {
 		fontSize: 14,
@@ -313,5 +329,22 @@ const styles = StyleSheet.create({
 	},
 	saveButtonTextDisabled: {
 		color: '#999',
+	},
+	forgotPasswordLink: {
+		borderRadius: 8,
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginTop: 18,
+	},
+	forgotPasswordText: {
+		color: '#363636',
+		fontSize: 14,
+		fontWeight: '500',
+		textDecorationLine: 'underline',
+	},
+	forgotPasswordTextPressed: {
+		fontSize: 14,
+		fontWeight: '500',
+		textDecorationLine: 'underline',
 	},
 });
