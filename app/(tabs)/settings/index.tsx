@@ -12,9 +12,7 @@ import {
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
 import { getAuth, signOut } from '@react-native-firebase/auth';
-import { OnboardingService } from '../../../services/onboardingService';
 
 export default function ProfileScreen() {
 	const router = useRouter();
@@ -44,48 +42,18 @@ export default function ProfileScreen() {
 				setUserProfile(data.data);
 			}
 		} catch (error) {
-			// UNCOMMENT WHILE TESTING AXIOS
 			// console.error('Error fetching profile:', error);
-		}
-	};
-
-	const pickImage = async () => {
-		// Request permission
-		const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-		if (status !== 'granted') {
-			Alert.alert(
-				'Permission needed',
-				'Please grant permission to access your photos'
-			);
-			return;
-		}
-
-		// Launch image picker
-		const result = await ImagePicker.launchImageLibraryAsync({
-			mediaTypes: ImagePicker.MediaTypeOptions.Images,
-			allowsEditing: true,
-			aspect: [1, 1],
-			quality: 1,
-		});
-
-		if (!result.canceled) {
-			setProfileImage({ uri: result.assets[0].uri });
 		}
 	};
 
 	const handleSignOut = async () => {
 		Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-			{
-				text: 'Cancel',
-				style: 'cancel',
-			},
+			{ text: 'Cancel', style: 'cancel' },
 			{
 				text: 'Sign Out',
 				style: 'destructive',
 				onPress: async () => {
 					try {
-						// Sign out from Firebase
 						signOut(getAuth());
 						Alert.alert('Signed Out', 'You have been signed out.');
 					} catch (error) {
@@ -97,11 +65,12 @@ export default function ProfileScreen() {
 		]);
 	};
 
+	/* ---------------------------------- UI --------------------------------- */
 	return (
 		<View style={styles.mainContainer}>
 			<ScrollView>
 				<SafeAreaView style={styles.safeArea}>
-					{/* Profile picture and name */}
+					{/* ——— Profile picture and balances ——— */}
 					<View style={styles.profilePicWrapper}>
 						<View style={styles.profilePicContainer}>
 							<Image
@@ -117,7 +86,7 @@ export default function ProfileScreen() {
 						<Text style={styles.totalValueLabel}>Total Amount Inputted</Text>
 					</View>
 
-					{/* Stats cards */}
+					{/* ——— Savings / Debt cards ——— */}
 					<View style={styles.statsContainer}>
 						<View style={styles.statCard}>
 							<Text style={styles.statValue}>
@@ -133,120 +102,89 @@ export default function ProfileScreen() {
 						</View>
 					</View>
 
-					{/* Settings List */}
+					{/* ——— Settings ——— */}
 					<View style={styles.settingsContainerWrapper}>
 						<View style={styles.settingsContainer}>
-							<TouchableOpacity
-								style={styles.settingItem}
-								onPress={() => router.push('./settings/account')}
-							>
-								<Ionicons name="person-outline" size={24} color="#555" />
-								<Text style={styles.settingText}>Account</Text>
-								<Ionicons
-									name="chevron-forward"
-									size={18}
-									style={styles.chevronIcon}
-								/>
-							</TouchableOpacity>
-							<TouchableOpacity
-								style={styles.settingItem}
-								onPress={() =>
-									router.push('./settings/notification/notificationSettings')
-								}
-							>
-								<Ionicons name="notifications-outline" size={24} color="#555" />
-								<Text style={styles.settingText}>Notifications</Text>
-								<Ionicons
-									name="chevron-forward"
-									size={18}
-									style={styles.chevronIcon}
-								/>
-							</TouchableOpacity>
-							{/* <TouchableOpacity
-								style={styles.settingItem}
-								onPress={() => router.push('/screens/fixedExpenses')}
-							>
-								<Ionicons name="cube-outline" size={24} color="#555" />
-								<Text style={styles.settingText}>Fixed Expenses</Text>
-								<Ionicons
-									name="chevron-forward"
-									size={18}
-									style={styles.chevronIcon}
-								/>
-							</TouchableOpacity> */}
+							{/* ACCOUNT */}
+							<Text style={styles.settingsHeader}>Account</Text>
+							<Setting
+								icon="person-outline"
+								label="Profile"
+								onPress={() => router.push('./settings/profile')}
+							/>
 
-							{/* <TouchableOpacity
-						style={styles.settingItem}
-						onPress={() => router.push('/screens/preferences')}
-					>
-						<Ionicons name="settings-outline" size={24} color="#555" />
-						<Text style={styles.settingText}>Preferences</Text>
-						<Ionicons name="chevron-forward" size={24} color="#555" />
-					</TouchableOpacity>
-					<TouchableOpacity style={styles.settingItem}>
-						<Ionicons name="color-palette-outline" size={24} color="#555" />
-						<Text style={styles.settingText}>Appearance</Text>
-						<Ionicons name="chevron-forward" size={24} color="#555" />
-					</TouchableOpacity> */}
-							<TouchableOpacity
-								style={styles.settingItem}
-								onPress={() => {
-									router.push('/settings/privacyandsecurity');
-								}}
-							>
-								<Ionicons
-									name="shield-checkmark-outline"
-									size={24}
-									color="#555"
-								/>
-								<Text style={styles.settingText}>Privacy & Security</Text>
-								<Ionicons
-									name="chevron-forward"
-									size={18}
-									style={styles.chevronIcon}
-								/>
-							</TouchableOpacity>
-							<TouchableOpacity
-								style={styles.settingItem}
+							{/* FINANCE */}
+							<Text style={styles.settingsHeader}>Finance</Text>
+							<Setting
+								icon="card-outline"
+								label="Income & Budgets"
+								onPress={() => router.push('./settings/incomeBudget')}
+							/>
+							<Setting
+								icon="albums-outline"
+								label="Categories"
+								onPress={() => router.push('./settings/categories')}
+							/>
+							<Setting
+								icon="trophy-outline"
+								label="Goals"
+								onPress={() => router.push('./settings/goals')}
+							/>
+
+							{/* AI & PRIVACY */}
+							<Text style={styles.settingsHeader}>AI & Privacy</Text>
+							<Setting
+								icon="bulb-outline"
+								label="AI Insights"
+								onPress={() => router.push('./settings/aiInsights')}
+							/>
+							<Setting
+								icon="shield-outline"
+								label="Data & Privacy"
+								onPress={() => router.push('./settings/privacy')}
+							/>
+
+							{/* APP PREFERENCES */}
+							<Text style={styles.settingsHeader}>Preferences</Text>
+							<Setting
+								icon="notifications-outline"
+								label="Notifications"
+								onPress={() => router.push('./settings/notification')}
+							/>
+							<Setting
+								icon="color-palette-outline"
+								label="Appearance"
+								onPress={() => router.push('./settings/appearance')}
+							/>
+
+							{/* LEGAL & SUPPORT */}
+							<Text style={styles.settingsHeader}>Support & Legal</Text>
+							<Setting
+								icon="help-circle-outline"
+								label="Help & Support"
 								onPress={() => router.push('./settings/help')}
-							>
-								<Ionicons name="help-circle-outline" size={24} color="#555" />
-								<Text style={styles.settingText}>Help & Support</Text>
-								<Ionicons
-									name="chevron-forward"
-									size={18}
-									style={styles.chevronIcon}
-								/>
-							</TouchableOpacity>
-							<TouchableOpacity
-								style={styles.settingItem}
+							/>
+							<Setting
+								icon="information-circle-outline"
+								label="About"
 								onPress={() => router.push('./settings/about')}
-							>
-								<Ionicons
-									name="information-circle-outline"
-									size={24}
-									color="#555"
-								/>
-								<Text style={styles.settingText}>About</Text>
-								<Ionicons
-									name="chevron-forward"
-									size={18}
-									style={styles.chevronIcon}
-								/>
-							</TouchableOpacity>
-							<TouchableOpacity style={styles.settingItem}>
-								<Ionicons
-									name="chatbox-ellipses-outline"
-									size={24}
-									color="#555"
-								/>
-								<Text style={styles.settingText}>Ai Chat</Text>
-								<Text style={styles.chevronIcon}>Coming Soon</Text>
-							</TouchableOpacity>
+							/>
+							<Setting
+								icon="document-text-outline"
+								label="Legal Documents"
+								onPress={() => router.push('./settings/legal')}
+							/>
+
+							{/* PLACEHOLDER / FUTURE */}
+							<Setting
+								icon="chatbox-ellipses-outline"
+								label="AI Chat"
+								trailing="Coming Soon"
+							/>
 						</View>
 					</View>
 
-					{/* Sign Out Button */}
+					{/* ——— Sign-out ——— */}
 					<View style={styles.signOutContainer}>
 						<TouchableOpacity
 							style={styles.signOutButton}
@@ -262,72 +200,60 @@ export default function ProfileScreen() {
 	);
 }
 
+/* --------------------- Re-usable Setting Row -------------------- */
+function Setting({
+	icon,
+	label,
+	onPress,
+	trailing,
+}: {
+	icon: keyof typeof Ionicons.glyphMap;
+	label: string;
+	onPress?: () => void;
+	trailing?: string;
+}) {
+	return (
+		<TouchableOpacity
+			style={styles.settingItem}
+			onPress={onPress}
+			disabled={!onPress}
+		>
+			<Ionicons name={icon} size={24} color="#555" />
+			<Text style={styles.settingText}>{label}</Text>
+			{trailing ? (
+				<Text style={[styles.chevronIcon, { fontSize: 12 }]}>{trailing}</Text>
+			) : (
+				<Ionicons name="chevron-forward" size={18} style={styles.chevronIcon} />
+			)}
+		</TouchableOpacity>
+	);
+}
+
+/* ---------------------------- Styles --------------------------- */
 const styles = StyleSheet.create({
-	mainContainer: {
-		flex: 1,
-		backgroundColor: '#fff',
-	},
-	safeArea: {
-		flex: 1,
-	},
-	headerContainer: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		paddingHorizontal: 24,
-	},
-	headerText: {
-		color: '#222222',
-		fontSize: 28,
-		fontWeight: '500',
-	},
+	/***** containers *****/
+	mainContainer: { flex: 1, backgroundColor: '#fff' },
+	safeArea: { flex: 1 },
+
+	/***** profile *****/
 	profilePicWrapper: {
 		alignItems: 'center',
 		paddingHorizontal: 24,
 		marginTop: 12,
 	},
-	profilePicContainer: {
-		position: 'relative',
-		marginBottom: 12,
-	},
+	profilePicContainer: { marginBottom: 12 },
 	profilePic: {
-		width: 80,
-		height: 80,
-		borderRadius: 40,
+		width: 100,
+		height: 100,
+		borderRadius: 50,
 		borderWidth: 2,
 		borderColor: '#ddd',
 	},
-	editIconContainer: {
-		position: 'absolute',
-		bottom: 0,
-		right: 0,
-	},
-	editIconBackground: {
-		backgroundColor: '#0095FF',
-		width: 28,
-		height: 28,
-		borderRadius: 14,
-		justifyContent: 'center',
-		alignItems: 'center',
-		borderWidth: 2,
-		borderColor: '#fff',
-	},
-	userName: {
-		fontSize: 18,
-		fontWeight: '500',
-		color: '#666666',
-		marginBottom: 4,
-	},
-	totalValue: {
-		fontSize: 24,
-		fontWeight: '600',
-		color: '#222222',
-	},
-	totalValueLabel: {
-		fontSize: 14,
-		color: '#828282',
-		marginBottom: 4,
-	},
+	userName: { fontSize: 18, fontWeight: '500', color: '#666', marginBottom: 4 },
+	totalValue: { fontSize: 24, fontWeight: '600', color: '#222' },
+	totalValueLabel: { fontSize: 14, color: '#828282', marginBottom: 4 },
+
+	/***** stats *****/
 	statsContainer: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
@@ -336,7 +262,7 @@ const styles = StyleSheet.create({
 		gap: 12,
 	},
 	statCard: {
-		backgroundColor: '#fff',
+		backgroundColor: '#0790ff',
 		padding: 16,
 		borderRadius: 12,
 		alignItems: 'center',
@@ -347,65 +273,42 @@ const styles = StyleSheet.create({
 		shadowOpacity: 0.1,
 		shadowRadius: 3.84,
 	},
-	statValue: { fontSize: 20, fontWeight: 'bold' },
-	statLabel: { fontSize: 12, color: '#666', marginTop: 4 },
-	settingsContainerWrapper: {
-		marginTop: 24,
-		padding: 16,
-		borderRadius: 12,
-	},
-	settingsContainer: {
-		backgroundColor: '#ffffff',
-		borderRadius: 12,
+	statValue: { fontSize: 20, fontWeight: '300', color: '#fff' },
+	statLabel: { fontSize: 12, fontWeight: '700', color: '#fff', marginTop: 4 },
+
+	/***** settings *****/
+	settingsContainerWrapper: { marginTop: 24, padding: 16 },
+	settingsContainer: { backgroundColor: '#fff', borderRadius: 12 },
+	settingsHeader: {
+		fontSize: 12,
+		fontWeight: '700',
+		color: '#8e8e8e',
+		textTransform: 'uppercase',
+		paddingHorizontal: 16,
+		paddingTop: 16,
+		paddingBottom: 4,
 	},
 	settingItem: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		padding: 16,
-		elevation: 2,
 		borderBottomWidth: 1,
 		borderBottomColor: '#efefef',
 	},
-	chevronIcon: {
-		color: '#BEBEBE',
-	},
-	settingText: {
-		flex: 1,
-		marginLeft: 12,
-		fontSize: 16,
-		color: '#333',
-	},
-	settingValue: {
-		flexDirection: 'row',
-		alignItems: 'center',
-	},
-	settingValueText: {
-		fontSize: 14,
-		color: '#666',
-		marginRight: 8,
-	},
-	signOutContainer: {
-		marginTop: 'auto',
-		padding: 16,
-	},
+	settingText: { flex: 1, marginLeft: 12, fontSize: 16, color: '#333' },
+	chevronIcon: { color: '#BEBEBE' },
+
+	/***** sign-out *****/
+	signOutContainer: { marginTop: 'auto', padding: 16 },
 	signOutButton: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'center',
-		backgroundColor: '#fff',
 		padding: 16,
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: '#FF3B30',
-		elevation: 2,
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
-		shadowRadius: 3.84,
 	},
 	signOutText: {
 		marginLeft: 8,
-		fontSize: 16,
+		fontSize: 14,
 		fontWeight: '500',
 		color: '#FF3B30',
 	},

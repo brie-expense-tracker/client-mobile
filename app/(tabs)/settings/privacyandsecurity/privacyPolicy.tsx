@@ -4,11 +4,11 @@ import { Stack } from 'expo-router';
 
 export default function PrivacyPolicyScreen() {
 	return (
-		<>
+		<View style={styles.container}>
 			{/* This tells Expo Router to label the header */}
 			<Stack.Screen options={{ title: 'Privacy Policy' }} />
 
-			<ScrollView contentContainerStyle={styles.container}>
+			<ScrollView contentContainerStyle={styles.scrollContainer}>
 				<Text style={styles.smallMuted}>Effective Date: 06/19/2025</Text>
 
 				<Section title="1. Information We Collect">
@@ -81,7 +81,7 @@ export default function PrivacyPolicyScreen() {
 					</Paragraph>
 				</Section>
 			</ScrollView>
-		</>
+		</View>
 	);
 }
 
@@ -111,7 +111,8 @@ function Bullet({ children }: { children: React.ReactNode }) {
 }
 
 const styles = StyleSheet.create({
-	container: { padding: 24, gap: 16 },
+	container: { padding: 24, gap: 16, backgroundColor: '#fff' },
+	scrollContainer: { backgroundColor: '#fff' },
 	h1: { fontSize: 28, fontWeight: '700', marginBottom: 8 },
 	h2: { fontSize: 20, fontWeight: '600', marginBottom: 4 },
 	p: { fontSize: 16, lineHeight: 22 },

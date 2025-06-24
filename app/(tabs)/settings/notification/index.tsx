@@ -117,7 +117,7 @@ const NotificationSettingsScreen: React.FC = () => {
 							/>
 						</View>
 
-						<View style={styles.lastRow}>
+						<View style={styles.row}>
 							<Text style={styles.label}>Budget Milestones</Text>
 							<Switch
 								value={settings.budgetMilestones}
@@ -131,7 +131,7 @@ const NotificationSettingsScreen: React.FC = () => {
 				<View style={styles.sectionContainer}>
 					<Text style={styles.sectionTitle}>SUMMARIES</Text>
 					<View style={styles.section}>
-						<View style={styles.lastRow}>
+						<View style={styles.row}>
 							<Text style={styles.label}>Weekly Summary</Text>
 							<Switch
 								value={settings.weeklySummary}
@@ -149,7 +149,7 @@ const NotificationSettingsScreen: React.FC = () => {
 const styles = StyleSheet.create({
 	mainContainer: {
 		flex: 1,
-		backgroundColor: '#f7f7f7',
+		backgroundColor: '#ffffff',
 	},
 	content: {
 		padding: 16,
