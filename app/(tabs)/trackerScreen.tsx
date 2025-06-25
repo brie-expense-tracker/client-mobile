@@ -1,24 +1,22 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
 	View,
 	Text,
 	TextInput,
 	StyleSheet,
 	Alert,
-	TouchableOpacity,
 	ScrollView,
+	KeyboardAvoidingView,
+	Platform,
+	ActivityIndicator,
 } from 'react-native';
+import { RectButton, BorderlessButton } from 'react-native-gesture-handler';
 import axios from 'axios';
 import { useForm, Controller } from 'react-hook-form';
 import { Ionicons, FontAwesome } from '@expo/vector-icons';
-import { useRouter, Stack } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-interface FloatingActionButtonProps {
-	color: string;
-	name: string;
-	onPress?: () => void;
-}
+import { useFonts } from 'expo-font';
 
 interface TransactionFormData {
 	type: 'income' | 'expense';
@@ -30,10 +28,14 @@ interface TransactionFormData {
 
 //
 //  FUNCTIONS START===============================================
-const addTransactionScreen = () => {
+const AddTransactionScreen = () => {
 	const router = useRouter();
 	const amountInputRef = useRef<TextInput>(null);
 	const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+	const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+	const [fontsLoaded] = useFonts({
+		...FontAwesome.font,
+	});
 
 	const { control, handleSubmit, setValue, watch } =
 		useForm<TransactionFormData>({
@@ -48,6 +50,14 @@ const addTransactionScreen = () => {
 
 	const amount = watch('amount');
 
+	// Memoize the setValue function to prevent infinite re-renders
+	const handleAmountChange = useCallback(
+		(value: string) => {
+			setValue('amount', value);
+		},
+		[setValue]
+	);
+
 	useEffect(() => {
 		if (amountInputRef.current) {
 			amountInputRef.current.setNativeProps({
@@ -59,6 +69,16 @@ const addTransactionScreen = () => {
 		}
 	}, [amount]);
 
+	// Show loading screen if fonts are not loaded
+	if (!fontsLoaded) {
+		return (
+			<View style={styles.loadingContainer}>
+				<ActivityIndicator size="large" color="#0095FF" />
+				<Text style={styles.loadingText}>Loading...</Text>
+			</View>
+		);
+	}
+
 	const onSubmit = async (data: TransactionFormData) => {
 		try {
 			// Validate amount
@@ -68,10 +88,8 @@ const addTransactionScreen = () => {
 				return;
 			}
 
-			const response = await axios.post(
-				'http://localhost:3000/api/transactions',
-				data
-			);
+			const response = await axios.post(`${BASE_URL}/api/transactions`, data);
+
 			console.log('Transaction saved:', response.data);
 			Alert.alert('Success', 'Transaction saved successfully!');
 
@@ -110,20 +128,10 @@ const addTransactionScreen = () => {
 	// MAIN COMPONENT===============================================
 	return (
 		<View style={styles.container}>
-			<Stack.Screen
-				options={{
-					headerShown: false,
-					gestureEnabled: true,
-					contentStyle: {
-						backgroundColor: 'transparent',
-					},
-				}}
-			/>
 			<SafeAreaView style={styles.safeArea} edges={['top']}>
 				<View style={styles.mainContainer}>
 					<View style={styles.topContainer}>
 						<View style={styles.inputAmountContainer}>
-							<View style={styles.inputAmountWrapper}></View>
 							<FontAwesome
 								name="dollar"
 								size={24}
@@ -154,11 +162,11 @@ const addTransactionScreen = () => {
 						<View style={styles.carouselContainer}>
 							<ScrollView horizontal showsHorizontalScrollIndicator={false}>
 								{mockTags.map((category, index) => (
-									<TouchableOpacity
+									<RectButton
 										key={index}
 										onPress={() => toggleCategorySelection(category)}
 										style={[
-											styles.carouselText,
+											styles.carouselTextWrapper,
 											selectedCategory === category && styles.selectedTag,
 										]}
 									>
@@ -169,61 +177,73 @@ const addTransactionScreen = () => {
 										>
 											{category}
 										</Text>
-									</TouchableOpacity>
+									</RectButton>
 								))}
-								<TouchableOpacity
-									onPress={() => console.log('Add Category Pressed')}
+								<RectButton
+									onPress={() => router.push('/settings/categories')}
 									style={styles.addCategoryButton}
 								>
 									<Ionicons name="add-circle-outline" size={24} color="grey" />
-								</TouchableOpacity>
+								</RectButton>
 							</ScrollView>
 						</View>
-						<Controller
-							control={control}
-							name="description"
-							render={({
-								field: { value, onChange },
-							}: {
-								field: { value: string; onChange: (value: string) => void };
-							}) => (
-								<TextInput
-									style={styles.inputDescription}
-									placeholder="What's this for?"
-									placeholderTextColor={'#a3a3a3'}
-									value={value}
-									onChangeText={onChange}
-								/>
-							)}
-						/>
+						<KeyboardAvoidingView
+							behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+						>
+							<Controller
+								control={control}
+								name="description"
+								render={({
+									field: { value, onChange },
+								}: {
+									field: { value: string; onChange: (value: string) => void };
+								}) => (
+									<TextInput
+										style={styles.inputDescription}
+										placeholder="What's this for?"
+										placeholderTextColor={'#a3a3a3'}
+										value={value}
+										onChangeText={onChange}
+									/>
+								)}
+							/>
+						</KeyboardAvoidingView>
 
-						<View style={styles.fabsContainer}>
-							<View style={styles.fabContainer}>
-								<FloatingActionButton
-									name="Spent"
-									color="#0095FF"
+						<View style={styles.transactionButtonsContainer}>
+							<View style={styles.transactionButtonContainer}>
+								<RectButton
+									style={styles.transactionButton}
 									onPress={() => {
 										setValue('type', 'expense');
 										handleSubmit(onSubmit)();
 									}}
-								/>
+								>
+									<Text
+										style={{ color: 'white', fontWeight: 'bold', fontSize: 18 }}
+									>
+										Spent
+									</Text>
+								</RectButton>
 							</View>
-							<View style={styles.fabContainer}>
-								<FloatingActionButton
-									name="Made"
-									color="#0095FF"
+							<View style={styles.transactionButtonContainer}>
+								<RectButton
+									style={styles.transactionButton}
 									onPress={() => {
 										setValue('type', 'income');
 										handleSubmit(onSubmit)();
 									}}
-								/>
+								>
+									<Text
+										style={{ color: 'white', fontWeight: 'bold', fontSize: 18 }}
+									>
+										Made
+									</Text>
+								</RectButton>
 							</View>
 						</View>
 					</View>
 					<View style={styles.topNumPadContainer}>
-						<NumberPad
-							onValueChange={(value: string) => setValue('amount', value)}
-						/>
+						<NumberPad onValueChange={handleAmountChange} />
 					</View>
 				</View>
 			</SafeAreaView>
@@ -232,26 +252,17 @@ const addTransactionScreen = () => {
 };
 
 //
-// FAB COMPONENT===============================================
-const FloatingActionButton: React.FC<
-	FloatingActionButtonProps & { onPress?: () => void }
-> = ({ color, name, onPress = () => console.log(`${name} FAB Pressed`) }) => (
-	<TouchableOpacity
-		style={[styles.fab, { backgroundColor: color }]}
-		onPress={onPress}
-	>
-		<Text style={{ color: 'white', fontWeight: 'bold', fontSize: 18 }}>
-			{name}
-		</Text>
-	</TouchableOpacity>
-);
-
-//
 // NUMBER PAD COMPONENT===============================================
 const NumberPad: React.FC<{ onValueChange: (value: string) => void }> = ({
 	onValueChange,
 }) => {
 	const [value, setValue] = useState('');
+	const [pressed, setPressed] = useState(false);
+
+	// Use useEffect to call onValueChange when value changes
+	useEffect(() => {
+		onValueChange(value);
+	}, [value, onValueChange]);
 
 	const validateAmount = (newValue: string): boolean => {
 		// Check if empty
@@ -292,7 +303,6 @@ const NumberPad: React.FC<{ onValueChange: (value: string) => void }> = ({
 
 			// Limit to 9 characters total
 			newValue = newValue.slice(-9);
-			onValueChange(newValue);
 			return newValue;
 		});
 	};
@@ -300,7 +310,6 @@ const NumberPad: React.FC<{ onValueChange: (value: string) => void }> = ({
 	const handleBackspace = () => {
 		setValue((prev) => {
 			const newValue = prev.slice(0, -1);
-			onValueChange(newValue);
 			return newValue;
 		});
 	};
@@ -309,56 +318,62 @@ const NumberPad: React.FC<{ onValueChange: (value: string) => void }> = ({
 		<View style={styles.numPadContainer}>
 			<View style={styles.numPadRow}>
 				{[1, 2, 3].map((num) => (
-					<TouchableOpacity
+					<BorderlessButton
 						key={num}
 						style={styles.buttonNumLight}
 						onPress={() => handlePress(num.toString())}
+						onActiveStateChange={(active) => setPressed(!pressed)}
 					>
 						<Text style={styles.buttonText}>{num}</Text>
-					</TouchableOpacity>
+					</BorderlessButton>
 				))}
 			</View>
 			<View style={styles.numPadRow}>
 				{[4, 5, 6].map((num) => (
-					<TouchableOpacity
+					<BorderlessButton
 						key={num}
 						style={styles.buttonNumLight}
 						onPress={() => handlePress(num.toString())}
+						onActiveStateChange={(active) => setPressed(!pressed)}
 					>
 						<Text style={styles.buttonText}>{num}</Text>
-					</TouchableOpacity>
+					</BorderlessButton>
 				))}
 			</View>
 			<View style={styles.numPadRow}>
 				{[7, 8, 9].map((num) => (
-					<TouchableOpacity
+					<BorderlessButton
 						key={num}
 						style={styles.buttonNumLight}
 						onPress={() => handlePress(num.toString())}
+						onActiveStateChange={(active) => setPressed(!pressed)}
 					>
 						<Text style={styles.buttonText}>{num}</Text>
-					</TouchableOpacity>
+					</BorderlessButton>
 				))}
 			</View>
 			<View style={styles.numPadRow}>
-				<TouchableOpacity
+				<BorderlessButton
 					style={styles.buttonNumDark}
 					onPress={() => handlePress('.')}
+					onActiveStateChange={(active) => setPressed(!pressed)}
 				>
 					<Text style={styles.buttonText}>.</Text>
-				</TouchableOpacity>
-				<TouchableOpacity
+				</BorderlessButton>
+				<BorderlessButton
 					style={styles.buttonNumLight}
 					onPress={() => handlePress('0')}
+					onActiveStateChange={(active) => setPressed(!pressed)}
 				>
 					<Text style={styles.buttonText}>0</Text>
-				</TouchableOpacity>
-				<TouchableOpacity
+				</BorderlessButton>
+				<BorderlessButton
 					style={styles.buttonNumDark}
 					onPress={handleBackspace}
+					onActiveStateChange={(active) => setPressed(!pressed)}
 				>
 					<Text style={styles.buttonText}>⌫</Text>
-				</TouchableOpacity>
+				</BorderlessButton>
 			</View>
 		</View>
 	);
@@ -384,22 +399,11 @@ const styles = StyleSheet.create({
 		padding: 20,
 		paddingBottom: 10,
 	},
-	closeButton: {
-		position: 'absolute',
-		top: 0,
-		right: 20,
-		zIndex: 1,
-		padding: 8,
-	},
 	inputAmountContainer: {
 		flexDirection: 'row',
 		justifyContent: 'center',
 		alignItems: 'center',
 		flex: 1,
-	},
-	inputAmountWrapper: {
-		justifyContent: 'center',
-		alignItems: 'center',
 	},
 	dollarIcon: {
 		marginRight: 6,
@@ -424,20 +428,21 @@ const styles = StyleSheet.create({
 		color: 'green',
 		marginTop: 10,
 	},
-	fabsContainer: {
+	transactionButtonsContainer: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		gap: 10,
 	},
-	fabContainer: {
+	transactionButtonContainer: {
 		flex: 1,
 	},
-	fab: {
+	transactionButton: {
 		width: '100%',
 		height: 56,
 		alignItems: 'center',
 		justifyContent: 'center',
 		borderRadius: 24,
+		backgroundColor: '#0095FF',
 	},
 
 	topNumPadContainer: {
@@ -477,15 +482,16 @@ const styles = StyleSheet.create({
 	carouselContainer: {
 		marginBottom: 10,
 	},
-	carouselText: {
+	carouselTextWrapper: {
 		fontSize: 16,
 		marginHorizontal: 5,
 		color: '#333',
 		padding: 8,
 		justifyContent: 'center',
+		borderRadius: 8,
 	},
 	selectedTag: {
-		backgroundColor: '#007ACC',
+		backgroundColor: '#0095FF',
 		borderRadius: 8,
 		padding: 8,
 	},
@@ -497,6 +503,16 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 		alignItems: 'center',
 	},
+	loadingContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	loadingText: {
+		fontSize: 18,
+		fontWeight: 'bold',
+		marginTop: 10,
+	},
 });
 
-export default addTransactionScreen;
+export default AddTransactionScreen;

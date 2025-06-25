@@ -8,6 +8,7 @@ import {
 	TouchableOpacity,
 	Alert,
 	ScrollView,
+	ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +17,7 @@ import { getAuth, signOut } from '@react-native-firebase/auth';
 
 export default function ProfileScreen() {
 	const router = useRouter();
+	const [isLoading, setIsLoading] = useState(true);
 	const [profileImage, setProfileImage] = useState(
 		require('../../../assets/images/profile.jpg')
 	);
@@ -34,6 +36,7 @@ export default function ProfileScreen() {
 
 	const fetchProfile = async () => {
 		try {
+			setIsLoading(true);
 			const response = await fetch(
 				'http://localhost:3000/api/profiles/68431f0b700221021c84552a'
 			);
@@ -43,6 +46,8 @@ export default function ProfileScreen() {
 			}
 		} catch (error) {
 			// console.error('Error fetching profile:', error);
+		} finally {
+			setIsLoading(false);
 		}
 	};
 
@@ -64,6 +69,16 @@ export default function ProfileScreen() {
 			},
 		]);
 	};
+
+	/* ---------------------------------- Loading State --------------------------------- */
+	if (isLoading) {
+		return (
+			<View style={styles.loadingContainer}>
+				<ActivityIndicator size="large" color="#0790ff" />
+				<Text style={styles.loadingText}>Loading profile...</Text>
+			</View>
+		);
+	}
 
 	/* ---------------------------------- UI --------------------------------- */
 	return (
@@ -141,7 +156,7 @@ export default function ProfileScreen() {
 							<Setting
 								icon="shield-outline"
 								label="Data & Privacy"
-								onPress={() => router.push('./settings/privacy')}
+								onPress={() => router.push('./settings/dataandprivacy')}
 							/>
 
 							{/* APP PREFERENCES */}
@@ -234,6 +249,20 @@ const styles = StyleSheet.create({
 	/***** containers *****/
 	mainContainer: { flex: 1, backgroundColor: '#fff' },
 	safeArea: { flex: 1 },
+
+	/***** loading *****/
+	loadingContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		backgroundColor: '#fff',
+	},
+	loadingText: {
+		marginTop: 16,
+		fontSize: 16,
+		color: '#666',
+		fontWeight: '500',
+	},
 
 	/***** profile *****/
 	profilePicWrapper: {

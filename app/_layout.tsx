@@ -18,7 +18,6 @@ function RootLayoutContent() {
 	}
 
 	useEffect(() => {
-		
 		const subscriber = onAuthStateChanged(getAuth(), handleAuthStateChanged);
 		return subscriber; // unsubscribe on unmount
 	}, []);
@@ -57,7 +56,6 @@ function RootLayoutContent() {
 			<Stack>
 				<Stack.Screen name="(auth)" options={{ headerShown: false }} />
 				<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-				<Stack.Screen name="notifications" />
 			</Stack>
 		</GestureHandlerRootView>
 	);

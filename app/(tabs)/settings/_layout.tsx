@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { router, Stack } from 'expo-router';
-import { TouchableOpacity } from 'react-native';
+import { BorderlessButton } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function _layout() {
+	const [isPressed, setIsPressed] = useState(false);
 	return (
 		<Stack>
 			<Stack.Screen
@@ -26,12 +27,13 @@ export default function _layout() {
 						color: '#333',
 					},
 					headerLeft: () => (
-						<TouchableOpacity
+						<BorderlessButton
 							onPress={() => router.back()}
+							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
+						</BorderlessButton>
 					),
 				}}
 			/>
@@ -47,12 +49,13 @@ export default function _layout() {
 						backgroundColor: '#ffffff',
 					},
 					headerLeft: () => (
-						<TouchableOpacity
+						<BorderlessButton
 							onPress={() => router.back()}
+							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
+						</BorderlessButton>
 					),
 				}}
 			/>
@@ -64,12 +67,13 @@ export default function _layout() {
 					headerTitle: '',
 					headerShadowVisible: false,
 					headerLeft: () => (
-						<TouchableOpacity
+						<BorderlessButton
 							onPress={() => router.back()}
+							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
+						</BorderlessButton>
 					),
 					headerStyle: {
 						backgroundColor: '#f7f7f7',
@@ -98,12 +102,13 @@ export default function _layout() {
 					},
 
 					headerLeft: () => (
-						<TouchableOpacity
+						<BorderlessButton
 							onPress={() => router.back()}
+							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
+						</BorderlessButton>
 					),
 				}}
 			/>
@@ -124,12 +129,13 @@ export default function _layout() {
 					},
 
 					headerLeft: () => (
-						<TouchableOpacity
+						<BorderlessButton
 							onPress={() => router.back()}
+							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
+						</BorderlessButton>
 					),
 				}}
 			/>
@@ -150,12 +156,13 @@ export default function _layout() {
 					},
 
 					headerLeft: () => (
-						<TouchableOpacity
+						<BorderlessButton
 							onPress={() => router.back()}
+							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
+						</BorderlessButton>
 					),
 				}}
 			/>
@@ -176,12 +183,13 @@ export default function _layout() {
 					},
 
 					headerLeft: () => (
-						<TouchableOpacity
+						<BorderlessButton
 							onPress={() => router.back()}
+							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
+						</BorderlessButton>
 					),
 				}}
 			/>
@@ -202,12 +210,13 @@ export default function _layout() {
 					},
 
 					headerLeft: () => (
-						<TouchableOpacity
+						<BorderlessButton
 							onPress={() => router.back()}
+							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
+						</BorderlessButton>
 					),
 				}}
 			/>
@@ -219,25 +228,7 @@ export default function _layout() {
 					headerTitle: 'Forgot Password',
 				}}
 			/>
-			<Stack.Screen
-				name="profile/exportData"
-				options={{
-					headerShown: true,
-					headerTitle: '',
-					headerLeft: () => (
-						<TouchableOpacity
-							onPress={() => router.back()}
-							style={{ width: 50 }}
-						>
-							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
-					),
-					headerStyle: {
-						backgroundColor: '#f7f7f7',
-					},
-					headerShadowVisible: false,
-				}}
-			/>
+
 			<Stack.Screen
 				name="security/index"
 				options={{
@@ -255,12 +246,13 @@ export default function _layout() {
 					},
 
 					headerLeft: () => (
-						<TouchableOpacity
+						<BorderlessButton
 							onPress={() => router.back()}
+							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
+						</BorderlessButton>
 					),
 				}}
 			/>
@@ -285,12 +277,13 @@ export default function _layout() {
 					},
 
 					headerLeft: () => (
-						<TouchableOpacity
+						<BorderlessButton
 							onPress={() => router.back()}
+							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
+						</BorderlessButton>
 					),
 				}}
 			/>
@@ -316,12 +309,13 @@ export default function _layout() {
 					},
 
 					headerLeft: () => (
-						<TouchableOpacity
+						<BorderlessButton
 							onPress={() => router.back()}
+							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
+						</BorderlessButton>
 					),
 				}}
 			/>
@@ -329,7 +323,58 @@ export default function _layout() {
 				name="incomeBudget/index"
 				options={{
 					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
 					headerTitle: 'Income & Budgets',
+					headerShadowVisible: false,
+					headerLargeTitle: true,
+					headerLargeStyle: {
+						backgroundColor: '#ffffff',
+					},
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+
+					headerLeft: () => (
+						<BorderlessButton
+							onPress={() => router.back()}
+							onActiveStateChange={setIsPressed}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</BorderlessButton>
+					),
+				}}
+			/>
+			<Stack.Screen
+				name="categories/index"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Categories',
+					headerShadowVisible: false,
+
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+
+					headerLeft: () => (
+						<BorderlessButton
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</BorderlessButton>
+					),
 				}}
 			/>
 			<Stack.Screen
@@ -353,12 +398,12 @@ export default function _layout() {
 					},
 
 					headerLeft: () => (
-						<TouchableOpacity
+						<BorderlessButton
 							onPress={() => router.back()}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
+						</BorderlessButton>
 					),
 				}}
 			/>
@@ -378,12 +423,13 @@ export default function _layout() {
 						color: '#333',
 					},
 					headerLeft: () => (
-						<TouchableOpacity
+						<BorderlessButton
 							onPress={() => router.back()}
+							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
+						</BorderlessButton>
 					),
 				}}
 			/>
@@ -407,12 +453,13 @@ export default function _layout() {
 						backgroundColor: '#ffffff',
 					},
 					headerLeft: () => (
-						<TouchableOpacity
+						<BorderlessButton
 							onPress={() => router.back()}
+							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
+						</BorderlessButton>
 					),
 				}}
 			/>
@@ -433,12 +480,13 @@ export default function _layout() {
 					},
 
 					headerLeft: () => (
-						<TouchableOpacity
+						<BorderlessButton
 							onPress={() => router.back()}
+							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
+						</BorderlessButton>
 					),
 				}}
 			/>
@@ -459,12 +507,12 @@ export default function _layout() {
 					},
 
 					headerLeft: () => (
-						<TouchableOpacity
+						<BorderlessButton
 							onPress={() => router.back()}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
+						</BorderlessButton>
 					),
 				}}
 			/>
@@ -485,12 +533,13 @@ export default function _layout() {
 					},
 
 					headerLeft: () => (
-						<TouchableOpacity
+						<BorderlessButton
 							onPress={() => router.back()}
+							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
+						</BorderlessButton>
 					),
 				}}
 			/>
@@ -511,12 +560,13 @@ export default function _layout() {
 					},
 
 					headerLeft: () => (
-						<TouchableOpacity
+						<BorderlessButton
 							onPress={() => router.back()}
+							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
+						</BorderlessButton>
 					),
 				}}
 			/>
@@ -537,12 +587,13 @@ export default function _layout() {
 					},
 
 					headerLeft: () => (
-						<TouchableOpacity
+						<BorderlessButton
 							onPress={() => router.back()}
+							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
+						</BorderlessButton>
 					),
 				}}
 			/>
@@ -563,12 +614,67 @@ export default function _layout() {
 					},
 
 					headerLeft: () => (
-						<TouchableOpacity
+						<BorderlessButton
 							onPress={() => router.back()}
+							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
+						</BorderlessButton>
+					),
+				}}
+			/>
+			<Stack.Screen
+				name="dataandprivacy/index"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Data & Privacy',
+					headerShadowVisible: false,
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+
+					headerLeft: () => (
+						<BorderlessButton
+							onPress={() => router.back()}
+							onActiveStateChange={setIsPressed}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</BorderlessButton>
+					),
+				}}
+			/>
+			<Stack.Screen
+				name="dataandprivacy/exportData"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Export Data',
+					headerShadowVisible: false,
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+
+					headerLeft: () => (
+						<BorderlessButton
+							onPress={() => router.back()}
+							onActiveStateChange={setIsPressed}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</BorderlessButton>
 					),
 				}}
 			/>
