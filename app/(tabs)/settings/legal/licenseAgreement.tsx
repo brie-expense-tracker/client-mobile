@@ -8,7 +8,7 @@ export default function LicenseAgreementScreen() {
 			<Stack.Screen options={{ title: 'License Agreement' }} />
 			<ScrollView contentContainerStyle={styles.container}>
 				<Text style={styles.h1}>Brie Finance – License Agreement</Text>
-				<Text style={styles.muted}>Effective Date: 23 June 2025</Text>
+				<Text style={styles.muted}>Last Updated: June 24, 2025</Text>
 
 				<Section title="1. License Grant">
 					<Paragraph>

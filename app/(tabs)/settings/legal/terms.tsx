@@ -10,7 +10,7 @@ export default function TermsOfServiceScreen() {
 
 			<ScrollView contentContainerStyle={styles.container}>
 				<Text style={styles.h1}>Brie Finance — Terms of Service</Text>
-				<Text style={styles.muted}>Effective Date: (insert date)</Text>
+				<Text style={styles.muted}>Last Updated: June 24, 2025</Text>
 
 				{/* 1. About */}
 				<Section title="1. About Brie Finance">
