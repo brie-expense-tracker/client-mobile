@@ -8,9 +8,9 @@ import {
 	Switch,
 	StyleSheet,
 	TextInput,
+	TouchableOpacity,
 } from 'react-native';
 import { Stack } from 'expo-router';
-import { Picker } from '@react-native-picker/picker'; // expo install @react-native-picker/picker
 
 export default function BudgetSettingsScreen() {
 	/* Local state → replace with Context / Redux / backend fetch later */
@@ -29,22 +29,40 @@ export default function BudgetSettingsScreen() {
 			<ScrollView contentContainerStyle={styles.container}>
 				{/* —— Cycle —— */}
 				<Section title="Budget Cycle">
-					<Label>Cycle type</Label>
-					<Picker
-						style={styles.picker}
-						selectedValue={cycleType}
-						onValueChange={(v) => setCycleType(v)}
-					>
-						<Picker.Item label="Monthly" value="monthly" />
-						<Picker.Item label="Weekly" value="weekly" />
-						<Picker.Item label="Bi-Weekly" value="biweekly" />
-					</Picker>
+					<SectionSubtext>
+						Configure how your budget periods are calculated and when they reset
+					</SectionSubtext>
+					<Label>Cycle Type</Label>
+					<LabelSubtext>
+						Choose how often your budget resets - monthly, weekly, or every two
+						weeks
+					</LabelSubtext>
+					<OptionRow
+						label="Monthly"
+						selected={cycleType === 'monthly'}
+						onPress={() => setCycleType('monthly')}
+					/>
+					<OptionRow
+						label="Weekly"
+						selected={cycleType === 'weekly'}
+						onPress={() => setCycleType('weekly')}
+					/>
+					<OptionRow
+						label="Bi-Weekly"
+						selected={cycleType === 'biweekly'}
+						onPress={() => setCycleType('biweekly')}
+					/>
 
 					<Label>
 						{cycleType === 'monthly'
-							? 'Start day (1-28)'
-							: 'Start weekday (0=Sun)'}{' '}
+							? 'Start Day (1-28)'
+							: 'Start Weekday (0=Sunday)'}
 					</Label>
+					<LabelSubtext>
+						{cycleType === 'monthly'
+							? 'Which day of the month your budget cycle starts'
+							: 'Which day of the week your budget cycle starts (0=Sunday, 1=Monday, etc.)'}
+					</LabelSubtext>
 					<TextInput
 						style={styles.input}
 						keyboardType="numeric"
@@ -55,7 +73,13 @@ export default function BudgetSettingsScreen() {
 
 				{/* —— Alerts —— */}
 				<Section title="Notifications">
-					<Label>Overspend alert %</Label>
+					<SectionSubtext>
+						Set up alerts to help you stay on track with your budget
+					</SectionSubtext>
+					<Label>Overspend Alert Percentage</Label>
+					<LabelSubtext>
+						Get notified when you've spent this percentage of your budget
+					</LabelSubtext>
 					<TextInput
 						style={styles.input}
 						keyboardType="numeric"
@@ -66,6 +90,9 @@ export default function BudgetSettingsScreen() {
 
 				{/* —— Toggles —— */}
 				<Section title="Preferences">
+					<SectionSubtext>
+						Customize how your budget behaves and updates
+					</SectionSubtext>
 					<Row
 						label="Carry over unused budgets"
 						value={carryOver}
@@ -83,11 +110,21 @@ export default function BudgetSettingsScreen() {
 }
 
 /* ——— Helper components ——— */
-const Section = ({ title, children }: any) => (
+const Section = ({
+	title,
+	children,
+}: {
+	title: string;
+	children: React.ReactNode;
+}) => (
 	<View style={{ marginBottom: 32 }}>
 		<Text style={styles.sectionHeader}>{title}</Text>
 		{children}
 	</View>
+);
+
+const SectionSubtext = ({ children }: { children: React.ReactNode }) => (
+	<Text style={styles.sectionSubtext}>{children}</Text>
 );
 
 const Row = ({
@@ -105,22 +142,59 @@ const Row = ({
 	</View>
 );
 
-const Label = ({ children }: any) => (
+const OptionRow = ({
+	label,
+	selected,
+	onPress,
+}: {
+	label: string;
+	selected: boolean;
+	onPress: () => void;
+}) => (
+	<TouchableOpacity style={styles.optionRow} onPress={onPress}>
+		<Text style={styles.optionLabel}>{label}</Text>
+		<Text style={[styles.checkmark, selected && styles.checkmarkSelected]}>
+			{selected ? '✓' : ''}
+		</Text>
+	</TouchableOpacity>
+);
+
+const Label = ({ children }: { children: React.ReactNode }) => (
 	<Text style={styles.label}>{children}</Text>
+);
+
+const LabelSubtext = ({ children }: { children: React.ReactNode }) => (
+	<Text style={styles.labelSubtext}>{children}</Text>
 );
 
 const styles = StyleSheet.create({
 	safe: { flex: 1, backgroundColor: '#fff' },
 	container: { padding: 24, paddingBottom: 48 },
 	sectionHeader: { fontSize: 18, fontWeight: '600', marginBottom: 12 },
+	sectionSubtext: { fontSize: 12, color: '#666', marginBottom: 12 },
 	row: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
 		paddingVertical: 12,
+		borderBottomWidth: 1,
+		borderBottomColor: '#efefef',
 	},
 	rowLabel: { fontSize: 16, color: '#333', flexShrink: 1 },
+	optionRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		paddingVertical: 12,
+		paddingHorizontal: 4,
+		borderBottomWidth: 1,
+		borderBottomColor: '#efefef',
+	},
+	optionLabel: { fontSize: 16, color: '#333' },
+	checkmark: { fontSize: 18, color: '#ccc', fontWeight: 'bold' },
+	checkmarkSelected: { color: '#007AFF' },
 	label: { fontSize: 14, color: '#666', marginTop: 12, marginBottom: 4 },
+	labelSubtext: { fontSize: 12, color: '#666', marginBottom: 4 },
 	input: {
 		borderWidth: 1,
 		borderColor: '#ddd',
@@ -128,5 +202,4 @@ const styles = StyleSheet.create({
 		padding: 10,
 		fontSize: 16,
 	},
-	picker: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8 },
 });

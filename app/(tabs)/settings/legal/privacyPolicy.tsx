@@ -8,7 +8,7 @@ export default function PrivacyPolicyScreen() {
 			<Stack.Screen options={{ title: 'Privacy Policy' }} />
 			<ScrollView contentContainerStyle={styles.container}>
 				<Text style={styles.h1}>Brie Finance – Privacy Policy</Text>
-				<Text style={styles.muted}>Effective Date: 23 June 2025</Text>
+				<Text style={styles.muted}>Last Updated: June 24, 2025</Text>
 
 				<Section title="1. What We Collect">
 					<Bullet>Account info (email, login method)</Bullet>

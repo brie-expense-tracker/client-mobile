@@ -294,84 +294,7 @@ export default function _layout() {
 					),
 				}}
 			/>
-			<Stack.Screen
-				name="about/terms"
-				options={{
-					headerShown: true,
-					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: 'Terms of Service',
-					headerShadowVisible: false,
-					headerTitleStyle: {
-						fontSize: 20,
-						fontWeight: '600',
-						color: '#333',
-					},
-					headerStyle: {
-						backgroundColor: '#ffffff',
-					},
 
-					headerLeft: () => (
-						<TouchableOpacity
-							onPress={() => router.back()}
-							style={{ width: 50 }}
-						>
-							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
-					),
-				}}
-			/>
-			<Stack.Screen
-				name="about/privacyPolicy"
-				options={{
-					headerShown: true,
-					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: 'Privacy Policy',
-					headerShadowVisible: false,
-					headerTitleStyle: {
-						fontSize: 20,
-						fontWeight: '600',
-						color: '#333',
-					},
-					headerStyle: {
-						backgroundColor: '#ffffff',
-					},
-
-					headerLeft: () => (
-						<TouchableOpacity
-							onPress={() => router.back()}
-							style={{ width: 50 }}
-						>
-							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
-					),
-				}}
-			/>
-			<Stack.Screen
-				name="about/licenseAgreement"
-				options={{
-					headerShown: true,
-					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: 'License Agreement',
-					headerShadowVisible: false,
-					headerTitleStyle: {
-						fontSize: 20,
-						fontWeight: '600',
-						color: '#333',
-					},
-					headerStyle: {
-						backgroundColor: '#ffffff',
-					},
-
-					headerLeft: () => (
-						<TouchableOpacity
-							onPress={() => router.back()}
-							style={{ width: 50 }}
-						>
-							<Ionicons name="chevron-back" size={24} color="#333" />
-						</TouchableOpacity>
-					),
-				}}
-			/>
 			<Stack.Screen
 				name="help/index"
 				options={{
@@ -454,6 +377,191 @@ export default function _layout() {
 						fontWeight: '600',
 						color: '#333',
 					},
+					headerLeft: () => (
+						<TouchableOpacity
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</TouchableOpacity>
+					),
+				}}
+			/>
+			<Stack.Screen
+				name="legal/index"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Legal Documents',
+					headerShadowVisible: false,
+					headerLargeTitle: true,
+					headerLargeStyle: {
+						backgroundColor: '#ffffff',
+					},
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+					headerLeft: () => (
+						<TouchableOpacity
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</TouchableOpacity>
+					),
+				}}
+			/>
+			<Stack.Screen
+				name="legal/terms"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Terms of Service',
+					headerShadowVisible: false,
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+
+					headerLeft: () => (
+						<TouchableOpacity
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</TouchableOpacity>
+					),
+				}}
+			/>
+			<Stack.Screen
+				name="legal/privacyPolicy"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Privacy Policy',
+					headerShadowVisible: false,
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+
+					headerLeft: () => (
+						<TouchableOpacity
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</TouchableOpacity>
+					),
+				}}
+			/>
+			<Stack.Screen
+				name="legal/licenseAgreement"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'License Agreement',
+					headerShadowVisible: false,
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+
+					headerLeft: () => (
+						<TouchableOpacity
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</TouchableOpacity>
+					),
+				}}
+			/>
+			<Stack.Screen
+				name="legal/cookiePolicy"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Cookie Policy',
+					headerShadowVisible: false,
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+
+					headerLeft: () => (
+						<TouchableOpacity
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</TouchableOpacity>
+					),
+				}}
+			/>
+			<Stack.Screen
+				name="legal/disclaimer"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Disclaimer',
+					headerShadowVisible: false,
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+
+					headerLeft: () => (
+						<TouchableOpacity
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</TouchableOpacity>
+					),
+				}}
+			/>
+			<Stack.Screen
+				name="legal/dataRightsCompliance"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Data Rights & Compliance',
+					headerShadowVisible: false,
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+
 					headerLeft: () => (
 						<TouchableOpacity
 							onPress={() => router.back()}
