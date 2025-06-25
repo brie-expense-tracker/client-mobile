@@ -1,18 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
 	View,
 	Text,
 	StyleSheet,
 	FlatList,
 	Dimensions,
-	SafeAreaView,
 	TouchableOpacity,
 	Modal,
 	TextInput,
 	Animated,
 	KeyboardAvoidingView,
 	Platform,
-	ScrollView,
+	ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -148,6 +147,7 @@ export default function BudgetScreen() {
 	// ==========================================
 	const [budgets, setBudgets] = useState<Budget[]>(initialBudgets);
 	const [isModalVisible, setIsModalVisible] = useState(false);
+	const [isLoading, setIsLoading] = useState(true);
 	const [newBudget, setNewBudget] = useState({
 		category: '',
 		allocated: '',
@@ -159,6 +159,43 @@ export default function BudgetScreen() {
 	// Animation Setup
 	// ==========================================
 	const slideAnim = React.useRef(new Animated.Value(0)).current;
+
+	// ==========================================
+	// Loading Effect
+	// ==========================================
+	useEffect(() => {
+		// Simulate loading time for data fetching/initialization
+		const loadData = async () => {
+			try {
+				// Add a small delay to ensure smooth loading experience
+				await new Promise((resolve) => setTimeout(resolve, 500));
+
+				// Here you would typically fetch data from your API
+				// For now, we'll just set the budgets from initial data
+				setBudgets(initialBudgets);
+
+				// Mark loading as complete
+				setIsLoading(false);
+			} catch (error) {
+				console.error('Error loading budgets:', error);
+				setIsLoading(false);
+			}
+		};
+
+		loadData();
+	}, []);
+
+	// ==========================================
+	// Loading Screen Component
+	// ==========================================
+	const LoadingScreen = () => (
+		<View style={styles.loadingContainer}>
+			<View style={styles.loadingContent}>
+				<ActivityIndicator size="large" color="#00a2ff" />
+				<Text style={styles.loadingText}>Loading budgets...</Text>
+			</View>
+		</View>
+	);
 
 	// ==========================================
 	// Budget Management
@@ -337,6 +374,11 @@ export default function BudgetScreen() {
 	// ==========================================
 	// Main Render
 	// ==========================================
+	// Show loading screen while data is being loaded
+	if (isLoading) {
+		return <LoadingScreen />;
+	}
+
 	return (
 		<View style={styles.mainContainer}>
 			<FlatList
@@ -443,6 +485,21 @@ const styles = StyleSheet.create({
 	mainContainer: {
 		flex: 1,
 		backgroundColor: '#fff',
+	},
+	loadingContainer: {
+		flex: 1,
+		backgroundColor: '#fff',
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	loadingContent: {
+		alignItems: 'center',
+	},
+	loadingText: {
+		marginTop: 16,
+		fontSize: 16,
+		color: '#757575',
+		fontWeight: '500',
 	},
 	listContent: {
 		paddingHorizontal: 24,

@@ -7,6 +7,7 @@ import {
 	SafeAreaView,
 	StyleSheet,
 	RefreshControl,
+	ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import {
@@ -316,6 +317,7 @@ const Dashboard = () => {
 	// State Management
 	const [transactions, setTransactions] = useState<Transaction[]>([]);
 	const [refreshing, setRefreshing] = useState(false);
+	const [isLoading, setIsLoading] = useState(true);
 
 	// Calculate total balance from transactions
 	const totalBalance = transactions.reduce((sum, t) => {
@@ -357,6 +359,8 @@ const Dashboard = () => {
 			setTransactions(formattedTransactions);
 		} catch (error) {
 			setTransactions(dummyTransactions);
+		} finally {
+			setIsLoading(false);
 		}
 	};
 
@@ -376,6 +380,18 @@ const Dashboard = () => {
 	useEffect(() => {
 		fetchTransactions();
 	}, []);
+
+	// Show loading screen while data is being fetched
+	if (isLoading) {
+		return (
+			<SafeAreaView style={styles.safeArea}>
+				<View style={styles.loadingContainer}>
+					<ActivityIndicator size="large" color="#0095FF" />
+					<Text style={styles.loadingText}>Loading your dashboard...</Text>
+				</View>
+			</SafeAreaView>
+		);
+	}
 
 	// Main render
 	return (
@@ -402,7 +418,7 @@ const Dashboard = () => {
 							</View>
 
 							<TouchableOpacity
-								onPress={() => router.push('/notifications')}
+								onPress={() => router.push('/dashboard/notifications')}
 								style={styles.notificationButton}
 							>
 								<View style={{ position: 'relative' }}>
@@ -471,6 +487,18 @@ const styles = StyleSheet.create({
 	safeArea: {
 		flex: 1,
 		backgroundColor: '#f7f7f7',
+	},
+	loadingContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		backgroundColor: '#f7f7f7',
+	},
+	loadingText: {
+		marginTop: 16,
+		fontSize: 16,
+		color: '#535353',
+		fontWeight: '500',
 	},
 	scrollView: {
 		flex: 1,
@@ -673,7 +701,6 @@ const styles = StyleSheet.create({
 	},
 	transactionsListContainer: {
 		flex: 1,
-		// backgroundColor: '#ffffff',
 		borderRadius: 12,
 		overflow: 'hidden',
 	},
