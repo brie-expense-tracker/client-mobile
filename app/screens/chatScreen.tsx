@@ -17,11 +17,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import axios from 'axios';
-import { Transaction } from '../../data/transactions';
+import { Transaction } from '../../src/data/transactions';
 import {
 	analyzeTransactions,
 	getFinancialInsights,
-} from '../../services/aiService';
+} from '../../src/services/aiService';
 import Constants from 'expo-constants';
 
 // Define API URL based on environment

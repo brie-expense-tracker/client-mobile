@@ -107,67 +107,6 @@ export default function AboutScreen() {
 				</View>
 			</View>
 
-			{/* Legal */}
-			<View style={styles.section}>
-				<Text style={styles.sectionTitle}>Legal</Text>
-				<View style={styles.settingsContainer}>
-					<TouchableOpacity
-						style={styles.settingItem}
-						onPress={() => {
-							router.push('./about/terms');
-						}}
-					>
-						<Ionicons name="document-text-outline" size={24} color="#555" />
-						<Text style={styles.settingText}>Terms of Service</Text>
-						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
-					</TouchableOpacity>
-
-					<TouchableOpacity
-						style={styles.settingItem}
-						onPress={() => router.push('./about/privacyPolicy')}
-					>
-						<Ionicons name="shield-checkmark-outline" size={24} color="#555" />
-						<Text style={styles.settingText}>Privacy Policy</Text>
-						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
-					</TouchableOpacity>
-
-					<TouchableOpacity
-						style={styles.settingItem}
-						onPress={() => {
-							router.push('./about/licenseAgreement');
-						}}
-					>
-						<Ionicons name="document-outline" size={24} color="#555" />
-						<Text style={styles.settingText}>License Agreement</Text>
-						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
-					</TouchableOpacity>
-				</View>
-			</View>
-
-			{/* Contact */}
-			<View style={styles.section}>
-				<Text style={styles.sectionTitle}>Contact</Text>
-				<View style={styles.settingsContainer}>
-					<TouchableOpacity
-						style={styles.settingItem}
-						onPress={() => handleOpenLink(appInfo.website)}
-					>
-						<Ionicons name="globe-outline" size={24} color="#555" />
-						<Text style={styles.settingText}>Website</Text>
-						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
-					</TouchableOpacity>
-
-					<TouchableOpacity
-						style={styles.settingItem}
-						onPress={handleEmailSupport}
-					>
-						<Ionicons name="mail-outline" size={24} color="#555" />
-						<Text style={styles.settingText}>Email Support</Text>
-						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
-					</TouchableOpacity>
-				</View>
-			</View>
-
 			{/* Credits */}
 			<View style={styles.section}>
 				<Text style={styles.sectionTitle}>Credits</Text>

@@ -32,6 +32,7 @@ function RootLayoutContent() {
 		if (user) {
 			// User is authenticated - show main app
 			if (!inTabsGroup) {
+				console.log('inTabsGroup', inTabsGroup);
 				router.replace('/(tabs)/dashboard');
 			}
 		} else {

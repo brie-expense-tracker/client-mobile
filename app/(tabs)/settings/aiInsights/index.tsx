@@ -24,7 +24,6 @@ export default function AIInsightsSettingsScreen() {
 
 	return (
 		<SafeAreaView style={styles.safe}>
-			<Stack.Screen options={{ title: 'AI Insights Settings' }} />
 			<ScrollView contentContainerStyle={styles.container}>
 				{/* Main AI Toggle */}
 				<Section title="AI Insights">

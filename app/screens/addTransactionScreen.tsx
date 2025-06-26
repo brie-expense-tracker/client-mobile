@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
 import axios from 'axios';
 import { Picker } from '@react-native-picker/picker';
-import MonthYearPickerModal from '../components/MonthYearPickerModal';
-import MonthYearDayPickerModal from '../components/MonthYearDayPickerModal';
+import MonthYearPickerModal from '../../src/components/MonthYearPickerModal';
+import MonthYearDayPickerModal from '../../src/components/MonthYearDayPickerModal';
 
 const addTransactionScreen = () => {
 	const [transaction, setTransaction] = useState({

@@ -15,7 +15,7 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useOnboarding } from '../../context/OnboardingContext';
+import { useOnboarding } from '../../src/context/OnboardingContext';
 
 type RootStackParamList = {
 	Home: undefined;
