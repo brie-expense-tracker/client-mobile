@@ -1,4 +1,3 @@
-// ProfileScreen.tsx
 import React, { useState, useEffect } from 'react';
 import {
 	SafeAreaView,
@@ -14,8 +13,9 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { getAuth, signOut } from '@react-native-firebase/auth';
+import { RectButton } from 'react-native-gesture-handler';
 
-export default function ProfileScreen() {
+export default function SettingsScreen() {
 	const router = useRouter();
 	const [isLoading, setIsLoading] = useState(true);
 	const [profileImage, setProfileImage] = useState(
@@ -83,8 +83,8 @@ export default function ProfileScreen() {
 	/* ---------------------------------- UI --------------------------------- */
 	return (
 		<View style={styles.mainContainer}>
-			<ScrollView>
-				<SafeAreaView style={styles.safeArea}>
+			<SafeAreaView style={styles.safeArea}>
+				<ScrollView>
 					{/* ——— Profile picture and balances ——— */}
 					<View style={styles.profilePicWrapper}>
 						<View style={styles.profilePicContainer}>
@@ -95,27 +95,7 @@ export default function ProfileScreen() {
 							/>
 						</View>
 						<Text style={styles.userName}>@{userProfile.username}</Text>
-						{/* <Text style={styles.totalValue}>
-							${(userProfile?.monthlyIncome || 0).toLocaleString()}
-						</Text>
-						<Text style={styles.totalValueLabel}>Total Amount Inputted</Text> */}
 					</View>
-
-					{/* ——— Savings / Debt cards ——— */}
-					{/* <View style={styles.statsContainer}>
-						<View style={styles.statCard}>
-							<Text style={styles.statValue}>
-								${(userProfile?.savings || 0).toLocaleString()}
-							</Text>
-							<Text style={styles.statLabel}>Total Savings</Text>
-						</View>
-						<View style={styles.statCard}>
-							<Text style={styles.statValue}>
-								${(userProfile?.debt || 0).toLocaleString()}
-							</Text>
-							<Text style={styles.statLabel}>Total Debt</Text>
-						</View>
-					</View> */}
 
 					{/* ——— Settings ——— */}
 					<View style={styles.settingsContainerWrapper}>
@@ -166,11 +146,6 @@ export default function ProfileScreen() {
 								label="Notifications"
 								onPress={() => router.push('./settings/notification')}
 							/>
-							<Setting
-								icon="color-palette-outline"
-								label="Appearance"
-								onPress={() => router.push('./settings/appearance')}
-							/>
 
 							{/* LEGAL & SUPPORT */}
 							<Text style={styles.settingsHeader}>Support & Legal</Text>
@@ -201,16 +176,16 @@ export default function ProfileScreen() {
 
 					{/* ——— Sign-out ——— */}
 					<View style={styles.signOutContainer}>
-						<TouchableOpacity
+						<RectButton
 							style={styles.signOutButton}
 							onPress={handleSignOut}
 						>
 							<Ionicons name="log-out-outline" size={24} color="#FF3B30" />
 							<Text style={styles.signOutText}>Sign Out</Text>
-						</TouchableOpacity>
+						</RectButton>
 					</View>
-				</SafeAreaView>
-			</ScrollView>
+				</ScrollView>
+			</SafeAreaView>
 		</View>
 	);
 }

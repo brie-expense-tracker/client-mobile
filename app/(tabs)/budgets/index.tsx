@@ -514,10 +514,10 @@ const styles = StyleSheet.create({
 		// iOS shadow
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
-		shadowRadius: 4,
+		shadowOpacity: 0.05,
+		shadowRadius: 8,
 		// Android shadow
-		elevation: 3,
+		elevation: 2,
 	},
 	cardHeader: {
 		flexDirection: 'row',

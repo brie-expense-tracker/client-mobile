@@ -3,16 +3,6 @@ import React, { ReactNode } from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-interface NonInteractiveButtonProps {
-	children: ReactNode;
-}
-
-const NonInteractiveButton = ({ children }: NonInteractiveButtonProps) => (
-	<View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-		{children}
-	</View>
-);
-
 export default function TabLayout() {
 	return (
 		<Tabs
@@ -48,34 +38,23 @@ export default function TabLayout() {
 				}}
 			/>
 			<Tabs.Screen
-				name="transactions"
+				name="ledger"
 				options={{
 					tabBarIcon: ({ color, size }) => (
 						<Ionicons name="timer-outline" color={color} size={size} />
 					),
 					tabBarShowLabel: false,
-					tabBarLabel: 'History',
+					tabBarLabel: 'Ledger',
 				}}
 			/>
 			<Tabs.Screen
-				name="trackerScreen"
+				name="transaction/index"
 				options={{
 					tabBarIcon: ({ color, size, focused }) => (
-						<View
-							style={{
-								backgroundColor: focused ? '#007bff' : '#09a1ff',
-								borderRadius: 15,
-								width: 50,
-								height: 50,
-								justifyContent: 'center',
-								alignItems: 'center',
-							}}
-						>
-							<Ionicons name="contract-outline" color="white" size={32} />
-						</View>
+						<Ionicons name="add-circle-outline" color={color} size={size} />
 					),
 					tabBarShowLabel: false,
-					tabBarLabel: 'Add',
+					tabBarLabel: 'Transaction',
 				}}
 			/>
 			<Tabs.Screen

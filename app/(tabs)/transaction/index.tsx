@@ -132,8 +132,8 @@ const AddTransactionScreen = () => {
 				<View style={styles.mainContainer}>
 					<View style={styles.topContainer}>
 						<View style={styles.inputAmountContainer}>
-							<FontAwesome
-								name="dollar"
+							<Ionicons
+								name="logo-usd"
 								size={24}
 								color="black"
 								style={styles.dollarIcon}
@@ -158,6 +158,7 @@ const AddTransactionScreen = () => {
 								)}
 							/>
 						</View>
+
 						{/* Carousel */}
 						<View style={styles.carouselContainer}>
 							<ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -180,10 +181,10 @@ const AddTransactionScreen = () => {
 									</RectButton>
 								))}
 								<RectButton
-									onPress={() => router.push('/settings/categories')}
+									onPress={() => router.replace('/settings/categories')}
 									style={styles.addCategoryButton}
 								>
-									<Ionicons name="add-circle-outline" size={24} color="grey" />
+									<Ionicons name="add-outline" size={24} color="grey" />
 								</RectButton>
 							</ScrollView>
 						</View>
@@ -218,11 +219,7 @@ const AddTransactionScreen = () => {
 										handleSubmit(onSubmit)();
 									}}
 								>
-									<Text
-										style={{ color: 'white', fontWeight: 'bold', fontSize: 18 }}
-									>
-										Spent
-									</Text>
+									<Text style={styles.transactionButtonText}>Spent</Text>
 								</RectButton>
 							</View>
 							<View style={styles.transactionButtonContainer}>
@@ -233,11 +230,7 @@ const AddTransactionScreen = () => {
 										handleSubmit(onSubmit)();
 									}}
 								>
-									<Text
-										style={{ color: 'white', fontWeight: 'bold', fontSize: 18 }}
-									>
-										Made
-									</Text>
+									<Text style={styles.transactionButtonText}>Made</Text>
 								</RectButton>
 							</View>
 						</View>
@@ -382,16 +375,16 @@ const NumberPad: React.FC<{ onValueChange: (value: string) => void }> = ({
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: '#f9f9f9',
+		backgroundColor: '#ffffff',
 	},
 	safeArea: {
 		flex: 1,
-		backgroundColor: '#f9f9f9',
+		backgroundColor: '#ffffff',
 	},
 	mainContainer: {
 		flex: 1,
 		justifyContent: 'space-between',
-		backgroundColor: '#f9f9f9',
+		backgroundColor: '#ffffff',
 	},
 	topContainer: {
 		flex: 1,
@@ -410,7 +403,7 @@ const styles = StyleSheet.create({
 		height: 40,
 	},
 	inputAmount: {
-		fontSize: 80,
+		fontSize: 60,
 		fontWeight: 'bold',
 		textAlign: 'left',
 	},
@@ -438,20 +431,23 @@ const styles = StyleSheet.create({
 	},
 	transactionButton: {
 		width: '100%',
-		height: 56,
 		alignItems: 'center',
 		justifyContent: 'center',
-		borderRadius: 24,
+		borderRadius: 16,
 		backgroundColor: '#0095FF',
+		padding: 16,
 	},
-
+	transactionButtonText: {
+		color: 'white',
+		fontWeight: '600',
+		fontSize: 18,
+	},
 	topNumPadContainer: {
 		padding: 5,
 		paddingTop: 10,
 		borderTopWidth: 1,
 		borderColor: '#ebebeb',
 	},
-
 	numPadContainer: {
 		justifyContent: 'center',
 	},
@@ -502,6 +498,7 @@ const styles = StyleSheet.create({
 		padding: 8,
 		justifyContent: 'center',
 		alignItems: 'center',
+		borderRadius: 8,
 	},
 	loadingContainer: {
 		flex: 1,
