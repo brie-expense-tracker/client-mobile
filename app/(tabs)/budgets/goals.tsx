@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import {
 	View,
 	Text,
@@ -14,22 +14,13 @@ import {
 	Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useGoal, Goal } from '../../../src/context/goalContext';
 
 const { width } = Dimensions.get('window');
 
 // ==========================================
 // Types
 // ==========================================
-type Goal = {
-	id: string;
-	name: string;
-	target: number;
-	current: number;
-	deadline: string;
-	icon: keyof typeof Ionicons.glyphMap;
-	color: string;
-};
-
 type ColorOption = {
 	base: string;
 	pastel: string;
@@ -86,55 +77,17 @@ const COLOR_PALETTE: Record<string, ColorOption> = {
 };
 
 // ==========================================
-// Mock Data
-// ==========================================
-const initialGoals: Goal[] = [
-	{
-		id: '1',
-		name: 'Emergency Fund',
-		target: 10000,
-		current: 6500,
-		deadline: '2024-12-31',
-		icon: 'shield-checkmark-outline',
-		color: '#4CAF50',
-	},
-	{
-		id: '2',
-		name: 'New Car',
-		target: 25000,
-		current: 12000,
-		deadline: '2025-06-30',
-		icon: 'car-outline',
-		color: '#2196F3',
-	},
-	{
-		id: '3',
-		name: 'Vacation Fund',
-		target: 5000,
-		current: 2500,
-		deadline: '2024-08-31',
-		icon: 'airplane-outline',
-		color: '#FF9800',
-	},
-	{
-		id: 'add',
-		name: 'Add Goal',
-		target: 0,
-		current: 0,
-		deadline: '',
-		icon: 'add-circle-outline',
-		color: '#00a2ff',
-	},
-];
-
-// ==========================================
 // Main Component
 // ==========================================
 export default function GoalsScreen() {
 	// ==========================================
+	// Context
+	// ==========================================
+	const { goals, addGoal } = useGoal();
+
+	// ==========================================
 	// State Management
 	// ==========================================
-	const [goals, setGoals] = useState<Goal[]>(initialGoals);
 	const [isModalVisible, setIsModalVisible] = useState(false);
 	const [newGoal, setNewGoal] = useState({
 		name: '',
@@ -152,36 +105,32 @@ export default function GoalsScreen() {
 	// ==========================================
 	// Goal Management
 	// ==========================================
-	const handleAddGoal = () => {
+	const handleAddGoal = async () => {
 		if (!newGoal.name || !newGoal.target || !newGoal.deadline) {
 			return;
 		}
 
-		const goalToAdd: Goal = {
-			id: Date.now().toString(),
-			name: newGoal.name,
-			target: parseFloat(newGoal.target),
-			current: 0,
-			deadline: newGoal.deadline,
-			icon: newGoal.icon,
-			color: newGoal.color,
-		};
+		try {
+			await addGoal({
+				name: newGoal.name,
+				target: parseFloat(newGoal.target),
+				deadline: newGoal.deadline,
+				icon: newGoal.icon,
+				color: newGoal.color,
+			});
 
-		const updatedGoals = [
-			...goals.slice(0, -1),
-			goalToAdd,
-			goals[goals.length - 1],
-		];
-
-		setGoals(updatedGoals);
-		hideModal();
-		setNewGoal({
-			name: '',
-			target: '',
-			deadline: '',
-			icon: 'flag-outline',
-			color: COLOR_PALETTE.blue.base,
-		});
+			hideModal();
+			setNewGoal({
+				name: '',
+				target: '',
+				deadline: '',
+				icon: 'flag-outline',
+				color: COLOR_PALETTE.blue.base,
+			});
+		} catch (error) {
+			console.error('Error adding goal:', error);
+			// You might want to show an error message to the user
+		}
 	};
 
 	// ==========================================
@@ -266,24 +215,6 @@ export default function GoalsScreen() {
 	// Render Functions
 	// ==========================================
 	const renderItem = ({ item }: { item: Goal }) => {
-		if (item.id === 'add') {
-			return (
-				<TouchableOpacity style={styles.card} onPress={showModal}>
-					<View style={styles.cardHeader}>
-						<View
-							style={[
-								styles.iconWrapper,
-								{ backgroundColor: `${item.color}20` },
-							]}
-						>
-							<Ionicons name={item.icon} size={24} color={item.color} />
-						</View>
-						<Text style={styles.categoryText}>{item.name}</Text>
-					</View>
-				</TouchableOpacity>
-			);
-		}
-
 		const percent = Math.min((item.current / item.target) * 100, 100);
 		const deadline = new Date(item.deadline);
 		const today = new Date();
@@ -297,7 +228,7 @@ export default function GoalsScreen() {
 					<View
 						style={[styles.iconWrapper, { backgroundColor: `${item.color}20` }]}
 					>
-						<Ionicons name={item.icon} size={24} color={item.color} />
+						<Ionicons name={item.icon as any} size={24} color={item.color} />
 					</View>
 					<Text style={styles.categoryText}>{item.name}</Text>
 				</View>
@@ -330,12 +261,49 @@ export default function GoalsScreen() {
 	// ==========================================
 	// Main Render
 	// ==========================================
+	// Add the "Add Goal" card to the data
+	const goalsWithAdd = [
+		...goals,
+		{
+			id: 'add',
+			name: 'Add Goal',
+			target: 0,
+			current: 0,
+			deadline: '',
+			icon: 'add-circle-outline',
+			color: '#00a2ff',
+		} as Goal,
+	];
+
 	return (
 		<View style={styles.mainContainer}>
 			<FlatList
-				data={goals}
+				data={goalsWithAdd}
 				keyExtractor={(item) => item.id}
-				renderItem={renderItem}
+				renderItem={({ item }) => {
+					if (item.id === 'add') {
+						return (
+							<TouchableOpacity style={styles.card} onPress={showModal}>
+								<View style={styles.cardHeader}>
+									<View
+										style={[
+											styles.iconWrapper,
+											{ backgroundColor: `${item.color}20` },
+										]}
+									>
+										<Ionicons
+											name={item.icon as any}
+											size={24}
+											color={item.color}
+										/>
+									</View>
+									<Text style={styles.categoryText}>{item.name}</Text>
+								</View>
+							</TouchableOpacity>
+						);
+					}
+					return renderItem({ item });
+				}}
 				contentContainerStyle={styles.listContent}
 				showsVerticalScrollIndicator={false}
 			/>

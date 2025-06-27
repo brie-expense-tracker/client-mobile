@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import {
 	SafeAreaView,
 	ScrollView,
@@ -8,57 +8,97 @@ import {
 	FlatList,
 	Alert,
 	StyleSheet,
+	ActivityIndicator,
 } from 'react-native';
-import { FontAwesome } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import { RectButton } from 'react-native-gesture-handler';
-
-type Category = {
-	id: string;
-	name: string;
-	type: 'income' | 'expense';
-	icon?: string;
-};
+import { TransactionContext } from '../../../../src/context/transactionContext';
+import { Category } from '../../../../src/data/transactions';
 
 export default function CategorySettingsScreen() {
-	const [categories, setCategories] = useState<Category[]>([
-		{ id: '1', name: 'Groceries', type: 'expense', icon: 'shopping-cart' },
-		{ id: '2', name: 'Salary', type: 'income', icon: 'money' },
-	]);
+	const { getCategories, addCategory, deleteCategory, categoriesLoading } =
+		useContext(TransactionContext);
 	const [newCategory, setNewCategory] = useState('');
 	const [type, setType] = useState<'income' | 'expense'>('expense');
+	const [isAdding, setIsAdding] = useState(false);
 
-	const addCategory = () => {
+	// Get categories from transaction context
+	const allCategories = getCategories();
+	const categoriesByType = allCategories.filter((cat) => cat.type === type);
+
+	const handleAddCategory = async () => {
 		if (!newCategory.trim()) return;
-		const exists = categories.find(
+
+		const exists = allCategories.find(
 			(cat) =>
 				cat.name.toLowerCase() === newCategory.toLowerCase() &&
 				cat.type === type
 		);
+
 		if (exists) {
 			Alert.alert('Category already exists');
 			return;
 		}
-		const newCat: Category = {
-			id: Date.now().toString(),
-			name: newCategory.trim(),
-			type,
-			icon: type === 'income' ? 'plus' : 'minus',
-		};
-		setCategories((prev) => [...prev, newCat]);
-		setNewCategory('');
+
+		setIsAdding(true);
+		try {
+			const newCat: Category = {
+				name: newCategory.trim(),
+				type,
+				icon: type === 'income' ? 'plus' : 'minus',
+				color: type === 'income' ? '#4CAF50' : '#F44336',
+			};
+
+			await addCategory(newCat);
+			setNewCategory('');
+			Alert.alert('Success', 'Category added successfully!');
+		} catch (error) {
+			Alert.alert('Error', 'Failed to add category. Please try again.');
+		} finally {
+			setIsAdding(false);
+		}
 	};
 
-	const deleteCategory = (id: string) => {
-		Alert.alert('Delete Category', 'Are you sure?', [
-			{ text: 'Cancel', style: 'cancel' },
-			{
-				text: 'Delete',
-				style: 'destructive',
-				onPress: () => setCategories(categories.filter((cat) => cat.id !== id)),
-			},
-		]);
+	const handleDeleteCategory = async (
+		categoryId: string,
+		categoryName: string
+	) => {
+		Alert.alert(
+			'Delete Category',
+			`Are you sure you want to delete "${categoryName}"?`,
+			[
+				{ text: 'Cancel', style: 'cancel' },
+				{
+					text: 'Delete',
+					style: 'destructive',
+					onPress: async () => {
+						try {
+							await deleteCategory(categoryId);
+							Alert.alert('Success', 'Category deleted successfully!');
+						} catch (error) {
+							Alert.alert(
+								'Error',
+								'Failed to delete category. Please try again.'
+							);
+						}
+					},
+				},
+			]
+		);
 	};
+
+	if (categoriesLoading) {
+		return (
+			<SafeAreaView style={styles.safe}>
+				<Stack.Screen options={{ title: 'Category Settings' }} />
+				<View style={styles.loadingContainer}>
+					<ActivityIndicator size="large" color="#007AFF" />
+					<Text style={styles.loadingText}>Loading categories...</Text>
+				</View>
+			</SafeAreaView>
+		);
+	}
 
 	return (
 		<SafeAreaView style={styles.safe}>
@@ -119,9 +159,18 @@ export default function CategorySettingsScreen() {
 							value={newCategory}
 							onChangeText={setNewCategory}
 							style={styles.input}
+							editable={!isAdding}
 						/>
-						<RectButton onPress={addCategory} style={styles.addButton}>
-							<Text style={styles.addButtonText}>Add</Text>
+						<RectButton
+							onPress={handleAddCategory}
+							style={[styles.addButton, isAdding && styles.addButtonDisabled]}
+							enabled={!isAdding}
+						>
+							{isAdding ? (
+								<ActivityIndicator size="small" color="white" />
+							) : (
+								<Text style={styles.addButtonText}>Add</Text>
+							)}
 						</RectButton>
 					</View>
 				</Section>
@@ -134,29 +183,48 @@ export default function CategorySettingsScreen() {
 						Manage your existing {type} categories
 					</SectionSubtext>
 
-					<FlatList
-						data={categories.filter((cat) => cat.type === type)}
-						keyExtractor={(item) => item.id}
-						scrollEnabled={false}
-						renderItem={({ item }) => (
-							<View style={styles.categoryItem}>
-								<View style={styles.categoryInfo}>
-									<FontAwesome
-										name={(item.icon as any) || 'tag'}
-										size={18}
-										style={styles.categoryIcon}
-									/>
-									<Text style={styles.categoryName}>{item.name}</Text>
+					{categoriesByType.length === 0 ? (
+						<View style={styles.emptyState}>
+							<Text style={styles.emptyStateText}>
+								No {type} categories found. Add some categories to get started!
+							</Text>
+						</View>
+					) : (
+						<FlatList
+							data={categoriesByType}
+							keyExtractor={(item) => item.id || `${item.name}-${item.type}`}
+							scrollEnabled={false}
+							renderItem={({ item }) => (
+								<View style={styles.categoryItem}>
+									<View style={styles.categoryInfo}>
+										<Ionicons
+											name={
+												(item.icon as any) ||
+												(item.type === 'income' ? 'plus' : 'minus')
+											}
+											size={18}
+											style={[
+												styles.categoryIcon,
+												{ color: item.color || '#666' },
+											]}
+										/>
+										<Text style={styles.categoryName}>{item.name}</Text>
+										{item.isDefault && (
+											<Text style={styles.defaultBadge}>Default</Text>
+										)}
+									</View>
+									{!item.isDefault && (
+										<RectButton
+											onPress={() => handleDeleteCategory(item.id!, item.name)}
+											style={styles.deleteButton}
+										>
+											<Ionicons name="trash" size={16} color="#FF3B30" />
+										</RectButton>
+									)}
 								</View>
-								<RectButton
-									onPress={() => deleteCategory(item.id)}
-									style={styles.deleteButton}
-								>
-									<FontAwesome name="trash" size={16} color="#FF3B30" />
-								</RectButton>
-							</View>
-						)}
-					/>
+							)}
+						/>
+					)}
 				</Section>
 			</ScrollView>
 		</SafeAreaView>
@@ -191,6 +259,16 @@ const LabelSubtext = ({ children }: { children: React.ReactNode }) => (
 const styles = StyleSheet.create({
 	safe: { flex: 1, backgroundColor: '#fff' },
 	container: { padding: 24, paddingBottom: 48 },
+	loadingContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	loadingText: {
+		marginTop: 12,
+		color: '#666',
+		fontSize: 16,
+	},
 	sectionHeader: { fontSize: 18, fontWeight: '600', marginBottom: 12 },
 	sectionSubtext: { fontSize: 12, color: '#666', marginBottom: 12 },
 	label: { fontSize: 14, color: '#666', marginTop: 12, marginBottom: 4 },
@@ -214,6 +292,9 @@ const styles = StyleSheet.create({
 		borderRadius: 8,
 		justifyContent: 'center',
 		minWidth: 60,
+	},
+	addButtonDisabled: {
+		backgroundColor: '#ccc',
 	},
 	addButtonText: {
 		color: 'white',
@@ -259,13 +340,31 @@ const styles = StyleSheet.create({
 	},
 	categoryIcon: {
 		marginRight: 12,
-		color: '#666',
 	},
 	categoryName: {
 		fontSize: 16,
 		color: '#333',
+		flex: 1,
+	},
+	defaultBadge: {
+		fontSize: 10,
+		color: '#666',
+		backgroundColor: '#f0f0f0',
+		paddingHorizontal: 6,
+		paddingVertical: 2,
+		borderRadius: 4,
+		marginLeft: 8,
 	},
 	deleteButton: {
 		padding: 8,
+	},
+	emptyState: {
+		padding: 20,
+		alignItems: 'center',
+	},
+	emptyStateText: {
+		color: '#666',
+		fontSize: 14,
+		textAlign: 'center',
 	},
 });

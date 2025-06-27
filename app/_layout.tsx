@@ -1,49 +1,47 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import './global.css';
-import React, { useState, useEffect } from 'react';
-import { getAuth, onAuthStateChanged } from '@react-native-firebase/auth';
+import React, { useEffect } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
+import { AuthProvider } from '../src/context/AuthContext';
+import useAuth from '../src/context/AuthContext';
 
 function RootLayoutContent() {
-	const [initializing, setInitializing] = useState(true);
-	const [user, setUser] = useState();
+	const { user, firebaseUser, loading } = useAuth();
 	const router = useRouter();
 	const segments = useSegments();
 
-	// Handle user state changes
-	function handleAuthStateChanged(user: any) {
-		setUser(user);
-		if (initializing) setInitializing(false);
-	}
-
 	useEffect(() => {
-		const subscriber = onAuthStateChanged(getAuth(), handleAuthStateChanged);
-		return subscriber; // unsubscribe on unmount
-	}, []);
-
-	useEffect(() => {
-		if (initializing) return;
+		if (loading) return;
 
 		const inAuthGroup = segments[0] === '(auth)';
 		const inTabsGroup = segments[0] === '(tabs)';
 
 		// Navigation logic based on user state
-		if (user) {
-			// User is authenticated - show main app
+		if (firebaseUser && user) {
+			// User is authenticated in Firebase AND exists in MongoDB - show main app
 			if (!inTabsGroup) {
-				console.log('inTabsGroup', inTabsGroup);
+				console.log('User authenticated, navigating to dashboard');
 				router.replace('/(tabs)/dashboard');
 			}
-		} else {
-			// User is not authenticated
+		} else if (firebaseUser && !user) {
+			// User is authenticated in Firebase but not in MongoDB - redirect to signup
 			if (!inAuthGroup) {
-				router.replace('/(auth)/signup-test');
+				console.log(
+					'Firebase user exists but not in MongoDB, redirecting to signup'
+				);
+				router.replace('/(auth)/signup');
+			}
+		} else {
+			// User is not authenticated - show login screen
+			if (!inAuthGroup) {
+				console.log('User not authenticated, redirecting to login');
+				router.replace('/(auth)/login');
 			}
 		}
-	}, [user, initializing, segments]);
+	}, [user, firebaseUser, loading, segments]);
 
-	if (initializing) {
+	if (loading) {
 		return (
 			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
 				<ActivityIndicator size="large" color="#007ACC" />
@@ -63,5 +61,9 @@ function RootLayoutContent() {
 }
 
 export default function RootLayout() {
-	return <RootLayoutContent />;
+	return (
+		<AuthProvider>
+			<RootLayoutContent />
+		</AuthProvider>
+	);
 }

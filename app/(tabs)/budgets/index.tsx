@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
 	View,
 	Text,
@@ -14,21 +14,13 @@ import {
 	ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useBudget, Budget } from '../../../src/context/budgetContext';
 
 const { width } = Dimensions.get('window');
 
 // ==========================================
 // Types
 // ==========================================
-type Budget = {
-	id: string;
-	category: string;
-	allocated: number;
-	spent: number;
-	icon: keyof typeof Ionicons.glyphMap;
-	color: string;
-};
-
 type ColorOption = {
 	base: string;
 	pastel: string;
@@ -85,69 +77,18 @@ const COLOR_PALETTE: Record<string, ColorOption> = {
 };
 
 // ==========================================
-// Mock Data
-// ==========================================
-const initialBudgets: Budget[] = [
-	{
-		id: '1',
-		category: 'Groceries',
-		allocated: 500,
-		spent: 275,
-		icon: 'cart-outline',
-		color: '#4CAF50',
-	},
-	{
-		id: '2',
-		category: 'Rent',
-		allocated: 1200,
-		spent: 1200,
-		icon: 'home-outline',
-		color: '#795548',
-	},
-	{
-		id: '3',
-		category: 'Entertainment',
-		allocated: 200,
-		spent: 80,
-		icon: 'game-controller-outline',
-		color: '#9C27B0',
-	},
-	{
-		id: '4',
-		category: 'Dining Out',
-		allocated: 150,
-		spent: 95,
-		icon: 'restaurant-outline',
-		color: '#FF9800',
-	},
-	{
-		id: '5',
-		category: 'Utilities',
-		allocated: 180,
-		spent: 130,
-		icon: 'flash-outline',
-		color: '#FFC107',
-	},
-	{
-		id: 'add',
-		category: 'Add Budget',
-		allocated: 0,
-		spent: 0,
-		icon: 'add-circle-outline',
-		color: '#00a2ff',
-	},
-];
-
-// ==========================================
 // Main Component
 // ==========================================
 export default function BudgetScreen() {
 	// ==========================================
+	// Context
+	// ==========================================
+	const { budgets, isLoading, addBudget } = useBudget();
+
+	// ==========================================
 	// State Management
 	// ==========================================
-	const [budgets, setBudgets] = useState<Budget[]>(initialBudgets);
 	const [isModalVisible, setIsModalVisible] = useState(false);
-	const [isLoading, setIsLoading] = useState(true);
 	const [newBudget, setNewBudget] = useState({
 		category: '',
 		allocated: '',
@@ -159,31 +100,6 @@ export default function BudgetScreen() {
 	// Animation Setup
 	// ==========================================
 	const slideAnim = React.useRef(new Animated.Value(0)).current;
-
-	// ==========================================
-	// Loading Effect
-	// ==========================================
-	useEffect(() => {
-		// Simulate loading time for data fetching/initialization
-		const loadData = async () => {
-			try {
-				// Add a small delay to ensure smooth loading experience
-				await new Promise((resolve) => setTimeout(resolve, 500));
-
-				// Here you would typically fetch data from your API
-				// For now, we'll just set the budgets from initial data
-				setBudgets(initialBudgets);
-
-				// Mark loading as complete
-				setIsLoading(false);
-			} catch (error) {
-				console.error('Error loading budgets:', error);
-				setIsLoading(false);
-			}
-		};
-
-		loadData();
-	}, []);
 
 	// ==========================================
 	// Loading Screen Component
@@ -200,36 +116,31 @@ export default function BudgetScreen() {
 	// ==========================================
 	// Budget Management
 	// ==========================================
-	const handleAddBudget = () => {
+	const handleAddBudget = async () => {
 		if (!newBudget.category || !newBudget.allocated) {
 			// You might want to add proper form validation here
 			return;
 		}
 
-		const budgetToAdd: Budget = {
-			id: Date.now().toString(), // Simple way to generate unique IDs
-			category: newBudget.category,
-			allocated: parseFloat(newBudget.allocated),
-			spent: 0, // New budgets start with 0 spent
-			icon: newBudget.icon,
-			color: newBudget.color,
-		};
+		try {
+			await addBudget({
+				category: newBudget.category,
+				allocated: parseFloat(newBudget.allocated),
+				icon: newBudget.icon,
+				color: newBudget.color,
+			});
 
-		// Insert the new budget before the "Add Budget" card
-		const updatedBudgets = [
-			...budgets.slice(0, -1), // All budgets except the last "Add Budget" card
-			budgetToAdd,
-			budgets[budgets.length - 1], // Add back the "Add Budget" card
-		];
-
-		setBudgets(updatedBudgets);
-		hideModal();
-		setNewBudget({
-			category: '',
-			allocated: '',
-			icon: 'cart-outline',
-			color: COLOR_PALETTE.blue.base,
-		});
+			hideModal();
+			setNewBudget({
+				category: '',
+				allocated: '',
+				icon: 'cart-outline',
+				color: COLOR_PALETTE.blue.base,
+			});
+		} catch (error) {
+			console.error('Error adding budget:', error);
+			// You might want to show an error message to the user
+		}
 	};
 
 	// ==========================================
@@ -316,24 +227,6 @@ export default function BudgetScreen() {
 	// Render Functions
 	// ==========================================
 	const renderItem = ({ item }: { item: Budget }) => {
-		if (item.id === 'add') {
-			return (
-				<TouchableOpacity style={styles.card} onPress={showModal}>
-					<View style={styles.cardHeader}>
-						<View
-							style={[
-								styles.iconWrapper,
-								{ backgroundColor: `${item.color}20` },
-							]}
-						>
-							<Ionicons name={item.icon} size={24} color={item.color} />
-						</View>
-						<Text style={styles.categoryText}>{item.category}</Text>
-					</View>
-				</TouchableOpacity>
-			);
-		}
-
 		const percent = Math.min((item.spent / item.allocated) * 100, 100);
 
 		return (
@@ -342,7 +235,7 @@ export default function BudgetScreen() {
 					<View
 						style={[styles.iconWrapper, { backgroundColor: `${item.color}20` }]}
 					>
-						<Ionicons name={item.icon} size={24} color={item.color} />
+						<Ionicons name={item.icon as any} size={24} color={item.color} />
 					</View>
 					<Text style={styles.categoryText}>{item.category}</Text>
 				</View>
@@ -379,12 +272,48 @@ export default function BudgetScreen() {
 		return <LoadingScreen />;
 	}
 
+	// Add the "Add Budget" card to the data
+	const budgetsWithAdd = [
+		...budgets,
+		{
+			id: 'add',
+			category: 'Add Budget',
+			allocated: 0,
+			spent: 0,
+			icon: 'add-circle-outline',
+			color: '#00a2ff',
+		} as Budget,
+	];
+
 	return (
 		<View style={styles.mainContainer}>
 			<FlatList
-				data={budgets}
+				data={budgetsWithAdd}
 				keyExtractor={(item) => item.id}
-				renderItem={renderItem}
+				renderItem={({ item }) => {
+					if (item.id === 'add') {
+						return (
+							<TouchableOpacity style={styles.card} onPress={showModal}>
+								<View style={styles.cardHeader}>
+									<View
+										style={[
+											styles.iconWrapper,
+											{ backgroundColor: `${item.color}20` },
+										]}
+									>
+										<Ionicons
+											name={item.icon as any}
+											size={24}
+											color={item.color}
+										/>
+									</View>
+									<Text style={styles.categoryText}>{item.category}</Text>
+								</View>
+							</TouchableOpacity>
+						);
+					}
+					return renderItem({ item });
+				}}
 				contentContainerStyle={styles.listContent}
 				showsVerticalScrollIndicator={false}
 			/>

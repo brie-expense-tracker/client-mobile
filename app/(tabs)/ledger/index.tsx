@@ -18,7 +18,6 @@ import { router } from 'expo-router';
 import { Calendar } from 'react-native-calendars';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Transaction } from '../../../src/data/transactions';
-import axios from 'axios';
 import { TransactionContext } from '../../../src/context/transactionContext';
 import { FilterContext } from '../../../src/context/filterContext';
 import { TransactionRow } from '../../../src/components/transactionRow';
@@ -51,7 +50,7 @@ const formatDate = (
 	// Check if the date is today
 	const today = new Date();
 	if (date.toDateString() === today.toDateString()) {
-		return 'Today';
+		return today.toLocaleDateString(locale, options);
 	}
 
 	return date.toLocaleDateString(locale, options);
@@ -117,7 +116,7 @@ export default function TransactionScreen() {
 				// category match
 				const catMatch =
 					selectedCategories.length === 0 ||
-					tx.category.some((cat) => selectedCategories.includes(cat));
+					tx.categories.some((cat) => selectedCategories.includes(cat.name));
 				// date match
 				const txDay = tx.date.slice(0, 10);
 				const dateMatch =
@@ -128,7 +127,7 @@ export default function TransactionScreen() {
 				const searchMatch =
 					!text ||
 					tx.description.toLowerCase().includes(text) ||
-					tx.category.some((cat) => cat.toLowerCase().includes(text));
+					tx.categories.some((cat) => cat.name.toLowerCase().includes(text));
 				return catMatch && dateMatch && searchMatch;
 			})
 			.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -260,12 +259,16 @@ export default function TransactionScreen() {
 					<View style={styles.listContainer}>
 						<SectionList
 							sections={sections}
-							keyExtractor={(item) => item.id}
-							renderSectionHeader={({ section }) => (
-								<View style={styles.monthHeader}>
-									<Text style={styles.monthHeaderText}>{section.title}</Text>
-								</View>
-							)}
+							keyExtractor={(item, index) =>
+								item.id || `temp-${index}-${Date.now()}`
+							}
+							renderSectionHeader={({ section }) =>
+								dateFilterMode === 'month' ? (
+									<View style={styles.monthHeader}>
+										<Text style={styles.monthHeaderText}>{section.title}</Text>
+									</View>
+								) : null
+							}
 							renderItem={({ item }) => (
 								<TransactionRow item={item} onDelete={onDelete} />
 							)}
@@ -478,8 +481,8 @@ const styles = StyleSheet.create({
 		transform: [{ translateX: -width * 0.45 }, { translateY: -height * 0.35 }],
 	},
 	monthHeader: {
-		paddingTop: 8,
-		marginTop: 8,
+		paddingVertical: 8,
+		backgroundColor: '#ffffff',
 	},
 	monthHeaderText: {
 		fontSize: 14,

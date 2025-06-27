@@ -1,4 +1,11 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, {
+	useState,
+	useRef,
+	useEffect,
+	useCallback,
+	useContext,
+	useMemo,
+} from 'react';
 import {
 	View,
 	Text,
@@ -11,31 +18,43 @@ import {
 	ActivityIndicator,
 } from 'react-native';
 import { RectButton, BorderlessButton } from 'react-native-gesture-handler';
-import axios from 'axios';
 import { useForm, Controller } from 'react-hook-form';
-import { Ionicons, FontAwesome } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
+import { TransactionContext } from '../../../src/context/transactionContext';
+import { Category } from '../../../src/data/transactions';
 
 interface TransactionFormData {
 	type: 'income' | 'expense';
 	description: string;
 	amount: string;
-	category: string;
+	categories: Category[];
 	date: string;
 }
 
+// Utility function to get local date in ISO format
+const getLocalIsoDate = (): string => {
+	const today = new Date();
+	// Adjust for timezone offset to ensure we get the correct local date
+	const offset = today.getTimezoneOffset();
+	const localDate = new Date(today.getTime() - offset * 60 * 1000);
+	return localDate.toISOString().split('T')[0];
+};
+
 //
-//  FUNCTIONS START===============================================
+//  FUNCTIONS START======f=========================================
 const AddTransactionScreen = () => {
 	const router = useRouter();
 	const amountInputRef = useRef<TextInput>(null);
-	const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-	const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+	const [selectedCategories, setSelectedCategories] = useState<Category[]>([]);
+	const [resetNumberPad, setResetNumberPad] = useState(false);
 	const [fontsLoaded] = useFonts({
-		...FontAwesome.font,
+		...Ionicons.font,
 	});
+	const { transactions, categories, isLoading, addTransaction } =
+		useContext(TransactionContext);
 
 	const { control, handleSubmit, setValue, watch } =
 		useForm<TransactionFormData>({
@@ -43,8 +62,8 @@ const AddTransactionScreen = () => {
 				type: 'income',
 				description: '',
 				amount: '',
-				category: '',
-				date: new Date().toISOString().split('T')[0],
+				categories: [],
+				date: getLocalIsoDate(),
 			},
 		});
 
@@ -57,6 +76,16 @@ const AddTransactionScreen = () => {
 		},
 		[setValue]
 	);
+
+	// Reset the resetNumberPad state after it's been used
+	useEffect(() => {
+		if (resetNumberPad) {
+			const timer = setTimeout(() => {
+				setResetNumberPad(false);
+			}, 100);
+			return () => clearTimeout(timer);
+		}
+	}, [resetNumberPad]);
 
 	useEffect(() => {
 		if (amountInputRef.current) {
@@ -88,19 +117,34 @@ const AddTransactionScreen = () => {
 				return;
 			}
 
-			const response = await axios.post(`${BASE_URL}/api/transactions`, data);
+			const transactionData = {
+				description: data.description,
+				amount: amount,
+				categories: data.categories.map((cat) => ({
+					name: cat.name,
+					type: cat.type,
+				})),
+				date: data.date,
+				type: data.type,
+			};
 
-			console.log('Transaction saved:', response.data);
+			// Use the context's addTransaction method
+			await addTransaction(transactionData);
+
+			console.log('Transaction saved successfully!');
 			Alert.alert('Success', 'Transaction saved successfully!');
 
 			// Reset form values
 			setValue('description', '');
-			setValue('amount', '');
-			setValue('category', '');
-			setValue('date', new Date().toISOString().split('T')[0]);
+			setValue('amount', ''); // Reset to empty string to show placeholder
+			setValue('categories', []);
+			setValue('date', getLocalIsoDate());
 
 			// Reset selected category
-			setSelectedCategory(null);
+			setSelectedCategories([]);
+
+			// Reset NumberPad
+			setResetNumberPad(true);
 
 			router.back();
 		} catch (error) {
@@ -109,19 +153,30 @@ const AddTransactionScreen = () => {
 		}
 	};
 
-	const mockTags = [
-		'Groceries',
-		'Utilities',
-		'Entertainment',
-		'Travel',
-		'Health',
-	];
+	const currentCategories = useMemo(() => {
+		// Get unique categories from both transactions and the categories list
+		const transactionCategories = transactions
+			.flatMap((t) => t.categories)
+			.filter(
+				(cat, index, arr) => arr.findIndex((c) => c.name === cat.name) === index
+			);
 
-	const toggleCategorySelection = (category: string) => {
-		setSelectedCategory((prevSelectedCategory) =>
-			prevSelectedCategory === category ? null : category
+		// Combine with categories from context and remove duplicates
+		const allCategories = [...categories, ...transactionCategories];
+		return allCategories.filter(
+			(cat, index, arr) => arr.findIndex((c) => c.name === cat.name) === index
 		);
-		setValue('category', category);
+	}, [transactions, categories]);
+
+	const toggleCategorySelection = (category: Category) => {
+		const newSelectedCategories = selectedCategories.some(
+			(cat) => cat.name === category.name
+		)
+			? selectedCategories.filter((c) => c.name !== category.name)
+			: [...selectedCategories, category];
+
+		setSelectedCategories(newSelectedCategories);
+		setValue('categories', newSelectedCategories);
 	};
 
 	//
@@ -162,21 +217,25 @@ const AddTransactionScreen = () => {
 						{/* Carousel */}
 						<View style={styles.carouselContainer}>
 							<ScrollView horizontal showsHorizontalScrollIndicator={false}>
-								{mockTags.map((category, index) => (
+								{currentCategories.map((category, index) => (
 									<RectButton
 										key={index}
 										onPress={() => toggleCategorySelection(category)}
 										style={[
 											styles.carouselTextWrapper,
-											selectedCategory === category && styles.selectedTag,
+											selectedCategories.some(
+												(cat) => cat.name === category.name
+											) && styles.selectedTag,
 										]}
 									>
 										<Text
 											style={
-												selectedCategory === category && styles.selectedTagText
+												selectedCategories.some(
+													(cat) => cat.name === category.name
+												) && styles.selectedTagText
 											}
 										>
-											{category}
+											{category.name}
 										</Text>
 									</RectButton>
 								))}
@@ -188,6 +247,7 @@ const AddTransactionScreen = () => {
 								</RectButton>
 							</ScrollView>
 						</View>
+
 						<KeyboardAvoidingView
 							behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
 						>
@@ -236,7 +296,10 @@ const AddTransactionScreen = () => {
 						</View>
 					</View>
 					<View style={styles.topNumPadContainer}>
-						<NumberPad onValueChange={handleAmountChange} />
+						<NumberPad
+							onValueChange={handleAmountChange}
+							reset={resetNumberPad}
+						/>
 					</View>
 				</View>
 			</SafeAreaView>
@@ -246,11 +309,19 @@ const AddTransactionScreen = () => {
 
 //
 // NUMBER PAD COMPONENT===============================================
-const NumberPad: React.FC<{ onValueChange: (value: string) => void }> = ({
-	onValueChange,
-}) => {
+const NumberPad: React.FC<{
+	onValueChange: (value: string) => void;
+	reset?: boolean;
+}> = ({ onValueChange, reset = false }) => {
 	const [value, setValue] = useState('');
 	const [pressed, setPressed] = useState(false);
+
+	// Reset the value when reset prop changes to true
+	useEffect(() => {
+		if (reset) {
+			setValue('');
+		}
+	}, [reset]);
 
 	// Use useEffect to call onValueChange when value changes
 	useEffect(() => {
@@ -399,13 +470,13 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 	dollarIcon: {
-		marginRight: 6,
 		height: 40,
 	},
 	inputAmount: {
 		fontSize: 60,
 		fontWeight: 'bold',
 		textAlign: 'left',
+		marginRight: 10,
 	},
 	inputDescription: {
 		height: 50,
@@ -444,7 +515,6 @@ const styles = StyleSheet.create({
 	},
 	topNumPadContainer: {
 		padding: 5,
-		paddingTop: 10,
 		borderTopWidth: 1,
 		borderColor: '#ebebeb',
 	},
@@ -453,7 +523,7 @@ const styles = StyleSheet.create({
 	},
 	buttonNumLight: {
 		flex: 1,
-		height: 60,
+		paddingVertical: 12,
 		justifyContent: 'center',
 		alignItems: 'center',
 		margin: 5,
@@ -461,7 +531,7 @@ const styles = StyleSheet.create({
 	},
 	buttonNumDark: {
 		flex: 1,
-		height: 60,
+		paddingVertical: 12,
 		justifyContent: 'center',
 		alignItems: 'center',
 		margin: 5,
@@ -509,6 +579,35 @@ const styles = StyleSheet.create({
 		fontSize: 18,
 		fontWeight: 'bold',
 		marginTop: 10,
+	},
+	selectedCategoriesContainer: {
+		marginBottom: 10,
+	},
+	selectedCategoriesLabel: {
+		fontSize: 16,
+		fontWeight: '600',
+		marginBottom: 8,
+		color: '#666',
+	},
+	selectedCategoryChip: {
+		backgroundColor: '#0095FF',
+		borderRadius: 20,
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		marginRight: 8,
+		flexDirection: 'row',
+		alignItems: 'center',
+	},
+	selectedCategoryText: {
+		color: 'white',
+		fontSize: 14,
+		fontWeight: '500',
+		marginRight: 4,
+	},
+	removeCategoryButton: {
+		padding: 2,
+		justifyContent: 'center',
+		alignItems: 'center',
 	},
 });
 

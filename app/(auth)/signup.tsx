@@ -6,17 +6,24 @@ import {
 	Alert,
 	StyleSheet,
 	Image,
-	Platform,
 	SafeAreaView,
 } from 'react-native';
 import React, { useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Link, router, Stack } from 'expo-router';
+import { Link, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import {
+	getAuth,
+	createUserWithEmailAndPassword,
+} from '@react-native-firebase/auth';
+import useAuth from '../../src/context/AuthContext';
 
-export default function Login() {
+export default function Signup() {
 	const [email, setEmail] = useState('');
 	const [password, setPassword] = useState('');
+	const [name, setName] = useState('');
+	const [isLoading, setIsLoading] = useState(false);
+	const { createUserInMongoDB } = useAuth();
 
 	// Email validator function
 	const isValidEmail = (email: string) => {
@@ -29,14 +36,9 @@ export default function Login() {
 		return password.length >= 6; // Minimum 6 characters for this example
 	};
 
-	const handleLogin = async () => {
+	const handleSignup = async () => {
 		if (!email || !password) {
 			Alert.alert('Error', 'Please fill in all fields.');
-			return;
-		}
-
-		if (!isValidPassword(password)) {
-			Alert.alert('Error', 'Password must be at least 6 characters long.');
 			return;
 		}
 
@@ -45,13 +47,42 @@ export default function Login() {
 			return;
 		}
 
-		// Fake login logic
-		if (email === 'test@test.com' && password === 'password') {
-			Alert.alert('Success', `Logged in with ${email}`);
-			console.log('201: Successfully logged in.');
-			router.replace('/onboardingThree');
-		} else {
-			Alert.alert('Error', 'Invalid email or password.');
+		if (!isValidPassword(password)) {
+			Alert.alert('Error', 'Password must be at least 6 characters long.');
+			return;
+		}
+
+		setIsLoading(true);
+
+		try {
+			// Create user in Firebase
+			const userCredential = await createUserWithEmailAndPassword(
+				getAuth(),
+				email,
+				password
+			);
+			const firebaseUser = userCredential.user;
+
+			// Create user in MongoDB
+			await createUserInMongoDB(firebaseUser, name);
+
+			Alert.alert('Success', `Account created for ${email}`);
+			console.log('Successfully created User in Firebase and MongoDB.');
+		} catch (error: any) {
+			console.error('Signup error:', error);
+
+			let errorMessage = 'An error occurred during signup.';
+			if (error.code === 'auth/email-already-in-use') {
+				errorMessage = 'An account with this email already exists.';
+			} else if (error.code === 'auth/weak-password') {
+				errorMessage = 'Password is too weak.';
+			} else if (error.code === 'auth/invalid-email') {
+				errorMessage = 'Invalid email address.';
+			}
+
+			Alert.alert('Error', errorMessage);
+		} finally {
+			setIsLoading(false);
 		}
 	};
 
@@ -64,7 +95,7 @@ export default function Login() {
 					resizeMode="contain"
 				/>
 				<View style={styles.formContainer}>
-					<Text style={styles.title}>Welcome Back!</Text>
+					<Text style={styles.title}>Create Your Account</Text>
 					<Text style={styles.label}>Email</Text>
 					<TextInput
 						style={styles.input}
@@ -83,19 +114,25 @@ export default function Login() {
 						secureTextEntry
 					/>
 					<View style={styles.buttonContainer}>
-						<Pressable style={styles.button} onPress={handleLogin}>
+						<Pressable
+							style={[styles.button, isLoading && styles.buttonDisabled]}
+							onPress={handleSignup}
+							disabled={isLoading}
+						>
 							<LinearGradient
 								colors={['#0095FF', '#008cff']}
 								style={styles.gradient}
 							>
-								<Text style={styles.buttonText}>Sign In</Text>
+								<Text style={styles.buttonText}>
+									{isLoading ? 'Creating Account...' : 'Sign Up'}
+								</Text>
 							</LinearGradient>
 						</Pressable>
 					</View>
 
 					<View style={styles.dividerContainer}>
 						<View style={styles.divider} />
-						<Text style={styles.dividerText}>or sign in with</Text>
+						<Text style={styles.dividerText}>or sign up with</Text>
 						<View style={styles.divider} />
 					</View>
 
@@ -105,7 +142,7 @@ export default function Login() {
 							onPress={() =>
 								Alert.alert(
 									'Coming Soon',
-									'Google Sign In will be available soon!'
+									'Google Sign Up will be available soon!'
 								)
 							}
 						>
@@ -118,7 +155,7 @@ export default function Login() {
 							onPress={() =>
 								Alert.alert(
 									'Coming Soon',
-									'Apple Sign In will be available soon!'
+									'Apple Sign Up will be available soon!'
 								)
 							}
 						>
@@ -127,10 +164,10 @@ export default function Login() {
 						</Pressable>
 					</View>
 				</View>
-				<View style={styles.signupContainer}>
-					<Text style={styles.signupText}>Don't have an account?</Text>
-					<Link replace href={'/signup-test'}>
-						<Text style={styles.signupLink}>Sign Up</Text>
+				<View style={styles.loginContainer}>
+					<Text style={styles.loginText}>Already have account?</Text>
+					<Link replace href={'/login'}>
+						<Text style={styles.loginLink}>Log In</Text>
 					</Link>
 				</View>
 			</View>
@@ -169,6 +206,7 @@ const styles = StyleSheet.create({
 		borderRadius: 24,
 		padding: 24,
 	},
+
 	title: {
 		fontSize: 24,
 		color: '#000000',
@@ -224,10 +262,10 @@ const styles = StyleSheet.create({
 		color: 'white',
 		fontSize: 20,
 		textAlign: 'center',
-		fontWeight: '500',
+		fontWeight: 'bold',
 		marginVertical: 18,
 	},
-	signupContainer: {
+	loginContainer: {
 		flexDirection: 'row',
 		gap: 4,
 		width: '100%',
@@ -235,10 +273,10 @@ const styles = StyleSheet.create({
 		bottom: 0,
 		justifyContent: 'center',
 	},
-	signupText: {
+	loginText: {
 		color: '#4A5568',
 	},
-	signupLink: {
+	loginLink: {
 		color: '#2C5282',
 		opacity: 0.7,
 		fontWeight: 'bold',
@@ -286,5 +324,8 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		color: '#4A5568',
 		fontWeight: '500',
+	},
+	buttonDisabled: {
+		backgroundColor: '#E2E8F0',
 	},
 });

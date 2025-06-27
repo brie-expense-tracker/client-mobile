@@ -1,9 +1,18 @@
+export interface Category {
+	name: string;
+	type: 'income' | 'expense';
+	id?: string;
+	color?: string;
+	icon?: string;
+	isDefault?: boolean;
+}
+
 export interface Transaction {
 	id: string;
 	description: string;
 	amount: number;
 	date: string; // ISO string
-	category: string[];
+	categories: Category[];
 	type: 'income' | 'expense';
 }
 
@@ -19,31 +28,40 @@ const generateDummyTransactions = (): Transaction[] => {
 		{
 			description: 'Monthly Salary',
 			amount: 3200,
-			category: ['Work', 'Salary'],
+			categories: [
+				{ name: 'Work', type: 'income' as const },
+				{ name: 'Salary', type: 'income' as const },
+			],
 			type: 'income' as const,
 		},
 		{
 			description: 'Rent',
 			amount: 1200,
-			category: ['Housing'],
+			categories: [{ name: 'Housing', type: 'expense' as const }],
 			type: 'expense' as const,
 		},
 		{
 			description: 'Internet Bill',
 			amount: 65,
-			category: ['Utilities'],
+			categories: [{ name: 'Utilities', type: 'expense' as const }],
 			type: 'expense' as const,
 		},
 		{
 			description: 'Phone Bill',
 			amount: 75,
-			category: ['Utilities', 'Phone'],
+			categories: [
+				{ name: 'Utilities', type: 'expense' as const },
+				{ name: 'Phone', type: 'expense' as const },
+			],
 			type: 'expense' as const,
 		},
 		{
 			description: 'Gym Membership',
 			amount: 45,
-			category: ['Health', 'Fitness'],
+			categories: [
+				{ name: 'Health', type: 'expense' as const },
+				{ name: 'Fitness', type: 'expense' as const },
+			],
 			type: 'expense' as const,
 		},
 	];
@@ -69,31 +87,46 @@ const generateDummyTransactions = (): Transaction[] => {
 				{
 					description: 'Coffee Shop',
 					amount: 4.75,
-					category: ['Food', 'Coffee'],
+					categories: [
+						{ name: 'Food', type: 'expense' as const },
+						{ name: 'Coffee', type: 'expense' as const },
+					],
 					type: 'expense' as const,
 				},
 				{
 					description: 'Restaurant Dinner',
 					amount: 45.8,
-					category: ['Food', 'Dining'],
+					categories: [
+						{ name: 'Food', type: 'expense' as const },
+						{ name: 'Dining', type: 'expense' as const },
+					],
 					type: 'expense' as const,
 				},
 				{
 					description: 'Grocery Shopping',
 					amount: 85.5,
-					category: ['Food', 'Groceries'],
+					categories: [
+						{ name: 'Food', type: 'expense' as const },
+						{ name: 'Groceries', type: 'expense' as const },
+					],
 					type: 'expense' as const,
 				},
 				{
 					description: 'Gas Station',
 					amount: 45.0,
-					category: ['Transportation', 'Gas'],
+					categories: [
+						{ name: 'Transportation', type: 'expense' as const },
+						{ name: 'Gas', type: 'expense' as const },
+					],
 					type: 'expense' as const,
 				},
 				{
 					description: 'Uber Ride',
 					amount: 25.75,
-					category: ['Transportation', 'Ride Share'],
+					categories: [
+						{ name: 'Transportation', type: 'expense' as const },
+						{ name: 'Ride Share', type: 'expense' as const },
+					],
 					type: 'expense' as const,
 				},
 			];
@@ -114,19 +147,25 @@ const generateDummyTransactions = (): Transaction[] => {
 				{
 					description: 'Freelance Project',
 					amount: 750,
-					category: ['Work', 'Freelance'],
+					categories: [
+						{ name: 'Work', type: 'income' as const },
+						{ name: 'Freelance', type: 'income' as const },
+					],
 					type: 'income' as const,
 				},
 				{
 					description: 'Consulting Work',
 					amount: 1200,
-					category: ['Work', 'Consulting'],
+					categories: [
+						{ name: 'Work', type: 'income' as const },
+						{ name: 'Consulting', type: 'income' as const },
+					],
 					type: 'income' as const,
 				},
 				{
 					description: 'Investment Dividend',
 					amount: 120.75,
-					category: ['Investment'],
+					categories: [{ name: 'Investment', type: 'income' as const }],
 					type: 'income' as const,
 				},
 			];

@@ -6,45 +6,24 @@ import {
 	Alert,
 	StyleSheet,
 	Image,
+	Platform,
 	SafeAreaView,
 } from 'react-native';
 import React, { useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Link, Stack } from 'expo-router';
+import { Link, router, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
 	getAuth,
-	createUserWithEmailAndPassword,
+	signInWithEmailAndPassword,
 } from '@react-native-firebase/auth';
+import useAuth from '../../src/context/AuthContext';
 
-export default function Signup() {
+export default function Login() {
 	const [email, setEmail] = useState('');
 	const [password, setPassword] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
-
-	// const signUp = async () => {
-	// 	setIsLoading(true);
-	// 	try {
-	// 		await auth().createUserWithEmailAndPassword(email, password);
-	// 	} catch (error) {
-	// 		console.log(error);
-	// 		Alert.alert('Error', 'Please fill in all fields.');
-	// 	} finally {
-	// 		setIsLoading(false);
-	// 	}
-	// };
-
-	// const signIn = async () => {
-	// 	setIsLoading(true);
-	// 	try {
-	// 		await auth().signInWithEmailAndPassword(email, password);
-	// 	} catch (error) {
-	// 		console.log(error);
-	// 		Alert.alert('Error', 'Please fill in all fields.');
-	// 	} finally {
-	// 		setIsLoading(false);
-	// 	}
-	// };
+	const { login } = useAuth();
 
 	// Email validator function
 	const isValidEmail = (email: string) => {
@@ -57,14 +36,9 @@ export default function Signup() {
 		return password.length >= 6; // Minimum 6 characters for this example
 	};
 
-	const handleSignup = async () => {
+	const handleLogin = async () => {
 		if (!email || !password) {
 			Alert.alert('Error', 'Please fill in all fields.');
-			return;
-		}
-
-		if (!isValidEmail(email)) {
-			Alert.alert('Error', 'Please enter a valid email address.');
 			return;
 		}
 
@@ -73,25 +47,41 @@ export default function Signup() {
 			return;
 		}
 
-		// Fake signup logic
-		// if (email === 'user@email.com' && password === 'Password123') {
-		// 	Alert.alert('Success', `Account created for ${email}`);
-		// 	console.log('201: Successfully created User.');
-		// 	router.replace('/onboardingThree');
-		// } else {
-		// 	Alert.alert('Error', 'Email already in use or invalid password.');
-		// }
-		// setIsLoading(true);
+		if (!isValidEmail(email)) {
+			Alert.alert('Error', 'Please enter a valid email address.');
+			return;
+		}
 
-		// Real signup logic
+		setIsLoading(true);
+
 		try {
-			// await auth().createUserWithEmailAndPassword(email, password);
-			Alert.alert('Success', `Account created for ${email}`);
-			console.log('201: Successfully created User.');
-			createUserWithEmailAndPassword(getAuth(), email, password);
-		} catch (error) {
-			console.log(error);
-			Alert.alert('Error', 'Please fill in all fields.');
+			// Sign in with Firebase
+			const userCredential = await signInWithEmailAndPassword(
+				getAuth(),
+				email,
+				password
+			);
+			const firebaseUser = userCredential.user;
+
+			// Use the auth context to handle MongoDB user verification
+			await login(firebaseUser);
+
+			console.log('Successfully logged in user');
+		} catch (error: any) {
+			console.error('Login error:', error);
+
+			let errorMessage = 'Invalid email or password.';
+			if (error.code === 'auth/user-not-found') {
+				errorMessage = 'No account found with this email address.';
+			} else if (error.code === 'auth/wrong-password') {
+				errorMessage = 'Incorrect password.';
+			} else if (error.code === 'auth/invalid-email') {
+				errorMessage = 'Invalid email address.';
+			} else if (error.code === 'auth/too-many-requests') {
+				errorMessage = 'Too many failed attempts. Please try again later.';
+			}
+
+			Alert.alert('Error', errorMessage);
 		} finally {
 			setIsLoading(false);
 		}
@@ -106,7 +96,7 @@ export default function Signup() {
 					resizeMode="contain"
 				/>
 				<View style={styles.formContainer}>
-					<Text style={styles.title}>Create Your Account</Text>
+					<Text style={styles.title}>Welcome Back!</Text>
 					<Text style={styles.label}>Email</Text>
 					<TextInput
 						style={styles.input}
@@ -125,19 +115,25 @@ export default function Signup() {
 						secureTextEntry
 					/>
 					<View style={styles.buttonContainer}>
-						<Pressable style={styles.button} onPress={handleSignup}>
+						<Pressable
+							style={[styles.button, isLoading && styles.buttonDisabled]}
+							onPress={handleLogin}
+							disabled={isLoading}
+						>
 							<LinearGradient
 								colors={['#0095FF', '#008cff']}
 								style={styles.gradient}
 							>
-								<Text style={styles.buttonText}>Sign Up</Text>
+								<Text style={styles.buttonText}>
+									{isLoading ? 'Signing In...' : 'Sign In'}
+								</Text>
 							</LinearGradient>
 						</Pressable>
 					</View>
 
 					<View style={styles.dividerContainer}>
 						<View style={styles.divider} />
-						<Text style={styles.dividerText}>or sign up with</Text>
+						<Text style={styles.dividerText}>or sign in with</Text>
 						<View style={styles.divider} />
 					</View>
 
@@ -147,7 +143,7 @@ export default function Signup() {
 							onPress={() =>
 								Alert.alert(
 									'Coming Soon',
-									'Google Sign Up will be available soon!'
+									'Google Sign In will be available soon!'
 								)
 							}
 						>
@@ -160,7 +156,7 @@ export default function Signup() {
 							onPress={() =>
 								Alert.alert(
 									'Coming Soon',
-									'Apple Sign Up will be available soon!'
+									'Apple Sign In will be available soon!'
 								)
 							}
 						>
@@ -169,10 +165,10 @@ export default function Signup() {
 						</Pressable>
 					</View>
 				</View>
-				<View style={styles.loginContainer}>
-					<Text style={styles.loginText}>Already have account?</Text>
-					<Link replace href={'/login-test'}>
-						<Text style={styles.loginLink}>Log In</Text>
+				<View style={styles.signupContainer}>
+					<Text style={styles.signupText}>Don't have an account?</Text>
+					<Link replace href={'/signup'}>
+						<Text style={styles.signupLink}>Sign Up</Text>
 					</Link>
 				</View>
 			</View>
@@ -211,7 +207,6 @@ const styles = StyleSheet.create({
 		borderRadius: 24,
 		padding: 24,
 	},
-
 	title: {
 		fontSize: 24,
 		color: '#000000',
@@ -267,10 +262,10 @@ const styles = StyleSheet.create({
 		color: 'white',
 		fontSize: 20,
 		textAlign: 'center',
-		fontWeight: 'bold',
+		fontWeight: '500',
 		marginVertical: 18,
 	},
-	loginContainer: {
+	signupContainer: {
 		flexDirection: 'row',
 		gap: 4,
 		width: '100%',
@@ -278,10 +273,10 @@ const styles = StyleSheet.create({
 		bottom: 0,
 		justifyContent: 'center',
 	},
-	loginText: {
+	signupText: {
 		color: '#4A5568',
 	},
-	loginLink: {
+	signupLink: {
 		color: '#2C5282',
 		opacity: 0.7,
 		fontWeight: 'bold',
@@ -329,5 +324,8 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		color: '#4A5568',
 		fontWeight: '500',
+	},
+	buttonDisabled: {
+		backgroundColor: '#E2E8F0',
 	},
 });

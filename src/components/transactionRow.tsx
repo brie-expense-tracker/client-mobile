@@ -14,6 +14,45 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 import type { Transaction } from '../data/transactions';
 
+// Helper function to format date without time
+const formatDateWithoutTime = (dateString: string): string => {
+	try {
+		// Handle empty, null, or undefined date strings
+		if (
+			!dateString ||
+			typeof dateString !== 'string' ||
+			dateString.trim() === ''
+		) {
+			return 'Invalid Date';
+		}
+
+		// Extract just the date part (YYYY-MM-DD) if it's a longer string
+		const datePart = dateString.slice(0, 10);
+
+		// Check if it's a valid YYYY-MM-DD format
+		if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+			return 'Invalid Date';
+		}
+
+		// Parse the date in local timezone by creating a date object
+		// and adjusting for timezone offset
+		const [year, month, day] = datePart.split('-').map(Number);
+		const date = new Date(year, month - 1, day); // month is 0-indexed
+
+		// Check if the date is valid
+		if (isNaN(date.getTime())) {
+			return 'Invalid Date';
+		}
+
+		return date.toLocaleDateString('en-US', {
+			month: 'short',
+			day: 'numeric',
+		});
+	} catch (error) {
+		return 'Invalid Date';
+	}
+};
+
 interface TransactionRowProps {
 	item: Transaction;
 	onDelete: (id: string, resetAnimation: () => void) => void;
@@ -29,6 +68,7 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 	const TRANSLATE_THRESHOLD = -70;
 	const DELETE_WIDTH = 60;
 
+	// Fallback category mapping for when categories don't have icon/color data
 	const categoryMap: Record<
 		string,
 		{ name: keyof typeof Ionicons.glyphMap; color: string }
@@ -36,11 +76,35 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 		Groceries: { name: 'cart-outline', color: '#4CAF50' },
 		Utilities: { name: 'flash-outline', color: '#FFC107' },
 		Entertainment: { name: 'game-controller-outline', color: '#9C27B0' },
+		Food: { name: 'restaurant-outline', color: '#F44336' },
+		Transportation: { name: 'car-outline', color: '#2196F3' },
+		Housing: { name: 'home-outline', color: '#795548' },
+		Healthcare: { name: 'medical-outline', color: '#00BCD4' },
+		Shopping: { name: 'cart-outline', color: '#9E9E9E' },
+		Education: { name: 'school-outline', color: '#3F51B5' },
+		Salary: { name: 'cash-outline', color: '#4CAF50' },
+		Investment: { name: 'trending-up-outline', color: '#009688' },
+		Freelance: { name: 'briefcase-outline', color: '#2196F3' },
+		Bonus: { name: 'gift-outline', color: '#9C27B0' },
 		// …other categories…
 		Other: { name: 'ellipsis-horizontal-outline', color: '#9E9E9E' },
 	};
-	const primary = item.category[0] || 'Other';
-	const { name, color } = categoryMap[primary] || categoryMap.Other;
+
+	// Get the primary category (first category in the array)
+	const primaryCategory = item.categories[0];
+	const primary = primaryCategory?.name || 'Other';
+
+	// Get icon and color from the category if available, otherwise use fallback
+	const categoryIcon = primaryCategory?.icon;
+	const categoryColor = primaryCategory?.color;
+
+	// Use category data if available, otherwise fall back to the mapping
+	const { name: fallbackIcon, color: fallbackColor } =
+		categoryMap[primary] || categoryMap.Other;
+
+	const iconName =
+		(categoryIcon as keyof typeof Ionicons.glyphMap) || fallbackIcon;
+	const iconColor = categoryColor || fallbackColor;
 
 	const triggerHaptic = () => {
 		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -105,12 +169,16 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 
 			<GestureDetector gesture={panGesture}>
 				<Animated.View style={[styles.row, animatedRowStyle]}>
-					<View style={[styles.iconCircle, { backgroundColor: `${color}20` }]}>
-						<Ionicons name={name} size={20} color={color} />
+					<View
+						style={[styles.iconCircle, { backgroundColor: `${iconColor}20` }]}
+					>
+						<Ionicons name={iconName} size={20} color={iconColor} />
 					</View>
 					<View style={styles.textContainer}>
 						<Text style={styles.description}>{item.description}</Text>
-						<Text style={styles.category}>{item.category.join(', ')}</Text>
+						<Text style={styles.category}>
+							{item.categories.map((cat) => cat.name).join(', ')}
+						</Text>
 					</View>
 					<View style={styles.amountDate}>
 						<Text
@@ -119,9 +187,10 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 								item.type === 'income' ? styles.income : styles.expense,
 							]}
 						>
-							{item.type === 'income' ? '+' : '-'}${item.amount.toFixed(2)}
+							{item.type === 'income' ? '+' : '-'}$
+							{(isNaN(item.amount) ? 0 : item.amount).toFixed(2)}
 						</Text>
-						<Text style={styles.date}>{item.date.slice(5)}</Text>
+						<Text style={styles.date}>{formatDateWithoutTime(item.date)}</Text>
 					</View>
 				</Animated.View>
 			</GestureDetector>
