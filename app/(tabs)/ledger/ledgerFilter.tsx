@@ -34,8 +34,8 @@ export default function LedgerFilterScreen() {
 	const availableCategories = useMemo(() => {
 		const cats = new Set<string>();
 		transactions.forEach((tx) => {
-			tx.category.forEach((c) => {
-				if (c && c.trim()) cats.add(c.trim());
+			tx.categories.forEach((c) => {
+				if (c.name && c.name.trim()) cats.add(c.name.trim());
 			});
 		});
 		return Array.from(cats).sort((a, b) => a.localeCompare(b));
@@ -82,7 +82,7 @@ export default function LedgerFilterScreen() {
 				<Section title="Categories">
 					<SectionSubtext>Select which categories to include</SectionSubtext>
 
-					{/* “All” option */}
+					{/* "All" option */}
 					<OptionRow
 						label="All Categories"
 						selected={localSelectedCategories.length === 0}

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useContext, useMemo, useState } from 'react';
 import {
 	View,
 	Text,
@@ -11,13 +11,15 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import {
-	Transaction,
-	transactions as dummyTransactions,
-} from '../../../src/data/transactions';
-import axios from 'axios';
+import { Transaction } from '../../../src/data/transactions';
 import { Ionicons } from '@expo/vector-icons';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import {
+	BorderlessButton,
+	GestureHandlerRootView,
+} from 'react-native-gesture-handler';
+import { TransactionContext } from '../../../src/context/transactionContext';
+import useAuth from '../../../src/context/AuthContext';
+import { getCategoryMeta } from '../../../src/utils/categoriesUtils';
 
 /**
  * -----------------------------------------------------------------------------
@@ -25,15 +27,67 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
  * -----------------------------------------------------------------------------
  */
 
-// Prefer env var ➜ LAN / Production fallback instead of hard‑coded localhost
-const API_URL =
-	process.env.EXPO_PUBLIC_API_URL ??
-	'http://192.168.1.10:3000/api/transactions';
-
 const currency = new Intl.NumberFormat('en-US', {
 	style: 'currency',
 	currency: 'USD',
 }).format;
+
+// Date handling utilities (from ledger)
+const getLocalIsoDate = (): string => {
+	const today = new Date();
+	// Adjust for timezone offset to ensure we get the correct local date
+	const offset = today.getTimezoneOffset();
+	const localDate = new Date(today.getTime() - offset * 60 * 1000);
+	return localDate.toISOString().split('T')[0];
+};
+
+const formatTransactionDate = (dateString: string): string => {
+	try {
+		// Handle empty, null, or undefined date strings
+		if (
+			!dateString ||
+			typeof dateString !== 'string' ||
+			dateString.trim() === ''
+		) {
+			return 'Invalid Date';
+		}
+
+		// Extract just the date part (YYYY-MM-DD) if it's a longer string
+		const datePart = dateString.slice(0, 10);
+
+		// Check if it's a valid YYYY-MM-DD format
+		if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+			return 'Invalid Date';
+		}
+
+		// Parse the date in local timezone by creating a date object
+		// and adjusting for timezone offset
+		const [year, month, day] = datePart.split('-').map(Number);
+		const date = new Date(year, month - 1, day); // month is 0-indexed
+
+		// Check if the date is valid
+		if (isNaN(date.getTime())) {
+			return 'Invalid Date';
+		}
+
+		// Check if the date is today
+		const today = new Date();
+		if (date.toDateString() === today.toDateString()) {
+			return today.toLocaleDateString('en-US', {
+				month: 'short',
+				day: 'numeric',
+			});
+		}
+
+		// Format as "Jun 27" for PST timezone
+		return date.toLocaleDateString('en-US', {
+			month: 'short',
+			day: 'numeric',
+		});
+	} catch (error) {
+		return 'Invalid Date';
+	}
+};
 
 // Category → icon map lives at module scope so it isn't recreated each render
 const CATEGORY_ICON_MAP: Record<
@@ -45,7 +99,7 @@ const CATEGORY_ICON_MAP: Record<
 	Entertainment: { name: 'game-controller-outline', color: '#9C27B0' },
 	Travel: { name: 'airplane-outline', color: '#2196F3' },
 	Health: { name: 'fitness-outline', color: '#F44336' },
-	Dining: { name: 'restaurant-outline', color: '#FF9800' },
+	Food: { name: 'restaurant-outline', color: '#FF9800' },
 	Shopping: { name: 'bag-outline', color: '#E91E63' },
 	Transportation: { name: 'car-outline', color: '#2196F3' },
 	Housing: { name: 'home-outline', color: '#795548' },
@@ -114,10 +168,10 @@ const SimpleBalanceWidget: React.FC<BalanceWidgetProps> = ({
 	const { totalIncome, totalExpense } = useMemo(() => {
 		const income = transactions
 			.filter((t) => t.type === 'income')
-			.reduce((s, t) => s + t.amount, 0);
+			.reduce((s, t) => s + (isNaN(t.amount) ? 0 : t.amount), 0);
 		const expense = transactions
 			.filter((t) => t.type === 'expense')
-			.reduce((s, t) => s + t.amount, 0);
+			.reduce((s, t) => s + (isNaN(t.amount) ? 0 : t.amount), 0);
 		return { totalIncome: income, totalExpense: expense } as const;
 	}, [transactions]);
 
@@ -172,72 +226,89 @@ const AISuggestionBox = () => (
  * TransactionHistory – recent transactions list (top 6)
  * -----------------------------------------------------------------------------
  */
-const TransactionHistory: React.FC<{ transactions: Transaction[] }> = ({
-	transactions,
-}) => (
-	<View style={styles.transactionsSectionContainer}>
-		<View style={styles.transactionsHeader}>
-			<Text style={styles.transactionsTitle}>Recent Activity</Text>
-			<TouchableOpacity onPress={() => router.push('/ledger')}>
-				<Text style={styles.viewAllText}>View All</Text>
-			</TouchableOpacity>
-		</View>
+const TransactionHistory: React.FC<{
+	transactions: Transaction[];
+	onPress: (isPressed: boolean) => void;
+}> = ({ transactions, onPress }) => {
+	const recentTransactions = transactions
+		.sort((a, b) => +new Date(b.date) - +new Date(a.date))
+		.slice(0, 6);
 
-		<View style={styles.transactionsListContainer}>
-			{transactions
-				.sort((a, b) => +new Date(b.date) - +new Date(a.date))
-				.slice(0, 6)
-				.map((t) => {
-					const categoryKey = t.category?.[0] ?? 'Other';
-					const iconData =
-						CATEGORY_ICON_MAP[categoryKey] ?? CATEGORY_ICON_MAP['Other'];
-					const { name, color } = iconData;
+	return (
+		<View style={styles.transactionsSectionContainer}>
+			<View style={styles.transactionsHeader}>
+				<Text style={styles.transactionsTitle}>Recent Activity</Text>
+				<TouchableOpacity onPress={() => router.push('/ledger')}>
+					<Text style={styles.viewAllText}>View All</Text>
+				</TouchableOpacity>
+			</View>
 
-					return (
-						<View key={t.id} style={styles.transactionItem}>
-							<TouchableOpacity
-								onPress={() => router.push('/ledger')}
-								style={styles.transactionContent}
-							>
-								<View style={styles.transactionLeft}>
-									<View
-										style={[
-											styles.iconContainer,
-											{ backgroundColor: `${color}20` },
-										]}
-									>
-										<Ionicons name={name} size={20} color={color} />
+			<View style={styles.transactionsListContainer}>
+				{recentTransactions.length > 0 ? (
+					recentTransactions.map((t) => {
+						const iconData = getCategoryMeta(t.categories?.[0] as any);
+
+						return (
+							<View key={t.id} style={styles.transactionItem}>
+								<BorderlessButton
+									onPress={() => router.push('/ledger')}
+									style={styles.transactionContent}
+									onActiveStateChange={onPress}
+								>
+									<View style={styles.transactionLeft}>
+										<View
+											style={[
+												styles.iconContainer,
+												{ backgroundColor: `${iconData.color}20` },
+											]}
+										>
+											<Ionicons
+												name={iconData.icon}
+												size={20}
+												color={iconData.color}
+											/>
+										</View>
+										<View style={styles.transactionInfo}>
+											<Text style={styles.transactionDescription}>
+												{t.description}
+											</Text>
+											<Text style={styles.transactionCategory}>
+												{t.categories?.map((cat) => cat.name).join(', ') ||
+													'Other'}
+											</Text>
+										</View>
 									</View>
-									<View style={styles.transactionInfo}>
-										<Text style={styles.transactionDescription}>
-											{t.description}
+
+									<View style={styles.transactionRight}>
+										<Text
+											style={[
+												styles.transactionAmount,
+												t.type === 'income'
+													? styles.incomeAmount
+													: styles.expenseAmount,
+											]}
+										>
+											{t.type === 'income' ? '+' : '-'}{' '}
+											{currency(isNaN(t.amount) ? 0 : t.amount)}
 										</Text>
-										<Text style={styles.transactionCategory}>
-											{t.category?.join(', ') || 'Other'}
+										<Text style={styles.transactionDate}>
+											{formatTransactionDate(t.date)}
 										</Text>
 									</View>
-								</View>
-
-								<View style={styles.transactionRight}>
-									<Text
-										style={[
-											styles.transactionAmount,
-											t.type === 'income'
-												? styles.incomeAmount
-												: styles.expenseAmount,
-										]}
-									>
-										{t.type === 'income' ? '+' : '-'} {currency(t.amount)}
-									</Text>
-									<Text style={styles.transactionDate}>{t.date.slice(5)}</Text>
-								</View>
-							</TouchableOpacity>
-						</View>
-					);
-				})}
+								</BorderlessButton>
+							</View>
+						);
+					})
+				) : (
+					<View style={styles.emptyContainer}>
+						<Ionicons name="document-outline" size={48} color="#ccc" />
+						<Text style={styles.emptyText}>No transactions</Text>
+					</View>
+				)}
+			</View>
 		</View>
-	</View>
-);
+	);
+};
 
 /**
  * -----------------------------------------------------------------------------
@@ -245,63 +316,47 @@ const TransactionHistory: React.FC<{ transactions: Transaction[] }> = ({
  * -----------------------------------------------------------------------------
  */
 const Dashboard: React.FC = () => {
-	const [transactions, setTransactions] = useState<Transaction[]>([]);
-	const [isFetching, setIsFetching] = useState(true);
-	const [refreshing, setRefreshing] = useState(false);
-
-	/**
-	 * ----------------------- Fetch data ------------------------
-	 */
-	const fetchTransactions = useCallback(async () => {
-		setIsFetching(true);
-		try {
-			const { data } = await axios.get(API_URL);
-			const formatted: Transaction[] = data.map((t: any) => ({
-				id: t._id ?? t.id,
-				description: t.description ?? '',
-				amount: Number(t.amount) ?? 0,
-				date: t.date ?? new Date().toISOString(),
-				tags: t.tags ?? [],
-				type: t.type ?? 'expense',
-				category: t.category ?? ['Other'],
-			}));
-			setTransactions(formatted);
-		} catch (err) {
-			console.warn('[Dashboard] API failed, using dummy data', err);
-			setTransactions(dummyTransactions);
-		} finally {
-			setIsFetching(false);
-		}
-	}, []);
-
-	useEffect(() => {
-		fetchTransactions();
-	}, [fetchTransactions]);
+	const { transactions, isLoading, refetch } = useContext(TransactionContext);
+	const { user } = useAuth();
+	const [isPressed, setIsPressed] = useState(false);
 
 	const onRefresh = useCallback(async () => {
-		setRefreshing(true);
-		await fetchTransactions();
-		setRefreshing(false);
-	}, [fetchTransactions]);
+		await refetch();
+	}, [refetch]);
 
 	/**
 	 * ------------------ Derived / memoised values ---------------
 	 */
 	const { totalBalance, dailyChange } = useMemo(() => {
 		const balance = transactions.reduce(
-			(sum, t) => sum + (t.type === 'income' ? t.amount : -t.amount),
+			(sum, t) =>
+				sum +
+				(t.type === 'income'
+					? isNaN(t.amount)
+						? 0
+						: t.amount
+					: -(isNaN(t.amount) ? 0 : t.amount)),
 			0
 		);
 
-		const today = new Date();
-		today.setHours(0, 0, 0, 0);
+		// Use timezone-aware date handling (from ledger)
+		const today = getLocalIsoDate();
 		const change = transactions
 			.filter((t) => {
-				const d = new Date(t.date);
-				d.setHours(0, 0, 0, 0);
-				return d.getTime() === today.getTime();
+				// Compare transaction date with today's date using ISO string format
+				const txDay = t.date.slice(0, 10);
+				return txDay === today;
 			})
-			.reduce((s, t) => s + (t.type === 'income' ? t.amount : -t.amount), 0);
+			.reduce(
+				(s, t) =>
+					s +
+					(t.type === 'income'
+						? isNaN(t.amount)
+							? 0
+							: t.amount
+						: -(isNaN(t.amount) ? 0 : t.amount)),
+				0
+			);
 
 		return { totalBalance: balance, dailyChange: change } as const;
 	}, [transactions]);
@@ -309,7 +364,7 @@ const Dashboard: React.FC = () => {
 	/**
 	 * --------------------------- UI -----------------------------
 	 */
-	if (isFetching) {
+	if (isLoading) {
 		return (
 			<SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
 				<View style={styles.loadingContainer}>
@@ -328,7 +383,7 @@ const Dashboard: React.FC = () => {
 					showsVerticalScrollIndicator={false}
 					refreshControl={
 						<RefreshControl
-							refreshing={refreshing}
+							refreshing={isLoading}
 							onRefresh={onRefresh}
 							tintColor="#007AFF"
 							colors={['#007AFF']}
@@ -347,6 +402,11 @@ const Dashboard: React.FC = () => {
 									style={styles.logo}
 									resizeMode="contain"
 								/>
+								{user?.name && (
+									<Text style={styles.welcomeText}>
+										Welcome back, {user.name}! 👋
+									</Text>
+								)}
 							</View>
 
 							<TouchableOpacity
@@ -381,7 +441,11 @@ const Dashboard: React.FC = () => {
 								]}
 							>
 								{dailyChange >= 0 ? '+' : ''}
-								{currency(dailyChange)} today
+								{currency(dailyChange)}{' '}
+								{new Date().toLocaleDateString('en-US', {
+									month: 'short',
+									day: 'numeric',
+								})}
 							</Text>
 
 							<SimpleBalanceWidget transactions={transactions} />
@@ -391,7 +455,10 @@ const Dashboard: React.FC = () => {
 						<AISuggestionBox />
 
 						{/* Recent Transactions */}
-						<TransactionHistory transactions={transactions} />
+						<TransactionHistory
+							transactions={transactions}
+							onPress={setIsPressed}
+						/>
 					</View>
 				</ScrollView>
 			</GestureHandlerRootView>
@@ -426,6 +493,7 @@ const styles = StyleSheet.create({
 	},
 	contentContainer: {
 		padding: 24,
+		paddingTop: 0,
 	},
 	/** Header **/
 	headerContainer: {
@@ -559,6 +627,7 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
+		flex: 1,
 	},
 	transactionLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
 	iconContainer: {
@@ -620,6 +689,23 @@ const styles = StyleSheet.create({
 	logo: {
 		width: 100,
 		height: 30,
+	},
+	welcomeText: {
+		fontSize: 16,
+		fontWeight: '500',
+		color: '#333',
+		marginTop: 8,
+	},
+	emptyContainer: {
+		justifyContent: 'center',
+		alignItems: 'center',
+		paddingVertical: 40,
+	},
+	emptyText: {
+		marginTop: 16,
+		fontSize: 16,
+		color: '#666',
+		fontWeight: '500',
 	},
 });
 

@@ -12,11 +12,12 @@ import {
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { getAuth, signOut } from '@react-native-firebase/auth';
 import { RectButton } from 'react-native-gesture-handler';
+import useAuth from '../../../src/context/AuthContext';
 
 export default function SettingsScreen() {
 	const router = useRouter();
+	const { user, logout } = useAuth();
 	const [isLoading, setIsLoading] = useState(true);
 	const [profileImage, setProfileImage] = useState(
 		require('../../../assets/images/profile.jpg')
@@ -59,7 +60,7 @@ export default function SettingsScreen() {
 				style: 'destructive',
 				onPress: async () => {
 					try {
-						signOut(getAuth());
+						await logout();
 						Alert.alert('Signed Out', 'You have been signed out.');
 					} catch (error) {
 						console.error('Error signing out:', error);
@@ -94,7 +95,11 @@ export default function SettingsScreen() {
 								contentFit="cover"
 							/>
 						</View>
-						<Text style={styles.userName}>@{userProfile.username}</Text>
+						<Text style={styles.userName}>
+							{user?.name
+								? `@${user.name.toLowerCase().replace(/\s+/g, '')}`
+								: '@user'}
+						</Text>
 					</View>
 
 					{/* ——— Settings ——— */}
@@ -176,10 +181,7 @@ export default function SettingsScreen() {
 
 					{/* ——— Sign-out ——— */}
 					<View style={styles.signOutContainer}>
-						<RectButton
-							style={styles.signOutButton}
-							onPress={handleSignOut}
-						>
+						<RectButton style={styles.signOutButton} onPress={handleSignOut}>
 							<Ionicons name="log-out-outline" size={24} color="#FF3B30" />
 							<Text style={styles.signOutText}>Sign Out</Text>
 						</RectButton>

@@ -62,8 +62,8 @@ const ProfitGraph: React.FC<ProfitGraphProps> = ({ transactions }) => {
 
 	// Update amounts on transaction days
 	sortedTransactions.forEach((transaction) => {
-		const amount =
-			transaction.type === 'income' ? transaction.amount : -transaction.amount;
+		const safeAmount = isNaN(transaction.amount) ? 0 : transaction.amount;
+		const amount = transaction.type === 'income' ? safeAmount : -safeAmount;
 		cumulativeAmount += amount;
 		lastAmount = cumulativeAmount;
 

@@ -2,7 +2,6 @@
 import { Stack } from 'expo-router';
 import { createContext } from 'react';
 import { Transaction } from '../../../src/data/transactions';
-import { TransactionProvider } from '../../../src/context/transactionContext';
 import { FilterProvider } from '../../../src/context/filterContext';
 
 export const dateFilterModes = [
@@ -34,21 +33,19 @@ export const FilterContext = createContext<{
 
 export default function TransactionStack() {
 	return (
-		<TransactionProvider>
-			<FilterProvider>
-				<Stack
-					screenOptions={{
-						animation: 'slide_from_right',
-						gestureEnabled: true,
-					}}
-				>
-					<Stack.Screen
-						name="index"
-						options={{ animation: 'slide_from_left', headerShown: false }}
-					/>
-					<Stack.Screen name="ledgerFilter" />
-				</Stack>
-			</FilterProvider>
-		</TransactionProvider>
+		<FilterProvider>
+			<Stack
+				screenOptions={{
+					animation: 'slide_from_right',
+					gestureEnabled: true,
+				}}
+			>
+				<Stack.Screen
+					name="index"
+					options={{ animation: 'slide_from_left', headerShown: false }}
+				/>
+				<Stack.Screen name="ledgerFilter" />
+			</Stack>
+		</FilterProvider>
 	);
 }

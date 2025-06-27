@@ -1,62 +1,127 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { OnboardingService } from '../services/onboardingService';
-
-interface User {
-	id: string;
-	token: string;
-}
+import { getAuth, onAuthStateChanged } from '@react-native-firebase/auth';
+import type { FirebaseAuthTypes } from '@react-native-firebase/auth';
+import { UserService, User } from '../services/userService';
 
 interface AuthContextType {
 	user: User | null;
-	login: (token: string, userId: string) => Promise<void>;
+	firebaseUser: FirebaseAuthTypes.User | null;
+	loading: boolean;
+	login: (firebaseUser: FirebaseAuthTypes.User) => Promise<void>;
 	logout: () => Promise<void>;
+	createUserInMongoDB: (
+		firebaseUser: FirebaseAuthTypes.User,
+		name?: string
+	) => Promise<User>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const [user, setUser] = useState<User | null>(null);
+	const [firebaseUser, setFirebaseUser] =
+		useState<FirebaseAuthTypes.User | null>(null);
+	const [loading, setLoading] = useState(true);
 
 	useEffect(() => {
-		// Load user data from storage on mount
-		loadUser();
+		// Listen for Firebase auth state changes
+		const unsubscribe = onAuthStateChanged(getAuth(), async (firebaseUser) => {
+			setFirebaseUser(firebaseUser);
+
+			if (firebaseUser) {
+				// User is signed in
+				try {
+					// Try to get user from MongoDB
+					const mongoUser = await UserService.getUserByFirebaseUID(
+						firebaseUser.uid
+					);
+					if (mongoUser) {
+						setUser(mongoUser);
+						await AsyncStorage.setItem('firebaseUID', firebaseUser.uid);
+					} else {
+						// User exists in Firebase but not in MongoDB
+						// This will be handled during signup flow
+						setUser(null);
+					}
+				} catch (error) {
+					console.error('Error fetching user from MongoDB:', error);
+					setUser(null);
+				}
+			} else {
+				// User is signed out
+				setUser(null);
+				await AsyncStorage.removeItem('firebaseUID');
+			}
+
+			setLoading(false);
+		});
+
+		return unsubscribe;
 	}, []);
 
-	const loadUser = async () => {
+	const createUserInMongoDB = async (
+		firebaseUser: FirebaseAuthTypes.User,
+		name?: string
+	): Promise<User> => {
 		try {
-			const token = await AsyncStorage.getItem('token');
-			const userId = await AsyncStorage.getItem('userId');
-			if (token && userId) {
-				setUser({ id: userId, token });
-			}
+			const userData = {
+				firebaseUID: firebaseUser.uid,
+				email: firebaseUser.email!,
+				name: name || firebaseUser.displayName || undefined,
+			};
+
+			const newUser = await UserService.createUser(userData);
+			setUser(newUser);
+			await AsyncStorage.setItem('firebaseUID', firebaseUser.uid);
+			return newUser;
 		} catch (error) {
-			console.error('Error loading user:', error);
+			console.error('Error creating user in MongoDB:', error);
+			throw error;
 		}
 	};
 
-	const login = async (token: string, userId: string) => {
+	const login = async (firebaseUser: FirebaseAuthTypes.User) => {
 		try {
-			await AsyncStorage.setItem('token', token);
-			await AsyncStorage.setItem('userId', userId);
-			setUser({ id: userId, token });
+			// Check if user exists in MongoDB
+			const mongoUser = await UserService.getUserByFirebaseUID(
+				firebaseUser.uid
+			);
+			if (mongoUser) {
+				setUser(mongoUser);
+				await AsyncStorage.setItem('firebaseUID', firebaseUser.uid);
+			} else {
+				// User doesn't exist in MongoDB, create them
+				await createUserInMongoDB(firebaseUser);
+			}
 		} catch (error) {
-			console.error('Error saving user:', error);
+			console.error('Error during login:', error);
+			throw error;
 		}
 	};
 
 	const logout = async () => {
 		try {
-			await AsyncStorage.removeItem('token');
-			await AsyncStorage.removeItem('userId');
+			await getAuth().signOut();
 			setUser(null);
+			setFirebaseUser(null);
+			await AsyncStorage.removeItem('firebaseUID');
 		} catch (error) {
-			console.error('Error removing user:', error);
+			console.error('Error during logout:', error);
 		}
 	};
 
 	return (
-		<AuthContext.Provider value={{ user, login, logout }}>
+		<AuthContext.Provider
+			value={{
+				user,
+				firebaseUser,
+				loading,
+				login,
+				logout,
+				createUserInMongoDB,
+			}}
+		>
 			{children}
 		</AuthContext.Provider>
 	);
