@@ -56,11 +56,13 @@ const formatDateWithoutTime = (dateString: string): string => {
 interface TransactionRowProps {
 	item: Transaction;
 	onDelete: (id: string, resetAnimation: () => void) => void;
+	onEdit?: (transaction: Transaction) => void;
 }
 
 const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 	item,
 	onDelete,
+	onEdit,
 }) => {
 	const translateX = useSharedValue(0);
 	const iconScale = useSharedValue(1);
@@ -132,7 +134,6 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 			} else if (translateX.value >= TRANSLATE_THRESHOLD && hasHaptics.value) {
 				hasHaptics.value = false;
 				iconScale.value = withSpring(1, { damping: 15, stiffness: 150 });
-				runOnJS(triggerHaptic)();
 			}
 		})
 		.onEnd(() => {
@@ -149,6 +150,14 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 				iconScale.value = withSpring(1, { damping: 15, stiffness: 150 });
 			}
 		});
+
+	const tapGesture = Gesture.Tap().onEnd(() => {
+		if (onEdit) {
+			runOnJS(onEdit)(item);
+		}
+	});
+
+	const combinedGesture = Gesture.Simultaneous(panGesture, tapGesture);
 
 	const animatedRowStyle = useAnimatedStyle(() => ({
 		transform: [{ translateX: translateX.value }],
@@ -167,7 +176,7 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 				</Animated.View>
 			</View>
 
-			<GestureDetector gesture={panGesture}>
+			<GestureDetector gesture={combinedGesture}>
 				<Animated.View style={[styles.row, animatedRowStyle]}>
 					<View
 						style={[styles.iconCircle, { backgroundColor: `${iconColor}20` }]}
@@ -203,9 +212,11 @@ export const TransactionRow = React.memo(
 	(prev, next) =>
 		prev.item.id === next.item.id &&
 		prev.item.amount === next.item.amount &&
-		// you can add more granular checks if needed
 		prev.item.description === next.item.description &&
-		prev.item.date === next.item.date
+		prev.item.date === next.item.date &&
+		prev.item.type === next.item.type &&
+		JSON.stringify(prev.item.categories) ===
+			JSON.stringify(next.item.categories)
 );
 
 const styles = StyleSheet.create({

@@ -24,6 +24,10 @@ interface TransactionContextType {
 	addTransaction: (
 		transactionData: Omit<Transaction, 'id'>
 	) => Promise<Transaction>;
+	updateTransaction: (
+		id: string,
+		transactionData: Partial<Omit<Transaction, 'id'>>
+	) => Promise<Transaction>;
 	// Category management
 	getCategories: () => Category[];
 	addCategory: (category: Category) => Promise<Category>;
@@ -44,6 +48,9 @@ export const TransactionContext = createContext<TransactionContextType>({
 	deleteTransaction: async () => {},
 	addTransaction: async () => {
 		throw new Error('addTransaction not implemented');
+	},
+	updateTransaction: async () => {
+		throw new Error('updateTransaction not implemented');
 	},
 	getCategories: () => [],
 	addCategory: async () => {
@@ -83,6 +90,8 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 							? tx.categories.map((cat: any) => ({
 									name: cat.name ?? 'Other',
 									type: cat.type ?? 'expense',
+									color: cat.color,
+									icon: cat.icon,
 							  }))
 							: [{ name: 'Other', type: 'expense' }],
 						type: tx.type ?? 'expense',
@@ -169,6 +178,8 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 							? response.data.categories.map((cat: any) => ({
 									name: cat.name ?? 'Other',
 									type: cat.type ?? 'expense',
+									color: cat.color,
+									icon: cat.icon,
 							  }))
 							: transactionData.categories,
 						type: response.data.type ?? transactionData.type,
@@ -203,6 +214,65 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 				console.warn('Delete failed, refetching', err);
 				// Rollback or just refetch
 				await refetch();
+			}
+		},
+		[refetch]
+	);
+
+	const updateTransaction = useCallback(
+		async (id: string, transactionData: Partial<Omit<Transaction, 'id'>>) => {
+			// Optimistically update UI with proper category handling
+			setTransactions((prev) =>
+				prev.map((t) =>
+					t.id === id
+						? {
+								...t,
+								...transactionData,
+								// Ensure categories are properly handled in optimistic update
+								categories: transactionData.categories || t.categories,
+						  }
+						: t
+				)
+			);
+
+			try {
+				const response = await ApiService.put<any>(
+					`/transactions/${id}`,
+					transactionData
+				);
+
+				if (response.success && response.data) {
+					const updatedTransaction: Transaction = {
+						id: response.data._id ?? response.data.id ?? id,
+						description:
+							response.data.description ?? transactionData.description,
+						amount: response.data.amount ?? transactionData.amount,
+						date: response.data.date ?? transactionData.date,
+						categories: Array.isArray(response.data.categories)
+							? response.data.categories.map((cat: any) => ({
+									name: cat.name ?? 'Other',
+									type: cat.type ?? 'expense',
+									color: cat.color,
+									icon: cat.icon,
+							  }))
+							: transactionData.categories,
+						type: response.data.type ?? transactionData.type,
+					};
+
+					// Update the local state with the server response
+					setTransactions((prev) =>
+						prev.map((t) => (t.id === id ? updatedTransaction : t))
+					);
+
+					return updatedTransaction;
+				} else {
+					throw new Error('Failed to update transaction');
+				}
+			} catch (error) {
+				console.error('Error in updateTransaction:', error);
+				// Rollback or just refetch
+				await refetch();
+				throw error;
 			}
 		},
 		[refetch]
@@ -302,6 +372,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 			refetchCategories,
 			deleteTransaction,
 			addTransaction,
+			updateTransaction,
 			getCategories,
 			addCategory,
 			deleteCategory,
@@ -316,6 +387,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 			refetchCategories,
 			deleteTransaction,
 			addTransaction,
+			updateTransaction,
 			getCategories,
 			addCategory,
 			deleteCategory,

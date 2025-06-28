@@ -446,7 +446,7 @@ const NumberPad: React.FC<{
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: '#ffffff',
+		backgroundColor: '#fff',
 	},
 	safeArea: {
 		flex: 1,

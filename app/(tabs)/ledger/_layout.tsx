@@ -1,8 +1,10 @@
 // _layout.tsx
-import { Stack } from 'expo-router';
-import { createContext } from 'react';
+import { router, Stack } from 'expo-router';
+import { createContext, useState } from 'react';
 import { Transaction } from '../../../src/data/transactions';
 import { FilterProvider } from '../../../src/context/filterContext';
+import { BorderlessButton } from 'react-native-gesture-handler';
+import { Ionicons } from '@expo/vector-icons';
 
 export const dateFilterModes = [
 	{ label: 'Day', value: 'day', icon: 'calendar-outline' },
@@ -32,6 +34,7 @@ export const FilterContext = createContext<{
 });
 
 export default function TransactionStack() {
+	const [isPressed, setIsPressed] = useState(false);
 	return (
 		<FilterProvider>
 			<Stack
@@ -45,6 +48,32 @@ export default function TransactionStack() {
 					options={{ animation: 'slide_from_left', headerShown: false }}
 				/>
 				<Stack.Screen name="ledgerFilter" />
+				<Stack.Screen
+					name="edit"
+					options={{
+						headerShown: true,
+						headerBackButtonDisplayMode: 'minimal',
+						headerTitle: 'Edit Transaction',
+						headerShadowVisible: false,
+						headerStyle: {
+							backgroundColor: '#ffffff',
+						},
+						headerTitleStyle: {
+							fontSize: 20,
+							fontWeight: '600',
+							color: '#333',
+						},
+						headerLeft: () => (
+							<BorderlessButton
+								onPress={() => router.back()}
+								onActiveStateChange={setIsPressed}
+								style={{ width: 50 }}
+							>
+								<Ionicons name="chevron-back" size={24} color="#333" />
+							</BorderlessButton>
+						),
+					}}
+				/>
 			</Stack>
 		</FilterProvider>
 	);

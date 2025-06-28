@@ -11,6 +11,9 @@ import {
 	Alert,
 	TextInput,
 	SectionList,
+	Animated,
+	KeyboardAvoidingView,
+	Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -50,10 +53,22 @@ const formatDate = (
 	// Check if the date is today
 	const today = new Date();
 	if (date.toDateString() === today.toDateString()) {
-		return today.toLocaleDateString(locale, options);
+		return 'Today';
 	}
 
-	return date.toLocaleDateString(locale, options);
+	// Check if the date is yesterday
+	const yesterday = new Date(today);
+	yesterday.setDate(yesterday.getDate() - 1);
+	if (date.toDateString() === yesterday.toDateString()) {
+		return 'Yesterday';
+	}
+
+	// For other dates, use a simplified format
+	return date.toLocaleDateString(locale, {
+		month: 'short',
+		day: 'numeric',
+		year: 'numeric',
+	});
 };
 
 const monthNames = [
@@ -182,6 +197,14 @@ export default function TransactionScreen() {
 		setActivePicker(null);
 	};
 
+	// Edit modal handlers
+	const showEditModal = (transaction: Transaction) => {
+		router.push({
+			pathname: '/ledger/edit',
+			params: { id: transaction.id },
+		});
+	};
+
 	const renderDateHeader = () => {
 		if (dateFilterMode !== 'day' || !selectedDate) return null;
 		return (
@@ -270,7 +293,11 @@ export default function TransactionScreen() {
 								) : null
 							}
 							renderItem={({ item }) => (
-								<TransactionRow item={item} onDelete={onDelete} />
+								<TransactionRow
+									item={item}
+									onDelete={onDelete}
+									onEdit={showEditModal}
+								/>
 							)}
 							ListEmptyComponent={
 								isLoading ? (
@@ -303,7 +330,7 @@ export default function TransactionScreen() {
 				<TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
 					<View style={styles.modalOverlay}>
 						<TouchableWithoutFeedback>
-							<View style={styles.calendarModalContent}>
+							<View style={styles.modalContent}>
 								<View style={styles.modalHeader}>
 									<Text style={styles.modalTitle}>Select Date</Text>
 									<TouchableOpacity
@@ -439,6 +466,7 @@ const styles = StyleSheet.create({
 		left: 0,
 		right: 0,
 		bottom: 0,
+		zIndex: 2000,
 	},
 	modalContent: {
 		backgroundColor: 'white',
@@ -468,17 +496,6 @@ const styles = StyleSheet.create({
 	picker: {
 		width: '100%',
 		height: 200,
-	},
-	calendarModalContent: {
-		width: width * 0.9,
-		maxHeight: height * 0.7,
-		backgroundColor: '#fff',
-		borderRadius: 24,
-		overflow: 'hidden',
-		position: 'absolute',
-		top: '50%',
-		left: '50%',
-		transform: [{ translateX: -width * 0.45 }, { translateY: -height * 0.35 }],
 	},
 	monthHeader: {
 		paddingVertical: 8,
@@ -566,5 +583,151 @@ const styles = StyleSheet.create({
 	},
 	clearButton: {
 		padding: 4,
+	},
+	modalContainer: {
+		width: '100%',
+	},
+	formGroup: {
+		marginBottom: 20,
+	},
+	label: {
+		fontSize: 14,
+		fontWeight: '500',
+		color: '#757575',
+		marginBottom: 8,
+	},
+	input: {
+		backgroundColor: '#F5F5F5',
+		borderRadius: 12,
+		padding: 16,
+		fontSize: 16,
+		color: '#212121',
+	},
+	typeSelector: {
+		flexDirection: 'row',
+		gap: 12,
+	},
+	typeButton: {
+		flex: 1,
+		paddingVertical: 12,
+		paddingHorizontal: 16,
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#E0E0E0',
+		alignItems: 'center',
+		backgroundColor: '#F5F5F5',
+	},
+	typeButtonActive: {
+		backgroundColor: '#0095FF',
+		borderColor: '#0095FF',
+	},
+	typeButtonText: {
+		fontSize: 16,
+		fontWeight: '500',
+		color: '#757575',
+	},
+	typeButtonTextActive: {
+		color: '#FFFFFF',
+		fontWeight: '600',
+	},
+	updateButton: {
+		backgroundColor: '#0095FF',
+		borderRadius: 12,
+		padding: 16,
+		alignItems: 'center',
+		marginTop: 8,
+	},
+	updateButtonText: {
+		color: '#FFFFFF',
+		fontSize: 16,
+		fontWeight: '600',
+	},
+	// Edit modal specific styles
+	editModalContainer: {
+		width: '100%',
+		zIndex: 999,
+	},
+	editModalContent: {
+		backgroundColor: '#FFFFFF',
+		borderTopLeftRadius: 20,
+		borderTopRightRadius: 20,
+		padding: 24,
+		zIndex: 1000,
+	},
+	editFormGroup: {
+		marginBottom: 20,
+	},
+	editLabel: {
+		fontSize: 14,
+		fontWeight: '500',
+		color: '#757575',
+		marginBottom: 8,
+	},
+	editInput: {
+		backgroundColor: '#F5F5F5',
+		borderRadius: 12,
+		padding: 16,
+		fontSize: 16,
+		color: '#212121',
+	},
+	editTypeSelector: {
+		flexDirection: 'row',
+		gap: 12,
+	},
+	editTypeButton: {
+		flex: 1,
+		paddingVertical: 12,
+		paddingHorizontal: 16,
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#E0E0E0',
+		alignItems: 'center',
+		backgroundColor: '#F5F5F5',
+	},
+	editTypeButtonActive: {
+		backgroundColor: '#0095FF',
+		borderColor: '#0095FF',
+	},
+	editTypeButtonText: {
+		fontSize: 16,
+		fontWeight: '500',
+		color: '#757575',
+	},
+	editTypeButtonTextActive: {
+		color: '#FFFFFF',
+		fontWeight: '600',
+	},
+	editUpdateButton: {
+		backgroundColor: '#0095FF',
+		borderRadius: 12,
+		padding: 16,
+		alignItems: 'center',
+		marginTop: 8,
+	},
+	editUpdateButtonText: {
+		color: '#FFFFFF',
+		fontSize: 16,
+		fontWeight: '600',
+	},
+	editDateButton: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		backgroundColor: '#F5F5F5',
+		borderRadius: 12,
+		padding: 16,
+		borderWidth: 1,
+		borderColor: '#E0E0E0',
+	},
+	editDateButtonText: {
+		fontSize: 16,
+		color: '#212121',
+	},
+	calendarContainer: {
+		marginTop: 16,
+		padding: 16,
+		borderWidth: 1,
+		borderColor: '#E0E0E0',
+		borderRadius: 12,
 	},
 });
