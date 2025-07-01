@@ -6,13 +6,16 @@ import {
 	TextInput,
 	Alert,
 	ScrollView,
+	ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { RectButton } from 'react-native-gesture-handler';
+import { useProfile } from '../../../../src/context/profileContext';
 
 export default function EditNameScreen() {
 	const router = useRouter();
+	const { profile, loading, error, updateProfile } = useProfile();
 	const [firstName, setFirstName] = useState('');
 	const [lastName, setLastName] = useState('');
 	const [originalFirstName, setOriginalFirstName] = useState('');
@@ -20,8 +23,6 @@ export default function EditNameScreen() {
 	const [isLoading, setIsLoading] = useState(false);
 
 	// Check if any changes have been made
-	const hasChanges =
-		firstName !== originalFirstName || lastName !== originalLastName;
 	const hasFirstNameChanges = firstName !== originalFirstName;
 	const hasLastNameChanges = lastName !== originalLastName;
 	const hasAnyNameChanges = hasFirstNameChanges || hasLastNameChanges;
@@ -45,75 +46,15 @@ export default function EditNameScreen() {
 	};
 
 	useEffect(() => {
-		fetchProfile();
-	}, []);
-
-	const fetchProfile = async () => {
-		try {
-			const response = await fetch(
-				'http://localhost:3000/api/profiles/68431f0b700221021c84552a'
-			);
-			if (response.ok) {
-				const data = await response.json();
-				const fetchedFirstName = data.data.firstName || '';
-				const fetchedLastName = data.data.lastName || '';
-				setOriginalFirstName(fetchedFirstName);
-				setOriginalLastName(fetchedLastName);
-				setFirstName(fetchedFirstName);
-				setLastName(fetchedLastName);
-			}
-		} catch (error) {
-			setOriginalFirstName('Max');
-			setOriginalLastName('Mustermann');
-			setFirstName('Max');
-			setLastName('Mustermann');
-			console.error('Error fetching profile:', error);
+		if (profile) {
+			const fetchedFirstName = profile.firstName || '';
+			const fetchedLastName = profile.lastName || '';
+			setOriginalFirstName(fetchedFirstName);
+			setOriginalLastName(fetchedLastName);
+			setFirstName(fetchedFirstName);
+			setLastName(fetchedLastName);
 		}
-	};
-
-	const handleSave = async () => {
-		if (!firstName.trim() || !lastName.trim()) {
-			Alert.alert('Error', 'Please fill in both first name and last name');
-			return;
-		}
-
-		setIsLoading(true);
-		try {
-			const response = await fetch(
-				'http://localhost:3000/api/profiles/68431f0b700221021c84552a',
-				{
-					method: 'PATCH',
-					headers: {
-						'Content-Type': 'application/json',
-					},
-					body: JSON.stringify({
-						firstName: firstName.trim(),
-						lastName: lastName.trim(),
-					}),
-				}
-			);
-
-			if (response.ok) {
-				Alert.alert('Success', 'Name updated successfully', [
-					{
-						text: 'OK',
-						onPress: () => {
-							setOriginalFirstName(firstName.trim());
-							setOriginalLastName(lastName.trim());
-							router.back();
-						},
-					},
-				]);
-			} else {
-				Alert.alert('Error', 'Failed to update name');
-			}
-		} catch (error) {
-			console.error('Error updating name:', error);
-			Alert.alert('Error', 'Failed to update name');
-		} finally {
-			setIsLoading(false);
-		}
-	};
+	}, [profile]);
 
 	const handleSaveChanges = async () => {
 		// Check if there are any changes to save
@@ -121,7 +62,7 @@ export default function EditNameScreen() {
 			return;
 		}
 
-		// Validate that both names are filled if either has changes
+		// Validate that both names are filled
 		if (!firstName.trim() || !lastName.trim()) {
 			Alert.alert('Error', 'Please fill in both first name and last name');
 			return;
@@ -129,41 +70,22 @@ export default function EditNameScreen() {
 
 		setIsLoading(true);
 		try {
-			const updateData: any = {};
+			// Always update both names together to ensure consistency
+			await updateProfile({
+				firstName: firstName.trim(),
+				lastName: lastName.trim(),
+			});
 
-			// Only include fields that have actually changed
-			if (hasFirstNameChanges) {
-				updateData.firstName = firstName.trim();
-			}
-			if (hasLastNameChanges) {
-				updateData.lastName = lastName.trim();
-			}
-
-			const response = await fetch(
-				'http://localhost:3000/api/profiles/68431f0b700221021c84552a',
+			Alert.alert('Success', 'Name updated successfully', [
 				{
-					method: 'PATCH',
-					headers: {
-						'Content-Type': 'application/json',
+					text: 'OK',
+					onPress: () => {
+						setOriginalFirstName(firstName.trim());
+						setOriginalLastName(lastName.trim());
+						router.back();
 					},
-					body: JSON.stringify(updateData),
-				}
-			);
-
-			if (response.ok) {
-				Alert.alert('Success', 'Name updated successfully', [
-					{
-						text: 'OK',
-						onPress: () => {
-							setOriginalFirstName(firstName.trim());
-							setOriginalLastName(lastName.trim());
-							router.back();
-						},
-					},
-				]);
-			} else {
-				Alert.alert('Error', 'Failed to update name');
-			}
+				},
+			]);
 		} catch (error) {
 			console.error('Error updating name:', error);
 			Alert.alert('Error', 'Failed to update name');
@@ -171,6 +93,34 @@ export default function EditNameScreen() {
 			setIsLoading(false);
 		}
 	};
+
+	if (loading) {
+		return (
+			<View style={styles.loadingContainer}>
+				<ActivityIndicator size="large" color="#0095FF" />
+				<Text style={styles.loadingText}>Loading profile...</Text>
+			</View>
+		);
+	}
+
+	if (error) {
+		return (
+			<View style={styles.errorContainer}>
+				<Ionicons name="alert-circle-outline" size={48} color="#ff6b6b" />
+				<Text style={styles.errorText}>Failed to load profile</Text>
+				<Text style={styles.errorSubtext}>{error}</Text>
+			</View>
+		);
+	}
+
+	if (!profile) {
+		return (
+			<View style={styles.errorContainer}>
+				<Ionicons name="person-outline" size={48} color="#999" />
+				<Text style={styles.errorText}>No profile found</Text>
+			</View>
+		);
+	}
 
 	return (
 		<View style={styles.container}>
@@ -335,5 +285,32 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		fontWeight: '600',
 		color: '#333',
+	},
+	loadingContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	loadingText: {
+		fontSize: 18,
+		fontWeight: '600',
+		color: '#333',
+		marginTop: 16,
+	},
+	errorContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	errorText: {
+		fontSize: 18,
+		fontWeight: '600',
+		color: '#ff6b6b',
+		marginTop: 16,
+	},
+	errorSubtext: {
+		fontSize: 16,
+		color: '#666',
+		marginTop: 8,
 	},
 });

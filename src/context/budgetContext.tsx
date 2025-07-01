@@ -106,6 +106,8 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 	}, []);
 
 	const addBudget = useCallback(async (budgetData: CreateBudgetData) => {
+		console.log('addBudget called with:', budgetData);
+
 		// Create a temporary ID for optimistic update
 		const tempId = `temp-${Date.now()}-${Math.random()}`;
 		const newBudget: Budget = {
@@ -114,38 +116,61 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 			spent: 0,
 		};
 
+		console.log('Optimistic budget created:', newBudget);
+
 		// Optimistically add to UI
-		setBudgets((prev) => [newBudget, ...prev]);
+		setBudgets((prev) => {
+			const updated = [newBudget, ...prev];
+			console.log('Updated budgets state (optimistic):', updated);
+			return updated;
+		});
 
 		try {
 			const response = await ApiService.post<any>('/budgets', budgetData);
+			console.log('API response:', response);
 
-			if (response.success && response.data) {
+			// Handle the response format properly
+			const actualData = response.data?.data || response.data;
+			const actualSuccess = response.success;
+
+			console.log('Processed response:', { actualSuccess, actualData });
+
+			if (actualSuccess && actualData) {
 				// Update with the real ID from the server
 				const serverBudget: Budget = {
-					id: response.data._id ?? response.data.id ?? tempId,
-					category: response.data.category,
-					allocated: Number(response.data.allocated) || 0,
-					spent: Number(response.data.spent) || 0,
-					icon: response.data.icon,
-					color: response.data.color,
-					userId: response.data.userId,
-					createdAt: response.data.createdAt,
-					updatedAt: response.data.updatedAt,
+					id: actualData._id ?? actualData.id ?? tempId,
+					category: actualData.category,
+					allocated: Number(actualData.allocated) || 0,
+					spent: Number(actualData.spent) || 0,
+					icon: actualData.icon,
+					color: actualData.color,
+					userId: actualData.userId,
+					createdAt: actualData.createdAt,
+					updatedAt: actualData.updatedAt,
 				};
 
+				console.log('Server budget created:', serverBudget);
+
 				// Replace the temporary budget with the real one
-				setBudgets((prev) =>
-					prev.map((b) => (b.id === tempId ? serverBudget : b))
-				);
+				setBudgets((prev) => {
+					const updated = prev.map((b) => (b.id === tempId ? serverBudget : b));
+					console.log('Updated budgets state (server):', updated);
+					return updated;
+				});
 
 				return serverBudget;
 			} else {
-				throw new Error('Failed to create budget');
+				// If the response doesn't indicate success, throw an error
+				throw new Error(response.error || 'Failed to create budget');
 			}
 		} catch (error) {
 			// Remove the optimistic budget on error
-			setBudgets((prev) => prev.filter((b) => b.id !== tempId));
+			setBudgets((prev) => {
+				const updated = prev.filter((b) => b.id !== tempId);
+				console.log('Removed optimistic budget on error:', updated);
+				return updated;
+			});
+			console.error('Error adding budget:', error);
 			throw error;
 		}
 	}, []);
@@ -155,17 +180,21 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 			try {
 				const response = await ApiService.put<any>(`/budgets/${id}`, updates);
 
-				if (response.success && response.data) {
+				// Handle the response format properly
+				const actualData = response.data?.data || response.data;
+				const actualSuccess = response.success;
+
+				if (actualSuccess && actualData) {
 					const updatedBudget: Budget = {
-						id: response.data._id ?? response.data.id,
-						category: response.data.category,
-						allocated: Number(response.data.allocated) || 0,
-						spent: Number(response.data.spent) || 0,
-						icon: response.data.icon,
-						color: response.data.color,
-						userId: response.data.userId,
-						createdAt: response.data.createdAt,
-						updatedAt: response.data.updatedAt,
+						id: actualData._id ?? actualData.id,
+						category: actualData.category,
+						allocated: Number(actualData.allocated) || 0,
+						spent: Number(actualData.spent) || 0,
+						icon: actualData.icon,
+						color: actualData.color,
+						userId: actualData.userId,
+						createdAt: actualData.createdAt,
+						updatedAt: actualData.updatedAt,
 					};
 
 					setBudgets((prev) =>
@@ -174,7 +203,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 
 					return updatedBudget;
 				} else {
-					throw new Error('Failed to update budget');
+					throw new Error(response.error || 'Failed to update budget');
 				}
 			} catch (error) {
 				console.error('Failed to update budget:', error);
@@ -208,17 +237,21 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 					amount,
 				});
 
-				if (response.success && response.data) {
+				// Handle the response format properly
+				const actualData = response.data?.data || response.data;
+				const actualSuccess = response.success;
+
+				if (actualSuccess && actualData) {
 					const updatedBudget: Budget = {
-						id: response.data._id ?? response.data.id,
-						category: response.data.category,
-						allocated: Number(response.data.allocated) || 0,
-						spent: Number(response.data.spent) || 0,
-						icon: response.data.icon,
-						color: response.data.color,
-						userId: response.data.userId,
-						createdAt: response.data.createdAt,
-						updatedAt: response.data.updatedAt,
+						id: actualData._id ?? actualData.id,
+						category: actualData.category,
+						allocated: Number(actualData.allocated) || 0,
+						spent: Number(actualData.spent) || 0,
+						icon: actualData.icon,
+						color: actualData.color,
+						userId: actualData.userId,
+						createdAt: actualData.createdAt,
+						updatedAt: actualData.updatedAt,
 					};
 
 					setBudgets((prev) =>
@@ -227,7 +260,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 
 					return updatedBudget;
 				} else {
-					throw new Error('Failed to update budget spent');
+					throw new Error(response.error || 'Failed to update budget spent');
 				}
 			} catch (error) {
 				console.error('Failed to update budget spent:', error);

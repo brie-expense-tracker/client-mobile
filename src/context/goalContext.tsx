@@ -110,6 +110,8 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 	}, []);
 
 	const addGoal = useCallback(async (goalData: CreateGoalData) => {
+		console.log('addGoal called with:', goalData);
+
 		// Create a temporary ID for optimistic update
 		const tempId = `temp-${Date.now()}-${Math.random()}`;
 		const newGoal: Goal = {
@@ -118,37 +120,62 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 			current: 0,
 		};
 
+		console.log('Optimistic goal created:', newGoal);
+
 		// Optimistically add to UI
-		setGoals((prev) => [newGoal, ...prev]);
+		setGoals((prev) => {
+			const updated = [newGoal, ...prev];
+			console.log('Updated goals state (optimistic):', updated);
+			return updated;
+		});
 
 		try {
 			const response = await ApiService.post<any>('/goals', goalData);
+			console.log('API response:', response);
 
-			if (response.success && response.data) {
+			// Handle the response format properly
+			const actualData = response.data?.data || response.data;
+			const actualSuccess = response.success;
+
+			console.log('Processed response:', { actualSuccess, actualData });
+
+			if (actualSuccess && actualData) {
 				// Update with the real ID from the server
 				const serverGoal: Goal = {
-					id: response.data._id ?? response.data.id ?? tempId,
-					name: response.data.name,
-					target: Number(response.data.target) || 0,
-					current: Number(response.data.current) || 0,
-					deadline: response.data.deadline,
-					icon: response.data.icon,
-					color: response.data.color,
-					userId: response.data.userId,
-					createdAt: response.data.createdAt,
-					updatedAt: response.data.updatedAt,
+					id: actualData._id ?? actualData.id ?? tempId,
+					name: actualData.name,
+					target: Number(actualData.target) || 0,
+					current: Number(actualData.current) || 0,
+					deadline: actualData.deadline,
+					icon: actualData.icon,
+					color: actualData.color,
+					userId: actualData.userId,
+					createdAt: actualData.createdAt,
+					updatedAt: actualData.updatedAt,
 				};
 
+				console.log('Server goal created:', serverGoal);
+
 				// Replace the temporary goal with the real one
-				setGoals((prev) => prev.map((g) => (g.id === tempId ? serverGoal : g)));
+				setGoals((prev) => {
+					const updated = prev.map((g) => (g.id === tempId ? serverGoal : g));
+					console.log('Updated goals state (server):', updated);
+					return updated;
+				});
 
 				return serverGoal;
 			} else {
-				throw new Error('Failed to create goal');
+				// If the response doesn't indicate success, throw an error
+				throw new Error(response.error || 'Failed to create goal');
 			}
 		} catch (error) {
 			// Remove the optimistic goal on error
-			setGoals((prev) => prev.filter((g) => g.id !== tempId));
+			setGoals((prev) => {
+				const updated = prev.filter((g) => g.id !== tempId);
+				console.log('Removed optimistic goal on error:', updated);
+				return updated;
+			});
+			console.error('Error adding goal:', error);
 			throw error;
 		}
 	}, []);
@@ -158,25 +185,29 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 			try {
 				const response = await ApiService.put<any>(`/goals/${id}`, updates);
 
-				if (response.success && response.data) {
+				// Handle the response format properly
+				const actualData = response.data?.data || response.data;
+				const actualSuccess = response.success;
+
+				if (actualSuccess && actualData) {
 					const updatedGoal: Goal = {
-						id: response.data._id ?? response.data.id,
-						name: response.data.name,
-						target: Number(response.data.target) || 0,
-						current: Number(response.data.current) || 0,
-						deadline: response.data.deadline,
-						icon: response.data.icon,
-						color: response.data.color,
-						userId: response.data.userId,
-						createdAt: response.data.createdAt,
-						updatedAt: response.data.updatedAt,
+						id: actualData._id ?? actualData.id,
+						name: actualData.name,
+						target: Number(actualData.target) || 0,
+						current: Number(actualData.current) || 0,
+						deadline: actualData.deadline,
+						icon: actualData.icon,
+						color: actualData.color,
+						userId: actualData.userId,
+						createdAt: actualData.createdAt,
+						updatedAt: actualData.updatedAt,
 					};
 
 					setGoals((prev) => prev.map((g) => (g.id === id ? updatedGoal : g)));
 
 					return updatedGoal;
 				} else {
-					throw new Error('Failed to update goal');
+					throw new Error(response.error || 'Failed to update goal');
 				}
 			} catch (error) {
 				console.error('Failed to update goal:', error);
@@ -210,18 +241,22 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 					amount,
 				});
 
-				if (response.success && response.data) {
+				// Handle the response format properly
+				const actualData = response.data?.data || response.data;
+				const actualSuccess = response.success;
+
+				if (actualSuccess && actualData) {
 					const updatedGoal: Goal = {
-						id: response.data._id ?? response.data.id,
-						name: response.data.name,
-						target: Number(response.data.target) || 0,
-						current: Number(response.data.current) || 0,
-						deadline: response.data.deadline,
-						icon: response.data.icon,
-						color: response.data.color,
-						userId: response.data.userId,
-						createdAt: response.data.createdAt,
-						updatedAt: response.data.updatedAt,
+						id: actualData._id ?? actualData.id,
+						name: actualData.name,
+						target: Number(actualData.target) || 0,
+						current: Number(actualData.current) || 0,
+						deadline: actualData.deadline,
+						icon: actualData.icon,
+						color: actualData.color,
+						userId: actualData.userId,
+						createdAt: actualData.createdAt,
+						updatedAt: actualData.updatedAt,
 					};
 
 					setGoals((prev) =>
@@ -230,7 +265,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 
 					return updatedGoal;
 				} else {
-					throw new Error('Failed to update goal current');
+					throw new Error(response.error || 'Failed to update goal current');
 				}
 			} catch (error) {
 				console.error('Failed to update goal current:', error);

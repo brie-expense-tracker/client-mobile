@@ -317,7 +317,7 @@ const TransactionHistory: React.FC<{
  */
 const Dashboard: React.FC = () => {
 	const { transactions, isLoading, refetch } = useContext(TransactionContext);
-	const { user } = useAuth();
+	const { user, profile } = useAuth();
 	const [isPressed, setIsPressed] = useState(false);
 
 	const onRefresh = useCallback(async () => {
@@ -402,9 +402,9 @@ const Dashboard: React.FC = () => {
 									style={styles.logo}
 									resizeMode="contain"
 								/>
-								{user?.name && (
+								{profile?.firstName && (
 									<Text style={styles.welcomeText}>
-										Welcome back, {user.name}! 👋
+										Welcome back, {profile.firstName}! 👋
 									</Text>
 								)}
 							</View>

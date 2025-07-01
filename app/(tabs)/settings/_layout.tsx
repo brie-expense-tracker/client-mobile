@@ -171,7 +171,7 @@ export default function _layout() {
 				options={{
 					headerShown: true,
 					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: 'Edit Password',
+					headerTitle: 'Change Password',
 					headerShadowVisible: false,
 					headerTitleStyle: {
 						fontSize: 20,

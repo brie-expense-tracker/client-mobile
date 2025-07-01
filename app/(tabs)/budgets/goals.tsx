@@ -5,15 +5,15 @@ import {
 	StyleSheet,
 	FlatList,
 	Dimensions,
-	SafeAreaView,
-	TouchableOpacity,
 	Modal,
 	TextInput,
 	Animated,
 	KeyboardAvoidingView,
 	Platform,
+	Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { BorderlessButton, RectButton } from 'react-native-gesture-handler';
 import { useGoal, Goal } from '../../../src/context/goalContext';
 
 const { width } = Dimensions.get('window');
@@ -83,12 +83,14 @@ export default function GoalsScreen() {
 	// ==========================================
 	// Context
 	// ==========================================
-	const { goals, addGoal } = useGoal();
+	const { goals, addGoal, updateGoal, deleteGoal } = useGoal();
 
 	// ==========================================
 	// State Management
 	// ==========================================
 	const [isModalVisible, setIsModalVisible] = useState(false);
+	const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+	const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
 	const [newGoal, setNewGoal] = useState({
 		name: '',
 		target: '',
@@ -103,21 +105,52 @@ export default function GoalsScreen() {
 	const slideAnim = React.useRef(new Animated.Value(0)).current;
 
 	// ==========================================
+	// Debug logging
+	// ==========================================
+	React.useEffect(() => {
+		console.log('newGoal state changed:', newGoal);
+	}, [newGoal]);
+
+	// ==========================================
 	// Goal Management
 	// ==========================================
+	const validateDate = (dateString: string): boolean => {
+		const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+		if (!dateRegex.test(dateString)) {
+			return false;
+		}
+
+		const date = new Date(dateString);
+		return date instanceof Date && !isNaN(date.getTime());
+	};
+
 	const handleAddGoal = async () => {
 		if (!newGoal.name || !newGoal.target || !newGoal.deadline) {
+			console.log('Validation failed: missing name, target, or deadline');
 			return;
 		}
 
+		if (!validateDate(newGoal.deadline)) {
+			Alert.alert(
+				'Invalid Date',
+				'Please enter a valid date in YYYY-MM-DD format (e.g., 2024-12-31)',
+				[{ text: 'OK' }]
+			);
+			return;
+		}
+
+		console.log('Adding goal:', newGoal);
+
 		try {
-			await addGoal({
+			const result = await addGoal({
 				name: newGoal.name,
 				target: parseFloat(newGoal.target),
 				deadline: newGoal.deadline,
 				icon: newGoal.icon,
 				color: newGoal.color,
 			});
+
+			console.log('Goal added successfully:', result);
 
 			hideModal();
 			setNewGoal({
@@ -133,10 +166,64 @@ export default function GoalsScreen() {
 		}
 	};
 
+	const handleEditGoal = async () => {
+		if (!editingGoal || !newGoal.name || !newGoal.target || !newGoal.deadline) {
+			return;
+		}
+
+		if (!validateDate(newGoal.deadline)) {
+			Alert.alert(
+				'Invalid Date',
+				'Please enter a valid date in YYYY-MM-DD format (e.g., 2024-12-31)',
+				[{ text: 'OK' }]
+			);
+			return;
+		}
+
+		try {
+			await updateGoal(editingGoal.id, {
+				name: newGoal.name,
+				target: parseFloat(newGoal.target),
+				deadline: newGoal.deadline,
+				icon: newGoal.icon,
+				color: newGoal.color,
+			});
+
+			hideEditModal();
+			setNewGoal({
+				name: '',
+				target: '',
+				deadline: '',
+				icon: 'flag-outline',
+				color: COLOR_PALETTE.blue.base,
+			});
+			setEditingGoal(null);
+		} catch (error) {
+			console.error('Error updating goal:', error);
+		}
+	};
+
+	const handleDeleteGoal = async (goalId: string) => {
+		try {
+			await deleteGoal(goalId);
+		} catch (error) {
+			console.error('Error deleting goal:', error);
+		}
+	};
+
 	// ==========================================
 	// Modal Handlers
 	// ==========================================
 	const showModal = () => {
+		console.log('showModal called - resetting newGoal state');
+		// Ensure newGoal is reset to empty values
+		setNewGoal({
+			name: '',
+			target: '',
+			deadline: '',
+			icon: 'flag-outline' as keyof typeof Ionicons.glyphMap,
+			color: COLOR_PALETTE.blue.base,
+		});
 		setIsModalVisible(true);
 		Animated.spring(slideAnim, {
 			toValue: 1,
@@ -154,6 +241,35 @@ export default function GoalsScreen() {
 		}).start(() => setIsModalVisible(false));
 	};
 
+	const showEditModal = (goal: Goal) => {
+		setEditingGoal(goal);
+		setNewGoal({
+			name: goal.name,
+			target: goal.target.toString(),
+			deadline: goal.deadline.split('T')[0],
+			icon: goal.icon as keyof typeof Ionicons.glyphMap,
+			color: goal.color,
+		});
+		setIsEditModalVisible(true);
+		Animated.spring(slideAnim, {
+			toValue: 1,
+			useNativeDriver: true,
+			tension: 50,
+			friction: 7,
+		}).start();
+	};
+
+	const hideEditModal = () => {
+		Animated.timing(slideAnim, {
+			toValue: 0,
+			duration: 200,
+			useNativeDriver: true,
+		}).start(() => {
+			setIsEditModalVisible(false);
+			setEditingGoal(null);
+		});
+	};
+
 	// ==========================================
 	// Color Selection Component
 	// ==========================================
@@ -163,7 +279,7 @@ export default function GoalsScreen() {
 			<View style={styles.colorGrid}>
 				{Object.entries(COLOR_PALETTE).map(([name, colors]) => (
 					<View key={name} style={styles.colorColumn}>
-						<TouchableOpacity
+						<RectButton
 							style={styles.colorOptionContainer}
 							onPress={() => setNewGoal({ ...newGoal, color: colors.base })}
 						>
@@ -176,8 +292,8 @@ export default function GoalsScreen() {
 									</View>
 								)}
 							</View>
-						</TouchableOpacity>
-						<TouchableOpacity
+						</RectButton>
+						<RectButton
 							style={styles.colorOptionContainer}
 							onPress={() => setNewGoal({ ...newGoal, color: colors.pastel })}
 						>
@@ -190,8 +306,8 @@ export default function GoalsScreen() {
 									</View>
 								)}
 							</View>
-						</TouchableOpacity>
-						<TouchableOpacity
+						</RectButton>
+						<RectButton
 							style={styles.colorOptionContainer}
 							onPress={() => setNewGoal({ ...newGoal, color: colors.dark })}
 						>
@@ -204,7 +320,7 @@ export default function GoalsScreen() {
 									</View>
 								)}
 							</View>
-						</TouchableOpacity>
+						</RectButton>
 					</View>
 				))}
 			</View>
@@ -223,7 +339,7 @@ export default function GoalsScreen() {
 		);
 
 		return (
-			<View style={styles.card}>
+			<RectButton style={styles.card} onPress={() => showEditModal(item)}>
 				<View style={styles.cardHeader}>
 					<View
 						style={[styles.iconWrapper, { backgroundColor: `${item.color}20` }]}
@@ -254,7 +370,7 @@ export default function GoalsScreen() {
 					<Text style={styles.percentageText}>{percent.toFixed(0)}%</Text>
 					<Text style={styles.deadlineText}>{daysLeft} days left</Text>
 				</View>
-			</View>
+			</RectButton>
 		);
 	};
 
@@ -283,7 +399,7 @@ export default function GoalsScreen() {
 				renderItem={({ item }) => {
 					if (item.id === 'add') {
 						return (
-							<TouchableOpacity style={styles.card} onPress={showModal}>
+							<RectButton style={styles.card} onPress={showModal}>
 								<View style={styles.cardHeader}>
 									<View
 										style={[
@@ -299,7 +415,7 @@ export default function GoalsScreen() {
 									</View>
 									<Text style={styles.categoryText}>{item.name}</Text>
 								</View>
-							</TouchableOpacity>
+							</RectButton>
 						);
 					}
 					return renderItem({ item });
@@ -315,19 +431,12 @@ export default function GoalsScreen() {
 				animationType="fade"
 				onRequestClose={hideModal}
 			>
-				<TouchableOpacity
-					style={styles.modalOverlay}
-					activeOpacity={1}
-					onPress={hideModal}
-				>
+				<RectButton style={styles.modalOverlay} onPress={hideModal}>
 					<KeyboardAvoidingView
 						behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
 						style={styles.modalContainer}
 					>
-						<TouchableOpacity
-							activeOpacity={1}
-							onPress={(e) => e.stopPropagation()}
-						>
+						<RectButton onPress={() => {}}>
 							<Animated.View
 								style={[
 									styles.modalContent,
@@ -345,9 +454,9 @@ export default function GoalsScreen() {
 							>
 								<View style={styles.modalHeader}>
 									<Text style={styles.modalTitle}>Add New Goal</Text>
-									<TouchableOpacity onPress={hideModal}>
+									<RectButton onPress={hideModal}>
 										<Ionicons name="close" size={24} color="#757575" />
-									</TouchableOpacity>
+									</RectButton>
 								</View>
 
 								<View style={styles.formGroup}>
@@ -360,6 +469,8 @@ export default function GoalsScreen() {
 										}
 										placeholder="e.g., Emergency Fund"
 										placeholderTextColor="#9E9E9E"
+										autoComplete="off"
+										autoCorrect={false}
 									/>
 								</View>
 
@@ -374,6 +485,7 @@ export default function GoalsScreen() {
 										placeholder="e.g., 10000"
 										keyboardType="numeric"
 										placeholderTextColor="#9E9E9E"
+										autoComplete="off"
 									/>
 								</View>
 
@@ -387,21 +499,129 @@ export default function GoalsScreen() {
 										}
 										placeholder="YYYY-MM-DD"
 										placeholderTextColor="#9E9E9E"
+										autoComplete="off"
 									/>
 								</View>
 
 								<ColorPicker />
 
-								<TouchableOpacity
+								<RectButton
 									style={[styles.addButton, { backgroundColor: newGoal.color }]}
 									onPress={handleAddGoal}
 								>
 									<Text style={styles.addButtonText}>Add Goal</Text>
-								</TouchableOpacity>
+								</RectButton>
 							</Animated.View>
-						</TouchableOpacity>
+						</RectButton>
 					</KeyboardAvoidingView>
-				</TouchableOpacity>
+				</RectButton>
+			</Modal>
+
+			{/* Edit Goal Modal */}
+			<Modal
+				visible={isEditModalVisible}
+				transparent
+				animationType="fade"
+				onRequestClose={hideEditModal}
+			>
+				<RectButton style={styles.modalOverlay} onPress={hideEditModal}>
+					<KeyboardAvoidingView
+						behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+						style={styles.modalContainer}
+					>
+						<RectButton onPress={() => {}}>
+							<Animated.View
+								style={[
+									styles.modalContent,
+									{
+										transform: [
+											{
+												translateY: slideAnim.interpolate({
+													inputRange: [0, 1],
+													outputRange: [600, 0],
+												}),
+											},
+										],
+									},
+								]}
+							>
+								<View style={styles.modalHeader}>
+									<Text style={styles.modalTitle}>Edit Goal</Text>
+									<RectButton onPress={hideEditModal}>
+										<Ionicons name="close" size={24} color="#757575" />
+									</RectButton>
+								</View>
+
+								<View style={styles.formGroup}>
+									<Text style={styles.label}>Goal Name</Text>
+									<TextInput
+										style={styles.input}
+										value={newGoal.name}
+										onChangeText={(text) =>
+											setNewGoal({ ...newGoal, name: text })
+										}
+										placeholder="e.g., Emergency Fund"
+										placeholderTextColor="#9E9E9E"
+										autoComplete="off"
+										autoCorrect={false}
+									/>
+								</View>
+
+								<View style={styles.formGroup}>
+									<Text style={styles.label}>Target Amount</Text>
+									<TextInput
+										style={styles.input}
+										value={newGoal.target}
+										onChangeText={(text) =>
+											setNewGoal({ ...newGoal, target: text })
+										}
+										placeholder="e.g., 10000"
+										keyboardType="numeric"
+										placeholderTextColor="#9E9E9E"
+										autoComplete="off"
+									/>
+								</View>
+
+								<View style={styles.formGroup}>
+									<Text style={styles.label}>Target Date</Text>
+									<TextInput
+										style={styles.input}
+										value={newGoal.deadline}
+										onChangeText={(text) =>
+											setNewGoal({ ...newGoal, deadline: text })
+										}
+										placeholder="YYYY-MM-DD"
+										placeholderTextColor="#9E9E9E"
+										autoComplete="off"
+									/>
+								</View>
+
+								<ColorPicker />
+
+								<View style={styles.modalButtonContainer}>
+									<RectButton
+										style={[styles.addButton]}
+										onPress={handleEditGoal}
+									>
+										<Text style={styles.addButtonText}>Update Goal</Text>
+									</RectButton>
+
+									<RectButton
+										style={styles.deleteButton}
+										onPress={() => {
+											if (editingGoal) {
+												handleDeleteGoal(editingGoal.id);
+												hideEditModal();
+											}
+										}}
+									>
+										<Text style={styles.deleteButtonText}>Delete Goal</Text>
+									</RectButton>
+								</View>
+							</Animated.View>
+						</RectButton>
+					</KeyboardAvoidingView>
+				</RectButton>
 			</Modal>
 		</View>
 	);
@@ -451,6 +671,15 @@ const styles = StyleSheet.create({
 		fontSize: 18,
 		fontWeight: '600',
 		color: '#212121',
+		flex: 1,
+	},
+	cardActions: {
+		flexDirection: 'row',
+		alignItems: 'center',
+	},
+	actionButton: {
+		padding: 8,
+		marginLeft: 4,
 	},
 	amounts: {
 		flexDirection: 'row',
@@ -536,13 +765,28 @@ const styles = StyleSheet.create({
 		color: '#212121',
 	},
 	addButton: {
-		backgroundColor: '#00a2ff',
+		backgroundColor: '#0095FF',
 		borderRadius: 12,
 		padding: 16,
 		alignItems: 'center',
 		marginTop: 8,
 	},
 	addButtonText: {
+		color: '#FFFFFF',
+		fontSize: 16,
+		fontWeight: '600',
+	},
+	modalButtonContainer: {
+		marginTop: 8,
+	},
+	deleteButton: {
+		backgroundColor: '#E53935',
+		borderRadius: 12,
+		padding: 16,
+		alignItems: 'center',
+		marginTop: 12,
+	},
+	deleteButtonText: {
 		color: '#FFFFFF',
 		fontSize: 16,
 		fontWeight: '600',

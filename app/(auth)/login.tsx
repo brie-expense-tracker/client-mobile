@@ -1,28 +1,27 @@
 import {
 	View,
 	Text,
-	Pressable,
 	TextInput,
 	Alert,
 	StyleSheet,
 	Image,
-	Platform,
 	SafeAreaView,
 } from 'react-native';
 import React, { useState } from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Link, router, Stack } from 'expo-router';
+import { Link, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
 	getAuth,
 	signInWithEmailAndPassword,
 } from '@react-native-firebase/auth';
 import useAuth from '../../src/context/AuthContext';
+import { RectButton, BorderlessButton } from 'react-native-gesture-handler';
 
 export default function Login() {
 	const [email, setEmail] = useState('');
 	const [password, setPassword] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
+	const [isPressed, setIsPressed] = useState(false);
 	const { login } = useAuth();
 
 	// Email validator function
@@ -88,15 +87,15 @@ export default function Login() {
 	};
 
 	return (
-		<SafeAreaView style={styles.container}>
-			<View style={styles.contentContainer}>
+		<SafeAreaView style={styles.safeAreaContainer}>
+			<View style={styles.mainContainer}>
 				<Image
 					source={require('../../assets/images/brie-logos.png')}
 					style={styles.logo}
 					resizeMode="contain"
 				/>
 				<View style={styles.formContainer}>
-					<Text style={styles.title}>Welcome Back!</Text>
+					<Text style={styles.title}>Welcome Back</Text>
 					<Text style={styles.label}>Email</Text>
 					<TextInput
 						style={styles.input}
@@ -114,21 +113,23 @@ export default function Login() {
 						onChangeText={setPassword}
 						secureTextEntry
 					/>
+					<View style={styles.forgotPasswordContainer}>
+						<Link href="/forgotPassword" asChild>
+							<BorderlessButton onActiveStateChange={setIsPressed}>
+								<Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+							</BorderlessButton>
+						</Link>
+					</View>
 					<View style={styles.buttonContainer}>
-						<Pressable
+						<RectButton
 							style={[styles.button, isLoading && styles.buttonDisabled]}
 							onPress={handleLogin}
-							disabled={isLoading}
+							enabled={!isLoading}
 						>
-							<LinearGradient
-								colors={['#0095FF', '#008cff']}
-								style={styles.gradient}
-							>
-								<Text style={styles.buttonText}>
-									{isLoading ? 'Signing In...' : 'Sign In'}
-								</Text>
-							</LinearGradient>
-						</Pressable>
+							<Text style={styles.buttonText}>
+								{isLoading ? 'Signing In...' : 'Sign In'}
+							</Text>
+						</RectButton>
 					</View>
 
 					<View style={styles.dividerContainer}>
@@ -138,7 +139,7 @@ export default function Login() {
 					</View>
 
 					<View style={styles.socialButtonsContainer}>
-						<Pressable
+						<RectButton
 							style={styles.socialButton}
 							onPress={() =>
 								Alert.alert(
@@ -149,9 +150,9 @@ export default function Login() {
 						>
 							<Ionicons name="logo-google" size={24} color="#0051ff" />
 							<Text style={styles.socialButtonText}>Continue with Google</Text>
-						</Pressable>
+						</RectButton>
 
-						<Pressable
+						<RectButton
 							style={styles.socialButton}
 							onPress={() =>
 								Alert.alert(
@@ -162,13 +163,15 @@ export default function Login() {
 						>
 							<Ionicons name="logo-apple" size={24} color="#000000" />
 							<Text style={styles.socialButtonText}>Continue with Apple</Text>
-						</Pressable>
+						</RectButton>
 					</View>
 				</View>
 				<View style={styles.signupContainer}>
 					<Text style={styles.signupText}>Don't have an account?</Text>
-					<Link replace href={'/signup'}>
-						<Text style={styles.signupLink}>Sign Up</Text>
+					<Link replace href={'/signup'} asChild>
+						<BorderlessButton onActiveStateChange={setIsPressed}>
+							<Text style={styles.signupLink}>Sign Up</Text>
+						</BorderlessButton>
 					</Link>
 				</View>
 			</View>
@@ -179,15 +182,14 @@ export default function Login() {
 }
 
 const styles = StyleSheet.create({
-	container: {
+	safeAreaContainer: {
 		flex: 1,
 		backgroundColor: '#fff',
 	},
-	contentContainer: {
+	mainContainer: {
 		flex: 1,
-		paddingHorizontal: 10,
-		justifyContent: 'flex-start',
 		alignItems: 'center',
+		paddingHorizontal: 24,
 	},
 	logo: {
 		width: 100,
@@ -202,10 +204,7 @@ const styles = StyleSheet.create({
 		alignItems: 'flex-start',
 		backgroundColor: 'white',
 		alignSelf: 'center',
-		shadowRadius: 3,
-		elevation: 5,
 		borderRadius: 24,
-		padding: 24,
 	},
 	title: {
 		fontSize: 24,
@@ -254,15 +253,13 @@ const styles = StyleSheet.create({
 		borderRadius: 9999,
 		overflow: 'hidden',
 		alignSelf: 'center',
-	},
-	gradient: {
-		width: '100%',
+		backgroundColor: '#0095FF',
 	},
 	buttonText: {
 		color: 'white',
 		fontSize: 20,
 		textAlign: 'center',
-		fontWeight: '500',
+		fontWeight: '700',
 		marginVertical: 18,
 	},
 	signupContainer: {
@@ -327,5 +324,15 @@ const styles = StyleSheet.create({
 	},
 	buttonDisabled: {
 		backgroundColor: '#E2E8F0',
+	},
+	forgotPasswordContainer: {
+		width: '100%',
+		alignItems: 'flex-end',
+		marginBottom: 10,
+	},
+	forgotPasswordText: {
+		color: '#4A5568',
+		fontSize: 14,
+		fontWeight: '500',
 	},
 });

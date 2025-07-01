@@ -27,11 +27,15 @@ export class ApiService {
 				headers,
 			});
 
+			const data = await response.json();
+
 			if (!response.ok) {
-				throw new Error(`HTTP error! status: ${response.status}`);
+				return {
+					success: false,
+					error: data.error || `HTTP error! status: ${response.status}`,
+				};
 			}
 
-			const data = await response.json();
 			return { success: true, data };
 		} catch (error) {
 			console.error('API GET error:', error);
@@ -51,11 +55,15 @@ export class ApiService {
 				body: JSON.stringify(body),
 			});
 
+			const data = await response.json();
+
 			if (!response.ok) {
-				throw new Error(`HTTP error! status: ${response.status}`);
+				return {
+					success: false,
+					error: data.error || `HTTP error! status: ${response.status}`,
+				};
 			}
 
-			const data = await response.json();
 			return { success: true, data };
 		} catch (error) {
 			console.error('API POST error:', error);
@@ -75,11 +83,15 @@ export class ApiService {
 				body: JSON.stringify(body),
 			});
 
+			const data = await response.json();
+
 			if (!response.ok) {
-				throw new Error(`HTTP error! status: ${response.status}`);
+				return {
+					success: false,
+					error: data.error || `HTTP error! status: ${response.status}`,
+				};
 			}
 
-			const data = await response.json();
 			return { success: true, data };
 		} catch (error) {
 			console.error('API PUT error:', error);
@@ -98,11 +110,15 @@ export class ApiService {
 				headers,
 			});
 
+			const data = await response.json();
+
 			if (!response.ok) {
-				throw new Error(`HTTP error! status: ${response.status}`);
+				return {
+					success: false,
+					error: data.error || `HTTP error! status: ${response.status}`,
+				};
 			}
 
-			const data = await response.json();
 			return { success: true, data };
 		} catch (error) {
 			console.error('API DELETE error:', error);

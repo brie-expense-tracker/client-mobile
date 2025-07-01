@@ -5,7 +5,6 @@ import {
 	StyleSheet,
 	FlatList,
 	Dimensions,
-	TouchableOpacity,
 	Modal,
 	TextInput,
 	Animated,
@@ -14,6 +13,7 @@ import {
 	ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { BorderlessButton, RectButton } from 'react-native-gesture-handler';
 import { useBudget, Budget } from '../../../src/context/budgetContext';
 
 const { width } = Dimensions.get('window');
@@ -83,23 +83,34 @@ export default function BudgetScreen() {
 	// ==========================================
 	// Context
 	// ==========================================
-	const { budgets, isLoading, addBudget } = useBudget();
+	const { budgets, isLoading, addBudget, updateBudget, deleteBudget } =
+		useBudget();
 
 	// ==========================================
 	// State Management
 	// ==========================================
 	const [isModalVisible, setIsModalVisible] = useState(false);
+	const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+	const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
 	const [newBudget, setNewBudget] = useState({
 		category: '',
 		allocated: '',
 		icon: 'cart-outline' as keyof typeof Ionicons.glyphMap,
 		color: COLOR_PALETTE.blue.base,
 	});
+	const [isPressed, setIsPressed] = useState(false);
 
 	// ==========================================
 	// Animation Setup
 	// ==========================================
 	const slideAnim = React.useRef(new Animated.Value(0)).current;
+
+	// ==========================================
+	// Debug logging
+	// ==========================================
+	useEffect(() => {
+		console.log('newBudget state changed:', newBudget);
+	}, [newBudget]);
 
 	// ==========================================
 	// Loading Screen Component
@@ -119,16 +130,21 @@ export default function BudgetScreen() {
 	const handleAddBudget = async () => {
 		if (!newBudget.category || !newBudget.allocated) {
 			// You might want to add proper form validation here
+			console.log('Validation failed: missing category or allocated amount');
 			return;
 		}
 
+		console.log('Adding budget:', newBudget);
+
 		try {
-			await addBudget({
+			const result = await addBudget({
 				category: newBudget.category,
 				allocated: parseFloat(newBudget.allocated),
 				icon: newBudget.icon,
 				color: newBudget.color,
 			});
+
+			console.log('Budget added successfully:', result);
 
 			hideModal();
 			setNewBudget({
@@ -143,10 +159,52 @@ export default function BudgetScreen() {
 		}
 	};
 
+	const handleEditBudget = async () => {
+		if (!editingBudget || !newBudget.category || !newBudget.allocated) {
+			return;
+		}
+
+		try {
+			await updateBudget(editingBudget.id, {
+				category: newBudget.category,
+				allocated: parseFloat(newBudget.allocated),
+				icon: newBudget.icon,
+				color: newBudget.color,
+			});
+
+			hideEditModal();
+			setNewBudget({
+				category: '',
+				allocated: '',
+				icon: 'cart-outline',
+				color: COLOR_PALETTE.blue.base,
+			});
+			setEditingBudget(null);
+		} catch (error) {
+			console.error('Error updating budget:', error);
+		}
+	};
+
+	const handleDeleteBudget = async (budgetId: string) => {
+		try {
+			await deleteBudget(budgetId);
+		} catch (error) {
+			console.error('Error deleting budget:', error);
+		}
+	};
+
 	// ==========================================
 	// Modal Handlers
 	// ==========================================
 	const showModal = () => {
+		console.log('showModal called - resetting newBudget state');
+		// Ensure newBudget is reset to empty values
+		setNewBudget({
+			category: '',
+			allocated: '',
+			icon: 'cart-outline' as keyof typeof Ionicons.glyphMap,
+			color: COLOR_PALETTE.blue.base,
+		});
 		setIsModalVisible(true);
 		Animated.spring(slideAnim, {
 			toValue: 1,
@@ -164,6 +222,34 @@ export default function BudgetScreen() {
 		}).start(() => setIsModalVisible(false));
 	};
 
+	const showEditModal = (budget: Budget) => {
+		setEditingBudget(budget);
+		setNewBudget({
+			category: budget.category,
+			allocated: budget.allocated.toString(),
+			icon: budget.icon as keyof typeof Ionicons.glyphMap,
+			color: budget.color,
+		});
+		setIsEditModalVisible(true);
+		Animated.spring(slideAnim, {
+			toValue: 1,
+			useNativeDriver: true,
+			tension: 50,
+			friction: 7,
+		}).start();
+	};
+
+	const hideEditModal = () => {
+		Animated.timing(slideAnim, {
+			toValue: 0,
+			duration: 200,
+			useNativeDriver: true,
+		}).start(() => {
+			setIsEditModalVisible(false);
+			setEditingBudget(null);
+		});
+	};
+
 	// ==========================================
 	// Color Selection Component
 	// ==========================================
@@ -173,7 +259,7 @@ export default function BudgetScreen() {
 			<View style={styles.colorGrid}>
 				{Object.entries(COLOR_PALETTE).map(([name, colors]) => (
 					<View key={name} style={styles.colorColumn}>
-						<TouchableOpacity
+						<RectButton
 							style={styles.colorOptionContainer}
 							onPress={() => setNewBudget({ ...newBudget, color: colors.base })}
 						>
@@ -186,8 +272,8 @@ export default function BudgetScreen() {
 									</View>
 								)}
 							</View>
-						</TouchableOpacity>
-						<TouchableOpacity
+						</RectButton>
+						<RectButton
 							style={styles.colorOptionContainer}
 							onPress={() =>
 								setNewBudget({ ...newBudget, color: colors.pastel })
@@ -202,8 +288,8 @@ export default function BudgetScreen() {
 									</View>
 								)}
 							</View>
-						</TouchableOpacity>
-						<TouchableOpacity
+						</RectButton>
+						<RectButton
 							style={styles.colorOptionContainer}
 							onPress={() => setNewBudget({ ...newBudget, color: colors.dark })}
 						>
@@ -216,7 +302,7 @@ export default function BudgetScreen() {
 									</View>
 								)}
 							</View>
-						</TouchableOpacity>
+						</RectButton>
 					</View>
 				))}
 			</View>
@@ -230,7 +316,11 @@ export default function BudgetScreen() {
 		const percent = Math.min((item.spent / item.allocated) * 100, 100);
 
 		return (
-			<View style={styles.card}>
+			<BorderlessButton
+				style={styles.card}
+				onPress={() => showEditModal(item)}
+				onActiveStateChange={setIsPressed}
+			>
 				<View style={styles.cardHeader}>
 					<View
 						style={[styles.iconWrapper, { backgroundColor: `${item.color}20` }]}
@@ -260,7 +350,7 @@ export default function BudgetScreen() {
 				</View>
 
 				<Text style={styles.percentageText}>{percent.toFixed(0)}%</Text>
-			</View>
+			</BorderlessButton>
 		);
 	};
 
@@ -293,7 +383,7 @@ export default function BudgetScreen() {
 				renderItem={({ item }) => {
 					if (item.id === 'add') {
 						return (
-							<TouchableOpacity style={styles.card} onPress={showModal}>
+							<RectButton style={styles.card} onPress={showModal}>
 								<View style={styles.cardHeader}>
 									<View
 										style={[
@@ -309,7 +399,7 @@ export default function BudgetScreen() {
 									</View>
 									<Text style={styles.categoryText}>{item.category}</Text>
 								</View>
-							</TouchableOpacity>
+							</RectButton>
 						);
 					}
 					return renderItem({ item });
@@ -325,19 +415,12 @@ export default function BudgetScreen() {
 				animationType="fade"
 				onRequestClose={hideModal}
 			>
-				<TouchableOpacity
-					style={styles.modalOverlay}
-					activeOpacity={1}
-					onPress={hideModal}
-				>
+				<RectButton style={styles.modalOverlay} onPress={hideModal}>
 					<KeyboardAvoidingView
 						behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
 						style={styles.modalContainer}
 					>
-						<TouchableOpacity
-							activeOpacity={1}
-							onPress={(e) => e.stopPropagation()}
-						>
+						<RectButton onPress={() => {}}>
 							<Animated.View
 								style={[
 									styles.modalContent,
@@ -355,9 +438,9 @@ export default function BudgetScreen() {
 							>
 								<View style={styles.modalHeader}>
 									<Text style={styles.modalTitle}>Add New Budget</Text>
-									<TouchableOpacity onPress={hideModal}>
+									<RectButton onPress={hideModal}>
 										<Ionicons name="close" size={24} color="#757575" />
-									</TouchableOpacity>
+									</RectButton>
 								</View>
 
 								<View style={styles.formGroup}>
@@ -370,6 +453,8 @@ export default function BudgetScreen() {
 										}
 										placeholder="e.g., Groceries"
 										placeholderTextColor="#9E9E9E"
+										autoComplete="off"
+										autoCorrect={false}
 									/>
 								</View>
 
@@ -384,12 +469,13 @@ export default function BudgetScreen() {
 										placeholder="e.g., 500"
 										keyboardType="numeric"
 										placeholderTextColor="#9E9E9E"
+										autoComplete="off"
 									/>
 								</View>
 
 								<ColorPicker />
 
-								<TouchableOpacity
+								<RectButton
 									style={[
 										styles.addButton,
 										{ backgroundColor: newBudget.color },
@@ -397,11 +483,104 @@ export default function BudgetScreen() {
 									onPress={handleAddBudget}
 								>
 									<Text style={styles.addButtonText}>Add Budget</Text>
-								</TouchableOpacity>
+								</RectButton>
 							</Animated.View>
-						</TouchableOpacity>
+						</RectButton>
 					</KeyboardAvoidingView>
-				</TouchableOpacity>
+				</RectButton>
+			</Modal>
+
+			{/* Edit Budget Modal */}
+			<Modal
+				visible={isEditModalVisible}
+				transparent
+				animationType="fade"
+				onRequestClose={hideEditModal}
+			>
+				<RectButton style={styles.modalOverlay} onPress={hideEditModal}>
+					<KeyboardAvoidingView
+						behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+						style={styles.modalContainer}
+					>
+						<RectButton onPress={() => {}}>
+							<Animated.View
+								style={[
+									styles.modalContent,
+									{
+										transform: [
+											{
+												translateY: slideAnim.interpolate({
+													inputRange: [0, 1],
+													outputRange: [600, 0],
+												}),
+											},
+										],
+									},
+								]}
+							>
+								<View style={styles.modalHeader}>
+									<Text style={styles.modalTitle}>Edit Budget</Text>
+									<RectButton onPress={hideEditModal}>
+										<Ionicons name="close" size={24} color="#757575" />
+									</RectButton>
+								</View>
+
+								<View style={styles.formGroup}>
+									<Text style={styles.label}>Category Name</Text>
+									<TextInput
+										style={styles.input}
+										value={newBudget.category}
+										onChangeText={(text) =>
+											setNewBudget({ ...newBudget, category: text })
+										}
+										placeholder="e.g., Groceries"
+										placeholderTextColor="#9E9E9E"
+										autoComplete="off"
+										autoCorrect={false}
+									/>
+								</View>
+
+								<View style={styles.formGroup}>
+									<Text style={styles.label}>Budget Amount</Text>
+									<TextInput
+										style={styles.input}
+										value={newBudget.allocated}
+										onChangeText={(text) =>
+											setNewBudget({ ...newBudget, allocated: text })
+										}
+										placeholder="e.g., 500"
+										keyboardType="numeric"
+										placeholderTextColor="#9E9E9E"
+										autoComplete="off"
+									/>
+								</View>
+
+								<ColorPicker />
+
+								<View style={styles.modalButtonContainer}>
+									<RectButton
+										style={[styles.addButton]}
+										onPress={handleEditBudget}
+									>
+										<Text style={styles.addButtonText}>Update Budget</Text>
+									</RectButton>
+
+									<RectButton
+										style={styles.deleteButton}
+										onPress={() => {
+											if (editingBudget) {
+												handleDeleteBudget(editingBudget.id);
+												hideEditModal();
+											}
+										}}
+									>
+										<Text style={styles.deleteButtonText}>Delete Budget</Text>
+									</RectButton>
+								</View>
+							</Animated.View>
+						</RectButton>
+					</KeyboardAvoidingView>
+				</RectButton>
 			</Modal>
 		</View>
 	);
@@ -465,6 +644,15 @@ const styles = StyleSheet.create({
 		fontSize: 18,
 		fontWeight: '600',
 		color: '#212121',
+		flex: 1,
+	},
+	cardActions: {
+		flexDirection: 'row',
+		alignItems: 'center',
+	},
+	actionButton: {
+		padding: 8,
+		marginLeft: 4,
 	},
 	amounts: {
 		flexDirection: 'row',
@@ -548,6 +736,21 @@ const styles = StyleSheet.create({
 		marginTop: 8,
 	},
 	addButtonText: {
+		color: '#FFFFFF',
+		fontSize: 16,
+		fontWeight: '600',
+	},
+	modalButtonContainer: {
+		marginTop: 8,
+	},
+	deleteButton: {
+		backgroundColor: '#E53935',
+		borderRadius: 12,
+		padding: 16,
+		alignItems: 'center',
+		marginTop: 12,
+	},
+	deleteButtonText: {
 		color: '#FFFFFF',
 		fontSize: 16,
 		fontWeight: '600',

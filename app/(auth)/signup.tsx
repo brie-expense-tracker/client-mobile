@@ -1,7 +1,6 @@
 import {
 	View,
 	Text,
-	Pressable,
 	TextInput,
 	Alert,
 	StyleSheet,
@@ -9,21 +8,17 @@ import {
 	SafeAreaView,
 } from 'react-native';
 import React, { useState } from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Link, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import {
-	getAuth,
-	createUserWithEmailAndPassword,
-} from '@react-native-firebase/auth';
 import useAuth from '../../src/context/AuthContext';
+import { RectButton, BorderlessButton } from 'react-native-gesture-handler';
 
 export default function Signup() {
 	const [email, setEmail] = useState('');
 	const [password, setPassword] = useState('');
-	const [name, setName] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
-	const { createUserInMongoDB } = useAuth();
+	const { signup } = useAuth();
+	const [isPressed, setIsPressed] = useState(false);
 
 	// Email validator function
 	const isValidEmail = (email: string) => {
@@ -55,19 +50,8 @@ export default function Signup() {
 		setIsLoading(true);
 
 		try {
-			// Create user in Firebase
-			const userCredential = await createUserWithEmailAndPassword(
-				getAuth(),
-				email,
-				password
-			);
-			const firebaseUser = userCredential.user;
-
-			// Create user in MongoDB
-			await createUserInMongoDB(firebaseUser, name);
-
+			await signup(email, password);
 			Alert.alert('Success', `Account created for ${email}`);
-			console.log('Successfully created User in Firebase and MongoDB.');
 		} catch (error: any) {
 			console.error('Signup error:', error);
 
@@ -78,6 +62,11 @@ export default function Signup() {
 				errorMessage = 'Password is too weak.';
 			} else if (error.code === 'auth/invalid-email') {
 				errorMessage = 'Invalid email address.';
+			} else if (error.code === 'auth/network-request-failed') {
+				errorMessage =
+					'Network error. Please check your connection and try again.';
+			} else if (error.message?.includes('Failed to create user')) {
+				errorMessage = 'Failed to create account. Please try again.';
 			}
 
 			Alert.alert('Error', errorMessage);
@@ -87,8 +76,8 @@ export default function Signup() {
 	};
 
 	return (
-		<SafeAreaView style={styles.container}>
-			<View style={styles.contentContainer}>
+		<SafeAreaView style={styles.safeAreaContainer}>
+			<View style={styles.mainContainer}>
 				<Image
 					source={require('../../assets/images/brie-logos.png')}
 					style={styles.logo}
@@ -114,20 +103,15 @@ export default function Signup() {
 						secureTextEntry
 					/>
 					<View style={styles.buttonContainer}>
-						<Pressable
+						<RectButton
 							style={[styles.button, isLoading && styles.buttonDisabled]}
 							onPress={handleSignup}
-							disabled={isLoading}
+							enabled={!isLoading}
 						>
-							<LinearGradient
-								colors={['#0095FF', '#008cff']}
-								style={styles.gradient}
-							>
-								<Text style={styles.buttonText}>
-									{isLoading ? 'Creating Account...' : 'Sign Up'}
-								</Text>
-							</LinearGradient>
-						</Pressable>
+							<Text style={styles.buttonText}>
+								{isLoading ? 'Creating Account...' : 'Sign Up'}
+							</Text>
+						</RectButton>
 					</View>
 
 					<View style={styles.dividerContainer}>
@@ -137,7 +121,7 @@ export default function Signup() {
 					</View>
 
 					<View style={styles.socialButtonsContainer}>
-						<Pressable
+						<RectButton
 							style={styles.socialButton}
 							onPress={() =>
 								Alert.alert(
@@ -146,11 +130,15 @@ export default function Signup() {
 								)
 							}
 						>
-							<Ionicons name="logo-google" size={24} color="#0051ff" />
-							<Text style={styles.socialButtonText}>Continue with Google</Text>
-						</Pressable>
+							<View style={styles.socialButtonContent}>
+								<Ionicons name="logo-google" size={24} color="#0051ff" />
+								<Text style={styles.socialButtonText}>
+									Continue with Google
+								</Text>
+							</View>
+						</RectButton>
 
-						<Pressable
+						<RectButton
 							style={styles.socialButton}
 							onPress={() =>
 								Alert.alert(
@@ -159,15 +147,19 @@ export default function Signup() {
 								)
 							}
 						>
-							<Ionicons name="logo-apple" size={24} color="#000000" />
-							<Text style={styles.socialButtonText}>Continue with Apple</Text>
-						</Pressable>
+							<View style={styles.socialButtonContent}>
+								<Ionicons name="logo-apple" size={24} color="#000000" />
+								<Text style={styles.socialButtonText}>Continue with Apple</Text>
+							</View>
+						</RectButton>
 					</View>
 				</View>
 				<View style={styles.loginContainer}>
 					<Text style={styles.loginText}>Already have account?</Text>
-					<Link replace href={'/login'}>
-						<Text style={styles.loginLink}>Log In</Text>
+					<Link replace href={'/login'} asChild>
+						<BorderlessButton onActiveStateChange={setIsPressed}>
+							<Text style={styles.loginLink}>Log In</Text>
+						</BorderlessButton>
 					</Link>
 				</View>
 			</View>
@@ -178,15 +170,14 @@ export default function Signup() {
 }
 
 const styles = StyleSheet.create({
-	container: {
+	safeAreaContainer: {
 		flex: 1,
 		backgroundColor: '#fff',
 	},
-	contentContainer: {
+	mainContainer: {
 		flex: 1,
-		paddingHorizontal: 10,
-		justifyContent: 'flex-start',
 		alignItems: 'center',
+		paddingHorizontal: 24,
 	},
 	logo: {
 		width: 100,
@@ -204,9 +195,7 @@ const styles = StyleSheet.create({
 		shadowRadius: 3,
 		elevation: 5,
 		borderRadius: 24,
-		padding: 24,
 	},
-
 	title: {
 		fontSize: 24,
 		color: '#000000',
@@ -254,15 +243,13 @@ const styles = StyleSheet.create({
 		borderRadius: 9999,
 		overflow: 'hidden',
 		alignSelf: 'center',
-	},
-	gradient: {
-		width: '100%',
+		backgroundColor: '#0095FF',
 	},
 	buttonText: {
 		color: 'white',
 		fontSize: 20,
 		textAlign: 'center',
-		fontWeight: 'bold',
+		fontWeight: '700',
 		marginVertical: 18,
 	},
 	loginContainer: {
@@ -319,6 +306,12 @@ const styles = StyleSheet.create({
 		shadowOpacity: 0.3,
 		shadowRadius: 6,
 		elevation: 5,
+	},
+	socialButtonContent: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		gap: 12,
 	},
 	socialButtonText: {
 		fontSize: 16,

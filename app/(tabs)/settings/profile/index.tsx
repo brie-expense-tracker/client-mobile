@@ -6,45 +6,26 @@ import {
 	TouchableOpacity,
 	Alert,
 	ScrollView,
+	ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { useProfile } from '../../../../src/context/profileContext';
+import useAuth from '../../../../src/context/AuthContext';
 
 export default function AccountScreen() {
 	const router = useRouter();
+	const { profile, loading, error, fetchProfile } = useProfile();
+	const { user } = useAuth();
 	const [profileImage, setProfileImage] = useState(
 		require('../../../../assets/images/profile.jpg')
 	);
-	const [userProfile, setUserProfile] = useState({
-		firstName: 'Max',
-		lastName: 'Mustermann',
-		username: 'maxmustermann',
-		email: 'max@example.com',
-		phone: '+1 (555) 123-4567',
-		monthlyIncome: 1000,
-		savings: 100,
-		debt: 100,
-	});
 
 	useEffect(() => {
 		fetchProfile();
 	}, []);
-
-	const fetchProfile = async () => {
-		try {
-			const response = await fetch(
-				'http://localhost:3000/api/profiles/68431f0b700221021c84552a'
-			);
-			if (response.ok) {
-				const data = await response.json();
-				setUserProfile(data.data);
-			}
-		} catch (error) {
-			console.error('Error fetching profile:', error);
-		}
-	};
 
 	const pickImage = async () => {
 		const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -90,6 +71,42 @@ export default function AccountScreen() {
 		);
 	};
 
+	if (loading) {
+		return (
+			<View style={styles.loadingContainer}>
+				<ActivityIndicator size="large" color="#0095FF" />
+				<Text style={styles.loadingText}>
+					{profile ? 'Loading profile...' : 'Setting up your profile...'}
+				</Text>
+			</View>
+		);
+	}
+
+	if (error) {
+		return (
+			<View style={styles.errorContainer}>
+				<Ionicons name="alert-circle-outline" size={48} color="#ff6b6b" />
+				<Text style={styles.errorText}>Failed to load profile</Text>
+				<Text style={styles.errorSubtext}>{error}</Text>
+				<TouchableOpacity style={styles.retryButton} onPress={fetchProfile}>
+					<Text style={styles.retryButtonText}>Retry</Text>
+				</TouchableOpacity>
+			</View>
+		);
+	}
+
+	if (!profile) {
+		return (
+			<View style={styles.errorContainer}>
+				<Ionicons name="person-outline" size={48} color="#999" />
+				<Text style={styles.errorText}>No profile found</Text>
+				<TouchableOpacity style={styles.retryButton} onPress={fetchProfile}>
+					<Text style={styles.retryButtonText}>Refresh</Text>
+				</TouchableOpacity>
+			</View>
+		);
+	}
+
 	return (
 		<ScrollView
 			style={styles.scrollView}
@@ -117,9 +134,8 @@ export default function AccountScreen() {
 					</View>
 					<View style={styles.profileInfo}>
 						<Text style={styles.userName}>
-							{userProfile.firstName} {userProfile.lastName}
+							{profile.firstName} {profile.lastName}
 						</Text>
-						<Text style={styles.username}>@{userProfile.username}</Text>
 					</View>
 				</View>
 			</View>
@@ -136,7 +152,7 @@ export default function AccountScreen() {
 						<View style={styles.settingContent}>
 							<Text style={styles.settingText}>Name</Text>
 							<Text style={styles.settingValue}>
-								{userProfile.firstName} {userProfile.lastName}
+								{profile.firstName} {profile.lastName}
 							</Text>
 						</View>
 						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
@@ -149,7 +165,9 @@ export default function AccountScreen() {
 						<Ionicons name="call-outline" size={24} color="#555" />
 						<View style={styles.settingContent}>
 							<Text style={styles.settingText}>Phone</Text>
-							<Text style={styles.settingValue}>{userProfile.phone}</Text>
+							<Text style={styles.settingValue}>
+								{profile.phone || 'Not set'}
+							</Text>
 						</View>
 						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
 					</TouchableOpacity>
@@ -158,7 +176,9 @@ export default function AccountScreen() {
 						<Ionicons name="mail-outline" size={24} color="#555" />
 						<View style={styles.settingContent}>
 							<Text style={styles.settingText}>Email</Text>
-							<Text style={styles.settingValue}>{userProfile.email}</Text>
+							<Text style={styles.settingValue}>
+								{user?.email || 'Not set'}
+							</Text>
 						</View>
 					</View>
 
@@ -180,35 +200,63 @@ export default function AccountScreen() {
 			<View style={styles.section}>
 				<Text style={styles.sectionTitle}>Financial Information</Text>
 				<View style={styles.settingsContainer}>
-					<View style={styles.settingItem}>
+					<TouchableOpacity
+						style={styles.settingItem}
+						onPress={() => router.push('/settings/profile/editFinancial')}
+					>
 						<Ionicons name="cash-outline" size={24} color="#555" />
 						<View style={styles.settingContent}>
 							<Text style={styles.settingText}>Monthly Income</Text>
 							<Text style={styles.settingValue}>
-								${userProfile.monthlyIncome?.toLocaleString()}
+								${profile.monthlyIncome?.toLocaleString() || '0'}
 							</Text>
 						</View>
-					</View>
+						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
+					</TouchableOpacity>
 
-					<View style={styles.settingItem}>
+					<TouchableOpacity
+						style={styles.settingItem}
+						onPress={() => router.push('/settings/profile/editFinancial')}
+					>
 						<Ionicons name="trending-up-outline" size={24} color="#555" />
 						<View style={styles.settingContent}>
 							<Text style={styles.settingText}>Total Savings</Text>
 							<Text style={styles.settingValue}>
-								${userProfile.savings?.toLocaleString()}
+								${profile.savings?.toLocaleString() || '0'}
 							</Text>
 						</View>
-					</View>
+						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
+					</TouchableOpacity>
 
-					<View style={styles.settingItem}>
+					<TouchableOpacity
+						style={styles.settingItem}
+						onPress={() => router.push('/settings/profile/editFinancial')}
+					>
 						<Ionicons name="trending-down-outline" size={24} color="#555" />
 						<View style={styles.settingContent}>
 							<Text style={styles.settingText}>Total Debt</Text>
 							<Text style={styles.settingValue}>
-								${userProfile.debt?.toLocaleString()}
+								${profile.debt?.toLocaleString() || '0'}
 							</Text>
 						</View>
-					</View>
+						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
+					</TouchableOpacity>
+
+					{profile.expenses && (
+						<TouchableOpacity
+							style={styles.settingItem}
+							onPress={() => router.push('/settings/profile/editExpenses')}
+						>
+							<Ionicons name="card-outline" size={24} color="#555" />
+							<View style={styles.settingContent}>
+								<Text style={styles.settingText}>Expenses</Text>
+								<Text style={styles.settingValue}>
+									Housing: ${profile.expenses.housing?.toLocaleString() || '0'}
+								</Text>
+							</View>
+							<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
+						</TouchableOpacity>
+					)}
 				</View>
 			</View>
 
@@ -266,7 +314,6 @@ const styles = StyleSheet.create({
 		width: 32,
 	},
 	section: {
-		// marginTop: 24,
 		paddingHorizontal: 16,
 	},
 	sectionTitle: {
@@ -279,13 +326,13 @@ const styles = StyleSheet.create({
 	profileSection: {
 		backgroundColor: '#fff',
 		borderRadius: 12,
-		padding: 20,
+		padding: 6,
 		marginTop: 0,
 		alignItems: 'center',
 	},
 	profilePicContainer: {
 		position: 'relative',
-		marginBottom: 16,
+		marginBottom: 8,
 	},
 	profilePic: {
 		width: 80,
@@ -350,5 +397,48 @@ const styles = StyleSheet.create({
 	settingValue: {
 		fontSize: 14,
 		color: '#666',
+	},
+	loadingContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		backgroundColor: '#fff',
+	},
+	loadingText: {
+		marginTop: 16,
+		fontSize: 16,
+		color: '#666',
+	},
+	errorContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		backgroundColor: '#fff',
+		paddingHorizontal: 32,
+	},
+	errorText: {
+		marginTop: 16,
+		fontSize: 18,
+		fontWeight: '600',
+		color: '#333',
+		textAlign: 'center',
+	},
+	errorSubtext: {
+		marginTop: 8,
+		fontSize: 14,
+		color: '#666',
+		textAlign: 'center',
+	},
+	retryButton: {
+		marginTop: 24,
+		backgroundColor: '#0095FF',
+		paddingHorizontal: 24,
+		paddingVertical: 12,
+		borderRadius: 8,
+	},
+	retryButtonText: {
+		color: '#fff',
+		fontSize: 16,
+		fontWeight: '600',
 	},
 });

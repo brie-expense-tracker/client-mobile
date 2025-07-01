@@ -6,37 +6,28 @@ import {
 	TextInput,
 	Alert,
 	ScrollView,
+	ActivityIndicator,
 } from 'react-native';
 import { RectButton } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useProfile } from '../../../../src/context/profileContext';
 
 export default function EditPhoneScreen() {
 	const router = useRouter();
+	const { profile, loading, error, updateProfile } = useProfile();
 	const [phone, setPhone] = useState('');
 	const [currentPhone, setCurrentPhone] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
 
 	useEffect(() => {
-		fetchProfile();
-	}, []);
-
-	const fetchProfile = async () => {
-		try {
-			const response = await fetch(
-				'http://localhost:3000/api/profiles/68431f0b700221021c84552a'
-			);
-			if (response.ok) {
-				const data = await response.json();
-				const phoneNumber = data.data.phone || '';
-				console.log('Current phone number:', phoneNumber);
-				setCurrentPhone(phoneNumber);
-				// Don't set phone initially so placeholder shows current phone number
-			}
-		} catch (error) {
-			console.error('Error fetching profile:', error);
+		if (profile) {
+			const phoneNumber = profile.phone || '';
+			console.log('Current phone number:', phoneNumber);
+			setCurrentPhone(phoneNumber);
+			// Don't set phone initially so placeholder shows current phone number
 		}
-	};
+	}, [profile]);
 
 	const validatePhone = (phone: string) => {
 		// Remove all non-digit characters for validation
@@ -94,29 +85,16 @@ export default function EditPhoneScreen() {
 
 		setIsLoading(true);
 		try {
-			const response = await fetch(
-				'http://localhost:3000/api/profiles/68431f0b700221021c84552a',
-				{
-					method: 'PATCH',
-					headers: {
-						'Content-Type': 'application/json',
-					},
-					body: JSON.stringify({
-						phone: phone.trim(),
-					}),
-				}
-			);
+			await updateProfile({
+				phone: phone.trim(),
+			});
 
-			if (response.ok) {
-				Alert.alert('Success', 'Phone number updated successfully', [
-					{
-						text: 'OK',
-						onPress: () => router.back(),
-					},
-				]);
-			} else {
-				Alert.alert('Error', 'Failed to update phone number');
-			}
+			Alert.alert('Success', 'Phone number updated successfully', [
+				{
+					text: 'OK',
+					onPress: () => router.back(),
+				},
+			]);
 		} catch (error) {
 			console.error('Error updating phone number:', error);
 			Alert.alert('Error', 'Failed to update phone number');
@@ -142,6 +120,34 @@ export default function EditPhoneScreen() {
 			!isLoading
 		);
 	};
+
+	if (loading) {
+		return (
+			<View style={styles.loadingContainer}>
+				<ActivityIndicator size="large" color="#0095FF" />
+				<Text style={styles.loadingText}>Loading profile...</Text>
+			</View>
+		);
+	}
+
+	if (error) {
+		return (
+			<View style={styles.errorContainer}>
+				<Ionicons name="alert-circle-outline" size={48} color="#ff6b6b" />
+				<Text style={styles.errorText}>Failed to load profile</Text>
+				<Text style={styles.errorSubtext}>{error}</Text>
+			</View>
+		);
+	}
+
+	if (!profile) {
+		return (
+			<View style={styles.errorContainer}>
+				<Ionicons name="person-outline" size={48} color="#999" />
+				<Text style={styles.errorText}>No profile found</Text>
+			</View>
+		);
+	}
 
 	return (
 		<View style={styles.container}>
@@ -295,5 +301,32 @@ const styles = StyleSheet.create({
 	currentPhoneText: {
 		fontSize: 16,
 		color: '#333',
+	},
+	loadingContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	loadingText: {
+		fontSize: 18,
+		fontWeight: '600',
+		color: '#333',
+		marginTop: 20,
+	},
+	errorContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	errorText: {
+		fontSize: 18,
+		fontWeight: '600',
+		color: '#ff6b6b',
+		marginTop: 20,
+	},
+	errorSubtext: {
+		fontSize: 14,
+		color: '#666',
+		marginTop: 10,
 	},
 });
