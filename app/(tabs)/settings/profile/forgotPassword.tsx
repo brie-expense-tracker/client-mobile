@@ -13,11 +13,20 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import useAuth from '../../../../src/context/AuthContext';
+import { RectButton } from 'react-native-gesture-handler';
 
 export default function ForgotPasswordScreen() {
 	const router = useRouter();
 	const [email, setEmail] = useState('');
 	const [loading, setLoading] = useState(false);
+	const { sendPasswordResetEmail } = useAuth();
+
+	// Email validator function
+	const isValidEmail = (email: string) => {
+		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+		return emailRegex.test(email);
+	};
 
 	const handleReset = async () => {
 		if (!email.trim()) {
@@ -26,16 +35,14 @@ export default function ForgotPasswordScreen() {
 		}
 
 		// Basic email validation
-		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-		if (!emailRegex.test(email.trim())) {
+		if (!isValidEmail(email.trim())) {
 			Alert.alert('Invalid Email', 'Please enter a valid email address.');
 			return;
 		}
 
 		try {
 			setLoading(true);
-			// TODO: Integrate with your auth backend here
-			// await sendPasswordResetEmail(auth, email.trim());
+			await sendPasswordResetEmail(email.trim());
 
 			Alert.alert(
 				'Reset Email Sent',
@@ -49,10 +56,17 @@ export default function ForgotPasswordScreen() {
 			);
 		} catch (error: any) {
 			console.error('Password reset error:', error);
-			Alert.alert(
-				'Error',
-				error.message || 'Could not send reset email. Please try again.'
-			);
+
+			let errorMessage = 'Could not send reset email. Please try again.';
+			if (error.code === 'auth/user-not-found') {
+				errorMessage = 'No account found with this email address.';
+			} else if (error.code === 'auth/invalid-email') {
+				errorMessage = 'Invalid email address.';
+			} else if (error.code === 'auth/too-many-requests') {
+				errorMessage = 'Too many failed attempts. Please try again later.';
+			}
+
+			Alert.alert('Error', errorMessage);
 		} finally {
 			setLoading(false);
 		}
@@ -105,15 +119,21 @@ export default function ForgotPasswordScreen() {
 								/>
 							</View>
 
-							<TouchableOpacity
-								style={[styles.button, loading && styles.buttonDisabled]}
+							<RectButton
+								style={[
+									styles.button,
+									(loading || !isValidEmail(email.trim()) || !email.trim()) &&
+										styles.buttonDisabled,
+								]}
 								onPress={handleReset}
-								disabled={loading}
+								enabled={
+									!loading && isValidEmail(email.trim()) && email.trim() !== ''
+								}
 							>
 								<Text style={styles.buttonText}>
 									{loading ? 'Sending...' : 'Send Reset Email'}
 								</Text>
-							</TouchableOpacity>
+							</RectButton>
 
 							<View style={styles.infoContainer}>
 								<Ionicons

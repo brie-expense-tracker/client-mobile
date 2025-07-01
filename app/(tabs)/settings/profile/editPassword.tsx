@@ -2,349 +2,237 @@ import React, { useState } from 'react';
 import {
 	View,
 	Text,
-	StyleSheet,
 	TextInput,
+	StyleSheet,
 	Alert,
 	ScrollView,
+	SafeAreaView,
+	Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import {
-	RectButton,
-	BorderlessButton,
-	BaseButton,
-} from 'react-native-gesture-handler';
+import { RectButton } from 'react-native-gesture-handler';
+import useAuth from '../../../../src/context/AuthContext';
 
 export default function EditPasswordScreen() {
 	const router = useRouter();
-	const [currentPassword, setCurrentPassword] = useState('');
-	const [newPassword, setNewPassword] = useState('');
-	const [confirmPassword, setConfirmPassword] = useState('');
-	const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-	const [showNewPassword, setShowNewPassword] = useState(false);
-	const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-	const [pressed, setPressed] = useState(false);
-	const [isLoading, setIsLoading] = useState(false);
+	const [email, setEmail] = useState('');
+	const [loading, setLoading] = useState(false);
+	const { sendPasswordResetEmail } = useAuth();
+	const [emailIsValid, setEmailIsValid] = useState(false);
 
-	const validatePassword = (password: string) => {
-		// At least 8 characters, 1 uppercase, 1 lowercase, 1 number
-		const passwordRegex =
-			/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d@$!%*?&]{8,}$/;
-		return passwordRegex.test(password);
+	// Email validator function
+	const isValidEmail = (email: string) => {
+		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+		return emailRegex.test(email);
 	};
 
-	// Check if save button should be enabled
-	const isSaveButtonEnabled = () => {
-		const passwordsMatch = newPassword.trim() === confirmPassword.trim();
-		const passwordsDontMatch = currentPassword.trim() !== newPassword.trim();
-		const hasValidInputs = Boolean(
-			currentPassword.trim() && newPassword.trim() && confirmPassword.trim()
-		);
-
-		return passwordsMatch && passwordsDontMatch && hasValidInputs && !isLoading;
+	// Handle email input change with validation
+	const handleEmailChange = (text: string) => {
+		setEmail(text);
+		setEmailIsValid(isValidEmail(text));
 	};
 
-	const handleSave = async () => {
-		if (!currentPassword.trim()) {
-			Alert.alert('Error', 'Please enter your current password');
+	const handlePasswordChange = async () => {
+		if (!email.trim()) {
+			Alert.alert('Missing Email', 'Please enter your email address.');
 			return;
 		}
 
-		if (!newPassword.trim()) {
-			Alert.alert('Error', 'Please enter a new password');
+		if (!isValidEmail(email.trim())) {
+			Alert.alert('Invalid Email', 'Please enter a valid email address.');
 			return;
 		}
 
-		if (!validatePassword(newPassword.trim())) {
-			Alert.alert(
-				'Error',
-				'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number'
-			);
-			return;
-		}
-
-		if (newPassword.trim() !== confirmPassword.trim()) {
-			Alert.alert('Error', 'New passwords do not match');
-			return;
-		}
-
-		setIsLoading(true);
 		try {
-			const response = await fetch(
-				'http://localhost:3000/api/users/change-password',
-				{
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-					},
-					body: JSON.stringify({
-						currentPassword: currentPassword.trim(),
-						newPassword: newPassword.trim(),
-					}),
-				}
-			);
+			setLoading(true);
+			await sendPasswordResetEmail(email.trim());
 
-			if (response.ok) {
-				Alert.alert('Success', 'Password changed successfully', [
+			Alert.alert(
+				'Password Reset Email Sent',
+				"Check your inbox for the password reset link. If you don't see it, check your spam folder.",
+				[
 					{
 						text: 'OK',
 						onPress: () => {
-							// Clear form
-							setCurrentPassword('');
-							setNewPassword('');
-							setConfirmPassword('');
+							// Clear form and navigate back
+							setEmail('');
+							setEmailIsValid(false);
 							router.back();
 						},
 					},
-				]);
-			} else {
-				const errorData = await response.json();
-				Alert.alert('Error', errorData.message || 'Failed to change password');
+				]
+			);
+		} catch (error: any) {
+			console.error('Password reset error:', error);
+
+			let errorMessage = 'Could not send reset email. Please try again.';
+			if (error.code === 'auth/user-not-found') {
+				errorMessage = 'No account found with this email address.';
+			} else if (error.code === 'auth/invalid-email') {
+				errorMessage = 'Invalid email address.';
+			} else if (error.code === 'auth/too-many-requests') {
+				errorMessage = 'Too many failed attempts. Please try again later.';
 			}
-		} catch (error) {
-			console.error('Error changing password:', error);
-			Alert.alert('Error', 'Failed to change password');
+
+			Alert.alert('Error', errorMessage);
 		} finally {
-			setIsLoading(false);
+			setLoading(false);
 		}
 	};
 
 	return (
-		<View style={styles.container}>
+		<SafeAreaView style={styles.safeAreaContainer}>
 			<ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-				<View style={styles.formContainer}>
-					<Text style={styles.sectionTitle}>Password Change</Text>
-
-					<View style={styles.inputContainer}>
-						<Text style={styles.label}>Current Password</Text>
-						<View style={styles.passwordInputContainer}>
-							<TextInput
-								style={styles.passwordInput}
-								value={currentPassword}
-								onChangeText={setCurrentPassword}
-								placeholder="Enter your current password"
-								placeholderTextColor="#999"
-								secureTextEntry={!showCurrentPassword}
-								autoCapitalize="none"
-								autoCorrect={false}
-							/>
-							<RectButton
-								style={styles.eyeButton}
-								onPress={() => setShowCurrentPassword(!showCurrentPassword)}
-							>
-								<View accessible accessibilityRole="button">
-									<Ionicons
-										name={showCurrentPassword ? 'eye-off' : 'eye'}
-										size={20}
-										color="#666"
-									/>
-								</View>
-							</RectButton>
+				<View style={styles.mainContainer}>
+					<Image
+						source={require('../../../../assets/images/brie-logos.png')}
+						style={styles.logo}
+						resizeMode="contain"
+					/>
+					<View style={styles.formContainer}>
+						<View style={styles.iconContainer}>
+							<Ionicons name="lock-open-outline" size={48} color="#007AFF" />
 						</View>
-					</View>
-
-					<View style={styles.inputContainer}>
-						<Text style={styles.label}>New Password</Text>
-						<View style={styles.passwordInputContainer}>
-							<TextInput
-								style={styles.passwordInput}
-								value={newPassword}
-								onChangeText={setNewPassword}
-								placeholder="Enter your new password"
-								placeholderTextColor="#999"
-								secureTextEntry={!showNewPassword}
-								autoCapitalize="none"
-								autoCorrect={false}
-							/>
-							<BorderlessButton
-								style={styles.eyeButton}
-								onPress={() => setShowNewPassword(!showNewPassword)}
-							>
-								<View accessible accessibilityRole="button">
-									<Ionicons
-										name={showNewPassword ? 'eye-off' : 'eye'}
-										size={20}
-										color="#666"
-									/>
-								</View>
-							</BorderlessButton>
-						</View>
-					</View>
-
-					<View style={styles.inputContainer}>
-						<Text style={styles.label}>Confirm New Password</Text>
-						<View style={styles.passwordInputContainer}>
-							<TextInput
-								style={styles.passwordInput}
-								value={confirmPassword}
-								onChangeText={setConfirmPassword}
-								placeholder="Confirm your new password"
-								placeholderTextColor="#999"
-								secureTextEntry={!showConfirmPassword}
-								autoCapitalize="none"
-								autoCorrect={false}
-							/>
-							<RectButton
-								style={styles.eyeButton}
-								onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-							>
-								<View accessible accessibilityRole="button">
-									<Ionicons
-										name={showConfirmPassword ? 'eye-off' : 'eye'}
-										size={20}
-										color="#666"
-									/>
-								</View>
-							</RectButton>
-						</View>
-
-						<BorderlessButton
-							style={styles.forgotPasswordLink}
-							onPress={() => router.push('/settings/profile/forgotPassword')}
-							onActiveStateChange={() => setPressed(!pressed)}
-						>
-							<View accessible accessibilityRole="button">
-								<Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-							</View>
-						</BorderlessButton>
-					</View>
-
-					<View style={styles.infoContainer}>
-						<Ionicons
-							name="information-circle-outline"
-							size={20}
-							color="#666"
-						/>
-						<Text style={styles.infoText}>
-							Your password must be at least 8 characters long and contain at
-							least one uppercase letter, one lowercase letter, and one number.
+						<Text style={styles.title}>Change Your Password</Text>
+						<Text style={styles.subtitle}>
+							Enter your email address and we'll send you a link to change your
+							password.
 						</Text>
-					</View>
 
-					<RectButton
-						style={[
-							styles.saveButton,
-							!isSaveButtonEnabled() && styles.saveButtonDisabled,
-						]}
-						onPress={isSaveButtonEnabled() ? handleSave : undefined}
-						enabled={isSaveButtonEnabled()}
-						underlayColor={'#0077CC'}
-					>
-						<View accessible accessibilityRole="button">
-							<Text
-								style={[
-									styles.saveButtonText,
-									!isSaveButtonEnabled() && styles.saveButtonTextDisabled,
-								]}
+						<Text style={styles.label}>Email Address</Text>
+						<TextInput
+							style={[styles.input]}
+							placeholder="Enter your email"
+							placeholderTextColor="#888"
+							value={email}
+							onChangeText={handleEmailChange}
+							keyboardType="email-address"
+							autoCapitalize="none"
+							autoCorrect={false}
+							autoComplete="email"
+						/>
+
+						<View style={styles.buttonContainer}>
+							<RectButton
+								style={[styles.button, !emailIsValid && styles.buttonDisabled]}
+								onPress={handlePasswordChange}
+								enabled={!loading && emailIsValid}
 							>
-								{isLoading ? 'Saving...' : 'Save Changes'}
+								<Text style={styles.buttonText}>
+									{loading ? 'Sending...' : 'Send Password Change Email'}
+								</Text>
+							</RectButton>
+						</View>
+
+						<View style={styles.infoContainer}>
+							<Ionicons
+								name="information-circle-outline"
+								size={16}
+								color="#666"
+							/>
+							<Text style={styles.infoText}>
+								The password change link will expire in 1 hour for security
+								reasons.
 							</Text>
 						</View>
-					</RectButton>
+					</View>
 				</View>
 			</ScrollView>
-		</View>
+		</SafeAreaView>
 	);
 }
 
 const styles = StyleSheet.create({
-	container: {
+	safeAreaContainer: {
 		flex: 1,
-		backgroundColor: '#fff',
+		backgroundColor: '#ffffff',
 	},
 	content: {
 		flex: 1,
 	},
-	formContainer: {
-		padding: 16,
+	mainContainer: {
+		flex: 1,
+		paddingHorizontal: 24,
 	},
-	sectionTitle: {
-		fontSize: 20,
-		fontWeight: '600',
-		color: '#333',
+	logo: {
+		width: 100,
+		height: 40,
+		marginVertical: 20,
+	},
+	formContainer: {
+		backgroundColor: '#FFF',
+	},
+	iconContainer: {
+		alignItems: 'center',
 		marginBottom: 24,
 	},
-	inputContainer: {
-		marginBottom: 20,
+	title: {
+		fontSize: 22,
+		fontWeight: '700',
+		textAlign: 'center',
+		marginBottom: 24,
+		color: '#111',
+	},
+	subtitle: {
+		fontSize: 16,
+		textAlign: 'center',
+		color: '#666',
+		marginBottom: 24,
 	},
 	label: {
-		fontSize: 16,
-		fontWeight: '500',
-		color: '#333',
+		fontSize: 14,
+		fontWeight: '600',
+		color: '#111',
 		marginBottom: 8,
 	},
-	passwordInputContainer: {
-		flexDirection: 'row',
-		alignItems: 'center',
+	input: {
+		height: 50,
 		borderWidth: 1,
-		borderColor: '#ddd',
-		borderRadius: 8,
-		backgroundColor: '#fff',
-	},
-	passwordInput: {
-		flex: 1,
+		borderColor: '#D1D5DB',
+		borderRadius: 10,
 		paddingHorizontal: 16,
-		paddingVertical: 12,
-		fontSize: 16,
-		color: '#333',
+		backgroundColor: '#FFF',
+		marginBottom: 16,
 	},
-	eyeButton: {
-		padding: 12,
-		borderRadius: 8,
-		alignItems: 'center',
-		justifyContent: 'center',
+	buttonContainer: {
+		width: '100%',
+		alignSelf: 'center',
+		shadowColor: '#000000',
+		shadowOffset: {
+			width: 0,
+			height: 4,
+		},
+		shadowOpacity: 0.2,
+		shadowRadius: 6,
+		elevation: 5,
+		marginVertical: 5,
+	},
+	button: {
+		width: '100%',
+		borderRadius: 9999,
+		overflow: 'hidden',
+		alignSelf: 'center',
+		backgroundColor: '#0095FF',
+	},
+	buttonDisabled: {
+		backgroundColor: '#aeafb1',
+	},
+	buttonText: {
+		color: 'white',
+		fontSize: 20,
+		textAlign: 'center',
+		fontWeight: '700',
+		marginVertical: 18,
 	},
 	infoContainer: {
 		flexDirection: 'row',
-		alignItems: 'flex-start',
-		backgroundColor: '#f8f9fa',
-		paddingHorizontal: 16,
-		borderRadius: 8,
-		marginTop: 8,
-		marginBottom: 16,
+		alignItems: 'center',
+		marginTop: 16,
 	},
 	infoText: {
 		fontSize: 14,
 		color: '#666',
 		marginLeft: 8,
-		flex: 1,
-		lineHeight: 20,
-	},
-	saveButton: {
-		backgroundColor: '#0095FF',
-		paddingVertical: 16,
-		borderRadius: 8,
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginTop: 20,
-		minHeight: 56,
-	},
-	saveButtonDisabled: {
-		backgroundColor: '#ccc',
-	},
-	saveButtonText: {
-		color: '#fff',
-		fontSize: 16,
-		fontWeight: '600',
-	},
-	saveButtonTextDisabled: {
-		color: '#999',
-	},
-	forgotPasswordLink: {
-		borderRadius: 8,
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginTop: 18,
-	},
-	forgotPasswordText: {
-		color: '#363636',
-		fontSize: 14,
-		fontWeight: '500',
-		textDecorationLine: 'underline',
-	},
-	forgotPasswordTextPressed: {
-		fontSize: 14,
-		fontWeight: '500',
-		textDecorationLine: 'underline',
 	},
 });

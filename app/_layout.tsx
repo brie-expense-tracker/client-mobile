@@ -33,10 +33,10 @@ function RootLayoutContent() {
 				router.replace('/(auth)/signup');
 			}
 		} else {
-			// User is not authenticated - show login screen
+			// User is not authenticated - show auth screens
 			if (!inAuthGroup) {
-				console.log('User not authenticated, redirecting to login');
-				router.replace('/(auth)/login');
+				console.log('User not authenticated, redirecting to signup');
+				router.replace('/(auth)/signup');
 			}
 		}
 	}, [user, firebaseUser, loading, segments]);

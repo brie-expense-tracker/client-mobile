@@ -1,25 +1,38 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getAuth, onAuthStateChanged } from '@react-native-firebase/auth';
+import {
+	getAuth,
+	onAuthStateChanged,
+	sendPasswordResetEmail,
+	confirmPasswordReset,
+	updatePassword,
+	createUserWithEmailAndPassword,
+} from '@react-native-firebase/auth';
 import type { FirebaseAuthTypes } from '@react-native-firebase/auth';
-import { UserService, User } from '../services/userService';
+import { UserService, User, Profile } from '../services/userService';
 
 interface AuthContextType {
 	user: User | null;
+	profile: Profile | null;
 	firebaseUser: FirebaseAuthTypes.User | null;
 	loading: boolean;
 	login: (firebaseUser: FirebaseAuthTypes.User) => Promise<void>;
 	logout: () => Promise<void>;
+	signup: (email: string, password: string, name?: string) => Promise<void>;
 	createUserInMongoDB: (
 		firebaseUser: FirebaseAuthTypes.User,
 		name?: string
 	) => Promise<User>;
+	sendPasswordResetEmail: (email: string) => Promise<void>;
+	confirmPasswordReset: (code: string, newPassword: string) => Promise<void>;
+	updatePassword: (newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const [user, setUser] = useState<User | null>(null);
+	const [profile, setProfile] = useState<Profile | null>(null);
 	const [firebaseUser, setFirebaseUser] =
 		useState<FirebaseAuthTypes.User | null>(null);
 	const [loading, setLoading] = useState(true);
@@ -38,19 +51,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 					);
 					if (mongoUser) {
 						setUser(mongoUser);
+						// Fetch the user's profile
+						const userProfile = await UserService.getProfileByUserId(
+							mongoUser._id
+						);
+						setProfile(userProfile);
 						await AsyncStorage.setItem('firebaseUID', firebaseUser.uid);
 					} else {
 						// User exists in Firebase but not in MongoDB
 						// This will be handled during signup flow
 						setUser(null);
+						setProfile(null);
 					}
 				} catch (error) {
 					console.error('Error fetching user from MongoDB:', error);
 					setUser(null);
+					setProfile(null);
 				}
 			} else {
 				// User is signed out
 				setUser(null);
+				setProfile(null);
 				await AsyncStorage.removeItem('firebaseUID');
 			}
 
@@ -71,12 +92,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				name: name || firebaseUser.displayName || undefined,
 			};
 
-			const newUser = await UserService.createUser(userData);
-			setUser(newUser);
+			const response = await UserService.createUser(userData);
+			setUser(response.user);
+			setProfile(response.profile);
 			await AsyncStorage.setItem('firebaseUID', firebaseUser.uid);
-			return newUser;
+			return response.user;
 		} catch (error) {
 			console.error('Error creating user in MongoDB:', error);
+			// Clear any partial state that might have been set
+			setUser(null);
+			setProfile(null);
+			await AsyncStorage.removeItem('firebaseUID');
 			throw error;
 		}
 	};
@@ -89,6 +115,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			);
 			if (mongoUser) {
 				setUser(mongoUser);
+				// Fetch the user's profile
+				const userProfile = await UserService.getProfileByUserId(mongoUser._id);
+				setProfile(userProfile);
 				await AsyncStorage.setItem('firebaseUID', firebaseUser.uid);
 			} else {
 				// User doesn't exist in MongoDB, create them
@@ -104,6 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		try {
 			await getAuth().signOut();
 			setUser(null);
+			setProfile(null);
 			setFirebaseUser(null);
 			await AsyncStorage.removeItem('firebaseUID');
 		} catch (error) {
@@ -111,15 +141,110 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		}
 	};
 
+	const sendPasswordResetEmailToUser = async (email: string) => {
+		try {
+			console.log('🔍 Starting password reset process...');
+			console.log('📧 Email:', email);
+			console.log('🔥 Firebase Auth instance:', getAuth());
+			console.log('🔥 Firebase Auth current user:', getAuth().currentUser);
+
+			// Check if Firebase is properly initialized
+			const auth = getAuth();
+			if (!auth) {
+				throw new Error('Firebase Auth is not initialized');
+			}
+
+			console.log('📤 Sending password reset email...');
+			await sendPasswordResetEmail(auth, email);
+			console.log('✅ Password reset email sent successfully');
+		} catch (error: any) {
+			console.error('❌ Error sending password reset email:', error);
+			console.error('❌ Error details:', {
+				message: error.message,
+				code: error.code,
+				stack: error.stack,
+			});
+			throw error;
+		}
+	};
+
+	const confirmPasswordResetCode = async (
+		code: string,
+		newPassword: string
+	) => {
+		try {
+			await confirmPasswordReset(getAuth(), code, newPassword);
+		} catch (error) {
+			console.error('Error confirming password reset:', error);
+			throw error;
+		}
+	};
+
+	const updatePasswordToUser = async (newPassword: string) => {
+		try {
+			const currentUser = getAuth().currentUser;
+			if (!currentUser) {
+				throw new Error('No user is currently signed in');
+			}
+			await updatePassword(currentUser, newPassword);
+		} catch (error) {
+			console.error('Error updating password:', error);
+			throw error;
+		}
+	};
+
+	const signup = async (email: string, password: string, name?: string) => {
+		let firebaseUser: FirebaseAuthTypes.User | null = null;
+
+		try {
+			// Create user in Firebase first
+			const userCredential = await createUserWithEmailAndPassword(
+				getAuth(),
+				email,
+				password
+			);
+			firebaseUser = userCredential.user;
+
+			// Create user in MongoDB
+			await createUserInMongoDB(firebaseUser, name);
+
+			console.log('Successfully created User in Firebase and MongoDB.');
+		} catch (error: any) {
+			console.error('Signup error:', error);
+
+			// If Firebase user was created but MongoDB creation failed, delete the Firebase user
+			if (firebaseUser) {
+				try {
+					await firebaseUser.delete();
+					console.log(
+						'Cleaned up Firebase user after MongoDB creation failure'
+					);
+				} catch (deleteError) {
+					console.error(
+						'Error deleting Firebase user during cleanup:',
+						deleteError
+					);
+				}
+			}
+
+			throw error;
+		}
+	};
+
 	return (
 		<AuthContext.Provider
 			value={{
 				user,
+				profile,
 				firebaseUser,
 				loading,
 				login,
 				logout,
+				signup,
 				createUserInMongoDB,
+				sendPasswordResetEmail: sendPasswordResetEmailToUser,
+				confirmPasswordReset: confirmPasswordResetCode,
+				updatePassword: updatePasswordToUser,
 			}}
 		>
 			{children}

@@ -14,43 +14,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { RectButton } from 'react-native-gesture-handler';
 import useAuth from '../../../src/context/AuthContext';
+import { useProfile } from '../../../src/context/profileContext';
 
 export default function SettingsScreen() {
 	const router = useRouter();
 	const { user, logout } = useAuth();
-	const [isLoading, setIsLoading] = useState(true);
+	const {
+		profile,
+		loading: profileLoading,
+		error: profileError,
+	} = useProfile();
 	const [profileImage, setProfileImage] = useState(
 		require('../../../assets/images/profile.jpg')
 	);
-	const [userProfile, setUserProfile] = useState({
-		firstName: 'Max',
-		lastName: 'Mustermann',
-		username: 'maxmustermann',
-		monthlyIncome: 1000,
-		savings: 100,
-		debt: 100,
-	});
-
-	useEffect(() => {
-		fetchProfile();
-	}, []);
-
-	const fetchProfile = async () => {
-		try {
-			setIsLoading(true);
-			const response = await fetch(
-				'http://localhost:3000/api/profiles/68431f0b700221021c84552a'
-			);
-			if (response.ok) {
-				const data = await response.json();
-				setUserProfile(data.data);
-			}
-		} catch (error) {
-			// console.error('Error fetching profile:', error);
-		} finally {
-			setIsLoading(false);
-		}
-	};
 
 	const handleSignOut = async () => {
 		Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -72,7 +48,7 @@ export default function SettingsScreen() {
 	};
 
 	/* ---------------------------------- Loading State --------------------------------- */
-	if (isLoading) {
+	if (profileLoading) {
 		return (
 			<View style={styles.loadingContainer}>
 				<ActivityIndicator size="large" color="#0790ff" />
@@ -96,15 +72,38 @@ export default function SettingsScreen() {
 							/>
 						</View>
 						<Text style={styles.userName}>
-							{user?.name
-								? `@${user.name.toLowerCase().replace(/\s+/g, '')}`
-								: '@user'}
+							{profile
+								? `${profile.firstName} ${profile.lastName}`
+								: user?.email || '@user'}
 						</Text>
+						{profile && (
+							<Text style={styles.userDetails}>
+								Monthly Income: ${profile.monthlyIncome.toLocaleString()} |
+								Savings: ${profile.savings.toLocaleString()}
+							</Text>
+						)}
 					</View>
 
 					{/* ——— Settings ——— */}
 					<View style={styles.settingsContainerWrapper}>
 						<View style={styles.settingsContainer}>
+							<Setting
+								icon="person-outline"
+								label="Profile Editor"
+								onPress={() => router.push('./settings/test/ProfileEditor')}
+							/>
+							<Setting
+								icon="person-outline"
+								label="Test"
+								onPress={() => router.push('./settings/test/test')}
+							/>
+							<Setting
+								icon="person-outline"
+								label="Test reset password"
+								onPress={() =>
+									router.push('./settings/test/test-password-reset')
+								}
+							/>
 							{/* ACCOUNT */}
 							<Text style={styles.settingsHeader}>Account</Text>
 							<Setting
@@ -256,8 +255,7 @@ const styles = StyleSheet.create({
 		borderColor: '#ddd',
 	},
 	userName: { fontSize: 18, fontWeight: '500', color: '#666', marginBottom: 4 },
-	totalValue: { fontSize: 24, fontWeight: '600', color: '#222' },
-	totalValueLabel: { fontSize: 14, color: '#828282', marginBottom: 4 },
+	userDetails: { fontSize: 14, color: '#828282', marginBottom: 4 },
 
 	/***** stats *****/
 	statsContainer: {
