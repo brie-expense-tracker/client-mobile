@@ -63,7 +63,7 @@ export default function AboutScreen() {
 			<View style={styles.heroSection}>
 				<View style={styles.appInfoSection}>
 					<Image
-						source={require('../../../../assets/images/brie-logos.png')}
+						source={require('../../../../src/assets/images/brie-logos.png')}
 						style={styles.appIcon}
 						contentFit="contain"
 					/>

@@ -84,7 +84,7 @@ export default function ForgotPasswordScreen() {
 		<SafeAreaView style={styles.safeAreaContainer}>
 			<View style={styles.mainContainer}>
 				<Image
-					source={require('../../assets/images/brie-logos.png')}
+					source={require('../../src/assets/images/brie-logos.png')}
 					style={styles.logo}
 					resizeMode="contain"
 				/>

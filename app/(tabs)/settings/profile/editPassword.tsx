@@ -86,7 +86,7 @@ export default function EditPasswordScreen() {
 			<ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
 				<View style={styles.mainContainer}>
 					<Image
-						source={require('../../../../assets/images/brie-logos.png')}
+						source={require('../../../../src/assets/images/brie-logos.png')}
 						style={styles.logo}
 						resizeMode="contain"
 					/>

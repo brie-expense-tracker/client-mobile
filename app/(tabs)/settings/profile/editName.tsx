@@ -62,26 +62,37 @@ export default function EditNameScreen() {
 			return;
 		}
 
-		// Validate that both names are filled
-		if (!firstName.trim() || !lastName.trim()) {
-			Alert.alert('Error', 'Please fill in both first name and last name');
+		// Validate that at least one name is filled
+		if (!firstName.trim() && !lastName.trim()) {
+			Alert.alert('Error', 'Please fill in at least one name field');
 			return;
 		}
 
 		setIsLoading(true);
 		try {
-			// Always update both names together to ensure consistency
-			await updateProfile({
-				firstName: firstName.trim(),
-				lastName: lastName.trim(),
-			});
+			// Update only the names that have changed
+			const updateData: { firstName?: string; lastName?: string } = {};
+
+			if (hasFirstNameChanges) {
+				updateData.firstName = firstName.trim();
+			}
+
+			if (hasLastNameChanges) {
+				updateData.lastName = lastName.trim();
+			}
+
+			await updateProfile(updateData);
 
 			Alert.alert('Success', 'Name updated successfully', [
 				{
 					text: 'OK',
 					onPress: () => {
-						setOriginalFirstName(firstName.trim());
-						setOriginalLastName(lastName.trim());
+						if (hasFirstNameChanges) {
+							setOriginalFirstName(firstName.trim());
+						}
+						if (hasLastNameChanges) {
+							setOriginalLastName(lastName.trim());
+						}
 						router.back();
 					},
 				},
@@ -131,15 +142,6 @@ export default function EditNameScreen() {
 						<Text style={styles.editNameTitle}>Change First Name</Text>
 
 						<View style={styles.inputContainer}>
-							{/* Current First Name Display
-							<View style={styles.currentNameDisplay}>
-								<Text style={styles.currentNameLabel}>Current First Name</Text>
-								<Text style={styles.currentNameValue}>
-									{originalFirstName || 'Not set'}
-								</Text>
-							</View>
-
-							<Text style={styles.label}>New First Name</Text> */}
 							<TextInput
 								style={styles.input}
 								value={firstName}
@@ -158,14 +160,6 @@ export default function EditNameScreen() {
 
 						<View style={styles.inputContainer}>
 							{/* Current Last Name Display */}
-							{/* <View style={styles.currentNameDisplay}>
-								<Text style={styles.currentNameLabel}>Current Last Name</Text>
-								<Text style={styles.currentNameValue}>
-									{originalLastName || 'Not set'}
-								</Text>
-							</View>
-
-							<Text style={styles.label}>New Last Name</Text> */}
 							<TextInput
 								style={styles.input}
 								value={lastName}

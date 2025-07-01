@@ -8,7 +8,7 @@ import {
 	SafeAreaView,
 } from 'react-native';
 import React, { useState } from 'react';
-import { Link, Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import useAuth from '../../src/context/AuthContext';
 import { RectButton, BorderlessButton } from 'react-native-gesture-handler';
@@ -79,7 +79,7 @@ export default function Signup() {
 		<SafeAreaView style={styles.safeAreaContainer}>
 			<View style={styles.mainContainer}>
 				<Image
-					source={require('../../assets/images/brie-logos.png')}
+					source={require('../../src/assets/images/brie-logos.png')}
 					style={styles.logo}
 					resizeMode="contain"
 				/>
@@ -156,11 +156,14 @@ export default function Signup() {
 				</View>
 				<View style={styles.loginContainer}>
 					<Text style={styles.loginText}>Already have account?</Text>
-					<Link replace href={'/login'} asChild>
-						<BorderlessButton onActiveStateChange={setIsPressed}>
-							<Text style={styles.loginLink}>Log In</Text>
-						</BorderlessButton>
-					</Link>
+					<BorderlessButton
+						onActiveStateChange={setIsPressed}
+						onPress={() => {
+							router.replace('/login');
+						}}
+					>
+						<Text style={styles.loginLink}>Log In</Text>
+					</BorderlessButton>
 				</View>
 			</View>
 
