@@ -8,7 +8,7 @@ import {
 	SafeAreaView,
 } from 'react-native';
 import React, { useState } from 'react';
-import { Link, Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
 	getAuth,
@@ -90,7 +90,7 @@ export default function Login() {
 		<SafeAreaView style={styles.safeAreaContainer}>
 			<View style={styles.mainContainer}>
 				<Image
-					source={require('../../assets/images/brie-logos.png')}
+					source={require('../../src/assets/images/brie-logos.png')}
 					style={styles.logo}
 					resizeMode="contain"
 				/>
@@ -114,11 +114,14 @@ export default function Login() {
 						secureTextEntry
 					/>
 					<View style={styles.forgotPasswordContainer}>
-						<Link href="/forgotPassword" asChild>
-							<BorderlessButton onActiveStateChange={setIsPressed}>
-								<Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-							</BorderlessButton>
-						</Link>
+						<BorderlessButton
+							onActiveStateChange={setIsPressed}
+							onPress={() => {
+								router.replace('/forgotPassword');
+							}}
+						>
+							<Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+						</BorderlessButton>
 					</View>
 					<View style={styles.buttonContainer}>
 						<RectButton
@@ -168,11 +171,15 @@ export default function Login() {
 				</View>
 				<View style={styles.signupContainer}>
 					<Text style={styles.signupText}>Don't have an account?</Text>
-					<Link replace href={'/signup'} asChild>
-						<BorderlessButton onActiveStateChange={setIsPressed}>
-							<Text style={styles.signupLink}>Sign Up</Text>
-						</BorderlessButton>
-					</Link>
+
+					<BorderlessButton
+						onActiveStateChange={setIsPressed}
+						onPress={() => {
+							router.replace('/signup');
+						}}
+					>
+						<Text style={styles.signupLink}>Sign Up</Text>
+					</BorderlessButton>
 				</View>
 			</View>
 

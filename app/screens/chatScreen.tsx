@@ -18,11 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import axios from 'axios';
 import { Transaction } from '../../src/data/transactions';
-import {
-	analyzeTransactions,
-	getFinancialInsights,
-} from '../../src/services/aiService';
-import Constants from 'expo-constants';
+import { getFinancialInsights } from '../../src/services/aiService';
 
 // Define API URL based on environment
 const API_URL = __DEV__
@@ -164,7 +160,7 @@ const ChatScreen = () => {
 						uri: 'https://ui-avatars.com/api/?name=Brie&background=007AFF&color=fff',
 					}}
 					style={styles.avatar}
-					defaultSource={require('../../assets/images/default-avatar.jpg')}
+					defaultSource={require('../../src/assets/images/default-avatar.jpg')}
 				/>
 			)}
 			{item.sender === 'ai' && (
@@ -173,7 +169,7 @@ const ChatScreen = () => {
 						uri: 'https://ui-avatars.com/api/?name=AI&background=007AFF&color=fff',
 					}}
 					style={styles.avatar}
-					defaultSource={require('../../assets/images/default-avatar.jpg')}
+					defaultSource={require('../../src/assets/images/default-avatar.jpg')}
 				/>
 			)}
 			<View

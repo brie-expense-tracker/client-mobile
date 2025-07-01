@@ -14,13 +14,14 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useProfile } from '../../../../src/context/profileContext';
 import useAuth from '../../../../src/context/AuthContext';
+import Setting from '../../../../src/components/Setting';
 
 export default function AccountScreen() {
 	const router = useRouter();
 	const { profile, loading, error, fetchProfile } = useProfile();
 	const { user } = useAuth();
 	const [profileImage, setProfileImage] = useState(
-		require('../../../../assets/images/profile.jpg')
+		require('../../../../src/assets/images/profile.jpg')
 	);
 
 	useEffect(() => {
@@ -144,55 +145,36 @@ export default function AccountScreen() {
 			<View style={styles.section}>
 				<Text style={styles.sectionTitle}>Account Details</Text>
 				<View style={styles.settingsContainer}>
-					<TouchableOpacity
-						style={styles.settingItem}
+					<Setting
+						icon="person-outline"
+						label="Name"
+						value={
+							profile.firstName || profile.lastName
+								? `${profile.firstName} ${profile.lastName}`
+								: 'Not set'
+						}
 						onPress={() => router.push('/settings/profile/editName')}
-					>
-						<Ionicons name="person-outline" size={24} color="#555" />
-						<View style={styles.settingContent}>
-							<Text style={styles.settingText}>Name</Text>
-							<Text style={styles.settingValue}>
-								{profile.firstName} {profile.lastName}
-							</Text>
-						</View>
-						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
-					</TouchableOpacity>
+					/>
 
-					<TouchableOpacity
-						style={styles.settingItem}
+					<Setting
+						icon="call-outline"
+						label="Phone"
+						value={profile.phone || 'Not set'}
 						onPress={() => router.push('/settings/profile/editPhone')}
-					>
-						<Ionicons name="call-outline" size={24} color="#555" />
-						<View style={styles.settingContent}>
-							<Text style={styles.settingText}>Phone</Text>
-							<Text style={styles.settingValue}>
-								{profile.phone || 'Not set'}
-							</Text>
-						</View>
-						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
-					</TouchableOpacity>
+					/>
 
-					<View style={styles.settingItem}>
-						<Ionicons name="mail-outline" size={24} color="#555" />
-						<View style={styles.settingContent}>
-							<Text style={styles.settingText}>Email</Text>
-							<Text style={styles.settingValue}>
-								{user?.email || 'Not set'}
-							</Text>
-						</View>
-					</View>
+					<Setting
+						icon="mail-outline"
+						label="Email"
+						value={user?.email || 'Not set'}
+					/>
 
-					<TouchableOpacity
-						style={styles.settingItem}
+					<Setting
+						icon="key-outline"
+						label="Change Password"
+						value="••••••••"
 						onPress={() => router.push('/settings/profile/editPassword')}
-					>
-						<Ionicons name="key-outline" size={24} color="#555" />
-						<View style={styles.settingContent}>
-							<Text style={styles.settingText}>Change Password</Text>
-							<Text style={styles.settingValue}>••••••••</Text>
-						</View>
-						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
-					</TouchableOpacity>
+					/>
 				</View>
 			</View>
 
@@ -200,62 +182,36 @@ export default function AccountScreen() {
 			<View style={styles.section}>
 				<Text style={styles.sectionTitle}>Financial Information</Text>
 				<View style={styles.settingsContainer}>
-					<TouchableOpacity
-						style={styles.settingItem}
+					<Setting
+						icon="cash-outline"
+						label="Monthly Income"
+						value={`$${profile.monthlyIncome?.toLocaleString() || '0'}`}
 						onPress={() => router.push('/settings/profile/editFinancial')}
-					>
-						<Ionicons name="cash-outline" size={24} color="#555" />
-						<View style={styles.settingContent}>
-							<Text style={styles.settingText}>Monthly Income</Text>
-							<Text style={styles.settingValue}>
-								${profile.monthlyIncome?.toLocaleString() || '0'}
-							</Text>
-						</View>
-						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
-					</TouchableOpacity>
+					/>
 
-					<TouchableOpacity
-						style={styles.settingItem}
+					<Setting
+						icon="trending-up-outline"
+						label="Total Savings"
+						value={`$${profile.savings?.toLocaleString() || '0'}`}
 						onPress={() => router.push('/settings/profile/editFinancial')}
-					>
-						<Ionicons name="trending-up-outline" size={24} color="#555" />
-						<View style={styles.settingContent}>
-							<Text style={styles.settingText}>Total Savings</Text>
-							<Text style={styles.settingValue}>
-								${profile.savings?.toLocaleString() || '0'}
-							</Text>
-						</View>
-						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
-					</TouchableOpacity>
+					/>
 
-					<TouchableOpacity
-						style={styles.settingItem}
+					<Setting
+						icon="trending-down-outline"
+						label="Total Debt"
+						value={`$${profile.debt?.toLocaleString() || '0'}`}
 						onPress={() => router.push('/settings/profile/editFinancial')}
-					>
-						<Ionicons name="trending-down-outline" size={24} color="#555" />
-						<View style={styles.settingContent}>
-							<Text style={styles.settingText}>Total Debt</Text>
-							<Text style={styles.settingValue}>
-								${profile.debt?.toLocaleString() || '0'}
-							</Text>
-						</View>
-						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
-					</TouchableOpacity>
+					/>
 
 					{profile.expenses && (
-						<TouchableOpacity
-							style={styles.settingItem}
+						<Setting
+							icon="card-outline"
+							label="Expenses"
+							value={`Housing: $${
+								profile.expenses.housing?.toLocaleString() || '0'
+							}`}
 							onPress={() => router.push('/settings/profile/editExpenses')}
-						>
-							<Ionicons name="card-outline" size={24} color="#555" />
-							<View style={styles.settingContent}>
-								<Text style={styles.settingText}>Expenses</Text>
-								<Text style={styles.settingValue}>
-									Housing: ${profile.expenses.housing?.toLocaleString() || '0'}
-								</Text>
-							</View>
-							<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
-						</TouchableOpacity>
+						/>
 					)}
 				</View>
 			</View>
@@ -264,14 +220,11 @@ export default function AccountScreen() {
 			<View style={styles.section}>
 				<Text style={styles.sectionTitle}>Account Management</Text>
 				<View style={styles.settingsContainer}>
-					<TouchableOpacity
-						style={styles.settingItem}
+					<Setting
+						icon="trash-outline"
+						label="Delete Account"
 						onPress={() => router.push('/settings/profile/deleteAccount')}
-					>
-						<Ionicons name="trash-outline" size={24} color="#555" />
-						<Text style={styles.settingIconText}>Delete Account</Text>
-						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
-					</TouchableOpacity>
+					/>
 				</View>
 			</View>
 		</ScrollView>
@@ -372,31 +325,6 @@ const styles = StyleSheet.create({
 	settingsContainer: {
 		backgroundColor: '#fff',
 		overflow: 'hidden',
-	},
-	settingItem: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		padding: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: '#efefef',
-	},
-	settingContent: {
-		flex: 1,
-		marginLeft: 12,
-	},
-	settingText: {
-		fontSize: 16,
-		color: '#333',
-		marginBottom: 2,
-	},
-	settingIconText: {
-		fontSize: 16,
-		color: '#333',
-		marginLeft: 12,
-	},
-	settingValue: {
-		fontSize: 14,
-		color: '#666',
 	},
 	loadingContainer: {
 		flex: 1,

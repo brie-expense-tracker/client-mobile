@@ -398,7 +398,7 @@ const Dashboard: React.FC = () => {
 						<View style={styles.headerContainer}>
 							<View style={styles.headerTextContainer}>
 								<Image
-									source={require('../../../assets/images/brie-logos.png')}
+									source={require('../../../src/assets/images/brie-logos.png')}
 									style={styles.logo}
 									resizeMode="contain"
 								/>

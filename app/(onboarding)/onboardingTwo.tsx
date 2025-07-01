@@ -6,17 +6,19 @@ import {
 	ImageBackground,
 	StyleSheet,
 } from 'react-native';
-import React from 'react';
+import React, { useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link, Stack, router } from 'expo-router';
+import { BorderlessButton } from 'react-native-gesture-handler';
 
 export default function OnboardingTwo() {
+	const [isPressed, setIsPressed] = useState(false);
 	return (
 		<View style={styles.container}>
 			<View style={styles.contentContainer}>
 				<Image
 					style={styles.logoImage}
-					source={require('../../assets/images/brie-logos.png')}
+					source={require('../../src/assets/images/brie-logos.png')}
 				/>
 				<View style={styles.titleContainer}>
 					<Text style={styles.title}>Create Your Tracker Account</Text>
@@ -40,9 +42,14 @@ export default function OnboardingTwo() {
 
 				<View style={styles.loginContainer}>
 					<Text style={styles.loginText}>Already have account?</Text>
-					<Link replace href={'/(auth)/login-test'}>
+					<BorderlessButton
+						onActiveStateChange={setIsPressed}
+						onPress={() => {
+							router.replace('/login');
+						}}
+					>
 						<Text style={styles.loginLink}>Log In</Text>
-					</Link>
+					</BorderlessButton>
 				</View>
 			</View>
 			<Stack.Screen options={{ headerShown: false }} />

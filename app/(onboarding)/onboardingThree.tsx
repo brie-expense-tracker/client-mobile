@@ -3,7 +3,6 @@ import {
 	View,
 	Text,
 	TextInput,
-	TouchableOpacity,
 	StyleSheet,
 	Pressable,
 	Image,
@@ -444,7 +443,7 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 				<View style={styles.logoContainer}>
 					<Image
 						style={styles.logoImage}
-						source={require('../../assets/images/brie-logos.png')}
+						source={require('../../src/assets/images/brie-logos.png')}
 					/>
 				</View>
 				<Pressable onPress={handleSkip} style={styles.skipButton}>

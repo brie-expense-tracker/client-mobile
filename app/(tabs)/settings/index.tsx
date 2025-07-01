@@ -12,9 +12,10 @@ import {
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { RectButton } from 'react-native-gesture-handler';
+import { BorderlessButton, RectButton } from 'react-native-gesture-handler';
 import useAuth from '../../../src/context/AuthContext';
 import { useProfile } from '../../../src/context/profileContext';
+import Setting from '../../../src/components/Setting';
 
 export default function SettingsScreen() {
 	const router = useRouter();
@@ -25,7 +26,7 @@ export default function SettingsScreen() {
 		error: profileError,
 	} = useProfile();
 	const [profileImage, setProfileImage] = useState(
-		require('../../../assets/images/profile.jpg')
+		require('../../../src/assets/images/profile.jpg')
 	);
 
 	const handleSignOut = async () => {
@@ -87,23 +88,6 @@ export default function SettingsScreen() {
 					{/* ——— Settings ——— */}
 					<View style={styles.settingsContainerWrapper}>
 						<View style={styles.settingsContainer}>
-							<Setting
-								icon="person-outline"
-								label="Profile Editor"
-								onPress={() => router.push('./settings/test/ProfileEditor')}
-							/>
-							<Setting
-								icon="person-outline"
-								label="Test"
-								onPress={() => router.push('./settings/test/test')}
-							/>
-							<Setting
-								icon="person-outline"
-								label="Test reset password"
-								onPress={() =>
-									router.push('./settings/test/test-password-reset')
-								}
-							/>
 							{/* ACCOUNT */}
 							<Text style={styles.settingsHeader}>Account</Text>
 							<Setting
@@ -191,35 +175,6 @@ export default function SettingsScreen() {
 	);
 }
 
-/* --------------------- Re-usable Setting Row -------------------- */
-function Setting({
-	icon,
-	label,
-	onPress,
-	trailing,
-}: {
-	icon: keyof typeof Ionicons.glyphMap;
-	label: string;
-	onPress?: () => void;
-	trailing?: string;
-}) {
-	return (
-		<TouchableOpacity
-			style={styles.settingItem}
-			onPress={onPress}
-			disabled={!onPress}
-		>
-			<Ionicons name={icon} size={24} color="#555" />
-			<Text style={styles.settingText}>{label}</Text>
-			{trailing ? (
-				<Text style={[styles.chevronIcon, { fontSize: 12 }]}>{trailing}</Text>
-			) : (
-				<Ionicons name="chevron-forward" size={18} style={styles.chevronIcon} />
-			)}
-		</TouchableOpacity>
-	);
-}
-
 /* ---------------------------- Styles --------------------------- */
 const styles = StyleSheet.create({
 	/***** containers *****/
@@ -292,15 +247,6 @@ const styles = StyleSheet.create({
 		paddingTop: 16,
 		paddingBottom: 4,
 	},
-	settingItem: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		padding: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: '#efefef',
-	},
-	settingText: { flex: 1, marginLeft: 12, fontSize: 16, color: '#333' },
-	chevronIcon: { color: '#BEBEBE' },
 
 	/***** sign-out *****/
 	signOutContainer: { marginTop: 'auto', padding: 16 },
