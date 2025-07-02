@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
 	View,
 	Text,
@@ -22,6 +22,14 @@ type RootStackParamList = {
 
 type OnboardingScreenProps = {
 	navigation: NativeStackNavigationProp<RootStackParamList>;
+};
+
+type Category = {
+	_id: string;
+	name: string;
+	type: 'income' | 'expense';
+	color: string;
+	icon: string;
 };
 
 const { width } = Dimensions.get('window');
@@ -50,10 +58,47 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 	const [autoSave, setAutoSave] = useState(false);
 	const [autoSaveAmount, setAutoSaveAmount] = useState('');
 
+	// Categories
+	const [availableCategories, setAvailableCategories] = useState<Category[]>(
+		[]
+	);
+	const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+	const [categoriesLoading, setCategoriesLoading] = useState(false);
+
 	const flatListRef = useRef<FlatList>(null);
 	const [currentIndex, setCurrentIndex] = useState(0);
 
 	const { markOnboardingComplete } = useOnboarding();
+
+	// Fetch available categories on component mount
+	useEffect(() => {
+		fetchAvailableCategories();
+	}, []);
+
+	const fetchAvailableCategories = async () => {
+		setCategoriesLoading(true);
+		try {
+			const response = await fetch(
+				'http://localhost:3000/api/categories/available'
+			);
+			if (response.ok) {
+				const categories = await response.json();
+				setAvailableCategories(categories);
+			}
+		} catch (error) {
+			console.error('Error fetching categories:', error);
+		} finally {
+			setCategoriesLoading(false);
+		}
+	};
+
+	const toggleCategorySelection = (categoryId: string) => {
+		setSelectedCategories((prev) =>
+			prev.includes(categoryId)
+				? prev.filter((id) => id !== categoryId)
+				: [...prev, categoryId]
+		);
+	};
 
 	const handleSubmit = async () => {
 		const profileData = {
@@ -83,11 +128,25 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 		};
 
 		try {
+			// Submit profile data
 			await fetch('http://localhost:3000/api/profile/', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(profileData),
 			});
+
+			// Submit selected categories
+			if (selectedCategories.length > 0) {
+				const selectedCategoryData = availableCategories.filter((cat) =>
+					selectedCategories.includes(cat._id)
+				);
+
+				await fetch('http://localhost:3000/api/categories/selected', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ selectedCategories: selectedCategoryData }),
+				});
+			}
 
 			// Mark onboarding as complete and navigate to main app
 			await markOnboardingComplete();
@@ -342,6 +401,107 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 							contentContainerStyle={styles.scrollContent}
 							showsVerticalScrollIndicator={false}
 						>
+							<Text style={styles.title}>Choose Your Categories</Text>
+							<Text style={styles.subtitle}>
+								Select the categories you'd like to use for tracking your income
+								and expenses
+							</Text>
+
+							{categoriesLoading ? (
+								<View style={styles.loadingContainer}>
+									<Text style={styles.loadingText}>Loading categories...</Text>
+								</View>
+							) : (
+								<>
+									<View style={styles.inputContainer}>
+										<Text style={styles.label}>Income Categories</Text>
+										<View style={styles.categoryContainer}>
+											{availableCategories
+												.filter((cat) => cat.type === 'income')
+												.map((category) => (
+													<Pressable
+														key={category._id}
+														onPress={() =>
+															toggleCategorySelection(category._id)
+														}
+														style={[
+															styles.categoryButton,
+															selectedCategories.includes(category._id) &&
+																styles.selectedCategory,
+														]}
+													>
+														<View
+															style={[
+																styles.categoryIcon,
+																{ backgroundColor: category.color },
+															]}
+														>
+															<Text style={styles.categoryIconText}>📊</Text>
+														</View>
+														<Text
+															style={[
+																styles.categoryText,
+																selectedCategories.includes(category._id) &&
+																	styles.selectedCategoryText,
+															]}
+														>
+															{category.name}
+														</Text>
+													</Pressable>
+												))}
+										</View>
+									</View>
+
+									<View style={styles.inputContainer}>
+										<Text style={styles.label}>Expense Categories</Text>
+										<View style={styles.categoryContainer}>
+											{availableCategories
+												.filter((cat) => cat.type === 'expense')
+												.map((category) => (
+													<Pressable
+														key={category._id}
+														onPress={() =>
+															toggleCategorySelection(category._id)
+														}
+														style={[
+															styles.categoryButton,
+															selectedCategories.includes(category._id) &&
+																styles.selectedCategory,
+														]}
+													>
+														<View
+															style={[
+																styles.categoryIcon,
+																{ backgroundColor: category.color },
+															]}
+														>
+															<Text style={styles.categoryIconText}>📊</Text>
+														</View>
+														<Text
+															style={[
+																styles.categoryText,
+																selectedCategories.includes(category._id) &&
+																	styles.selectedCategoryText,
+															]}
+														>
+															{category.name}
+														</Text>
+													</Pressable>
+												))}
+										</View>
+									</View>
+								</>
+							)}
+						</ScrollView>
+					</View>
+				);
+			case 4:
+				return (
+					<View style={styles.slide}>
+						<ScrollView
+							contentContainerStyle={styles.scrollContent}
+							showsVerticalScrollIndicator={false}
+						>
 							<Text style={styles.title}>Final Preferences</Text>
 							<View style={styles.inputContainer}>
 								<Text style={styles.label}>Advice Frequency</Text>
@@ -418,7 +578,7 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 	};
 
 	const handleNext = () => {
-		if (currentIndex < 3) {
+		if (currentIndex < 4) {
 			flatListRef.current?.scrollToIndex({
 				index: currentIndex + 1,
 				animated: true,
@@ -452,7 +612,7 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 			</View>
 			<FlatList
 				ref={flatListRef}
-				data={[1, 2, 3, 4]}
+				data={[1, 2, 3, 4, 5]}
 				renderItem={renderItem}
 				horizontal
 				pagingEnabled
@@ -464,7 +624,7 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 				style={styles.flatList}
 			/>
 			<View style={styles.paginationContainer}>
-				{[0, 1, 2, 3].map((index) => (
+				{[0, 1, 2, 3, 4].map((index) => (
 					<View
 						key={index}
 						style={[
@@ -472,7 +632,8 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 							(index === currentIndex ||
 								(currentIndex > 0 && index === currentIndex - 1) ||
 								index === currentIndex - 2 ||
-								index === currentIndex - 3) &&
+								index === currentIndex - 3 ||
+								index === currentIndex - 4) &&
 								styles.paginationDotActive,
 						]}
 					/>
@@ -486,7 +647,7 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 				) : (
 					<View style={styles.navButton} />
 				)}
-				{currentIndex < 3 && (
+				{currentIndex < 4 && (
 					<Pressable
 						onPress={handleNext}
 						style={[styles.navButton, styles.nextButton]}
@@ -758,6 +919,66 @@ const styles = StyleSheet.create({
 		color: '#0095FF',
 		fontWeight: '600',
 		fontSize: 18,
+	},
+	categoryContainer: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		gap: 8,
+		marginBottom: 12,
+	},
+	categoryButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		padding: 12,
+		borderRadius: 8,
+		backgroundColor: 'white',
+		borderWidth: 1,
+		borderColor: '#e5e7eb',
+		flex: 1,
+		minWidth: '45%',
+	},
+	selectedCategory: {
+		borderColor: '#0095FF',
+		backgroundColor: '#f0f9ff',
+	},
+	categoryIcon: {
+		width: 24,
+		height: 24,
+		borderRadius: 4,
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginRight: 8,
+	},
+	categoryIconText: {
+		fontSize: 12,
+		fontWeight: 'bold',
+		color: 'white',
+	},
+	categoryText: {
+		fontSize: 14,
+		color: '#374151',
+		flex: 1,
+	},
+	selectedCategoryText: {
+		color: '#0095FF',
+		fontWeight: '600',
+	},
+	loadingContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		paddingVertical: 40,
+	},
+	loadingText: {
+		fontSize: 16,
+		fontWeight: 'bold',
+		color: '#374151',
+	},
+	subtitle: {
+		fontSize: 16,
+		color: '#6b7280',
+		textAlign: 'center',
+		marginBottom: 24,
 	},
 });
 

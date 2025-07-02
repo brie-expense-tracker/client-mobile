@@ -128,4 +128,44 @@ export class UserService {
 
 		return response.data?.profile || null;
 	}
+
+	static async deleteUserAccount(): Promise<void> {
+		const response = await ApiService.delete<{ message: string }>('/users/me');
+
+		if (!response.success) {
+			throw new Error(response.error || 'Failed to delete user account');
+		}
+	}
+
+	static async syncFirebaseAccount(
+		firebaseUID: string,
+		email: string,
+		name?: string
+	): Promise<CreateUserResponse> {
+		const response = await ApiService.post<CreateUserResponse>(
+			'/users/sync-firebase',
+			{ firebaseUID, email, name }
+		);
+
+		if (!response.success || !response.data?.user || !response.data?.profile) {
+			throw new Error(response.error || 'Failed to sync Firebase account');
+		}
+
+		return response.data;
+	}
+
+	static async getSyncStats(): Promise<{
+		totalUsers: number;
+		usersWithFirebaseUID: number;
+		usersWithoutFirebaseUID: number;
+		syncPercentage: number;
+	}> {
+		const response = await ApiService.get<{ stats: any }>('/users/sync-stats');
+
+		if (!response.success || !response.data?.stats) {
+			throw new Error(response.error || 'Failed to get sync stats');
+		}
+
+		return response.data.stats;
+	}
 }
