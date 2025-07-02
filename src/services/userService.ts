@@ -43,6 +43,41 @@ export interface Profile {
 			aiSuggestion: boolean;
 			budgetMilestones: boolean;
 		};
+		budgetSettings?: {
+			cycleType: 'monthly' | 'weekly' | 'biweekly';
+			cycleStart: number;
+			alertPct: number;
+			carryOver: boolean;
+			autoSync: boolean;
+		};
+		goalSettings?: {
+			defaults: {
+				target: number;
+				dueDays: number;
+				sortBy: 'percent' | 'name' | 'date';
+				currency: string;
+			};
+			ai: {
+				enabled: boolean;
+				tone: 'friendly' | 'technical' | 'minimal';
+				frequency: 'low' | 'medium' | 'high';
+				whatIf: boolean;
+			};
+			notifications: {
+				milestoneAlerts: boolean;
+				weeklySummary: boolean;
+				offTrackAlert: boolean;
+			};
+			display: {
+				showCompleted: boolean;
+				autoArchive: boolean;
+				rounding: 'none' | '1' | '5';
+			};
+			security: {
+				lockEdit: boolean;
+				undoWindow: number;
+			};
+		};
 	};
 	createdAt: string;
 	updatedAt: string;

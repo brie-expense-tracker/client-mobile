@@ -5,6 +5,7 @@ import React, { useEffect } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { AuthProvider } from '../src/context/AuthContext';
 import { OnboardingProvider } from '../src/context/OnboardingContext';
+import { ProfileProvider } from '../src/context/profileContext';
 import useAuth from '../src/context/AuthContext';
 import { useOnboarding } from '../src/context/OnboardingContext';
 
@@ -29,7 +30,7 @@ function RootLayoutContent() {
 				console.log(
 					'User authenticated but needs onboarding, navigating to onboarding'
 				);
-				router.replace('/(onboarding)/onboardingOne');
+				router.replace('/(onboarding)/onboardingThree');
 			} else if (hasSeenOnboarding && !inTabsGroup) {
 				// User has seen onboarding - show main app
 				console.log(
@@ -79,7 +80,9 @@ export default function RootLayout() {
 	return (
 		<AuthProvider>
 			<OnboardingProvider>
-				<RootLayoutContent />
+				<ProfileProvider>
+					<RootLayoutContent />
+				</ProfileProvider>
 			</OnboardingProvider>
 		</AuthProvider>
 	);

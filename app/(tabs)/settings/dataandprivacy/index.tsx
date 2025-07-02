@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
 	SafeAreaView,
 	ScrollView,
@@ -7,21 +7,36 @@ import {
 	Switch,
 	StyleSheet,
 	Alert,
-	Linking,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { router, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Stack } from 'expo-router';
 import { RectButton } from 'react-native-gesture-handler';
+import { useProfile } from '../../../../src/context/profileContext';
 
 export default function DataPrivacySettingsScreen() {
 	const router = useRouter();
+	const { profile, updateAIInsightsSettings } = useProfile();
 
-	// Toggle states (replace with values from backend or context)
-	const [shareAnalytics, setShareAnalytics] = useState(true);
+	// Initialize state from profile
 	const [aiDataConsent, setAiDataConsent] = useState(true);
-	const [personalizedOffers, setPersonalizedOffers] = useState(false);
-	const [emailUpdates, setEmailUpdates] = useState(true);
+
+	// Update local state when profile loads
+	useEffect(() => {
+		if (profile?.preferences?.aiInsights) {
+			setAiDataConsent(profile.preferences.aiInsights.enabled);
+		}
+	}, [profile]);
+
+	// Handle AI data consent toggle
+	const handleAiDataConsentChange = async (value: boolean) => {
+		try {
+			setAiDataConsent(value);
+			await updateAIInsightsSettings({ enabled: value });
+		} catch (error) {
+			Alert.alert('Error', 'Failed to update AI insights settings');
+			setAiDataConsent(!value); // Revert on error
+		}
+	};
 
 	return (
 		<SafeAreaView style={styles.safe}>
@@ -30,43 +45,19 @@ export default function DataPrivacySettingsScreen() {
 				{/* ----- Data Collection ----- */}
 				<Section title="Data Collection">
 					<SectionSubtext>
-						Control how your data is used to improve the app and provide
+						Control how your data is used to provide AI-powered financial
 						insights
 					</SectionSubtext>
 					<Row
-						label="Share anonymous analytics"
-						value={shareAnalytics}
-						onValueChange={setShareAnalytics}
-					/>
-					<Row
 						label="Allow spending data for AI insights"
 						value={aiDataConsent}
-						onValueChange={setAiDataConsent}
+						onValueChange={handleAiDataConsentChange}
 					/>
-				</Section>
-
-				{/* ----- Personalization & Ads ----- */}
-				<Section title="Personalization">
-					<SectionSubtext>
-						Customize your experience with personalized content and offers
-					</SectionSubtext>
-					<Row
-						label="Show personalized offers"
-						value={personalizedOffers}
-						onValueChange={setPersonalizedOffers}
-					/>
-				</Section>
-
-				{/* ----- Notifications & Marketing ----- */}
-				<Section title="Notifications & Marketing">
-					<SectionSubtext>
-						Manage how we communicate with you about updates and features
-					</SectionSubtext>
-					<Row
-						label="Product update emails"
-						value={emailUpdates}
-						onValueChange={setEmailUpdates}
-					/>
+					<Text style={styles.settingDescription}>
+						When enabled, your transaction data is used to generate personalized
+						financial insights and recommendations. Data is processed securely
+						and never shared with third parties.
+					</Text>
 				</Section>
 
 				{/* ----- Account & Data Control ----- */}
@@ -157,6 +148,13 @@ const styles = StyleSheet.create({
 		borderBottomColor: '#efefef',
 	},
 	rowLabel: { fontSize: 16, color: '#333', flexShrink: 1 },
+	settingDescription: {
+		fontSize: 14,
+		color: '#666',
+		marginTop: 8,
+		lineHeight: 20,
+		fontStyle: 'italic',
+	},
 	linkText: { color: '#007AFF' },
 	actionButton: {
 		paddingVertical: 12,

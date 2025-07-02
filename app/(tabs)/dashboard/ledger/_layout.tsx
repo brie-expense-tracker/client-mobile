@@ -1,8 +1,8 @@
 // _layout.tsx
 import { router, Stack } from 'expo-router';
 import { createContext, useState } from 'react';
-import { Transaction } from '../../../src/data/transactions';
-import { FilterProvider } from '../../../src/context/filterContext';
+import { Transaction } from '../../../../src/data/transactions';
+import { FilterProvider } from '../../../../src/context/filterContext';
 import { BorderlessButton } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 

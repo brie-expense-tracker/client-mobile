@@ -1,5 +1,3 @@
-import { View, Text, Image, TouchableOpacity } from 'react-native';
-import React, { ReactNode } from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TransactionProvider } from '../../src/context/transactionContext';
@@ -46,13 +44,13 @@ export default function TabLayout() {
 								}}
 							/>
 							<Tabs.Screen
-								name="ledger"
+								name="insights"
 								options={{
 									tabBarIcon: ({ color, size }) => (
 										<Ionicons name="timer-outline" color={color} size={size} />
 									),
 									tabBarShowLabel: false,
-									tabBarLabel: 'Ledger',
+									tabBarLabel: 'Insights',
 								}}
 							/>
 							<Tabs.Screen

@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = 'http://localhost:3000/api'; // Updated to include /api prefix
+const API_BASE_URL = __DEV__
+	? 'http://192.168.1.65:3000/api' // Your computer's local IP address
+	: 'https://your-production-api.com/api';
 
 export interface ApiResponse<T = any> {
 	success: boolean;
@@ -16,13 +18,20 @@ export class ApiService {
 		// Debug: Log the Firebase UID being used
 		console.log('ApiService - Firebase UID from AsyncStorage:', firebaseUID);
 
+		// Use the actual Firebase UID from AsyncStorage
+		if (!firebaseUID) {
+			console.error('ApiService - No Firebase UID found in AsyncStorage');
+			throw new Error('User not authenticated');
+		}
+
 		const headers = {
 			'Content-Type': 'application/json',
-			...(firebaseUID && { 'x-firebase-uid': firebaseUID }),
+			'x-firebase-uid': firebaseUID,
 		};
 
 		// Debug: Log the final headers
 		console.log('ApiService - Final headers:', headers);
+		console.log('ApiService - Using Firebase UID:', firebaseUID);
 
 		return headers;
 	}
