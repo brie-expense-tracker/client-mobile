@@ -7,6 +7,7 @@ import {
 	confirmPasswordReset,
 	updatePassword,
 	createUserWithEmailAndPassword,
+	signInWithEmailAndPassword,
 } from '@react-native-firebase/auth';
 import type { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import { UserService, User, Profile } from '../services/userService';
@@ -40,35 +41,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	useEffect(() => {
 		// Listen for Firebase auth state changes
 		const unsubscribe = onAuthStateChanged(getAuth(), async (firebaseUser) => {
+			console.log(
+				'AuthContext - Firebase auth state changed:',
+				firebaseUser ? 'User signed in' : 'User signed out'
+			);
+
 			setFirebaseUser(firebaseUser);
 
 			if (firebaseUser) {
-				// User is signed in
+				console.log('AuthContext - User signed in, UID:', firebaseUser.uid);
+				// User is signed in - always store the Firebase UID
+				await AsyncStorage.setItem('firebaseUID', firebaseUser.uid);
+				console.log('AuthContext - Firebase UID stored in AsyncStorage');
+
 				try {
 					// Try to get user from MongoDB
+					console.log('AuthContext - Fetching user from MongoDB...');
 					const mongoUser = await UserService.getUserByFirebaseUID(
 						firebaseUser.uid
 					);
 					if (mongoUser) {
+						console.log('AuthContext - User found in MongoDB:', mongoUser._id);
 						setUser(mongoUser);
 						// Fetch the user's profile
 						const userProfile = await UserService.getProfileByUserId(
 							mongoUser._id
 						);
 						setProfile(userProfile);
-						await AsyncStorage.setItem('firebaseUID', firebaseUser.uid);
 					} else {
+						console.log(
+							'AuthContext - User not found in MongoDB, will be handled during signup'
+						);
 						// User exists in Firebase but not in MongoDB
 						// This will be handled during signup flow
 						setUser(null);
 						setProfile(null);
 					}
 				} catch (error) {
-					console.error('Error fetching user from MongoDB:', error);
+					console.error(
+						'AuthContext - Error fetching user from MongoDB:',
+						error
+					);
 					setUser(null);
 					setProfile(null);
+					// Note: Firebase UID is still stored in AsyncStorage above
 				}
 			} else {
+				console.log('AuthContext - User signed out, clearing data');
 				// User is signed out
 				setUser(null);
 				setProfile(null);
@@ -120,8 +139,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				setProfile(userProfile);
 				await AsyncStorage.setItem('firebaseUID', firebaseUser.uid);
 			} else {
-				// User doesn't exist in MongoDB, create them
-				await createUserInMongoDB(firebaseUser);
+				// User doesn't exist in MongoDB, try to sync first
+				try {
+					console.log(
+						'User not found in MongoDB, attempting to sync Firebase account...'
+					);
+					const syncResult = await UserService.syncFirebaseAccount(
+						firebaseUser.uid,
+						firebaseUser.email!,
+						firebaseUser.displayName || undefined
+					);
+					setUser(syncResult.user);
+					setProfile(syncResult.profile);
+					await AsyncStorage.setItem('firebaseUID', firebaseUser.uid);
+				} catch (syncError) {
+					console.error(
+						'Error syncing Firebase account during login:',
+						syncError
+					);
+					// Fallback to createUserInMongoDB if sync fails
+					await createUserInMongoDB(firebaseUser);
+				}
 			}
 		} catch (error) {
 			console.error('Error during login:', error);
@@ -212,8 +250,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		} catch (error: any) {
 			console.error('Signup error:', error);
 
+			// Handle specific Firebase errors
+			if (error.code === 'auth/email-already-in-use') {
+				// Firebase account exists but MongoDB might not
+				try {
+					// Try to sign in with the existing Firebase account
+					const userCredential = await getAuth().signInWithEmailAndPassword(
+						email,
+						password
+					);
+					const existingFirebaseUser = userCredential.user;
+
+					// Check if user exists in MongoDB
+					const mongoUser = await UserService.getUserByFirebaseUID(
+						existingFirebaseUser.uid
+					);
+
+					if (mongoUser) {
+						// User exists in both Firebase and MongoDB, log them in
+						console.log(
+							'User exists in both Firebase and MongoDB, logging in...'
+						);
+						await login(existingFirebaseUser);
+						return;
+					} else {
+						// Firebase account exists but MongoDB doesn't - populate MongoDB
+						console.log(
+							"Firebase account exists but MongoDB doesn't, populating MongoDB..."
+						);
+						try {
+							// Try to sync the Firebase account with MongoDB
+							const syncResult = await UserService.syncFirebaseAccount(
+								existingFirebaseUser.uid,
+								existingFirebaseUser.email!,
+								name
+							);
+							setUser(syncResult.user);
+							setProfile(syncResult.profile);
+							await AsyncStorage.setItem(
+								'firebaseUID',
+								existingFirebaseUser.uid
+							);
+							return;
+						} catch (syncError) {
+							console.error('Error syncing Firebase account:', syncError);
+							// Fallback to createUserInMongoDB if sync fails
+							await createUserInMongoDB(existingFirebaseUser, name);
+							return;
+						}
+					}
+				} catch (signInError: any) {
+					console.error('Error signing in with existing account:', signInError);
+					// If sign in fails, it means the password is wrong
+					throw new Error(
+						'An account with this email already exists. Please use the correct password to sign in.'
+					);
+				}
+			}
+
 			// If Firebase user was created but MongoDB creation failed, delete the Firebase user
-			if (firebaseUser) {
+			if (firebaseUser && error.code !== 'auth/email-already-in-use') {
 				try {
 					await firebaseUser.delete();
 					console.log(

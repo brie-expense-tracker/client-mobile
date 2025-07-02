@@ -13,10 +13,18 @@ export class ApiService {
 	private static async getAuthHeaders(): Promise<Record<string, string>> {
 		const firebaseUID = await AsyncStorage.getItem('firebaseUID');
 
-		return {
+		// Debug: Log the Firebase UID being used
+		console.log('ApiService - Firebase UID from AsyncStorage:', firebaseUID);
+
+		const headers = {
 			'Content-Type': 'application/json',
 			...(firebaseUID && { 'x-firebase-uid': firebaseUID }),
 		};
+
+		// Debug: Log the final headers
+		console.log('ApiService - Final headers:', headers);
+
+		return headers;
 	}
 
 	static async get<T>(endpoint: string): Promise<ApiResponse<T>> {

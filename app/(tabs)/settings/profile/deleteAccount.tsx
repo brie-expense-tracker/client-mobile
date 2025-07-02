@@ -10,21 +10,38 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { RectButton } from 'react-native-gesture-handler';
-import { getAuth, deleteUser } from '@react-native-firebase/auth';
+import {
+	getAuth,
+	deleteUser,
+	EmailAuthProvider,
+	reauthenticateWithCredential,
+} from '@react-native-firebase/auth';
+import { UserService } from '../../../../src/services/userService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function DeleteAccountScreen() {
 	const router = useRouter();
 	const [confirmText, setConfirmText] = useState('');
+	const [password, setPassword] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
 	const [isDeleted, setIsDeleted] = useState(false);
 
 	const isDeleteButtonEnabled = () => {
-		return confirmText.trim().toLowerCase() === 'delete' && !isLoading;
+		return (
+			confirmText.trim().toLowerCase() === 'delete' &&
+			password.trim() !== '' &&
+			!isLoading
+		);
 	};
 
 	const handleDeleteAccount = async () => {
 		if (confirmText.trim().toLowerCase() !== 'delete') {
 			Alert.alert('Error', 'Please type "DELETE" to confirm');
+			return;
+		}
+
+		if (password.trim() === '') {
+			Alert.alert('Error', 'Please enter your password');
 			return;
 		}
 
@@ -43,29 +60,68 @@ export default function DeleteAccountScreen() {
 						setIsLoading(true);
 						try {
 							const user = getAuth().currentUser!;
-							deleteUser(user);
+
+							// Debug: Log current user info
+							console.log('Current Firebase user:', {
+								uid: user.uid,
+								email: user.email,
+							});
+
+							// Debug: Check AsyncStorage
+							const storedFirebaseUID = await AsyncStorage.getItem(
+								'firebaseUID'
+							);
+							console.log(
+								'Stored Firebase UID in AsyncStorage:',
+								storedFirebaseUID
+							);
+
+							// Re-authenticate the user before deleting
+							const credential = EmailAuthProvider.credential(
+								user.email!,
+								password
+							);
+							await reauthenticateWithCredential(user, credential);
+
+							// First, delete all user data from the backend
+							await UserService.deleteUserAccount();
+
+							// Clear all local storage data
+							await AsyncStorage.clear();
+
+							// Then delete the Firebase user
+							await deleteUser(user);
 							setIsDeleted(true);
 
-							if (isDeleted) {
+							Alert.alert(
+								'Account Deleted',
+								'Your account has been permanently deleted.',
+								[
+									{
+										text: 'OK',
+									},
+								]
+							);
+						} catch (error: any) {
+							console.error('Error deleting account:', error);
+
+							// Handle specific Firebase auth errors
+							if (error.code === 'auth/wrong-password') {
 								Alert.alert(
-									'Account Deleted',
-									'Your account has been permanently deleted.',
-									[
-										{
-											text: 'OK',
-											onPress: () => {
-												// Navigate to login or onboarding
-												router.replace('/(auth)/login-test');
-											},
-										},
-									]
+									'Authentication Error',
+									'Incorrect password. Please try again.'
+								);
+							} else if (error.code === 'auth/too-many-requests') {
+								Alert.alert(
+									'Too Many Attempts',
+									'Too many failed attempts. Please try again later.'
 								);
 							} else {
-								Alert.alert('Error', 'Failed to delete account');
+								Alert.alert(
+									'Error',
+									'Failed to delete account. Please try again.'
+								);
 							}
-						} catch (error) {
-							console.error('Error deleting account:', error);
-							Alert.alert('Error', 'Failed to delete account');
 						} finally {
 							setIsLoading(false);
 						}
@@ -101,6 +157,20 @@ export default function DeleteAccountScreen() {
 						/>
 					</View>
 
+					<View style={styles.inputContainer}>
+						<Text style={styles.label}>Enter Your Password</Text>
+						<TextInput
+							style={styles.textInput}
+							value={password}
+							onChangeText={setPassword}
+							placeholder="Enter your password"
+							placeholderTextColor="#999"
+							secureTextEntry={true}
+							autoCapitalize="none"
+							autoCorrect={false}
+						/>
+					</View>
+
 					<View style={styles.infoContainer}>
 						<Ionicons
 							name="information-circle-outline"
@@ -109,7 +179,8 @@ export default function DeleteAccountScreen() {
 						/>
 						<Text style={styles.infoText}>
 							By deleting your account, you will lose access to all your
-							financial data and this action cannot be reversed.
+							financial data and this action cannot be reversed. You will need
+							to enter your password to confirm this action.
 						</Text>
 					</View>
 
