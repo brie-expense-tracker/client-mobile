@@ -20,10 +20,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Calendar } from 'react-native-calendars';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Transaction } from '../../../src/data/transactions';
-import { TransactionContext } from '../../../src/context/transactionContext';
-import { FilterContext } from '../../../src/context/filterContext';
-import { TransactionRow } from '../../../src/components/transactionRow';
+import { Transaction } from '../../../../src/data/transactions';
+import { TransactionContext } from '../../../../src/context/transactionContext';
+import { FilterContext } from '../../../../src/context/filterContext';
+import { TransactionRow } from '../../../../src/components/transactionRow';
 
 // =============================================
 // Utility Functions
@@ -200,7 +200,7 @@ export default function TransactionScreen() {
 	// Edit modal handlers
 	const showEditModal = (transaction: Transaction) => {
 		router.push({
-			pathname: '/ledger/edit',
+			pathname: '/dashboard/ledger/edit',
 			params: { id: transaction.id },
 		});
 	};

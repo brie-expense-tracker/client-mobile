@@ -83,62 +83,56 @@ export default function EditPasswordScreen() {
 
 	return (
 		<SafeAreaView style={styles.safeAreaContainer}>
-			<ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-				<View style={styles.mainContainer}>
-					<Image
-						source={require('../../../../src/assets/images/brie-logos.png')}
-						style={styles.logo}
-						resizeMode="contain"
+			<View style={styles.mainContainer}>
+				<View style={styles.formContainer}>
+					<View style={styles.iconContainer}>
+						<Ionicons name="lock-open-outline" size={48} color="#007AFF" />
+					</View>
+					<Text style={styles.title}>Change Your Password</Text>
+					<Text style={styles.subtitle}>
+						Enter your email address and we'll send you a link to change your
+						password.
+					</Text>
+
+					<Text style={styles.label}>Email Address</Text>
+					<TextInput
+						style={[styles.input]}
+						placeholder="Enter your email"
+						placeholderTextColor="#888"
+						value={email}
+						onChangeText={handleEmailChange}
+						keyboardType="email-address"
+						autoCapitalize="none"
+						autoCorrect={false}
+						autoComplete="email"
 					/>
-					<View style={styles.formContainer}>
-						<View style={styles.iconContainer}>
-							<Ionicons name="lock-open-outline" size={48} color="#007AFF" />
-						</View>
-						<Text style={styles.title}>Change Your Password</Text>
-						<Text style={styles.subtitle}>
-							Enter your email address and we'll send you a link to change your
-							password.
+
+					<RectButton
+						style={[
+							styles.actionButton,
+							!emailIsValid && styles.buttonDisabled,
+						]}
+						onPress={handlePasswordChange}
+						enabled={!loading && emailIsValid}
+					>
+						<Text style={styles.actionButtonText}>
+							{loading ? 'Sending...' : 'Send Password Change Email'}
 						</Text>
+					</RectButton>
 
-						<Text style={styles.label}>Email Address</Text>
-						<TextInput
-							style={[styles.input]}
-							placeholder="Enter your email"
-							placeholderTextColor="#888"
-							value={email}
-							onChangeText={handleEmailChange}
-							keyboardType="email-address"
-							autoCapitalize="none"
-							autoCorrect={false}
-							autoComplete="email"
+					<View style={styles.infoContainer}>
+						<Ionicons
+							name="information-circle-outline"
+							size={16}
+							color="#666"
 						/>
-
-						<View style={styles.buttonContainer}>
-							<RectButton
-								style={[styles.button, !emailIsValid && styles.buttonDisabled]}
-								onPress={handlePasswordChange}
-								enabled={!loading && emailIsValid}
-							>
-								<Text style={styles.buttonText}>
-									{loading ? 'Sending...' : 'Send Password Change Email'}
-								</Text>
-							</RectButton>
-						</View>
-
-						<View style={styles.infoContainer}>
-							<Ionicons
-								name="information-circle-outline"
-								size={16}
-								color="#666"
-							/>
-							<Text style={styles.infoText}>
-								The password change link will expire in 1 hour for security
-								reasons.
-							</Text>
-						</View>
+						<Text style={styles.infoText}>
+							The password change link will expire in 1 hour for security
+							reasons.
+						</Text>
 					</View>
 				</View>
-			</ScrollView>
+			</View>
 		</SafeAreaView>
 	);
 }
@@ -148,20 +142,16 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: '#ffffff',
 	},
-	content: {
-		flex: 1,
-	},
 	mainContainer: {
 		flex: 1,
 		paddingHorizontal: 24,
+		justifyContent: 'center',
+		marginBottom: 100,
 	},
-	logo: {
-		width: 100,
-		height: 40,
-		marginVertical: 20,
-	},
+
 	formContainer: {
-		backgroundColor: '#FFF',
+		flex: 1,
+		justifyContent: 'center',
 	},
 	iconContainer: {
 		alignItems: 'center',
@@ -215,6 +205,26 @@ const styles = StyleSheet.create({
 		alignSelf: 'center',
 		backgroundColor: '#0095FF',
 	},
+	actionButton: {
+		paddingVertical: 12,
+		alignItems: 'center',
+		borderRadius: 8,
+		backgroundColor: '#007AFF',
+		marginTop: 10,
+		borderWidth: 1,
+		borderColor: '#ddd',
+	},
+	actionButtonText: { color: '#FFF', fontSize: 16, fontWeight: '600' },
+	actionButtonDisabled: {
+		paddingVertical: 12,
+		alignItems: 'center',
+		borderRadius: 8,
+		backgroundColor: '#EFEFF4',
+		marginTop: 10,
+		borderWidth: 1,
+		borderColor: '#ddd',
+	},
+
 	buttonDisabled: {
 		backgroundColor: '#aeafb1',
 	},

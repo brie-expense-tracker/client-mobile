@@ -13,9 +13,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { TransactionContext } from '../../../src/context/transactionContext';
+import { TransactionContext } from '../../../../src/context/transactionContext';
 import { Calendar } from 'react-native-calendars';
-import { Category } from '../../../src/data/transactions';
+import { Category } from '../../../../src/data/transactions';
 
 /**
  * EditTransactionScreen - Component for editing existing transactions

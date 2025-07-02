@@ -1,5 +1,5 @@
 /* budgetSettings.tsx — keeps it lightweight & self-contained */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
 	SafeAreaView,
 	ScrollView,
@@ -9,18 +9,100 @@ import {
 	StyleSheet,
 	TextInput,
 	TouchableOpacity,
+	Alert,
+	ActivityIndicator,
 } from 'react-native';
 import { Stack } from 'expo-router';
+import { useProfile } from '../../../../src/context/profileContext';
 
 export default function BudgetSettingsScreen() {
-	/* Local state → replace with Context / Redux / backend fetch later */
+	const { profile, loading, updateBudgetSettings } = useProfile();
+
+	/* Local state for form inputs */
 	const [cycleType, setCycleType] = useState<'monthly' | 'weekly' | 'biweekly'>(
 		'monthly'
 	);
-	const [cycleStart, setCycleStart] = useState('1'); // 1 = 1st of month | 0 = Sunday
-	const [alertPct, setAlertPct] = useState('80'); // overspend threshold
+	const [cycleStart, setCycleStart] = useState('1');
+	const [alertPct, setAlertPct] = useState('80');
 	const [carryOver, setCarryOver] = useState(false);
 	const [autoSync, setAutoSync] = useState(true);
+	const [saving, setSaving] = useState(false);
+
+	// Load settings from profile when available
+	useEffect(() => {
+		if (profile?.preferences?.budgetSettings) {
+			const settings = profile.preferences.budgetSettings;
+			setCycleType(settings.cycleType);
+			setCycleStart(settings.cycleStart.toString());
+			setAlertPct(settings.alertPct.toString());
+			setCarryOver(settings.carryOver);
+			setAutoSync(settings.autoSync);
+		}
+	}, [profile]);
+
+	const handleSave = async () => {
+		try {
+			setSaving(true);
+
+			// Validate inputs
+			const cycleStartNum = parseInt(cycleStart);
+			const alertPctNum = parseInt(alertPct);
+
+			if (
+				cycleType === 'monthly' &&
+				(cycleStartNum < 1 || cycleStartNum > 28)
+			) {
+				Alert.alert(
+					'Invalid Input',
+					'Monthly cycle start must be between 1 and 28'
+				);
+				return;
+			}
+
+			if (cycleType !== 'monthly' && (cycleStartNum < 0 || cycleStartNum > 6)) {
+				Alert.alert(
+					'Invalid Input',
+					'Weekly cycle start must be between 0 (Sunday) and 6 (Saturday)'
+				);
+				return;
+			}
+
+			if (alertPctNum < 1 || alertPctNum > 100) {
+				Alert.alert(
+					'Invalid Input',
+					'Alert percentage must be between 1 and 100'
+				);
+				return;
+			}
+
+			await updateBudgetSettings({
+				cycleType,
+				cycleStart: cycleStartNum,
+				alertPct: alertPctNum,
+				carryOver,
+				autoSync,
+			});
+
+			Alert.alert('Success', 'Budget settings saved successfully');
+		} catch (error) {
+			console.error('Error saving budget settings:', error);
+			Alert.alert('Error', 'Failed to save budget settings');
+		} finally {
+			setSaving(false);
+		}
+	};
+
+	if (loading) {
+		return (
+			<SafeAreaView style={styles.safe}>
+				<Stack.Screen options={{ title: 'Budget Settings' }} />
+				<View style={styles.loadingContainer}>
+					<ActivityIndicator size="large" color="#007AFF" />
+					<Text style={styles.loadingText}>Loading settings...</Text>
+				</View>
+			</SafeAreaView>
+		);
+	}
 
 	return (
 		<SafeAreaView style={styles.safe}>
@@ -104,6 +186,19 @@ export default function BudgetSettingsScreen() {
 						onValueChange={setAutoSync}
 					/>
 				</Section>
+
+				{/* Save Button */}
+				<TouchableOpacity
+					style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+					onPress={handleSave}
+					disabled={saving}
+				>
+					{saving ? (
+						<ActivityIndicator size="small" color="#fff" />
+					) : (
+						<Text style={styles.saveButtonText}>Save Settings</Text>
+					)}
+				</TouchableOpacity>
 			</ScrollView>
 		</SafeAreaView>
 	);
@@ -202,4 +297,18 @@ const styles = StyleSheet.create({
 		padding: 10,
 		fontSize: 16,
 	},
+	loadingContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	loadingText: { fontSize: 16, color: '#666', marginTop: 12 },
+	saveButton: {
+		backgroundColor: '#007AFF',
+		padding: 12,
+		borderRadius: 8,
+		alignItems: 'center',
+	},
+	saveButtonDisabled: { backgroundColor: '#ccc' },
+	saveButtonText: { fontSize: 16, color: '#fff', fontWeight: 'bold' },
 });

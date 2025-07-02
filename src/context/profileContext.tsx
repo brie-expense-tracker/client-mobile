@@ -21,6 +21,52 @@ interface ProfilePreferences {
 		aiSuggestion: boolean;
 		budgetMilestones: boolean;
 	};
+	aiInsights: {
+		enabled: boolean;
+		frequency: 'daily' | 'weekly' | 'monthly';
+		pushNotifications: boolean;
+		emailAlerts: boolean;
+		insightTypes: {
+			budgetingTips: boolean;
+			expenseReduction: boolean;
+			incomeSuggestions: boolean;
+		};
+	};
+	budgetSettings: {
+		cycleType: 'monthly' | 'weekly' | 'biweekly';
+		cycleStart: number;
+		alertPct: number;
+		carryOver: boolean;
+		autoSync: boolean;
+	};
+	goalSettings: {
+		defaults: {
+			target: number;
+			dueDays: number;
+			sortBy: 'percent' | 'name' | 'date';
+			currency: string;
+		};
+		ai: {
+			enabled: boolean;
+			tone: 'friendly' | 'technical' | 'minimal';
+			frequency: 'low' | 'medium' | 'high';
+			whatIf: boolean;
+		};
+		notifications: {
+			milestoneAlerts: boolean;
+			weeklySummary: boolean;
+			offTrackAlert: boolean;
+		};
+		display: {
+			showCompleted: boolean;
+			autoArchive: boolean;
+			rounding: 'none' | '1' | '5';
+		};
+		security: {
+			lockEdit: boolean;
+			undoWindow: number;
+		};
+	};
 }
 
 interface RiskProfile {
@@ -64,6 +110,15 @@ interface ProfileContextType {
 	) => Promise<void>;
 	updateNotificationSettings: (
 		settings: Partial<ProfilePreferences['notifications']>
+	) => Promise<void>;
+	updateAIInsightsSettings: (
+		settings: Partial<ProfilePreferences['aiInsights']>
+	) => Promise<void>;
+	updateBudgetSettings: (
+		settings: Partial<ProfilePreferences['budgetSettings']>
+	) => Promise<void>;
+	updateGoalSettings: (
+		settings: Partial<ProfilePreferences['goalSettings']>
 	) => Promise<void>;
 	refreshProfile: () => Promise<void>;
 }
@@ -166,6 +221,52 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 						overspendingAlert: false,
 						aiSuggestion: true,
 						budgetMilestones: false,
+					},
+					aiInsights: {
+						enabled: true,
+						frequency: 'weekly',
+						pushNotifications: true,
+						emailAlerts: false,
+						insightTypes: {
+							budgetingTips: true,
+							expenseReduction: true,
+							incomeSuggestions: true,
+						},
+					},
+					budgetSettings: {
+						cycleType: 'monthly',
+						cycleStart: 1,
+						alertPct: 80,
+						carryOver: false,
+						autoSync: true,
+					},
+					goalSettings: {
+						defaults: {
+							target: 1000,
+							dueDays: 90,
+							sortBy: 'percent',
+							currency: 'USD',
+						},
+						ai: {
+							enabled: true,
+							tone: 'friendly',
+							frequency: 'medium',
+							whatIf: true,
+						},
+						notifications: {
+							milestoneAlerts: true,
+							weeklySummary: false,
+							offTrackAlert: true,
+						},
+						display: {
+							showCompleted: true,
+							autoArchive: true,
+							rounding: '1',
+						},
+						security: {
+							lockEdit: false,
+							undoWindow: 24,
+						},
 					},
 				},
 			};
@@ -306,6 +407,138 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 		}
 	};
 
+	const updateAIInsightsSettings = async (
+		settings: Partial<ProfilePreferences['aiInsights']>
+	) => {
+		if (!user || !firebaseUser) {
+			throw new Error('User not authenticated');
+		}
+
+		try {
+			setError(null);
+
+			const response = await ApiService.put<ProfilePreferences['aiInsights']>(
+				'/profiles/ai-insights',
+				settings
+			);
+
+			if (response.success && response.data) {
+				// Update the profile state with new AI insights settings
+				setProfile((prev) =>
+					prev
+						? {
+								...prev,
+								preferences: {
+									...prev.preferences,
+									aiInsights: {
+										...prev.preferences.aiInsights,
+										...response.data,
+									},
+								},
+						  }
+						: null
+				);
+			} else {
+				throw new Error(
+					response.error || 'Failed to update AI insights settings'
+				);
+			}
+		} catch (err) {
+			console.error('Error updating AI insights settings:', err);
+			setError(
+				err instanceof Error
+					? err.message
+					: 'Failed to update AI insights settings'
+			);
+			throw err;
+		}
+	};
+
+	const updateBudgetSettings = async (
+		settings: Partial<ProfilePreferences['budgetSettings']>
+	) => {
+		if (!user || !firebaseUser) {
+			throw new Error('User not authenticated');
+		}
+
+		try {
+			setError(null);
+
+			const response = await ApiService.put<
+				ProfilePreferences['budgetSettings']
+			>('/profiles/budget-settings', settings);
+
+			if (response.success && response.data) {
+				// Update the profile state with new budget settings
+				setProfile((prev) =>
+					prev
+						? {
+								...prev,
+								preferences: {
+									...prev.preferences,
+									budgetSettings: {
+										...prev.preferences.budgetSettings,
+										...response.data,
+									},
+								},
+						  }
+						: null
+				);
+			} else {
+				throw new Error(response.error || 'Failed to update budget settings');
+			}
+		} catch (err) {
+			console.error('Error updating budget settings:', err);
+			setError(
+				err instanceof Error ? err.message : 'Failed to update budget settings'
+			);
+			throw err;
+		}
+	};
+
+	const updateGoalSettings = async (
+		settings: Partial<ProfilePreferences['goalSettings']>
+	) => {
+		if (!user || !firebaseUser) {
+			throw new Error('User not authenticated');
+		}
+
+		try {
+			setError(null);
+
+			const response = await ApiService.put<ProfilePreferences['goalSettings']>(
+				'/profiles/goal-settings',
+				settings
+			);
+
+			if (response.success && response.data) {
+				// Update the profile state with new goal settings
+				setProfile((prev) =>
+					prev
+						? {
+								...prev,
+								preferences: {
+									...prev.preferences,
+									goalSettings: {
+										...prev.preferences.goalSettings,
+										...response.data,
+									},
+								},
+						  }
+						: null
+				);
+			} else {
+				throw new Error(response.error || 'Failed to update goal settings');
+			}
+		} catch (err) {
+			console.error('Error updating goal settings:', err);
+			setError(
+				err instanceof Error ? err.message : 'Failed to update goal settings'
+			);
+			throw err;
+		}
+	};
+
 	const refreshProfile = async () => {
 		await fetchProfile();
 	};
@@ -333,6 +566,9 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 		updateProfile,
 		updatePreferences,
 		updateNotificationSettings,
+		updateAIInsightsSettings,
+		updateBudgetSettings,
+		updateGoalSettings,
 		refreshProfile,
 	};
 

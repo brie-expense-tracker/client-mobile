@@ -208,7 +208,7 @@ export default function EditFinancialScreen() {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: '#f8f9fa',
+		backgroundColor: '#ffffff',
 	},
 	content: {
 		flex: 1,

@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
 	View,
 	Text,
@@ -13,7 +13,7 @@ import {
 	Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { BorderlessButton, RectButton } from 'react-native-gesture-handler';
+import { RectButton } from 'react-native-gesture-handler';
 import { useGoal, Goal } from '../../../src/context/goalContext';
 
 const { width } = Dimensions.get('window');
@@ -107,9 +107,7 @@ export default function GoalsScreen() {
 	// ==========================================
 	// Debug logging
 	// ==========================================
-	React.useEffect(() => {
-		console.log('newGoal state changed:', newGoal);
-	}, [newGoal]);
+	useEffect(() => {}, [newGoal]);
 
 	// ==========================================
 	// Goal Management

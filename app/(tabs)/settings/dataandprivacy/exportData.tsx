@@ -8,26 +8,45 @@ import {
 	StyleSheet,
 	Alert,
 } from 'react-native';
-import axios from 'axios';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import { ApiService } from '../../../../src/services/apiService';
+
+interface Category {
+	name: string;
+	type: 'income' | 'expense';
+	color?: string;
+	icon?: string;
+	id?: string;
+}
 
 interface Transaction {
-	id: string;
+	_id: string;
+	type: 'income' | 'expense';
 	description: string;
 	amount: number;
 	date: string; // ISO-8601 (e.g. "2025-06-19T15:24:00Z")
+	categories: Category[];
+	userId?: string;
+	createdAt?: string;
+	updatedAt?: string;
 }
 
 /** Convert an array of transactions to CSV */
 const toCSV = (rows: Transaction[]) => {
 	// header
-	const header = ['Date', 'Description', 'Amount'];
+	const header = ['Date', 'Type', 'Description', 'Amount', 'Categories'];
 	const escape = (value: string | number) =>
 		`"${String(value).replace(/"/g, '""')}"`; // escape quotes
 
 	const lines = rows.map((t) =>
-		[new Date(t.date).toLocaleDateString(), t.description, t.amount.toFixed(2)]
+		[
+			new Date(t.date).toLocaleDateString(),
+			t.type,
+			t.description,
+			t.amount.toFixed(2),
+			t.categories.map((cat) => cat.name).join(', '),
+		]
 			.map(escape)
 			.join(',')
 	);
@@ -42,19 +61,22 @@ export default function DownloadDataScreen() {
 		try {
 			setLoading(true);
 
-			// 1. Fetch transactions – change URL / auth headers as needed
-			const { data } = await axios.get<Transaction[]>(
-				'https://api.example.com/transactions',
-				{
-					headers: { Authorization: 'Bearer <token>' },
-				}
-			);
+			// 1. Fetch transactions using API service
+			const response = await ApiService.get<Transaction[]>('/transactions');
+
+			if (!response.success) {
+				throw new Error(response.error || 'Failed to fetch transactions');
+			}
+
+			const transactions = response.data || [];
 
 			// 2. Convert to CSV
-			const csv = toCSV(data);
+			const csv = toCSV(transactions);
 
-			// 3. Write to a file in the app’s doc dir
-			const fileUri = FileSystem.documentDirectory + 'transactions.csv';
+			// 3. Write to a file in the app's doc dir
+			const today = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
+			const fileUri =
+				FileSystem.documentDirectory + `transactions-${today}.csv`;
 			await FileSystem.writeAsStringAsync(fileUri, csv, {
 				encoding: FileSystem.EncodingType.UTF8,
 			});
@@ -93,7 +115,7 @@ export default function DownloadDataScreen() {
 				)}
 			</TouchableOpacity>
 			<Text style={styles.hint}>
-				A share sheet will open – choose “Save to Files”, “Gmail”, etc.
+				A share sheet will open – choose "Save to Files", "Gmail", etc.
 			</Text>
 		</View>
 	);

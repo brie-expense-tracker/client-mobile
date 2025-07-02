@@ -252,60 +252,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 			// Handle specific Firebase errors
 			if (error.code === 'auth/email-already-in-use') {
-				// Firebase account exists but MongoDB might not
-				try {
-					// Try to sign in with the existing Firebase account
-					const userCredential = await getAuth().signInWithEmailAndPassword(
-						email,
-						password
-					);
-					const existingFirebaseUser = userCredential.user;
-
-					// Check if user exists in MongoDB
-					const mongoUser = await UserService.getUserByFirebaseUID(
-						existingFirebaseUser.uid
-					);
-
-					if (mongoUser) {
-						// User exists in both Firebase and MongoDB, log them in
-						console.log(
-							'User exists in both Firebase and MongoDB, logging in...'
-						);
-						await login(existingFirebaseUser);
-						return;
-					} else {
-						// Firebase account exists but MongoDB doesn't - populate MongoDB
-						console.log(
-							"Firebase account exists but MongoDB doesn't, populating MongoDB..."
-						);
-						try {
-							// Try to sync the Firebase account with MongoDB
-							const syncResult = await UserService.syncFirebaseAccount(
-								existingFirebaseUser.uid,
-								existingFirebaseUser.email!,
-								name
-							);
-							setUser(syncResult.user);
-							setProfile(syncResult.profile);
-							await AsyncStorage.setItem(
-								'firebaseUID',
-								existingFirebaseUser.uid
-							);
-							return;
-						} catch (syncError) {
-							console.error('Error syncing Firebase account:', syncError);
-							// Fallback to createUserInMongoDB if sync fails
-							await createUserInMongoDB(existingFirebaseUser, name);
-							return;
-						}
-					}
-				} catch (signInError: any) {
-					console.error('Error signing in with existing account:', signInError);
-					// If sign in fails, it means the password is wrong
-					throw new Error(
-						'An account with this email already exists. Please use the correct password to sign in.'
-					);
-				}
+				// An account with this email already exists - don't log them in automatically
+				throw new Error(
+					'An account with this email already exists. Please log in instead.'
+				);
 			}
 
 			// If Firebase user was created but MongoDB creation failed, delete the Firebase user

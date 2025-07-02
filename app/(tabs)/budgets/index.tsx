@@ -109,7 +109,7 @@ export default function BudgetScreen() {
 	// Debug logging
 	// ==========================================
 	useEffect(() => {
-		console.log('newBudget state changed:', newBudget);
+
 	}, [newBudget]);
 
 	// ==========================================

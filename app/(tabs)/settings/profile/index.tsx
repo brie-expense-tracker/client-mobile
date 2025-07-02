@@ -157,13 +157,6 @@ export default function AccountScreen() {
 					/>
 
 					<Setting
-						icon="call-outline"
-						label="Phone"
-						value={profile.phone || 'Not set'}
-						onPress={() => router.push('/settings/profile/editPhone')}
-					/>
-
-					<Setting
 						icon="mail-outline"
 						label="Email"
 						value={user?.email || 'Not set'}

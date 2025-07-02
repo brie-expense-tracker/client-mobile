@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
 	SafeAreaView,
 	ScrollView,
@@ -9,11 +9,16 @@ import {
 	StyleSheet,
 	Platform,
 	TouchableOpacity,
+	Alert,
+	ActivityIndicator,
 } from 'react-native';
 import { Stack } from 'expo-router';
+import { useProfile } from '../../../../src/context/profileContext';
 
 export default function GoalSettingsScreen() {
-	// Defaults
+	const { profile, loading, updateGoalSettings } = useProfile();
+
+	// Local state for form inputs
 	const [defaultTarget, setDefaultTarget] = useState('1000');
 	const [defaultDueDays, setDefaultDueDays] = useState('90');
 	const [defaultSort, setDefaultSort] = useState<'percent' | 'name' | 'date'>(
@@ -44,6 +49,121 @@ export default function GoalSettingsScreen() {
 	// Security
 	const [lockEdit, setLockEdit] = useState(false);
 	const [undoWindow, setUndoWindow] = useState('24');
+
+	const [saving, setSaving] = useState(false);
+
+	// Load settings from profile when available
+	useEffect(() => {
+		if (profile?.preferences?.goalSettings) {
+			const settings = profile.preferences.goalSettings;
+
+			// Defaults
+			setDefaultTarget(settings.defaults.target.toString());
+			setDefaultDueDays(settings.defaults.dueDays.toString());
+			setDefaultSort(settings.defaults.sortBy);
+			setDefaultCurrency(settings.defaults.currency);
+
+			// AI
+			setAiEnabled(settings.ai.enabled);
+			setAiTone(settings.ai.tone);
+			setAiFrequency(settings.ai.frequency);
+			setAiWhatIf(settings.ai.whatIf);
+
+			// Notifications
+			setMilestoneAlerts(settings.notifications.milestoneAlerts);
+			setWeeklySummary(settings.notifications.weeklySummary);
+			setOffTrackAlert(settings.notifications.offTrackAlert);
+
+			// Display
+			setShowCompleted(settings.display.showCompleted);
+			setAutoArchive(settings.display.autoArchive);
+			setRounding(settings.display.rounding);
+
+			// Security
+			setLockEdit(settings.security.lockEdit);
+			setUndoWindow(settings.security.undoWindow.toString());
+		}
+	}, [profile]);
+
+	const handleSave = async () => {
+		try {
+			setSaving(true);
+
+			// Validate inputs
+			const targetNum = parseFloat(defaultTarget);
+			const dueDaysNum = parseInt(defaultDueDays);
+			const undoWindowNum = parseInt(undoWindow);
+
+			if (targetNum < 0) {
+				Alert.alert('Invalid Input', 'Default target must be positive');
+				return;
+			}
+
+			if (dueDaysNum < 1 || dueDaysNum > 3650) {
+				Alert.alert(
+					'Invalid Input',
+					'Default due days must be between 1 and 3650'
+				);
+				return;
+			}
+
+			if (undoWindowNum < 1 || undoWindowNum > 168) {
+				Alert.alert(
+					'Invalid Input',
+					'Undo window must be between 1 and 168 hours'
+				);
+				return;
+			}
+
+			await updateGoalSettings({
+				defaults: {
+					target: targetNum,
+					dueDays: dueDaysNum,
+					sortBy: defaultSort,
+					currency: defaultCurrency,
+				},
+				ai: {
+					enabled: aiEnabled,
+					tone: aiTone,
+					frequency: aiFrequency,
+					whatIf: aiWhatIf,
+				},
+				notifications: {
+					milestoneAlerts,
+					weeklySummary,
+					offTrackAlert,
+				},
+				display: {
+					showCompleted,
+					autoArchive,
+					rounding,
+				},
+				security: {
+					lockEdit,
+					undoWindow: undoWindowNum,
+				},
+			});
+
+			Alert.alert('Success', 'Goal settings saved successfully');
+		} catch (error) {
+			console.error('Error saving goal settings:', error);
+			Alert.alert('Error', 'Failed to save goal settings');
+		} finally {
+			setSaving(false);
+		}
+	};
+
+	if (loading) {
+		return (
+			<SafeAreaView style={styles.safe}>
+				<Stack.Screen options={{ title: 'Goal Settings' }} />
+				<View style={styles.loadingContainer}>
+					<ActivityIndicator size="large" color="#007AFF" />
+					<Text style={styles.loadingText}>Loading settings...</Text>
+				</View>
+			</SafeAreaView>
+		);
+	}
 
 	return (
 		<SafeAreaView style={styles.safe}>
@@ -240,6 +360,19 @@ export default function GoalSettingsScreen() {
 						onChangeText={setUndoWindow}
 					/>
 				</Section>
+
+				{/* Save Button */}
+				<TouchableOpacity
+					style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+					onPress={handleSave}
+					disabled={saving}
+				>
+					{saving ? (
+						<ActivityIndicator size="small" color="#fff" />
+					) : (
+						<Text style={styles.saveButtonText}>Save Settings</Text>
+					)}
+				</TouchableOpacity>
 			</ScrollView>
 		</SafeAreaView>
 	);
@@ -336,5 +469,31 @@ const styles = StyleSheet.create({
 		borderRadius: 8,
 		padding: 10,
 		fontSize: 16,
+	},
+	loadingContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	loadingText: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#007AFF',
+		marginTop: 12,
+	},
+	saveButton: {
+		backgroundColor: '#007AFF',
+		borderRadius: 8,
+		padding: 16,
+		alignItems: 'center',
+		marginTop: 24,
+	},
+	saveButtonDisabled: {
+		backgroundColor: '#ccc',
+	},
+	saveButtonText: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#fff',
 	},
 });

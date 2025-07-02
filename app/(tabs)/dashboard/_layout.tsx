@@ -36,6 +36,7 @@ export default function _layout() {
 					),
 				}}
 			/>
+			<Stack.Screen name="ledger" options={{ headerShown: false }} />
 		</Stack>
 	);
 }

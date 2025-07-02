@@ -56,8 +56,12 @@ export default function Signup() {
 			console.error('Signup error:', error);
 
 			let errorMessage = 'An error occurred during signup.';
-			if (error.code === 'auth/email-already-in-use') {
-				errorMessage = 'An account with this email already exists.';
+			if (
+				error.code === 'auth/email-already-in-use' ||
+				error.message?.includes('already exists')
+			) {
+				errorMessage =
+					'An account with this email already exists. Please log in instead.';
 			} else if (error.code === 'auth/weak-password') {
 				errorMessage = 'Password is too weak.';
 			} else if (error.code === 'auth/invalid-email') {
