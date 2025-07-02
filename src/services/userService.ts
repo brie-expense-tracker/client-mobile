@@ -6,6 +6,7 @@ export interface User {
 	_id: string;
 	firebaseUID: string;
 	email: string;
+	onboardingVersion: number;
 	createdAt: string;
 }
 

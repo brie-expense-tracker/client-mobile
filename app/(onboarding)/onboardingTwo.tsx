@@ -45,7 +45,7 @@ export default function OnboardingTwo() {
 					<BorderlessButton
 						onActiveStateChange={setIsPressed}
 						onPress={() => {
-							router.replace('/login');
+							router.replace('/(auth)/login');
 						}}
 					>
 						<Text style={styles.loginLink}>Log In</Text>

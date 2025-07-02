@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { OnboardingService } from '../services/onboardingService';
+import useAuth from './AuthContext'; // Import useAuth
 
 interface OnboardingContextType {
 	hasSeenOnboarding: boolean | null;
@@ -17,8 +18,13 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
 	const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean | null>(
 		null
 	);
+	const { user, loading: authLoading } = useAuth(); // Get user and loading
 
 	const refreshOnboardingStatus = async () => {
+		if (!user) {
+			setHasSeenOnboarding(null);
+			return;
+		}
 		try {
 			const onboardingSeen = await OnboardingService.hasSeenOnboarding();
 			setHasSeenOnboarding(onboardingSeen);
@@ -27,6 +33,14 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
 			setHasSeenOnboarding(false);
 		}
 	};
+
+	useEffect(() => {
+		if (!user || authLoading) {
+			setHasSeenOnboarding(null);
+			return;
+		}
+		refreshOnboardingStatus();
+	}, [user, authLoading]);
 
 	const markOnboardingComplete = async () => {
 		try {
@@ -37,10 +51,6 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
 			throw error;
 		}
 	};
-
-	useEffect(() => {
-		refreshOnboardingStatus();
-	}, []);
 
 	return (
 		<OnboardingContext.Provider

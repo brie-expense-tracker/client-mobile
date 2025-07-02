@@ -30,12 +30,28 @@ export class ApiService {
 	static async get<T>(endpoint: string): Promise<ApiResponse<T>> {
 		try {
 			const headers = await this.getAuthHeaders();
-			const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+			const url = `${API_BASE_URL}${endpoint}`;
+
+			// Debug: Log the request details
+			console.log('ApiService GET - URL:', url);
+			console.log('ApiService GET - Headers:', headers);
+
+			const response = await fetch(url, {
 				method: 'GET',
 				headers,
 			});
 
+			// Debug: Log the response status
+			console.log('ApiService GET - Response status:', response.status);
+			console.log('ApiService GET - Response ok:', response.ok);
+
 			const data = await response.json();
+
+			// Debug: Log the raw server response
+			console.log(
+				'ApiService GET - Raw server response:',
+				JSON.stringify(data, null, 2)
+			);
 
 			if (!response.ok) {
 				return {
