@@ -27,6 +27,23 @@ export interface AIInsight {
 		}>;
 		comparisonPeriod: string;
 		percentageChange: number;
+		historicalComparison?: {
+			previousPeriod: {
+				totalIncome: number;
+				totalExpenses: number;
+				netIncome: number;
+				topCategories: Array<{
+					name: string;
+					amount: number;
+					percentage: number;
+				}>;
+			};
+			percentageChanges: {
+				income: number;
+				expenses: number;
+				netIncome: number;
+			};
+		};
 	};
 	generatedAt: string;
 	createdAt: string;

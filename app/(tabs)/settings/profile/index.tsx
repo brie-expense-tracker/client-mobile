@@ -225,22 +225,6 @@ export default function AccountScreen() {
 }
 
 const styles = StyleSheet.create({
-	mainContainer: {
-		flex: 1,
-		backgroundColor: '#fff',
-	},
-	stickyHeader: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		paddingHorizontal: 24,
-		paddingVertical: 16,
-		backgroundColor: '#fff',
-		borderBottomWidth: 1,
-		borderBottomColor: '#efefef',
-		marginTop: 50,
-		zIndex: 1000,
-	},
 	scrollView: {
 		flex: 1,
 		backgroundColor: '#ffffff',
