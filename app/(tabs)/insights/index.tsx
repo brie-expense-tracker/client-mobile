@@ -17,7 +17,6 @@ import {
 	AIInsight,
 } from '../../../src/services/insightsService';
 import useAuth from '../../../src/context/AuthContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function InsightsHubScreen() {
 	const router = useRouter();
@@ -25,34 +24,10 @@ export default function InsightsHubScreen() {
 	const [insights, setInsights] = useState<AIInsight[] | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [generating, setGenerating] = useState(false);
-	const [debugInfo, setDebugInfo] = useState<any>(null);
 
 	useEffect(() => {
 		fetchInsights();
-		getDebugInfo();
 	}, []);
-
-	async function getDebugInfo() {
-		try {
-			const firebaseUID = await AsyncStorage.getItem('firebaseUID');
-			setDebugInfo({
-				firebaseUID,
-				user: user ? { id: user._id, email: user.email } : null,
-				profile: profile
-					? {
-							aiInsightsEnabled: (profile.preferences as any)?.aiInsights
-								?.enabled,
-							aiInsightsSettings: (profile.preferences as any)?.aiInsights,
-					  }
-					: null,
-				firebaseUser: firebaseUser
-					? { uid: firebaseUser.uid, email: firebaseUser.email }
-					: null,
-			});
-		} catch (error) {
-			console.error('Error getting debug info:', error);
-		}
-	}
 
 	async function fetchInsights() {
 		try {
@@ -215,32 +190,6 @@ export default function InsightsHubScreen() {
 		<SafeAreaView style={styles.safe}>
 			<Text style={styles.header}>AI Coach</Text>
 
-			{/* Debug Information */}
-			{debugInfo && (
-				<View style={styles.debugContainer}>
-					<Text style={styles.debugTitle}>Debug Info:</Text>
-					<Text style={styles.debugText}>
-						Firebase UID: {debugInfo.firebaseUID || 'Not found'}
-					</Text>
-					<Text style={styles.debugText}>
-						User: {debugInfo.user ? `ID: ${debugInfo.user.id}` : 'Not found'}
-					</Text>
-					<Text style={styles.debugText}>
-						Profile: {debugInfo.profile ? 'Found' : 'Not found'}
-					</Text>
-					<Text style={styles.debugText}>
-						AI Insights Enabled:{' '}
-						{debugInfo.profile?.aiInsightsEnabled ? 'Yes' : 'No'}
-					</Text>
-					<Text style={styles.debugText}>
-						Firebase User:{' '}
-						{debugInfo.firebaseUser
-							? `UID: ${debugInfo.firebaseUser.uid}`
-							: 'Not found'}
-					</Text>
-				</View>
-			)}
-
 			<ScrollView contentContainerStyle={styles.container}>
 				{insights && insights.length > 0 ? (
 					insights.map((insight) => (
@@ -263,11 +212,9 @@ export default function InsightsHubScreen() {
 					<View style={styles.emptyState}>
 						<Text style={styles.emptyText}>No insights available yet.</Text>
 						<Text style={styles.emptySubtext}>
-							Add some transactions to generate insights, or try generating test
-							insights.
+							Add some transactions to generate insights.
 						</Text>
 
-						{/* Debug button for generating test insights */}
 						<Pressable
 							style={[
 								styles.generateButton,
@@ -279,92 +226,12 @@ export default function InsightsHubScreen() {
 							{generating ? (
 								<ActivityIndicator size="small" color="#fff" />
 							) : (
-								<Text style={styles.generateButtonText}>
-									Generate Test Insights
-								</Text>
+								<Text style={styles.generateButtonText}>Generate Insights</Text>
 							)}
 						</Pressable>
 
 						<Pressable style={styles.refreshButton} onPress={fetchInsights}>
 							<Text style={styles.refreshButtonText}>Refresh</Text>
-						</Pressable>
-
-						{/* Debug button to create test user */}
-						<Pressable
-							style={[styles.generateButton, { backgroundColor: '#ff6b6b' }]}
-							onPress={async () => {
-								try {
-									if (firebaseUser) {
-										const response = await fetch(
-											'http://192.168.1.65:3000/api/users/sync-firebase',
-											{
-												method: 'POST',
-												headers: {
-													'Content-Type': 'application/json',
-												},
-												body: JSON.stringify({
-													firebaseUID: firebaseUser.uid,
-													email: firebaseUser.email,
-													name: firebaseUser.displayName || 'Test User',
-												}),
-											}
-										);
-										const result = await response.json();
-										console.log('Sync result:', result);
-										Alert.alert('Success', 'User synced successfully!');
-										getDebugInfo(); // Refresh debug info
-									} else {
-										Alert.alert('Error', 'No Firebase user found');
-									}
-								} catch (error) {
-									console.error('Error syncing user:', error);
-									Alert.alert('Error', 'Failed to sync user');
-								}
-							}}
-						>
-							<Text style={styles.generateButtonText}>
-								Sync User to MongoDB
-							</Text>
-						</Pressable>
-
-						{/* Enable AI Insights button */}
-						<Pressable
-							style={[styles.generateButton, { backgroundColor: '#28a745' }]}
-							onPress={async () => {
-								try {
-									const response = await fetch(
-										'http://192.168.1.65:3000/api/profiles/ai-insights',
-										{
-											method: 'PUT',
-											headers: {
-												'Content-Type': 'application/json',
-												'x-firebase-uid':
-													(await AsyncStorage.getItem('firebaseUID')) || '',
-											},
-											body: JSON.stringify({
-												enabled: true,
-												frequency: 'weekly',
-												pushNotifications: true,
-												emailAlerts: false,
-												insightTypes: {
-													budgetingTips: true,
-													expenseReduction: true,
-													incomeSuggestions: true,
-												},
-											}),
-										}
-									);
-									const result = await response.json();
-									console.log('Enable AI insights result:', result);
-									Alert.alert('Success', 'AI insights enabled!');
-									getDebugInfo(); // Refresh debug info
-								} catch (error) {
-									console.error('Error enabling AI insights:', error);
-									Alert.alert('Error', 'Failed to enable AI insights');
-								}
-							}}
-						>
-							<Text style={styles.generateButtonText}>Enable AI Insights</Text>
 						</Pressable>
 					</View>
 				)}
@@ -461,24 +328,5 @@ const styles = StyleSheet.create({
 		color: '#666',
 		fontSize: 16,
 		fontWeight: '500',
-	},
-	debugContainer: {
-		backgroundColor: '#f0f0f0',
-		padding: 12,
-		margin: 16,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: '#ddd',
-	},
-	debugTitle: {
-		fontSize: 14,
-		fontWeight: '600',
-		color: '#333',
-		marginBottom: 8,
-	},
-	debugText: {
-		fontSize: 12,
-		color: '#666',
-		marginBottom: 4,
 	},
 });
