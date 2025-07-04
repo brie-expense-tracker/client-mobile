@@ -24,13 +24,20 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import { TransactionContext } from '../../../src/context/transactionContext';
-import { Category } from '../../../src/data/transactions';
+import { useBudget, Budget } from '../../../src/context/budgetContext';
+import { useGoal, Goal } from '../../../src/context/goalContext';
+import {
+	navigateToGoalsWithModal,
+	navigateToBudgets,
+	navigateToBudgetsWithModal,
+} from '../../../src/utils/navigationUtils';
 
 interface TransactionFormData {
 	type: 'income' | 'expense';
 	description: string;
 	amount: string;
-	categories: Category[];
+	goals: Goal[];
+	budgets: Budget[];
 	date: string;
 }
 
@@ -48,13 +55,16 @@ const getLocalIsoDate = (): string => {
 const AddTransactionScreen = () => {
 	const router = useRouter();
 	const amountInputRef = useRef<TextInput>(null);
-	const [selectedCategories, setSelectedCategories] = useState<Category[]>([]);
+	const [selectedGoals, setSelectedGoals] = useState<Goal[]>([]);
+	const [selectedBudgets, setSelectedBudgets] = useState<Budget[]>([]);
 	const [resetNumberPad, setResetNumberPad] = useState(false);
 	const [fontsLoaded] = useFonts({
 		...Ionicons.font,
 	});
-	const { transactions, categories, isLoading, addTransaction } =
+	const { transactions, isLoading, addTransaction } =
 		useContext(TransactionContext);
+	const { goals, isLoading: goalsLoading } = useGoal();
+	const { budgets, isLoading: budgetsLoading } = useBudget();
 
 	const { control, handleSubmit, setValue, watch } =
 		useForm<TransactionFormData>({
@@ -62,7 +72,8 @@ const AddTransactionScreen = () => {
 				type: 'income',
 				description: '',
 				amount: '',
-				categories: [],
+				goals: [],
+				budgets: [],
 				date: getLocalIsoDate(),
 			},
 		});
@@ -99,7 +110,7 @@ const AddTransactionScreen = () => {
 	}, [amount]);
 
 	// Show loading screen if fonts are not loaded
-	if (!fontsLoaded) {
+	if (!fontsLoaded || goalsLoading || budgetsLoading) {
 		return (
 			<View style={styles.loadingContainer}>
 				<ActivityIndicator size="large" color="#0095FF" />
@@ -120,10 +131,7 @@ const AddTransactionScreen = () => {
 			const transactionData = {
 				description: data.description,
 				amount: amount,
-				categories: data.categories.map((cat) => ({
-					name: cat.name,
-					type: cat.type,
-				})),
+				categories: [], // Keep empty categories for backward compatibility
 				date: data.date,
 				type: data.type,
 			};
@@ -137,11 +145,13 @@ const AddTransactionScreen = () => {
 			// Reset form values
 			setValue('description', '');
 			setValue('amount', ''); // Reset to empty string to show placeholder
-			setValue('categories', []);
+			setValue('goals', []);
+			setValue('budgets', []);
 			setValue('date', getLocalIsoDate());
 
-			// Reset selected category
-			setSelectedCategories([]);
+			// Reset selected goals and budgets
+			setSelectedGoals([]);
+			setSelectedBudgets([]);
 
 			// Reset NumberPad
 			setResetNumberPad(true);
@@ -153,30 +163,22 @@ const AddTransactionScreen = () => {
 		}
 	};
 
-	const currentCategories = useMemo(() => {
-		// Get unique categories from both transactions and the categories list
-		const transactionCategories = transactions
-			.flatMap((t) => t.categories)
-			.filter(
-				(cat, index, arr) => arr.findIndex((c) => c.name === cat.name) === index
-			);
+	const toggleGoalSelection = (goal: Goal) => {
+		const newSelectedGoals = selectedGoals.some((g) => g.id === goal.id)
+			? selectedGoals.filter((g) => g.id !== goal.id)
+			: [...selectedGoals, goal];
 
-		// Combine with categories from context and remove duplicates
-		const allCategories = [...categories, ...transactionCategories];
-		return allCategories.filter(
-			(cat, index, arr) => arr.findIndex((c) => c.name === cat.name) === index
-		);
-	}, [transactions, categories]);
+		setSelectedGoals(newSelectedGoals);
+		setValue('goals', newSelectedGoals);
+	};
 
-	const toggleCategorySelection = (category: Category) => {
-		const newSelectedCategories = selectedCategories.some(
-			(cat) => cat.name === category.name
-		)
-			? selectedCategories.filter((c) => c.name !== category.name)
-			: [...selectedCategories, category];
+	const toggleBudgetSelection = (budget: Budget) => {
+		const newSelectedBudgets = selectedBudgets.some((b) => b.id === budget.id)
+			? selectedBudgets.filter((b) => b.id !== budget.id)
+			: [...selectedBudgets, budget];
 
-		setSelectedCategories(newSelectedCategories);
-		setValue('categories', newSelectedCategories);
+		setSelectedBudgets(newSelectedBudgets);
+		setValue('budgets', newSelectedBudgets);
 	};
 
 	//
@@ -214,34 +216,88 @@ const AddTransactionScreen = () => {
 							/>
 						</View>
 
-						{/* Carousel */}
+						{/* Goals Carousel */}
 						<View style={styles.carouselContainer}>
+							<Text style={styles.carouselLabel}>Goals</Text>
 							<ScrollView horizontal showsHorizontalScrollIndicator={false}>
-								{currentCategories.map((category, index) => (
+								{goals.map((goal, index) => (
 									<RectButton
 										key={index}
-										onPress={() => toggleCategorySelection(category)}
+										onPress={() => toggleGoalSelection(goal)}
 										style={[
 											styles.carouselTextWrapper,
-											selectedCategories.some(
-												(cat) => cat.name === category.name
-											) && styles.selectedTag,
+											selectedGoals.some((g) => g.id === goal.id) &&
+												styles.selectedTag,
 										]}
 									>
-										<Text
-											style={
-												selectedCategories.some(
-													(cat) => cat.name === category.name
-												) && styles.selectedTagText
+										<Ionicons
+											name={goal.icon as keyof typeof Ionicons.glyphMap}
+											size={16}
+											color={
+												selectedGoals.some((g) => g.id === goal.id)
+													? 'white'
+													: goal.color
 											}
+											style={styles.carouselIcon}
+										/>
+										<Text
+											style={[
+												styles.carouselText,
+												selectedGoals.some((g) => g.id === goal.id) &&
+													styles.selectedTagText,
+											]}
 										>
-											{category.name}
+											{goal.name}
 										</Text>
 									</RectButton>
 								))}
 								<RectButton
-									onPress={() => router.replace('/settings/categories')}
-									style={styles.addCategoryButton}
+									onPress={navigateToGoalsWithModal}
+									style={styles.addButton}
+								>
+									<Ionicons name="add-outline" size={24} color="grey" />
+								</RectButton>
+							</ScrollView>
+						</View>
+
+						{/* Budgets Carousel */}
+						<View style={styles.carouselContainer}>
+							<Text style={styles.carouselLabel}>Budgets</Text>
+							<ScrollView horizontal showsHorizontalScrollIndicator={false}>
+								{budgets.map((budget, index) => (
+									<RectButton
+										key={index}
+										onPress={() => toggleBudgetSelection(budget)}
+										style={[
+											styles.carouselTextWrapper,
+											selectedBudgets.some((b) => b.id === budget.id) &&
+												styles.selectedTag,
+										]}
+									>
+										<Ionicons
+											name={budget.icon as keyof typeof Ionicons.glyphMap}
+											size={16}
+											color={
+												selectedBudgets.some((b) => b.id === budget.id)
+													? 'white'
+													: budget.color
+											}
+											style={styles.carouselIcon}
+										/>
+										<Text
+											style={[
+												styles.carouselText,
+												selectedBudgets.some((b) => b.id === budget.id) &&
+													styles.selectedTagText,
+											]}
+										>
+											{budget.category}
+										</Text>
+									</RectButton>
+								))}
+								<RectButton
+									onPress={navigateToBudgetsWithModal}
+									style={styles.addButton}
 								>
 									<Ionicons name="add-outline" size={24} color="grey" />
 								</RectButton>
@@ -549,7 +605,8 @@ const styles = StyleSheet.create({
 		marginBottom: 10,
 	},
 	carouselTextWrapper: {
-		fontSize: 16,
+		flexDirection: 'row',
+		alignItems: 'center',
 		marginHorizontal: 5,
 		color: '#333',
 		padding: 8,
@@ -564,7 +621,7 @@ const styles = StyleSheet.create({
 	selectedTagText: {
 		color: 'white',
 	},
-	addCategoryButton: {
+	addButton: {
 		padding: 8,
 		justifyContent: 'center',
 		alignItems: 'center',
@@ -580,34 +637,16 @@ const styles = StyleSheet.create({
 		fontWeight: 'bold',
 		marginTop: 10,
 	},
-	selectedCategoriesContainer: {
+	carouselLabel: {
+		fontSize: 18,
+		fontWeight: 'bold',
 		marginBottom: 10,
 	},
-	selectedCategoriesLabel: {
-		fontSize: 16,
-		fontWeight: '600',
-		marginBottom: 8,
-		color: '#666',
-	},
-	selectedCategoryChip: {
-		backgroundColor: '#0095FF',
-		borderRadius: 20,
-		paddingHorizontal: 12,
-		paddingVertical: 6,
+	carouselIcon: {
 		marginRight: 8,
-		flexDirection: 'row',
-		alignItems: 'center',
 	},
-	selectedCategoryText: {
-		color: 'white',
-		fontSize: 14,
-		fontWeight: '500',
-		marginRight: 4,
-	},
-	removeCategoryButton: {
-		padding: 2,
-		justifyContent: 'center',
-		alignItems: 'center',
+	carouselText: {
+		fontSize: 16,
 	},
 });
 

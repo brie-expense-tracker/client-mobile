@@ -19,6 +19,7 @@ export interface Goal {
 	deadline: string;
 	icon: string;
 	color: string;
+	categories: string[];
 	userId?: string;
 	createdAt?: string;
 	updatedAt?: string;
@@ -30,6 +31,7 @@ export interface CreateGoalData {
 	deadline: string;
 	icon: string;
 	color: string;
+	categories: string[];
 }
 
 export interface UpdateGoalData {
@@ -39,6 +41,7 @@ export interface UpdateGoalData {
 	deadline?: string;
 	icon?: string;
 	color?: string;
+	categories?: string[];
 }
 
 interface GoalContextType {
@@ -92,6 +95,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 					deadline: goal.deadline,
 					icon: goal.icon,
 					color: goal.color,
+					categories: Array.isArray(goal.categories) ? goal.categories : [],
 					userId: goal.userId,
 					createdAt: goal.createdAt,
 					updatedAt: goal.updatedAt,
@@ -149,6 +153,9 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 					deadline: actualData.deadline,
 					icon: actualData.icon,
 					color: actualData.color,
+					categories: Array.isArray(actualData.categories)
+						? actualData.categories
+						: [],
 					userId: actualData.userId,
 					createdAt: actualData.createdAt,
 					updatedAt: actualData.updatedAt,
@@ -198,6 +205,9 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 						deadline: actualData.deadline,
 						icon: actualData.icon,
 						color: actualData.color,
+						categories: Array.isArray(actualData.categories)
+							? actualData.categories
+							: [],
 						userId: actualData.userId,
 						createdAt: actualData.createdAt,
 						updatedAt: actualData.updatedAt,
@@ -254,6 +264,9 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 						deadline: actualData.deadline,
 						icon: actualData.icon,
 						color: actualData.color,
+						categories: Array.isArray(actualData.categories)
+							? actualData.categories
+							: [],
 						userId: actualData.userId,
 						createdAt: actualData.createdAt,
 						updatedAt: actualData.updatedAt,

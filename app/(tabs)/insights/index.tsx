@@ -376,10 +376,6 @@ export default function InsightsHubScreen() {
 										</Text>
 									)}
 								</Pressable>
-
-								<Pressable style={styles.refreshButton} onPress={fetchInsights}>
-									<Text style={styles.refreshButtonText}>Refresh</Text>
-								</Pressable>
 							</View>
 						)}
 					</View>
@@ -506,17 +502,6 @@ const styles = StyleSheet.create({
 	},
 	generateButtonText: {
 		color: '#fff',
-		fontSize: 16,
-		fontWeight: '500',
-	},
-	refreshButton: {
-		backgroundColor: '#f0f0f0',
-		paddingHorizontal: 24,
-		paddingVertical: 12,
-		borderRadius: 8,
-	},
-	refreshButtonText: {
-		color: '#666',
 		fontSize: 16,
 		fontWeight: '500',
 	},

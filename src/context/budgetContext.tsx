@@ -18,6 +18,7 @@ export interface Budget {
 	spent: number;
 	icon: string;
 	color: string;
+	categories: string[];
 	userId?: string;
 	createdAt?: string;
 	updatedAt?: string;
@@ -28,6 +29,7 @@ export interface CreateBudgetData {
 	allocated: number;
 	icon: string;
 	color: string;
+	categories: string[];
 }
 
 export interface UpdateBudgetData {
@@ -36,6 +38,7 @@ export interface UpdateBudgetData {
 	spent?: number;
 	icon?: string;
 	color?: string;
+	categories?: string[];
 }
 
 interface BudgetContextType {
@@ -88,6 +91,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 					spent: Number(budget.spent) || 0,
 					icon: budget.icon,
 					color: budget.color,
+					categories: Array.isArray(budget.categories) ? budget.categories : [],
 					userId: budget.userId,
 					createdAt: budget.createdAt,
 					updatedAt: budget.updatedAt,
@@ -144,6 +148,9 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 					spent: Number(actualData.spent) || 0,
 					icon: actualData.icon,
 					color: actualData.color,
+					categories: Array.isArray(actualData.categories)
+						? actualData.categories
+						: [],
 					userId: actualData.userId,
 					createdAt: actualData.createdAt,
 					updatedAt: actualData.updatedAt,
@@ -192,6 +199,9 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 						spent: Number(actualData.spent) || 0,
 						icon: actualData.icon,
 						color: actualData.color,
+						categories: Array.isArray(actualData.categories)
+							? actualData.categories
+							: [],
 						userId: actualData.userId,
 						createdAt: actualData.createdAt,
 						updatedAt: actualData.updatedAt,
@@ -249,6 +259,9 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 						spent: Number(actualData.spent) || 0,
 						icon: actualData.icon,
 						color: actualData.color,
+						categories: Array.isArray(actualData.categories)
+							? actualData.categories
+							: [],
 						userId: actualData.userId,
 						createdAt: actualData.createdAt,
 						updatedAt: actualData.updatedAt,

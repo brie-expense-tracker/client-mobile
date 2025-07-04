@@ -11,10 +11,14 @@ import {
 	KeyboardAvoidingView,
 	Platform,
 	ActivityIndicator,
+	ScrollView,
+	SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BorderlessButton, RectButton } from 'react-native-gesture-handler';
 import { useBudget, Budget } from '../../../src/context/budgetContext';
+import { TransactionContext } from '../../../src/context/transactionContext';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
@@ -32,6 +36,28 @@ type ColorOption = {
 // ==========================================
 const CARD_WIDTH = width - 48;
 const CARD_PADDING = 16;
+
+// Popular budget icons
+const budgetIcons: (keyof typeof Ionicons.glyphMap)[] = [
+	'restaurant-outline',
+	'cart-outline',
+	'car-outline',
+	'home-outline',
+	'game-controller-outline',
+	'airplane-outline',
+	'bag-outline',
+	'fitness-outline',
+	'school-outline',
+	'gift-outline',
+	'flash-outline',
+	'call-outline',
+	'medical-outline',
+	'book-outline',
+	'musical-notes-outline',
+];
+
+// Quick amount presets
+const amountPresets = [200, 500, 1000, 2000, 5000];
 
 const COLOR_PALETTE: Record<string, ColorOption> = {
 	red: {
@@ -85,6 +111,13 @@ export default function BudgetScreen() {
 	// ==========================================
 	const { budgets, isLoading, addBudget, updateBudget, deleteBudget } =
 		useBudget();
+	const { categories } = useContext(TransactionContext);
+
+	// ==========================================
+	// Route Parameters
+	// ==========================================
+	const params = useLocalSearchParams();
+	const router = useRouter();
 
 	// ==========================================
 	// State Management
@@ -92,11 +125,15 @@ export default function BudgetScreen() {
 	const [isModalVisible, setIsModalVisible] = useState(false);
 	const [isEditModalVisible, setIsEditModalVisible] = useState(false);
 	const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
+	const [showColorPicker, setShowColorPicker] = useState(false);
+	const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+	const [showIconPicker, setShowIconPicker] = useState(false);
 	const [newBudget, setNewBudget] = useState({
 		category: '',
 		allocated: '',
 		icon: 'cart-outline' as keyof typeof Ionicons.glyphMap,
 		color: COLOR_PALETTE.blue.base,
+		categories: [] as string[],
 	});
 	const [isPressed, setIsPressed] = useState(false);
 
@@ -106,11 +143,23 @@ export default function BudgetScreen() {
 	const slideAnim = React.useRef(new Animated.Value(0)).current;
 
 	// ==========================================
-	// Debug logging
+	// Auto-open modal on navigation
 	// ==========================================
 	useEffect(() => {
+		// Check if we should auto-open the modal
+		if (params.openModal === 'true') {
+			// Small delay to ensure component is fully mounted
+			const timer = setTimeout(() => {
+				showModal();
+			}, 100);
+			return () => clearTimeout(timer);
+		}
+	}, [params.openModal]);
 
-	}, [newBudget]);
+	// ==========================================
+	// Debug logging
+	// ==========================================
+	useEffect(() => {}, [newBudget]);
 
 	// ==========================================
 	// Loading Screen Component
@@ -129,7 +178,6 @@ export default function BudgetScreen() {
 	// ==========================================
 	const handleAddBudget = async () => {
 		if (!newBudget.category || !newBudget.allocated) {
-			// You might want to add proper form validation here
 			console.log('Validation failed: missing category or allocated amount');
 			return;
 		}
@@ -142,20 +190,23 @@ export default function BudgetScreen() {
 				allocated: parseFloat(newBudget.allocated),
 				icon: newBudget.icon,
 				color: newBudget.color,
+				categories: newBudget.categories,
 			});
 
 			console.log('Budget added successfully:', result);
 
 			hideModal();
+			// Update the URL to remove the openModal parameter
+			router.setParams({ openModal: 'false' });
 			setNewBudget({
 				category: '',
 				allocated: '',
 				icon: 'cart-outline',
 				color: COLOR_PALETTE.blue.base,
+				categories: [],
 			});
 		} catch (error) {
 			console.error('Error adding budget:', error);
-			// You might want to show an error message to the user
 		}
 	};
 
@@ -170,14 +221,18 @@ export default function BudgetScreen() {
 				allocated: parseFloat(newBudget.allocated),
 				icon: newBudget.icon,
 				color: newBudget.color,
+				categories: newBudget.categories,
 			});
 
 			hideEditModal();
+			// Update the URL to remove the openModal parameter
+			router.setParams({ openModal: 'false' });
 			setNewBudget({
 				category: '',
 				allocated: '',
 				icon: 'cart-outline',
 				color: COLOR_PALETTE.blue.base,
+				categories: [],
 			});
 			setEditingBudget(null);
 		} catch (error) {
@@ -198,13 +253,16 @@ export default function BudgetScreen() {
 	// ==========================================
 	const showModal = () => {
 		console.log('showModal called - resetting newBudget state');
-		// Ensure newBudget is reset to empty values
 		setNewBudget({
 			category: '',
 			allocated: '',
 			icon: 'cart-outline' as keyof typeof Ionicons.glyphMap,
 			color: COLOR_PALETTE.blue.base,
+			categories: [],
 		});
+		setShowColorPicker(false);
+		setShowCategoryPicker(false);
+		setShowIconPicker(false);
 		setIsModalVisible(true);
 		Animated.spring(slideAnim, {
 			toValue: 1,
@@ -219,7 +277,11 @@ export default function BudgetScreen() {
 			toValue: 0,
 			duration: 200,
 			useNativeDriver: true,
-		}).start(() => setIsModalVisible(false));
+		}).start(() => {
+			setIsModalVisible(false);
+			// Update the URL to remove the openModal parameter
+			router.setParams({ openModal: 'false' });
+		});
 	};
 
 	const showEditModal = (budget: Budget) => {
@@ -229,7 +291,11 @@ export default function BudgetScreen() {
 			allocated: budget.allocated.toString(),
 			icon: budget.icon as keyof typeof Ionicons.glyphMap,
 			color: budget.color,
+			categories: budget.categories || [],
 		});
+		setShowColorPicker(false);
+		setShowCategoryPicker(false);
+		setShowIconPicker(false);
 		setIsEditModalVisible(true);
 		Animated.spring(slideAnim, {
 			toValue: 1,
@@ -247,6 +313,8 @@ export default function BudgetScreen() {
 		}).start(() => {
 			setIsEditModalVisible(false);
 			setEditingBudget(null);
+			// Update the URL to remove the openModal parameter
+			router.setParams({ openModal: 'false' });
 		});
 	};
 
@@ -256,56 +324,231 @@ export default function BudgetScreen() {
 	const ColorPicker = () => (
 		<View style={styles.colorPickerContainer}>
 			<Text style={styles.label}>Choose Color</Text>
-			<View style={styles.colorGrid}>
-				{Object.entries(COLOR_PALETTE).map(([name, colors]) => (
-					<View key={name} style={styles.colorColumn}>
-						<RectButton
-							style={styles.colorOptionContainer}
-							onPress={() => setNewBudget({ ...newBudget, color: colors.base })}
-						>
-							<View
-								style={[styles.colorSquare, { backgroundColor: colors.base }]}
+			<RectButton
+				style={styles.colorButton}
+				onPress={() => setShowColorPicker(!showColorPicker)}
+			>
+				<View style={styles.colorButtonContent}>
+					<View
+						style={[styles.colorPreview, { backgroundColor: newBudget.color }]}
+					/>
+					<Text style={styles.colorButtonText}>Choose Color</Text>
+					<Ionicons
+						name={showColorPicker ? 'chevron-up' : 'chevron-down'}
+						size={20}
+						color="#757575"
+					/>
+				</View>
+			</RectButton>
+
+			{showColorPicker && (
+				<View style={styles.colorGrid}>
+					{Object.entries(COLOR_PALETTE).map(([name, colors]) => (
+						<View key={name} style={styles.colorColumn}>
+							<RectButton
+								style={styles.colorOptionContainer}
+								onPress={() =>
+									setNewBudget({ ...newBudget, color: colors.base })
+								}
 							>
-								{newBudget.color === colors.base && (
-									<View style={styles.selectedIndicator}>
-										<Ionicons name="checkmark" size={20} color="#FFF" />
-									</View>
-								)}
-							</View>
-						</RectButton>
-						<RectButton
-							style={styles.colorOptionContainer}
-							onPress={() =>
-								setNewBudget({ ...newBudget, color: colors.pastel })
-							}
-						>
-							<View
-								style={[styles.colorSquare, { backgroundColor: colors.pastel }]}
+								<View
+									style={[styles.colorSquare, { backgroundColor: colors.base }]}
+								>
+									{newBudget.color === colors.base && (
+										<View style={styles.selectedIndicator}>
+											<Ionicons name="checkmark" size={20} color="#FFF" />
+										</View>
+									)}
+								</View>
+							</RectButton>
+							<RectButton
+								style={styles.colorOptionContainer}
+								onPress={() =>
+									setNewBudget({ ...newBudget, color: colors.pastel })
+								}
 							>
-								{newBudget.color === colors.pastel && (
-									<View style={styles.selectedIndicator}>
-										<Ionicons name="checkmark" size={20} color="#000" />
-									</View>
-								)}
-							</View>
-						</RectButton>
-						<RectButton
-							style={styles.colorOptionContainer}
-							onPress={() => setNewBudget({ ...newBudget, color: colors.dark })}
-						>
-							<View
-								style={[styles.colorSquare, { backgroundColor: colors.dark }]}
+								<View
+									style={[
+										styles.colorSquare,
+										{ backgroundColor: colors.pastel },
+									]}
+								>
+									{newBudget.color === colors.pastel && (
+										<View style={styles.selectedIndicator}>
+											<Ionicons name="checkmark" size={20} color="#000" />
+										</View>
+									)}
+								</View>
+							</RectButton>
+							<RectButton
+								style={styles.colorOptionContainer}
+								onPress={() =>
+									setNewBudget({ ...newBudget, color: colors.dark })
+								}
 							>
-								{newBudget.color === colors.dark && (
-									<View style={styles.selectedIndicator}>
-										<Ionicons name="checkmark" size={20} color="#FFF" />
-									</View>
-								)}
-							</View>
-						</RectButton>
+								<View
+									style={[styles.colorSquare, { backgroundColor: colors.dark }]}
+								>
+									{newBudget.color === colors.dark && (
+										<View style={styles.selectedIndicator}>
+											<Ionicons name="checkmark" size={20} color="#FFF" />
+										</View>
+									)}
+								</View>
+							</RectButton>
+						</View>
+					))}
+				</View>
+			)}
+		</View>
+	);
+
+	// ==========================================
+	// Icon Selection Component
+	// ==========================================
+	const IconPicker = () => (
+		<View style={styles.iconPickerContainer}>
+			<Text style={styles.label}>Choose Icon</Text>
+			<RectButton
+				style={styles.iconButton}
+				onPress={() => setShowIconPicker(!showIconPicker)}
+			>
+				<View style={styles.iconButtonContent}>
+					<View
+						style={[
+							styles.iconPreview,
+							{ backgroundColor: newBudget.color + '20' },
+						]}
+					>
+						<Ionicons
+							name={newBudget.icon as any}
+							size={24}
+							color={newBudget.color}
+						/>
 					</View>
-				))}
-			</View>
+					<Text style={styles.iconButtonText}>Choose Icon</Text>
+					<Ionicons
+						name={showIconPicker ? 'chevron-up' : 'chevron-down'}
+						size={20}
+						color="#757575"
+					/>
+				</View>
+			</RectButton>
+
+			{showIconPicker && (
+				<View style={styles.iconGrid}>
+					{budgetIcons.map((icon) => (
+						<RectButton
+							key={icon}
+							style={styles.iconOption}
+							onPress={() => {
+								setNewBudget({ ...newBudget, icon });
+								setShowIconPicker(false);
+							}}
+						>
+							<Ionicons
+								name={icon as any}
+								size={24}
+								color={newBudget.icon === icon ? 'white' : newBudget.color}
+							/>
+						</RectButton>
+					))}
+				</View>
+			)}
+		</View>
+	);
+
+	// ==========================================
+	// Category Selection Component
+	// ==========================================
+	const CategoryPicker = () => (
+		<View style={styles.categoryPickerContainer}>
+			<Text style={styles.label}>Select Categories</Text>
+			<Text style={styles.categorySubtext}>
+				Choose which spending categories contribute to this budget
+			</Text>
+			<RectButton
+				style={styles.categoryButton}
+				onPress={() => setShowCategoryPicker(!showCategoryPicker)}
+			>
+				<View style={styles.categoryButtonContent}>
+					<View style={styles.categoryButtonLeft}>
+						<View
+							style={[
+								styles.categoryIcon,
+								{ backgroundColor: newBudget.color + '20' },
+							]}
+						>
+							<Ionicons name="list" size={16} color={newBudget.color} />
+						</View>
+						<Text style={styles.categoryButtonText}>
+							{newBudget.categories.length > 0
+								? `${newBudget.categories.length} categories selected`
+								: 'Choose categories'}
+						</Text>
+					</View>
+					<Ionicons
+						name={showCategoryPicker ? 'chevron-up' : 'chevron-down'}
+						size={20}
+						color="#757575"
+					/>
+				</View>
+			</RectButton>
+
+			{showCategoryPicker && (
+				<ScrollView
+					style={styles.categoryList}
+					showsVerticalScrollIndicator={false}
+				>
+					{categories.map((category) => (
+						<RectButton
+							key={category.id}
+							style={styles.categoryOption}
+							onPress={() => {
+								const isSelected = newBudget.categories.includes(category.name);
+								if (isSelected) {
+									setNewBudget({
+										...newBudget,
+										categories: newBudget.categories.filter(
+											(cat) => cat !== category.name
+										),
+									});
+								} else {
+									setNewBudget({
+										...newBudget,
+										categories: [...newBudget.categories, category.name],
+									});
+								}
+							}}
+						>
+							<View style={styles.categoryOptionContent}>
+								<View
+									style={[
+										styles.categoryIcon,
+										{ backgroundColor: category.color + '20' },
+									]}
+								>
+									<Ionicons
+										name={category.icon as any}
+										size={16}
+										color={category.color}
+									/>
+								</View>
+								<Text style={styles.categoryName}>{category.name}</Text>
+								<View style={styles.checkboxContainer}>
+									{newBudget.categories.includes(category.name) && (
+										<Ionicons
+											name="checkmark-circle"
+											size={20}
+											color={newBudget.color}
+										/>
+									)}
+								</View>
+							</View>
+						</RectButton>
+					))}
+				</ScrollView>
+			)}
 		</View>
 	);
 
@@ -415,34 +658,36 @@ export default function BudgetScreen() {
 				animationType="fade"
 				onRequestClose={hideModal}
 			>
-				<RectButton style={styles.modalOverlay} onPress={hideModal}>
+				<SafeAreaView style={styles.safeAreaContainer}>
 					<KeyboardAvoidingView
 						behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
 						style={styles.modalContainer}
 					>
-						<RectButton onPress={() => {}}>
-							<Animated.View
-								style={[
-									styles.modalContent,
-									{
-										transform: [
-											{
-												translateY: slideAnim.interpolate({
-													inputRange: [0, 1],
-													outputRange: [600, 0],
-												}),
-											},
-										],
-									},
-								]}
+						<Animated.View
+							style={[
+								styles.modalContent,
+								{
+									transform: [
+										{
+											translateY: slideAnim.interpolate({
+												inputRange: [0, 1],
+												outputRange: [600, 0],
+											}),
+										},
+									],
+								},
+							]}
+						>
+							<View style={styles.modalHeader}>
+								<Text style={styles.modalTitle}>Add New Budget</Text>
+								<RectButton onPress={hideModal}>
+									<Ionicons name="close" size={24} color="#757575" />
+								</RectButton>
+							</View>
+							<ScrollView
+								showsVerticalScrollIndicator={false}
+								contentContainerStyle={{ paddingBottom: 24 }}
 							>
-								<View style={styles.modalHeader}>
-									<Text style={styles.modalTitle}>Add New Budget</Text>
-									<RectButton onPress={hideModal}>
-										<Ionicons name="close" size={24} color="#757575" />
-									</RectButton>
-								</View>
-
 								<View style={styles.formGroup}>
 									<Text style={styles.label}>Category Name</Text>
 									<TextInput
@@ -460,6 +705,42 @@ export default function BudgetScreen() {
 
 								<View style={styles.formGroup}>
 									<Text style={styles.label}>Budget Amount</Text>
+									<Text style={styles.amountSubtext}>
+										Set your monthly spending limit for this category
+									</Text>
+
+									{/* Quick Amount Presets */}
+									<View style={styles.amountPresetsContainer}>
+										{amountPresets.map((amount) => (
+											<RectButton
+												key={amount}
+												style={[
+													styles.amountPreset,
+													newBudget.allocated === amount.toString() &&
+														styles.selectedAmountPreset,
+												]}
+												onPress={() =>
+													setNewBudget({
+														...newBudget,
+														allocated: amount.toString(),
+													})
+												}
+											>
+												<Text
+													style={[
+														styles.amountPresetText,
+														newBudget.allocated === amount.toString() &&
+															styles.selectedAmountPresetText,
+													]}
+												>
+													${amount}
+												</Text>
+											</RectButton>
+										))}
+									</View>
+
+									{/* Custom Amount Input */}
+									<Text style={styles.inputLabel}>Or enter custom amount</Text>
 									<TextInput
 										style={styles.input}
 										value={newBudget.allocated}
@@ -473,7 +754,9 @@ export default function BudgetScreen() {
 									/>
 								</View>
 
+								<IconPicker />
 								<ColorPicker />
+								<CategoryPicker />
 
 								<RectButton
 									style={[
@@ -484,103 +767,10 @@ export default function BudgetScreen() {
 								>
 									<Text style={styles.addButtonText}>Add Budget</Text>
 								</RectButton>
-							</Animated.View>
-						</RectButton>
+							</ScrollView>
+						</Animated.View>
 					</KeyboardAvoidingView>
-				</RectButton>
-			</Modal>
-
-			{/* Edit Budget Modal */}
-			<Modal
-				visible={isEditModalVisible}
-				transparent
-				animationType="fade"
-				onRequestClose={hideEditModal}
-			>
-				<RectButton style={styles.modalOverlay} onPress={hideEditModal}>
-					<KeyboardAvoidingView
-						behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-						style={styles.modalContainer}
-					>
-						<RectButton onPress={() => {}}>
-							<Animated.View
-								style={[
-									styles.modalContent,
-									{
-										transform: [
-											{
-												translateY: slideAnim.interpolate({
-													inputRange: [0, 1],
-													outputRange: [600, 0],
-												}),
-											},
-										],
-									},
-								]}
-							>
-								<View style={styles.modalHeader}>
-									<Text style={styles.modalTitle}>Edit Budget</Text>
-									<RectButton onPress={hideEditModal}>
-										<Ionicons name="close" size={24} color="#757575" />
-									</RectButton>
-								</View>
-
-								<View style={styles.formGroup}>
-									<Text style={styles.label}>Category Name</Text>
-									<TextInput
-										style={styles.input}
-										value={newBudget.category}
-										onChangeText={(text) =>
-											setNewBudget({ ...newBudget, category: text })
-										}
-										placeholder="e.g., Groceries"
-										placeholderTextColor="#9E9E9E"
-										autoComplete="off"
-										autoCorrect={false}
-									/>
-								</View>
-
-								<View style={styles.formGroup}>
-									<Text style={styles.label}>Budget Amount</Text>
-									<TextInput
-										style={styles.input}
-										value={newBudget.allocated}
-										onChangeText={(text) =>
-											setNewBudget({ ...newBudget, allocated: text })
-										}
-										placeholder="e.g., 500"
-										keyboardType="numeric"
-										placeholderTextColor="#9E9E9E"
-										autoComplete="off"
-									/>
-								</View>
-
-								<ColorPicker />
-
-								<View style={styles.modalButtonContainer}>
-									<RectButton
-										style={[styles.addButton]}
-										onPress={handleEditBudget}
-									>
-										<Text style={styles.addButtonText}>Update Budget</Text>
-									</RectButton>
-
-									<RectButton
-										style={styles.deleteButton}
-										onPress={() => {
-											if (editingBudget) {
-												handleDeleteBudget(editingBudget.id);
-												hideEditModal();
-											}
-										}}
-									>
-										<Text style={styles.deleteButtonText}>Delete Budget</Text>
-									</RectButton>
-								</View>
-							</Animated.View>
-						</RectButton>
-					</KeyboardAvoidingView>
-				</RectButton>
+				</SafeAreaView>
 			</Modal>
 		</View>
 	);
@@ -687,16 +877,15 @@ const styles = StyleSheet.create({
 		color: '#757575',
 		textAlign: 'right',
 	},
-	modalOverlay: {
+	safeAreaContainer: {
 		flex: 1,
 		backgroundColor: 'rgba(0, 0, 0, 0.5)',
-		justifyContent: 'flex-end',
 	},
 	modalContainer: {
-		width: '100%',
+		flex: 1,
 	},
 	modalContent: {
-		backgroundColor: '#FFFFFF',
+		backgroundColor: '#ffffff',
 		borderTopLeftRadius: 20,
 		borderTopRightRadius: 20,
 		padding: 24,
@@ -758,6 +947,30 @@ const styles = StyleSheet.create({
 	colorPickerContainer: {
 		marginBottom: 10,
 	},
+	colorButton: {
+		backgroundColor: '#F5F5F5',
+		borderRadius: 12,
+		padding: 16,
+		marginBottom: 8,
+	},
+	colorButtonContent: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	colorPreview: {
+		width: 24,
+		height: 24,
+		borderRadius: 6,
+		borderWidth: 1,
+		borderColor: '#E0E0E0',
+	},
+	colorButtonText: {
+		fontSize: 16,
+		color: '#212121',
+		flex: 1,
+		marginLeft: 12,
+	},
 	colorGrid: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
@@ -787,6 +1000,156 @@ const styles = StyleSheet.create({
 		bottom: 0,
 		backgroundColor: 'rgba(0, 0, 0, 0.2)',
 		borderRadius: 8,
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	iconPickerContainer: {
+		marginBottom: 10,
+	},
+	iconButton: {
+		backgroundColor: '#F5F5F5',
+		borderRadius: 12,
+		padding: 16,
+		marginBottom: 8,
+	},
+	iconButtonContent: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	iconPreview: {
+		width: 24,
+		height: 24,
+		borderRadius: 6,
+		borderWidth: 1,
+		borderColor: '#E0E0E0',
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	iconButtonText: {
+		fontSize: 16,
+		color: '#212121',
+		flex: 1,
+		marginLeft: 12,
+	},
+	iconGrid: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		gap: 8,
+		marginTop: 2,
+	},
+	iconOption: {
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+		backgroundColor: 'white',
+		alignItems: 'center',
+		justifyContent: 'center',
+		borderWidth: 1,
+		borderColor: '#E0E0E0',
+	},
+	amountSubtext: {
+		fontSize: 12,
+		fontWeight: '500',
+		color: '#757575',
+		marginBottom: 8,
+	},
+	amountPresetsContainer: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		gap: 8,
+		marginBottom: 12,
+	},
+	amountPreset: {
+		padding: 12,
+		borderRadius: 8,
+		backgroundColor: 'white',
+		borderWidth: 1,
+		borderColor: '#E0E0E0',
+	},
+	selectedAmountPreset: {
+		borderColor: '#00a2ff',
+		backgroundColor: '#f0f9ff',
+	},
+	amountPresetText: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#212121',
+	},
+	selectedAmountPresetText: {
+		color: '#00a2ff',
+		fontWeight: '600',
+	},
+	inputLabel: {
+		fontSize: 14,
+		fontWeight: '500',
+		color: '#757575',
+		marginBottom: 8,
+	},
+	categoryPickerContainer: {
+		marginBottom: 10,
+	},
+	categoryButton: {
+		backgroundColor: '#F5F5F5',
+		borderRadius: 12,
+		padding: 16,
+		marginBottom: 8,
+	},
+	categoryButtonContent: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	categoryButtonLeft: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		flex: 1,
+	},
+	categoryButtonText: {
+		fontSize: 16,
+		color: '#212121',
+		marginLeft: 12,
+	},
+	categorySubtext: {
+		fontSize: 12,
+		fontWeight: '500',
+		color: '#757575',
+		marginBottom: 8,
+	},
+	categoryList: {
+		padding: 10,
+	},
+	categoryOption: {
+		padding: 10,
+		borderWidth: 1,
+		borderColor: '#E0E0E0',
+		borderRadius: 8,
+	},
+	categoryOptionContent: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	categoryIcon: {
+		width: 24,
+		height: 24,
+		borderRadius: 8,
+		justifyContent: 'center',
+		alignItems: 'center',
+		marginRight: 10,
+	},
+	categoryName: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#212121',
+		flex: 1,
+	},
+	checkboxContainer: {
+		width: 24,
+		height: 24,
+		borderRadius: 4,
+		borderWidth: 1,
+		borderColor: '#E0E0E0',
 		justifyContent: 'center',
 		alignItems: 'center',
 	},

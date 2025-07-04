@@ -11,51 +11,57 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, Stack } from 'expo-router';
 import { dateFilterModes } from './_layout';
 import { FilterContext } from '../../../../src/context/filterContext';
-import { TransactionContext } from '../../../../src/context/transactionContext';
+import { useBudget } from '../../../../src/context/budgetContext';
+import { useGoal } from '../../../../src/context/goalContext';
 
 export default function LedgerFilterScreen() {
 	const {
-		selectedCategories,
-		setSelectedCategories,
+		selectedGoals,
+		setSelectedGoals,
+		selectedBudgets,
+		setSelectedBudgets,
 		dateFilterMode,
 		setDateFilterMode,
 	} = useContext(FilterContext);
 
-	// --- get all transactions to derive categories ---
-	const { transactions } = useContext(TransactionContext);
+	// Get goals and budgets from context
+	const { goals } = useGoal();
+	const { budgets } = useBudget();
 
 	// Initialize local state from context
-	const [localSelectedCategories, setLocalSelectedCategories] =
-		useState<string[]>(selectedCategories);
+	const [localSelectedGoals, setLocalSelectedGoals] =
+		useState<string[]>(selectedGoals);
+	const [localSelectedBudgets, setLocalSelectedBudgets] =
+		useState<string[]>(selectedBudgets);
 	const [localDateFilterMode, setLocalDateFilterMode] =
 		useState<string>(dateFilterMode);
 
-	// --- derive available categories from the full list ---
-	const availableCategories = useMemo(() => {
-		const cats = new Set<string>();
-		transactions.forEach((tx) => {
-			tx.categories.forEach((c) => {
-				if (c.name && c.name.trim()) cats.add(c.name.trim());
-			});
-		});
-		return Array.from(cats).sort((a, b) => a.localeCompare(b));
-	}, [transactions]);
+	const handleGoalToggle = (goalId: string) => {
+		if (goalId === '') {
+			setLocalSelectedGoals([]);
+		} else if (localSelectedGoals.includes(goalId)) {
+			setLocalSelectedGoals(localSelectedGoals.filter((id) => id !== goalId));
+		} else {
+			setLocalSelectedGoals([...localSelectedGoals, goalId]);
+		}
+	};
 
-	const handleCategoryToggle = (cat: string) => {
-		if (cat === '') {
-			setLocalSelectedCategories([]);
-		} else if (localSelectedCategories.includes(cat)) {
-			setLocalSelectedCategories(
-				localSelectedCategories.filter((c) => c !== cat)
+	const handleBudgetToggle = (budgetId: string) => {
+		if (budgetId === '') {
+			setLocalSelectedBudgets([]);
+		} else if (localSelectedBudgets.includes(budgetId)) {
+			setLocalSelectedBudgets(
+				localSelectedBudgets.filter((id) => id !== budgetId)
 			);
 		} else {
-			setLocalSelectedCategories([...localSelectedCategories, cat]);
+			setLocalSelectedBudgets([...localSelectedBudgets, budgetId]);
 		}
 	};
 
 	const handleBack = () => {
 		// push edits back into global filter context
-		setSelectedCategories(localSelectedCategories);
+		setSelectedGoals(localSelectedGoals);
+		setSelectedBudgets(localSelectedBudgets);
 		setDateFilterMode(localDateFilterMode);
 		router.back();
 	};
@@ -78,28 +84,55 @@ export default function LedgerFilterScreen() {
 
 				<View style={styles.divider} />
 
-				{/* Categories */}
-				<Section title="Categories">
-					<SectionSubtext>Select which categories to include</SectionSubtext>
+				{/* Goals */}
+				<Section title="Goals">
+					<SectionSubtext>Select which goals to include (income transactions)</SectionSubtext>
 
 					{/* "All" option */}
 					<OptionRow
-						label="All Categories"
-						selected={localSelectedCategories.length === 0}
-						onPress={() => handleCategoryToggle('')}
+						label="All Goals"
+						selected={localSelectedGoals.length === 0}
+						onPress={() => handleGoalToggle('')}
 					/>
 
-					{availableCategories.length ? (
-						availableCategories.map((cat) => (
+					{goals.length ? (
+						goals.map((goal) => (
 							<OptionRow
-								key={cat}
-								label={cat}
-								selected={localSelectedCategories.includes(cat)}
-								onPress={() => handleCategoryToggle(cat)}
+								key={goal.id}
+								label={goal.name}
+								selected={localSelectedGoals.includes(goal.id)}
+								onPress={() => handleGoalToggle(goal.id)}
 							/>
 						))
 					) : (
-						<Text style={styles.noCatsText}>No categories available</Text>
+						<Text style={styles.noCatsText}>No goals available</Text>
+					)}
+				</Section>
+
+				<View style={styles.divider} />
+
+				{/* Budgets */}
+				<Section title="Budgets">
+					<SectionSubtext>Select which budgets to include (expense transactions)</SectionSubtext>
+
+					{/* "All" option */}
+					<OptionRow
+						label="All Budgets"
+						selected={localSelectedBudgets.length === 0}
+						onPress={() => handleBudgetToggle('')}
+					/>
+
+					{budgets.length ? (
+						budgets.map((budget) => (
+							<OptionRow
+								key={budget.id}
+								label={budget.category}
+								selected={localSelectedBudgets.includes(budget.id)}
+								onPress={() => handleBudgetToggle(budget.id)}
+							/>
+						))
+					) : (
+						<Text style={styles.noCatsText}>No budgets available</Text>
 					)}
 				</Section>
 			</ScrollView>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
-import { LineChart, LineChartBicolor } from 'react-native-gifted-charts';
+import { LineChart } from 'react-native-gifted-charts';
 
 interface Transaction {
 	id: string;
@@ -22,7 +22,7 @@ const SpendingTrendsGraph: React.FC<SpendingTrendsGraphProps> = ({
 	period = 'month',
 }) => {
 	const screenWidth = Dimensions.get('window').width;
-	const chartWidth = screenWidth - 40;
+	const chartWidth = screenWidth - 120; // More conservative to ensure it fits
 
 	// Get date range based on period
 	const getDateRange = () => {
@@ -80,10 +80,10 @@ const SpendingTrendsGraph: React.FC<SpendingTrendsGraphProps> = ({
 		groupedByDate.set(dateKey, existing);
 	});
 
-	// Convert to chart data
+	// Convert to chart data with alternating labels
 	const chartData = Array.from(groupedByDate.entries())
 		.sort(([a], [b]) => a.localeCompare(b))
-		.map(([date, data]) => {
+		.map(([date, data], index) => {
 			const dateObj = new Date(date);
 			const label =
 				period === 'week'
@@ -95,15 +95,51 @@ const SpendingTrendsGraph: React.FC<SpendingTrendsGraphProps> = ({
 							day: 'numeric',
 					  });
 
+			// Show label every 3rd point or at the end
+			const shouldShowLabel =
+				index % 3 === 0 || index === groupedByDate.size - 1;
+
 			return {
 				value: data.expense,
-				label,
+				...(shouldShowLabel && {
+					labelComponent: () => (
+						<Text
+							style={{
+								fontSize: 11,
+								fontWeight: '500',
+								color: '#666',
+								textAlign: 'center',
+							}}
+						>
+							{label}
+						</Text>
+					),
+				}),
+				...(index % 2 === 0
+					? { customDataPoint: dPoint }
+					: { hideDataPoint: true }),
 				date,
 				income: data.income,
 				expense: data.expense,
 				net: data.income - data.expense,
 			};
 		});
+
+	// Custom data point component
+	const dPoint = () => {
+		return (
+			<View
+				style={{
+					width: 14,
+					height: 14,
+					backgroundColor: 'white',
+					borderWidth: 3,
+					borderRadius: 7,
+					borderColor: colors.expense,
+				}}
+			/>
+		);
+	};
 
 	// Calculate summary statistics
 	const totalIncome = filteredTransactions
@@ -137,6 +173,9 @@ const SpendingTrendsGraph: React.FC<SpendingTrendsGraphProps> = ({
 		net: '#2E78B7',
 		background: '#F8F9FA',
 	};
+
+	// Use the full chart width available
+	const adjustedChartWidth = chartWidth;
 
 	return (
 		<View style={styles.container}>
@@ -183,40 +222,39 @@ const SpendingTrendsGraph: React.FC<SpendingTrendsGraphProps> = ({
 			{/* Chart */}
 			{chartData.length > 0 ? (
 				<View style={styles.chartContainer}>
-					<LineChartBicolor
-						data={chartData}
-						width={chartWidth}
-						height={200}
-						thickness={3}
-						color={colors.expense}
-						colorNegative={colors.income}
-						maxValue={
-							Math.max(...chartData.map((d) => Math.max(d.income, d.expense))) *
-							1.2
-						}
-						noOfSections={4}
-						areaChart
-						curved
-						startFillColor={colors.expense + '40'}
-						endFillColor={colors.expense + '10'}
-						startOpacity={0.4}
-						endOpacity={0.1}
-						spacing={chartWidth / (chartData.length - 1)}
-						initialSpacing={20}
-						endSpacing={20}
-						yAxisTextStyle={styles.yAxisText}
-						xAxisLabelTextStyle={styles.xAxisLabel}
-						yAxisColor="#E0E0E0"
-						xAxisColor="#E0E0E0"
-						hideRules
-						showVerticalLines
-						verticalLinesColor="#F0F0F0"
-						dataPointsHeight={8}
-						dataPointsWidth={8}
-						dataPointsColor={colors.expense}
-						dataPointsRadius={4}
-						hideDataPoints={false}
-					/>
+					<View style={styles.chartWrapper}>
+						<LineChart
+							isAnimated
+							thickness={3}
+							color={colors.expense}
+							maxValue={
+								Math.max(
+									...chartData.map((d) => Math.max(d.income, d.expense))
+								) * 1.2
+							}
+							noOfSections={4}
+							animateOnDataChange
+							animationDuration={1000}
+							onDataChangeAnimationDuration={300}
+							areaChart
+							yAxisTextStyle={styles.yAxisText}
+							data={chartData}
+							hideDataPoints
+							startFillColor={colors.expense + '40'}
+							endFillColor={colors.expense + '10'}
+							startOpacity={0.4}
+							endOpacity={0.1}
+							spacing={22}
+							backgroundColor="#FFFFFF"
+							rulesColor="#E0E0E0"
+							rulesType="solid"
+							initialSpacing={10}
+							yAxisColor="#E0E0E0"
+							xAxisColor="#E0E0E0"
+							width={adjustedChartWidth}
+							height={220}
+						/>
+					</View>
 				</View>
 			) : (
 				<View style={styles.emptyState}>
@@ -276,7 +314,6 @@ const styles = StyleSheet.create({
 		backgroundColor: '#FFFFFF',
 		borderRadius: 16,
 		padding: 20,
-		marginHorizontal: 20,
 		marginVertical: 10,
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 2 },
@@ -315,12 +352,16 @@ const styles = StyleSheet.create({
 	chartContainer: {
 		alignItems: 'center',
 		marginBottom: 20,
+		width: '100%',
+		overflow: 'visible',
+	},
+	chartWrapper: {
+		overflow: 'visible',
+		borderRadius: 12,
+		paddingBottom: 5,
+		alignItems: 'center',
 	},
 	yAxisText: {
-		fontSize: 11,
-		color: '#666',
-	},
-	xAxisLabel: {
 		fontSize: 11,
 		color: '#666',
 	},
@@ -401,11 +442,13 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		fontWeight: '600',
 		color: '#1A1A1A',
+		flexShrink: 1,
 	},
 	categoryAmount: {
 		fontSize: 12,
 		color: '#666',
 		marginTop: 2,
+		flexShrink: 1,
 	},
 	categoryPercentage: {
 		alignItems: 'flex-end',

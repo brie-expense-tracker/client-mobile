@@ -357,7 +357,15 @@ export default function GraphsDemoScreen() {
 							<Text style={styles.backToSelectorText}>Back to Graphs</Text>
 						</TouchableOpacity>
 					</View>
-					{renderSelectedGraph()}
+					<View style={styles.graphContentWrapper}>
+						<ScrollView
+							style={styles.graphScrollView}
+							contentContainerStyle={styles.graphScrollContent}
+							showsVerticalScrollIndicator={false}
+						>
+							{renderSelectedGraph()}
+						</ScrollView>
+					</View>
 				</View>
 			)}
 		</SafeAreaView>
@@ -441,6 +449,7 @@ const styles = StyleSheet.create({
 	},
 	graphContainer: {
 		flex: 1,
+		overflow: 'hidden',
 	},
 	graphHeader: {
 		paddingHorizontal: 20,
@@ -458,5 +467,17 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		fontWeight: '600',
 		color: '#2E78B7',
+	},
+	graphScrollView: {
+		flex: 1,
+		overflow: 'hidden',
+	},
+	graphScrollContent: {
+		padding: 20,
+		paddingBottom: 40,
+	},
+	graphContentWrapper: {
+		flex: 1,
+		overflow: 'hidden',
 	},
 });
