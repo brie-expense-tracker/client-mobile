@@ -128,6 +128,7 @@ export default function GoalsScreen() {
 	const [showColorPicker, setShowColorPicker] = useState(false);
 	const [showCategoryPicker, setShowCategoryPicker] = useState(false);
 	const [showIconPicker, setShowIconPicker] = useState(false);
+	const [showCustomTarget, setShowCustomTarget] = useState(false);
 	const [newGoal, setNewGoal] = useState({
 		name: '',
 		target: '',
@@ -285,6 +286,7 @@ export default function GoalsScreen() {
 		setShowColorPicker(false);
 		setShowCategoryPicker(false);
 		setShowIconPicker(false);
+		setShowCustomTarget(false);
 		setIsModalVisible(true);
 		Animated.spring(slideAnim, {
 			toValue: 1,
@@ -319,6 +321,7 @@ export default function GoalsScreen() {
 		setShowColorPicker(false);
 		setShowCategoryPicker(false);
 		setShowIconPicker(false);
+		setShowCustomTarget(false);
 		setIsEditModalVisible(true);
 		Animated.spring(slideAnim, {
 			toValue: 1,
@@ -673,130 +676,353 @@ export default function GoalsScreen() {
 				animationType="fade"
 				onRequestClose={hideModal}
 			>
-				<SafeAreaView style={styles.safeAreaContainer}>
-					<KeyboardAvoidingView
-						behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-						style={styles.modalContainer}
+				<KeyboardAvoidingView
+					behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+					style={styles.modalContainer}
+				>
+					<Animated.View
+						style={[
+							styles.modalAnimationContainer,
+							{
+								transform: [
+									{
+										translateY: slideAnim.interpolate({
+											inputRange: [0, 1],
+											outputRange: [600, 0],
+										}),
+									},
+								],
+							},
+						]}
 					>
-						<Animated.View
-							style={[
-								styles.modalContent,
-								{
-									transform: [
-										{
-											translateY: slideAnim.interpolate({
-												inputRange: [0, 1],
-												outputRange: [600, 0],
-											}),
-										},
-									],
-								},
-							]}
-						>
-							<View style={styles.modalHeader}>
-								<Text style={styles.modalTitle}>Add New Goal</Text>
-								<RectButton onPress={hideModal}>
-									<Ionicons name="close" size={24} color="#757575" />
-								</RectButton>
-							</View>
-							<ScrollView
-								showsVerticalScrollIndicator={false}
-								contentContainerStyle={{ paddingBottom: 24 }}
-							>
-								<View style={styles.formGroup}>
-									<Text style={styles.label}>Goal Name</Text>
-									<TextInput
-										style={styles.input}
-										value={newGoal.name}
-										onChangeText={(text) =>
-											setNewGoal({ ...newGoal, name: text })
-										}
-										placeholder="e.g., Emergency Fund"
-										placeholderTextColor="#9E9E9E"
-										autoComplete="off"
-										autoCorrect={false}
-									/>
+						<View style={styles.modalContainer}>
+							<View style={styles.modalContent}>
+								<View style={styles.modalHeader}>
+									<Text style={styles.modalTitle}>Add New Goal</Text>
+									<RectButton onPress={hideModal}>
+										<Ionicons name="close" size={24} color="#757575" />
+									</RectButton>
 								</View>
-
-								<View style={styles.formGroup}>
-									<Text style={styles.label}>Target Amount</Text>
-									<Text style={styles.targetSubtext}>
-										Set your target amount for this goal
-									</Text>
-
-									{/* Quick Target Presets */}
-									<View style={styles.targetPresetsContainer}>
-										{targetPresets.map((amount) => (
-											<RectButton
-												key={amount}
-												style={[
-													styles.targetPreset,
-													newGoal.target === amount.toString() &&
-														styles.selectedTargetPreset,
-												]}
-												onPress={() =>
-													setNewGoal({
-														...newGoal,
-														target: amount.toString(),
-													})
-												}
-											>
-												<Text
-													style={[
-														styles.targetPresetText,
-														newGoal.target === amount.toString() &&
-															styles.selectedTargetPresetText,
-													]}
-												>
-													${amount}
-												</Text>
-											</RectButton>
-										))}
+								<ScrollView
+									showsVerticalScrollIndicator={false}
+									contentContainerStyle={{ paddingBottom: 24 }}
+								>
+									<View style={styles.formGroup}>
+										<Text style={styles.label}>Goal Name</Text>
+										<TextInput
+											style={styles.input}
+											value={newGoal.name}
+											onChangeText={(text) =>
+												setNewGoal({ ...newGoal, name: text })
+											}
+											placeholder="e.g., Emergency Fund"
+											placeholderTextColor="#9E9E9E"
+											autoComplete="off"
+											autoCorrect={false}
+										/>
 									</View>
 
-									{/* Custom Amount Input */}
-									<Text style={styles.inputLabel}>Or enter custom amount</Text>
-									<TextInput
-										style={styles.input}
-										value={newGoal.target}
-										onChangeText={(text) =>
-											setNewGoal({ ...newGoal, target: text })
-										}
-										placeholder="e.g., 10000"
-										keyboardType="numeric"
-										placeholderTextColor="#9E9E9E"
-										autoComplete="off"
-									/>
+									<View style={styles.formGroup}>
+										<Text style={styles.label}>Target Amount</Text>
+										<Text style={styles.targetSubtext}>
+											Set your target amount for this goal
+										</Text>
+
+										{/* Quick Target Presets */}
+										<View style={styles.targetPresetsContainer}>
+											{targetPresets.map((amount) => (
+												<RectButton
+													key={amount}
+													style={[
+														styles.targetPreset,
+														newGoal.target === amount.toString() &&
+															styles.selectedTargetPreset,
+													]}
+													onPress={() => {
+														setNewGoal({
+															...newGoal,
+															target: amount.toString(),
+														});
+														setShowCustomTarget(false);
+													}}
+												>
+													<Text
+														style={[
+															styles.targetPresetText,
+															newGoal.target === amount.toString() &&
+																styles.selectedTargetPresetText,
+														]}
+													>
+														${amount}
+													</Text>
+												</RectButton>
+											))}
+										</View>
+
+										{/* Custom Amount Button */}
+										<RectButton
+											style={[
+												styles.targetPreset,
+												showCustomTarget && styles.selectedTargetPreset,
+											]}
+											onPress={() => setShowCustomTarget(!showCustomTarget)}
+										>
+											<Text
+												style={[
+													styles.targetPresetText,
+													showCustomTarget && styles.selectedTargetPresetText,
+												]}
+											>
+												Custom
+											</Text>
+										</RectButton>
+
+										{/* Custom Amount Input */}
+										{showCustomTarget && (
+											<View style={styles.customInputContainer}>
+												<Text style={styles.inputLabel}>
+													Enter custom amount
+												</Text>
+												<TextInput
+													style={styles.input}
+													value={newGoal.target}
+													onChangeText={(text) =>
+														setNewGoal({ ...newGoal, target: text })
+													}
+													placeholder="e.g., 10000"
+													keyboardType="numeric"
+													placeholderTextColor="#9E9E9E"
+													autoComplete="off"
+												/>
+											</View>
+										)}
+									</View>
+
+									<View style={styles.formGroup}>
+										<Text style={styles.label}>Target Date</Text>
+										<TextInput
+											style={styles.input}
+											value={newGoal.deadline}
+											onChangeText={(text) =>
+												setNewGoal({ ...newGoal, deadline: text })
+											}
+											placeholder="YYYY-MM-DD"
+											placeholderTextColor="#9E9E9E"
+											autoComplete="off"
+										/>
+									</View>
+
+									<IconPicker />
+									<ColorPicker />
+									<CategoryPicker />
+
+									<RectButton
+										style={[
+											styles.addButton,
+											{ backgroundColor: newGoal.color },
+										]}
+										onPress={handleAddGoal}
+									>
+										<Text style={styles.addButtonText}>Add Goal</Text>
+									</RectButton>
+								</ScrollView>
+							</View>
+						</View>
+					</Animated.View>
+				</KeyboardAvoidingView>
+			</Modal>
+
+			{/* Edit Goal Modal */}
+			<Modal
+				visible={isEditModalVisible}
+				transparent
+				animationType="fade"
+				onRequestClose={hideEditModal}
+			>
+				<KeyboardAvoidingView
+					behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+					style={styles.modalContainer}
+				>
+					<Animated.View
+						style={[
+							styles.modalAnimationContainer,
+							{
+								transform: [
+									{
+										translateY: slideAnim.interpolate({
+											inputRange: [0, 1],
+											outputRange: [600, 0],
+										}),
+									},
+								],
+							},
+						]}
+					>
+						<View style={styles.modalContainer}>
+							<View style={styles.modalContent}>
+								<View style={styles.modalHeader}>
+									<Text style={styles.modalTitle}>Edit Goal</Text>
+									<RectButton onPress={hideEditModal}>
+										<Ionicons name="close" size={24} color="#757575" />
+									</RectButton>
 								</View>
-
-								<View style={styles.formGroup}>
-									<Text style={styles.label}>Target Date</Text>
-									<TextInput
-										style={styles.input}
-										value={newGoal.deadline}
-										onChangeText={(text) =>
-											setNewGoal({ ...newGoal, deadline: text })
-										}
-										placeholder="YYYY-MM-DD"
-										placeholderTextColor="#9E9E9E"
-										autoComplete="off"
-									/>
-								</View>
-
-								<IconPicker />
-								<ColorPicker />
-								<CategoryPicker />
-
-								<RectButton
-									style={[styles.addButton, { backgroundColor: newGoal.color }]}
-									onPress={handleAddGoal}
+								<ScrollView
+									showsVerticalScrollIndicator={false}
+									contentContainerStyle={{ paddingBottom: 24 }}
 								>
-									<Text style={styles.addButtonText}>Add Goal</Text>
-								</RectButton>
-							</ScrollView>
-						</Animated.View>
-					</KeyboardAvoidingView>
-				</SafeAreaView>
+									<View style={styles.formGroup}>
+										<Text style={styles.label}>Goal Name</Text>
+										<TextInput
+											style={styles.input}
+											value={newGoal.name}
+											onChangeText={(text) =>
+												setNewGoal({ ...newGoal, name: text })
+											}
+											placeholder="e.g., Emergency Fund"
+											placeholderTextColor="#9E9E9E"
+											autoComplete="off"
+											autoCorrect={false}
+										/>
+									</View>
+
+									<View style={styles.formGroup}>
+										<Text style={styles.label}>Target Amount</Text>
+										<Text style={styles.targetSubtext}>
+											Set your target amount for this goal
+										</Text>
+
+										{/* Quick Target Presets */}
+										<View style={styles.targetPresetsContainer}>
+											{targetPresets.map((amount) => (
+												<RectButton
+													key={amount}
+													style={[
+														styles.targetPreset,
+														newGoal.target === amount.toString() &&
+															styles.selectedTargetPreset,
+													]}
+													onPress={() => {
+														setNewGoal({
+															...newGoal,
+															target: amount.toString(),
+														});
+														setShowCustomTarget(false);
+													}}
+												>
+													<Text
+														style={[
+															styles.targetPresetText,
+															newGoal.target === amount.toString() &&
+																styles.selectedTargetPresetText,
+														]}
+													>
+														${amount}
+													</Text>
+												</RectButton>
+											))}
+										</View>
+
+										{/* Custom Amount Button */}
+										<RectButton
+											style={[
+												styles.targetPreset,
+												showCustomTarget && styles.selectedTargetPreset,
+											]}
+											onPress={() => setShowCustomTarget(!showCustomTarget)}
+										>
+											<Text
+												style={[
+													styles.targetPresetText,
+													showCustomTarget && styles.selectedTargetPresetText,
+												]}
+											>
+												Custom
+											</Text>
+										</RectButton>
+
+										{/* Custom Amount Input */}
+										{showCustomTarget && (
+											<View style={styles.customInputContainer}>
+												<Text style={styles.inputLabel}>
+													Enter custom amount
+												</Text>
+												<TextInput
+													style={styles.input}
+													value={newGoal.target}
+													onChangeText={(text) =>
+														setNewGoal({ ...newGoal, target: text })
+													}
+													placeholder="e.g., 10000"
+													keyboardType="numeric"
+													placeholderTextColor="#9E9E9E"
+													autoComplete="off"
+												/>
+											</View>
+										)}
+									</View>
+
+									<View style={styles.formGroup}>
+										<Text style={styles.label}>Target Date</Text>
+										<TextInput
+											style={styles.input}
+											value={newGoal.deadline}
+											onChangeText={(text) =>
+												setNewGoal({ ...newGoal, deadline: text })
+											}
+											placeholder="YYYY-MM-DD"
+											placeholderTextColor="#9E9E9E"
+											autoComplete="off"
+										/>
+									</View>
+
+									<IconPicker />
+									<ColorPicker />
+									<CategoryPicker />
+
+									<View style={styles.modalButtonContainer}>
+										<RectButton
+											style={[
+												styles.addButton,
+												{ backgroundColor: newGoal.color },
+											]}
+											onPress={handleEditGoal}
+										>
+											<Text style={styles.addButtonText}>Update Goal</Text>
+										</RectButton>
+
+										{editingGoal && (
+											<RectButton
+												style={styles.deleteButton}
+												onPress={() => {
+													Alert.alert(
+														'Delete Goal',
+														'Are you sure you want to delete this goal? This action cannot be undone.',
+														[
+															{
+																text: 'Cancel',
+																style: 'cancel',
+															},
+															{
+																text: 'Delete',
+																style: 'destructive',
+																onPress: () => {
+																	handleDeleteGoal(editingGoal.id);
+																	hideEditModal();
+																},
+															},
+														]
+													);
+												}}
+											>
+												<Text style={styles.deleteButtonText}>Delete Goal</Text>
+											</RectButton>
+										)}
+									</View>
+								</ScrollView>
+							</View>
+						</View>
+					</Animated.View>
+				</KeyboardAvoidingView>
 			</Modal>
 		</View>
 	);
@@ -898,7 +1124,7 @@ const styles = StyleSheet.create({
 		fontWeight: '500',
 		color: '#757575',
 	},
-	safeAreaContainer: {
+	modalAnimationContainer: {
 		flex: 1,
 		backgroundColor: 'rgba(0, 0, 0, 0.5)',
 	},
@@ -906,10 +1132,12 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 	modalContent: {
+		flex: 1,
 		backgroundColor: '#ffffff',
 		borderTopLeftRadius: 20,
 		borderTopRightRadius: 20,
 		padding: 24,
+		marginTop: 80,
 	},
 	modalHeader: {
 		flexDirection: 'row',
@@ -1174,5 +1402,8 @@ const styles = StyleSheet.create({
 		borderColor: '#E0E0E0',
 		justifyContent: 'center',
 		alignItems: 'center',
+	},
+	customInputContainer: {
+		marginTop: 10,
 	},
 });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
 	View,
 	Text,
@@ -12,12 +12,10 @@ import {
 	Platform,
 	ActivityIndicator,
 	ScrollView,
-	SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BorderlessButton, RectButton } from 'react-native-gesture-handler';
 import { useBudget, Budget } from '../../../src/context/budgetContext';
-import { TransactionContext } from '../../../src/context/transactionContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
@@ -111,7 +109,6 @@ export default function BudgetScreen() {
 	// ==========================================
 	const { budgets, isLoading, addBudget, updateBudget, deleteBudget } =
 		useBudget();
-	const { categories } = useContext(TransactionContext);
 
 	// ==========================================
 	// Route Parameters
@@ -126,14 +123,13 @@ export default function BudgetScreen() {
 	const [isEditModalVisible, setIsEditModalVisible] = useState(false);
 	const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
 	const [showColorPicker, setShowColorPicker] = useState(false);
-	const [showCategoryPicker, setShowCategoryPicker] = useState(false);
 	const [showIconPicker, setShowIconPicker] = useState(false);
+	const [showCustomAmount, setShowCustomAmount] = useState(false);
 	const [newBudget, setNewBudget] = useState({
 		category: '',
 		allocated: '',
 		icon: 'cart-outline' as keyof typeof Ionicons.glyphMap,
 		color: COLOR_PALETTE.blue.base,
-		categories: [] as string[],
 	});
 	const [isPressed, setIsPressed] = useState(false);
 
@@ -190,7 +186,7 @@ export default function BudgetScreen() {
 				allocated: parseFloat(newBudget.allocated),
 				icon: newBudget.icon,
 				color: newBudget.color,
-				categories: newBudget.categories,
+				categories: [],
 			});
 
 			console.log('Budget added successfully:', result);
@@ -203,7 +199,6 @@ export default function BudgetScreen() {
 				allocated: '',
 				icon: 'cart-outline',
 				color: COLOR_PALETTE.blue.base,
-				categories: [],
 			});
 		} catch (error) {
 			console.error('Error adding budget:', error);
@@ -221,7 +216,7 @@ export default function BudgetScreen() {
 				allocated: parseFloat(newBudget.allocated),
 				icon: newBudget.icon,
 				color: newBudget.color,
-				categories: newBudget.categories,
+				categories: [],
 			});
 
 			hideEditModal();
@@ -232,7 +227,6 @@ export default function BudgetScreen() {
 				allocated: '',
 				icon: 'cart-outline',
 				color: COLOR_PALETTE.blue.base,
-				categories: [],
 			});
 			setEditingBudget(null);
 		} catch (error) {
@@ -258,17 +252,16 @@ export default function BudgetScreen() {
 			allocated: '',
 			icon: 'cart-outline' as keyof typeof Ionicons.glyphMap,
 			color: COLOR_PALETTE.blue.base,
-			categories: [],
 		});
 		setShowColorPicker(false);
-		setShowCategoryPicker(false);
 		setShowIconPicker(false);
+		setShowCustomAmount(false);
 		setIsModalVisible(true);
 		Animated.spring(slideAnim, {
 			toValue: 1,
 			useNativeDriver: true,
 			tension: 50,
-			friction: 7,
+			friction: 9,
 		}).start();
 	};
 
@@ -291,17 +284,16 @@ export default function BudgetScreen() {
 			allocated: budget.allocated.toString(),
 			icon: budget.icon as keyof typeof Ionicons.glyphMap,
 			color: budget.color,
-			categories: budget.categories || [],
 		});
 		setShowColorPicker(false);
-		setShowCategoryPicker(false);
 		setShowIconPicker(false);
+		setShowCustomAmount(false);
 		setIsEditModalVisible(true);
 		Animated.spring(slideAnim, {
 			toValue: 1,
 			useNativeDriver: true,
 			tension: 50,
-			friction: 7,
+			friction: 9,
 		}).start();
 	};
 
@@ -422,7 +414,7 @@ export default function BudgetScreen() {
 					>
 						<Ionicons
 							name={newBudget.icon as any}
-							size={24}
+							size={18}
 							color={newBudget.color}
 						/>
 					</View>
@@ -440,10 +432,14 @@ export default function BudgetScreen() {
 					{budgetIcons.map((icon) => (
 						<RectButton
 							key={icon}
-							style={styles.iconOption}
+							style={[
+								styles.iconOption,
+								newBudget.icon === icon && {
+									backgroundColor: newBudget.color,
+								},
+							]}
 							onPress={() => {
 								setNewBudget({ ...newBudget, icon });
-								setShowIconPicker(false);
 							}}
 						>
 							<Ionicons
@@ -454,100 +450,6 @@ export default function BudgetScreen() {
 						</RectButton>
 					))}
 				</View>
-			)}
-		</View>
-	);
-
-	// ==========================================
-	// Category Selection Component
-	// ==========================================
-	const CategoryPicker = () => (
-		<View style={styles.categoryPickerContainer}>
-			<Text style={styles.label}>Select Categories</Text>
-			<Text style={styles.categorySubtext}>
-				Choose which spending categories contribute to this budget
-			</Text>
-			<RectButton
-				style={styles.categoryButton}
-				onPress={() => setShowCategoryPicker(!showCategoryPicker)}
-			>
-				<View style={styles.categoryButtonContent}>
-					<View style={styles.categoryButtonLeft}>
-						<View
-							style={[
-								styles.categoryIcon,
-								{ backgroundColor: newBudget.color + '20' },
-							]}
-						>
-							<Ionicons name="list" size={16} color={newBudget.color} />
-						</View>
-						<Text style={styles.categoryButtonText}>
-							{newBudget.categories.length > 0
-								? `${newBudget.categories.length} categories selected`
-								: 'Choose categories'}
-						</Text>
-					</View>
-					<Ionicons
-						name={showCategoryPicker ? 'chevron-up' : 'chevron-down'}
-						size={20}
-						color="#757575"
-					/>
-				</View>
-			</RectButton>
-
-			{showCategoryPicker && (
-				<ScrollView
-					style={styles.categoryList}
-					showsVerticalScrollIndicator={false}
-				>
-					{categories.map((category) => (
-						<RectButton
-							key={category.id}
-							style={styles.categoryOption}
-							onPress={() => {
-								const isSelected = newBudget.categories.includes(category.name);
-								if (isSelected) {
-									setNewBudget({
-										...newBudget,
-										categories: newBudget.categories.filter(
-											(cat) => cat !== category.name
-										),
-									});
-								} else {
-									setNewBudget({
-										...newBudget,
-										categories: [...newBudget.categories, category.name],
-									});
-								}
-							}}
-						>
-							<View style={styles.categoryOptionContent}>
-								<View
-									style={[
-										styles.categoryIcon,
-										{ backgroundColor: category.color + '20' },
-									]}
-								>
-									<Ionicons
-										name={category.icon as any}
-										size={16}
-										color={category.color}
-									/>
-								</View>
-								<Text style={styles.categoryName}>{category.name}</Text>
-								<View style={styles.checkboxContainer}>
-									{newBudget.categories.includes(category.name) && (
-										<Ionicons
-											name="checkmark-circle"
-											size={20}
-											color={newBudget.color}
-										/>
-									)}
-								</View>
-							</View>
-						</RectButton>
-					))}
-				</ScrollView>
 			)}
 		</View>
 	);
@@ -658,119 +560,328 @@ export default function BudgetScreen() {
 				animationType="fade"
 				onRequestClose={hideModal}
 			>
-				<SafeAreaView style={styles.safeAreaContainer}>
-					<KeyboardAvoidingView
-						behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-						style={styles.modalContainer}
+				<KeyboardAvoidingView
+					behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+					style={styles.modalContainer}
+				>
+					<Animated.View
+						style={[
+							styles.modalAnimationContainer,
+							{
+								transform: [
+									{
+										translateY: slideAnim.interpolate({
+											inputRange: [0, 1],
+											outputRange: [600, 0],
+										}),
+									},
+								],
+							},
+						]}
 					>
-						<Animated.View
-							style={[
-								styles.modalContent,
-								{
-									transform: [
-										{
-											translateY: slideAnim.interpolate({
-												inputRange: [0, 1],
-												outputRange: [600, 0],
-											}),
-										},
-									],
-								},
-							]}
-						>
-							<View style={styles.modalHeader}>
-								<Text style={styles.modalTitle}>Add New Budget</Text>
-								<RectButton onPress={hideModal}>
-									<Ionicons name="close" size={24} color="#757575" />
-								</RectButton>
-							</View>
-							<ScrollView
-								showsVerticalScrollIndicator={false}
-								contentContainerStyle={{ paddingBottom: 24 }}
-							>
-								<View style={styles.formGroup}>
-									<Text style={styles.label}>Category Name</Text>
-									<TextInput
-										style={styles.input}
-										value={newBudget.category}
-										onChangeText={(text) =>
-											setNewBudget({ ...newBudget, category: text })
-										}
-										placeholder="e.g., Groceries"
-										placeholderTextColor="#9E9E9E"
-										autoComplete="off"
-										autoCorrect={false}
-									/>
+						<View style={styles.modalContainer}>
+							<View style={styles.modalContent}>
+								<View style={styles.modalHeader}>
+									<Text style={styles.modalTitle}>Add New Budget</Text>
+									<RectButton onPress={hideModal}>
+										<Ionicons name="close" size={24} color="#757575" />
+									</RectButton>
 								</View>
+								<ScrollView
+									showsVerticalScrollIndicator={false}
+									contentContainerStyle={{
+										paddingBottom: 24,
+										justifyContent: 'flex-end',
+									}}
+								>
+									<View style={styles.formGroup}>
+										<Text style={styles.label}>Category Name</Text>
+										<TextInput
+											style={styles.input}
+											value={newBudget.category}
+											onChangeText={(text) =>
+												setNewBudget({ ...newBudget, category: text })
+											}
+											placeholder="e.g., Groceries"
+											placeholderTextColor="#9E9E9E"
+											autoComplete="off"
+											autoCorrect={false}
+										/>
+									</View>
 
-								<View style={styles.formGroup}>
-									<Text style={styles.label}>Budget Amount</Text>
-									<Text style={styles.amountSubtext}>
-										Set your monthly spending limit for this category
-									</Text>
+									<View style={styles.formGroup}>
+										<Text style={styles.label}>Budget Amount</Text>
+										<Text style={styles.amountSubtext}>
+											Set your monthly spending limit for this category
+										</Text>
 
-									{/* Quick Amount Presets */}
-									<View style={styles.amountPresetsContainer}>
-										{amountPresets.map((amount) => (
+										{/* Quick Amount Presets */}
+										<View style={styles.amountPresetsContainer}>
+											{amountPresets.map((amount) => (
+												<RectButton
+													key={amount}
+													style={[
+														styles.amountPreset,
+														newBudget.allocated === amount.toString() &&
+															styles.selectedAmountPreset,
+													]}
+													onPress={() => {
+														setNewBudget({
+															...newBudget,
+															allocated: amount.toString(),
+														});
+														setShowCustomAmount(false);
+													}}
+												>
+													<Text
+														style={[
+															styles.amountPresetText,
+															newBudget.allocated === amount.toString() &&
+																styles.selectedAmountPresetText,
+														]}
+													>
+														${amount}
+													</Text>
+												</RectButton>
+											))}
+
+											{/* Custom Amount Button */}
 											<RectButton
-												key={amount}
 												style={[
 													styles.amountPreset,
-													newBudget.allocated === amount.toString() &&
-														styles.selectedAmountPreset,
+													showCustomAmount && styles.selectedAmountPreset,
 												]}
-												onPress={() =>
-													setNewBudget({
-														...newBudget,
-														allocated: amount.toString(),
-													})
-												}
+												onPress={() => {
+													setShowCustomAmount(!showCustomAmount);
+													if (!showCustomAmount) {
+														setNewBudget({
+															...newBudget,
+															allocated: '',
+														});
+													}
+												}}
 											>
 												<Text
 													style={[
 														styles.amountPresetText,
-														newBudget.allocated === amount.toString() &&
-															styles.selectedAmountPresetText,
+														showCustomAmount && styles.selectedAmountPresetText,
 													]}
 												>
-													${amount}
+													Custom
 												</Text>
 											</RectButton>
-										))}
+										</View>
+
+										{/* Custom Amount Input */}
+										{showCustomAmount && (
+											<>
+												<Text style={styles.inputLabel}>
+													Enter custom amount
+												</Text>
+												<TextInput
+													style={styles.input}
+													value={newBudget.allocated}
+													onChangeText={(text) =>
+														setNewBudget({ ...newBudget, allocated: text })
+													}
+													placeholder="e.g., 500"
+													keyboardType="numeric"
+													placeholderTextColor="#9E9E9E"
+													autoComplete="off"
+												/>
+											</>
+										)}
 									</View>
 
-									{/* Custom Amount Input */}
-									<Text style={styles.inputLabel}>Or enter custom amount</Text>
-									<TextInput
-										style={styles.input}
-										value={newBudget.allocated}
-										onChangeText={(text) =>
-											setNewBudget({ ...newBudget, allocated: text })
-										}
-										placeholder="e.g., 500"
-										keyboardType="numeric"
-										placeholderTextColor="#9E9E9E"
-										autoComplete="off"
-									/>
+									<IconPicker />
+									<ColorPicker />
+
+									<RectButton
+										style={[
+											styles.addButton,
+											{ backgroundColor: newBudget.color },
+										]}
+										onPress={handleAddBudget}
+									>
+										<Text style={styles.addButtonText}>Add Budget</Text>
+									</RectButton>
+								</ScrollView>
+							</View>
+						</View>
+					</Animated.View>
+				</KeyboardAvoidingView>
+			</Modal>
+
+			{/* Edit Budget Modal */}
+			<Modal
+				visible={isEditModalVisible}
+				transparent
+				animationType="fade"
+				onRequestClose={hideEditModal}
+			>
+				<KeyboardAvoidingView
+					behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+					style={styles.modalContainer}
+				>
+					<Animated.View
+						style={[
+							styles.modalAnimationContainer,
+							{
+								transform: [
+									{
+										translateY: slideAnim.interpolate({
+											inputRange: [0, 1],
+											outputRange: [600, 0],
+										}),
+									},
+								],
+							},
+						]}
+					>
+						<View style={styles.modalContainer}>
+							<View style={styles.modalContent}>
+								<View style={styles.modalHeader}>
+									<Text style={styles.modalTitle}>Edit Budget</Text>
+									<RectButton onPress={hideEditModal}>
+										<Ionicons name="close" size={24} color="#757575" />
+									</RectButton>
 								</View>
-
-								<IconPicker />
-								<ColorPicker />
-								<CategoryPicker />
-
-								<RectButton
-									style={[
-										styles.addButton,
-										{ backgroundColor: newBudget.color },
-									]}
-									onPress={handleAddBudget}
+								<ScrollView
+									showsVerticalScrollIndicator={false}
+									contentContainerStyle={{
+										paddingBottom: 24,
+										justifyContent: 'flex-end',
+									}}
 								>
-									<Text style={styles.addButtonText}>Add Budget</Text>
-								</RectButton>
-							</ScrollView>
-						</Animated.View>
-					</KeyboardAvoidingView>
-				</SafeAreaView>
+									<View style={styles.formGroup}>
+										<Text style={styles.label}>Category Name</Text>
+										<TextInput
+											style={styles.input}
+											value={newBudget.category}
+											onChangeText={(text) =>
+												setNewBudget({ ...newBudget, category: text })
+											}
+											placeholder="e.g., Groceries"
+											placeholderTextColor="#9E9E9E"
+											autoComplete="off"
+											autoCorrect={false}
+										/>
+									</View>
+
+									<View style={styles.formGroup}>
+										<Text style={styles.label}>Budget Amount</Text>
+										<Text style={styles.amountSubtext}>
+											Set your monthly spending limit for this category
+										</Text>
+
+										{/* Quick Amount Presets */}
+										<View style={styles.amountPresetsContainer}>
+											{amountPresets.map((amount) => (
+												<RectButton
+													key={amount}
+													style={[
+														styles.amountPreset,
+														newBudget.allocated === amount.toString() &&
+															styles.selectedAmountPreset,
+													]}
+													onPress={() => {
+														setNewBudget({
+															...newBudget,
+															allocated: amount.toString(),
+														});
+														setShowCustomAmount(false);
+													}}
+												>
+													<Text
+														style={[
+															styles.amountPresetText,
+															newBudget.allocated === amount.toString() &&
+																styles.selectedAmountPresetText,
+														]}
+													>
+														${amount}
+													</Text>
+												</RectButton>
+											))}
+
+											{/* Custom Amount Button */}
+											<RectButton
+												style={[
+													styles.amountPreset,
+													showCustomAmount && styles.selectedAmountPreset,
+												]}
+												onPress={() => {
+													setShowCustomAmount(!showCustomAmount);
+													if (!showCustomAmount) {
+														setNewBudget({
+															...newBudget,
+															allocated: '',
+														});
+													}
+												}}
+											>
+												<Text
+													style={[
+														styles.amountPresetText,
+														showCustomAmount && styles.selectedAmountPresetText,
+													]}
+												>
+													Custom
+												</Text>
+											</RectButton>
+										</View>
+
+										{/* Custom Amount Input */}
+										{showCustomAmount && (
+											<>
+												<Text style={styles.inputLabel}>
+													Enter custom amount
+												</Text>
+												<TextInput
+													style={styles.input}
+													value={newBudget.allocated}
+													onChangeText={(text) =>
+														setNewBudget({ ...newBudget, allocated: text })
+													}
+													placeholder="e.g., 500"
+													keyboardType="numeric"
+													placeholderTextColor="#9E9E9E"
+													autoComplete="off"
+												/>
+											</>
+										)}
+									</View>
+
+									<IconPicker />
+									<ColorPicker />
+
+									<View style={styles.modalButtonContainer}>
+										<RectButton
+											style={[
+												styles.addButton,
+												{ backgroundColor: newBudget.color },
+											]}
+											onPress={handleEditBudget}
+										>
+											<Text style={styles.addButtonText}>Update Budget</Text>
+										</RectButton>
+
+										{editingBudget && (
+											<RectButton
+												style={styles.deleteButton}
+												onPress={() => handleDeleteBudget(editingBudget.id)}
+											>
+												<Text style={styles.deleteButtonText}>
+													Delete Budget
+												</Text>
+											</RectButton>
+										)}
+									</View>
+								</ScrollView>
+							</View>
+						</View>
+					</Animated.View>
+				</KeyboardAvoidingView>
 			</Modal>
 		</View>
 	);
@@ -877,7 +988,7 @@ const styles = StyleSheet.create({
 		color: '#757575',
 		textAlign: 'right',
 	},
-	safeAreaContainer: {
+	modalAnimationContainer: {
 		flex: 1,
 		backgroundColor: 'rgba(0, 0, 0, 0.5)',
 	},
@@ -885,10 +996,12 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 	modalContent: {
+		flex: 1,
 		backgroundColor: '#ffffff',
 		borderTopLeftRadius: 20,
 		borderTopRightRadius: 20,
 		padding: 24,
+		marginTop: 80,
 	},
 	modalHeader: {
 		flexDirection: 'row',
