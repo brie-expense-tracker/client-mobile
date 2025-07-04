@@ -22,7 +22,7 @@ import { getFinancialInsights } from '../../src/services/aiService';
 
 // Define API URL based on environment
 const API_URL = __DEV__
-	? 'http://192.168.1.65:3000' // Development
+	? 'http://192.168.1.222:3000' // Development
 	: 'https://api.brie.com'; // Production
 
 interface Message {
