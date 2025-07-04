@@ -10,24 +10,73 @@ import {
 	ActivityIndicator,
 	Alert,
 	View,
+	TouchableOpacity,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import {
 	InsightsService,
 	AIInsight,
 } from '../../../src/services/insightsService';
 import useAuth from '../../../src/context/AuthContext';
+import { useBudget } from '../../../src/context/budgetContext';
+import { useGoal } from '../../../src/context/goalContext';
+import { ApiService } from '../../../src/services/apiService';
+import {
+	BudgetOverviewGraph,
+	GoalsProgressGraph,
+	SpendingTrendsGraph,
+	CategoryBreakdownGraph,
+} from '../../../src/components';
+
+interface Transaction {
+	id: string;
+	type: 'income' | 'expense';
+	amount: number;
+	date: string;
+	category?: string;
+}
 
 export default function InsightsHubScreen() {
 	const router = useRouter();
 	const { user, firebaseUser, profile } = useAuth();
+	const { budgets } = useBudget();
+	const { goals } = useGoal();
 	const [insights, setInsights] = useState<AIInsight[] | null>(null);
+	const [transactions, setTransactions] = useState<Transaction[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [generating, setGenerating] = useState(false);
+	const [selectedPeriod, setSelectedPeriod] = useState<
+		'week' | 'month' | 'quarter'
+	>('month');
+	const [showGraphs, setShowGraphs] = useState(false);
 
 	useEffect(() => {
 		fetchInsights();
+		fetchTransactions();
 	}, []);
+
+	async function fetchTransactions() {
+		try {
+			const response = await ApiService.get<any>('/transactions');
+
+			if (response.success && response.data) {
+				const transactionData = response.data.data || response.data;
+				const formattedTransactions: Transaction[] = transactionData.map(
+					(tx: any) => ({
+						id: tx._id || tx.id,
+						type: tx.type,
+						amount: Number(tx.amount) || 0,
+						date: tx.date,
+						category: tx.category || tx.categories?.[0]?.name,
+					})
+				);
+				setTransactions(formattedTransactions);
+			}
+		} catch (error) {
+			console.error('Error fetching transactions:', error);
+		}
+	}
 
 	async function fetchInsights() {
 		try {
@@ -188,51 +237,151 @@ export default function InsightsHubScreen() {
 
 	return (
 		<SafeAreaView style={styles.safe}>
-			<Text style={styles.header}>AI Coach</Text>
+			<View style={styles.header}>
+				<Text style={styles.headerTitle}>AI Coach</Text>
+				<TouchableOpacity
+					style={styles.graphToggle}
+					onPress={() => setShowGraphs(!showGraphs)}
+				>
+					<Ionicons
+						name={showGraphs ? 'list' : 'analytics'}
+						size={24}
+						color="#2E78B7"
+					/>
+				</TouchableOpacity>
+			</View>
 
 			<ScrollView contentContainerStyle={styles.container}>
-				{insights && insights.length > 0 ? (
-					insights.map((insight) => (
-						<Pressable
-							key={insight._id}
-							style={styles.card}
-							onPress={() => {
-								router.push(`/insights/${insight.period}`);
-							}}
-						>
-							<Text style={styles.periodLabel}>
-								{insight.period.charAt(0).toUpperCase() +
-									insight.period.slice(1)}
-							</Text>
-							<Text style={styles.message}>{insight.message}</Text>
-							<Text style={styles.cta}>Tap to explore →</Text>
-						</Pressable>
-					))
-				) : (
-					<View style={styles.emptyState}>
-						<Text style={styles.emptyText}>No insights available yet.</Text>
-						<Text style={styles.emptySubtext}>
-							Add some transactions to generate insights.
-						</Text>
+				{showGraphs ? (
+					// Graph View
+					<View>
+						{/* Period Selector */}
+						<View style={styles.periodSelector}>
+							{[
+								{ key: 'week', label: 'Week', icon: 'calendar-outline' },
+								{ key: 'month', label: 'Month', icon: 'calendar' },
+								{ key: 'quarter', label: 'Quarter', icon: 'calendar-clear' },
+							].map((option) => (
+								<TouchableOpacity
+									key={option.key}
+									style={[
+										styles.periodOption,
+										selectedPeriod === option.key && styles.periodOptionActive,
+									]}
+									onPress={() => setSelectedPeriod(option.key as any)}
+								>
+									<Ionicons
+										name={option.icon as any}
+										size={16}
+										color={selectedPeriod === option.key ? '#FFFFFF' : '#666'}
+									/>
+									<Text
+										style={[
+											styles.periodOptionText,
+											selectedPeriod === option.key &&
+												styles.periodOptionTextActive,
+										]}
+									>
+										{option.label}
+									</Text>
+								</TouchableOpacity>
+							))}
+						</View>
 
-						<Pressable
-							style={[
-								styles.generateButton,
-								generating && styles.generateButtonDisabled,
-							]}
-							onPress={generateNewInsights}
-							disabled={generating}
-						>
-							{generating ? (
-								<ActivityIndicator size="small" color="#fff" />
-							) : (
-								<Text style={styles.generateButtonText}>Generate Insights</Text>
+						{/* Spending Trends Graph */}
+						{transactions.length > 0 && (
+							<SpendingTrendsGraph
+								transactions={transactions}
+								title={`${
+									selectedPeriod.charAt(0).toUpperCase() +
+									selectedPeriod.slice(1)
+								}ly Spending Trends`}
+								period={selectedPeriod}
+							/>
+						)}
+
+						{/* Category Breakdown Graph */}
+						{transactions.length > 0 && (
+							<CategoryBreakdownGraph
+								transactions={transactions}
+								title="Category Breakdown"
+								period={selectedPeriod}
+							/>
+						)}
+
+						{/* Budget Overview Graph */}
+						{budgets.length > 0 && (
+							<BudgetOverviewGraph budgets={budgets} title="Budget Overview" />
+						)}
+
+						{/* Goals Progress Graph */}
+						{goals.length > 0 && (
+							<GoalsProgressGraph goals={goals} title="Goals Progress" />
+						)}
+
+						{/* Empty State for Graphs */}
+						{transactions.length === 0 &&
+							budgets.length === 0 &&
+							goals.length === 0 && (
+								<View style={styles.emptyState}>
+									<Ionicons name="analytics-outline" size={64} color="#CCC" />
+									<Text style={styles.emptyText}>No Financial Data</Text>
+									<Text style={styles.emptySubtext}>
+										Add some transactions, budgets, and goals to see your
+										financial insights here.
+									</Text>
+								</View>
 							)}
-						</Pressable>
+					</View>
+				) : (
+					// AI Insights View
+					<View>
+						{insights && insights.length > 0 ? (
+							insights.map((insight) => (
+								<Pressable
+									key={insight._id}
+									style={styles.card}
+									onPress={() => {
+										router.push(`/insights/${insight.period}`);
+									}}
+								>
+									<Text style={styles.periodLabel}>
+										{insight.period.charAt(0).toUpperCase() +
+											insight.period.slice(1)}
+									</Text>
+									<Text style={styles.message}>{insight.message}</Text>
+									<Text style={styles.cta}>Tap to explore →</Text>
+								</Pressable>
+							))
+						) : (
+							<View style={styles.emptyState}>
+								<Text style={styles.emptyText}>No insights available yet.</Text>
+								<Text style={styles.emptySubtext}>
+									Add some transactions to generate insights.
+								</Text>
 
-						<Pressable style={styles.refreshButton} onPress={fetchInsights}>
-							<Text style={styles.refreshButtonText}>Refresh</Text>
-						</Pressable>
+								<Pressable
+									style={[
+										styles.generateButton,
+										generating && styles.generateButtonDisabled,
+									]}
+									onPress={generateNewInsights}
+									disabled={generating}
+								>
+									{generating ? (
+										<ActivityIndicator size="small" color="#fff" />
+									) : (
+										<Text style={styles.generateButtonText}>
+											Generate Insights
+										</Text>
+									)}
+								</Pressable>
+
+								<Pressable style={styles.refreshButton} onPress={fetchInsights}>
+									<Text style={styles.refreshButtonText}>Refresh</Text>
+								</Pressable>
+							</View>
+						)}
 					</View>
 				)}
 			</ScrollView>
@@ -243,13 +392,54 @@ export default function InsightsHubScreen() {
 const styles = StyleSheet.create({
 	safe: { flex: 1, backgroundColor: '#f9f9f9' },
 	header: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		paddingHorizontal: 16,
+		paddingVertical: 16,
+	},
+	headerTitle: {
 		fontSize: 28,
 		fontWeight: '600',
-		margin: 16,
+	},
+	graphToggle: {
+		padding: 8,
+		borderRadius: 8,
+		backgroundColor: '#F0F8FF',
 	},
 	container: {
 		paddingHorizontal: 16,
 		paddingBottom: 24,
+	},
+	periodSelector: {
+		flexDirection: 'row',
+		marginBottom: 20,
+	},
+	periodOption: {
+		flex: 1,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingVertical: 8,
+		paddingHorizontal: 12,
+		marginHorizontal: 4,
+		borderRadius: 8,
+		backgroundColor: '#FFFFFF',
+		borderWidth: 1,
+		borderColor: '#E0E0E0',
+	},
+	periodOptionActive: {
+		backgroundColor: '#2E78B7',
+		borderColor: '#2E78B7',
+	},
+	periodOptionText: {
+		marginLeft: 4,
+		fontSize: 12,
+		fontWeight: '600',
+		color: '#666',
+	},
+	periodOptionTextActive: {
+		color: '#FFFFFF',
 	},
 	card: {
 		backgroundColor: '#fff',
@@ -295,6 +485,7 @@ const styles = StyleSheet.create({
 		fontWeight: '500',
 		color: '#666',
 		marginBottom: 8,
+		marginTop: 16,
 	},
 	emptySubtext: {
 		fontSize: 14,

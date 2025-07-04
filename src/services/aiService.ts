@@ -4,7 +4,7 @@ import Constants from 'expo-constants';
 
 // Get the local IP address from Expo's manifest
 const API_URL = __DEV__
-	? 'http://192.168.1.65:3000' // Your computer's local IP address
+	? 'http://192.168.1.222:3000' // Your computer's local IP address
 	: 'https://your-production-api.com';
 
 interface AIResponse {
