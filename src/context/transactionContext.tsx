@@ -5,6 +5,7 @@ import React, {
 	useCallback,
 	useMemo,
 	ReactNode,
+	useContext,
 } from 'react';
 import { Transaction } from '../data/transactions';
 import { ApiService } from '../services/apiService';
@@ -12,6 +13,8 @@ import {
 	Category,
 	transactions as localTransactions,
 } from '../data/transactions';
+import { useBudget } from './budgetContext';
+import { useGoal } from './goalContext';
 
 interface TransactionContextType {
 	transactions: Transaction[];
@@ -67,6 +70,10 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 	const [categories, setCategories] = useState<Category[]>([]);
 	const [isLoading, setIsLoading] = useState<boolean>(true);
 	const [categoriesLoading, setCategoriesLoading] = useState<boolean>(true);
+
+	// Get budget and goal context functions
+	const { updateBudgetSpent, budgets } = useBudget();
+	const { updateGoalCurrent, goals } = useGoal();
 
 	const refetch = useCallback(async () => {
 		setIsLoading(true);
@@ -136,6 +143,85 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 		}
 	}, []);
 
+	// Helper function to update budgets and goals
+	const updateBudgetsAndGoals = useCallback(
+		async (transaction: Transaction) => {
+			try {
+				// Update budgets for expense transactions based on category mapping
+				if (
+					transaction.type === 'expense' &&
+					transaction.categories.length > 0
+				) {
+					// Find budgets that have the transaction's category in their categories array
+					const matchingBudgets = budgets.filter(
+						(budget) =>
+							budget.categories &&
+							budget.categories.some((budgetCategory) =>
+								transaction.categories.some(
+									(txCategory) => txCategory.name === budgetCategory
+								)
+							)
+					);
+
+					if (matchingBudgets.length > 0) {
+						// Update each matching budget
+						for (const budget of matchingBudgets) {
+							try {
+								await updateBudgetSpent(budget.category, transaction.amount);
+								console.log(
+									`Updated budget: ${budget.category} with ${transaction.amount}`
+								);
+							} catch (error) {
+								console.warn(
+									`Failed to update budget ${budget.category}:`,
+									error
+								);
+							}
+						}
+					} else {
+						console.log('No budgets found matching transaction categories');
+					}
+				}
+
+				// Update goals for income transactions based on category mapping
+				if (
+					transaction.type === 'income' &&
+					transaction.categories.length > 0
+				) {
+					// Find goals that have the transaction's category in their categories array
+					const matchingGoals = goals.filter(
+						(goal) =>
+							goal.categories &&
+							goal.categories.some((goalCategory) =>
+								transaction.categories.some(
+									(txCategory) => txCategory.name === goalCategory
+								)
+							)
+					);
+
+					if (matchingGoals.length > 0) {
+						// Distribute the income amount among matching goals
+						const amountPerGoal = transaction.amount / matchingGoals.length;
+
+						for (const goal of matchingGoals) {
+							try {
+								await updateGoalCurrent(goal.id, amountPerGoal);
+								console.log(`Updated goal: ${goal.name} with ${amountPerGoal}`);
+							} catch (error) {
+								console.warn(`Failed to update goal ${goal.name}:`, error);
+							}
+						}
+					} else {
+						console.log('No goals found matching transaction categories');
+					}
+				}
+			} catch (error) {
+				console.error('Error updating budgets and goals:', error);
+			}
+		},
+		[updateBudgetSpent, updateGoalCurrent, goals, budgets]
+	);
+
 	const addTransaction = useCallback(
 		async (transactionData: Omit<Transaction, 'id'>) => {
 			// Create a temporary ID for optimistic update
@@ -190,6 +276,9 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 						prev.map((t) => (t.id === tempId ? serverTransaction : t))
 					);
 
+					// Auto-update budgets and goals based on transaction
+					await updateBudgetsAndGoals(serverTransaction);
+
 					return serverTransaction;
 				} else {
 					throw new Error('Failed to create transaction');
@@ -200,7 +289,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 				throw error;
 			}
 		},
-		[]
+		[updateBudgetsAndGoals]
 	);
 
 	const deleteTransaction = useCallback(
@@ -264,6 +353,9 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 						prev.map((t) => (t.id === id ? updatedTransaction : t))
 					);
 
+					// Auto-update budgets and goals based on updated transaction
+					await updateBudgetsAndGoals(updatedTransaction);
+
 					return updatedTransaction;
 				} else {
 					throw new Error('Failed to update transaction');
@@ -275,7 +367,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 				throw error;
 			}
 		},
-		[refetch]
+		[refetch, updateBudgetsAndGoals]
 	);
 
 	// Category management functions

@@ -11,10 +11,15 @@ import {
 	KeyboardAvoidingView,
 	Platform,
 	Alert,
+	ScrollView,
+	SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { RectButton } from 'react-native-gesture-handler';
 import { useGoal, Goal } from '../../../src/context/goalContext';
+import { useContext } from 'react';
+import { TransactionContext } from '../../../src/context/transactionContext';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
@@ -32,6 +37,28 @@ type ColorOption = {
 // ==========================================
 const CARD_WIDTH = width - 48;
 const CARD_PADDING = 16;
+
+// Popular goal icons
+const goalIcons: (keyof typeof Ionicons.glyphMap)[] = [
+	'flag-outline',
+	'home-outline',
+	'car-outline',
+	'airplane-outline',
+	'gift-outline',
+	'medical-outline',
+	'book-outline',
+	'fitness-outline',
+	'game-controller-outline',
+	'bag-outline',
+	'heart-outline',
+	'star-outline',
+	'diamond-outline',
+	'trophy-outline',
+	'rocket-outline',
+];
+
+// Quick target presets
+const targetPresets = [500, 1000, 2500, 5000, 10000];
 
 const COLOR_PALETTE: Record<string, ColorOption> = {
 	red: {
@@ -84,6 +111,13 @@ export default function GoalsScreen() {
 	// Context
 	// ==========================================
 	const { goals, addGoal, updateGoal, deleteGoal } = useGoal();
+	const { categories } = useContext(TransactionContext);
+
+	// ==========================================
+	// Route Parameters
+	// ==========================================
+	const params = useLocalSearchParams();
+	const router = useRouter();
 
 	// ==========================================
 	// State Management
@@ -91,18 +125,36 @@ export default function GoalsScreen() {
 	const [isModalVisible, setIsModalVisible] = useState(false);
 	const [isEditModalVisible, setIsEditModalVisible] = useState(false);
 	const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
+	const [showColorPicker, setShowColorPicker] = useState(false);
+	const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+	const [showIconPicker, setShowIconPicker] = useState(false);
 	const [newGoal, setNewGoal] = useState({
 		name: '',
 		target: '',
 		deadline: '',
 		icon: 'flag-outline' as keyof typeof Ionicons.glyphMap,
 		color: COLOR_PALETTE.blue.base,
+		categories: [] as string[],
 	});
 
 	// ==========================================
 	// Animation Setup
 	// ==========================================
 	const slideAnim = React.useRef(new Animated.Value(0)).current;
+
+	// ==========================================
+	// Auto-open modal on navigation
+	// ==========================================
+	useEffect(() => {
+		// Check if we should auto-open the modal
+		if (params.openModal === 'true') {
+			// Small delay to ensure component is fully mounted
+			const timer = setTimeout(() => {
+				showModal();
+			}, 100);
+			return () => clearTimeout(timer);
+		}
+	}, [params.openModal]);
 
 	// ==========================================
 	// Debug logging
@@ -146,17 +198,21 @@ export default function GoalsScreen() {
 				deadline: newGoal.deadline,
 				icon: newGoal.icon,
 				color: newGoal.color,
+				categories: newGoal.categories,
 			});
 
 			console.log('Goal added successfully:', result);
 
 			hideModal();
+			// Update the URL to remove the openModal parameter
+			router.setParams({ openModal: 'false' });
 			setNewGoal({
 				name: '',
 				target: '',
 				deadline: '',
 				icon: 'flag-outline',
 				color: COLOR_PALETTE.blue.base,
+				categories: [],
 			});
 		} catch (error) {
 			console.error('Error adding goal:', error);
@@ -185,15 +241,19 @@ export default function GoalsScreen() {
 				deadline: newGoal.deadline,
 				icon: newGoal.icon,
 				color: newGoal.color,
+				categories: newGoal.categories,
 			});
 
 			hideEditModal();
+			// Update the URL to remove the openModal parameter
+			router.setParams({ openModal: 'false' });
 			setNewGoal({
 				name: '',
 				target: '',
 				deadline: '',
 				icon: 'flag-outline',
 				color: COLOR_PALETTE.blue.base,
+				categories: [],
 			});
 			setEditingGoal(null);
 		} catch (error) {
@@ -214,14 +274,17 @@ export default function GoalsScreen() {
 	// ==========================================
 	const showModal = () => {
 		console.log('showModal called - resetting newGoal state');
-		// Ensure newGoal is reset to empty values
 		setNewGoal({
 			name: '',
 			target: '',
 			deadline: '',
 			icon: 'flag-outline' as keyof typeof Ionicons.glyphMap,
 			color: COLOR_PALETTE.blue.base,
+			categories: [],
 		});
+		setShowColorPicker(false);
+		setShowCategoryPicker(false);
+		setShowIconPicker(false);
 		setIsModalVisible(true);
 		Animated.spring(slideAnim, {
 			toValue: 1,
@@ -236,7 +299,11 @@ export default function GoalsScreen() {
 			toValue: 0,
 			duration: 200,
 			useNativeDriver: true,
-		}).start(() => setIsModalVisible(false));
+		}).start(() => {
+			setIsModalVisible(false);
+			// Update the URL to remove the openModal parameter
+			router.setParams({ openModal: 'false' });
+		});
 	};
 
 	const showEditModal = (goal: Goal) => {
@@ -247,7 +314,11 @@ export default function GoalsScreen() {
 			deadline: goal.deadline.split('T')[0],
 			icon: goal.icon as keyof typeof Ionicons.glyphMap,
 			color: goal.color,
+			categories: goal.categories || [],
 		});
+		setShowColorPicker(false);
+		setShowCategoryPicker(false);
+		setShowIconPicker(false);
 		setIsEditModalVisible(true);
 		Animated.spring(slideAnim, {
 			toValue: 1,
@@ -265,6 +336,8 @@ export default function GoalsScreen() {
 		}).start(() => {
 			setIsEditModalVisible(false);
 			setEditingGoal(null);
+			// Update the URL to remove the openModal parameter
+			router.setParams({ openModal: 'false' });
 		});
 	};
 
@@ -274,54 +347,225 @@ export default function GoalsScreen() {
 	const ColorPicker = () => (
 		<View style={styles.colorPickerContainer}>
 			<Text style={styles.label}>Choose Color</Text>
-			<View style={styles.colorGrid}>
-				{Object.entries(COLOR_PALETTE).map(([name, colors]) => (
-					<View key={name} style={styles.colorColumn}>
-						<RectButton
-							style={styles.colorOptionContainer}
-							onPress={() => setNewGoal({ ...newGoal, color: colors.base })}
-						>
-							<View
-								style={[styles.colorSquare, { backgroundColor: colors.base }]}
+			<RectButton
+				style={styles.colorButton}
+				onPress={() => setShowColorPicker(!showColorPicker)}
+			>
+				<View style={styles.colorButtonContent}>
+					<View
+						style={[styles.colorPreview, { backgroundColor: newGoal.color }]}
+					/>
+					<Text style={styles.colorButtonText}>Choose Color</Text>
+					<Ionicons
+						name={showColorPicker ? 'chevron-up' : 'chevron-down'}
+						size={20}
+						color="#757575"
+					/>
+				</View>
+			</RectButton>
+
+			{showColorPicker && (
+				<View style={styles.colorGrid}>
+					{Object.entries(COLOR_PALETTE).map(([name, colors]) => (
+						<View key={name} style={styles.colorColumn}>
+							<RectButton
+								style={styles.colorOptionContainer}
+								onPress={() => setNewGoal({ ...newGoal, color: colors.base })}
 							>
-								{newGoal.color === colors.base && (
-									<View style={styles.selectedIndicator}>
-										<Ionicons name="checkmark" size={20} color="#FFF" />
-									</View>
-								)}
-							</View>
-						</RectButton>
-						<RectButton
-							style={styles.colorOptionContainer}
-							onPress={() => setNewGoal({ ...newGoal, color: colors.pastel })}
-						>
-							<View
-								style={[styles.colorSquare, { backgroundColor: colors.pastel }]}
+								<View
+									style={[styles.colorSquare, { backgroundColor: colors.base }]}
+								>
+									{newGoal.color === colors.base && (
+										<View style={styles.selectedIndicator}>
+											<Ionicons name="checkmark" size={20} color="#FFF" />
+										</View>
+									)}
+								</View>
+							</RectButton>
+							<RectButton
+								style={styles.colorOptionContainer}
+								onPress={() => setNewGoal({ ...newGoal, color: colors.pastel })}
 							>
-								{newGoal.color === colors.pastel && (
-									<View style={styles.selectedIndicator}>
-										<Ionicons name="checkmark" size={20} color="#000" />
-									</View>
-								)}
-							</View>
-						</RectButton>
-						<RectButton
-							style={styles.colorOptionContainer}
-							onPress={() => setNewGoal({ ...newGoal, color: colors.dark })}
-						>
-							<View
-								style={[styles.colorSquare, { backgroundColor: colors.dark }]}
+								<View
+									style={[
+										styles.colorSquare,
+										{ backgroundColor: colors.pastel },
+									]}
+								>
+									{newGoal.color === colors.pastel && (
+										<View style={styles.selectedIndicator}>
+											<Ionicons name="checkmark" size={20} color="#000" />
+										</View>
+									)}
+								</View>
+							</RectButton>
+							<RectButton
+								style={styles.colorOptionContainer}
+								onPress={() => setNewGoal({ ...newGoal, color: colors.dark })}
 							>
-								{newGoal.color === colors.dark && (
-									<View style={styles.selectedIndicator}>
-										<Ionicons name="checkmark" size={20} color="#FFF" />
-									</View>
-								)}
-							</View>
-						</RectButton>
+								<View
+									style={[styles.colorSquare, { backgroundColor: colors.dark }]}
+								>
+									{newGoal.color === colors.dark && (
+										<View style={styles.selectedIndicator}>
+											<Ionicons name="checkmark" size={20} color="#FFF" />
+										</View>
+									)}
+								</View>
+							</RectButton>
+						</View>
+					))}
+				</View>
+			)}
+		</View>
+	);
+
+	// ==========================================
+	// Icon Selection Component
+	// ==========================================
+	const IconPicker = () => (
+		<View style={styles.iconPickerContainer}>
+			<Text style={styles.label}>Choose Icon</Text>
+			<RectButton
+				style={styles.iconButton}
+				onPress={() => setShowIconPicker(!showIconPicker)}
+			>
+				<View style={styles.iconButtonContent}>
+					<View
+						style={[
+							styles.iconPreview,
+							{ backgroundColor: newGoal.color + '20' },
+						]}
+					>
+						<Ionicons
+							name={newGoal.icon as any}
+							size={24}
+							color={newGoal.color}
+						/>
 					</View>
-				))}
-			</View>
+					<Text style={styles.iconButtonText}>Choose Icon</Text>
+					<Ionicons
+						name={showIconPicker ? 'chevron-up' : 'chevron-down'}
+						size={20}
+						color="#757575"
+					/>
+				</View>
+			</RectButton>
+
+			{showIconPicker && (
+				<View style={styles.iconGrid}>
+					{goalIcons.map((icon) => (
+						<RectButton
+							key={icon}
+							style={styles.iconOption}
+							onPress={() => {
+								setNewGoal({ ...newGoal, icon });
+								setShowIconPicker(false);
+							}}
+						>
+							<Ionicons
+								name={icon as any}
+								size={24}
+								color={newGoal.icon === icon ? 'white' : newGoal.color}
+							/>
+						</RectButton>
+					))}
+				</View>
+			)}
+		</View>
+	);
+
+	// ==========================================
+	// Category Selection Component
+	// ==========================================
+	const CategoryPicker = () => (
+		<View style={styles.categoryPickerContainer}>
+			<Text style={styles.label}>Select Categories</Text>
+			<Text style={styles.categorySubtext}>
+				Choose which spending categories contribute to this goal
+			</Text>
+			<RectButton
+				style={styles.categoryButton}
+				onPress={() => setShowCategoryPicker(!showCategoryPicker)}
+			>
+				<View style={styles.categoryButtonContent}>
+					<View style={styles.categoryButtonLeft}>
+						<View
+							style={[
+								styles.categoryIcon,
+								{ backgroundColor: newGoal.color + '20' },
+							]}
+						>
+							<Ionicons name="list" size={16} color={newGoal.color} />
+						</View>
+						<Text style={styles.categoryButtonText}>
+							{newGoal.categories.length > 0
+								? `${newGoal.categories.length} categories selected`
+								: 'Choose categories'}
+						</Text>
+					</View>
+					<Ionicons
+						name={showCategoryPicker ? 'chevron-up' : 'chevron-down'}
+						size={20}
+						color="#757575"
+					/>
+				</View>
+			</RectButton>
+
+			{showCategoryPicker && (
+				<ScrollView
+					style={styles.categoryList}
+					showsVerticalScrollIndicator={false}
+				>
+					{categories.map((category) => (
+						<RectButton
+							key={category.id}
+							style={styles.categoryOption}
+							onPress={() => {
+								const isSelected = newGoal.categories.includes(category.name);
+								if (isSelected) {
+									setNewGoal({
+										...newGoal,
+										categories: newGoal.categories.filter(
+											(cat) => cat !== category.name
+										),
+									});
+								} else {
+									setNewGoal({
+										...newGoal,
+										categories: [...newGoal.categories, category.name],
+									});
+								}
+							}}
+						>
+							<View style={styles.categoryOptionContent}>
+								<View
+									style={[
+										styles.categoryIcon,
+										{ backgroundColor: category.color + '20' },
+									]}
+								>
+									<Ionicons
+										name={category.icon as any}
+										size={16}
+										color={category.color}
+									/>
+								</View>
+								<Text style={styles.categoryName}>{category.name}</Text>
+								<View style={styles.checkboxContainer}>
+									{newGoal.categories.includes(category.name) && (
+										<Ionicons
+											name="checkmark-circle"
+											size={20}
+											color={newGoal.color}
+										/>
+									)}
+								</View>
+							</View>
+						</RectButton>
+					))}
+				</ScrollView>
+			)}
 		</View>
 	);
 
@@ -429,34 +673,36 @@ export default function GoalsScreen() {
 				animationType="fade"
 				onRequestClose={hideModal}
 			>
-				<RectButton style={styles.modalOverlay} onPress={hideModal}>
+				<SafeAreaView style={styles.safeAreaContainer}>
 					<KeyboardAvoidingView
 						behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
 						style={styles.modalContainer}
 					>
-						<RectButton onPress={() => {}}>
-							<Animated.View
-								style={[
-									styles.modalContent,
-									{
-										transform: [
-											{
-												translateY: slideAnim.interpolate({
-													inputRange: [0, 1],
-													outputRange: [600, 0],
-												}),
-											},
-										],
-									},
-								]}
+						<Animated.View
+							style={[
+								styles.modalContent,
+								{
+									transform: [
+										{
+											translateY: slideAnim.interpolate({
+												inputRange: [0, 1],
+												outputRange: [600, 0],
+											}),
+										},
+									],
+								},
+							]}
+						>
+							<View style={styles.modalHeader}>
+								<Text style={styles.modalTitle}>Add New Goal</Text>
+								<RectButton onPress={hideModal}>
+									<Ionicons name="close" size={24} color="#757575" />
+								</RectButton>
+							</View>
+							<ScrollView
+								showsVerticalScrollIndicator={false}
+								contentContainerStyle={{ paddingBottom: 24 }}
 							>
-								<View style={styles.modalHeader}>
-									<Text style={styles.modalTitle}>Add New Goal</Text>
-									<RectButton onPress={hideModal}>
-										<Ionicons name="close" size={24} color="#757575" />
-									</RectButton>
-								</View>
-
 								<View style={styles.formGroup}>
 									<Text style={styles.label}>Goal Name</Text>
 									<TextInput
@@ -474,6 +720,42 @@ export default function GoalsScreen() {
 
 								<View style={styles.formGroup}>
 									<Text style={styles.label}>Target Amount</Text>
+									<Text style={styles.targetSubtext}>
+										Set your target amount for this goal
+									</Text>
+
+									{/* Quick Target Presets */}
+									<View style={styles.targetPresetsContainer}>
+										{targetPresets.map((amount) => (
+											<RectButton
+												key={amount}
+												style={[
+													styles.targetPreset,
+													newGoal.target === amount.toString() &&
+														styles.selectedTargetPreset,
+												]}
+												onPress={() =>
+													setNewGoal({
+														...newGoal,
+														target: amount.toString(),
+													})
+												}
+											>
+												<Text
+													style={[
+														styles.targetPresetText,
+														newGoal.target === amount.toString() &&
+															styles.selectedTargetPresetText,
+													]}
+												>
+													${amount}
+												</Text>
+											</RectButton>
+										))}
+									</View>
+
+									{/* Custom Amount Input */}
+									<Text style={styles.inputLabel}>Or enter custom amount</Text>
 									<TextInput
 										style={styles.input}
 										value={newGoal.target}
@@ -501,7 +783,9 @@ export default function GoalsScreen() {
 									/>
 								</View>
 
+								<IconPicker />
 								<ColorPicker />
+								<CategoryPicker />
 
 								<RectButton
 									style={[styles.addButton, { backgroundColor: newGoal.color }]}
@@ -509,117 +793,10 @@ export default function GoalsScreen() {
 								>
 									<Text style={styles.addButtonText}>Add Goal</Text>
 								</RectButton>
-							</Animated.View>
-						</RectButton>
+							</ScrollView>
+						</Animated.View>
 					</KeyboardAvoidingView>
-				</RectButton>
-			</Modal>
-
-			{/* Edit Goal Modal */}
-			<Modal
-				visible={isEditModalVisible}
-				transparent
-				animationType="fade"
-				onRequestClose={hideEditModal}
-			>
-				<RectButton style={styles.modalOverlay} onPress={hideEditModal}>
-					<KeyboardAvoidingView
-						behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-						style={styles.modalContainer}
-					>
-						<RectButton onPress={() => {}}>
-							<Animated.View
-								style={[
-									styles.modalContent,
-									{
-										transform: [
-											{
-												translateY: slideAnim.interpolate({
-													inputRange: [0, 1],
-													outputRange: [600, 0],
-												}),
-											},
-										],
-									},
-								]}
-							>
-								<View style={styles.modalHeader}>
-									<Text style={styles.modalTitle}>Edit Goal</Text>
-									<RectButton onPress={hideEditModal}>
-										<Ionicons name="close" size={24} color="#757575" />
-									</RectButton>
-								</View>
-
-								<View style={styles.formGroup}>
-									<Text style={styles.label}>Goal Name</Text>
-									<TextInput
-										style={styles.input}
-										value={newGoal.name}
-										onChangeText={(text) =>
-											setNewGoal({ ...newGoal, name: text })
-										}
-										placeholder="e.g., Emergency Fund"
-										placeholderTextColor="#9E9E9E"
-										autoComplete="off"
-										autoCorrect={false}
-									/>
-								</View>
-
-								<View style={styles.formGroup}>
-									<Text style={styles.label}>Target Amount</Text>
-									<TextInput
-										style={styles.input}
-										value={newGoal.target}
-										onChangeText={(text) =>
-											setNewGoal({ ...newGoal, target: text })
-										}
-										placeholder="e.g., 10000"
-										keyboardType="numeric"
-										placeholderTextColor="#9E9E9E"
-										autoComplete="off"
-									/>
-								</View>
-
-								<View style={styles.formGroup}>
-									<Text style={styles.label}>Target Date</Text>
-									<TextInput
-										style={styles.input}
-										value={newGoal.deadline}
-										onChangeText={(text) =>
-											setNewGoal({ ...newGoal, deadline: text })
-										}
-										placeholder="YYYY-MM-DD"
-										placeholderTextColor="#9E9E9E"
-										autoComplete="off"
-									/>
-								</View>
-
-								<ColorPicker />
-
-								<View style={styles.modalButtonContainer}>
-									<RectButton
-										style={[styles.addButton]}
-										onPress={handleEditGoal}
-									>
-										<Text style={styles.addButtonText}>Update Goal</Text>
-									</RectButton>
-
-									<RectButton
-										style={styles.deleteButton}
-										onPress={() => {
-											if (editingGoal) {
-												handleDeleteGoal(editingGoal.id);
-												hideEditModal();
-											}
-										}}
-									>
-										<Text style={styles.deleteButtonText}>Delete Goal</Text>
-									</RectButton>
-								</View>
-							</Animated.View>
-						</RectButton>
-					</KeyboardAvoidingView>
-				</RectButton>
+				</SafeAreaView>
 			</Modal>
 		</View>
 	);
@@ -721,16 +898,15 @@ const styles = StyleSheet.create({
 		fontWeight: '500',
 		color: '#757575',
 	},
-	modalOverlay: {
+	safeAreaContainer: {
 		flex: 1,
 		backgroundColor: 'rgba(0, 0, 0, 0.5)',
-		justifyContent: 'flex-end',
 	},
 	modalContainer: {
-		width: '100%',
+		flex: 1,
 	},
 	modalContent: {
-		backgroundColor: '#FFFFFF',
+		backgroundColor: '#ffffff',
 		borderTopLeftRadius: 20,
 		borderTopRightRadius: 20,
 		padding: 24,
@@ -789,8 +965,115 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		fontWeight: '600',
 	},
+	iconPickerContainer: {
+		marginBottom: 10,
+	},
+	iconButton: {
+		backgroundColor: '#F5F5F5',
+		borderRadius: 12,
+		padding: 16,
+		marginBottom: 8,
+	},
+	iconButtonContent: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	iconPreview: {
+		width: 24,
+		height: 24,
+		borderRadius: 6,
+		borderWidth: 1,
+		borderColor: '#E0E0E0',
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	iconButtonText: {
+		fontSize: 16,
+		color: '#212121',
+		flex: 1,
+		marginLeft: 12,
+	},
+	iconGrid: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		gap: 8,
+		marginTop: 2,
+	},
+	iconOption: {
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+		backgroundColor: 'white',
+		alignItems: 'center',
+		justifyContent: 'center',
+		borderWidth: 1,
+		borderColor: '#E0E0E0',
+	},
+	targetSubtext: {
+		fontSize: 12,
+		fontWeight: '500',
+		color: '#757575',
+		marginBottom: 8,
+	},
+	targetPresetsContainer: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		gap: 8,
+		marginBottom: 12,
+	},
+	targetPreset: {
+		padding: 12,
+		borderRadius: 8,
+		backgroundColor: 'white',
+		borderWidth: 1,
+		borderColor: '#E0E0E0',
+	},
+	selectedTargetPreset: {
+		borderColor: '#00a2ff',
+		backgroundColor: '#f0f9ff',
+	},
+	targetPresetText: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#212121',
+	},
+	selectedTargetPresetText: {
+		color: '#00a2ff',
+		fontWeight: '600',
+	},
+	inputLabel: {
+		fontSize: 14,
+		fontWeight: '500',
+		color: '#757575',
+		marginBottom: 8,
+	},
 	colorPickerContainer: {
 		marginBottom: 10,
+	},
+	colorButton: {
+		backgroundColor: '#F5F5F5',
+		borderRadius: 12,
+		padding: 16,
+		marginBottom: 8,
+	},
+	colorButtonContent: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	colorPreview: {
+		width: 24,
+		height: 24,
+		borderRadius: 6,
+		borderWidth: 1,
+		borderColor: '#E0E0E0',
+	},
+	colorButtonText: {
+		fontSize: 16,
+		color: '#212121',
+		flex: 1,
+		marginLeft: 12,
 	},
 	colorGrid: {
 		flexDirection: 'row',
@@ -821,6 +1104,74 @@ const styles = StyleSheet.create({
 		bottom: 0,
 		backgroundColor: 'rgba(0, 0, 0, 0.2)',
 		borderRadius: 8,
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	categoryPickerContainer: {
+		marginBottom: 10,
+	},
+	categoryButton: {
+		backgroundColor: '#F5F5F5',
+		borderRadius: 12,
+		padding: 16,
+		marginBottom: 8,
+	},
+	categoryButtonContent: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	categoryButtonLeft: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		flex: 1,
+	},
+	categoryButtonText: {
+		fontSize: 16,
+		color: '#212121',
+		marginLeft: 12,
+	},
+	categorySubtext: {
+		fontSize: 12,
+		fontWeight: '500',
+		color: '#757575',
+		marginBottom: 8,
+	},
+	categoryList: {
+		padding: 10,
+	},
+	categoryOption: {
+		padding: 8,
+		borderWidth: 1,
+		borderColor: '#E0E0E0',
+		borderRadius: 8,
+		marginBottom: 4,
+	},
+	categoryOptionContent: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	categoryIcon: {
+		width: 24,
+		height: 24,
+		borderRadius: 4,
+		justifyContent: 'center',
+		alignItems: 'center',
+		marginRight: 8,
+	},
+	categoryName: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#212121',
+		flex: 1,
+	},
+	checkboxContainer: {
+		width: 24,
+		height: 24,
+		borderRadius: 4,
+		borderWidth: 1,
+		borderColor: '#E0E0E0',
 		justifyContent: 'center',
 		alignItems: 'center',
 	},

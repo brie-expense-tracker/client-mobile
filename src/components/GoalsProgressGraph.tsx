@@ -13,7 +13,7 @@ const GoalsProgressGraph: React.FC<GoalsProgressGraphProps> = ({
 	title = 'Goals Progress',
 }) => {
 	const screenWidth = Dimensions.get('window').width;
-	const chartSize = Math.min(screenWidth - 80, 250); // Responsive size
+	const chartSize = Math.min(screenWidth - 120, 250); // Account for parent ScrollView padding (40px) + component padding (40px) + extra margin (40px)
 
 	// Filter out completed goals for the pie chart
 	const activeGoals = goals.filter((goal) => goal.current < goal.target);
@@ -72,27 +72,31 @@ const GoalsProgressGraph: React.FC<GoalsProgressGraphProps> = ({
 			</View>
 
 			{/* Pie Chart */}
-			{activeGoals.length > 0 ? (
+			{pieData.length > 0 ? (
 				<View style={styles.chartContainer}>
-					<PieChart
-						data={pieData}
-						radius={chartSize / 2}
-						innerRadius={chartSize / 4}
-						centerLabelComponent={() => (
-							<View style={styles.centerLabel}>
-								<Text style={styles.centerLabelText}>
-									{overallProgress.toFixed(0)}%
-								</Text>
-								<Text style={styles.centerLabelSubtext}>Complete</Text>
-							</View>
-						)}
-						showText
-						textColor="white"
-						textSize={12}
-						fontWeight="600"
-						strokeWidth={2}
-						strokeColor="white"
-					/>
+					<View style={styles.chartWrapper}>
+						<PieChart
+							data={pieData}
+							radius={chartSize / 2}
+							innerRadius={chartSize / 3}
+							centerLabelComponent={() => (
+								<View style={styles.centerLabel}>
+									<Text style={styles.centerLabelText}>
+										{overallProgress.toFixed(1)}%
+									</Text>
+									<Text style={styles.centerLabelSubtext}>Overall</Text>
+								</View>
+							)}
+							showText
+							textColor="white"
+							textSize={12}
+							fontWeight="600"
+							strokeWidth={2}
+							strokeColor="white"
+							showGradient
+							gradientCenterColor="#FFFFFF"
+						/>
+					</View>
 				</View>
 			) : (
 				<View style={styles.emptyState}>
@@ -167,7 +171,6 @@ const styles = StyleSheet.create({
 		backgroundColor: '#FFFFFF',
 		borderRadius: 16,
 		padding: 20,
-		marginHorizontal: 20,
 		marginVertical: 10,
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 2 },
@@ -206,6 +209,12 @@ const styles = StyleSheet.create({
 	chartContainer: {
 		alignItems: 'center',
 		marginBottom: 20,
+		width: '100%',
+		overflow: 'hidden',
+	},
+	chartWrapper: {
+		overflow: 'hidden',
+		borderRadius: 12,
 	},
 	centerLabel: {
 		alignItems: 'center',

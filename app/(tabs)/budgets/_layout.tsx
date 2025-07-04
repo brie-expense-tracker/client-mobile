@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
 	View,
 	Text,
@@ -7,11 +7,23 @@ import {
 	SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams } from 'expo-router';
 import BudgetScreen from './index';
 import GoalsScreen from './goals';
 
 export default function BudgetLayout() {
 	const [activeTab, setActiveTab] = useState('budgets');
+	const params = useLocalSearchParams();
+
+	// Auto-switch to appropriate tab if openModal parameter is present
+	useEffect(() => {
+		if (params.openModal === 'true') {
+			// Check if we're navigating to goals or budgets
+			// For now, default to budgets tab when openModal is true
+			// This can be enhanced later to support both goals and budgets
+			setActiveTab('budgets');
+		}
+	}, [params.openModal]);
 
 	return (
 		<SafeAreaView style={styles.container}>

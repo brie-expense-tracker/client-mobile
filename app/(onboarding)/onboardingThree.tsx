@@ -18,7 +18,6 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useOnboarding } from '../../src/context/OnboardingContext';
 import { useProfile } from '../../src/context/profileContext';
-import { getCategoryMeta } from '../../src/utils/categoriesUtils';
 import { ApiService } from '../../src/services/apiService';
 
 type RootStackParamList = {
@@ -29,34 +28,51 @@ type OnboardingScreenProps = {
 	navigation: NativeStackNavigationProp<RootStackParamList>;
 };
 
-type Category = {
-	_id: string;
-	name: string;
-	type: 'income' | 'expense';
-	color: string;
-	icon: string;
-};
-
 const { width } = Dimensions.get('window');
 
-// Predefined colors for categories
-const categoryColors = [
-	'#FF6B6B',
-	'#4ECDC4',
-	'#45B7D1',
-	'#96CEB4',
-	'#FFEAA7',
-	'#DDA0DD',
-	'#98D8C8',
-	'#F7DC6F',
-	'#BB8FCE',
-	'#85C1E9',
-	'#F8C471',
-	'#82E0AA',
-	'#F1948A',
-	'#85C1E9',
-	'#D7BDE2',
-];
+// Color palette matching budgets screen
+const COLOR_PALETTE = {
+	red: {
+		base: '#E53935',
+		pastel: '#EF5350',
+		dark: '#B71C1C',
+	},
+	orange: {
+		base: '#FB8C00',
+		pastel: '#FFB74D',
+		dark: '#E65100',
+	},
+	yellow: {
+		base: '#FDD835',
+		pastel: '#FFEE58',
+		dark: '#FBC02D',
+	},
+	green: {
+		base: '#43A047',
+		pastel: '#A5D6A7',
+		dark: '#1B5E20',
+	},
+	blue: {
+		base: '#1E88E5',
+		pastel: '#42A5F5',
+		dark: '#0D47A1',
+	},
+	indigo: {
+		base: '#5E35B1',
+		pastel: '#5C6BC0',
+		dark: '#311B92',
+	},
+	violet: {
+		base: '#8E24AA',
+		pastel: '#AB47BC',
+		dark: '#4A0072',
+	},
+	grey: {
+		base: '#424242',
+		pastel: '#757575',
+		dark: '#212121',
+	},
+};
 
 // Currency validation utility functions
 const validateCurrencyInput = (value: string): boolean => {
@@ -126,15 +142,6 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 
 	// Preferences
 	const [adviceFrequency, setAdviceFrequency] = useState('');
-	const [autoSave, setAutoSave] = useState(false);
-	const [autoSaveAmount, setAutoSaveAmount] = useState('');
-
-	// Categories
-	const [availableCategories, setAvailableCategories] = useState<Category[]>(
-		[]
-	);
-	const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-	const [categoriesLoading, setCategoriesLoading] = useState(false);
 
 	const flatListRef = useRef<FlatList>(null);
 	const [currentIndex, setCurrentIndex] = useState(0);
@@ -153,120 +160,6 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 		}
 	};
 
-	// Fetch available categories on component mount
-	useEffect(() => {
-		fetchAvailableCategories();
-	}, []);
-
-	const fetchAvailableCategories = async () => {
-		setCategoriesLoading(true);
-		try {
-			const response = await ApiService.get<Category[]>(
-				'/categories/available'
-			);
-			if (response.success && response.data) {
-				setAvailableCategories(response.data);
-			}
-		} catch (error) {
-			console.error('Error fetching categories:', error);
-		} finally {
-			setCategoriesLoading(false);
-		}
-	};
-
-	const toggleCategorySelection = (categoryId: string) => {
-		setSelectedCategories((prev) =>
-			prev.includes(categoryId)
-				? prev.filter((id) => id !== categoryId)
-				: [...prev, categoryId]
-		);
-	};
-
-	const generateInitialInsight = async (profileData: any) => {
-		try {
-			// Try to generate a weekly insight first
-			const response = await ApiService.post('/insights/generate/weekly', {});
-
-			// If no insights were generated (likely due to no transaction data), create a fallback insight
-			if (
-				!response.success ||
-				!response.data ||
-				!Array.isArray(response.data) ||
-				response.data.length === 0
-			) {
-				await createFallbackInsight(profileData);
-			}
-		} catch (error) {
-			console.error('Error generating initial insight:', error);
-			// Create fallback insight if generation fails
-			await createFallbackInsight(profileData);
-		}
-	};
-
-	const createFallbackInsight = async (profileData: any) => {
-		try {
-			const fallbackInsight = {
-				title: 'Welcome to Better Spending!',
-				message:
-					"Let's start your financial journey with some smart spending habits.",
-				detailedExplanation: `Welcome to Brie! Since you're just getting started, here are some fundamental spending principles to help you build a strong financial foundation:
-
-1. **Track Every Transaction**: Start by recording all your income and expenses. This visibility is the first step to better financial control.
-
-2. **Follow the 50/30/20 Rule**: Allocate 50% of your income to needs, 30% to wants, and 20% to savings and debt repayment.
-
-3. **Build an Emergency Fund**: Aim to save 3-6 months of expenses for unexpected situations.
-
-4. **Review Before You Buy**: Implement a 24-hour rule for non-essential purchases over $50.
-
-5. **Use Your Budget Categories**: The categories you selected will help you stay organized and identify spending patterns.`,
-				insightType: 'spending',
-				priority: 'medium',
-				isActionable: true,
-				actionItems: [
-					{
-						title: 'Set Up Your First Budget',
-						description:
-							'Create a monthly budget using your income and expense information from onboarding.',
-						completed: false,
-					},
-					{
-						title: 'Start Tracking Today',
-						description:
-							'Record your first transaction to begin building your financial history.',
-						completed: false,
-					},
-					{
-						title: 'Review Your Categories',
-						description:
-							'Make sure your selected categories match your actual spending patterns.',
-						completed: false,
-					},
-				],
-				metadata: {
-					totalIncome: profileData.monthlyIncome || 0,
-					totalExpenses:
-						(profileData.expenses?.housing || 0) +
-						(profileData.expenses?.loans || 0) +
-						(profileData.expenses?.subscriptions || 0),
-					netIncome:
-						(profileData.monthlyIncome || 0) -
-						((profileData.expenses?.housing || 0) +
-							(profileData.expenses?.loans || 0) +
-							(profileData.expenses?.subscriptions || 0)),
-					topCategories: [],
-					comparisonPeriod: 'weekly',
-					percentageChange: 0,
-				},
-			};
-
-			// Create the fallback insight via API
-			await ApiService.post('/insights/fallback', fallbackInsight);
-		} catch (error) {
-			console.error('Error creating fallback insight:', error);
-		}
-	};
-
 	const handleSubmit = async () => {
 		// Validate all currency inputs before submission
 		const currencyFields = [
@@ -276,7 +169,6 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 			{ value: subscriptions, name: 'Subscriptions' },
 			{ value: savingsBalance, name: 'Savings Balance' },
 			{ value: totalDebt, name: 'Total Debt' },
-			{ value: autoSaveAmount, name: 'Auto Save Amount' },
 		];
 
 		// Check if any currency field has invalid data
@@ -311,8 +203,8 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 			preferences: {
 				adviceFrequency,
 				autoSave: {
-					enabled: autoSave,
-					amount: autoSaveAmount ? parseFloat(autoSaveAmount) : 0,
+					enabled: false,
+					amount: 0,
 				},
 				notifications: {
 					enableNotifications: true,
@@ -374,20 +266,6 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 			// Update profile using profileContext
 			await updateProfile(profileData);
 
-			// Submit selected categories
-			if (selectedCategories.length > 0) {
-				const selectedCategoryData = availableCategories.filter((cat) =>
-					selectedCategories.includes(cat._id)
-				);
-
-				await ApiService.post('/categories/selected', {
-					selectedCategories: selectedCategoryData,
-				});
-			}
-
-			// Generate initial AI insight after onboarding
-			await generateInitialInsight(profileData);
-
 			// Mark onboarding as complete and navigate to main app
 			await markOnboardingComplete();
 			router.replace('/(tabs)/dashboard');
@@ -418,6 +296,29 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 	const renderItem = ({ item, index }: { item: any; index: number }) => {
 		switch (index) {
 			case 0:
+				return (
+					<View style={styles.slide}>
+						<ScrollView
+							contentContainerStyle={styles.scrollContent}
+							showsVerticalScrollIndicator={false}
+						>
+							<View style={styles.welcomeCard}>
+								<View style={styles.welcomeIllustration}>
+									<Ionicons name="wallet-outline" size={80} color="#0095FF" />
+								</View>
+								<Text style={styles.welcomeTitle}>Welcome to Brie!</Text>
+								<Text style={styles.welcomeSubtitle}>
+									Set up your budgets and goals to track your progress
+								</Text>
+								<Text style={styles.welcomeDescription}>
+									Let's create your first budget and financial goal to get you
+									started on your financial journey.
+								</Text>
+							</View>
+						</ScrollView>
+					</View>
+				);
+			case 1:
 				return (
 					<View style={styles.slide}>
 						<ScrollView
@@ -502,7 +403,7 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 						</ScrollView>
 					</View>
 				);
-			case 1:
+			case 2:
 				return (
 					<View style={styles.slide}>
 						<ScrollView
@@ -602,7 +503,7 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 						</ScrollView>
 					</View>
 				);
-			case 2:
+			case 3:
 				return (
 					<View style={styles.slide}>
 						<ScrollView
@@ -711,133 +612,6 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 						</ScrollView>
 					</View>
 				);
-			case 3:
-				return (
-					<View style={styles.slide}>
-						<ScrollView
-							contentContainerStyle={styles.scrollContent}
-							showsVerticalScrollIndicator={false}
-						>
-							<Text style={styles.title}>Choose Your Categories</Text>
-							<Text style={styles.subtitle}>
-								Select the categories you'd like to use for tracking your income
-								and expenses
-							</Text>
-
-							{categoriesLoading ? (
-								<View style={styles.loadingContainer}>
-									<Text style={styles.loadingText}>Loading categories...</Text>
-								</View>
-							) : (
-								<>
-									{/* Default Categories Section */}
-									<View style={styles.inputContainer}>
-										<View style={styles.inputContainer}>
-											<Text style={styles.label}>Income Categories</Text>
-											<View style={styles.categoryContainer}>
-												{availableCategories
-													.filter((cat) => cat.type === 'income')
-													.map((category) => (
-														<Pressable
-															key={category._id}
-															onPress={() =>
-																toggleCategorySelection(category._id)
-															}
-															style={[
-																styles.categoryButton,
-																selectedCategories.includes(category._id) &&
-																	styles.selectedCategory,
-															]}
-														>
-															<View
-																style={[
-																	styles.categoryIcon,
-																	{ backgroundColor: category.color },
-																]}
-															>
-																<Ionicons
-																	name={getCategoryMeta(category).icon}
-																	size={16}
-																	color="white"
-																/>
-															</View>
-															<Text
-																style={[
-																	styles.categoryText,
-																	selectedCategories.includes(category._id) &&
-																		styles.selectedCategoryText,
-																]}
-															>
-																{category.name}
-															</Text>
-														</Pressable>
-													))}
-											</View>
-										</View>
-
-										<View style={styles.inputContainer}>
-											<Text style={styles.label}>Expense Categories</Text>
-											<View style={styles.categoryContainer}>
-												{availableCategories
-													.filter((cat) => cat.type === 'expense')
-													.map((category) => (
-														<Pressable
-															key={category._id}
-															onPress={() =>
-																toggleCategorySelection(category._id)
-															}
-															style={[
-																styles.categoryButton,
-																selectedCategories.includes(category._id) &&
-																	styles.selectedCategory,
-															]}
-														>
-															<View
-																style={[
-																	styles.categoryIcon,
-																	{ backgroundColor: category.color },
-																]}
-															>
-																<Ionicons
-																	name={getCategoryMeta(category).icon}
-																	size={16}
-																	color="white"
-																/>
-															</View>
-															<Text
-																style={[
-																	styles.categoryText,
-																	selectedCategories.includes(category._id) &&
-																		styles.selectedCategoryText,
-																]}
-															>
-																{category.name}
-															</Text>
-														</Pressable>
-													))}
-											</View>
-										</View>
-									</View>
-
-									{/* Future Categories Info */}
-									<View style={styles.inputContainer}>
-										<View style={styles.infoContainer}>
-											<Ionicons
-												name="information-circle-outline"
-												size={20}
-												color="#6b7280"
-											/>
-											<Text style={styles.infoText}>
-												Don't see the categories you need? You can add custom
-												categories later in the Settings menu.
-											</Text>
-										</View>
-									</View>
-								</>
-							)}
-						</ScrollView>
-					</View>
-				);
 			case 4:
 				return (
 					<View style={styles.slide}>
@@ -876,50 +650,7 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 									)}
 								</View>
 							</View>
-							<View style={styles.inputContainer}>
-								<Text style={styles.label}>Automate Savings?</Text>
-								<Text style={styles.subtext}>
-									We can help you set up automatic savings transfers
-								</Text>
-								<View style={styles.autoSaveContainer}>
-									<Pressable
-										onPress={() => setAutoSave(!autoSave)}
-										style={[
-											styles.autoSaveButton,
-											autoSave && styles.selectedAutoSave,
-										]}
-									>
-										<Text
-											style={[
-												styles.autoSaveText,
-												autoSave && styles.selectedAutoSaveText,
-											]}
-										>
-											{autoSave ? 'Yes' : 'No'}
-										</Text>
-									</Pressable>
-									{autoSave && (
-										<>
-											<Text style={styles.inputLabel}>Auto-Save Amount</Text>
-											<View style={styles.inputWithIcon}>
-												<View style={styles.inputIcon}>
-													<Ionicons name="logo-usd" size={20} color="#6b7280" />
-												</View>
-												<TextInput
-													value={autoSaveAmount}
-													onChangeText={(text) =>
-														handleCurrencyInput(text, setAutoSaveAmount)
-													}
-													keyboardType="numeric"
-													style={styles.inputWithIconText}
-													placeholderTextColor="#6b7280"
-													placeholder="0.00"
-												/>
-											</View>
-										</>
-									)}
-								</View>
-							</View>
+
 							<Pressable onPress={handleSubmit} style={styles.submitButton}>
 								<LinearGradient
 									colors={['#0095FF', '#008cff']}
@@ -965,7 +696,7 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 						source={require('../../src/assets/images/brie-logos.png')}
 					/>
 				</View>
-				<Pressable style={styles.skipButton}>
+				<Pressable style={styles.skipButton} onPress={handleSkip}>
 					<Text style={styles.skipButtonText}></Text>
 				</Pressable>
 			</View>
@@ -1215,30 +946,7 @@ const styles = StyleSheet.create({
 		color: '#0095FF',
 		fontWeight: '600',
 	},
-	autoSaveContainer: {
-		gap: 8,
-		marginBottom: 12,
-	},
-	autoSaveButton: {
-		padding: 16,
-		borderRadius: 12,
-		backgroundColor: 'white',
-		borderWidth: 1,
-		borderColor: '#e5e7eb',
-		alignItems: 'center',
-	},
-	selectedAutoSave: {
-		borderColor: '#0095FF',
-		backgroundColor: '#f0f9ff',
-	},
-	autoSaveText: {
-		fontSize: 16,
-		color: '#374151',
-	},
-	selectedAutoSaveText: {
-		color: '#0095FF',
-		fontWeight: '600',
-	},
+
 	submitButton: {
 		width: '100%',
 		borderRadius: 9999,
@@ -1264,11 +972,10 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		justifyContent: 'center',
 		alignItems: 'center',
-		paddingHorizontal: 24,
 		paddingVertical: 12,
 	},
 	paginationDot: {
-		width: '20%',
+		width: '16.67%',
 		height: 7,
 		borderRadius: 4,
 		backgroundColor: '#e5e7eb',
@@ -1390,6 +1097,39 @@ const styles = StyleSheet.create({
 	frequencyText: {
 		fontSize: 16,
 		color: '#374151',
+	},
+	welcomeCard: {
+		alignItems: 'center',
+		paddingVertical: 40,
+	},
+	welcomeIllustration: {
+		width: 120,
+		height: 120,
+		borderRadius: 60,
+		backgroundColor: '#f0f9ff',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginBottom: 24,
+	},
+	welcomeTitle: {
+		fontSize: 32,
+		fontWeight: 'bold',
+		color: '#1f2937',
+		marginBottom: 12,
+		textAlign: 'center',
+	},
+	welcomeSubtitle: {
+		fontSize: 18,
+		color: '#0095FF',
+		fontWeight: '600',
+		marginBottom: 16,
+		textAlign: 'center',
+	},
+	welcomeDescription: {
+		fontSize: 16,
+		color: '#6b7280',
+		textAlign: 'center',
+		lineHeight: 24,
 	},
 });
 

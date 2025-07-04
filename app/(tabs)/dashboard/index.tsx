@@ -238,7 +238,7 @@ const TransactionHistory: React.FC<{
 		<View style={styles.transactionsSectionContainer}>
 			<View style={styles.transactionsHeader}>
 				<Text style={styles.transactionsTitle}>Recent Activity</Text>
-				<TouchableOpacity onPress={() => router.push('/ledger')}>
+				<TouchableOpacity onPress={() => router.push('/dashboard/ledger')}>
 					<Text style={styles.viewAllText}>View All</Text>
 				</TouchableOpacity>
 			</View>
@@ -251,7 +251,7 @@ const TransactionHistory: React.FC<{
 						return (
 							<View key={t.id} style={styles.transactionItem}>
 								<BorderlessButton
-									onPress={() => router.push('/ledger')}
+									onPress={() => router.push('/dashboard/ledger')}
 									style={styles.transactionContent}
 									onActiveStateChange={onPress}
 								>

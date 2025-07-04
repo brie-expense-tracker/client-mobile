@@ -19,10 +19,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Calendar } from 'react-native-calendars';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import {
+	BorderlessButton,
+	GestureHandlerRootView,
+} from 'react-native-gesture-handler';
 import { Transaction } from '../../../../src/data/transactions';
 import { TransactionContext } from '../../../../src/context/transactionContext';
 import { FilterContext } from '../../../../src/context/filterContext';
+import { useBudget } from '../../../../src/context/budgetContext';
+import { useGoal } from '../../../../src/context/goalContext';
 import { TransactionRow } from '../../../../src/components/transactionRow';
 
 // =============================================
@@ -118,7 +123,10 @@ export default function TransactionScreen() {
 
 	const { transactions, isLoading, refetch, deleteTransaction } =
 		useContext(TransactionContext);
-	const { selectedCategories, dateFilterMode } = useContext(FilterContext);
+	const { selectedGoals, selectedBudgets, dateFilterMode } =
+		useContext(FilterContext);
+	const { goals } = useGoal();
+	const { budgets } = useBudget();
 
 	const handleFilterPress = () => {
 		router.push('./ledger/ledgerFilter');
@@ -128,27 +136,64 @@ export default function TransactionScreen() {
 	const filtered = useMemo(() => {
 		return transactions
 			.filter((tx) => {
-				// category match
-				const catMatch =
-					selectedCategories.length === 0 ||
-					tx.categories.some((cat) => selectedCategories.includes(cat.name));
+				// goal/budget match
+				const goalBudgetMatch = (() => {
+					// If no goals or budgets are selected, show all transactions
+					if (selectedGoals.length === 0 && selectedBudgets.length === 0) {
+						return true;
+					}
+
+					// Check if transaction matches any selected goals (for income transactions)
+					if (tx.type === 'income' && selectedGoals.length > 0) {
+						const matchingGoals = goals.filter(
+							(goal) =>
+								selectedGoals.includes(goal.id) &&
+								goal.categories &&
+								goal.categories.some((goalCat) =>
+									tx.categories.some((txCat) => txCat.name === goalCat)
+								)
+						);
+						if (matchingGoals.length > 0) return true;
+					}
+
+					// Check if transaction matches any selected budgets (for expense transactions)
+					if (tx.type === 'expense' && selectedBudgets.length > 0) {
+						const matchingBudgets = budgets.filter(
+							(budget) =>
+								selectedBudgets.includes(budget.id) &&
+								budget.categories &&
+								budget.categories.some((budgetCat) =>
+									tx.categories.some((txCat) => txCat.name === budgetCat)
+								)
+						);
+						if (matchingBudgets.length > 0) return true;
+					}
+
+					return false;
+				})();
+
 				// date match
 				const txDay = tx.date.slice(0, 10);
 				const dateMatch =
 					dateFilterMode === 'month' ||
 					(dateFilterMode === 'day' && txDay === selectedDate);
+
 				// search match
 				const text = searchQuery.toLowerCase();
 				const searchMatch =
 					!text ||
 					tx.description.toLowerCase().includes(text) ||
 					tx.categories.some((cat) => cat.name.toLowerCase().includes(text));
-				return catMatch && dateMatch && searchMatch;
+
+				return goalBudgetMatch && dateMatch && searchMatch;
 			})
 			.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 	}, [
 		transactions,
-		selectedCategories,
+		selectedGoals,
+		selectedBudgets,
+		goals,
+		budgets,
 		dateFilterMode,
 		selectedDate,
 		searchQuery,
@@ -220,9 +265,9 @@ export default function TransactionScreen() {
 				<View style={styles.mainContainer}>
 					{/* Header */}
 					<View style={styles.headerContainer}>
-						<View style={styles.headerTextContainer}>
-							<Text style={styles.headerText}>Ledger</Text>
-						</View>
+						<BorderlessButton onPress={() => router.back()}>
+							<Ionicons name="chevron-back" size={24} color="#212121" />
+						</BorderlessButton>
 						<View style={styles.headerRight}>
 							<TouchableOpacity
 								style={[

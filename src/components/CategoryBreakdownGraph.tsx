@@ -22,7 +22,7 @@ const CategoryBreakdownGraph: React.FC<CategoryBreakdownGraphProps> = ({
 	period = 'month',
 }) => {
 	const screenWidth = Dimensions.get('window').width;
-	const chartSize = Math.min(screenWidth - 80, 250);
+	const chartSize = Math.min(screenWidth - 120, 250); // Account for parent ScrollView padding (40px) + component padding (40px) + extra margin (40px)
 
 	// Get date range based on period
 	const getDateRange = () => {
@@ -137,27 +137,29 @@ const CategoryBreakdownGraph: React.FC<CategoryBreakdownGraphProps> = ({
 			{/* Pie Chart */}
 			{pieData.length > 0 ? (
 				<View style={styles.chartContainer}>
-					<PieChart
-						data={pieData}
-						radius={chartSize / 2}
-						innerRadius={chartSize / 3}
-						centerLabelComponent={() => (
-							<View style={styles.centerLabel}>
-								<Text style={styles.centerLabelText}>
-									{categorySpending.size}
-								</Text>
-								<Text style={styles.centerLabelSubtext}>Categories</Text>
-							</View>
-						)}
-						showText
-						textColor="white"
-						textSize={12}
-						fontWeight="600"
-						strokeWidth={2}
-						strokeColor="white"
-						showGradient
-						gradientCenterColor="#FFFFFF"
-					/>
+					<View style={styles.chartWrapper}>
+						<PieChart
+							data={pieData}
+							radius={chartSize / 2}
+							innerRadius={chartSize / 3}
+							centerLabelComponent={() => (
+								<View style={styles.centerLabel}>
+									<Text style={styles.centerLabelText}>
+										{categorySpending.size}
+									</Text>
+									<Text style={styles.centerLabelSubtext}>Categories</Text>
+								</View>
+							)}
+							showText
+							textColor="white"
+							textSize={12}
+							fontWeight="600"
+							strokeWidth={2}
+							strokeColor="white"
+							showGradient
+							gradientCenterColor="#FFFFFF"
+						/>
+					</View>
 				</View>
 			) : (
 				<View style={styles.emptyState}>
@@ -263,7 +265,6 @@ const styles = StyleSheet.create({
 		backgroundColor: '#FFFFFF',
 		borderRadius: 16,
 		padding: 20,
-		marginHorizontal: 20,
 		marginVertical: 10,
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 2 },
@@ -302,6 +303,12 @@ const styles = StyleSheet.create({
 	chartContainer: {
 		alignItems: 'center',
 		marginBottom: 20,
+		width: '100%',
+		overflow: 'hidden',
+	},
+	chartWrapper: {
+		overflow: 'hidden',
+		borderRadius: 12,
 	},
 	centerLabel: {
 		alignItems: 'center',
@@ -363,10 +370,12 @@ const styles = StyleSheet.create({
 		fontWeight: '600',
 		color: '#1A1A1A',
 		marginBottom: 2,
+		flexShrink: 1,
 	},
 	categoryAmount: {
 		fontSize: 14,
 		color: '#666',
+		flexShrink: 1,
 	},
 	categoryStats: {
 		alignItems: 'flex-end',

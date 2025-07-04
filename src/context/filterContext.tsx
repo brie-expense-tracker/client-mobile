@@ -1,31 +1,38 @@
 import React, { createContext, useState, useMemo, ReactNode } from 'react';
 
 interface FilterContextType {
-	selectedCategories: string[];
-	setSelectedCategories: (cats: string[]) => void;
+	selectedGoals: string[];
+	setSelectedGoals: (goals: string[]) => void;
+	selectedBudgets: string[];
+	setSelectedBudgets: (budgets: string[]) => void;
 	dateFilterMode: string;
 	setDateFilterMode: (mode: string) => void;
 }
 
 export const FilterContext = createContext<FilterContextType>({
-	selectedCategories: [],
-	setSelectedCategories: () => {},
+	selectedGoals: [],
+	setSelectedGoals: () => {},
+	selectedBudgets: [],
+	setSelectedBudgets: () => {},
 	dateFilterMode: 'month',
 	setDateFilterMode: () => {},
 });
 
 export const FilterProvider = ({ children }: { children: ReactNode }) => {
-	const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+	const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
+	const [selectedBudgets, setSelectedBudgets] = useState<string[]>([]);
 	const [dateFilterMode, setDateFilterMode] = useState<string>('month');
 
 	const value = useMemo(
 		() => ({
-			selectedCategories,
-			setSelectedCategories,
+			selectedGoals,
+			setSelectedGoals,
+			selectedBudgets,
+			setSelectedBudgets,
 			dateFilterMode,
 			setDateFilterMode,
 		}),
-		[selectedCategories, dateFilterMode]
+		[selectedGoals, selectedBudgets, dateFilterMode]
 	);
 
 	return (
