@@ -1,21 +1,51 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import './global.css';
-import React, { useEffect } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+	ActivityIndicator,
+	Text,
+	View,
+	TouchableOpacity,
+	StyleSheet,
+} from 'react-native';
 import { AuthProvider } from '../src/context/AuthContext';
 import { OnboardingProvider } from '../src/context/OnboardingContext';
 import { ProfileProvider } from '../src/context/profileContext';
 import useAuth from '../src/context/AuthContext';
 import { useOnboarding } from '../src/context/OnboardingContext';
 
+// Demo mode toggle - set to true to enable demo mode
+const DEMO_MODE = false;
+
 function RootLayoutContent() {
 	const { user, firebaseUser, loading } = useAuth();
 	const { hasSeenOnboarding } = useOnboarding();
 	const router = useRouter();
 	const segments = useSegments();
+	const [isMounted, setIsMounted] = useState(false);
 
 	useEffect(() => {
+		// Mark component as mounted after initial render
+		setIsMounted(true);
+	}, []);
+
+	useEffect(() => {
+		// Don't navigate until component is mounted
+		if (!isMounted) return;
+
+		// If demo mode is enabled, skip all authentication and go directly to main app
+		if (DEMO_MODE) {
+			if (segments[0] !== '(tabs)') {
+				console.log('Demo mode: Navigating directly to main app');
+				// Add a small delay to ensure navigation is ready
+				setTimeout(() => {
+					router.replace('/(tabs)/dashboard');
+				}, 100);
+			}
+			return;
+		}
+
 		if (loading || (user && hasSeenOnboarding === null)) return;
 
 		const inAuthGroup = segments[0] === '(auth)';
@@ -53,7 +83,23 @@ function RootLayoutContent() {
 				router.replace('/(auth)/signup');
 			}
 		}
-	}, [user, firebaseUser, loading, hasSeenOnboarding, segments]);
+	}, [user, firebaseUser, loading, hasSeenOnboarding, segments, isMounted]);
+
+	// Show demo mode indicator if demo mode is enabled
+	if (DEMO_MODE) {
+		return (
+			<GestureHandlerRootView style={{ flex: 1 }}>
+				<View style={styles.demoIndicator}>
+					<Text style={styles.demoText}>DEMO MODE</Text>
+				</View>
+				<Stack>
+					<Stack.Screen name="(auth)" options={{ headerShown: false }} />
+					<Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
+					<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+				</Stack>
+			</GestureHandlerRootView>
+		);
+	}
 
 	// Show spinner if loading auth, or if user is authenticated and onboarding status is loading
 	if (loading || (user && hasSeenOnboarding === null)) {
@@ -75,6 +121,24 @@ function RootLayoutContent() {
 		</GestureHandlerRootView>
 	);
 }
+
+const styles = StyleSheet.create({
+	demoIndicator: {
+		position: 'absolute',
+		top: 50,
+		right: 20,
+		backgroundColor: '#FF6B6B',
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		borderRadius: 20,
+		zIndex: 1000,
+	},
+	demoText: {
+		color: 'white',
+		fontSize: 12,
+		fontWeight: 'bold',
+	},
+});
 
 export default function RootLayout() {
 	return (

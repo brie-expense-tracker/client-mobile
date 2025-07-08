@@ -11,14 +11,12 @@ import {
 	Alert,
 	TextInput,
 	SectionList,
-	Animated,
-	KeyboardAvoidingView,
 	Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Calendar } from 'react-native-calendars';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import {
 	BorderlessButton,
 	GestureHandlerRootView,
@@ -236,10 +234,12 @@ export default function TransactionScreen() {
 		}
 	};
 
-	const handleCalendarDayPress = (day: { dateString: string }) => {
-		setSelectedDate(day.dateString);
-		setModalVisible(false);
-		setActivePicker(null);
+	const handleDateChange = (event: any, selectedDate?: Date) => {
+		if (selectedDate) {
+			setSelectedDate(selectedDate.toISOString().split('T')[0]);
+			setModalVisible(false);
+			setActivePicker(null);
+		}
 	};
 
 	// Edit modal handlers
@@ -385,27 +385,21 @@ export default function TransactionScreen() {
 										<Ionicons name="close" size={24} color="#9ca3af" />
 									</TouchableOpacity>
 								</View>
-								<Calendar
-									onDayPress={handleCalendarDayPress}
-									markedDates={{
-										[selectedDate]: {
-											selected: true,
-											selectedColor: '#0095FF',
-										},
-									}}
-									theme={{
-										todayTextColor: '#0095FF',
-										arrowColor: '#0095FF',
-										dotColor: '#0095FF',
-										selectedDayBackgroundColor: '#0095FF',
-										textDayFontSize: 16,
-										textMonthFontSize: 16,
-										textDayHeaderFontSize: 16,
-										textDayFontWeight: '500',
-										textMonthFontWeight: '500',
-										textDayHeaderFontWeight: '500',
-									}}
-								/>
+								{Platform.OS === 'ios' ? (
+									<DateTimePicker
+										value={new Date(selectedDate)}
+										onChange={handleDateChange}
+										mode="date"
+										display="inline"
+									/>
+								) : (
+									<DateTimePicker
+										value={new Date(selectedDate)}
+										onChange={handleDateChange}
+										mode="date"
+										display="default"
+									/>
+								)}
 							</View>
 						</TouchableWithoutFeedback>
 					</View>
@@ -516,8 +510,7 @@ const styles = StyleSheet.create({
 	modalContent: {
 		backgroundColor: 'white',
 		borderRadius: 24,
-		width: width * 0.8,
-		maxHeight: height * 0.4,
+		padding: 16,
 	},
 	modalHeader: {
 		flexDirection: 'row',

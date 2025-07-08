@@ -18,7 +18,6 @@ import {
 	GestureHandlerRootView,
 } from 'react-native-gesture-handler';
 import { TransactionContext } from '../../../src/context/transactionContext';
-import useAuth from '../../../src/context/AuthContext';
 import { getCategoryMeta } from '../../../src/utils/categoriesUtils';
 
 /**
@@ -87,27 +86,6 @@ const formatTransactionDate = (dateString: string): string => {
 	} catch (error) {
 		return 'Invalid Date';
 	}
-};
-
-// Category → icon map lives at module scope so it isn't recreated each render
-const CATEGORY_ICON_MAP: Record<
-	string,
-	{ name: keyof typeof Ionicons.glyphMap; color: string }
-> = {
-	Groceries: { name: 'cart-outline', color: '#4CAF50' },
-	Utilities: { name: 'flash-outline', color: '#FFC107' },
-	Entertainment: { name: 'game-controller-outline', color: '#9C27B0' },
-	Travel: { name: 'airplane-outline', color: '#2196F3' },
-	Health: { name: 'fitness-outline', color: '#F44336' },
-	Food: { name: 'restaurant-outline', color: '#FF9800' },
-	Shopping: { name: 'bag-outline', color: '#E91E63' },
-	Transportation: { name: 'car-outline', color: '#2196F3' },
-	Housing: { name: 'home-outline', color: '#795548' },
-	Education: { name: 'school-outline', color: '#3F51B5' },
-	Salary: { name: 'cash-outline', color: '#4CAF50' },
-	Investment: { name: 'trending-up-outline', color: '#009688' },
-	Gifts: { name: 'gift-outline', color: '#E91E63' },
-	Other: { name: 'ellipsis-horizontal-outline', color: '#9E9E9E' },
 };
 
 /**
@@ -317,7 +295,6 @@ const TransactionHistory: React.FC<{
  */
 const Dashboard: React.FC = () => {
 	const { transactions, isLoading, refetch } = useContext(TransactionContext);
-	const { user, profile } = useAuth();
 	const [isPressed, setIsPressed] = useState(false);
 
 	const onRefresh = useCallback(async () => {
@@ -396,18 +373,11 @@ const Dashboard: React.FC = () => {
 						{/* Header */}
 						{/* -------------------------------------------------- */}
 						<View style={styles.headerContainer}>
-							<View style={styles.headerTextContainer}>
-								<Image
-									source={require('../../../src/assets/images/brie-logos.png')}
-									style={styles.logo}
-									resizeMode="contain"
-								/>
-								{profile?.firstName && (
-									<Text style={styles.welcomeText}>
-										Welcome back, {profile.firstName}! 👋
-									</Text>
-								)}
-							</View>
+							<Image
+								source={require('../../../src/assets/images/brie-logos.png')}
+								style={styles.logo}
+								resizeMode="contain"
+							/>
 
 							<TouchableOpacity
 								onPress={() => router.push('/dashboard/notifications')}
@@ -500,10 +470,8 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
-		marginBottom: 24,
-	},
-	headerTextContainer: {
-		flexDirection: 'column',
+		marginBottom: 12,
+		flex: 1,
 	},
 	notificationButton: {
 		width: 48,
@@ -687,15 +655,12 @@ const styles = StyleSheet.create({
 		lineHeight: 20,
 	},
 	logo: {
-		width: 100,
 		height: 30,
+		width: 80,
+		alignSelf: 'center',
+		marginBottom: 12,
 	},
-	welcomeText: {
-		fontSize: 16,
-		fontWeight: '500',
-		color: '#333',
-		marginTop: 8,
-	},
+
 	emptyContainer: {
 		justifyContent: 'center',
 		alignItems: 'center',

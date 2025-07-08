@@ -1,6 +1,6 @@
 // app/(tabs)/insights.tsx
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
 	SafeAreaView,
 	ScrollView,
@@ -11,6 +11,7 @@ import {
 	Alert,
 	View,
 	TouchableOpacity,
+	RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -46,6 +47,7 @@ export default function InsightsHubScreen() {
 	const [transactions, setTransactions] = useState<Transaction[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [generating, setGenerating] = useState(false);
+	const [refreshing, setRefreshing] = useState(false);
 	const [selectedPeriod, setSelectedPeriod] = useState<
 		'week' | 'month' | 'quarter'
 	>('month');
@@ -54,6 +56,17 @@ export default function InsightsHubScreen() {
 	useEffect(() => {
 		fetchInsights();
 		fetchTransactions();
+	}, []);
+
+	const onRefresh = useCallback(async () => {
+		setRefreshing(true);
+		try {
+			await Promise.all([fetchInsights(), fetchTransactions()]);
+		} catch (error) {
+			console.error('Error refreshing data:', error);
+		} finally {
+			setRefreshing(false);
+		}
 	}, []);
 
 	async function fetchTransactions() {
@@ -189,15 +202,87 @@ export default function InsightsHubScreen() {
 		}
 	}
 
+	async function testInsightsAPI() {
+		try {
+			console.log('Testing insights API...');
+
+			// Test 1: Check if we can reach the insights endpoint
+			const testResponse = await ApiService.get('/insights/weekly');
+			console.log('Test 1 - Weekly insights response:', testResponse);
+
+			// Test 2: Check if user has transactions
+			const transactionsResponse = await ApiService.get('/transactions');
+			console.log('Test 2 - Transactions response:', transactionsResponse);
+
+			// Test 3: Try to generate a single insight
+			const generateResponse = await ApiService.post(
+				'/insights/generate/weekly',
+				{}
+			);
+			console.log(
+				'Test 3 - Generate weekly insight response:',
+				generateResponse
+			);
+
+			const message =
+				`Test 1 (GET insights): ${
+					testResponse.success ? 'Success' : 'Failed'
+				}\n` +
+				`Test 2 (GET transactions): ${
+					transactionsResponse.success ? 'Success' : 'Failed'
+				}\n` +
+				`Test 3 (POST generate): ${
+					generateResponse.success ? 'Success' : 'Failed'
+				}\n\n` +
+				`Transactions count: ${
+					(transactionsResponse.data as any)?.data?.length || 0
+				}\n` +
+				`Error details: ${generateResponse.error || 'None'}`;
+
+			Alert.alert('API Test Results', message, [{ text: 'OK' }]);
+		} catch (error) {
+			console.error('API test error:', error);
+			Alert.alert(
+				'API Test Error',
+				error instanceof Error ? error.message : 'Unknown error'
+			);
+		}
+	}
+
 	async function generateNewInsights() {
 		try {
+			console.log('generateNewInsights - Starting generation process...');
 			setGenerating(true);
+
+			// Generate insights for all periods
+			console.log(
+				'generateNewInsights - Calling generateInsights for all periods...'
+			);
 			const [dailyGen, weeklyGen, monthlyGen] = await Promise.all([
 				InsightsService.generateInsights('daily'),
 				InsightsService.generateInsights('weekly'),
 				InsightsService.generateInsights('monthly'),
 			]);
 
+			console.log('Generation responses:', {
+				dailyGen: {
+					success: dailyGen.success,
+					dataLength: dailyGen.data?.length,
+					error: dailyGen.error,
+				},
+				weeklyGen: {
+					success: weeklyGen.success,
+					dataLength: weeklyGen.data?.length,
+					error: weeklyGen.error,
+				},
+				monthlyGen: {
+					success: monthlyGen.success,
+					dataLength: monthlyGen.data?.length,
+					error: monthlyGen.error,
+				},
+			});
+
+			// Collect all generated insights
 			const allInsights = [
 				...(dailyGen.success && dailyGen.data && Array.isArray(dailyGen.data)
 					? dailyGen.data
@@ -212,12 +297,40 @@ export default function InsightsHubScreen() {
 					: []),
 			];
 
+			console.log(
+				'generateNewInsights - Collected insights:',
+				allInsights.length
+			);
+
 			// Sort by most recent and take top 3
 			allInsights.sort(
 				(a, b) =>
 					new Date(b.generatedAt).getTime() - new Date(a.generatedAt).getTime()
 			);
-			setInsights(allInsights.slice(0, 3));
+
+			const recentInsights = allInsights.slice(0, 3);
+			console.log(
+				'generateNewInsights - Setting insights:',
+				recentInsights.length
+			);
+			setInsights(recentInsights);
+
+			// If we have insights, show success message
+			if (recentInsights.length > 0) {
+				console.log(
+					'generateNewInsights - Success! Generated insights:',
+					recentInsights.length
+				);
+				Alert.alert(
+					'Success',
+					`Generated ${recentInsights.length} new insights!`,
+					[{ text: 'OK' }]
+				);
+			} else {
+				// If no insights were generated, try to fetch existing ones
+				console.log('No insights generated, fetching existing ones...');
+				await fetchInsights();
+			}
 		} catch (error) {
 			console.error('Error generating insights:', error);
 			Alert.alert('Error', 'Failed to generate insights. Please try again.');
@@ -239,19 +352,46 @@ export default function InsightsHubScreen() {
 		<SafeAreaView style={styles.safe}>
 			<View style={styles.header}>
 				<Text style={styles.headerTitle}>AI Coach</Text>
-				<TouchableOpacity
-					style={styles.graphToggle}
-					onPress={() => setShowGraphs(!showGraphs)}
-				>
-					<Ionicons
-						name={showGraphs ? 'list' : 'analytics'}
-						size={24}
-						color="#2E78B7"
-					/>
-				</TouchableOpacity>
+				<View style={styles.headerActions}>
+					{/* Refresh Button */}
+					<TouchableOpacity
+						style={styles.refreshButton}
+						onPress={onRefresh}
+						disabled={refreshing}
+					>
+						<Ionicons
+							name="refresh"
+							size={20}
+							color="#2E78B7"
+							style={refreshing ? styles.rotating : undefined}
+						/>
+					</TouchableOpacity>
+
+					{/* Graph Toggle */}
+					<TouchableOpacity
+						style={styles.graphToggle}
+						onPress={() => setShowGraphs(!showGraphs)}
+					>
+						<Ionicons
+							name={showGraphs ? 'list' : 'analytics'}
+							size={24}
+							color="#2E78B7"
+						/>
+					</TouchableOpacity>
+				</View>
 			</View>
 
-			<ScrollView contentContainerStyle={styles.container}>
+			<ScrollView
+				contentContainerStyle={styles.container}
+				refreshControl={
+					<RefreshControl
+						refreshing={refreshing}
+						onRefresh={onRefresh}
+						colors={['#2E78B7']}
+						tintColor="#2E78B7"
+					/>
+				}
+			>
 				{showGraphs ? (
 					// Graph View
 					<View>
@@ -376,6 +516,17 @@ export default function InsightsHubScreen() {
 										</Text>
 									)}
 								</Pressable>
+
+								{/* Test Button */}
+								<Pressable
+									style={[
+										styles.generateButton,
+										{ backgroundColor: '#666', marginTop: 8 },
+									]}
+									onPress={testInsightsAPI}
+								>
+									<Text style={styles.generateButtonText}>Test API</Text>
+								</Pressable>
 							</View>
 						)}
 					</View>
@@ -398,10 +549,23 @@ const styles = StyleSheet.create({
 		fontSize: 28,
 		fontWeight: '600',
 	},
+	headerActions: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 12,
+	},
+	refreshButton: {
+		padding: 8,
+		borderRadius: 8,
+		backgroundColor: '#F0F8FF',
+	},
 	graphToggle: {
 		padding: 8,
 		borderRadius: 8,
 		backgroundColor: '#F0F8FF',
+	},
+	rotating: {
+		transform: [{ rotate: '360deg' }],
 	},
 	container: {
 		paddingHorizontal: 16,

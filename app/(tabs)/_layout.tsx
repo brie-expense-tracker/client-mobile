@@ -4,8 +4,36 @@ import { TransactionProvider } from '../../src/context/transactionContext';
 import { BudgetProvider } from '../../src/context/budgetContext';
 import { GoalProvider } from '../../src/context/goalContext';
 import { ProfileProvider } from '../../src/context/profileContext';
+import React, { useState } from 'react';
+import {
+	View,
+	Text,
+	TouchableOpacity,
+	StyleSheet,
+	Dimensions,
+} from 'react-native';
+import RNModal from 'react-native-modal';
+import { router } from 'expo-router';
+
+const { width, height } = Dimensions.get('window');
 
 export default function TabLayout() {
+	const [showTransactionModal, setShowTransactionModal] = useState(false);
+
+	const handleTransactionTabPress = () => {
+		setShowTransactionModal(true);
+	};
+
+	const navigateToAddTransaction = () => {
+		setShowTransactionModal(false);
+		router.replace('/transaction');
+	};
+
+	const navigateToAddExpense = () => {
+		setShowTransactionModal(false);
+		router.replace('/transaction/expense');
+	};
+
 	return (
 		<ProfileProvider>
 			<TransactionProvider>
@@ -66,6 +94,12 @@ export default function TabLayout() {
 									tabBarShowLabel: false,
 									tabBarLabel: 'Transaction',
 								}}
+								listeners={{
+									tabPress: (e) => {
+										e.preventDefault();
+										handleTransactionTabPress();
+									},
+								}}
 							/>
 							<Tabs.Screen
 								name="budgets"
@@ -92,9 +126,105 @@ export default function TabLayout() {
 								}}
 							/>
 						</Tabs>
+
+						{/* Transaction Choice Modal */}
+						<RNModal
+							isVisible={showTransactionModal}
+							onBackdropPress={() => setShowTransactionModal(false)}
+							animationIn="slideInUp"
+							animationOut="slideOutDown"
+							backdropOpacity={0.5}
+							useNativeDriver
+							style={styles.modal}
+						>
+							<View style={styles.modalContent}>
+								<Text style={styles.modalTitle}>
+									What would you like to do?
+								</Text>
+
+								<TouchableOpacity
+									style={styles.modalButton}
+									onPress={navigateToAddTransaction}
+								>
+									<Ionicons
+										name="add-circle-outline"
+										size={24}
+										color="#0095FF"
+									/>
+									<Text style={styles.modalButtonText}>Add Transaction</Text>
+								</TouchableOpacity>
+
+								<TouchableOpacity
+									style={styles.modalButton}
+									onPress={navigateToAddExpense}
+								>
+									<Ionicons
+										name="remove-circle-outline"
+										size={24}
+										color="#0095FF"
+									/>
+									<Text style={styles.modalButtonText}>Add Expense</Text>
+								</TouchableOpacity>
+
+								<TouchableOpacity
+									style={styles.cancelButton}
+									onPress={() => setShowTransactionModal(false)}
+								>
+									<Text style={styles.cancelButtonText}>Cancel</Text>
+								</TouchableOpacity>
+							</View>
+						</RNModal>
 					</GoalProvider>
 				</BudgetProvider>
 			</TransactionProvider>
 		</ProfileProvider>
 	);
 }
+
+const styles = StyleSheet.create({
+	modal: {
+		margin: 0,
+		justifyContent: 'flex-end',
+	},
+	modalContent: {
+		backgroundColor: 'white',
+		borderRadius: 16,
+		padding: 24,
+		maxWidth: 400,
+		alignItems: 'center',
+	},
+	modalTitle: {
+		fontSize: 20,
+		fontWeight: '600',
+		color: '#212121',
+		marginBottom: 24,
+		textAlign: 'center',
+	},
+	modalButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#f8f9fa',
+		paddingVertical: 16,
+		paddingHorizontal: 20,
+		borderRadius: 12,
+		marginBottom: 12,
+		width: '100%',
+		justifyContent: 'center',
+	},
+	modalButtonText: {
+		fontSize: 16,
+		fontWeight: '500',
+		color: '#212121',
+		marginLeft: 12,
+	},
+	cancelButton: {
+		marginTop: 8,
+		paddingVertical: 12,
+		paddingHorizontal: 20,
+	},
+	cancelButtonText: {
+		fontSize: 16,
+		color: '#6b7280',
+		fontWeight: '500',
+	},
+});

@@ -96,7 +96,7 @@ const AddTransaction: React.FC<AddTransactionProps> = ({
 	const handleMadeSubmit = async () => {
 		try {
 			const response = await axios.post(
-				'http://localhost:3000/api/transactions',
+				'http://192.168.1.222:3000/api/transactions',
 				transaction
 			);
 			console.log('Transaction saved:', response.data);
@@ -118,7 +118,7 @@ const AddTransaction: React.FC<AddTransactionProps> = ({
 	const handleSpentSubmit = async () => {
 		try {
 			const response = await axios.post(
-				'http://localhost:3000/api/transactions',
+				'http://192.168.1.222:3000/api/transactions',
 				transaction
 			);
 			console.log('Transaction saved:', response.data);

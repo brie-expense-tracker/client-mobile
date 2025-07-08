@@ -19,6 +19,7 @@ export interface Budget {
 	icon: string;
 	color: string;
 	categories: string[];
+	period: 'weekly' | 'monthly';
 	userId?: string;
 	createdAt?: string;
 	updatedAt?: string;
@@ -30,6 +31,7 @@ export interface CreateBudgetData {
 	icon: string;
 	color: string;
 	categories: string[];
+	period: 'weekly' | 'monthly';
 }
 
 export interface UpdateBudgetData {
@@ -39,6 +41,7 @@ export interface UpdateBudgetData {
 	icon?: string;
 	color?: string;
 	categories?: string[];
+	period?: 'weekly' | 'monthly';
 }
 
 interface BudgetContextType {
@@ -92,6 +95,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 					icon: budget.icon,
 					color: budget.color,
 					categories: Array.isArray(budget.categories) ? budget.categories : [],
+					period: budget.period || 'monthly', // Default to monthly if not provided
 					userId: budget.userId,
 					createdAt: budget.createdAt,
 					updatedAt: budget.updatedAt,
@@ -151,6 +155,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 					categories: Array.isArray(actualData.categories)
 						? actualData.categories
 						: [],
+					period: actualData.period || 'monthly', // Default to monthly if not provided
 					userId: actualData.userId,
 					createdAt: actualData.createdAt,
 					updatedAt: actualData.updatedAt,
@@ -202,6 +207,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 						categories: Array.isArray(actualData.categories)
 							? actualData.categories
 							: [],
+						period: actualData.period || 'monthly', // Default to monthly if not provided
 						userId: actualData.userId,
 						createdAt: actualData.createdAt,
 						updatedAt: actualData.updatedAt,
@@ -262,6 +268,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 						categories: Array.isArray(actualData.categories)
 							? actualData.categories
 							: [],
+						period: actualData.period || 'monthly', // Default to monthly if not provided
 						userId: actualData.userId,
 						createdAt: actualData.createdAt,
 						updatedAt: actualData.updatedAt,
