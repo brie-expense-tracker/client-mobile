@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TransactionContext } from '../../../../src/context/transactionContext';
-import { Calendar } from 'react-native-calendars';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Category } from '../../../../src/data/transactions';
 
 /**
@@ -149,12 +149,18 @@ const EditTransactionScreen = () => {
 	};
 
 	/**
-	 * Handles date selection from calendar
-	 * @param day - Object containing the selected date string
+	 * Handles date selection from date picker
+	 * @param event - The date picker event
+	 * @param selectedDate - The selected date
 	 */
-	const handleDateSelect = (day: { dateString: string }) => {
-		setEditForm({ ...editForm, date: day.dateString });
-		setShowCalendar(false);
+	const handleDateSelect = (event: any, selectedDate?: Date) => {
+		if (selectedDate) {
+			setEditForm({
+				...editForm,
+				date: selectedDate.toISOString().split('T')[0],
+			});
+			setShowCalendar(false);
+		}
 	};
 
 	/**
@@ -253,27 +259,21 @@ const EditTransactionScreen = () => {
 				{/* Calendar component - shown when date button is pressed */}
 				{showCalendar && (
 					<View style={styles.calendarContainer}>
-						<Calendar
-							onDayPress={handleDateSelect}
-							markedDates={{
-								[editForm.date]: {
-									selected: true,
-									selectedColor: '#0095FF',
-								},
-							}}
-							theme={{
-								todayTextColor: '#0095FF',
-								arrowColor: '#0095FF',
-								dotColor: '#0095FF',
-								selectedDayBackgroundColor: '#0095FF',
-								textDayFontSize: 16,
-								textMonthFontSize: 16,
-								textDayHeaderFontSize: 16,
-								textDayFontWeight: '500',
-								textMonthFontWeight: '500',
-								textDayHeaderFontWeight: '500',
-							}}
-						/>
+						{Platform.OS === 'ios' ? (
+							<DateTimePicker
+								value={new Date(editForm.date)}
+								onChange={handleDateSelect}
+								mode="date"
+								display="spinner"
+							/>
+						) : (
+							<DateTimePicker
+								value={new Date(editForm.date)}
+								onChange={handleDateSelect}
+								mode="date"
+								display="default"
+							/>
+						)}
 					</View>
 				)}
 

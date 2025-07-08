@@ -35,6 +35,7 @@ const sampleBudgets = [
 		spent: 320,
 		icon: 'restaurant',
 		color: '#FF6B6B',
+		categories: [],
 	},
 	{
 		id: '2',
@@ -43,6 +44,7 @@ const sampleBudgets = [
 		spent: 280,
 		icon: 'car',
 		color: '#4ECDC4',
+		categories: [],
 	},
 	{
 		id: '3',
@@ -51,6 +53,7 @@ const sampleBudgets = [
 		spent: 150,
 		icon: 'game-controller',
 		color: '#45B7D1',
+		categories: [],
 	},
 	{
 		id: '4',
@@ -59,6 +62,7 @@ const sampleBudgets = [
 		spent: 450,
 		icon: 'bag',
 		color: '#96CEB4',
+		categories: [],
 	},
 	{
 		id: '5',
@@ -67,6 +71,7 @@ const sampleBudgets = [
 		spent: 220,
 		icon: 'flash',
 		color: '#FFEAA7',
+		categories: [],
 	},
 ];
 
@@ -79,6 +84,7 @@ const sampleGoals = [
 		deadline: '2024-12-31',
 		icon: 'shield-checkmark',
 		color: '#4CAF50',
+		categories: [],
 	},
 	{
 		id: '2',
@@ -88,6 +94,7 @@ const sampleGoals = [
 		deadline: '2024-08-15',
 		icon: 'airplane',
 		color: '#2196F3',
+		categories: [],
 	},
 	{
 		id: '3',
@@ -97,6 +104,7 @@ const sampleGoals = [
 		deadline: '2025-06-30',
 		icon: 'car-sport',
 		color: '#FF9800',
+		categories: [],
 	},
 	{
 		id: '4',
@@ -106,6 +114,7 @@ const sampleGoals = [
 		deadline: '2025-12-31',
 		icon: 'home',
 		color: '#9C27B0',
+		categories: [],
 	},
 ];
 
@@ -357,15 +366,13 @@ export default function GraphsDemoScreen() {
 							<Text style={styles.backToSelectorText}>Back to Graphs</Text>
 						</TouchableOpacity>
 					</View>
-					<View style={styles.graphContentWrapper}>
-						<ScrollView
-							style={styles.graphScrollView}
-							contentContainerStyle={styles.graphScrollContent}
-							showsVerticalScrollIndicator={false}
-						>
-							{renderSelectedGraph()}
-						</ScrollView>
-					</View>
+					<ScrollView
+						style={styles.graphScrollView}
+						contentContainerStyle={styles.graphScrollContent}
+						showsVerticalScrollIndicator={false}
+					>
+						{renderSelectedGraph()}
+					</ScrollView>
 				</View>
 			)}
 		</SafeAreaView>
@@ -475,9 +482,5 @@ const styles = StyleSheet.create({
 	graphScrollContent: {
 		padding: 20,
 		paddingBottom: 40,
-	},
-	graphContentWrapper: {
-		flex: 1,
-		overflow: 'hidden',
 	},
 });

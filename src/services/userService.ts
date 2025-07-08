@@ -1,6 +1,6 @@
 import { ApiService } from './apiService';
 
-const API_BASE_URL = 'http://localhost:3000/api'; // Updated to include /api prefix
+// API_BASE_URL is now handled by ApiService
 
 export interface User {
 	_id: string;

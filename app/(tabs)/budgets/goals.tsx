@@ -5,9 +5,7 @@ import {
 	StyleSheet,
 	FlatList,
 	Dimensions,
-	Modal,
 	TextInput,
-	Animated,
 	KeyboardAvoidingView,
 	Platform,
 	Alert,
@@ -15,11 +13,15 @@ import {
 	SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RectButton } from 'react-native-gesture-handler';
+import { BorderlessButton, RectButton } from 'react-native-gesture-handler';
 import { useGoal, Goal } from '../../../src/context/goalContext';
 import { useContext } from 'react';
 import { TransactionContext } from '../../../src/context/transactionContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
+import RNModal from 'react-native-modal';
+import QuickAddTransaction from '../../../src/components/QuickAddTransaction';
 
 const { width } = Dimensions.get('window');
 
@@ -124,11 +126,19 @@ export default function GoalsScreen() {
 	// ==========================================
 	const [isModalVisible, setIsModalVisible] = useState(false);
 	const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+	const [isOptionsModalVisible, setIsOptionsModalVisible] = useState(false);
+	const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
 	const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
+	const [pendingEditGoal, setPendingEditGoal] = useState<Goal | null>(null);
 	const [showColorPicker, setShowColorPicker] = useState(false);
-	const [showCategoryPicker, setShowCategoryPicker] = useState(false);
 	const [showIconPicker, setShowIconPicker] = useState(false);
 	const [showCustomTarget, setShowCustomTarget] = useState(false);
+	const [showDatePicker, setShowDatePicker] = useState(false);
+	const [selectedDate, setSelectedDate] = useState(new Date());
+	const [isPressed, setIsPressed] = useState(false);
+	const [showQuickAddModal, setShowQuickAddModal] = useState(false);
+	const [selectedGoalForTransaction, setSelectedGoalForTransaction] =
+		useState<Goal | null>(null);
 	const [newGoal, setNewGoal] = useState({
 		name: '',
 		target: '',
@@ -137,11 +147,6 @@ export default function GoalsScreen() {
 		color: COLOR_PALETTE.blue.base,
 		categories: [] as string[],
 	});
-
-	// ==========================================
-	// Animation Setup
-	// ==========================================
-	const slideAnim = React.useRef(new Animated.Value(0)).current;
 
 	// ==========================================
 	// Auto-open modal on navigation
@@ -284,28 +289,17 @@ export default function GoalsScreen() {
 			categories: [],
 		});
 		setShowColorPicker(false);
-		setShowCategoryPicker(false);
 		setShowIconPicker(false);
 		setShowCustomTarget(false);
+		setShowDatePicker(false);
+		setSelectedDate(new Date());
 		setIsModalVisible(true);
-		Animated.spring(slideAnim, {
-			toValue: 1,
-			useNativeDriver: true,
-			tension: 50,
-			friction: 7,
-		}).start();
 	};
 
 	const hideModal = () => {
-		Animated.timing(slideAnim, {
-			toValue: 0,
-			duration: 200,
-			useNativeDriver: true,
-		}).start(() => {
-			setIsModalVisible(false);
-			// Update the URL to remove the openModal parameter
-			router.setParams({ openModal: 'false' });
-		});
+		setIsModalVisible(false);
+		// Update the URL to remove the openModal parameter
+		router.setParams({ openModal: 'false' });
 	};
 
 	const showEditModal = (goal: Goal) => {
@@ -319,29 +313,64 @@ export default function GoalsScreen() {
 			categories: goal.categories || [],
 		});
 		setShowColorPicker(false);
-		setShowCategoryPicker(false);
 		setShowIconPicker(false);
 		setShowCustomTarget(false);
+		setShowDatePicker(false);
+		setSelectedDate(new Date(goal.deadline));
 		setIsEditModalVisible(true);
-		Animated.spring(slideAnim, {
-			toValue: 1,
-			useNativeDriver: true,
-			tension: 50,
-			friction: 7,
-		}).start();
 	};
 
 	const hideEditModal = () => {
-		Animated.timing(slideAnim, {
-			toValue: 0,
-			duration: 200,
-			useNativeDriver: true,
-		}).start(() => {
-			setIsEditModalVisible(false);
-			setEditingGoal(null);
-			// Update the URL to remove the openModal parameter
-			router.setParams({ openModal: 'false' });
-		});
+		setIsEditModalVisible(false);
+		setEditingGoal(null);
+		// Update the URL to remove the openModal parameter
+		router.setParams({ openModal: 'false' });
+	};
+
+	const showOptionsModal = (goal: Goal) => {
+		setSelectedGoal(goal);
+		setIsOptionsModalVisible(true);
+	};
+
+	const hideOptionsModal = () => {
+		console.log('hideOptionsModal called');
+		setIsOptionsModalVisible(false);
+		setSelectedGoal(null);
+	};
+
+	const handleOptionsModalHide = () => {
+		console.log('Options modal hidden, checking for pending edit');
+		if (pendingEditGoal) {
+			console.log('Showing edit modal for pending goal:', pendingEditGoal);
+			showEditModal(pendingEditGoal);
+			setPendingEditGoal(null);
+		}
+	};
+
+	const handleEditFromOptions = () => {
+		console.log('handleEditFromOptions called, selectedGoal:', selectedGoal);
+		if (selectedGoal) {
+			// Store the goal to edit and hide the options modal
+			setPendingEditGoal(selectedGoal);
+			hideOptionsModal();
+		}
+	};
+
+	const handleDeleteFromOptions = async () => {
+		if (selectedGoal) {
+			hideOptionsModal();
+			await handleDeleteGoal(selectedGoal.id);
+		}
+	};
+
+	const handleQuickAddTransaction = (goal: Goal) => {
+		setSelectedGoalForTransaction(goal);
+		setShowQuickAddModal(true);
+	};
+
+	const handleCloseQuickAddModal = () => {
+		setShowQuickAddModal(false);
+		setSelectedGoalForTransaction(null);
 	};
 
 	// ==========================================
@@ -373,7 +402,10 @@ export default function GoalsScreen() {
 						<View key={name} style={styles.colorColumn}>
 							<RectButton
 								style={styles.colorOptionContainer}
-								onPress={() => setNewGoal({ ...newGoal, color: colors.base })}
+								onPress={() => {
+									setNewGoal({ ...newGoal, color: colors.base });
+									setShowColorPicker(!showColorPicker);
+								}}
 							>
 								<View
 									style={[styles.colorSquare, { backgroundColor: colors.base }]}
@@ -387,7 +419,10 @@ export default function GoalsScreen() {
 							</RectButton>
 							<RectButton
 								style={styles.colorOptionContainer}
-								onPress={() => setNewGoal({ ...newGoal, color: colors.pastel })}
+								onPress={() => {
+									setNewGoal({ ...newGoal, color: colors.pastel });
+									setShowColorPicker(!showColorPicker);
+								}}
 							>
 								<View
 									style={[
@@ -404,7 +439,10 @@ export default function GoalsScreen() {
 							</RectButton>
 							<RectButton
 								style={styles.colorOptionContainer}
-								onPress={() => setNewGoal({ ...newGoal, color: colors.dark })}
+								onPress={() => {
+									setNewGoal({ ...newGoal, color: colors.dark });
+									setShowColorPicker(!showColorPicker);
+								}}
 							>
 								<View
 									style={[styles.colorSquare, { backgroundColor: colors.dark }]}
@@ -442,7 +480,7 @@ export default function GoalsScreen() {
 					>
 						<Ionicons
 							name={newGoal.icon as any}
-							size={24}
+							size={20}
 							color={newGoal.color}
 						/>
 					</View>
@@ -460,7 +498,12 @@ export default function GoalsScreen() {
 					{goalIcons.map((icon) => (
 						<RectButton
 							key={icon}
-							style={styles.iconOption}
+							style={[
+								styles.iconOption,
+								newGoal.icon === icon && {
+									backgroundColor: newGoal.color,
+								},
+							]}
 							onPress={() => {
 								setNewGoal({ ...newGoal, icon });
 								setShowIconPicker(false);
@@ -479,95 +522,43 @@ export default function GoalsScreen() {
 	);
 
 	// ==========================================
-	// Category Selection Component
+	// Date Picker Component
 	// ==========================================
-	const CategoryPicker = () => (
-		<View style={styles.categoryPickerContainer}>
-			<Text style={styles.label}>Select Categories</Text>
-			<Text style={styles.categorySubtext}>
-				Choose which spending categories contribute to this goal
-			</Text>
+	const DatePicker = () => (
+		<View style={styles.datePickerContainer}>
+			<Text style={styles.label}>Target Date</Text>
 			<RectButton
-				style={styles.categoryButton}
-				onPress={() => setShowCategoryPicker(!showCategoryPicker)}
+				style={styles.dateButton}
+				onPress={() => setShowDatePicker(!showDatePicker)}
 			>
-				<View style={styles.categoryButtonContent}>
-					<View style={styles.categoryButtonLeft}>
-						<View
-							style={[
-								styles.categoryIcon,
-								{ backgroundColor: newGoal.color + '20' },
-							]}
-						>
-							<Ionicons name="list" size={16} color={newGoal.color} />
-						</View>
-						<Text style={styles.categoryButtonText}>
-							{newGoal.categories.length > 0
-								? `${newGoal.categories.length} categories selected`
-								: 'Choose categories'}
-						</Text>
+				<View style={styles.dateButtonContent}>
+					<View
+						style={[styles.dateIcon, { backgroundColor: newGoal.color + '20' }]}
+					>
+						<Ionicons name="calendar-outline" size={16} color={newGoal.color} />
 					</View>
-					<Ionicons
-						name={showCategoryPicker ? 'chevron-up' : 'chevron-down'}
-						size={20}
-						color="#757575"
-					/>
+					<Text style={styles.dateButtonText}>
+						{newGoal.deadline || 'Select date'}
+					</Text>
+					<Ionicons name="chevron-down" size={20} color="#757575" />
 				</View>
 			</RectButton>
 
-			{showCategoryPicker && (
-				<ScrollView
-					style={styles.categoryList}
-					showsVerticalScrollIndicator={false}
-				>
-					{categories.map((category) => (
-						<RectButton
-							key={category.id}
-							style={styles.categoryOption}
-							onPress={() => {
-								const isSelected = newGoal.categories.includes(category.name);
-								if (isSelected) {
-									setNewGoal({
-										...newGoal,
-										categories: newGoal.categories.filter(
-											(cat) => cat !== category.name
-										),
-									});
-								} else {
-									setNewGoal({
-										...newGoal,
-										categories: [...newGoal.categories, category.name],
-									});
-								}
-							}}
-						>
-							<View style={styles.categoryOptionContent}>
-								<View
-									style={[
-										styles.categoryIcon,
-										{ backgroundColor: category.color + '20' },
-									]}
-								>
-									<Ionicons
-										name={category.icon as any}
-										size={16}
-										color={category.color}
-									/>
-								</View>
-								<Text style={styles.categoryName}>{category.name}</Text>
-								<View style={styles.checkboxContainer}>
-									{newGoal.categories.includes(category.name) && (
-										<Ionicons
-											name="checkmark-circle"
-											size={20}
-											color={newGoal.color}
-										/>
-									)}
-								</View>
-							</View>
-						</RectButton>
-					))}
-				</ScrollView>
+			{showDatePicker && (
+				<DateTimePicker
+					mode="date"
+					display="inline"
+					onChange={(event, date) => {
+						setShowDatePicker(false);
+						if (date) {
+							setSelectedDate(date);
+							const formattedDate = date.toISOString().split('T')[0];
+							setNewGoal({ ...newGoal, deadline: formattedDate });
+						}
+					}}
+					minimumDate={new Date()}
+					value={selectedDate}
+				/>
 			)}
 		</View>
 	);
@@ -584,7 +575,10 @@ export default function GoalsScreen() {
 		);
 
 		return (
-			<RectButton style={styles.card} onPress={() => showEditModal(item)}>
+			<RectButton
+				style={styles.card}
+				onPress={() => handleQuickAddTransaction(item)}
+			>
 				<View style={styles.cardHeader}>
 					<View
 						style={[styles.iconWrapper, { backgroundColor: `${item.color}20` }]}
@@ -592,6 +586,13 @@ export default function GoalsScreen() {
 						<Ionicons name={item.icon as any} size={24} color={item.color} />
 					</View>
 					<Text style={styles.categoryText}>{item.name}</Text>
+					<BorderlessButton
+						style={styles.optionsButton}
+						onPress={() => showOptionsModal(item)}
+						onActiveStateChange={setIsPressed}
+					>
+						<Ionicons name="ellipsis-horizontal" size={20} color="#757575" />
+					</BorderlessButton>
 				</View>
 
 				<View style={styles.amounts}>
@@ -670,360 +671,357 @@ export default function GoalsScreen() {
 			/>
 
 			{/* Add Goal Modal */}
-			<Modal
-				visible={isModalVisible}
-				transparent
-				animationType="fade"
-				onRequestClose={hideModal}
+			<RNModal
+				isVisible={isModalVisible}
+				style={styles.modal}
+				animationIn="slideInUp"
+				animationOut="slideOutDown"
+				useNativeDriver
 			>
 				<KeyboardAvoidingView
 					behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
 					style={styles.modalContainer}
 				>
-					<Animated.View
-						style={[
-							styles.modalAnimationContainer,
-							{
-								transform: [
-									{
-										translateY: slideAnim.interpolate({
-											inputRange: [0, 1],
-											outputRange: [600, 0],
-										}),
-									},
-								],
-							},
-						]}
-					>
-						<View style={styles.modalContainer}>
-							<View style={styles.modalContent}>
-								<View style={styles.modalHeader}>
-									<Text style={styles.modalTitle}>Add New Goal</Text>
-									<RectButton onPress={hideModal}>
-										<Ionicons name="close" size={24} color="#757575" />
-									</RectButton>
-								</View>
-								<ScrollView
-									showsVerticalScrollIndicator={false}
-									contentContainerStyle={{ paddingBottom: 24 }}
-								>
-									<View style={styles.formGroup}>
-										<Text style={styles.label}>Goal Name</Text>
-										<TextInput
-											style={styles.input}
-											value={newGoal.name}
-											onChangeText={(text) =>
-												setNewGoal({ ...newGoal, name: text })
-											}
-											placeholder="e.g., Emergency Fund"
-											placeholderTextColor="#9E9E9E"
-											autoComplete="off"
-											autoCorrect={false}
-										/>
-									</View>
+					<View style={styles.modalContent}>
+						<View style={styles.modalHeader}>
+							<Text style={styles.modalTitle}>Add New Goal</Text>
+							<BorderlessButton
+								onActiveStateChange={setIsPressed}
+								onPress={hideModal}
+							>
+								<Ionicons name="close" size={24} color="#757575" />
+							</BorderlessButton>
+						</View>
+						<ScrollView
+							showsVerticalScrollIndicator={false}
+							contentContainerStyle={{ paddingBottom: 24 }}
+						>
+							<View style={styles.formGroup}>
+								<Text style={styles.label}>Goal Name</Text>
+								<TextInput
+									style={styles.input}
+									value={newGoal.name}
+									onChangeText={(text) =>
+										setNewGoal({ ...newGoal, name: text })
+									}
+									placeholder="e.g., Emergency Fund"
+									placeholderTextColor="#9E9E9E"
+									autoComplete="off"
+									autoCorrect={false}
+								/>
+							</View>
 
-									<View style={styles.formGroup}>
-										<Text style={styles.label}>Target Amount</Text>
-										<Text style={styles.targetSubtext}>
-											Set your target amount for this goal
-										</Text>
+							<View style={styles.formGroup}>
+								<Text style={styles.label}>Target Amount</Text>
+								<Text style={styles.targetSubtext}>
+									Set your target amount for this goal
+								</Text>
 
-										{/* Quick Target Presets */}
-										<View style={styles.targetPresetsContainer}>
-											{targetPresets.map((amount) => (
-												<RectButton
-													key={amount}
-													style={[
-														styles.targetPreset,
-														newGoal.target === amount.toString() &&
-															styles.selectedTargetPreset,
-													]}
-													onPress={() => {
-														setNewGoal({
-															...newGoal,
-															target: amount.toString(),
-														});
-														setShowCustomTarget(false);
-													}}
-												>
-													<Text
-														style={[
-															styles.targetPresetText,
-															newGoal.target === amount.toString() &&
-																styles.selectedTargetPresetText,
-														]}
-													>
-														${amount}
-													</Text>
-												</RectButton>
-											))}
-										</View>
-
-										{/* Custom Amount Button */}
+								{/* Quick Target Presets */}
+								<View style={styles.targetPresetsContainer}>
+									{targetPresets.map((amount) => (
 										<RectButton
+											key={amount}
 											style={[
 												styles.targetPreset,
-												showCustomTarget && styles.selectedTargetPreset,
+												newGoal.target === amount.toString() &&
+													styles.selectedTargetPreset,
 											]}
-											onPress={() => setShowCustomTarget(!showCustomTarget)}
+											onPress={() => {
+												setNewGoal({
+													...newGoal,
+													target: amount.toString(),
+												});
+												setShowCustomTarget(false);
+											}}
 										>
 											<Text
 												style={[
 													styles.targetPresetText,
-													showCustomTarget && styles.selectedTargetPresetText,
+													newGoal.target === amount.toString() &&
+														styles.selectedTargetPresetText,
 												]}
 											>
-												Custom
+												${amount}
 											</Text>
 										</RectButton>
-
-										{/* Custom Amount Input */}
-										{showCustomTarget && (
-											<View style={styles.customInputContainer}>
-												<Text style={styles.inputLabel}>
-													Enter custom amount
-												</Text>
-												<TextInput
-													style={styles.input}
-													value={newGoal.target}
-													onChangeText={(text) =>
-														setNewGoal({ ...newGoal, target: text })
-													}
-													placeholder="e.g., 10000"
-													keyboardType="numeric"
-													placeholderTextColor="#9E9E9E"
-													autoComplete="off"
-												/>
-											</View>
-										)}
-									</View>
-
-									<View style={styles.formGroup}>
-										<Text style={styles.label}>Target Date</Text>
-										<TextInput
-											style={styles.input}
-											value={newGoal.deadline}
-											onChangeText={(text) =>
-												setNewGoal({ ...newGoal, deadline: text })
-											}
-											placeholder="YYYY-MM-DD"
-											placeholderTextColor="#9E9E9E"
-											autoComplete="off"
-										/>
-									</View>
-
-									<IconPicker />
-									<ColorPicker />
-									<CategoryPicker />
-
+									))}
 									<RectButton
 										style={[
-											styles.addButton,
-											{ backgroundColor: newGoal.color },
+											styles.targetPreset,
+											showCustomTarget && styles.selectedTargetPreset,
 										]}
-										onPress={handleAddGoal}
+										onPress={() => {
+											setShowCustomTarget(!showCustomTarget);
+											if (!showCustomTarget) {
+												setNewGoal({ ...newGoal, target: '' });
+											}
+										}}
 									>
-										<Text style={styles.addButtonText}>Add Goal</Text>
+										<Text
+											style={[
+												styles.targetPresetText,
+												showCustomTarget && styles.selectedTargetPresetText,
+											]}
+										>
+											Custom
+										</Text>
 									</RectButton>
-								</ScrollView>
+								</View>
+
+								{/* Custom Amount Input */}
+								{showCustomTarget && (
+									<View style={styles.customInputContainer}>
+										<Text style={styles.inputLabel}>Enter custom amount</Text>
+										<TextInput
+											style={styles.input}
+											value={newGoal.target}
+											onChangeText={(text) =>
+												setNewGoal({ ...newGoal, target: text })
+											}
+											placeholder="e.g., 10000"
+											keyboardType="numeric"
+											placeholderTextColor="#9E9E9E"
+											autoComplete="off"
+										/>
+									</View>
+								)}
 							</View>
-						</View>
-					</Animated.View>
+
+							<DatePicker />
+
+							<IconPicker />
+							<ColorPicker />
+
+							<RectButton
+								style={[styles.addButton, { backgroundColor: newGoal.color }]}
+								onPress={handleAddGoal}
+							>
+								<Text style={styles.addButtonText}>Add Goal</Text>
+							</RectButton>
+						</ScrollView>
+					</View>
 				</KeyboardAvoidingView>
-			</Modal>
+			</RNModal>
 
 			{/* Edit Goal Modal */}
-			<Modal
-				visible={isEditModalVisible}
-				transparent
-				animationType="fade"
-				onRequestClose={hideEditModal}
+			<RNModal
+				isVisible={isEditModalVisible}
+				style={styles.modal}
+				animationIn="slideInUp"
+				animationOut="slideOutDown"
+				useNativeDriver
 			>
 				<KeyboardAvoidingView
 					behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
 					style={styles.modalContainer}
 				>
-					<Animated.View
-						style={[
-							styles.modalAnimationContainer,
-							{
-								transform: [
-									{
-										translateY: slideAnim.interpolate({
-											inputRange: [0, 1],
-											outputRange: [600, 0],
-										}),
-									},
-								],
-							},
-						]}
-					>
-						<View style={styles.modalContainer}>
-							<View style={styles.modalContent}>
-								<View style={styles.modalHeader}>
-									<Text style={styles.modalTitle}>Edit Goal</Text>
-									<RectButton onPress={hideEditModal}>
-										<Ionicons name="close" size={24} color="#757575" />
-									</RectButton>
-								</View>
-								<ScrollView
-									showsVerticalScrollIndicator={false}
-									contentContainerStyle={{ paddingBottom: 24 }}
-								>
-									<View style={styles.formGroup}>
-										<Text style={styles.label}>Goal Name</Text>
-										<TextInput
-											style={styles.input}
-											value={newGoal.name}
-											onChangeText={(text) =>
-												setNewGoal({ ...newGoal, name: text })
-											}
-											placeholder="e.g., Emergency Fund"
-											placeholderTextColor="#9E9E9E"
-											autoComplete="off"
-											autoCorrect={false}
-										/>
-									</View>
+					<View style={styles.modalContent}>
+						<View style={styles.modalHeader}>
+							<Text style={styles.modalTitle}>Edit Goal</Text>
+							<BorderlessButton
+								onActiveStateChange={setIsPressed}
+								onPress={hideEditModal}
+							>
+								<Ionicons name="close" size={24} color="#757575" />
+							</BorderlessButton>
+						</View>
+						<ScrollView
+							showsVerticalScrollIndicator={false}
+							contentContainerStyle={{ paddingBottom: 24 }}
+						>
+							<View style={styles.formGroup}>
+								<Text style={styles.label}>Goal Name</Text>
+								<TextInput
+									style={styles.input}
+									value={newGoal.name}
+									onChangeText={(text) =>
+										setNewGoal({ ...newGoal, name: text })
+									}
+									placeholder="e.g., Emergency Fund"
+									placeholderTextColor="#9E9E9E"
+									autoComplete="off"
+									autoCorrect={false}
+								/>
+							</View>
 
-									<View style={styles.formGroup}>
-										<Text style={styles.label}>Target Amount</Text>
-										<Text style={styles.targetSubtext}>
-											Set your target amount for this goal
-										</Text>
+							<View style={styles.formGroup}>
+								<Text style={styles.label}>Target Amount</Text>
+								<Text style={styles.targetSubtext}>
+									Set your target amount for this goal
+								</Text>
 
-										{/* Quick Target Presets */}
-										<View style={styles.targetPresetsContainer}>
-											{targetPresets.map((amount) => (
-												<RectButton
-													key={amount}
-													style={[
-														styles.targetPreset,
-														newGoal.target === amount.toString() &&
-															styles.selectedTargetPreset,
-													]}
-													onPress={() => {
-														setNewGoal({
-															...newGoal,
-															target: amount.toString(),
-														});
-														setShowCustomTarget(false);
-													}}
-												>
-													<Text
-														style={[
-															styles.targetPresetText,
-															newGoal.target === amount.toString() &&
-																styles.selectedTargetPresetText,
-														]}
-													>
-														${amount}
-													</Text>
-												</RectButton>
-											))}
-										</View>
-
-										{/* Custom Amount Button */}
+								{/* Quick Target Presets */}
+								<View style={styles.targetPresetsContainer}>
+									{targetPresets.map((amount) => (
 										<RectButton
+											key={amount}
 											style={[
 												styles.targetPreset,
-												showCustomTarget && styles.selectedTargetPreset,
+												newGoal.target === amount.toString() &&
+													styles.selectedTargetPreset,
 											]}
-											onPress={() => setShowCustomTarget(!showCustomTarget)}
+											onPress={() => {
+												setNewGoal({
+													...newGoal,
+													target: amount.toString(),
+												});
+												setShowCustomTarget(false);
+											}}
 										>
 											<Text
 												style={[
 													styles.targetPresetText,
-													showCustomTarget && styles.selectedTargetPresetText,
+													newGoal.target === amount.toString() &&
+														styles.selectedTargetPresetText,
 												]}
 											>
-												Custom
+												${amount}
 											</Text>
 										</RectButton>
+									))}
+									<RectButton
+										style={[
+											styles.targetPreset,
+											showCustomTarget && styles.selectedTargetPreset,
+										]}
+										onPress={() => {
+											setShowCustomTarget(!showCustomTarget);
+											if (!showCustomTarget) {
+												setNewGoal({ ...newGoal, target: '' });
+											}
+										}}
+									>
+										<Text
+											style={[
+												styles.targetPresetText,
+												showCustomTarget && styles.selectedTargetPresetText,
+											]}
+										>
+											Custom
+										</Text>
+									</RectButton>
+								</View>
 
-										{/* Custom Amount Input */}
-										{showCustomTarget && (
-											<View style={styles.customInputContainer}>
-												<Text style={styles.inputLabel}>
-													Enter custom amount
-												</Text>
-												<TextInput
-													style={styles.input}
-													value={newGoal.target}
-													onChangeText={(text) =>
-														setNewGoal({ ...newGoal, target: text })
-													}
-													placeholder="e.g., 10000"
-													keyboardType="numeric"
-													placeholderTextColor="#9E9E9E"
-													autoComplete="off"
-												/>
-											</View>
-										)}
-									</View>
-
-									<View style={styles.formGroup}>
-										<Text style={styles.label}>Target Date</Text>
+								{/* Custom Amount Input */}
+								{showCustomTarget && (
+									<View style={styles.customInputContainer}>
+										<Text style={styles.inputLabel}>Enter custom amount</Text>
 										<TextInput
 											style={styles.input}
-											value={newGoal.deadline}
+											value={newGoal.target}
 											onChangeText={(text) =>
-												setNewGoal({ ...newGoal, deadline: text })
+												setNewGoal({ ...newGoal, target: text })
 											}
-											placeholder="YYYY-MM-DD"
+											placeholder="e.g., 10000"
+											keyboardType="numeric"
 											placeholderTextColor="#9E9E9E"
 											autoComplete="off"
 										/>
 									</View>
-
-									<IconPicker />
-									<ColorPicker />
-									<CategoryPicker />
-
-									<View style={styles.modalButtonContainer}>
-										<RectButton
-											style={[
-												styles.addButton,
-												{ backgroundColor: newGoal.color },
-											]}
-											onPress={handleEditGoal}
-										>
-											<Text style={styles.addButtonText}>Update Goal</Text>
-										</RectButton>
-
-										{editingGoal && (
-											<RectButton
-												style={styles.deleteButton}
-												onPress={() => {
-													Alert.alert(
-														'Delete Goal',
-														'Are you sure you want to delete this goal? This action cannot be undone.',
-														[
-															{
-																text: 'Cancel',
-																style: 'cancel',
-															},
-															{
-																text: 'Delete',
-																style: 'destructive',
-																onPress: () => {
-																	handleDeleteGoal(editingGoal.id);
-																	hideEditModal();
-																},
-															},
-														]
-													);
-												}}
-											>
-												<Text style={styles.deleteButtonText}>Delete Goal</Text>
-											</RectButton>
-										)}
-									</View>
-								</ScrollView>
+								)}
 							</View>
-						</View>
-					</Animated.View>
+
+							<DatePicker />
+
+							<IconPicker />
+							<ColorPicker />
+
+							<View style={styles.modalButtonContainer}>
+								<RectButton
+									style={[styles.addButton, { backgroundColor: newGoal.color }]}
+									onPress={handleEditGoal}
+								>
+									<Text style={styles.addButtonText}>Update Goal</Text>
+								</RectButton>
+
+								{editingGoal && (
+									<RectButton
+										style={styles.deleteButton}
+										onPress={() => {
+											Alert.alert(
+												'Delete Goal',
+												'Are you sure you want to delete this goal? This action cannot be undone.',
+												[
+													{
+														text: 'Cancel',
+														style: 'cancel',
+													},
+													{
+														text: 'Delete',
+														style: 'destructive',
+														onPress: () => {
+															handleDeleteGoal(editingGoal.id);
+															hideEditModal();
+														},
+													},
+												]
+											);
+										}}
+									>
+										<Text style={styles.deleteButtonText}>Delete Goal</Text>
+									</RectButton>
+								)}
+							</View>
+						</ScrollView>
+					</View>
 				</KeyboardAvoidingView>
-			</Modal>
+			</RNModal>
+
+			{/* Options Menu Modal */}
+			<RNModal
+				isVisible={isOptionsModalVisible}
+				onBackdropPress={hideOptionsModal}
+				onBackButtonPress={hideOptionsModal}
+				onModalHide={handleOptionsModalHide}
+				animationIn="fadeIn"
+				animationOut="fadeOut"
+				backdropOpacity={0.5}
+				useNativeDriver
+				style={styles.optionsModal}
+			>
+				<View style={styles.optionsModalContent}>
+					<Text style={styles.optionsTitle}>{selectedGoal?.name}</Text>
+
+					<RectButton
+						style={styles.optionButton}
+						onPress={handleEditFromOptions}
+					>
+						<View style={styles.optionContent}>
+							<Ionicons name="create-outline" size={20} color="#00a2ff" />
+							<Text style={styles.optionText}>Edit</Text>
+						</View>
+					</RectButton>
+
+					<RectButton
+						style={styles.optionButton}
+						onPress={handleDeleteFromOptions}
+					>
+						<View style={styles.optionContent}>
+							<Ionicons name="trash-outline" size={20} color="#E53935" />
+							<Text style={[styles.optionText, { color: '#E53935' }]}>
+								Delete
+							</Text>
+						</View>
+					</RectButton>
+
+					<RectButton style={styles.optionButton} onPress={hideOptionsModal}>
+						<View style={styles.optionContent}>
+							<Ionicons name="close-outline" size={20} color="#757575" />
+							<Text style={styles.optionText}>Cancel</Text>
+						</View>
+					</RectButton>
+				</View>
+			</RNModal>
+
+			{/* Quick Add Transaction Modal */}
+			<QuickAddTransaction
+				isVisible={showQuickAddModal}
+				onClose={handleCloseQuickAddModal}
+				goalId={selectedGoalForTransaction?.id}
+				goalName={selectedGoalForTransaction?.name}
+				goalColor={selectedGoalForTransaction?.color}
+			/>
 		</View>
 	);
 }
@@ -1082,6 +1080,10 @@ const styles = StyleSheet.create({
 		padding: 8,
 		marginLeft: 4,
 	},
+	optionsButton: {
+		padding: 8,
+		marginLeft: 4,
+	},
 	amounts: {
 		flexDirection: 'row',
 		alignItems: 'baseline',
@@ -1124,9 +1126,16 @@ const styles = StyleSheet.create({
 		fontWeight: '500',
 		color: '#757575',
 	},
-	modalAnimationContainer: {
+	modal: {
+		margin: 0,
+		justifyContent: 'flex-end',
+	},
+	modalOverlay: {
 		flex: 1,
 		backgroundColor: 'rgba(0, 0, 0, 0.5)',
+	},
+	modalAnimationContainer: {
+		flex: 1,
 	},
 	modalContainer: {
 		flex: 1,
@@ -1182,14 +1191,16 @@ const styles = StyleSheet.create({
 		marginTop: 8,
 	},
 	deleteButton: {
-		backgroundColor: '#E53935',
+		backgroundColor: '#ffffff',
+		borderColor: '#E53935',
+		borderWidth: 1,
 		borderRadius: 12,
 		padding: 16,
 		alignItems: 'center',
 		marginTop: 12,
 	},
 	deleteButtonText: {
-		color: '#FFFFFF',
+		color: '#E53935',
 		fontSize: 16,
 		fontWeight: '600',
 	},
@@ -1335,75 +1346,96 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 		alignItems: 'center',
 	},
-	categoryPickerContainer: {
-		marginBottom: 10,
+	datePickerContainer: {
+		marginBottom: 20,
 	},
-	categoryButton: {
+	dateButton: {
 		backgroundColor: '#F5F5F5',
 		borderRadius: 12,
 		padding: 16,
-		marginBottom: 8,
 	},
-	categoryButtonContent: {
+	dateButtonContent: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
 	},
-	categoryButtonLeft: {
-		flexDirection: 'row',
+	dateIcon: {
+		width: 24,
+		height: 24,
+		borderRadius: 6,
+		justifyContent: 'center',
 		alignItems: 'center',
-		flex: 1,
 	},
-	categoryButtonText: {
+	dateButtonText: {
 		fontSize: 16,
 		color: '#212121',
+		flex: 1,
 		marginLeft: 12,
 	},
-	categorySubtext: {
-		fontSize: 12,
-		fontWeight: '500',
-		color: '#757575',
-		marginBottom: 8,
-	},
-	categoryList: {
-		padding: 10,
-	},
-	categoryOption: {
+	datePickerWrapper: {
+		backgroundColor: '#F5F5F5',
+		borderRadius: 12,
 		padding: 8,
+		marginTop: 8,
 		borderWidth: 1,
 		borderColor: '#E0E0E0',
-		borderRadius: 8,
-		marginBottom: 4,
-	},
-	categoryOptionContent: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-	categoryIcon: {
-		width: 24,
-		height: 24,
-		borderRadius: 4,
-		justifyContent: 'center',
-		alignItems: 'center',
-		marginRight: 8,
-	},
-	categoryName: {
-		fontSize: 16,
-		fontWeight: '600',
-		color: '#212121',
-		flex: 1,
-	},
-	checkboxContainer: {
-		width: 24,
-		height: 24,
-		borderRadius: 4,
-		borderWidth: 1,
-		borderColor: '#E0E0E0',
-		justifyContent: 'center',
-		alignItems: 'center',
 	},
 	customInputContainer: {
 		marginTop: 10,
+	},
+	optionsModal: {
+		margin: 0,
+		justifyContent: 'flex-end',
+	},
+	optionsModalContent: {
+		backgroundColor: 'white',
+		borderRadius: 16,
+		padding: 24,
+		maxWidth: 400,
+		alignItems: 'center',
+	},
+
+	optionsTitle: {
+		fontSize: 20,
+		fontWeight: '600',
+		color: '#212121',
+		marginBottom: 24,
+		textAlign: 'center',
+	},
+	optionButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#f8f9fa',
+		paddingVertical: 16,
+		paddingHorizontal: 20,
+		borderRadius: 12,
+		marginBottom: 12,
+		width: '100%',
+		justifyContent: 'center',
+	},
+	optionContent: {
+		flexDirection: 'row',
+		alignItems: 'center',
+	},
+	optionText: {
+		fontSize: 16,
+		fontWeight: '500',
+		color: '#212121',
+		marginLeft: 12,
+	},
+	quickAddHint: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginTop: 8,
+		paddingTop: 8,
+		borderTopWidth: 1,
+		borderTopColor: '#F0F0F0',
+		gap: 4,
+	},
+	quickAddHintText: {
+		fontSize: 12,
+		color: '#757575',
+		fontWeight: '400',
 	},
 });

@@ -54,6 +54,7 @@ export interface InsightsResponse {
 	success: boolean;
 	data?: AIInsight[];
 	message?: string;
+	error?: string;
 }
 
 export interface InsightDetailResponse {
@@ -126,51 +127,67 @@ export class InsightsService {
 	static async generateInsights(
 		period: 'daily' | 'weekly' | 'monthly'
 	): Promise<InsightsResponse> {
-		const response = await ApiService.post<AIInsight[]>(
-			`/insights/generate/${period}`,
-			{}
-		);
+		try {
+			console.log(
+				`InsightsService.generateInsights(${period}) - Starting generation...`
+			);
 
-		// Debug: Log the response to see what we're getting
-		console.log(
-			`InsightsService.generateInsights(${period}) - Response:`,
-			JSON.stringify(response, null, 2)
-		);
+			const response = await ApiService.post<AIInsight[]>(
+				`/insights/generate/${period}`,
+				{}
+			);
 
-		// Handle double-nested response structure
-		let arr: any = response.data;
+			// Debug: Log the response to see what we're getting
+			console.log(
+				`InsightsService.generateInsights(${period}) - Response:`,
+				JSON.stringify(response, null, 2)
+			);
 
-		// First level: check if response.data is a nested response object
-		if (arr && typeof arr === 'object' && arr.success !== undefined) {
-			// Second level: check if arr.data is the actual array or another nested response
-			if (arr.data && Array.isArray(arr.data)) {
-				arr = arr.data;
-			} else if (
-				arr.data &&
-				typeof arr.data === 'object' &&
-				arr.data.success !== undefined
-			) {
-				// Handle double-nested case
-				if (Array.isArray(arr.data.data)) {
-					arr = arr.data.data;
+			// Handle double-nested response structure
+			let arr: any = response.data;
+
+			// First level: check if response.data is a nested response object
+			if (arr && typeof arr === 'object' && arr.success !== undefined) {
+				// Second level: check if arr.data is the actual array or another nested response
+				if (arr.data && Array.isArray(arr.data)) {
+					arr = arr.data;
+				} else if (
+					arr.data &&
+					typeof arr.data === 'object' &&
+					arr.data.success !== undefined
+				) {
+					// Handle double-nested case
+					if (Array.isArray(arr.data.data)) {
+						arr = arr.data.data;
+					} else {
+						arr = [];
+					}
 				} else {
 					arr = [];
 				}
-			} else {
+			}
+
+			if (!Array.isArray(arr)) {
+				console.warn(
+					`InsightsService.generateInsights(${period}) - Data is not an array:`,
+					response.data
+				);
 				arr = [];
 			}
-		}
+			response.data = arr;
 
-		if (!Array.isArray(arr)) {
-			console.warn(
-				`InsightsService.generateInsights(${period}) - Data is not an array:`,
-				response.data
+			console.log(
+				`InsightsService.generateInsights(${period}) - Final processed data:`,
+				arr
 			);
-			arr = [];
+			return response;
+		} catch (error) {
+			console.error(
+				`InsightsService.generateInsights(${period}) - Error:`,
+				error
+			);
+			throw error;
 		}
-		response.data = arr;
-
-		return response;
 	}
 
 	// Mark insight as read

@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_BASE_URL = __DEV__
-	? 'http://192.168.1.222:3000/api' // Your computer's local IP address
+	? 'http://localhost:3000/api' // Your computer's local IP address
 	: 'https://your-production-api.com/api';
 
 export interface ApiResponse<T = any> {

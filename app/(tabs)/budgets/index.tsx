@@ -4,21 +4,18 @@ import {
 	Text,
 	StyleSheet,
 	FlatList,
-	Dimensions,
-	Modal,
 	TextInput,
-	Animated,
 	KeyboardAvoidingView,
 	Platform,
 	ActivityIndicator,
 	ScrollView,
 } from 'react-native';
+import RNModal from 'react-native-modal';
 import { Ionicons } from '@expo/vector-icons';
 import { BorderlessButton, RectButton } from 'react-native-gesture-handler';
 import { useBudget, Budget } from '../../../src/context/budgetContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-
-const { width } = Dimensions.get('window');
+import QuickAddBudgetTransaction from '../../../src/components/QuickAddBudgetTransaction';
 
 // ==========================================
 // Types
@@ -32,8 +29,6 @@ type ColorOption = {
 // ==========================================
 // Constants
 // ==========================================
-const CARD_WIDTH = width - 48;
-const CARD_PADDING = 16;
 
 // Popular budget icons
 const budgetIcons: (keyof typeof Ionicons.glyphMap)[] = [
@@ -121,7 +116,12 @@ export default function BudgetScreen() {
 	// ==========================================
 	const [isModalVisible, setIsModalVisible] = useState(false);
 	const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+	const [isOptionsModalVisible, setIsOptionsModalVisible] = useState(false);
+	const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null);
 	const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
+	const [pendingEditBudget, setPendingEditBudget] = useState<Budget | null>(
+		null
+	);
 	const [showColorPicker, setShowColorPicker] = useState(false);
 	const [showIconPicker, setShowIconPicker] = useState(false);
 	const [showCustomAmount, setShowCustomAmount] = useState(false);
@@ -130,13 +130,17 @@ export default function BudgetScreen() {
 		allocated: '',
 		icon: 'cart-outline' as keyof typeof Ionicons.glyphMap,
 		color: COLOR_PALETTE.blue.base,
+		period: 'monthly' as 'weekly' | 'monthly',
 	});
 	const [isPressed, setIsPressed] = useState(false);
+	const [showQuickAddModal, setShowQuickAddModal] = useState(false);
+	const [selectedBudgetForTransaction, setSelectedBudgetForTransaction] =
+		useState<Budget | null>(null);
 
 	// ==========================================
 	// Animation Setup
 	// ==========================================
-	const slideAnim = React.useRef(new Animated.Value(0)).current;
+	// Removed redundant animations since RNModal handles animations internally
 
 	// ==========================================
 	// Auto-open modal on navigation
@@ -156,6 +160,22 @@ export default function BudgetScreen() {
 	// Debug logging
 	// ==========================================
 	useEffect(() => {}, [newBudget]);
+
+	useEffect(() => {
+		console.log('isEditModalVisible changed to:', isEditModalVisible);
+	}, [isEditModalVisible]);
+
+	// Debug useEffect to track all modal states
+	useEffect(() => {
+		console.log(
+			'Modal states - isModalVisible:',
+			isModalVisible,
+			'isEditModalVisible:',
+			isEditModalVisible,
+			'isOptionsModalVisible:',
+			isOptionsModalVisible
+		);
+	}, [isModalVisible, isEditModalVisible, isOptionsModalVisible]);
 
 	// ==========================================
 	// Loading Screen Component
@@ -187,6 +207,7 @@ export default function BudgetScreen() {
 				icon: newBudget.icon,
 				color: newBudget.color,
 				categories: [],
+				period: newBudget.period,
 			});
 
 			console.log('Budget added successfully:', result);
@@ -199,6 +220,7 @@ export default function BudgetScreen() {
 				allocated: '',
 				icon: 'cart-outline',
 				color: COLOR_PALETTE.blue.base,
+				period: 'monthly',
 			});
 		} catch (error) {
 			console.error('Error adding budget:', error);
@@ -217,6 +239,7 @@ export default function BudgetScreen() {
 				icon: newBudget.icon,
 				color: newBudget.color,
 				categories: [],
+				period: newBudget.period,
 			});
 
 			hideEditModal();
@@ -227,6 +250,7 @@ export default function BudgetScreen() {
 				allocated: '',
 				icon: 'cart-outline',
 				color: COLOR_PALETTE.blue.base,
+				period: 'monthly',
 			});
 			setEditingBudget(null);
 		} catch (error) {
@@ -252,62 +276,95 @@ export default function BudgetScreen() {
 			allocated: '',
 			icon: 'cart-outline' as keyof typeof Ionicons.glyphMap,
 			color: COLOR_PALETTE.blue.base,
+			period: 'monthly',
 		});
 		setShowColorPicker(false);
 		setShowIconPicker(false);
 		setShowCustomAmount(false);
 		setIsModalVisible(true);
-		Animated.spring(slideAnim, {
-			toValue: 1,
-			useNativeDriver: true,
-			tension: 50,
-			friction: 9,
-		}).start();
 	};
 
 	const hideModal = () => {
-		Animated.timing(slideAnim, {
-			toValue: 0,
-			duration: 200,
-			useNativeDriver: true,
-		}).start(() => {
-			setIsModalVisible(false);
-			// Update the URL to remove the openModal parameter
-			router.setParams({ openModal: 'false' });
-		});
+		setIsModalVisible(false);
+		// Update the URL to remove the openModal parameter
+		router.setParams({ openModal: 'false' });
+	};
+
+	const showOptionsModal = (budget: Budget) => {
+		setSelectedBudget(budget);
+		setIsOptionsModalVisible(true);
+	};
+
+	const hideOptionsModal = () => {
+		console.log('hideOptionsModal called');
+		setIsOptionsModalVisible(false);
+		setSelectedBudget(null);
+	};
+
+	const handleOptionsModalHide = () => {
+		console.log('Options modal hidden, checking for pending edit');
+		if (pendingEditBudget) {
+			console.log('Showing edit modal for pending budget:', pendingEditBudget);
+			showEditModal(pendingEditBudget);
+			setPendingEditBudget(null);
+		}
+	};
+
+	const handleEditFromOptions = () => {
+		console.log(
+			'handleEditFromOptions called, selectedBudget:',
+			selectedBudget
+		);
+		if (selectedBudget) {
+			// Store the budget to edit and hide the options modal
+			setPendingEditBudget(selectedBudget);
+			hideOptionsModal();
+		}
+	};
+
+	const handleDeleteFromOptions = async () => {
+		if (selectedBudget) {
+			hideOptionsModal();
+			await handleDeleteBudget(selectedBudget.id);
+		}
+	};
+
+	const handleQuickAddTransaction = (budget: Budget) => {
+		setSelectedBudgetForTransaction(budget);
+		setShowQuickAddModal(true);
+	};
+
+	const handleCloseQuickAddModal = () => {
+		setShowQuickAddModal(false);
+		setSelectedBudgetForTransaction(null);
 	};
 
 	const showEditModal = (budget: Budget) => {
+		console.log('showEditModal called with budget:', budget);
+		console.log('Current isEditModalVisible state:', isEditModalVisible);
+
 		setEditingBudget(budget);
 		setNewBudget({
 			category: budget.category,
 			allocated: budget.allocated.toString(),
 			icon: budget.icon as keyof typeof Ionicons.glyphMap,
 			color: budget.color,
+			period: budget.period || 'monthly',
 		});
 		setShowColorPicker(false);
 		setShowIconPicker(false);
 		setShowCustomAmount(false);
+
+		console.log('About to set isEditModalVisible to true');
 		setIsEditModalVisible(true);
-		Animated.spring(slideAnim, {
-			toValue: 1,
-			useNativeDriver: true,
-			tension: 50,
-			friction: 9,
-		}).start();
+		console.log('Setting isEditModalVisible to true');
 	};
 
 	const hideEditModal = () => {
-		Animated.timing(slideAnim, {
-			toValue: 0,
-			duration: 200,
-			useNativeDriver: true,
-		}).start(() => {
-			setIsEditModalVisible(false);
-			setEditingBudget(null);
-			// Update the URL to remove the openModal parameter
-			router.setParams({ openModal: 'false' });
-		});
+		setIsEditModalVisible(false);
+		setEditingBudget(null);
+		// Update the URL to remove the openModal parameter
+		router.setParams({ openModal: 'false' });
 	};
 
 	// ==========================================
@@ -396,6 +453,70 @@ export default function BudgetScreen() {
 	);
 
 	// ==========================================
+	// Period Selection Component
+	// ==========================================
+	const PeriodPicker = () => (
+		<View style={styles.periodPickerContainer}>
+			<Text style={styles.label}>Budget Period</Text>
+			<Text style={styles.periodSubtext}>
+				Choose how often this budget resets
+			</Text>
+
+			<View style={styles.periodOptionsContainer}>
+				<RectButton
+					style={[
+						styles.periodOption,
+						newBudget.period === 'monthly' && styles.selectedPeriodOption,
+					]}
+					onPress={() => setNewBudget({ ...newBudget, period: 'monthly' })}
+				>
+					<View style={styles.periodOptionContent}>
+						<Ionicons
+							name="calendar-outline"
+							size={20}
+							color={newBudget.period === 'monthly' ? '#fff' : '#757575'}
+						/>
+						<Text
+							style={[
+								styles.periodOptionText,
+								newBudget.period === 'monthly' &&
+									styles.selectedPeriodOptionText,
+							]}
+						>
+							Monthly
+						</Text>
+					</View>
+				</RectButton>
+
+				<RectButton
+					style={[
+						styles.periodOption,
+						newBudget.period === 'weekly' && styles.selectedPeriodOption,
+					]}
+					onPress={() => setNewBudget({ ...newBudget, period: 'weekly' })}
+				>
+					<View style={styles.periodOptionContent}>
+						<Ionicons
+							name="calendar-clear-outline"
+							size={20}
+							color={newBudget.period === 'weekly' ? '#fff' : '#757575'}
+						/>
+						<Text
+							style={[
+								styles.periodOptionText,
+								newBudget.period === 'weekly' &&
+									styles.selectedPeriodOptionText,
+							]}
+						>
+							Weekly
+						</Text>
+					</View>
+				</RectButton>
+			</View>
+		</View>
+	);
+
+	// ==========================================
 	// Icon Selection Component
 	// ==========================================
 	const IconPicker = () => (
@@ -461,10 +582,9 @@ export default function BudgetScreen() {
 		const percent = Math.min((item.spent / item.allocated) * 100, 100);
 
 		return (
-			<BorderlessButton
+			<RectButton
 				style={styles.card}
-				onPress={() => showEditModal(item)}
-				onActiveStateChange={setIsPressed}
+				onPress={() => handleQuickAddTransaction(item)}
 			>
 				<View style={styles.cardHeader}>
 					<View
@@ -473,6 +593,13 @@ export default function BudgetScreen() {
 						<Ionicons name={item.icon as any} size={24} color={item.color} />
 					</View>
 					<Text style={styles.categoryText}>{item.category}</Text>
+					<BorderlessButton
+						style={styles.optionsButton}
+						onPress={() => showOptionsModal(item)}
+						onActiveStateChange={setIsPressed}
+					>
+						<Ionicons name="ellipsis-horizontal" size={20} color="#757575" />
+					</BorderlessButton>
 				</View>
 
 				<View style={styles.amounts}>
@@ -494,8 +621,13 @@ export default function BudgetScreen() {
 					/>
 				</View>
 
-				<Text style={styles.percentageText}>{percent.toFixed(0)}%</Text>
-			</BorderlessButton>
+				<View style={styles.budgetFooter}>
+					<Text style={styles.percentageText}>{percent.toFixed(0)}%</Text>
+					<Text style={styles.periodText}>
+						{item.period === 'weekly' ? 'Weekly' : 'Monthly'}
+					</Text>
+				</View>
+			</RectButton>
 		);
 	};
 
@@ -554,335 +686,344 @@ export default function BudgetScreen() {
 			/>
 
 			{/* Add Budget Modal */}
-			<Modal
-				visible={isModalVisible}
-				transparent
-				animationType="fade"
-				onRequestClose={hideModal}
+			<RNModal
+				isVisible={isModalVisible}
+				onBackdropPress={hideModal}
+				onBackButtonPress={hideModal}
+				style={styles.modal}
+				animationIn="slideInUp"
+				animationOut="slideOutDown"
+				useNativeDriver
 			>
 				<KeyboardAvoidingView
 					behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
 					style={styles.modalContainer}
 				>
-					<Animated.View
-						style={[
-							styles.modalAnimationContainer,
-							{
-								transform: [
-									{
-										translateY: slideAnim.interpolate({
-											inputRange: [0, 1],
-											outputRange: [600, 0],
-										}),
-									},
-								],
-							},
-						]}
-					>
-						<View style={styles.modalContainer}>
-							<View style={styles.modalContent}>
-								<View style={styles.modalHeader}>
-									<Text style={styles.modalTitle}>Add New Budget</Text>
-									<RectButton onPress={hideModal}>
-										<Ionicons name="close" size={24} color="#757575" />
-									</RectButton>
-								</View>
-								<ScrollView
-									showsVerticalScrollIndicator={false}
-									contentContainerStyle={{
-										paddingBottom: 24,
-										justifyContent: 'flex-end',
-									}}
-								>
-									<View style={styles.formGroup}>
-										<Text style={styles.label}>Category Name</Text>
-										<TextInput
-											style={styles.input}
-											value={newBudget.category}
-											onChangeText={(text) =>
-												setNewBudget({ ...newBudget, category: text })
-											}
-											placeholder="e.g., Groceries"
-											placeholderTextColor="#9E9E9E"
-											autoComplete="off"
-											autoCorrect={false}
-										/>
-									</View>
+					<View style={styles.modalContent}>
+						<View style={styles.modalHeader}>
+							<Text style={styles.modalTitle}>Add New Budget</Text>
+							<BorderlessButton
+								onActiveStateChange={setIsPressed}
+								onPress={hideModal}
+							>
+								<Ionicons name="close" size={24} color="#757575" />
+							</BorderlessButton>
+						</View>
+						<ScrollView
+							showsVerticalScrollIndicator={false}
+							contentContainerStyle={{
+								paddingBottom: 24,
+								justifyContent: 'flex-end',
+							}}
+						>
+							<View style={styles.formGroup}>
+								<Text style={styles.label}>Category Name</Text>
+								<TextInput
+									style={styles.input}
+									value={newBudget.category}
+									onChangeText={(text) =>
+										setNewBudget({ ...newBudget, category: text })
+									}
+									placeholder="e.g., Groceries"
+									placeholderTextColor="#9E9E9E"
+									autoComplete="off"
+									autoCorrect={false}
+								/>
+							</View>
 
-									<View style={styles.formGroup}>
-										<Text style={styles.label}>Budget Amount</Text>
-										<Text style={styles.amountSubtext}>
-											Set your monthly spending limit for this category
-										</Text>
+							<View style={styles.formGroup}>
+								<Text style={styles.label}>Budget Amount</Text>
+								<Text style={styles.amountSubtext}>
+									Set your monthly spending limit for this category
+								</Text>
 
-										{/* Quick Amount Presets */}
-										<View style={styles.amountPresetsContainer}>
-											{amountPresets.map((amount) => (
-												<RectButton
-													key={amount}
-													style={[
-														styles.amountPreset,
-														newBudget.allocated === amount.toString() &&
-															styles.selectedAmountPreset,
-													]}
-													onPress={() => {
-														setNewBudget({
-															...newBudget,
-															allocated: amount.toString(),
-														});
-														setShowCustomAmount(false);
-													}}
-												>
-													<Text
-														style={[
-															styles.amountPresetText,
-															newBudget.allocated === amount.toString() &&
-																styles.selectedAmountPresetText,
-														]}
-													>
-														${amount}
-													</Text>
-												</RectButton>
-											))}
-
-											{/* Custom Amount Button */}
-											<RectButton
+								{/* Quick Amount Presets */}
+								<View style={styles.amountPresetsContainer}>
+									{amountPresets.map((amount) => (
+										<RectButton
+											key={amount}
+											style={[
+												styles.amountPreset,
+												newBudget.allocated === amount.toString() &&
+													styles.selectedAmountPreset,
+											]}
+											onPress={() => {
+												setNewBudget({
+													...newBudget,
+													allocated: amount.toString(),
+												});
+												setShowCustomAmount(false);
+											}}
+										>
+											<Text
 												style={[
-													styles.amountPreset,
-													showCustomAmount && styles.selectedAmountPreset,
+													styles.amountPresetText,
+													newBudget.allocated === amount.toString() &&
+														styles.selectedAmountPresetText,
 												]}
-												onPress={() => {
-													setShowCustomAmount(!showCustomAmount);
-													if (!showCustomAmount) {
-														setNewBudget({
-															...newBudget,
-															allocated: '',
-														});
-													}
-												}}
 											>
-												<Text
-													style={[
-														styles.amountPresetText,
-														showCustomAmount && styles.selectedAmountPresetText,
-													]}
-												>
-													Custom
-												</Text>
-											</RectButton>
-										</View>
+												${amount}
+											</Text>
+										</RectButton>
+									))}
 
-										{/* Custom Amount Input */}
-										{showCustomAmount && (
-											<>
-												<Text style={styles.inputLabel}>
-													Enter custom amount
-												</Text>
-												<TextInput
-													style={styles.input}
-													value={newBudget.allocated}
-													onChangeText={(text) =>
-														setNewBudget({ ...newBudget, allocated: text })
-													}
-													placeholder="e.g., 500"
-													keyboardType="numeric"
-													placeholderTextColor="#9E9E9E"
-													autoComplete="off"
-												/>
-											</>
-										)}
-									</View>
-
-									<IconPicker />
-									<ColorPicker />
-
+									{/* Custom Amount Button */}
 									<RectButton
 										style={[
-											styles.addButton,
-											{ backgroundColor: newBudget.color },
+											styles.amountPreset,
+											showCustomAmount && styles.selectedAmountPreset,
 										]}
-										onPress={handleAddBudget}
+										onPress={() => {
+											setShowCustomAmount(!showCustomAmount);
+											if (!showCustomAmount) {
+												setNewBudget({
+													...newBudget,
+													allocated: '',
+												});
+											}
+										}}
 									>
-										<Text style={styles.addButtonText}>Add Budget</Text>
+										<Text
+											style={[
+												styles.amountPresetText,
+												showCustomAmount && styles.selectedAmountPresetText,
+											]}
+										>
+											Custom
+										</Text>
 									</RectButton>
-								</ScrollView>
+								</View>
+
+								{/* Custom Amount Input */}
+								{showCustomAmount && (
+									<>
+										<Text style={styles.inputLabel}>Enter custom amount</Text>
+										<TextInput
+											style={styles.input}
+											value={newBudget.allocated}
+											onChangeText={(text) =>
+												setNewBudget({ ...newBudget, allocated: text })
+											}
+											placeholder="e.g., 500"
+											keyboardType="numeric"
+											placeholderTextColor="#9E9E9E"
+											autoComplete="off"
+										/>
+									</>
+								)}
 							</View>
-						</View>
-					</Animated.View>
+
+							<IconPicker />
+							<ColorPicker />
+							<PeriodPicker />
+
+							<RectButton
+								style={[styles.addButton, { backgroundColor: newBudget.color }]}
+								onPress={handleAddBudget}
+							>
+								<Text style={styles.addButtonText}>Add Budget</Text>
+							</RectButton>
+						</ScrollView>
+					</View>
 				</KeyboardAvoidingView>
-			</Modal>
+			</RNModal>
 
 			{/* Edit Budget Modal */}
-			<Modal
-				visible={isEditModalVisible}
-				transparent
-				animationType="fade"
-				onRequestClose={hideEditModal}
+			<RNModal
+				isVisible={isEditModalVisible}
+				onBackdropPress={hideEditModal}
+				onBackButtonPress={hideEditModal}
+				animationIn="slideInUp"
+				animationOut="slideOutDown"
+				useNativeDriver
+				style={styles.modal}
 			>
 				<KeyboardAvoidingView
 					behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
 					style={styles.modalContainer}
 				>
-					<Animated.View
-						style={[
-							styles.modalAnimationContainer,
-							{
-								transform: [
-									{
-										translateY: slideAnim.interpolate({
-											inputRange: [0, 1],
-											outputRange: [600, 0],
-										}),
-									},
-								],
-							},
-						]}
-					>
-						<View style={styles.modalContainer}>
-							<View style={styles.modalContent}>
-								<View style={styles.modalHeader}>
-									<Text style={styles.modalTitle}>Edit Budget</Text>
-									<RectButton onPress={hideEditModal}>
-										<Ionicons name="close" size={24} color="#757575" />
+					<View style={styles.modalContent}>
+						<View style={styles.modalHeader}>
+							<Text style={styles.modalTitle}>Edit Budget</Text>
+							<BorderlessButton
+								onActiveStateChange={setIsPressed}
+								onPress={hideEditModal}
+							>
+								<Ionicons name="close" size={24} color="#757575" />
+							</BorderlessButton>
+						</View>
+						<ScrollView
+							showsVerticalScrollIndicator={false}
+							contentContainerStyle={{
+								paddingBottom: 24,
+								justifyContent: 'flex-end',
+							}}
+						>
+							<View style={styles.formGroup}>
+								<Text style={styles.label}>Category Name</Text>
+								<TextInput
+									style={styles.input}
+									value={newBudget.category}
+									onChangeText={(text) =>
+										setNewBudget({ ...newBudget, category: text })
+									}
+									placeholder="e.g., Groceries"
+									placeholderTextColor="#9E9E9E"
+									autoComplete="off"
+									autoCorrect={false}
+								/>
+							</View>
+
+							<View style={styles.formGroup}>
+								<Text style={styles.label}>Budget Amount</Text>
+								<Text style={styles.amountSubtext}>
+									Set your monthly spending limit for this category
+								</Text>
+
+								{/* Quick Amount Presets */}
+								<View style={styles.amountPresetsContainer}>
+									{amountPresets.map((amount) => (
+										<RectButton
+											key={amount}
+											style={[
+												styles.amountPreset,
+												newBudget.allocated === amount.toString() &&
+													styles.selectedAmountPreset,
+											]}
+											onPress={() => {
+												setNewBudget({
+													...newBudget,
+													allocated: amount.toString(),
+												});
+												setShowCustomAmount(false);
+											}}
+										>
+											<Text
+												style={[
+													styles.amountPresetText,
+													newBudget.allocated === amount.toString() &&
+														styles.selectedAmountPresetText,
+												]}
+											>
+												${amount}
+											</Text>
+										</RectButton>
+									))}
+
+									{/* Custom Amount Button */}
+									<RectButton
+										style={[
+											styles.amountPreset,
+											showCustomAmount && styles.selectedAmountPreset,
+										]}
+										onPress={() => {
+											setShowCustomAmount(!showCustomAmount);
+											if (!showCustomAmount) {
+												setNewBudget({
+													...newBudget,
+													allocated: '',
+												});
+											}
+										}}
+									>
+										<Text
+											style={[
+												styles.amountPresetText,
+												showCustomAmount && styles.selectedAmountPresetText,
+											]}
+										>
+											Custom
+										</Text>
 									</RectButton>
 								</View>
-								<ScrollView
-									showsVerticalScrollIndicator={false}
-									contentContainerStyle={{
-										paddingBottom: 24,
-										justifyContent: 'flex-end',
-									}}
-								>
-									<View style={styles.formGroup}>
-										<Text style={styles.label}>Category Name</Text>
+
+								{/* Custom Amount Input */}
+								{showCustomAmount && (
+									<>
+										<Text style={styles.inputLabel}>Enter custom amount</Text>
 										<TextInput
 											style={styles.input}
-											value={newBudget.category}
+											value={newBudget.allocated}
 											onChangeText={(text) =>
-												setNewBudget({ ...newBudget, category: text })
+												setNewBudget({ ...newBudget, allocated: text })
 											}
-											placeholder="e.g., Groceries"
+											placeholder="e.g., 500"
+											keyboardType="numeric"
 											placeholderTextColor="#9E9E9E"
 											autoComplete="off"
-											autoCorrect={false}
 										/>
-									</View>
-
-									<View style={styles.formGroup}>
-										<Text style={styles.label}>Budget Amount</Text>
-										<Text style={styles.amountSubtext}>
-											Set your monthly spending limit for this category
-										</Text>
-
-										{/* Quick Amount Presets */}
-										<View style={styles.amountPresetsContainer}>
-											{amountPresets.map((amount) => (
-												<RectButton
-													key={amount}
-													style={[
-														styles.amountPreset,
-														newBudget.allocated === amount.toString() &&
-															styles.selectedAmountPreset,
-													]}
-													onPress={() => {
-														setNewBudget({
-															...newBudget,
-															allocated: amount.toString(),
-														});
-														setShowCustomAmount(false);
-													}}
-												>
-													<Text
-														style={[
-															styles.amountPresetText,
-															newBudget.allocated === amount.toString() &&
-																styles.selectedAmountPresetText,
-														]}
-													>
-														${amount}
-													</Text>
-												</RectButton>
-											))}
-
-											{/* Custom Amount Button */}
-											<RectButton
-												style={[
-													styles.amountPreset,
-													showCustomAmount && styles.selectedAmountPreset,
-												]}
-												onPress={() => {
-													setShowCustomAmount(!showCustomAmount);
-													if (!showCustomAmount) {
-														setNewBudget({
-															...newBudget,
-															allocated: '',
-														});
-													}
-												}}
-											>
-												<Text
-													style={[
-														styles.amountPresetText,
-														showCustomAmount && styles.selectedAmountPresetText,
-													]}
-												>
-													Custom
-												</Text>
-											</RectButton>
-										</View>
-
-										{/* Custom Amount Input */}
-										{showCustomAmount && (
-											<>
-												<Text style={styles.inputLabel}>
-													Enter custom amount
-												</Text>
-												<TextInput
-													style={styles.input}
-													value={newBudget.allocated}
-													onChangeText={(text) =>
-														setNewBudget({ ...newBudget, allocated: text })
-													}
-													placeholder="e.g., 500"
-													keyboardType="numeric"
-													placeholderTextColor="#9E9E9E"
-													autoComplete="off"
-												/>
-											</>
-										)}
-									</View>
-
-									<IconPicker />
-									<ColorPicker />
-
-									<View style={styles.modalButtonContainer}>
-										<RectButton
-											style={[
-												styles.addButton,
-												{ backgroundColor: newBudget.color },
-											]}
-											onPress={handleEditBudget}
-										>
-											<Text style={styles.addButtonText}>Update Budget</Text>
-										</RectButton>
-
-										{editingBudget && (
-											<RectButton
-												style={styles.deleteButton}
-												onPress={() => handleDeleteBudget(editingBudget.id)}
-											>
-												<Text style={styles.deleteButtonText}>
-													Delete Budget
-												</Text>
-											</RectButton>
-										)}
-									</View>
-								</ScrollView>
+									</>
+								)}
 							</View>
-						</View>
-					</Animated.View>
+
+							<IconPicker />
+							<ColorPicker />
+							<PeriodPicker />
+
+							<RectButton
+								style={[styles.addButton, { backgroundColor: newBudget.color }]}
+								onPress={handleEditBudget}
+							>
+								<Text style={styles.addButtonText}>Update Budget</Text>
+							</RectButton>
+						</ScrollView>
+					</View>
 				</KeyboardAvoidingView>
-			</Modal>
+			</RNModal>
+
+			{/* Options Menu Modal */}
+			<RNModal
+				isVisible={isOptionsModalVisible}
+				onBackdropPress={hideOptionsModal}
+				onBackButtonPress={hideOptionsModal}
+				onModalHide={handleOptionsModalHide}
+				animationIn="slideInUp"
+				animationOut="slideOutDown"
+				useNativeDriver
+				style={styles.optionsModal}
+			>
+				<View style={styles.optionsModalContent}>
+					<Text style={styles.optionsTitle}>{selectedBudget?.category}</Text>
+
+					<RectButton
+						style={styles.optionButton}
+						onPress={handleEditFromOptions}
+					>
+						<View style={styles.optionContent}>
+							<Ionicons name="create-outline" size={20} color="#00a2ff" />
+							<Text style={styles.optionText}>Edit</Text>
+						</View>
+					</RectButton>
+
+					<RectButton
+						style={styles.optionButton}
+						onPress={handleDeleteFromOptions}
+					>
+						<View style={styles.optionContent}>
+							<Ionicons name="trash-outline" size={20} color="#E53935" />
+							<Text style={[styles.optionText, { color: '#E53935' }]}>
+								Delete
+							</Text>
+						</View>
+					</RectButton>
+
+					<RectButton style={styles.optionButton} onPress={hideOptionsModal}>
+						<View style={styles.optionContent}>
+							<Ionicons name="close-outline" size={20} color="#757575" />
+							<Text style={styles.optionText}>Cancel</Text>
+						</View>
+					</RectButton>
+				</View>
+			</RNModal>
+
+			{/* Quick Add Transaction Modal */}
+			<QuickAddBudgetTransaction
+				isVisible={showQuickAddModal}
+				onClose={handleCloseQuickAddModal}
+				budgetId={selectedBudgetForTransaction?.id}
+				budgetName={selectedBudgetForTransaction?.category}
+				budgetColor={selectedBudgetForTransaction?.color}
+			/>
 		</View>
 	);
 }
@@ -915,10 +1056,9 @@ const styles = StyleSheet.create({
 		marginTop: 8,
 	},
 	card: {
-		width: CARD_WIDTH,
 		backgroundColor: '#ffffff',
 		borderRadius: 16,
-		padding: CARD_PADDING,
+		padding: 16,
 		marginVertical: 8,
 		// iOS shadow
 		shadowColor: '#000',
@@ -988,9 +1128,15 @@ const styles = StyleSheet.create({
 		color: '#757575',
 		textAlign: 'right',
 	},
+	modal: {
+		margin: 0,
+		justifyContent: 'flex-end',
+	},
+	modalOverlay: {
+		flex: 1,
+	},
 	modalAnimationContainer: {
 		flex: 1,
-		backgroundColor: 'rgba(0, 0, 0, 0.5)',
 	},
 	modalContainer: {
 		flex: 1,
@@ -1265,5 +1411,100 @@ const styles = StyleSheet.create({
 		borderColor: '#E0E0E0',
 		justifyContent: 'center',
 		alignItems: 'center',
+	},
+	optionsButton: {
+		padding: 8,
+		marginLeft: 4,
+	},
+	optionsModal: {
+		margin: 0,
+		justifyContent: 'flex-end',
+	},
+	optionsModalContent: {
+		backgroundColor: 'white',
+		borderRadius: 16,
+		padding: 24,
+		maxWidth: 400,
+		alignItems: 'center',
+	},
+
+	optionsTitle: {
+		fontSize: 20,
+		fontWeight: '600',
+		color: '#212121',
+		marginBottom: 24,
+		textAlign: 'center',
+	},
+	optionButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#f8f9fa',
+		paddingVertical: 16,
+		paddingHorizontal: 20,
+		borderRadius: 12,
+		marginBottom: 12,
+		width: '100%',
+		justifyContent: 'center',
+	},
+	optionContent: {
+		flexDirection: 'row',
+		alignItems: 'center',
+	},
+	optionText: {
+		fontSize: 16,
+		fontWeight: '500',
+		color: '#212121',
+		marginLeft: 12,
+	},
+	periodPickerContainer: {
+		marginBottom: 20,
+	},
+	periodSubtext: {
+		fontSize: 12,
+		fontWeight: '500',
+		color: '#757575',
+		marginBottom: 8,
+	},
+	periodOptionsContainer: {
+		flexDirection: 'row',
+		gap: 12,
+	},
+	periodOption: {
+		flex: 1,
+		padding: 16,
+		borderRadius: 12,
+		backgroundColor: 'white',
+		borderWidth: 1,
+		borderColor: '#E0E0E0',
+	},
+	selectedPeriodOption: {
+		borderColor: '#00a2ff',
+		backgroundColor: '#00a2ff',
+	},
+	periodOptionContent: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		gap: 8,
+	},
+	periodOptionText: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#212121',
+	},
+	selectedPeriodOptionText: {
+		color: '#fff',
+		fontWeight: '600',
+	},
+	budgetFooter: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		marginTop: 6,
+	},
+	periodText: {
+		fontSize: 12,
+		fontWeight: '500',
+		color: '#757575',
 	},
 });

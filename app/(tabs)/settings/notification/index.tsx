@@ -27,7 +27,7 @@ const NotificationSettingsScreen: React.FC = () => {
 		try {
 			setLoading(true);
 			const response = await fetch(
-				'http://localhost:3000/api/profiles/notifications'
+				'http://192.168.1.222:3000/api/profiles/notifications'
 			);
 			if (response.ok) {
 				const data = await response.json();
@@ -48,7 +48,7 @@ const NotificationSettingsScreen: React.FC = () => {
 	) => {
 		try {
 			const response = await fetch(
-				'http://localhost:3000/api/profiles/notifications',
+				'http://192.168.1.222:3000/api/profiles/notifications',
 				{
 					method: 'PUT',
 					headers: {

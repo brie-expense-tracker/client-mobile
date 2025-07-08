@@ -23,14 +23,14 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import { TransactionContext } from '../../../src/context/transactionContext';
-import { useGoal, Goal } from '../../../src/context/goalContext';
-import { navigateToGoalsWithModal } from '../../../src/utils/navigationUtils';
+import { useBudget, Budget } from '../../../src/context/budgetContext';
+import { navigateToBudgetsWithModal } from '../../../src/utils/navigationUtils';
 
 interface TransactionFormData {
-	type: 'income';
+	type: 'expense';
 	description: string;
 	amount: string;
-	goals: Goal[];
+	budgets: Budget[];
 	date: string;
 }
 
@@ -48,22 +48,22 @@ const getLocalIsoDate = (): string => {
 const AddTransactionScreen = () => {
 	const router = useRouter();
 	const amountInputRef = useRef<TextInput>(null);
-	const [selectedGoals, setSelectedGoals] = useState<Goal[]>([]);
+	const [selectedBudgets, setSelectedBudgets] = useState<Budget[]>([]);
 	const [resetNumberPad, setResetNumberPad] = useState(false);
 	const [fontsLoaded] = useFonts({
 		...Ionicons.font,
 	});
 	const { transactions, isLoading, addTransaction } =
 		useContext(TransactionContext);
-	const { goals, isLoading: goalsLoading } = useGoal();
+	const { budgets, isLoading: budgetsLoading } = useBudget();
 
 	const { control, handleSubmit, setValue, watch } =
 		useForm<TransactionFormData>({
 			defaultValues: {
-				type: 'income',
+				type: 'expense',
 				description: '',
 				amount: '',
-				goals: [],
+				budgets: [],
 				date: getLocalIsoDate(),
 			},
 		});
@@ -100,7 +100,7 @@ const AddTransactionScreen = () => {
 	}, [amount]);
 
 	// Show loading screen if fonts are not loaded
-	if (!fontsLoaded || goalsLoading) {
+	if (!fontsLoaded || budgetsLoading) {
 		return (
 			<View style={styles.loadingContainer}>
 				<ActivityIndicator size="large" color="#0095FF" />
@@ -123,164 +123,166 @@ const AddTransactionScreen = () => {
 				amount: amount,
 				categories: [], // Keep empty categories for backward compatibility
 				date: data.date,
-				type: data.type,
+				type: 'expense' as const, // Always set as expense
 			};
 
 			// Use the context's addTransaction method
 			await addTransaction(transactionData);
 
-			console.log('Transaction saved successfully!');
-			Alert.alert('Success', 'Transaction saved successfully!');
+			console.log('Expense saved successfully!');
+			Alert.alert('Success', 'Expense saved successfully!');
 
 			// Reset form values
 			setValue('description', '');
 			setValue('amount', ''); // Reset to empty string to show placeholder
-			setValue('goals', []);
+			setValue('budgets', []);
 			setValue('date', getLocalIsoDate());
 
-			// Reset selected goals
-			setSelectedGoals([]);
+			// Reset selected budgets
+			setSelectedBudgets([]);
 
 			// Reset NumberPad
 			setResetNumberPad(true);
 
 			router.back();
 		} catch (error) {
-			console.error('Error saving transaction:', error);
-			Alert.alert('Error', 'Failed to save transaction');
+			console.error('Error saving expense:', error);
+			Alert.alert('Error', 'Failed to save expense');
 		}
 	};
 
-	const toggleGoalSelection = (goal: Goal) => {
-		const newSelectedGoals = selectedGoals.some((g) => g.id === goal.id)
-			? selectedGoals.filter((g) => g.id !== goal.id)
-			: [...selectedGoals, goal];
+	const toggleBudgetSelection = (budget: Budget) => {
+		const newSelectedBudgets = selectedBudgets.some((b) => b.id === budget.id)
+			? selectedBudgets.filter((b) => b.id !== budget.id)
+			: [...selectedBudgets, budget];
 
-		setSelectedGoals(newSelectedGoals);
-		setValue('goals', newSelectedGoals);
+		setSelectedBudgets(newSelectedBudgets);
+		setValue('budgets', newSelectedBudgets);
 	};
 
 	//
 	// MAIN COMPONENT===============================================
 	return (
 		<View style={styles.container}>
-			<View style={styles.mainContainer}>
-				<View style={styles.topContainer}>
-					<View style={styles.inputAmountContainer}>
-						<Ionicons
-							name="logo-usd"
-							size={24}
-							color="black"
-							style={styles.dollarIcon}
-						/>
-						<Controller
-							control={control}
-							name="amount"
-							render={({
-								field: { value, onChange },
-							}: {
-								field: { value: string; onChange: (value: string) => void };
-							}) => (
-								<TextInput
-									ref={amountInputRef}
-									style={styles.inputAmount}
-									placeholder="0"
-									placeholderTextColor={'#000000'}
-									value={value}
-									onChangeText={onChange}
-									showSoftInputOnFocus={false}
-								/>
-							)}
-						/>
-					</View>
-
-					{/* Goals Carousel */}
-					<View style={styles.carouselContainer}>
-						<Text style={styles.carouselLabel}>Goals</Text>
-						<ScrollView horizontal showsHorizontalScrollIndicator={false}>
-							{goals.map((goal, index) => (
-								<RectButton
-									key={index}
-									onPress={() => toggleGoalSelection(goal)}
-									style={[
-										styles.carouselTextWrapper,
-										selectedGoals.some((g) => g.id === goal.id) &&
-											styles.selectedTag,
-									]}
-								>
-									<Ionicons
-										name={goal.icon as keyof typeof Ionicons.glyphMap}
-										size={16}
-										color={
-											selectedGoals.some((g) => g.id === goal.id)
-												? 'white'
-												: goal.color
-										}
-										style={styles.carouselIcon}
+			<SafeAreaView style={styles.safeArea} edges={['top']}>
+				<View style={styles.mainContainer}>
+					<View style={styles.topContainer}>
+						<View style={styles.inputAmountContainer}>
+							<Ionicons
+								name="logo-usd"
+								size={24}
+								color="black"
+								style={styles.dollarIcon}
+							/>
+							<Controller
+								control={control}
+								name="amount"
+								render={({
+									field: { value, onChange },
+								}: {
+									field: { value: string; onChange: (value: string) => void };
+								}) => (
+									<TextInput
+										ref={amountInputRef}
+										style={styles.inputAmount}
+										placeholder="0"
+										placeholderTextColor={'#000000'}
+										value={value}
+										onChangeText={onChange}
+										showSoftInputOnFocus={false}
 									/>
-									<Text
+								)}
+							/>
+						</View>
+
+						{/* Budgets Carousel */}
+						<View style={styles.carouselContainer}>
+							<Text style={styles.carouselLabel}>Budgets</Text>
+							<ScrollView horizontal showsHorizontalScrollIndicator={false}>
+								{budgets.map((budget, index) => (
+									<RectButton
+										key={index}
+										onPress={() => toggleBudgetSelection(budget)}
 										style={[
-											styles.carouselText,
-											selectedGoals.some((g) => g.id === goal.id) &&
-												styles.selectedTagText,
+											styles.carouselTextWrapper,
+											selectedBudgets.some((b) => b.id === budget.id) &&
+												styles.selectedTag,
 										]}
 									>
-										{goal.name}
-									</Text>
+										<Ionicons
+											name={budget.icon as keyof typeof Ionicons.glyphMap}
+											size={16}
+											color={
+												selectedBudgets.some((b) => b.id === budget.id)
+													? 'white'
+													: budget.color
+											}
+											style={styles.carouselIcon}
+										/>
+										<Text
+											style={[
+												styles.carouselText,
+												selectedBudgets.some((b) => b.id === budget.id) &&
+													styles.selectedTagText,
+											]}
+										>
+											{budget.category}
+										</Text>
+									</RectButton>
+								))}
+								<RectButton
+									onPress={navigateToBudgetsWithModal}
+									style={styles.addButton}
+								>
+									<Ionicons name="add-outline" size={24} color="grey" />
 								</RectButton>
-							))}
-							<RectButton
-								onPress={navigateToGoalsWithModal}
-								style={styles.addButton}
-							>
-								<Ionicons name="add-outline" size={24} color="grey" />
-							</RectButton>
-						</ScrollView>
-					</View>
+							</ScrollView>
+						</View>
 
-					<KeyboardAvoidingView
-						behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-					>
-						<Controller
-							control={control}
-							name="description"
-							render={({
-								field: { value, onChange },
-							}: {
-								field: { value: string; onChange: (value: string) => void };
-							}) => (
-								<TextInput
-									style={styles.inputDescription}
-									placeholder="What's this for?"
-									placeholderTextColor={'#a3a3a3'}
-									value={value}
-									onChangeText={onChange}
-								/>
-							)}
-						/>
-					</KeyboardAvoidingView>
+						<KeyboardAvoidingView
+							behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+						>
+							<Controller
+								control={control}
+								name="description"
+								render={({
+									field: { value, onChange },
+								}: {
+									field: { value: string; onChange: (value: string) => void };
+								}) => (
+									<TextInput
+										style={styles.inputDescription}
+										placeholder="What did you spend this on?"
+										placeholderTextColor={'#a3a3a3'}
+										value={value}
+										onChangeText={onChange}
+									/>
+								)}
+							/>
+						</KeyboardAvoidingView>
 
-					<View style={styles.transactionButtonsContainer}>
-						<View style={styles.transactionButtonContainer}>
-							<RectButton
-								style={styles.transactionButton}
-								onPress={() => {
-									setValue('type', 'income');
-									handleSubmit(onSubmit)();
-								}}
-							>
-								<Text style={styles.transactionButtonText}>Made</Text>
-							</RectButton>
+						<View style={styles.transactionButtonsContainer}>
+							<View style={styles.transactionButtonContainer}>
+								<RectButton
+									style={styles.transactionButton}
+									onPress={() => {
+										setValue('type', 'expense');
+										handleSubmit(onSubmit)();
+									}}
+								>
+									<Text style={styles.transactionButtonText}>Spent</Text>
+								</RectButton>
+							</View>
 						</View>
 					</View>
+					<View style={styles.topNumPadContainer}>
+						<NumberPad
+							onValueChange={handleAmountChange}
+							reset={resetNumberPad}
+						/>
+					</View>
 				</View>
-				<View style={styles.topNumPadContainer}>
-					<NumberPad
-						onValueChange={handleAmountChange}
-						reset={resetNumberPad}
-					/>
-				</View>
-			</View>
+			</SafeAreaView>
 		</View>
 	);
 };
@@ -482,7 +484,7 @@ const styles = StyleSheet.create({
 		width: '100%',
 		alignItems: 'center',
 		justifyContent: 'center',
-		borderRadius: 10,
+		borderRadius: 16,
 		backgroundColor: '#0095FF',
 		padding: 16,
 	},
@@ -529,11 +531,11 @@ const styles = StyleSheet.create({
 	carouselTextWrapper: {
 		flexDirection: 'row',
 		alignItems: 'center',
+		marginHorizontal: 5,
 		color: '#333',
 		padding: 8,
 		justifyContent: 'center',
 		borderRadius: 8,
-		marginRight: 5,
 	},
 	selectedTag: {
 		backgroundColor: '#0095FF',
