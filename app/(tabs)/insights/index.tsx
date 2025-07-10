@@ -34,6 +34,7 @@ interface Transaction {
 	type: 'income' | 'expense';
 	amount: number;
 	date: string;
+	updatedAt?: string;
 }
 
 export default function InsightsHubScreen() {
@@ -79,9 +80,28 @@ export default function InsightsHubScreen() {
 						type: tx.type,
 						amount: Number(tx.amount) || 0,
 						date: tx.date,
+						updatedAt: tx.updatedAt ?? tx.createdAt ?? new Date().toISOString(),
 					})
 				);
-				setTransactions(formattedTransactions);
+
+				// Sort transactions by date first, then by updatedAt time when dates are the same
+				const sortedTransactions = formattedTransactions.sort((a, b) => {
+					// First, compare by date (newest first)
+					const dateA = new Date(a.date);
+					const dateB = new Date(b.date);
+
+					if (dateA.getTime() !== dateB.getTime()) {
+						return dateB.getTime() - dateA.getTime(); // Newest date first
+					}
+
+					// If dates are the same, compare by updatedAt time (newest first)
+					const updatedAtA = a.updatedAt ? new Date(a.updatedAt) : new Date(0);
+					const updatedAtB = b.updatedAt ? new Date(b.updatedAt) : new Date(0);
+
+					return updatedAtB.getTime() - updatedAtA.getTime(); // Newest time first
+				});
+
+				setTransactions(sortedTransactions);
 			}
 		} catch (error) {
 			console.error('Error fetching transactions:', error);

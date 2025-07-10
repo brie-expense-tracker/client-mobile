@@ -6,11 +6,9 @@ import React, {
 	useMemo,
 	useRef,
 	ReactNode,
-	useContext,
 } from 'react';
 import { Transaction } from '../data/transactions';
 import { ApiService } from '../services/apiService';
-import { transactions as localTransactions } from '../data/transactions';
 import { useBudget } from './budgetContext';
 import { useGoal } from './goalContext';
 
@@ -51,8 +49,8 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 	const [hasLoaded, setHasLoaded] = useState<boolean>(false); // Track if data has been loaded
 
 	// Get budget and goal context functions
-	const { budgets, refetch: refetchBudgets } = useBudget();
-	const { goals, refetch: refetchGoals } = useGoal();
+	const { refetch: refetchBudgets } = useBudget();
+	const { refetch: refetchGoals } = useGoal();
 
 	// Use refs to store the refetch functions to avoid dependency issues
 	const refetchBudgetsRef = useRef(refetchBudgets);
@@ -136,6 +134,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 						type: tx.type ?? 'expense',
 						target: targetId,
 						targetModel: targetModel,
+						updatedAt: tx.updatedAt ?? tx.createdAt ?? new Date().toISOString(),
 					};
 				});
 				console.log(
@@ -211,8 +210,33 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 		[] // No dependencies needed since we use refs
 	);
 
-	// Memoize the transactions data to prevent unnecessary re-renders
-	const memoizedTransactions = useMemo(() => transactions, [transactions]);
+	// Sort transactions by date first, then by updatedAt time when dates are the same
+	const sortTransactions = useCallback(
+		(transactionsToSort: Transaction[]): Transaction[] => {
+			return [...transactionsToSort].sort((a, b) => {
+				// First, compare by date (newest first)
+				const dateA = new Date(a.date);
+				const dateB = new Date(b.date);
+
+				if (dateA.getTime() !== dateB.getTime()) {
+					return dateB.getTime() - dateA.getTime(); // Newest date first
+				}
+
+				// If dates are the same, compare by updatedAt time (newest first)
+				const updatedAtA = a.updatedAt ? new Date(a.updatedAt) : new Date(0);
+				const updatedAtB = b.updatedAt ? new Date(b.updatedAt) : new Date(0);
+
+				return updatedAtB.getTime() - updatedAtA.getTime(); // Newest time first
+			});
+		},
+		[]
+	);
+
+	// Memoize the sorted transactions data to prevent unnecessary re-renders
+	const memoizedTransactions = useMemo(
+		() => sortTransactions(transactions),
+		[transactions, sortTransactions]
+	);
 
 	const addTransaction = useCallback(
 		async (transactionData: Omit<Transaction, 'id'>) => {
@@ -229,6 +253,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 				// Ensure target and targetModel are properly set for optimistic update
 				target: transactionData.target || undefined,
 				targetModel: transactionData.targetModel || undefined,
+				updatedAt: new Date().toISOString(), // Add current timestamp for sorting
 			};
 
 			console.log(
@@ -315,6 +340,10 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 						type: response.data.type ?? transactionData.type,
 						target: targetId,
 						targetModel: targetModel,
+						updatedAt:
+							response.data.updatedAt ??
+							response.data.createdAt ??
+							new Date().toISOString(),
 					};
 
 					console.log(
@@ -409,6 +438,8 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 									transactionData.targetModel !== undefined
 										? transactionData.targetModel
 										: t.targetModel,
+								// Update the updatedAt timestamp for sorting
+								updatedAt: new Date().toISOString(),
 						  }
 						: t
 				)
@@ -512,6 +543,10 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 						type: response.data.type ?? transactionData.type,
 						target: targetId,
 						targetModel: targetModel,
+						updatedAt:
+							response.data.updatedAt ??
+							response.data.createdAt ??
+							new Date().toISOString(),
 					};
 
 					console.log(

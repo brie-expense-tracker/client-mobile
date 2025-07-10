@@ -291,7 +291,21 @@ export default function TransactionScreen() {
 
 				return shouldInclude;
 			})
-			.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+			.sort((a, b) => {
+				// First, compare by date (newest first)
+				const dateA = new Date(a.date);
+				const dateB = new Date(b.date);
+
+				if (dateA.getTime() !== dateB.getTime()) {
+					return dateB.getTime() - dateA.getTime(); // Newest date first
+				}
+
+				// If dates are the same, compare by updatedAt time (newest first)
+				const updatedAtA = a.updatedAt ? new Date(a.updatedAt) : new Date(0);
+				const updatedAtB = b.updatedAt ? new Date(b.updatedAt) : new Date(0);
+
+				return updatedAtB.getTime() - updatedAtA.getTime(); // Newest time first
+			});
 	}, [
 		transactions,
 		selectedGoals,
@@ -315,7 +329,21 @@ export default function TransactionScreen() {
 			.sort(([a], [b]) => b.localeCompare(a))
 			.map(([monthKey, data]) => ({
 				title: formatMonthHeader(monthKey),
-				data,
+				data: data.sort((a, b) => {
+					// First, compare by date (newest first)
+					const dateA = new Date(a.date);
+					const dateB = new Date(b.date);
+
+					if (dateA.getTime() !== dateB.getTime()) {
+						return dateB.getTime() - dateA.getTime(); // Newest date first
+					}
+
+					// If dates are the same, compare by updatedAt time (newest first)
+					const updatedAtA = a.updatedAt ? new Date(a.updatedAt) : new Date(0);
+					const updatedAtB = b.updatedAt ? new Date(b.updatedAt) : new Date(0);
+
+					return updatedAtB.getTime() - updatedAtA.getTime(); // Newest time first
+				}),
 			}));
 	}, [filtered]);
 

@@ -242,7 +242,21 @@ const TransactionHistory: React.FC<{
 	const { goals } = useGoal();
 
 	const recentTransactions = transactions
-		.sort((a, b) => +new Date(b.date) - +new Date(a.date))
+		.sort((a, b) => {
+			// First, compare by date (newest first)
+			const dateA = new Date(a.date);
+			const dateB = new Date(b.date);
+
+			if (dateA.getTime() !== dateB.getTime()) {
+				return dateB.getTime() - dateA.getTime(); // Newest date first
+			}
+
+			// If dates are the same, compare by updatedAt time (newest first)
+			const updatedAtA = a.updatedAt ? new Date(a.updatedAt) : new Date(0);
+			const updatedAtB = b.updatedAt ? new Date(b.updatedAt) : new Date(0);
+
+			return updatedAtB.getTime() - updatedAtA.getTime(); // Newest time first
+		})
 		.slice(0, 6);
 
 	// Helper function to get target name and percentage
