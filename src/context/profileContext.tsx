@@ -464,35 +464,43 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 		try {
 			setError(null);
 
+			console.log('Updating budget settings with:', settings);
+
 			const response = await ApiService.put<
 				ProfilePreferences['budgetSettings']
 			>('/profiles/budget-settings', settings);
 
+			console.log('Budget settings update response:', response);
+
 			if (response.success && response.data) {
 				// Update the profile state with new budget settings
-				setProfile((prev) =>
-					prev
-						? {
-								...prev,
-								preferences: {
-									...prev.preferences,
-									budgetSettings: {
-										...prev.preferences.budgetSettings,
-										...response.data,
-									},
-								},
-						  }
-						: null
-				);
+				setProfile((prev) => {
+					if (!prev) {
+						console.warn('Profile not loaded, cannot update local state');
+						return null;
+					}
+
+					return {
+						...prev,
+						preferences: {
+							...prev.preferences,
+							budgetSettings: {
+								...prev.preferences.budgetSettings,
+								...response.data,
+							},
+						},
+					};
+				});
 			} else {
+				console.error('Budget settings update failed:', response.error);
 				throw new Error(response.error || 'Failed to update budget settings');
 			}
 		} catch (err) {
 			console.error('Error updating budget settings:', err);
-			setError(
-				err instanceof Error ? err.message : 'Failed to update budget settings'
-			);
-			throw err;
+			const errorMessage =
+				err instanceof Error ? err.message : 'Failed to update budget settings';
+			setError(errorMessage);
+			throw new Error(errorMessage);
 		}
 	};
 

@@ -7,11 +7,6 @@ interface HistoricalComparisonProps {
 			totalIncome: number;
 			totalExpenses: number;
 			netIncome: number;
-			topCategories: Array<{
-				name: string;
-				amount: number;
-				percentage: number;
-			}>;
 		};
 		percentageChanges: {
 			income: number;
@@ -140,20 +135,7 @@ export default function HistoricalComparison({
 				</View>
 			</View>
 
-			{previousPeriod.topCategories &&
-				previousPeriod.topCategories.length > 0 && (
-					<View style={styles.categoriesSection}>
-						<Text style={styles.categoriesTitle}>Previous Top Categories</Text>
-						{previousPeriod.topCategories.slice(0, 3).map((category, index) => (
-							<View key={index} style={styles.categoryItem}>
-								<Text style={styles.categoryName}>{category.name}</Text>
-								<Text style={styles.categoryAmount}>
-									{formatCurrency(category.amount)}
-								</Text>
-							</View>
-						))}
-					</View>
-				)}
+
 		</View>
 	);
 }
@@ -206,33 +188,7 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		fontWeight: '500',
 	},
-	categoriesSection: {
-		borderTopWidth: 1,
-		borderTopColor: '#e5e7eb',
-		paddingTop: 12,
-	},
-	categoriesTitle: {
-		fontSize: 14,
-		fontWeight: '600',
-		color: '#374151',
-		marginBottom: 8,
-	},
-	categoryItem: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		paddingVertical: 4,
-	},
-	categoryName: {
-		fontSize: 13,
-		color: '#6b7280',
-		flex: 1,
-	},
-	categoryAmount: {
-		fontSize: 13,
-		fontWeight: '500',
-		color: '#374151',
-	},
+
 	bodyText: {
 		fontSize: 14,
 		color: '#6b7280',

@@ -13,7 +13,6 @@ interface AIResponse {
 		insights?: string[];
 		recommendations?: string[];
 		trends?: {
-			category: string;
 			amount: number;
 			trend: 'up' | 'down' | 'stable';
 		}[];

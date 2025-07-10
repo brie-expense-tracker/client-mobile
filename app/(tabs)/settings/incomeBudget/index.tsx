@@ -13,10 +13,13 @@ import {
 	ActivityIndicator,
 } from 'react-native';
 import { Stack } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useProfile } from '../../../../src/context/profileContext';
+import { useBudget } from '../../../../src/context/budgetContext';
 
 export default function BudgetSettingsScreen() {
 	const { profile, loading, updateBudgetSettings } = useProfile();
+	const { checkBudgetAlerts } = useBudget();
 
 	/* Local state for form inputs */
 	const [cycleType, setCycleType] = useState<'monthly' | 'weekly' | 'biweekly'>(
@@ -27,7 +30,7 @@ export default function BudgetSettingsScreen() {
 	const [carryOver, setCarryOver] = useState(false);
 	const [autoSync, setAutoSync] = useState(true);
 	const [saving, setSaving] = useState(false);
-
+	const [testingAlerts, setTestingAlerts] = useState(false);
 	// Load settings from profile when available
 	useEffect(() => {
 		if (profile?.preferences?.budgetSettings) {
@@ -38,11 +41,17 @@ export default function BudgetSettingsScreen() {
 			setCarryOver(settings.carryOver);
 			setAutoSync(settings.autoSync);
 		}
-	}, [profile]);
+	}, [profile?.preferences?.budgetSettings]);
 
 	const handleSave = async () => {
 		try {
 			setSaving(true);
+
+			// Check if profile is loaded
+			if (!profile) {
+				Alert.alert('Error', 'Profile not loaded. Please try again.');
+				return;
+			}
 
 			// Validate inputs
 			const cycleStartNum = parseInt(cycleStart);
@@ -75,6 +84,14 @@ export default function BudgetSettingsScreen() {
 				return;
 			}
 
+			console.log('Saving budget settings:', {
+				cycleType,
+				cycleStart: cycleStartNum,
+				alertPct: alertPctNum,
+				carryOver,
+				autoSync,
+			});
+
 			await updateBudgetSettings({
 				cycleType,
 				cycleStart: cycleStartNum,
@@ -86,9 +103,29 @@ export default function BudgetSettingsScreen() {
 			Alert.alert('Success', 'Budget settings saved successfully');
 		} catch (error) {
 			console.error('Error saving budget settings:', error);
-			Alert.alert('Error', 'Failed to save budget settings');
+			const errorMessage =
+				error instanceof Error
+					? error.message
+					: 'Failed to save budget settings';
+			Alert.alert('Error', errorMessage);
 		} finally {
 			setSaving(false);
+		}
+	};
+
+	const handleTestAlerts = async () => {
+		try {
+			setTestingAlerts(true);
+			await checkBudgetAlerts();
+			Alert.alert(
+				'Test Complete',
+				'Budget alerts have been checked. If any budgets are over your alert threshold, you should receive a push notification.'
+			);
+		} catch (error) {
+			console.error('Error testing budget alerts:', error);
+			Alert.alert('Error', 'Failed to test budget alerts');
+		} finally {
+			setTestingAlerts(false);
 		}
 	};
 
@@ -97,7 +134,7 @@ export default function BudgetSettingsScreen() {
 			<SafeAreaView style={styles.safe}>
 				<Stack.Screen options={{ title: 'Budget Settings' }} />
 				<View style={styles.loadingContainer}>
-					<ActivityIndicator size="large" color="#007AFF" />
+					<ActivityIndicator size="large" color="#00a2ff" />
 					<Text style={styles.loadingText}>Loading settings...</Text>
 				</View>
 			</SafeAreaView>
@@ -109,82 +146,132 @@ export default function BudgetSettingsScreen() {
 			<Stack.Screen options={{ title: 'Budget Settings' }} />
 
 			<ScrollView contentContainerStyle={styles.container}>
-				{/* —— Cycle —— */}
-				<Section title="Budget Cycle">
+				{/* —— Budget Reset Cycle —— */}
+				<Section title="Budget Reset Cycle">
 					<SectionSubtext>
-						Configure how your budget periods are calculated and when they reset
+						Configure when your budgets automatically reset and start fresh
 					</SectionSubtext>
-					<Label>Cycle Type</Label>
+
+					<Label>Reset Frequency</Label>
 					<LabelSubtext>
-						Choose how often your budget resets - monthly, weekly, or every two
-						weeks
+						How often your budgets reset to zero spent amount
 					</LabelSubtext>
+
 					<OptionRow
 						label="Monthly"
+						subtext="Reset on the same day each month"
 						selected={cycleType === 'monthly'}
 						onPress={() => setCycleType('monthly')}
+						icon="calendar-outline"
 					/>
 					<OptionRow
 						label="Weekly"
+						subtext="Reset on the same day each week"
 						selected={cycleType === 'weekly'}
 						onPress={() => setCycleType('weekly')}
+						icon="calendar-clear-outline"
 					/>
 					<OptionRow
 						label="Bi-Weekly"
+						subtext="Reset every two weeks"
 						selected={cycleType === 'biweekly'}
 						onPress={() => setCycleType('biweekly')}
+						icon="calendar-number-outline"
 					/>
 
 					<Label>
 						{cycleType === 'monthly'
-							? 'Start Day (1-28)'
-							: 'Start Weekday (0=Sunday)'}
+							? 'Reset Day of Month'
+							: 'Reset Day of Week'}
 					</Label>
 					<LabelSubtext>
 						{cycleType === 'monthly'
-							? 'Which day of the month your budget cycle starts'
-							: 'Which day of the week your budget cycle starts (0=Sunday, 1=Monday, etc.)'}
+							? 'Which day of the month your budgets reset (1-28)'
+							: 'Which day of the week your budgets reset (0=Sunday, 1=Monday, etc.)'}
 					</LabelSubtext>
 					<TextInput
 						style={styles.input}
 						keyboardType="numeric"
 						value={cycleStart}
 						onChangeText={setCycleStart}
+						placeholder={cycleType === 'monthly' ? '1' : '0'}
 					/>
 				</Section>
 
-				{/* —— Alerts —— */}
-				<Section title="Notifications">
+				{/* —— Budget Behavior —— */}
+				<Section title="Budget Behavior">
 					<SectionSubtext>
-						Set up alerts to help you stay on track with your budget
+						Customize how your budgets behave when they reset
 					</SectionSubtext>
-					<Label>Overspend Alert Percentage</Label>
-					<LabelSubtext>
-						Get notified when you've spent this percentage of your budget
-					</LabelSubtext>
-					<TextInput
-						style={styles.input}
-						keyboardType="numeric"
-						value={alertPct}
-						onChangeText={setAlertPct}
-					/>
-				</Section>
 
-				{/* —— Toggles —— */}
-				<Section title="Preferences">
-					<SectionSubtext>
-						Customize how your budget behaves and updates
-					</SectionSubtext>
 					<Row
-						label="Carry over unused budgets"
+						label="Carry over unused budget"
+						subtext="Add leftover money to next period's budget"
 						value={carryOver}
 						onValueChange={setCarryOver}
 					/>
+
 					<Row
-						label="Auto-sync spent from transactions"
+						label="Auto-sync from transactions"
+						subtext="Automatically update spent amounts from your transactions"
 						value={autoSync}
 						onValueChange={setAutoSync}
 					/>
+				</Section>
+
+				{/* —— Spending Alerts —— */}
+				<Section title="Spending Alerts">
+					<SectionSubtext>
+						Get notified when you're approaching your budget limits
+					</SectionSubtext>
+
+					<Label>Alert Threshold</Label>
+					<LabelSubtext>
+						Get notified when you've spent this percentage of your budget
+					</LabelSubtext>
+
+					<View style={styles.percentageContainer}>
+						<TextInput
+							style={styles.percentageInput}
+							keyboardType="numeric"
+							value={alertPct}
+							onChangeText={setAlertPct}
+							placeholder="80"
+						/>
+						<Text style={styles.percentageSymbol}>%</Text>
+					</View>
+
+					<View style={styles.alertExamples}>
+						<Text style={styles.alertExampleText}>
+							• At 80%: "You've spent 80% of your Groceries budget"
+						</Text>
+						<Text style={styles.alertExampleText}>
+							• At 100%: "You've reached your Dining budget limit"
+						</Text>
+					</View>
+
+					{/* Test Alerts Button */}
+					<TouchableOpacity
+						style={[
+							styles.testButton,
+							testingAlerts && styles.testButtonDisabled,
+						]}
+						onPress={handleTestAlerts}
+						disabled={testingAlerts}
+					>
+						{testingAlerts ? (
+							<ActivityIndicator size="small" color="#00a2ff" />
+						) : (
+							<>
+								<Ionicons
+									name="notifications-outline"
+									size={20}
+									color="#00a2ff"
+								/>
+								<Text style={styles.testButtonText}>Test Budget Alerts</Text>
+							</>
+						)}
+					</TouchableOpacity>
 				</Section>
 
 				{/* Save Button */}
@@ -224,33 +311,76 @@ const SectionSubtext = ({ children }: { children: React.ReactNode }) => (
 
 const Row = ({
 	label,
+	subtext,
 	value,
 	onValueChange,
 }: {
 	label: string;
+	subtext?: string;
 	value: boolean;
 	onValueChange: (v: boolean) => void;
 }) => (
 	<View style={styles.row}>
-		<Text style={styles.rowLabel}>{label}</Text>
-		<Switch value={value} onValueChange={onValueChange} />
+		<View style={styles.rowContent}>
+			<Text style={styles.rowLabel}>{label}</Text>
+			{subtext && <Text style={styles.rowSubtext}>{subtext}</Text>}
+		</View>
+		<Switch
+			value={value}
+			onValueChange={onValueChange}
+			trackColor={{ false: '#e0e0e0', true: '#00a2ff' }}
+			thumbColor={value ? '#fff' : '#f4f3f4'}
+		/>
 	</View>
 );
 
 const OptionRow = ({
 	label,
+	subtext,
 	selected,
 	onPress,
+	icon,
 }: {
 	label: string;
+	subtext?: string;
 	selected: boolean;
 	onPress: () => void;
+	icon?: keyof typeof Ionicons.glyphMap;
 }) => (
-	<TouchableOpacity style={styles.optionRow} onPress={onPress}>
-		<Text style={styles.optionLabel}>{label}</Text>
-		<Text style={[styles.checkmark, selected && styles.checkmarkSelected]}>
-			{selected ? '✓' : ''}
-		</Text>
+	<TouchableOpacity
+		style={[styles.optionRow, selected && styles.selectedOptionRow]}
+		onPress={onPress}
+	>
+		<View style={styles.optionContent}>
+			{icon && (
+				<Ionicons
+					name={icon}
+					size={20}
+					color={selected ? '#00a2ff' : '#757575'}
+					style={styles.optionIcon}
+				/>
+			)}
+			<View style={styles.optionTextContainer}>
+				<Text
+					style={[styles.optionLabel, selected && styles.selectedOptionLabel]}
+				>
+					{label}
+				</Text>
+				{subtext && (
+					<Text
+						style={[
+							styles.optionSubtext,
+							selected && styles.selectedOptionSubtext,
+						]}
+					>
+						{subtext}
+					</Text>
+				)}
+			</View>
+		</View>
+		<View style={[styles.checkmark, selected && styles.checkmarkSelected]}>
+			{selected && <Ionicons name="checkmark" size={20} color="#00a2ff" />}
+		</View>
 	</TouchableOpacity>
 );
 
@@ -265,50 +395,196 @@ const LabelSubtext = ({ children }: { children: React.ReactNode }) => (
 const styles = StyleSheet.create({
 	safe: { flex: 1, backgroundColor: '#fff' },
 	container: { padding: 24, paddingBottom: 48 },
-	sectionHeader: { fontSize: 18, fontWeight: '600', marginBottom: 12 },
-	sectionSubtext: { fontSize: 12, color: '#666', marginBottom: 12 },
+	sectionHeader: {
+		fontSize: 20,
+		fontWeight: '700',
+		marginBottom: 8,
+		color: '#212121',
+	},
+	sectionSubtext: {
+		fontSize: 14,
+		color: '#757575',
+		marginBottom: 20,
+		lineHeight: 20,
+	},
 	row: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
-		paddingVertical: 12,
+		paddingVertical: 16,
 		borderBottomWidth: 1,
-		borderBottomColor: '#efefef',
+		borderBottomColor: '#f0f0f0',
 	},
-	rowLabel: { fontSize: 16, color: '#333', flexShrink: 1 },
+	rowContent: {
+		flex: 1,
+		marginRight: 16,
+	},
+	rowLabel: {
+		fontSize: 16,
+		color: '#212121',
+		fontWeight: '500',
+		marginBottom: 2,
+	},
+	rowSubtext: {
+		fontSize: 14,
+		color: '#757575',
+		lineHeight: 18,
+	},
 	optionRow: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
-		paddingVertical: 12,
-		paddingHorizontal: 4,
-		borderBottomWidth: 1,
-		borderBottomColor: '#efefef',
+		paddingVertical: 16,
+		paddingHorizontal: 12,
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#e0e0e0',
+		marginBottom: 8,
+		backgroundColor: '#fff',
 	},
-	optionLabel: { fontSize: 16, color: '#333' },
-	checkmark: { fontSize: 18, color: '#ccc', fontWeight: 'bold' },
-	checkmarkSelected: { color: '#007AFF' },
-	label: { fontSize: 14, color: '#666', marginTop: 12, marginBottom: 4 },
-	labelSubtext: { fontSize: 12, color: '#666', marginBottom: 4 },
+	selectedOptionRow: {
+		borderColor: '#00a2ff',
+		backgroundColor: '#f0f9ff',
+	},
+	optionContent: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		flex: 1,
+	},
+	optionIcon: {
+		marginRight: 12,
+	},
+	optionTextContainer: {
+		flex: 1,
+	},
+	optionLabel: {
+		fontSize: 16,
+		color: '#212121',
+		fontWeight: '500',
+		marginBottom: 2,
+	},
+	selectedOptionLabel: {
+		color: '#00a2ff',
+		fontWeight: '600',
+	},
+	optionSubtext: {
+		fontSize: 14,
+		color: '#757575',
+		lineHeight: 18,
+	},
+	selectedOptionSubtext: {
+		color: '#00a2ff',
+	},
+	checkmark: {
+		width: 24,
+		height: 24,
+		borderRadius: 12,
+		borderWidth: 2,
+		borderColor: '#e0e0e0',
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	checkmarkSelected: {
+		borderColor: '#00a2ff',
+		backgroundColor: '#00a2ff',
+	},
+	label: {
+		fontSize: 16,
+		color: '#212121',
+		marginTop: 16,
+		marginBottom: 8,
+		fontWeight: '600',
+	},
+	labelSubtext: {
+		fontSize: 14,
+		color: '#757575',
+		marginBottom: 12,
+		lineHeight: 18,
+	},
 	input: {
 		borderWidth: 1,
-		borderColor: '#ddd',
-		borderRadius: 8,
-		padding: 10,
+		borderColor: '#e0e0e0',
+		borderRadius: 12,
+		padding: 16,
 		fontSize: 16,
+		backgroundColor: '#fff',
+	},
+	percentageContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginBottom: 16,
+	},
+	percentageInput: {
+		borderWidth: 1,
+		borderColor: '#e0e0e0',
+		borderRadius: 12,
+		padding: 16,
+		fontSize: 16,
+		backgroundColor: '#fff',
+		width: 80,
+		marginRight: 8,
+	},
+	percentageSymbol: {
+		fontSize: 18,
+		color: '#757575',
+		fontWeight: '500',
+	},
+	alertExamples: {
+		backgroundColor: '#f8f9fa',
+		borderRadius: 12,
+		padding: 16,
+		marginBottom: 16,
+	},
+	alertExampleText: {
+		fontSize: 14,
+		color: '#757575',
+		lineHeight: 20,
+		marginBottom: 4,
+	},
+	testButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		padding: 16,
+		borderRadius: 12,
+		backgroundColor: '#f0f9ff',
+		borderWidth: 1,
+		borderColor: '#00a2ff',
+		marginBottom: 16,
+	},
+	testButtonDisabled: {
+		backgroundColor: '#f0f0f0',
+		borderColor: '#ccc',
+	},
+	testButtonText: {
+		fontSize: 16,
+		color: '#00a2ff',
+		fontWeight: '600',
+		marginLeft: 8,
 	},
 	loadingContainer: {
 		flex: 1,
 		justifyContent: 'center',
 		alignItems: 'center',
 	},
-	loadingText: { fontSize: 16, color: '#666', marginTop: 12 },
-	saveButton: {
-		backgroundColor: '#007AFF',
-		padding: 12,
-		borderRadius: 8,
-		alignItems: 'center',
+	loadingText: {
+		fontSize: 16,
+		color: '#757575',
+		marginTop: 12,
 	},
-	saveButtonDisabled: { backgroundColor: '#ccc' },
-	saveButtonText: { fontSize: 16, color: '#fff', fontWeight: 'bold' },
+	saveButton: {
+		backgroundColor: '#00a2ff',
+		padding: 16,
+		borderRadius: 12,
+		alignItems: 'center',
+		marginTop: 24,
+	},
+	saveButtonDisabled: {
+		backgroundColor: '#ccc',
+	},
+	saveButtonText: {
+		fontSize: 16,
+		color: '#fff',
+		fontWeight: '600',
+	},
 });

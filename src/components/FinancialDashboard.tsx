@@ -15,14 +15,12 @@ import { ApiService } from '../services/apiService';
 import BudgetOverviewGraph from './BudgetOverviewGraph';
 import GoalsProgressGraph from './GoalsProgressGraph';
 import SpendingTrendsGraph from './SpendingTrendsGraph';
-import CategoryBreakdownGraph from './CategoryBreakdownGraph';
 
 interface Transaction {
 	id: string;
 	type: 'income' | 'expense';
 	amount: number;
 	date: string;
-	category?: string;
 }
 
 interface FinancialDashboardProps {
@@ -65,7 +63,6 @@ const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
 						type: tx.type,
 						amount: Number(tx.amount) || 0,
 						date: tx.date,
-						category: tx.category || tx.categories?.[0]?.name,
 					})
 				);
 				setTransactions(formattedTransactions);
@@ -255,13 +252,6 @@ const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
 						title={`${
 							selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)
 						}ly Spending Trends`}
-						period={selectedPeriod}
-					/>
-
-					{/* Category Breakdown */}
-					<CategoryBreakdownGraph
-						transactions={transactions}
-						title="Category Breakdown"
 						period={selectedPeriod}
 					/>
 

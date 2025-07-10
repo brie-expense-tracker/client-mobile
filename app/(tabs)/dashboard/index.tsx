@@ -1,4 +1,10 @@
-import React, { useCallback, useContext, useMemo, useState } from 'react';
+import React, {
+	useCallback,
+	useContext,
+	useMemo,
+	useState,
+	useEffect,
+} from 'react';
 import {
 	View,
 	Text,
@@ -18,7 +24,8 @@ import {
 	GestureHandlerRootView,
 } from 'react-native-gesture-handler';
 import { TransactionContext } from '../../../src/context/transactionContext';
-import { getCategoryMeta } from '../../../src/utils/categoriesUtils';
+import { useBudget } from '../../../src/context/budgetContext';
+import { useGoal } from '../../../src/context/goalContext';
 
 /**
  * -----------------------------------------------------------------------------
@@ -144,12 +151,35 @@ const SimpleBalanceWidget: React.FC<BalanceWidgetProps> = ({
 	transactions,
 }) => {
 	const { totalIncome, totalExpense } = useMemo(() => {
+		console.log(
+			'[SimpleBalanceWidget] Calculating income/expense from transactions:',
+			transactions.length
+		);
+
 		const income = transactions
 			.filter((t) => t.type === 'income')
-			.reduce((s, t) => s + (isNaN(t.amount) ? 0 : t.amount), 0);
+			.reduce((s, t) => {
+				const amount = isNaN(t.amount) ? 0 : t.amount;
+				console.log(
+					`[SimpleBalanceWidget] Income transaction ${t.id}: ${t.amount} -> ${amount}`
+				);
+				return s + amount;
+			}, 0);
+
 		const expense = transactions
 			.filter((t) => t.type === 'expense')
-			.reduce((s, t) => s + (isNaN(t.amount) ? 0 : t.amount), 0);
+			.reduce((s, t) => {
+				const amount = isNaN(t.amount) ? 0 : t.amount;
+				console.log(
+					`[SimpleBalanceWidget] Expense transaction ${t.id}: ${t.amount} -> ${amount}`
+				);
+				return s + amount;
+			}, 0);
+
+		console.log('[SimpleBalanceWidget] Calculated totals:', {
+			totalIncome: income,
+			totalExpense: expense,
+		});
 		return { totalIncome: income, totalExpense: expense } as const;
 	}, [transactions]);
 
@@ -208,9 +238,55 @@ const TransactionHistory: React.FC<{
 	transactions: Transaction[];
 	onPress: (isPressed: boolean) => void;
 }> = ({ transactions, onPress }) => {
+	const { budgets } = useBudget();
+	const { goals } = useGoal();
+
 	const recentTransactions = transactions
 		.sort((a, b) => +new Date(b.date) - +new Date(a.date))
 		.slice(0, 6);
+
+	// Helper function to get target name
+	const getTargetName = (transaction: Transaction): string => {
+		if (transaction.target && transaction.targetModel) {
+			if (transaction.targetModel === 'Budget') {
+				const budget = budgets.find((b) => b.id === transaction.target);
+				return budget ? budget.category : 'Unknown Budget';
+			} else if (transaction.targetModel === 'Goal') {
+				const goal = goals.find((g) => g.id === transaction.target);
+				return goal ? goal.name : 'Unknown Goal';
+			}
+		}
+		return 'Other';
+	};
+
+	// Helper function to get transaction context (icon and color from target)
+	const getTransactionContext = (transaction: Transaction) => {
+		if (transaction.target && transaction.targetModel) {
+			if (transaction.targetModel === 'Budget') {
+				const budget = budgets.find((b) => b.id === transaction.target);
+				if (budget) {
+					return {
+						icon: budget.icon as keyof typeof Ionicons.glyphMap,
+						color: budget.color,
+					};
+				}
+			} else if (transaction.targetModel === 'Goal') {
+				const goal = goals.find((g) => g.id === transaction.target);
+				if (goal) {
+					return {
+						icon: goal.icon as keyof typeof Ionicons.glyphMap,
+						color: goal.color,
+					};
+				}
+			}
+		}
+
+		// Fallback for transactions without target or when target not found
+		return {
+			icon: 'cash' as keyof typeof Ionicons.glyphMap,
+			color: transaction.type === 'income' ? '#16a34a' : '#dc2626',
+		};
+	};
 
 	return (
 		<View style={styles.transactionsSectionContainer}>
@@ -224,7 +300,8 @@ const TransactionHistory: React.FC<{
 			<View style={styles.transactionsListContainer}>
 				{recentTransactions.length > 0 ? (
 					recentTransactions.map((t) => {
-						const iconData = getCategoryMeta(t.categories?.[0] as any);
+						// Get icon and color from transaction's target
+						const iconData = getTransactionContext(t);
 
 						return (
 							<View key={t.id} style={styles.transactionItem}>
@@ -251,8 +328,7 @@ const TransactionHistory: React.FC<{
 												{t.description}
 											</Text>
 											<Text style={styles.transactionCategory}>
-												{t.categories?.map((cat) => cat.name).join(', ') ||
-													'Other'}
+												{getTargetName(t)}
 											</Text>
 										</View>
 									</View>
@@ -295,46 +371,95 @@ const TransactionHistory: React.FC<{
  */
 const Dashboard: React.FC = () => {
 	const { transactions, isLoading, refetch } = useContext(TransactionContext);
+	const { budgets } = useBudget();
+	const { goals } = useGoal();
 	const [isPressed, setIsPressed] = useState(false);
+	const [refreshing, setRefreshing] = useState(false);
+
+	// Debug logging
+	useEffect(() => {
+		console.log('[Dashboard] Current state:', {
+			transactionsCount: transactions.length,
+			transactions: transactions.slice(0, 3).map((tx) => ({
+				id: tx.id,
+				description: tx.description,
+				type: tx.type,
+				amount: tx.amount,
+				target: tx.target,
+				targetModel: tx.targetModel,
+				date: tx.date,
+			})),
+			budgetsCount: budgets.length,
+			goalsCount: goals.length,
+			isLoading,
+		});
+	}, [transactions, budgets, goals, isLoading]);
 
 	const onRefresh = useCallback(async () => {
-		await refetch();
+		console.log('[Dashboard] onRefresh called');
+		setRefreshing(true);
+		try {
+			await refetch();
+		} catch (error) {
+			console.error('Error refreshing dashboard:', error);
+		} finally {
+			setRefreshing(false);
+		}
 	}, [refetch]);
 
 	/**
 	 * ------------------ Derived / memoised values ---------------
 	 */
 	const { totalBalance, dailyChange } = useMemo(() => {
-		const balance = transactions.reduce(
-			(sum, t) =>
-				sum +
-				(t.type === 'income'
+		console.log(
+			'[Dashboard] Calculating balance from transactions:',
+			transactions.length
+		);
+
+		const balance = transactions.reduce((sum, t) => {
+			const amount =
+				t.type === 'income'
 					? isNaN(t.amount)
 						? 0
 						: t.amount
-					: -(isNaN(t.amount) ? 0 : t.amount)),
-			0
-		);
+					: -(isNaN(t.amount) ? 0 : t.amount);
+			console.log(
+				`[Dashboard] Transaction ${t.id}: ${t.type} ${t.amount} -> contribution: ${amount}`
+			);
+			return sum + amount;
+		}, 0);
 
 		// Use timezone-aware date handling (from ledger)
 		const today = getLocalIsoDate();
+		console.log("[Dashboard] Today's date:", today);
+
 		const change = transactions
 			.filter((t) => {
 				// Compare transaction date with today's date using ISO string format
 				const txDay = t.date.slice(0, 10);
-				return txDay === today;
+				const isToday = txDay === today;
+				console.log(
+					`[Dashboard] Transaction ${t.id} date: ${t.date} -> ${txDay}, isToday: ${isToday}`
+				);
+				return isToday;
 			})
-			.reduce(
-				(s, t) =>
-					s +
-					(t.type === 'income'
+			.reduce((s, t) => {
+				const amount =
+					t.type === 'income'
 						? isNaN(t.amount)
 							? 0
 							: t.amount
-						: -(isNaN(t.amount) ? 0 : t.amount)),
-				0
-			);
+						: -(isNaN(t.amount) ? 0 : t.amount);
+				console.log(
+					`[Dashboard] Today's transaction ${t.id}: ${t.type} ${t.amount} -> contribution: ${amount}`
+				);
+				return s + amount;
+			}, 0);
 
+		console.log('[Dashboard] Calculated values:', {
+			totalBalance: balance,
+			dailyChange: change,
+		});
 		return { totalBalance: balance, dailyChange: change } as const;
 	}, [transactions]);
 
@@ -360,10 +485,10 @@ const Dashboard: React.FC = () => {
 					showsVerticalScrollIndicator={false}
 					refreshControl={
 						<RefreshControl
-							refreshing={isLoading}
+							refreshing={refreshing}
 							onRefresh={onRefresh}
-							tintColor="#007AFF"
-							colors={['#007AFF']}
+							tintColor="#00a2ff"
+							colors={['#00a2ff']}
 							progressBackgroundColor="#ffffff"
 						/>
 					}

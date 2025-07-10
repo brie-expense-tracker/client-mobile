@@ -25,7 +25,7 @@ export default function HelpScreen() {
 			id: 1,
 			question: 'How do I add a new transaction?',
 			answer:
-				'Tap the "+" button on the main screen or go to the Transactions tab and tap "Add Transaction". Fill in the amount, category, and description, then save.',
+				'Tap the "+" button on the main screen or go to the Transactions tab and tap "Add Transaction". Fill in the amount and description, then save.',
 		},
 		{
 			id: 2,

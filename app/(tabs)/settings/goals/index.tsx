@@ -51,7 +51,6 @@ export default function GoalSettingsScreen() {
 	const [undoWindow, setUndoWindow] = useState('24');
 
 	const [saving, setSaving] = useState(false);
-
 	// Load settings from profile when available
 	useEffect(() => {
 		if (profile?.preferences?.goalSettings) {
@@ -83,7 +82,7 @@ export default function GoalSettingsScreen() {
 			setLockEdit(settings.security.lockEdit);
 			setUndoWindow(settings.security.undoWindow.toString());
 		}
-	}, [profile]);
+	}, [profile?.preferences?.goalSettings]);
 
 	const handleSave = async () => {
 		try {

@@ -1,5 +1,5 @@
 // src/components/TransactionRow.tsx
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -13,6 +13,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import type { Transaction } from '../data/transactions';
+import { useBudget } from '../context/budgetContext';
+import { useGoal } from '../context/goalContext';
 
 // Helper function to format date without time
 const formatDateWithoutTime = (dateString: string): string => {
@@ -70,98 +72,136 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 	const TRANSLATE_THRESHOLD = -70;
 	const DELETE_WIDTH = 60;
 
-	// Fallback category mapping for when categories don't have icon/color data
-	const categoryMap: Record<
-		string,
-		{ name: keyof typeof Ionicons.glyphMap; color: string }
-	> = {
-		Groceries: { name: 'cart-outline', color: '#4CAF50' },
-		Utilities: { name: 'flash-outline', color: '#FFC107' },
-		Entertainment: { name: 'game-controller-outline', color: '#9C27B0' },
-		Food: { name: 'restaurant-outline', color: '#F44336' },
-		Transportation: { name: 'car-outline', color: '#2196F3' },
-		Housing: { name: 'home-outline', color: '#795548' },
-		Healthcare: { name: 'medical-outline', color: '#00BCD4' },
-		Shopping: { name: 'cart-outline', color: '#9E9E9E' },
-		Education: { name: 'school-outline', color: '#3F51B5' },
-		Salary: { name: 'cash-outline', color: '#4CAF50' },
-		Investment: { name: 'trending-up-outline', color: '#009688' },
-		Freelance: { name: 'briefcase-outline', color: '#2196F3' },
-		Bonus: { name: 'gift-outline', color: '#9C27B0' },
-		// …other categories…
-		Other: { name: 'ellipsis-horizontal-outline', color: '#9E9E9E' },
-	};
+	// Get budget and goal contexts
+	const { budgets } = useBudget();
+	const { goals } = useGoal();
 
-	// Get the primary category (first category in the array)
-	const primaryCategory = item.categories[0];
-	const primary = primaryCategory?.name || 'Other';
+	// Memoize the transaction context calculation to prevent unnecessary recalculations
+	const transactionContext = useMemo(() => {
+		// Check if transaction has a target and targetModel
+		if (item.target && item.targetModel) {
+			if (item.targetModel === 'Budget' && item.type === 'expense') {
+				// For expenses, find the matching budget by ID
+				const matchingBudget = budgets.find(
+					(budget) => budget.id === item.target
+				);
 
-	// Get icon and color from the category if available, otherwise use fallback
-	const categoryIcon = primaryCategory?.icon;
-	const categoryColor = primaryCategory?.color;
+				if (matchingBudget) {
+					return {
+						type: 'budget' as const,
+						name: matchingBudget.name,
+						icon: matchingBudget.icon as keyof typeof Ionicons.glyphMap,
+						color: matchingBudget.color,
+						progress:
+							((matchingBudget.spent || 0) / (matchingBudget.amount || 1)) *
+							100,
+						spent: matchingBudget.spent || 0,
+						allocated: matchingBudget.amount || 0,
+					};
+				}
+			} else if (item.targetModel === 'Goal' && item.type === 'income') {
+				// For income, find the matching goal by ID
+				const matchingGoal = goals.find((goal) => goal.id === item.target);
 
-	// Use category data if available, otherwise fall back to the mapping
-	const { name: fallbackIcon, color: fallbackColor } =
-		categoryMap[primary] || categoryMap.Other;
+				if (matchingGoal) {
+					return {
+						type: 'goal' as const,
+						name: matchingGoal.name,
+						icon: matchingGoal.icon as keyof typeof Ionicons.glyphMap,
+						color: matchingGoal.color,
+						progress: (matchingGoal.current / matchingGoal.target) * 100,
+						current: matchingGoal.current,
+						target: matchingGoal.target,
+					};
+				}
+			}
+		}
 
-	const iconName =
-		(categoryIcon as keyof typeof Ionicons.glyphMap) || fallbackIcon;
-	const iconColor = categoryColor || fallbackColor;
+		// Fallback for transactions without matching budget/goal or no target
+		return {
+			type: 'general' as const,
+			name: item.type === 'income' ? 'Income' : 'Expense',
+			icon:
+				item.type === 'income'
+					? 'trending-up-outline'
+					: ('trending-down-outline' as keyof typeof Ionicons.glyphMap),
+			color: item.type === 'income' ? '#4CAF50' : '#F44336',
+			progress: 0,
+			spent: 0,
+			allocated: 0,
+		};
+	}, [item.target, item.targetModel, item.type, budgets, goals]);
 
-	const triggerHaptic = () => {
+	const triggerHaptic = useCallback(() => {
 		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-	};
-	//  Your existing resetAnimation
-	const resetAnimation = () => {
+	}, []);
+
+	// Memoize the reset animation function
+	const resetAnimation = useCallback(() => {
 		translateX.value = withSpring(0, { damping: 20 });
 		iconScale.value = withSpring(1, { damping: 15, stiffness: 150 });
 		hasHaptics.value = false;
-	};
+	}, [translateX, iconScale, hasHaptics]);
 
 	const handleDeleteJS = useCallback(() => {
 		onDelete(item.id, resetAnimation);
 	}, [item.id, onDelete, resetAnimation]);
 
-	const panGesture = Gesture.Pan()
-		.activeOffsetX([-15, 15])
-		.failOffsetY([-10, 10])
-		.onUpdate(({ translationX }) => {
-			translateX.value = Math.min(0, translationX);
-			if (translateX.value < TRANSLATE_THRESHOLD && !hasHaptics.value) {
-				hasHaptics.value = true;
-				iconScale.value = withSpring(1.5, { damping: 15, stiffness: 150 });
-				runOnJS(triggerHaptic)();
-			} else if (translateX.value >= TRANSLATE_THRESHOLD && hasHaptics.value) {
-				hasHaptics.value = false;
-				iconScale.value = withSpring(1, { damping: 15, stiffness: 150 });
-			}
-		})
-		.onEnd(() => {
-			if (translateX.value < TRANSLATE_THRESHOLD) {
-				translateX.value = withTiming(
-					-DELETE_WIDTH,
-					{ duration: 400, easing: Easing.bezier(0.25, 0.1, 0.25, 1) },
-					() => {
-						runOnJS(handleDeleteJS)();
+	const panGesture = useMemo(
+		() =>
+			Gesture.Pan()
+				.activeOffsetX([-15, 15])
+				.failOffsetY([-10, 10])
+				.onUpdate(({ translationX }) => {
+					translateX.value = Math.min(0, translationX);
+					if (translateX.value < TRANSLATE_THRESHOLD && !hasHaptics.value) {
+						hasHaptics.value = true;
+						iconScale.value = withSpring(1.5, { damping: 15, stiffness: 150 });
+						runOnJS(triggerHaptic)();
+					} else if (
+						translateX.value >= TRANSLATE_THRESHOLD &&
+						hasHaptics.value
+					) {
+						hasHaptics.value = false;
+						iconScale.value = withSpring(1, { damping: 15, stiffness: 150 });
 					}
-				);
-			} else {
-				translateX.value = withSpring(0, { damping: 20 });
-				iconScale.value = withSpring(1, { damping: 15, stiffness: 150 });
-			}
-		});
+				})
+				.onEnd(() => {
+					if (translateX.value < TRANSLATE_THRESHOLD) {
+						translateX.value = withTiming(
+							-DELETE_WIDTH,
+							{ duration: 400, easing: Easing.bezier(0.25, 0.1, 0.25, 1) },
+							() => {
+								runOnJS(handleDeleteJS)();
+							}
+						);
+					} else {
+						translateX.value = withSpring(0, { damping: 20 });
+						iconScale.value = withSpring(1, { damping: 15, stiffness: 150 });
+					}
+				}),
+		[translateX, iconScale, hasHaptics, triggerHaptic, handleDeleteJS]
+	);
 
-	const tapGesture = Gesture.Tap().onEnd(() => {
-		if (onEdit) {
-			runOnJS(onEdit)(item);
-		}
-	});
+	const tapGesture = useMemo(
+		() =>
+			Gesture.Tap().onEnd(() => {
+				if (onEdit) {
+					runOnJS(onEdit)(item);
+				}
+			}),
+		[onEdit, item]
+	);
 
-	const combinedGesture = Gesture.Simultaneous(panGesture, tapGesture);
+	const combinedGesture = useMemo(
+		() => Gesture.Simultaneous(panGesture, tapGesture),
+		[panGesture, tapGesture]
+	);
 
 	const animatedRowStyle = useAnimatedStyle(() => ({
 		transform: [{ translateX: translateX.value }],
 	}));
+
 	const animatedIconStyle = useAnimatedStyle(() => ({
 		transform: [{ scale: iconScale.value }],
 	}));
@@ -179,14 +219,29 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 			<GestureDetector gesture={combinedGesture}>
 				<Animated.View style={[styles.row, animatedRowStyle]}>
 					<View
-						style={[styles.iconCircle, { backgroundColor: `${iconColor}20` }]}
+						style={[
+							styles.iconCircle,
+							{ backgroundColor: `${transactionContext.color}20` },
+						]}
 					>
-						<Ionicons name={iconName} size={20} color={iconColor} />
+						<Ionicons
+							name={transactionContext.icon}
+							size={20}
+							color={transactionContext.color}
+						/>
 					</View>
 					<View style={styles.textContainer}>
 						<Text style={styles.description}>{item.description}</Text>
 						<Text style={styles.category}>
-							{item.categories.map((cat) => cat.name).join(', ')}
+							{transactionContext.type === 'budget' &&
+								`${
+									transactionContext.name
+								} • ${transactionContext.progress.toFixed(0)}% used`}
+							{transactionContext.type === 'goal' &&
+								`${
+									transactionContext.name
+								} • ${transactionContext.progress.toFixed(0)}% complete`}
+							{transactionContext.type === 'general' && transactionContext.name}
 						</Text>
 					</View>
 					<View style={styles.amountDate}>
@@ -207,16 +262,37 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 	);
 };
 
+// Memoize the component to prevent unnecessary re-renders
 export const TransactionRow = React.memo(
 	TransactionRowComponent,
-	(prev, next) =>
-		prev.item.id === next.item.id &&
-		prev.item.amount === next.item.amount &&
-		prev.item.description === next.item.description &&
-		prev.item.date === next.item.date &&
-		prev.item.type === next.item.type &&
-		JSON.stringify(prev.item.categories) ===
-			JSON.stringify(next.item.categories)
+	(prevProps, nextProps) => {
+		// Custom comparison function to determine if re-render is needed
+		const shouldUpdate =
+			prevProps.item.id === nextProps.item.id &&
+			prevProps.item.description === nextProps.item.description &&
+			prevProps.item.amount === nextProps.item.amount &&
+			prevProps.item.date === nextProps.item.date &&
+			prevProps.item.type === nextProps.item.type &&
+			prevProps.item.target === nextProps.item.target &&
+			prevProps.item.targetModel === nextProps.item.targetModel;
+
+		// Debug logging for transaction updates
+		if (!shouldUpdate) {
+			console.log('[TransactionRow] Re-rendering due to changes:', {
+				id: prevProps.item.id,
+				prevDescription: prevProps.item.description,
+				nextDescription: nextProps.item.description,
+				prevAmount: prevProps.item.amount,
+				nextAmount: nextProps.item.amount,
+				prevTarget: prevProps.item.target,
+				nextTarget: nextProps.item.target,
+				prevTargetModel: prevProps.item.targetModel,
+				nextTargetModel: nextProps.item.targetModel,
+			});
+		}
+
+		return shouldUpdate;
+	}
 );
 
 const styles = StyleSheet.create({
@@ -259,6 +335,7 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		color: '#9ca3af',
 		marginTop: 4,
+		fontWeight: '500',
 	},
 	amountDate: {
 		alignItems: 'flex-end',

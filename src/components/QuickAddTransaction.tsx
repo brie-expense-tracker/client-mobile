@@ -32,7 +32,7 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 }) => {
 	const { addTransaction } = useContext(TransactionContext);
 	const [transaction, setTransaction] = useState({
-		type: 'income' as 'income' | 'expense',
+		type: 'income' as 'income' | 'expense', // Default to income for goals
 		description: '',
 		amount: '',
 		date: new Date().toISOString().split('T')[0],
@@ -43,13 +43,20 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 	useEffect(() => {
 		if (isVisible) {
 			setTransaction({
-				type: 'income',
+				type: 'income', // Default to income for goals
 				description: '',
 				amount: '',
 				date: new Date().toISOString().split('T')[0],
 			});
 		}
 	}, [isVisible]);
+
+	// Auto-set transaction type to income when goal is selected
+	useEffect(() => {
+		if (goalId && transaction.type === 'expense') {
+			setTransaction((prev) => ({ ...prev, type: 'income' }));
+		}
+	}, [goalId]);
 
 	// Focus amount input when modal opens
 	useEffect(() => {
@@ -107,21 +114,46 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 			return;
 		}
 
+		// For goals, only income transactions should be allowed
+		if (goalId && transaction.type === 'expense') {
+			Alert.alert(
+				'Invalid Transaction Type',
+				'Only income transactions can contribute to goal progress. Please change to income.'
+			);
+			return;
+		}
+
 		try {
-			// Create transaction data following the new pattern
+			// Validate that we have a goalId for proper linking
+			if (!goalId) {
+				Alert.alert(
+					'Missing Goal',
+					'Please select a goal to add this transaction to.'
+				);
+				return;
+			}
+
+			// Create transaction data with goal linking
 			const transactionData: Omit<Transaction, 'id'> = {
 				description: transaction.description,
 				amount: amount,
 				date: transaction.date,
 				type: transaction.type,
-				categories: [], // Keep empty for backward compatibility
+				// Link transaction to specific goal
+				target: goalId,
+				targetModel: 'Goal',
 			};
+
+			console.log(
+				'[QuickAddTransaction] Creating transaction:',
+				transactionData
+			);
 
 			await addTransaction(transactionData);
 
 			// Reset form and close modal
 			setTransaction({
-				type: 'income',
+				type: 'income', // Default to income for goals
 				description: '',
 				amount: '',
 				date: new Date().toISOString().split('T')[0],
@@ -208,27 +240,56 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 									transaction.type === 'expense' && {
 										backgroundColor: '#E53935',
 									},
+									goalId && styles.disabledTypeButton,
 								]}
-								onPress={() =>
-									setTransaction((prev) => ({ ...prev, type: 'expense' }))
-								}
+								onPress={() => {
+									if (goalId) {
+										Alert.alert(
+											'Goal Transactions',
+											'Only income transactions can contribute to goal progress. Please use income for goals.'
+										);
+										return;
+									}
+									setTransaction((prev) => ({ ...prev, type: 'expense' }));
+								}}
 							>
 								<Ionicons
 									name="arrow-down-circle"
 									size={20}
-									color={transaction.type === 'expense' ? 'white' : '#757575'}
+									color={
+										transaction.type === 'expense'
+											? 'white'
+											: goalId
+											? '#CCCCCC'
+											: '#757575'
+									}
 								/>
 								<Text
 									style={[
 										styles.typeButtonText,
 										transaction.type === 'expense' &&
 											styles.activeTypeButtonText,
+										goalId && styles.disabledTypeButtonText,
 									]}
 								>
 									Expense
 								</Text>
 							</RectButton>
 						</View>
+
+						{/* Help text for goal transactions */}
+						{goalId && (
+							<View style={styles.helpTextContainer}>
+								<Ionicons
+									name="information-circle-outline"
+									size={16}
+									color="#757575"
+								/>
+								<Text style={styles.helpText}>
+									Only income transactions contribute to goal progress
+								</Text>
+							</View>
+						)}
 
 						{/* Amount Input */}
 						<View style={styles.formGroup}>
@@ -379,6 +440,25 @@ const styles = StyleSheet.create({
 		color: '#FFFFFF',
 		fontSize: 16,
 		fontWeight: '600',
+	},
+	disabledTypeButton: {
+		opacity: 0.7,
+	},
+	disabledTypeButtonText: {
+		color: '#CCCCCC',
+	},
+	helpTextContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#F5F5F5',
+		borderRadius: 12,
+		padding: 12,
+		marginTop: 16,
+		gap: 8,
+	},
+	helpText: {
+		fontSize: 14,
+		color: '#757575',
 	},
 });
 

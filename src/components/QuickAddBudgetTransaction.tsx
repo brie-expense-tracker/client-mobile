@@ -21,6 +21,7 @@ interface QuickAddBudgetTransactionProps {
 	budgetId?: string;
 	budgetName?: string;
 	budgetColor?: string;
+	onTransactionAdded?: () => void;
 }
 
 const QuickAddBudgetTransaction: React.FC<QuickAddBudgetTransactionProps> = ({
@@ -29,6 +30,7 @@ const QuickAddBudgetTransaction: React.FC<QuickAddBudgetTransactionProps> = ({
 	budgetId,
 	budgetName,
 	budgetColor = '#00a2ff',
+	onTransactionAdded,
 }) => {
 	const { addTransaction } = useContext(TransactionContext);
 	const [transaction, setTransaction] = useState({
@@ -121,13 +123,30 @@ const QuickAddBudgetTransaction: React.FC<QuickAddBudgetTransactionProps> = ({
 		}
 
 		try {
+			// Validate that we have a budgetId for proper linking
+			if (!budgetId) {
+				Alert.alert(
+					'Missing Budget',
+					'Please select a budget to add this transaction to.'
+				);
+				return;
+			}
+
 			// Create transaction data for budget with selected type
 			const transactionData: Omit<Transaction, 'id'> = {
 				description: transaction.description,
 				amount: amount,
 				date: transaction.date,
 				type: transaction.type,
+				// Link transaction to specific budget
+				target: budgetId,
+				targetModel: 'Budget',
 			};
+
+			console.log(
+				'[QuickAddBudgetTransaction] Creating transaction:',
+				transactionData
+			);
 
 			await addTransaction(transactionData);
 
@@ -141,6 +160,7 @@ const QuickAddBudgetTransaction: React.FC<QuickAddBudgetTransactionProps> = ({
 			onClose();
 
 			Alert.alert('Success', 'Transaction added to budget successfully!');
+			onTransactionAdded?.(); // Notify parent
 		} catch (error) {
 			console.error('Error adding budget transaction:', error);
 			Alert.alert('Error', 'Failed to add transaction. Please try again.');

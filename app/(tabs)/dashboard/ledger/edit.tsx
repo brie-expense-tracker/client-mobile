@@ -10,12 +10,14 @@ import {
 	Platform,
 	TouchableOpacity,
 } from 'react-native';
+import RNModal from 'react-native-modal';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TransactionContext } from '../../../../src/context/transactionContext';
+import { useBudget, Budget } from '../../../../src/context/budgetContext';
+import { useGoal, Goal } from '../../../../src/context/goalContext';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Category } from '../../../../src/data/transactions';
 
 /**
  * EditTransactionScreen - Component for editing existing transactions
@@ -29,19 +31,31 @@ const EditTransactionScreen = () => {
 	const transactionId = params.id as string;
 
 	// Context for transaction management
-	const { transactions, updateTransaction, getCategories } =
-		useContext(TransactionContext);
+	const { transactions, updateTransaction } = useContext(TransactionContext);
+	const { budgets } = useBudget();
+	const { goals } = useGoal();
 
 	// Local state management
 	const [isLoading, setIsLoading] = useState(false);
 	const [showCalendar, setShowCalendar] = useState(false);
-	const [showCategorySelector, setShowCategorySelector] = useState(false);
+	const [showTargetSelector, setShowTargetSelector] = useState(false);
 
 	// Find the transaction to edit based on the ID from route params
 	const transaction = transactions.find((t) => t.id === transactionId);
 
-	// Get available categories
-	const availableCategories = getCategories();
+	// Helper function to get target name
+	const getTargetName = (transaction: any): string => {
+		if (transaction?.target && transaction?.targetModel) {
+			if (transaction.targetModel === 'Budget') {
+				const budget = budgets.find((b) => b.id === transaction.target);
+				return budget ? budget.name : 'Unknown Budget';
+			} else if (transaction.targetModel === 'Goal') {
+				const goal = goals.find((g) => g.id === transaction.target);
+				return goal ? goal.name : 'Unknown Goal';
+			}
+		}
+		return 'Other';
+	};
 
 	// Form state for editing transaction details
 	const [editForm, setEditForm] = useState({
@@ -49,13 +63,9 @@ const EditTransactionScreen = () => {
 		amount: '',
 		date: '',
 		type: 'expense' as 'income' | 'expense',
-		categories: [] as Category[],
+		target: '',
+		targetModel: '' as 'Budget' | 'Goal' | '',
 	});
-
-	// Filter categories by transaction type
-	const filteredCategories = availableCategories.filter(
-		(cat) => cat.type === editForm.type
-	);
 
 	// Initialize form with existing transaction data when component mounts
 	useEffect(() => {
@@ -65,10 +75,11 @@ const EditTransactionScreen = () => {
 				amount: transaction.amount.toString(),
 				date: transaction.date.split('T')[0], // Extract date part from ISO string
 				type: transaction.type,
-				categories: transaction.categories,
+				target: transaction.target || '',
+				targetModel: transaction.targetModel || '',
 			});
 		}
-	}, [transaction]);
+	}, []); // Only run once when component mounts, not when transaction changes
 
 	// Show error message if transaction is not found
 	if (!transaction) {
@@ -117,28 +128,28 @@ const EditTransactionScreen = () => {
 			return;
 		}
 
-		// Validate that at least one category is selected
-		if (editForm.categories.length === 0) {
-			Alert.alert('Error', 'Please select at least one category');
-			return;
-		}
-
 		setIsLoading(true);
 		try {
 			// Update the transaction with new data
-			const updateData = {
+			const updateData: any = {
 				description: editForm.description,
 				amount: amount,
 				date: new Date(editForm.date + 'T00:00:00').toISOString(),
 				type: editForm.type,
-				categories: editForm.categories,
 			};
+
+			// Always include target data - either the selected target or null to clear it
+			updateData.target = editForm.target || null;
+			updateData.targetModel = editForm.targetModel || null;
 
 			await updateTransaction(transaction.id, updateData);
 
-			// Show success message and navigate back
+			// Show success message and navigate back to ledger
 			Alert.alert('Success', 'Transaction updated successfully', [
-				{ text: 'OK', onPress: () => router.back() },
+				{
+					text: 'OK',
+					onPress: () => router.back(),
+				},
 			]);
 		} catch (error) {
 			console.error('Error updating transaction:', error);
@@ -164,48 +175,80 @@ const EditTransactionScreen = () => {
 	};
 
 	/**
-	 * Handles category selection/deselection
-	 * @param category - The category to toggle
-	 */
-	const toggleCategorySelection = (category: Category) => {
-		const isSelected = editForm.categories.some(
-			(cat) => cat.name === category.name
-		);
-
-		if (isSelected) {
-			// Remove category if already selected
-			const newCategories = editForm.categories.filter(
-				(cat) => cat.name !== category.name
-			);
-			setEditForm({
-				...editForm,
-				categories: newCategories,
-			});
-		} else {
-			// Add category if not selected
-			const newCategories = [...editForm.categories, category];
-			setEditForm({
-				...editForm,
-				categories: newCategories,
-			});
-		}
-	};
-
-	/**
-	 * Handles transaction type change and filters categories to match new type
+	 * Handles transaction type change
 	 * @param newType - The new transaction type
 	 */
 	const handleTypeChange = (newType: 'income' | 'expense') => {
-		// Filter existing categories to only keep those that match the new type
-		const filteredCategories = editForm.categories.filter(
-			(cat) => cat.type === newType
-		);
-
 		setEditForm({
 			...editForm,
 			type: newType,
-			categories: filteredCategories,
+			// Reset target when changing type to ensure compatibility
+			target: '',
+			targetModel: '',
 		});
+	};
+
+	/**
+	 * Handles target selection
+	 * @param targetId - The selected target ID
+	 * @param targetModel - The target model type
+	 */
+	const handleTargetSelect = (
+		targetId: string,
+		targetModel: 'Budget' | 'Goal'
+	) => {
+		setShowTargetSelector(false);
+		setEditForm((prevForm) => ({
+			...prevForm,
+			target: targetId,
+			targetModel: targetModel,
+		}));
+	};
+
+	/**
+	 * Clears the target selection
+	 */
+	const handleClearTarget = () => {
+		setEditForm((prevForm) => ({
+			...prevForm,
+			target: '',
+			targetModel: '',
+		}));
+	};
+
+	// Get available targets based on transaction type
+	const getAvailableTargets = () => {
+		if (editForm.type === 'expense') {
+			return budgets.map((budget) => ({
+				id: budget.id,
+				name: budget.name,
+				icon: budget.icon,
+				color: budget.color,
+				type: 'Budget' as const,
+			}));
+		} else {
+			return goals.map((goal) => ({
+				id: goal.id,
+				name: goal.name,
+				icon: goal.icon,
+				color: goal.color,
+				type: 'Goal' as const,
+			}));
+		}
+	};
+
+	// Get current target display name
+	const getCurrentTargetDisplay = () => {
+		if (editForm.target && editForm.targetModel) {
+			if (editForm.targetModel === 'Budget') {
+				const budget = budgets.find((b) => b.id === editForm.target);
+				return budget ? budget.name : 'Select target';
+			} else if (editForm.targetModel === 'Goal') {
+				const goal = goals.find((g) => g.id === editForm.target);
+				return goal ? goal.name : 'Select target';
+			}
+		}
+		return 'Select target';
 	};
 
 	return (
@@ -252,7 +295,7 @@ const EditTransactionScreen = () => {
 						<Text style={styles.dateButtonText}>
 							{editForm.date || 'Select date'}
 						</Text>
-						<Ionicons name="calendar" size={20} color="#0095FF" />
+						<Ionicons name="calendar" size={24} color="#0095FF" />
 					</TouchableOpacity>
 				</View>
 
@@ -316,99 +359,55 @@ const EditTransactionScreen = () => {
 					</View>
 				</View>
 
-				{/* Category selection */}
+				{/* Target selection */}
 				<View style={styles.formGroup}>
-					<Text style={styles.label}>Categories</Text>
+					<Text style={styles.label}>
+						{editForm.type === 'expense' ? 'Budget' : 'Goal'}
+					</Text>
 					<TouchableOpacity
-						style={styles.categoryButton}
-						onPress={() => setShowCategorySelector(!showCategorySelector)}
+						style={[
+							styles.targetButton,
+							editForm.target && styles.targetButtonSelected,
+						]}
+						onPress={() => setShowTargetSelector(true)}
 					>
-						<Text style={styles.categoryButtonText}>
-							{editForm.categories.length > 0
-								? editForm.categories.map((cat) => cat.name).join(', ')
-								: 'Select categories'}
-						</Text>
-						<Ionicons name="chevron-down" size={20} color="#0095FF" />
-					</TouchableOpacity>
-
-					{/* Selected categories display */}
-					{editForm.categories.length > 0 && (
-						<View style={styles.selectedCategoriesContainer}>
-							{editForm.categories.map((category, index) => (
-								<View key={index} style={styles.selectedCategoryChip}>
-									<Ionicons
-										name={(category.icon as any) || 'pricetag'}
-										size={16}
-										color={category.color || '#0095FF'}
-									/>
-									<Text style={styles.selectedCategoryText}>
-										{category.name}
-									</Text>
-									<TouchableOpacity
-										onPress={() => toggleCategorySelection(category)}
-										style={styles.removeCategoryButton}
-									>
-										<Ionicons name="close" size={14} color="#666" />
-									</TouchableOpacity>
-								</View>
-							))}
+						<View style={styles.targetButtonContent}>
+							{editForm.target && (
+								<Ionicons
+									name={
+										editForm.targetModel === 'Budget'
+											? 'wallet-outline'
+											: 'flag-outline'
+									}
+									size={20}
+									color="#0095FF"
+									style={{ marginRight: 8 }}
+								/>
+							)}
+							<Text
+								style={[
+									styles.targetButtonText,
+									editForm.target && styles.targetButtonTextSelected,
+								]}
+							>
+								{getCurrentTargetDisplay()}
+							</Text>
 						</View>
+						<Ionicons
+							name="chevron-down"
+							size={24}
+							color={editForm.target ? '#0095FF' : '#757575'}
+						/>
+					</TouchableOpacity>
+					{editForm.target && (
+						<TouchableOpacity
+							style={styles.clearTargetButton}
+							onPress={handleClearTarget}
+						>
+							<Text style={styles.clearTargetText}>Clear selection</Text>
+						</TouchableOpacity>
 					)}
 				</View>
-
-				{/* Category selector dropdown */}
-				{showCategorySelector && (
-					<View style={styles.categorySelectorContainer}>
-						<Text style={styles.categorySelectorTitle}>
-							Select {editForm.type} categories
-						</Text>
-						<ScrollView
-							style={styles.categoryList}
-							showsVerticalScrollIndicator={false}
-						>
-							{filteredCategories.length > 0 ? (
-								filteredCategories.map((category) => {
-									const isSelected = editForm.categories.some(
-										(cat) => cat.name === category.name
-									);
-									return (
-										<TouchableOpacity
-											key={category.id || category.name}
-											style={[
-												styles.categoryItem,
-												isSelected && styles.categoryItemSelected,
-											]}
-											onPress={() => toggleCategorySelection(category)}
-										>
-											<Ionicons
-												name={(category.icon as any) || 'pricetag'}
-												size={20}
-												color={
-													isSelected ? '#fff' : category.color || '#0095FF'
-												}
-											/>
-											<Text
-												style={[
-													styles.categoryItemText,
-													isSelected && styles.categoryItemTextSelected,
-												]}
-											>
-												{category.name}
-											</Text>
-											{isSelected && (
-												<Ionicons name="checkmark" size={20} color="#fff" />
-											)}
-										</TouchableOpacity>
-									);
-								})
-							) : (
-								<Text style={styles.noCategoriesText}>
-									No {editForm.type} categories available
-								</Text>
-							)}
-						</ScrollView>
-					</View>
-				)}
 
 				{/* Update button */}
 				<TouchableOpacity
@@ -424,6 +423,64 @@ const EditTransactionScreen = () => {
 					</Text>
 				</TouchableOpacity>
 			</ScrollView>
+
+			{/* Target Selector Modal */}
+			<RNModal
+				isVisible={showTargetSelector}
+				animationIn="slideInUp"
+				animationOut="slideOutDown"
+				backdropOpacity={0.5}
+				onBackdropPress={() => setShowTargetSelector(false)}
+				onBackButtonPress={() => setShowTargetSelector(false)}
+				style={styles.modal}
+			>
+				<View style={styles.modalContainer}>
+					<View style={styles.modalHeader}>
+						<Text style={styles.modalTitle}>
+							Select {editForm.type === 'expense' ? 'Budget' : 'Goal'}
+						</Text>
+						<TouchableOpacity
+							onPress={() => setShowTargetSelector(false)}
+							style={styles.closeButton}
+						>
+							<Ionicons name="close" size={28} color="#757575" />
+						</TouchableOpacity>
+					</View>
+					<ScrollView style={styles.modalContent}>
+						{getAvailableTargets().map((target) => (
+							<TouchableOpacity
+								key={target.id}
+								style={[
+									styles.targetItem,
+									editForm.target === target.id && styles.targetItemSelected,
+								]}
+								onPress={() => handleTargetSelect(target.id, target.type)}
+							>
+								<View style={styles.targetItemContent}>
+									<Ionicons
+										style={styles.targetItemIcon}
+										name={target.icon as any}
+										size={24}
+										color="#0095FF"
+									/>
+									<Text style={styles.targetItemName}>{target.name}</Text>
+								</View>
+								{editForm.target === target.id && (
+									<Ionicons name="checkmark-circle" size={24} color="#0095FF" />
+								)}
+							</TouchableOpacity>
+						))}
+						{getAvailableTargets().length === 0 && (
+							<View style={styles.emptyState}>
+								<Text style={styles.emptyStateText}>
+									No {editForm.type === 'expense' ? 'budgets' : 'goals'}{' '}
+									available
+								</Text>
+							</View>
+						)}
+					</ScrollView>
+				</View>
+			</RNModal>
 		</KeyboardAvoidingView>
 	);
 };
@@ -434,10 +491,33 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: '#fff',
 	},
+	header: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingHorizontal: 16,
+		paddingBottom: 16,
+		borderBottomWidth: 1,
+		borderBottomColor: '#E0E0E0',
+		backgroundColor: '#fff',
+	},
+	backButton: {
+		padding: 8,
+	},
+	headerTitle: {
+		flex: 1,
+		fontSize: 18,
+		fontWeight: '600',
+		color: '#212121',
+		textAlign: 'center',
+		marginLeft: -40, // Compensate for back button width
+	},
+	headerSpacer: {
+		width: 40,
+	},
 	content: {
 		flex: 1,
 		padding: 24,
-		paddingTop: 24, // Add top padding since header is removed
+		paddingTop: 24,
 	},
 	formGroup: {
 		marginBottom: 24,
@@ -506,7 +586,7 @@ const styles = StyleSheet.create({
 		color: '#FFFFFF',
 		fontWeight: '600',
 	},
-	categoryButton: {
+	targetButton: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
@@ -516,79 +596,31 @@ const styles = StyleSheet.create({
 		borderWidth: 1,
 		borderColor: '#E0E0E0',
 	},
-	categoryButtonText: {
+	targetButtonSelected: {
+		backgroundColor: '#E3F2FD',
+		borderColor: '#0095FF',
+	},
+	targetButtonText: {
 		fontSize: 16,
 		color: '#212121',
-		flex: 1,
 	},
-	selectedCategoriesContainer: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
-		marginTop: 12,
-		gap: 8,
-	},
-	selectedCategoryChip: {
-		backgroundColor: '#0095FF',
-		borderRadius: 20,
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
-	},
-	selectedCategoryText: {
-		color: 'white',
-		fontSize: 14,
-		fontWeight: '500',
-	},
-	removeCategoryButton: {
-		padding: 2,
-	},
-	categorySelectorContainer: {
-		marginBottom: 24,
-		padding: 16,
-		borderWidth: 1,
-		borderColor: '#E0E0E0',
-		borderRadius: 12,
-		backgroundColor: '#fff',
-		maxHeight: 300,
-	},
-	categorySelectorTitle: {
-		fontSize: 16,
+	targetButtonTextSelected: {
+		color: '#0095FF',
 		fontWeight: '600',
-		color: '#212121',
-		marginBottom: 12,
 	},
-	categoryList: {
-		maxHeight: 200,
-	},
-	categoryItem: {
+	targetButtonContent: {
+		flex: 1,
 		flexDirection: 'row',
 		alignItems: 'center',
-		paddingVertical: 12,
-		paddingHorizontal: 16,
-		borderRadius: 8,
-		marginBottom: 8,
-		backgroundColor: '#F5F5F5',
-		gap: 12,
 	},
-	categoryItemSelected: {
-		backgroundColor: '#0095FF',
+	clearTargetButton: {
+		marginTop: 8,
+		alignSelf: 'flex-end',
 	},
-	categoryItemText: {
-		fontSize: 16,
-		color: '#212121',
-		flex: 1,
-	},
-	categoryItemTextSelected: {
-		color: '#FFFFFF',
-		fontWeight: '500',
-	},
-	noCategoriesText: {
+	clearTargetText: {
 		fontSize: 14,
-		color: '#757575',
-		textAlign: 'center',
-		paddingVertical: 20,
+		color: '#FF6B6B',
+		fontWeight: '500',
 	},
 	updateButton: {
 		backgroundColor: '#0095FF',
@@ -604,6 +636,82 @@ const styles = StyleSheet.create({
 		color: '#FFFFFF',
 		fontSize: 16,
 		fontWeight: '600',
+	},
+	// Modal styles
+	modalContainer: {
+		flex: 1,
+		backgroundColor: '#fff',
+	},
+	modalHeader: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		padding: 20,
+		borderBottomWidth: 1,
+		borderBottomColor: '#E0E0E0',
+		paddingTop: 60, // Account for status bar
+	},
+	modalTitle: {
+		fontSize: 18,
+		fontWeight: '600',
+		color: '#212121',
+	},
+	closeButton: {
+		padding: 4,
+	},
+	modalContent: {
+		flex: 1,
+		padding: 20,
+	},
+	targetItem: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		padding: 16,
+		borderRadius: 12,
+		backgroundColor: '#F5F5F5',
+		marginBottom: 12,
+		borderWidth: 1,
+		borderColor: '#E0E0E0',
+	},
+	targetItemSelected: {
+		backgroundColor: '#E3F2FD',
+		borderColor: '#0095FF',
+	},
+	targetItemContent: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		flex: 1,
+	},
+	targetItemIcon: {
+		fontSize: 28,
+		marginRight: 16,
+		width: 40,
+		height: 40,
+		textAlign: 'center',
+		lineHeight: 40,
+		borderRadius: 20,
+		backgroundColor: '#E3F2FD',
+		overflow: 'hidden',
+	},
+	targetItemName: {
+		fontSize: 16,
+		color: '#212121',
+		fontWeight: '500',
+	},
+	emptyState: {
+		alignItems: 'center',
+		justifyContent: 'center',
+		padding: 40,
+	},
+	emptyStateText: {
+		fontSize: 16,
+		color: '#757575',
+		textAlign: 'center',
+	},
+	modal: {
+		margin: 0,
+		justifyContent: 'flex-end',
 	},
 });
 

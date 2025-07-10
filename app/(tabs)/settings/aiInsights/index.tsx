@@ -26,7 +26,6 @@ export default function AIInsightsSettingsScreen() {
 	const [budgetingTips, setBudgetingTips] = useState(true);
 	const [incomeIdeas, setIncomeIdeas] = useState(true);
 	const [expenseReduction, setExpenseReduction] = useState(true);
-
 	// Update local state when profile loads
 	useEffect(() => {
 		if (profile?.preferences?.aiInsights) {
@@ -39,7 +38,7 @@ export default function AIInsightsSettingsScreen() {
 			setIncomeIdeas(aiSettings.insightTypes.incomeSuggestions);
 			setExpenseReduction(aiSettings.insightTypes.expenseReduction);
 		}
-	}, [profile]);
+	}, [profile?.preferences?.aiInsights]);
 
 	// Handle AI enabled toggle
 	const handleAIEnabledChange = async (value: boolean) => {

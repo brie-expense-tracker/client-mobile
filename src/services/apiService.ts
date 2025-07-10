@@ -82,13 +82,30 @@ export class ApiService {
 	static async post<T>(endpoint: string, body: any): Promise<ApiResponse<T>> {
 		try {
 			const headers = await this.getAuthHeaders();
-			const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+			const url = `${API_BASE_URL}${endpoint}`;
+
+			// Debug: Log the request details
+			console.log('ApiService POST - URL:', url);
+			console.log('ApiService POST - Headers:', headers);
+			console.log('ApiService POST - Body:', body);
+
+			const response = await fetch(url, {
 				method: 'POST',
 				headers,
 				body: JSON.stringify(body),
 			});
 
+			// Debug: Log the response status
+			console.log('ApiService POST - Response status:', response.status);
+			console.log('ApiService POST - Response ok:', response.ok);
+
 			const data = await response.json();
+
+			// Debug: Log the raw server response
+			console.log(
+				'ApiService POST - Raw server response:',
+				JSON.stringify(data, null, 2)
+			);
 
 			if (!response.ok) {
 				return {
@@ -107,21 +124,43 @@ export class ApiService {
 		}
 	}
 
-	static async put<T>(endpoint: string, body: any): Promise<ApiResponse<T>> {
+			static async put<T>(endpoint: string, body: any): Promise<ApiResponse<T>> {
 		try {
 			const headers = await this.getAuthHeaders();
-			const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+			const url = `${API_BASE_URL}${endpoint}`;
+
+			// Debug: Log the request details
+			console.log('ApiService PUT - URL:', url);
+			console.log('ApiService PUT - Headers:', headers);
+			console.log('ApiService PUT - Body:', body);
+
+			const response = await fetch(url, {
 				method: 'PUT',
 				headers,
 				body: JSON.stringify(body),
 			});
 
+			// Debug: Log the response status
+			console.log('ApiService PUT - Response status:', response.status);
+			console.log('ApiService PUT - Response ok:', response.ok);
+
 			const data = await response.json();
 
+			// Debug: Log the raw server response
+			console.log(
+				'ApiService PUT - Raw server response:',
+				JSON.stringify(data, null, 2)
+			);
+
 			if (!response.ok) {
+				console.error('ApiService PUT - Response not ok:', {
+					status: response.status,
+					statusText: response.statusText,
+					data: data
+				});
 				return {
 					success: false,
-					error: data.error || `HTTP error! status: ${response.status}`,
+					error: data.error || data.message || `HTTP error! status: ${response.status}`,
 				};
 			}
 

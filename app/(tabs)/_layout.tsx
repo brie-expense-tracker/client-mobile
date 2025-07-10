@@ -5,17 +5,10 @@ import { BudgetProvider } from '../../src/context/budgetContext';
 import { GoalProvider } from '../../src/context/goalContext';
 import { ProfileProvider } from '../../src/context/profileContext';
 import React, { useState } from 'react';
-import {
-	View,
-	Text,
-	TouchableOpacity,
-	StyleSheet,
-	Dimensions,
-} from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import RNModal from 'react-native-modal';
 import { router } from 'expo-router';
-
-const { width, height } = Dimensions.get('window');
+import { RectButton } from 'react-native-gesture-handler';
 
 export default function TabLayout() {
 	const [showTransactionModal, setShowTransactionModal] = useState(false);
@@ -36,9 +29,9 @@ export default function TabLayout() {
 
 	return (
 		<ProfileProvider>
-			<TransactionProvider>
-				<BudgetProvider>
-					<GoalProvider>
+			<BudgetProvider>
+				<GoalProvider>
+					<TransactionProvider>
 						<Tabs
 							screenOptions={{
 								tabBarStyle: {
@@ -54,10 +47,6 @@ export default function TabLayout() {
 								},
 								tabBarInactiveTintColor: '#000',
 								tabBarActiveTintColor: '#007ACC',
-								tabBarItemStyle: {
-									padding: 0,
-									margin: 0,
-								},
 								headerShown: false,
 							}}
 						>
@@ -142,7 +131,7 @@ export default function TabLayout() {
 									What would you like to do?
 								</Text>
 
-								<TouchableOpacity
+								<RectButton
 									style={styles.modalButton}
 									onPress={navigateToAddTransaction}
 								>
@@ -151,10 +140,10 @@ export default function TabLayout() {
 										size={24}
 										color="#0095FF"
 									/>
-									<Text style={styles.modalButtonText}>Add Transaction</Text>
-								</TouchableOpacity>
+									<Text style={styles.modalButtonText}>Add Income</Text>
+								</RectButton>
 
-								<TouchableOpacity
+								<RectButton
 									style={styles.modalButton}
 									onPress={navigateToAddExpense}
 								>
@@ -164,19 +153,19 @@ export default function TabLayout() {
 										color="#0095FF"
 									/>
 									<Text style={styles.modalButtonText}>Add Expense</Text>
-								</TouchableOpacity>
+								</RectButton>
 
-								<TouchableOpacity
+								<RectButton
 									style={styles.cancelButton}
 									onPress={() => setShowTransactionModal(false)}
 								>
 									<Text style={styles.cancelButtonText}>Cancel</Text>
-								</TouchableOpacity>
+								</RectButton>
 							</View>
 						</RNModal>
-					</GoalProvider>
-				</BudgetProvider>
-			</TransactionProvider>
+					</TransactionProvider>
+				</GoalProvider>
+			</BudgetProvider>
 		</ProfileProvider>
 	);
 }
@@ -218,9 +207,15 @@ const styles = StyleSheet.create({
 		marginLeft: 12,
 	},
 	cancelButton: {
-		marginTop: 8,
-		paddingVertical: 12,
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#f8f9fa',
+		paddingVertical: 16,
 		paddingHorizontal: 20,
+		borderRadius: 12,
+		marginBottom: 12,
+		width: '100%',
+		justifyContent: 'center',
 	},
 	cancelButtonText: {
 		fontSize: 16,

@@ -27,7 +27,6 @@ import {
 	BudgetOverviewGraph,
 	GoalsProgressGraph,
 	SpendingTrendsGraph,
-	CategoryBreakdownGraph,
 } from '../../../src/components';
 
 interface Transaction {
@@ -35,7 +34,6 @@ interface Transaction {
 	type: 'income' | 'expense';
 	amount: number;
 	date: string;
-	category?: string;
 }
 
 export default function InsightsHubScreen() {
@@ -81,7 +79,6 @@ export default function InsightsHubScreen() {
 						type: tx.type,
 						amount: Number(tx.amount) || 0,
 						date: tx.date,
-						category: tx.category || tx.categories?.[0]?.name,
 					})
 				);
 				setTransactions(formattedTransactions);
@@ -436,15 +433,6 @@ export default function InsightsHubScreen() {
 									selectedPeriod.charAt(0).toUpperCase() +
 									selectedPeriod.slice(1)
 								}ly Spending Trends`}
-								period={selectedPeriod}
-							/>
-						)}
-
-						{/* Category Breakdown Graph */}
-						{transactions.length > 0 && (
-							<CategoryBreakdownGraph
-								transactions={transactions}
-								title="Category Breakdown"
 								period={selectedPeriod}
 							/>
 						)}

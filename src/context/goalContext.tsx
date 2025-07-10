@@ -5,8 +5,10 @@ import React, {
 	useCallback,
 	useMemo,
 	ReactNode,
+	useContext,
 } from 'react';
 import { ApiService } from '../services/apiService';
+import { TransactionContext } from './transactionContext';
 
 // ==========================================
 // Types
@@ -73,11 +75,14 @@ export const GoalContext = createContext<GoalContextType>({
 export const GoalProvider = ({ children }: { children: ReactNode }) => {
 	const [goals, setGoals] = useState<Goal[]>([]);
 	const [isLoading, setIsLoading] = useState<boolean>(true);
+	const { refreshTransactions } = useContext(TransactionContext);
 
 	const refetch = useCallback(async () => {
+		console.log('[GoalContext] refetch called');
 		setIsLoading(true);
 		try {
 			const response = await ApiService.get<any>('/goals');
+			console.log('[GoalContext] API response received:', response);
 
 			// Handle double-wrapped response from ApiService
 			const actualData = response.data?.data || response.data;
@@ -85,6 +90,11 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 				response.data?.success !== undefined
 					? response.data.success
 					: response.success;
+
+			console.log('[GoalContext] Processed response:', {
+				actualSuccess,
+				dataLength: actualData?.length,
+			});
 
 			if (actualSuccess && Array.isArray(actualData)) {
 				const formatted: Goal[] = actualData.map((goal: any) => ({
@@ -100,6 +110,15 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 					createdAt: goal.createdAt,
 					updatedAt: goal.updatedAt,
 				}));
+				console.log(
+					'[GoalContext] Formatted goals:',
+					formatted.map((g) => ({
+						id: g.id,
+						name: g.name,
+						current: g.current,
+						target: g.target,
+					}))
+				);
 				setGoals(formatted);
 			} else {
 				console.warn('[Goals] Unexpected response:', response);
@@ -110,6 +129,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 			setGoals([]);
 		} finally {
 			setIsLoading(false);
+			console.log('[GoalContext] refetch completed');
 		}
 	}, []);
 
@@ -215,6 +235,9 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 
 					setGoals((prev) => prev.map((g) => (g.id === id ? updatedGoal : g)));
 
+					// Refresh transactions to update display names when goal name changes
+					refreshTransactions();
+
 					return updatedGoal;
 				} else {
 					throw new Error(response.error || 'Failed to update goal');
@@ -224,7 +247,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 				throw error;
 			}
 		},
-		[]
+		[refreshTransactions]
 	);
 
 	const deleteGoal = useCallback(

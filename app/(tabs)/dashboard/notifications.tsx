@@ -7,6 +7,7 @@ import {
 	SafeAreaView,
 	TouchableOpacity,
 	Alert,
+	Button,
 } from 'react-native';
 import { useTheme } from '@react-navigation/native';
 import { Stack } from 'expo-router';
@@ -25,6 +26,7 @@ import Animated, {
 	Easing,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { useNotification } from '@/src/context/notificationContext';
 
 interface Notification {
 	id: string;
@@ -160,9 +162,35 @@ const NotificationItem = ({
 };
 
 export default function NotificationsScreen() {
+	const { notification, expoPushToken, error } = useNotification();
 	const { colors } = useTheme();
 	const [notifications, setNotifications] =
 		useState<Notification[]>(mockNotifications);
+
+	const sendPushNotification = async (expoPushToken: string) => {
+		const message = {
+			to: expoPushToken,
+			sound: 'default',
+			title: 'Test Notification',
+			body: 'This is a test notification from your app!',
+			data: { someData: 'goes here' },
+		};
+
+		try {
+			await fetch('https://exp.host/--/api/v2/push/send', {
+				method: 'POST',
+				headers: {
+					Accept: 'application/json',
+					'Accept-encoding': 'gzip, deflate',
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(message),
+			});
+			Alert.alert('Success', 'Test notification sent!');
+		} catch (error) {
+			Alert.alert('Error', 'Failed to send notification');
+		}
+	};
 
 	const handleDelete = (id: string, resetAnimation: () => void) => {
 		Alert.alert(
@@ -217,20 +245,22 @@ export default function NotificationsScreen() {
 						</View>
 					)}
 				/>
-				<Stack.Screen
-					options={{
-						title: 'Notifications',
-						// headerShadowVisible: false,
-						headerStyle: { backgroundColor: '#f9fafb' },
-						headerTintColor: '#333',
-						headerBackButtonDisplayMode: 'minimal',
-						headerBackTitle: 'Back',
-						headerTitleStyle: {
-							fontSize: 24,
-							fontWeight: '500',
-						},
-					}}
-				/>
+				<View style={styles.tokenContainer}>
+					<Text style={[styles.tokenText, { color: colors.text }]}>
+						Your push token: {expoPushToken || 'Loading...'}
+					</Text>
+					{error && (
+						<Text style={[styles.errorText, { color: '#dc2626' }]}>
+							Error: {error.toString()}
+						</Text>
+					)}
+					{expoPushToken && (
+						<Button
+							title="Send Test Notification"
+							onPress={() => sendPushNotification(expoPushToken)}
+						/>
+					)}
+				</View>
 			</SafeAreaView>
 		</GestureHandlerRootView>
 	);
@@ -269,4 +299,19 @@ const styles = StyleSheet.create({
 	title: { fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
 	message: { fontSize: 14, marginBottom: 8 },
 	timestamp: { fontSize: 12, opacity: 0.7 },
+	tokenContainer: {
+		padding: 16,
+		backgroundColor: '#f3f4f6',
+		borderTopWidth: 1,
+		borderTopColor: '#e5e7eb',
+	},
+	tokenText: {
+		fontSize: 12,
+		fontFamily: 'monospace',
+		marginBottom: 8,
+	},
+	errorText: {
+		fontSize: 12,
+		fontWeight: 'bold',
+	},
 });

@@ -111,7 +111,6 @@ const transactions = [
 		type: 'expense',
 		amount: 45,
 		date: '2024-01-15',
-		category: 'Food & Dining',
 	},
 	// ... more transactions
 ];
@@ -119,30 +118,6 @@ const transactions = [
 <SpendingTrendsGraph
 	transactions={transactions}
 	title="Spending Trends"
-	period="month"
-/>;
-```
-
-### 5. CategoryBreakdownGraph
-
-A pie chart component that shows spending distribution across categories.
-
-**Features:**
-
-- Donut chart with category breakdown
-- Top 5 categories with detailed progress bars
-- AI-powered insights
-- Color-coded categories
-- Percentage calculations
-
-**Usage:**
-
-```tsx
-import { CategoryBreakdownGraph } from '../components';
-
-<CategoryBreakdownGraph
-	transactions={transactions}
-	title="Category Breakdown"
 	period="month"
 />;
 ```
@@ -190,7 +165,6 @@ interface Transaction {
 	type: 'income' | 'expense';
 	amount: number;
 	date: string;
-	category?: string;
 }
 ```
 
@@ -242,7 +216,7 @@ import {
 	BudgetOverviewGraph,
 	GoalsProgressGraph,
 	SpendingTrendsGraph,
-	CategoryBreakdownGraph,
+
 } from '../components';
 ```
 

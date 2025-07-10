@@ -45,13 +45,11 @@ const AddTransaction: React.FC<AddTransactionProps> = ({
 		type: 'income',
 		description: '',
 		amount: '',
-		category: '',
 		date: new Date().toISOString().split('T')[0],
 	});
 
 	const router = useRouter();
 	const amountInputRef = useRef<TextInput>(null);
-	const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
 	useEffect(() => {
 		if (visible) {
@@ -104,7 +102,6 @@ const AddTransaction: React.FC<AddTransactionProps> = ({
 				type: 'income',
 				description: '',
 				amount: '',
-				category: '',
 				date: new Date().toISOString().split('T')[0],
 			});
 			Alert.alert('Success', 'Transaction saved successfully!');
@@ -126,7 +123,6 @@ const AddTransaction: React.FC<AddTransactionProps> = ({
 				type: 'expense',
 				description: '',
 				amount: '',
-				category: '',
 				date: new Date().toISOString().split('T')[0],
 			});
 			Alert.alert('Success', 'Transaction saved successfully!');
@@ -135,21 +131,6 @@ const AddTransaction: React.FC<AddTransactionProps> = ({
 			console.error('Error saving transaction:', error);
 			Alert.alert('Error', 'Failed to save transaction');
 		}
-	};
-
-	const mockTags = [
-		'Groceries',
-		'Utilities',
-		'Entertainment',
-		'Travel',
-		'Health',
-	];
-
-	const toggleCategorySelection = (category: string) => {
-		setSelectedCategory((prevSelectedCategory) =>
-			prevSelectedCategory === category ? null : category
-		);
-		setTransaction({ ...transaction, category: category });
 	};
 
 	return (
@@ -191,35 +172,7 @@ const AddTransaction: React.FC<AddTransactionProps> = ({
 											showSoftInputOnFocus={false}
 										/>
 									</View>
-									<View style={styles.carouselContainer}>
-										<ScrollView
-											horizontal
-											showsHorizontalScrollIndicator={false}
-										>
-											{mockTags.map((category, index) => (
-												<TouchableOpacity
-													key={index}
-													onPress={() => toggleCategorySelection(category)}
-													style={[
-														styles.carouselText,
-														selectedCategory === category && styles.selectedTag,
-													]}
-												>
-													<Text>{category}</Text>
-												</TouchableOpacity>
-											))}
-											<TouchableOpacity
-												onPress={() => console.log('Add Category Pressed')}
-												style={styles.addCategoryButton}
-											>
-												<Ionicons
-													name="add-circle-outline"
-													size={24}
-													color="grey"
-												/>
-											</TouchableOpacity>
-										</ScrollView>
-									</View>
+
 									<TextInput
 										style={styles.inputDescription}
 										placeholder="What's this for?"

@@ -25,6 +25,7 @@ import { useFonts } from 'expo-font';
 import { TransactionContext } from '../../../src/context/transactionContext';
 import { useBudget, Budget } from '../../../src/context/budgetContext';
 import { navigateToBudgetsWithModal } from '../../../src/utils/navigationUtils';
+import { BudgetSuggestionService } from '../../../src/services/budgetSuggestionService';
 
 interface TransactionFormData {
 	type: 'expense';
@@ -32,6 +33,8 @@ interface TransactionFormData {
 	amount: string;
 	budgets: Budget[];
 	date: string;
+	target?: string;
+	targetModel?: 'Budget' | 'Goal';
 }
 
 // Utility function to get local date in ISO format
@@ -50,6 +53,8 @@ const AddTransactionScreen = () => {
 	const amountInputRef = useRef<TextInput>(null);
 	const [selectedBudgets, setSelectedBudgets] = useState<Budget[]>([]);
 	const [resetNumberPad, setResetNumberPad] = useState(false);
+	const [budgetSuggestions, setBudgetSuggestions] = useState<Budget[]>([]);
+	const [showSuggestions, setShowSuggestions] = useState(false);
 	const [fontsLoaded] = useFonts({
 		...Ionicons.font,
 	});
@@ -65,6 +70,8 @@ const AddTransactionScreen = () => {
 				amount: '',
 				budgets: [],
 				date: getLocalIsoDate(),
+				target: undefined,
+				targetModel: undefined,
 			},
 		});
 
@@ -118,13 +125,19 @@ const AddTransactionScreen = () => {
 				return;
 			}
 
-			const transactionData = {
+			// Create transaction data - budget will be auto-matched by backend if not selected
+			const transactionData: any = {
 				description: data.description,
 				amount: amount,
-				categories: [], // Keep empty categories for backward compatibility
 				date: data.date,
-				type: 'expense' as const, // Always set as expense
+				type: 'expense' as const,
 			};
+
+			// If a budget is selected, use it; otherwise let backend auto-match
+			if (selectedBudgets.length > 0) {
+				transactionData.target = selectedBudgets[0].id;
+				transactionData.targetModel = 'Budget';
+			}
 
 			// Use the context's addTransaction method
 			await addTransaction(transactionData);
@@ -144,7 +157,12 @@ const AddTransactionScreen = () => {
 			// Reset NumberPad
 			setResetNumberPad(true);
 
-			router.back();
+			// Navigate back to the previous screen
+			if (router.canGoBack()) {
+				router.back();
+			} else {
+				router.replace('/(tabs)/dashboard');
+			}
 		} catch (error) {
 			console.error('Error saving expense:', error);
 			Alert.alert('Error', 'Failed to save expense');
@@ -158,6 +176,37 @@ const AddTransactionScreen = () => {
 
 		setSelectedBudgets(newSelectedBudgets);
 		setValue('budgets', newSelectedBudgets);
+	};
+
+	// Handle description changes and get budget suggestions
+	const handleDescriptionChange = async (text: string) => {
+		setValue('description', text);
+
+		// Get budget suggestions if description is long enough
+		if (text.trim().length >= 2) {
+			try {
+				const suggestions = await BudgetSuggestionService.getBudgetSuggestions(
+					text
+				);
+				setBudgetSuggestions(suggestions);
+				setShowSuggestions(suggestions.length > 0);
+			} catch (error) {
+				console.error('Error getting budget suggestions:', error);
+				setBudgetSuggestions([]);
+				setShowSuggestions(false);
+			}
+		} else {
+			setBudgetSuggestions([]);
+			setShowSuggestions(false);
+		}
+	};
+
+	// Auto-select budget from suggestions
+	const selectBudgetFromSuggestion = (budget: Budget) => {
+		setSelectedBudgets([budget]);
+		setValue('budgets', [budget]);
+		setShowSuggestions(false);
+		setBudgetSuggestions([]);
 	};
 
 	//
@@ -226,7 +275,7 @@ const AddTransactionScreen = () => {
 													styles.selectedTagText,
 											]}
 										>
-											{budget.category}
+											{budget.name}
 										</Text>
 									</RectButton>
 								))}
@@ -255,10 +304,34 @@ const AddTransactionScreen = () => {
 										placeholder="What did you spend this on?"
 										placeholderTextColor={'#a3a3a3'}
 										value={value}
-										onChangeText={onChange}
+										onChangeText={handleDescriptionChange}
 									/>
 								)}
 							/>
+							
+							{/* Budget Suggestions */}
+							{showSuggestions && budgetSuggestions.length > 0 && (
+								<View style={styles.suggestionsContainer}>
+									<Text style={styles.suggestionsTitle}>Suggested Budgets:</Text>
+									<ScrollView horizontal showsHorizontalScrollIndicator={false}>
+										{budgetSuggestions.map((budget) => (
+											<RectButton
+												key={budget.id}
+												style={styles.suggestionButton}
+												onPress={() => selectBudgetFromSuggestion(budget)}
+											>
+												<Ionicons
+													name={budget.icon as keyof typeof Ionicons.glyphMap}
+													size={16}
+													color={budget.color}
+													style={styles.suggestionIcon}
+												/>
+												<Text style={styles.suggestionText}>{budget.name}</Text>
+											</RectButton>
+										))}
+									</ScrollView>
+								</View>
+							)}
 						</KeyboardAvoidingView>
 
 						<View style={styles.transactionButtonsContainer}>
@@ -571,6 +644,35 @@ const styles = StyleSheet.create({
 	},
 	carouselText: {
 		fontSize: 16,
+	},
+	suggestionsContainer: {
+		marginTop: 10,
+		marginBottom: 10,
+	},
+	suggestionsTitle: {
+		fontSize: 14,
+		fontWeight: '600',
+		color: '#666',
+		marginBottom: 8,
+	},
+	suggestionButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#f0f0f0',
+		paddingHorizontal: 12,
+		paddingVertical: 8,
+		borderRadius: 20,
+		marginRight: 8,
+		borderWidth: 1,
+		borderColor: '#e0e0e0',
+	},
+	suggestionIcon: {
+		marginRight: 6,
+	},
+	suggestionText: {
+		fontSize: 14,
+		color: '#333',
+		fontWeight: '500',
 	},
 });
 
