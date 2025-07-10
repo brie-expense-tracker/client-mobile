@@ -33,18 +33,21 @@ export interface CreateGoalData {
 	deadline: string;
 	icon: string;
 	color: string;
-	categories: string[];
+	categories?: string[];
 }
 
 export interface UpdateGoalData {
 	name?: string;
 	target?: number;
-	current?: number;
 	deadline?: string;
 	icon?: string;
 	color?: string;
 	categories?: string[];
 }
+
+// ==========================================
+// Context
+// ==========================================
 
 interface GoalContextType {
 	goals: Goal[];
@@ -76,6 +79,9 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 	const [goals, setGoals] = useState<Goal[]>([]);
 	const [isLoading, setIsLoading] = useState<boolean>(true);
 	const { refreshTransactions } = useContext(TransactionContext);
+
+	// Memoize the goals data to prevent unnecessary re-renders
+	const memoizedGoals = useMemo(() => goals, [goals]);
 
 	const refetch = useCallback(async () => {
 		console.log('[GoalContext] refetch called');
@@ -142,6 +148,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 			id: tempId,
 			...goalData,
 			current: 0,
+			categories: goalData.categories || [],
 		};
 
 		console.log('Optimistic goal created:', newGoal);
@@ -315,9 +322,10 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 		refetch();
 	}, [refetch]);
 
+	// Memoize the context value to prevent unnecessary re-renders
 	const value = useMemo(
 		() => ({
-			goals,
+			goals: memoizedGoals,
 			isLoading,
 			refetch,
 			addGoal,
@@ -326,7 +334,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 			updateGoalCurrent,
 		}),
 		[
-			goals,
+			memoizedGoals,
 			isLoading,
 			refetch,
 			addGoal,
