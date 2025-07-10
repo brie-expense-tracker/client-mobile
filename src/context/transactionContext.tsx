@@ -17,6 +17,7 @@ import { useGoal } from './goalContext';
 interface TransactionContextType {
 	transactions: Transaction[];
 	isLoading: boolean;
+	hasLoaded: boolean; // Track if data has been loaded at least once
 	refetch: () => Promise<void>;
 	refreshTransactions: () => void; // Add this new function
 	deleteTransaction: (id: string) => Promise<void>;
@@ -31,7 +32,8 @@ interface TransactionContextType {
 
 export const TransactionContext = createContext<TransactionContextType>({
 	transactions: [],
-	isLoading: true,
+	isLoading: false,
+	hasLoaded: false,
 	refetch: async () => {},
 	refreshTransactions: () => {}, // Add this new function
 	deleteTransaction: async () => {},
@@ -45,7 +47,8 @@ export const TransactionContext = createContext<TransactionContextType>({
 
 export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 	const [transactions, setTransactions] = useState<Transaction[]>([]);
-	const [isLoading, setIsLoading] = useState<boolean>(true);
+	const [isLoading, setIsLoading] = useState<boolean>(false); // Changed from true to false
+	const [hasLoaded, setHasLoaded] = useState<boolean>(false); // Track if data has been loaded
 
 	// Get budget and goal context functions
 	const { budgets, refetch: refetchBudgets } = useBudget();
@@ -99,12 +102,31 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 						if (tx.target._id) {
 							targetId = tx.target._id;
 							targetModel = tx.targetModel;
-						} else {
+						} else if (typeof tx.target === 'string') {
 							// If target is just an ID string
 							targetId = tx.target;
 							targetModel = tx.targetModel;
+						} else {
+							// If target is an object but doesn't have _id, try to find an id field
+							const targetKeys = Object.keys(tx.target);
+							const idKey = targetKeys.find((key) =>
+								key.toLowerCase().includes('id')
+							);
+							if (idKey && tx.target[idKey]) {
+								targetId = tx.target[idKey];
+								targetModel = tx.targetModel;
+							}
 						}
 					}
+
+					console.log('[TransactionContext] Transaction target processing:', {
+						transactionId: tx._id ?? tx.id,
+						description: tx.description,
+						originalTarget: tx.target,
+						originalTargetModel: tx.targetModel,
+						extractedTargetId: targetId,
+						extractedTargetModel: targetModel,
+					});
 
 					return {
 						id: tx._id ?? tx.id,
@@ -116,9 +138,20 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 						targetModel: targetModel,
 					};
 				});
+				console.log(
+					'[TransactionContext] Formatted transactions:',
+					formatted.map((t) => ({
+						id: t.id,
+						description: t.description,
+						target: t.target,
+						targetModel: t.targetModel,
+					}))
+				);
 				setTransactions(formatted);
+				setHasLoaded(true); // Mark as loaded
 			} else {
 				setTransactions([]);
+				setHasLoaded(true); // Mark as loaded even if empty
 			}
 		} catch (err) {
 			console.warn(
@@ -126,6 +159,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 				err
 			);
 			setTransactions([]);
+			setHasLoaded(true); // Mark as loaded even on error
 		} finally {
 			setIsLoading(false);
 		}
@@ -177,6 +211,9 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 		[] // No dependencies needed since we use refs
 	);
 
+	// Memoize the transactions data to prevent unnecessary re-renders
+	const memoizedTransactions = useMemo(() => transactions, [transactions]);
+
 	const addTransaction = useCallback(
 		async (transactionData: Omit<Transaction, 'id'>) => {
 			console.log(
@@ -189,6 +226,9 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 			const newTransaction: Transaction = {
 				id: tempId,
 				...transactionData,
+				// Ensure target and targetModel are properly set for optimistic update
+				target: transactionData.target || undefined,
+				targetModel: transactionData.targetModel || undefined,
 			};
 
 			console.log(
@@ -228,20 +268,42 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 					}
 
 					// Handle populated target data from server response
-					let targetId = null;
-					let targetModel = null;
+					let targetId = transactionData.target; // Use original data as fallback
+					let targetModel = transactionData.targetModel; // Use original data as fallback
 
 					if (response.data.target) {
 						// If target is populated (has _id and other fields), extract the ID
 						if (response.data.target._id) {
 							targetId = response.data.target._id;
-							targetModel = response.data.targetModel;
-						} else {
+							targetModel =
+								response.data.targetModel || transactionData.targetModel;
+						} else if (typeof response.data.target === 'string') {
 							// If target is just an ID string
 							targetId = response.data.target;
-							targetModel = response.data.targetModel;
+							targetModel =
+								response.data.targetModel || transactionData.targetModel;
+						} else {
+							// If target is an object but doesn't have _id, try to find an id field
+							const targetKeys = Object.keys(response.data.target);
+							const idKey = targetKeys.find((key) =>
+								key.toLowerCase().includes('id')
+							);
+							if (idKey && response.data.target[idKey]) {
+								targetId = response.data.target[idKey];
+								targetModel =
+									response.data.targetModel || transactionData.targetModel;
+							}
 						}
 					}
+
+					console.log('[TransactionContext] Target processing result:', {
+						originalTarget: transactionData.target,
+						originalTargetModel: transactionData.targetModel,
+						finalTargetId: targetId,
+						finalTargetModel: targetModel,
+						responseTarget: response.data.target,
+						responseTargetModel: response.data.targetModel,
+					});
 
 					// Update with the real ID from the server
 					const serverTransaction: Transaction = {
@@ -338,6 +400,15 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 						? {
 								...t,
 								...transactionData,
+								// Ensure target and targetModel are properly updated
+								target:
+									transactionData.target !== undefined
+										? transactionData.target
+										: t.target,
+								targetModel:
+									transactionData.targetModel !== undefined
+										? transactionData.targetModel
+										: t.targetModel,
 						  }
 						: t
 				)
@@ -351,14 +422,16 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 
 				if (response.success && response.data) {
 					// Handle populated target data from server response
-					let targetId = null;
-					let targetModel = null;
+					let targetId = transactionData.target; // Use update data as fallback
+					let targetModel = transactionData.targetModel; // Use update data as fallback
 
 					console.log('[TransactionContext] Processing server response:', {
 						hasTarget: !!response.data.target,
 						targetType: typeof response.data.target,
 						targetValue: response.data.target,
 						targetModel: response.data.targetModel,
+						updateDataTarget: transactionData.target,
+						updateDataTargetModel: transactionData.targetModel,
 					});
 
 					if (response.data.target) {
@@ -371,7 +444,8 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 						// If target is populated (has _id and other fields), extract the ID
 						if (response.data.target._id) {
 							targetId = response.data.target._id;
-							targetModel = response.data.targetModel;
+							targetModel =
+								response.data.targetModel || transactionData.targetModel;
 							console.log(
 								'[TransactionContext] Extracted target from populated object:',
 								{ targetId, targetModel }
@@ -379,7 +453,8 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 						} else if (typeof response.data.target === 'string') {
 							// If target is just an ID string
 							targetId = response.data.target;
-							targetModel = response.data.targetModel;
+							targetModel =
+								response.data.targetModel || transactionData.targetModel;
 							console.log(
 								'[TransactionContext] Extracted target from ID string:',
 								{ targetId, targetModel }
@@ -392,7 +467,8 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 							);
 							if (idKey && response.data.target[idKey]) {
 								targetId = response.data.target[idKey];
-								targetModel = response.data.targetModel;
+								targetModel =
+									response.data.targetModel || transactionData.targetModel;
 								console.log(
 									'[TransactionContext] Extracted target from object with id field:',
 									{ targetId, targetModel, idKey }
@@ -488,13 +564,16 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 	}, [refetch]);
 
 	useEffect(() => {
-		refetch();
-	}, [refetch]);
+		if (!hasLoaded) {
+			refetch();
+		}
+	}, [refetch, hasLoaded]);
 
 	const value = useMemo(
 		() => ({
-			transactions,
+			transactions: memoizedTransactions,
 			isLoading,
+			hasLoaded,
 			refetch,
 			refreshTransactions,
 			deleteTransaction,
@@ -502,8 +581,9 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 			updateTransaction,
 		}),
 		[
-			transactions,
+			memoizedTransactions,
 			isLoading,
+			hasLoaded,
 			refetch,
 			refreshTransactions,
 			deleteTransaction,

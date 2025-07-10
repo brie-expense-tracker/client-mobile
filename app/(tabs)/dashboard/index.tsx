@@ -245,15 +245,28 @@ const TransactionHistory: React.FC<{
 		.sort((a, b) => +new Date(b.date) - +new Date(a.date))
 		.slice(0, 6);
 
-	// Helper function to get target name
+	// Helper function to get target name and percentage
 	const getTargetName = (transaction: Transaction): string => {
 		if (transaction.target && transaction.targetModel) {
 			if (transaction.targetModel === 'Budget') {
 				const budget = budgets.find((b) => b.id === transaction.target);
-				return budget ? budget.category : 'Unknown Budget';
+				if (budget) {
+					const percentage = budget.spentPercentage
+						? `${Math.round(budget.spentPercentage)}%`
+						: '';
+					return `${budget.name}${percentage ? ` (${percentage})` : ''}`;
+				}
+				return 'Unknown Budget';
 			} else if (transaction.targetModel === 'Goal') {
 				const goal = goals.find((g) => g.id === transaction.target);
-				return goal ? goal.name : 'Unknown Goal';
+				if (goal) {
+					const percentage =
+						goal.target > 0
+							? `${Math.round((goal.current / goal.target) * 100)}%`
+							: '';
+					return `${goal.name}${percentage ? ` (${percentage})` : ''}`;
+				}
+				return 'Unknown Goal';
 			}
 		}
 		return 'Other';

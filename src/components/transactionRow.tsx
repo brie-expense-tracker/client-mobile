@@ -87,16 +87,19 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 				);
 
 				if (matchingBudget) {
+					// Calculate the incremental percentage this transaction contributes to the budget
+					const transactionContribution =
+						(item.amount / (matchingBudget.amount || 1)) * 100;
+
 					return {
 						type: 'budget' as const,
 						name: matchingBudget.name,
 						icon: matchingBudget.icon as keyof typeof Ionicons.glyphMap,
 						color: matchingBudget.color,
-						progress:
-							((matchingBudget.spent || 0) / (matchingBudget.amount || 1)) *
-							100,
+						progress: transactionContribution,
 						spent: matchingBudget.spent || 0,
 						allocated: matchingBudget.amount || 0,
+						transactionAmount: item.amount,
 					};
 				}
 			} else if (item.targetModel === 'Goal' && item.type === 'income') {
@@ -104,14 +107,19 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 				const matchingGoal = goals.find((goal) => goal.id === item.target);
 
 				if (matchingGoal) {
+					// Calculate the incremental percentage this transaction contributes to the goal
+					const transactionContribution =
+						(item.amount / matchingGoal.target) * 100;
+
 					return {
 						type: 'goal' as const,
 						name: matchingGoal.name,
 						icon: matchingGoal.icon as keyof typeof Ionicons.glyphMap,
 						color: matchingGoal.color,
-						progress: (matchingGoal.current / matchingGoal.target) * 100,
+						progress: transactionContribution,
 						current: matchingGoal.current,
 						target: matchingGoal.target,
+						transactionAmount: item.amount,
 					};
 				}
 			}
@@ -130,7 +138,7 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 			spent: 0,
 			allocated: 0,
 		};
-	}, [item.target, item.targetModel, item.type, budgets, goals]);
+	}, [item.target, item.targetModel, item.type, item.amount, budgets, goals]);
 
 	const triggerHaptic = useCallback(() => {
 		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -236,11 +244,11 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 							{transactionContext.type === 'budget' &&
 								`${
 									transactionContext.name
-								} • ${transactionContext.progress.toFixed(0)}% used`}
+								} • +${transactionContext.progress.toFixed(1)}% to budget`}
 							{transactionContext.type === 'goal' &&
 								`${
 									transactionContext.name
-								} • ${transactionContext.progress.toFixed(0)}% complete`}
+								} • +${transactionContext.progress.toFixed(1)}% to goal`}
 							{transactionContext.type === 'general' && transactionContext.name}
 						</Text>
 					</View>

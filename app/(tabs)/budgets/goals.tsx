@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
 	View,
 	Text,
@@ -144,6 +144,26 @@ export default function GoalsScreen() {
 		color: COLOR_PALETTE.blue.base,
 		categories: [] as string[],
 	});
+
+	// ==========================================
+	// Memoized Data
+	// ==========================================
+	// Memoize goals with add button to prevent unnecessary re-renders
+	const goalsWithAdd = useMemo(
+		() => [
+			...goals,
+			{
+				id: 'add',
+				name: 'Add Goal',
+				target: 0,
+				current: 0,
+				deadline: '',
+				icon: 'add-circle-outline',
+				color: '#00a2ff',
+			} as Goal,
+		],
+		[goals]
+	);
 
 	// ==========================================
 	// Auto-open modal on navigation
@@ -578,59 +598,67 @@ export default function GoalsScreen() {
 	// ==========================================
 	// Render Functions
 	// ==========================================
-	const renderItem = ({ item }: { item: Goal }) => {
-		const percent = Math.min((item.current / item.target) * 100, 100);
-		const deadline = new Date(item.deadline);
-		const today = new Date();
-		const daysLeft = Math.ceil(
-			(deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-		);
+	const renderItem = useCallback(
+		({ item }: { item: Goal }) => {
+			const percent = Math.min((item.current / item.target) * 100, 100);
+			const deadline = new Date(item.deadline);
+			const today = new Date();
+			const daysLeft = Math.ceil(
+				(deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+			);
 
-		return (
-			<RectButton
-				style={styles.card}
-				onPress={() => handleQuickAddTransaction(item)}
-			>
-				<View style={styles.cardHeader}>
-					<View
-						style={[styles.iconWrapper, { backgroundColor: `${item.color}20` }]}
-					>
-						<Ionicons name={item.icon as any} size={24} color={item.color} />
+			return (
+				<RectButton
+					style={styles.card}
+					onPress={() => handleQuickAddTransaction(item)}
+				>
+					<View style={styles.cardHeader}>
+						<View
+							style={[
+								styles.iconWrapper,
+								{ backgroundColor: `${item.color}20` },
+							]}
+						>
+							<Ionicons name={item.icon as any} size={24} color={item.color} />
+						</View>
+						<Text style={styles.categoryText}>{item.name}</Text>
+						<BorderlessButton
+							style={styles.optionsButton}
+							onPress={() => showOptionsModal(item)}
+							onActiveStateChange={setIsPressed}
+						>
+							<Ionicons name="ellipsis-horizontal" size={20} color="#757575" />
+						</BorderlessButton>
 					</View>
-					<Text style={styles.categoryText}>{item.name}</Text>
-					<BorderlessButton
-						style={styles.optionsButton}
-						onPress={() => showOptionsModal(item)}
-						onActiveStateChange={setIsPressed}
-					>
-						<Ionicons name="ellipsis-horizontal" size={20} color="#757575" />
-					</BorderlessButton>
-				</View>
 
-				<View style={styles.amounts}>
-					<Text style={styles.spentText}>${item.current.toFixed(2)}</Text>
-					<Text style={styles.allocatedText}>/ ${item.target.toFixed(2)}</Text>
-				</View>
+					<View style={styles.amounts}>
+						<Text style={styles.spentText}>${item.current.toFixed(2)}</Text>
+						<Text style={styles.allocatedText}>
+							/ ${item.target.toFixed(2)}
+						</Text>
+					</View>
 
-				<View style={styles.progressBarBackground}>
-					<View
-						style={[
-							styles.progressBarFill,
-							{
-								width: `${percent}%`,
-								backgroundColor: item.color,
-							},
-						]}
-					/>
-				</View>
+					<View style={styles.progressBarBackground}>
+						<View
+							style={[
+								styles.progressBarFill,
+								{
+									width: `${percent}%`,
+									backgroundColor: item.color,
+								},
+							]}
+						/>
+					</View>
 
-				<View style={styles.goalFooter}>
-					<Text style={styles.percentageText}>{percent.toFixed(0)}%</Text>
-					<Text style={styles.deadlineText}>{daysLeft} days left</Text>
-				</View>
-			</RectButton>
-		);
-	};
+					<View style={styles.goalFooter}>
+						<Text style={styles.percentageText}>{percent.toFixed(0)}%</Text>
+						<Text style={styles.deadlineText}>{daysLeft} days left</Text>
+					</View>
+				</RectButton>
+			);
+		},
+		[handleQuickAddTransaction, showOptionsModal]
+	);
 
 	// ==========================================
 	// Empty State Component
@@ -655,19 +683,6 @@ export default function GoalsScreen() {
 	// Main Render
 	// ==========================================
 	// Show empty state if no goals, otherwise show goals with add button
-	const goalsWithAdd = [
-		...goals,
-		{
-			id: 'add',
-			name: 'Add Goal',
-			target: 0,
-			current: 0,
-			deadline: '',
-			icon: 'add-circle-outline',
-			color: '#00a2ff',
-		} as Goal,
-	];
-
 	return (
 		<View style={styles.mainContainer}>
 			{goals.length === 0 ? (
