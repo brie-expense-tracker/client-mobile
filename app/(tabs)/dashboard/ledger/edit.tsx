@@ -15,8 +15,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TransactionContext } from '../../../../src/context/transactionContext';
-import { useBudget, Budget } from '../../../../src/context/budgetContext';
-import { useGoal, Goal } from '../../../../src/context/goalContext';
+import { useBudget } from '../../../../src/context/budgetContext';
+import { useGoal } from '../../../../src/context/goalContext';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 /**
@@ -43,18 +43,22 @@ const EditTransactionScreen = () => {
 	// Find the transaction to edit based on the ID from route params
 	const transaction = transactions.find((t) => t.id === transactionId);
 
-	// Helper function to get target name
-	const getTargetName = (transaction: any): string => {
-		if (transaction?.target && transaction?.targetModel) {
-			if (transaction.targetModel === 'Budget') {
-				const budget = budgets.find((b) => b.id === transaction.target);
-				return budget ? budget.name : 'Unknown Budget';
-			} else if (transaction.targetModel === 'Goal') {
-				const goal = goals.find((g) => g.id === transaction.target);
-				return goal ? goal.name : 'Unknown Goal';
-			}
+	// Helper function to format date consistently
+	const formatDateForDisplay = (dateString: string): string => {
+		if (!dateString) return '';
+		try {
+			const date = new Date(dateString + 'T00:00:00');
+			return date.toISOString().split('T')[0];
+		} catch (error) {
+			console.error('Error formatting date:', error);
+			return dateString;
 		}
-		return 'Other';
+	};
+
+	// Helper function to get current date in YYYY-MM-DD format
+	const getCurrentDateString = (): string => {
+		const now = new Date();
+		return now.toISOString().split('T')[0];
 	};
 
 	// Form state for editing transaction details
@@ -70,16 +74,36 @@ const EditTransactionScreen = () => {
 	// Initialize form with existing transaction data when component mounts
 	useEffect(() => {
 		if (transaction) {
+			// Handle date properly to avoid timezone issues
+			let dateString = '';
+			try {
+				const transactionDate = new Date(transaction.date);
+				if (!isNaN(transactionDate.getTime())) {
+					const localDate = new Date(
+						transactionDate.getFullYear(),
+						transactionDate.getMonth(),
+						transactionDate.getDate()
+					);
+					dateString = localDate.toISOString().split('T')[0];
+				} else {
+					// Fallback to current date if transaction date is invalid
+					dateString = getCurrentDateString();
+				}
+			} catch (error) {
+				console.error('Error parsing transaction date:', error);
+				dateString = getCurrentDateString();
+			}
+
 			setEditForm({
 				description: transaction.description,
 				amount: transaction.amount.toString(),
-				date: transaction.date.split('T')[0], // Extract date part from ISO string
+				date: dateString,
 				type: transaction.type,
 				target: transaction.target || '',
 				targetModel: transaction.targetModel || '',
 			});
 		}
-	}, []); // Only run once when component mounts, not when transaction changes
+	}, [transaction]); // Run when transaction changes to ensure real-time sync
 
 	// Show error message if transaction is not found
 	if (!transaction) {
@@ -130,11 +154,15 @@ const EditTransactionScreen = () => {
 
 		setIsLoading(true);
 		try {
+			// Create date in local timezone to avoid timezone issues
+			const [year, month, day] = editForm.date.split('-').map(Number);
+			const localDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+
 			// Update the transaction with new data
 			const updateData: any = {
 				description: editForm.description,
 				amount: amount,
-				date: new Date(editForm.date + 'T00:00:00').toISOString(),
+				date: localDate.toISOString(),
 				type: editForm.type,
 			};
 
@@ -166,11 +194,18 @@ const EditTransactionScreen = () => {
 	 */
 	const handleDateSelect = (event: any, selectedDate?: Date) => {
 		if (selectedDate) {
+			// Create date in local timezone to ensure consistency
+			const localDate = new Date(
+				selectedDate.getFullYear(),
+				selectedDate.getMonth(),
+				selectedDate.getDate()
+			);
+
 			setEditForm({
 				...editForm,
-				date: selectedDate.toISOString().split('T')[0],
+				date: localDate.toISOString().split('T')[0],
 			});
-			setShowCalendar(false);
+			// Don't close the picker - let user manually close it
 		}
 	};
 
@@ -278,7 +313,17 @@ const EditTransactionScreen = () => {
 					<TextInput
 						style={styles.input}
 						value={editForm.amount}
-						onChangeText={(text) => setEditForm({ ...editForm, amount: text })}
+						onChangeText={(text) => {
+							// Only allow numbers and decimal point
+							const numericText = text.replace(/[^0-9.]/g, '');
+							// Ensure only one decimal point
+							const parts = numericText.split('.');
+							const filteredText =
+								parts.length > 2
+									? parts[0] + '.' + parts.slice(1).join('')
+									: numericText;
+							setEditForm({ ...editForm, amount: filteredText });
+						}}
 						placeholder="0.00"
 						keyboardType="numeric"
 						placeholderTextColor="#9E9E9E"
@@ -286,16 +331,29 @@ const EditTransactionScreen = () => {
 				</View>
 
 				{/* Date selection with calendar */}
-				<View style={styles.formGroup}>
+				<View>
 					<Text style={styles.label}>Date</Text>
 					<TouchableOpacity
 						style={styles.dateButton}
 						onPress={() => setShowCalendar(!showCalendar)}
 					>
 						<Text style={styles.dateButtonText}>
-							{editForm.date || 'Select date'}
+							{editForm.date
+								? formatDateForDisplay(editForm.date)
+								: 'Select date'}
 						</Text>
 						<Ionicons name="calendar" size={24} color="#0095FF" />
+					</TouchableOpacity>
+					<TouchableOpacity
+						style={styles.todayButton}
+						onPress={() => {
+							setEditForm({
+								...editForm,
+								date: getCurrentDateString(),
+							});
+						}}
+					>
+						<Text style={styles.todayButtonText}>Set to Today</Text>
 					</TouchableOpacity>
 				</View>
 
@@ -304,17 +362,27 @@ const EditTransactionScreen = () => {
 					<View style={styles.calendarContainer}>
 						{Platform.OS === 'ios' ? (
 							<DateTimePicker
-								value={new Date(editForm.date)}
+								value={
+									editForm.date
+										? new Date(editForm.date + 'T00:00:00')
+										: new Date()
+								}
 								onChange={handleDateSelect}
 								mode="date"
 								display="spinner"
+								timeZoneOffsetInMinutes={new Date().getTimezoneOffset()}
 							/>
 						) : (
 							<DateTimePicker
-								value={new Date(editForm.date)}
+								value={
+									editForm.date
+										? new Date(editForm.date + 'T00:00:00')
+										: new Date()
+								}
 								onChange={handleDateSelect}
 								mode="date"
 								display="default"
+								timeZoneOffsetInMinutes={new Date().getTimezoneOffset()}
 							/>
 						)}
 					</View>
@@ -551,6 +619,22 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		color: '#212121',
 	},
+	todayButton: {
+		marginVertical: 8,
+		alignSelf: 'flex-end',
+		paddingVertical: 8,
+		paddingHorizontal: 12,
+		borderRadius: 8,
+		backgroundColor: '#E3F2FD',
+		borderWidth: 1,
+		borderColor: '#0095FF',
+	},
+	todayButtonText: {
+		fontSize: 14,
+		color: '#0095FF',
+		fontWeight: '500',
+	},
+
 	calendarContainer: {
 		marginBottom: 24,
 		padding: 16,
