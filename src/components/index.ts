@@ -2,7 +2,7 @@
 export { default as BudgetOverviewGraph } from './BudgetOverviewGraph';
 export { default as GoalsProgressGraph } from './GoalsProgressGraph';
 export { default as SpendingTrendsGraph } from './SpendingTrendsGraph';
-export { default as CategoryBreakdownGraph } from './CategoryBreakdownGraph';
+
 export { default as FinancialDashboard } from './FinancialDashboard';
 
 // Existing Components

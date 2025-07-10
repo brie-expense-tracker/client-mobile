@@ -32,6 +32,8 @@ interface TransactionFormData {
 	amount: string;
 	goals: Goal[];
 	date: string;
+	target?: string;
+	targetModel?: 'Budget' | 'Goal';
 }
 
 // Utility function to get local date in ISO format
@@ -65,6 +67,8 @@ const AddTransactionScreen = () => {
 				amount: '',
 				goals: [],
 				date: getLocalIsoDate(),
+				target: undefined,
+				targetModel: undefined,
 			},
 		});
 
@@ -118,13 +122,25 @@ const AddTransactionScreen = () => {
 				return;
 			}
 
-			const transactionData = {
+			// Create transaction data
+			const transactionData: any = {
 				description: data.description,
 				amount: amount,
-				categories: [], // Keep empty categories for backward compatibility
 				date: data.date,
 				type: data.type,
 			};
+
+			// If a goal is selected, associate with that goal
+			if (selectedGoals.length > 0) {
+				transactionData.target = selectedGoals[0].id;
+				transactionData.targetModel = 'Goal';
+			} else {
+				// No goal selected - this will be categorized as "Other"
+				// Don't set target or targetModel, which means it's an "Other" transaction
+				console.log(
+					'[Transaction] Creating transaction without specific goal target'
+				);
+			}
 
 			// Use the context's addTransaction method
 			await addTransaction(transactionData);
@@ -144,7 +160,12 @@ const AddTransactionScreen = () => {
 			// Reset NumberPad
 			setResetNumberPad(true);
 
-			router.back();
+			// Navigate back to the previous screen
+			if (router.canGoBack()) {
+				router.back();
+			} else {
+				router.replace('/(tabs)/dashboard');
+			}
 		} catch (error) {
 			console.error('Error saving transaction:', error);
 			Alert.alert('Error', 'Failed to save transaction');
@@ -196,7 +217,7 @@ const AddTransactionScreen = () => {
 
 					{/* Goals Carousel */}
 					<View style={styles.carouselContainer}>
-						<Text style={styles.carouselLabel}>Goals</Text>
+						<Text style={styles.carouselLabel}>Goals (Optional)</Text>
 						<ScrollView horizontal showsHorizontalScrollIndicator={false}>
 							{goals.map((goal, index) => (
 								<RectButton

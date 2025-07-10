@@ -374,11 +374,11 @@ export default function _layout() {
 				}}
 			/>
 			<Stack.Screen
-				name="incomeBudget/index"
+				name="budgets/index"
 				options={{
 					headerShown: true,
 					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: 'Income & Budgets',
+					headerTitle: 'Budgets',
 					headerShadowVisible: false,
 					headerLargeTitle: true,
 					headerLargeStyle: {
@@ -404,33 +404,7 @@ export default function _layout() {
 					),
 				}}
 			/>
-			<Stack.Screen
-				name="categories/index"
-				options={{
-					headerShown: true,
-					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: 'Categories',
-					headerShadowVisible: false,
 
-					headerTitleStyle: {
-						fontSize: 20,
-						fontWeight: '600',
-						color: '#333',
-					},
-					headerStyle: {
-						backgroundColor: '#ffffff',
-					},
-
-					headerLeft: () => (
-						<BorderlessButton
-							onPress={() => router.back()}
-							style={{ width: 50 }}
-						>
-							<Ionicons name="chevron-back" size={24} color="#333" />
-						</BorderlessButton>
-					),
-				}}
-			/>
 			<Stack.Screen
 				name="goals/index"
 				options={{

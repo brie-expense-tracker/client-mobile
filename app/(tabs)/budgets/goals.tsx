@@ -10,16 +10,13 @@ import {
 	Platform,
 	Alert,
 	ScrollView,
-	SafeAreaView,
+	RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BorderlessButton, RectButton } from 'react-native-gesture-handler';
 import { useGoal, Goal } from '../../../src/context/goalContext';
-import { useContext } from 'react';
-import { TransactionContext } from '../../../src/context/transactionContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import RNModal from 'react-native-modal';
 import QuickAddTransaction from '../../../src/components/QuickAddTransaction';
 
@@ -112,8 +109,7 @@ export default function GoalsScreen() {
 	// ==========================================
 	// Context
 	// ==========================================
-	const { goals, addGoal, updateGoal, deleteGoal } = useGoal();
-	const { categories } = useContext(TransactionContext);
+	const { goals, addGoal, updateGoal, deleteGoal, refetch } = useGoal();
 
 	// ==========================================
 	// Route Parameters
@@ -139,6 +135,7 @@ export default function GoalsScreen() {
 	const [showQuickAddModal, setShowQuickAddModal] = useState(false);
 	const [selectedGoalForTransaction, setSelectedGoalForTransaction] =
 		useState<Goal | null>(null);
+	const [refreshing, setRefreshing] = useState(false);
 	const [newGoal, setNewGoal] = useState({
 		name: '',
 		target: '',
@@ -166,6 +163,21 @@ export default function GoalsScreen() {
 	// Debug logging
 	// ==========================================
 	useEffect(() => {}, [newGoal]);
+
+	// ==========================================
+	// Refresh Handler
+	// ==========================================
+	const onRefresh = async () => {
+		setRefreshing(true);
+		try {
+			// Trigger a refresh of goals data from the server
+			await refetch();
+		} catch (error) {
+			console.error('Error refreshing goals:', error);
+		} finally {
+			setRefreshing(false);
+		}
+	};
 
 	// ==========================================
 	// Goal Management
@@ -621,9 +633,28 @@ export default function GoalsScreen() {
 	};
 
 	// ==========================================
+	// Empty State Component
+	// ==========================================
+	const EmptyState = () => (
+		<View style={styles.emptyContainer}>
+			<View style={styles.emptyContent}>
+				<Ionicons name="flag-outline" size={64} color="#e0e0e0" />
+				<Text style={styles.emptyTitle}>No Goals Yet</Text>
+				<Text style={styles.emptySubtext}>
+					Create your first goal to start saving towards your dreams
+				</Text>
+				<RectButton style={styles.emptyAddButton} onPress={showModal}>
+					<Ionicons name="add" size={20} color="#fff" />
+					<Text style={styles.emptyAddButtonText}>Add Goal</Text>
+				</RectButton>
+			</View>
+		</View>
+	);
+
+	// ==========================================
 	// Main Render
 	// ==========================================
-	// Add the "Add Goal" card to the data
+	// Show empty state if no goals, otherwise show goals with add button
 	const goalsWithAdd = [
 		...goals,
 		{
@@ -639,36 +670,48 @@ export default function GoalsScreen() {
 
 	return (
 		<View style={styles.mainContainer}>
-			<FlatList
-				data={goalsWithAdd}
-				keyExtractor={(item) => item.id}
-				renderItem={({ item }) => {
-					if (item.id === 'add') {
-						return (
-							<RectButton style={styles.card} onPress={showModal}>
-								<View style={styles.cardHeader}>
-									<View
-										style={[
-											styles.iconWrapper,
-											{ backgroundColor: `${item.color}20` },
-										]}
-									>
-										<Ionicons
-											name={item.icon as any}
-											size={24}
-											color={item.color}
-										/>
-									</View>
-									<Text style={styles.categoryText}>{item.name}</Text>
-								</View>
-							</RectButton>
-						);
+			{goals.length === 0 ? (
+				<EmptyState />
+			) : (
+				<FlatList
+					data={goalsWithAdd}
+					keyExtractor={(item) => item.id}
+					refreshControl={
+						<RefreshControl
+							refreshing={refreshing}
+							onRefresh={onRefresh}
+							tintColor="#00a2ff"
+							colors={['#00a2ff']}
+						/>
 					}
-					return renderItem({ item });
-				}}
-				contentContainerStyle={styles.listContent}
-				showsVerticalScrollIndicator={false}
-			/>
+					renderItem={({ item }) => {
+						if (item.id === 'add') {
+							return (
+								<RectButton style={styles.card} onPress={showModal}>
+									<View style={styles.cardHeader}>
+										<View
+											style={[
+												styles.iconWrapper,
+												{ backgroundColor: `${item.color}20` },
+											]}
+										>
+											<Ionicons
+												name={item.icon as any}
+												size={24}
+												color={item.color}
+											/>
+										</View>
+										<Text style={styles.categoryText}>{item.name}</Text>
+									</View>
+								</RectButton>
+							);
+						}
+						return renderItem({ item });
+					}}
+					contentContainerStyle={styles.listContent}
+					showsVerticalScrollIndicator={false}
+				/>
+			)}
 
 			{/* Add Goal Modal */}
 			<RNModal
@@ -1437,5 +1480,44 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		color: '#757575',
 		fontWeight: '400',
+	},
+	emptyContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		paddingHorizontal: 24,
+	},
+	emptyContent: {
+		alignItems: 'center',
+		maxWidth: 280,
+	},
+	emptyTitle: {
+		fontSize: 24,
+		fontWeight: '600',
+		color: '#212121',
+		marginTop: 16,
+		marginBottom: 8,
+		textAlign: 'center',
+	},
+	emptySubtext: {
+		fontSize: 16,
+		color: '#757575',
+		textAlign: 'center',
+		marginBottom: 32,
+		lineHeight: 22,
+	},
+	emptyAddButton: {
+		backgroundColor: '#00a2ff',
+		borderRadius: 12,
+		paddingVertical: 16,
+		paddingHorizontal: 24,
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+	},
+	emptyAddButtonText: {
+		color: '#FFFFFF',
+		fontSize: 16,
+		fontWeight: '600',
 	},
 });

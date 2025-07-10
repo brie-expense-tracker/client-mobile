@@ -2,21 +2,49 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import './global.css';
 import React, { useEffect, useState } from 'react';
-import {
-	ActivityIndicator,
-	Text,
-	View,
-	TouchableOpacity,
-	StyleSheet,
-} from 'react-native';
+import { ActivityIndicator, Text, View, StyleSheet } from 'react-native';
 import { AuthProvider } from '../src/context/AuthContext';
 import { OnboardingProvider } from '../src/context/OnboardingContext';
 import { ProfileProvider } from '../src/context/profileContext';
+import { NotificationProvider } from '../src/context/notificationContext';
 import useAuth from '../src/context/AuthContext';
 import { useOnboarding } from '../src/context/OnboardingContext';
+import * as Notifications from 'expo-notifications';
+import * as TaskManager from 'expo-task-manager';
 
 // Demo mode toggle - set to true to enable demo mode
 const DEMO_MODE = false;
+
+Notifications.setNotificationHandler({
+	handleNotification: async () => ({
+		shouldShowBanner: true,
+		shouldShowList: true,
+		shouldPlaySound: false,
+		shouldSetBadge: false,
+	}),
+});
+
+const BACKGROUND_NOTIFICATION_TASK = 'BACKGROUND-NOTIFICATION-TASK';
+
+TaskManager.defineTask(
+	BACKGROUND_NOTIFICATION_TASK,
+	async ({ data, error, executionInfo }) => {
+		console.log('✅ Received a notification in the background!', {
+			data,
+			error,
+			executionInfo,
+		});
+		// Do something with the notification data
+		return {
+			shouldShowBanner: true,
+			shouldShowList: true,
+			shouldPlaySound: false,
+			shouldSetBadge: false,
+		};
+	}
+);
+
+Notifications.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK);
 
 function RootLayoutContent() {
 	const { user, firebaseUser, loading } = useAuth();
@@ -142,12 +170,14 @@ const styles = StyleSheet.create({
 
 export default function RootLayout() {
 	return (
-		<AuthProvider>
-			<OnboardingProvider>
-				<ProfileProvider>
-					<RootLayoutContent />
-				</ProfileProvider>
-			</OnboardingProvider>
-		</AuthProvider>
+		<NotificationProvider>
+			<AuthProvider>
+				<OnboardingProvider>
+					<ProfileProvider>
+						<RootLayoutContent />
+					</ProfileProvider>
+				</OnboardingProvider>
+			</AuthProvider>
+		</NotificationProvider>
 	);
 }

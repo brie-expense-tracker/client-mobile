@@ -1,5 +1,5 @@
 // index.tsx
-import React, { useState, useMemo, useContext } from 'react';
+import React, { useState, useMemo, useContext, useEffect } from 'react';
 import {
 	View,
 	Text,
@@ -126,47 +126,132 @@ export default function TransactionScreen() {
 	const { goals } = useGoal();
 	const { budgets } = useBudget();
 
+	// Debug logging
+	useEffect(() => {
+		console.log('[Ledger] Current state:', {
+			transactionsCount: transactions.length,
+			transactions: transactions.map((tx) => ({
+				id: tx.id,
+				description: tx.description,
+				type: tx.type,
+				target: tx.target,
+				targetModel: tx.targetModel,
+				date: tx.date,
+			})),
+			selectedGoals,
+			selectedBudgets,
+			dateFilterMode,
+			selectedDate,
+			goalsCount: goals.length,
+			budgetsCount: budgets.length,
+		});
+	}, [
+		transactions,
+		selectedGoals,
+		selectedBudgets,
+		dateFilterMode,
+		selectedDate,
+		goals,
+		budgets,
+	]);
+
 	const handleFilterPress = () => {
 		router.push('./ledger/ledgerFilter');
 	};
 
 	// filter transactions
 	const filtered = useMemo(() => {
+		console.log('[Ledger] Filtering transactions:', {
+			totalTransactions: transactions.length,
+			selectedGoals,
+			selectedBudgets,
+			dateFilterMode,
+			selectedDate,
+			searchQuery,
+		});
+
 		return transactions
 			.filter((tx) => {
 				// goal/budget match
 				const goalBudgetMatch = (() => {
 					// If no goals or budgets are selected, show all transactions
 					if (selectedGoals.length === 0 && selectedBudgets.length === 0) {
+						console.log(
+							'[Ledger] No filters selected, showing all transactions'
+						);
 						return true;
 					}
 
 					// Check if transaction matches any selected goals (for income transactions)
 					if (tx.type === 'income' && selectedGoals.length > 0) {
-						const matchingGoals = goals.filter(
-							(goal) =>
-								selectedGoals.includes(goal.id) &&
-								goal.categories &&
-								goal.categories.some((goalCat) =>
-									tx.categories.some((txCat) => txCat.name === goalCat)
-								)
-						);
-						if (matchingGoals.length > 0) return true;
+						// Check if transaction has a goal target
+						if (tx.target && tx.targetModel === 'Goal') {
+							const matchingGoals = goals.filter(
+								(goal) =>
+									selectedGoals.includes(goal.id) && tx.target === goal.id
+							);
+							if (matchingGoals.length > 0) {
+								console.log(
+									'[Ledger] Transaction matches selected goal:',
+									tx.description
+								);
+								return true;
+							}
+						} else {
+							// Transaction doesn't have a goal target, but we have goals selected
+							// This means it's an "Other" transaction for goals
+							console.log(
+								'[Ledger] Transaction is "Other" for goals:',
+								tx.description
+							);
+							return false; // Don't show "Other" transactions when specific goals are selected
+						}
 					}
 
 					// Check if transaction matches any selected budgets (for expense transactions)
 					if (tx.type === 'expense' && selectedBudgets.length > 0) {
-						const matchingBudgets = budgets.filter(
-							(budget) =>
-								selectedBudgets.includes(budget.id) &&
-								budget.categories &&
-								budget.categories.some((budgetCat) =>
-									tx.categories.some((txCat) => txCat.name === budgetCat)
-								)
-						);
-						if (matchingBudgets.length > 0) return true;
+						// Check if transaction has a budget target
+						if (tx.target && tx.targetModel === 'Budget') {
+							const matchingBudgets = budgets.filter(
+								(budget) =>
+									selectedBudgets.includes(budget.id) && tx.target === budget.id
+							);
+							if (matchingBudgets.length > 0) {
+								console.log(
+									'[Ledger] Transaction matches selected budget:',
+									tx.description
+								);
+								return true;
+							}
+						} else {
+							// Transaction doesn't have a budget target, but we have budgets selected
+							// This means it's an "Other" transaction for budgets
+							console.log(
+								'[Ledger] Transaction is "Other" for budgets:',
+								tx.description
+							);
+							return false; // Don't show "Other" transactions when specific budgets are selected
+						}
 					}
 
+					// If we have goals selected but this is an expense transaction, or
+					// if we have budgets selected but this is an income transaction,
+					// don't show it
+					if (
+						(selectedGoals.length > 0 && tx.type === 'expense') ||
+						(selectedBudgets.length > 0 && tx.type === 'income')
+					) {
+						console.log(
+							'[Ledger] Transaction type mismatch with selected filters:',
+							tx.description
+						);
+						return false;
+					}
+
+					console.log(
+						'[Ledger] Transaction filtered out by goal/budget filter:',
+						tx.description
+					);
 					return false;
 				})();
 
@@ -176,14 +261,35 @@ export default function TransactionScreen() {
 					dateFilterMode === 'month' ||
 					(dateFilterMode === 'day' && txDay === selectedDate);
 
+				if (!dateMatch) {
+					console.log(
+						'[Ledger] Transaction filtered out by date filter:',
+						tx.description,
+						'txDay:',
+						txDay,
+						'selectedDate:',
+						selectedDate
+					);
+				}
+
 				// search match
 				const text = searchQuery.toLowerCase();
 				const searchMatch =
-					!text ||
-					tx.description.toLowerCase().includes(text) ||
-					tx.categories.some((cat) => cat.name.toLowerCase().includes(text));
+					!text || tx.description.toLowerCase().includes(text);
 
-				return goalBudgetMatch && dateMatch && searchMatch;
+				if (!searchMatch) {
+					console.log(
+						'[Ledger] Transaction filtered out by search filter:',
+						tx.description
+					);
+				}
+
+				const shouldInclude = goalBudgetMatch && dateMatch && searchMatch;
+				if (shouldInclude) {
+					console.log('[Ledger] Transaction included:', tx.description);
+				}
+
+				return shouldInclude;
 			})
 			.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 	}, [
@@ -352,7 +458,7 @@ export default function TransactionScreen() {
 								) : (
 									<View style={styles.emptyContainer}>
 										<Ionicons name="document-outline" size={48} color="#ccc" />
-										<Text>No transactions</Text>
+										<Text style={styles.emptyText}>No transactions</Text>
 									</View>
 								)
 							}
@@ -447,6 +553,12 @@ const styles = StyleSheet.create({
 		flex: 1,
 		justifyContent: 'center',
 		alignItems: 'center',
+	},
+	emptyText: {
+		marginTop: 16,
+		fontSize: 16,
+		color: '#666',
+		fontWeight: '500',
 	},
 	loadingContainer: {
 		flex: 1,

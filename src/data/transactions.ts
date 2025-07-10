@@ -1,19 +1,11 @@
-export interface Category {
-	name: string;
-	type: 'income' | 'expense';
-	id?: string;
-	color?: string;
-	icon?: string;
-	isDefault?: boolean;
-}
-
 export interface Transaction {
 	id: string;
 	description: string;
 	amount: number;
 	date: string; // ISO string
-	categories?: Category[];
 	type: 'income' | 'expense';
+	target?: string; // ObjectId of the target Budget or Goal
+	targetModel?: 'Budget' | 'Goal';
 }
 
 // Function to generate dummy transactions for the last 6 months
@@ -28,40 +20,26 @@ const generateDummyTransactions = (): Transaction[] => {
 		{
 			description: 'Monthly Salary',
 			amount: 3200,
-			categories: [
-				{ name: 'Work', type: 'income' as const },
-				{ name: 'Salary', type: 'income' as const },
-			],
 			type: 'income' as const,
 		},
 		{
 			description: 'Rent',
 			amount: 1200,
-			categories: [{ name: 'Housing', type: 'expense' as const }],
 			type: 'expense' as const,
 		},
 		{
 			description: 'Internet Bill',
 			amount: 65,
-			categories: [{ name: 'Utilities', type: 'expense' as const }],
 			type: 'expense' as const,
 		},
 		{
 			description: 'Phone Bill',
 			amount: 75,
-			categories: [
-				{ name: 'Utilities', type: 'expense' as const },
-				{ name: 'Phone', type: 'expense' as const },
-			],
 			type: 'expense' as const,
 		},
 		{
 			description: 'Gym Membership',
 			amount: 45,
-			categories: [
-				{ name: 'Health', type: 'expense' as const },
-				{ name: 'Fitness', type: 'expense' as const },
-			],
 			type: 'expense' as const,
 		},
 	];
@@ -87,46 +65,26 @@ const generateDummyTransactions = (): Transaction[] => {
 				{
 					description: 'Coffee Shop',
 					amount: 4.75,
-					categories: [
-						{ name: 'Food', type: 'expense' as const },
-						{ name: 'Coffee', type: 'expense' as const },
-					],
 					type: 'expense' as const,
 				},
 				{
 					description: 'Restaurant Dinner',
 					amount: 45.8,
-					categories: [
-						{ name: 'Food', type: 'expense' as const },
-						{ name: 'Dining', type: 'expense' as const },
-					],
 					type: 'expense' as const,
 				},
 				{
 					description: 'Grocery Shopping',
 					amount: 85.5,
-					categories: [
-						{ name: 'Food', type: 'expense' as const },
-						{ name: 'Groceries', type: 'expense' as const },
-					],
 					type: 'expense' as const,
 				},
 				{
 					description: 'Gas Station',
 					amount: 45.0,
-					categories: [
-						{ name: 'Transportation', type: 'expense' as const },
-						{ name: 'Gas', type: 'expense' as const },
-					],
 					type: 'expense' as const,
 				},
 				{
 					description: 'Uber Ride',
 					amount: 25.75,
-					categories: [
-						{ name: 'Transportation', type: 'expense' as const },
-						{ name: 'Ride Share', type: 'expense' as const },
-					],
 					type: 'expense' as const,
 				},
 			];
@@ -147,25 +105,16 @@ const generateDummyTransactions = (): Transaction[] => {
 				{
 					description: 'Freelance Project',
 					amount: 750,
-					categories: [
-						{ name: 'Work', type: 'income' as const },
-						{ name: 'Freelance', type: 'income' as const },
-					],
 					type: 'income' as const,
 				},
 				{
 					description: 'Consulting Work',
 					amount: 1200,
-					categories: [
-						{ name: 'Work', type: 'income' as const },
-						{ name: 'Consulting', type: 'income' as const },
-					],
 					type: 'income' as const,
 				},
 				{
 					description: 'Investment Dividend',
 					amount: 120.75,
-					categories: [{ name: 'Investment', type: 'income' as const }],
 					type: 'income' as const,
 				},
 			];

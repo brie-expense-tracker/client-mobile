@@ -7,8 +7,9 @@ import {
 	TextInput,
 	KeyboardAvoidingView,
 	Platform,
-	ActivityIndicator,
 	ScrollView,
+	RefreshControl,
+	Alert,
 } from 'react-native';
 import RNModal from 'react-native-modal';
 import { Ionicons } from '@expo/vector-icons';
@@ -102,8 +103,15 @@ export default function BudgetScreen() {
 	// ==========================================
 	// Context
 	// ==========================================
-	const { budgets, isLoading, addBudget, updateBudget, deleteBudget } =
-		useBudget();
+	const {
+		budgets,
+		isLoading,
+		hasLoaded,
+		addBudget,
+		updateBudget,
+		deleteBudget,
+		refetch,
+	} = useBudget();
 
 	// ==========================================
 	// Route Parameters
@@ -126,16 +134,78 @@ export default function BudgetScreen() {
 	const [showIconPicker, setShowIconPicker] = useState(false);
 	const [showCustomAmount, setShowCustomAmount] = useState(false);
 	const [newBudget, setNewBudget] = useState({
-		category: '',
-		allocated: '',
+		name: '',
+		amount: '',
 		icon: 'cart-outline' as keyof typeof Ionicons.glyphMap,
 		color: COLOR_PALETTE.blue.base,
 		period: 'monthly' as 'weekly' | 'monthly',
+		weekStartDay: 1 as 0 | 1,
+		monthStartDay: 1 as
+			| 1
+			| 2
+			| 3
+			| 4
+			| 5
+			| 6
+			| 7
+			| 8
+			| 9
+			| 10
+			| 11
+			| 12
+			| 13
+			| 14
+			| 15
+			| 16
+			| 17
+			| 18
+			| 19
+			| 20
+			| 21
+			| 22
+			| 23
+			| 24
+			| 25
+			| 26
+			| 27
+			| 28,
+		rollover: false,
 	});
 	const [isPressed, setIsPressed] = useState(false);
 	const [showQuickAddModal, setShowQuickAddModal] = useState(false);
 	const [selectedBudgetForTransaction, setSelectedBudgetForTransaction] =
 		useState<Budget | null>(null);
+	const [refreshing, setRefreshing] = useState(false);
+
+	// ==========================================
+	// Calculate Total Budget Summary
+	// ==========================================
+	const totalBudgetSummary = budgets.reduce(
+		(acc, budget) => {
+			acc.totalAllocated += budget.amount;
+			acc.totalSpent += budget.spent || 0;
+			return acc;
+		},
+		{ totalAllocated: 0, totalSpent: 0 }
+	);
+
+	const totalPercentage =
+		totalBudgetSummary.totalAllocated > 0
+			? Math.min(
+					(totalBudgetSummary.totalSpent / totalBudgetSummary.totalAllocated) *
+						100,
+					100
+			  )
+			: 0;
+
+	// ==========================================
+	// Debug logging for budgets data
+	// ==========================================
+	useEffect(() => {
+		console.log('[BudgetScreen] Current budgets:', budgets);
+		console.log('[BudgetScreen] Total summary:', totalBudgetSummary);
+		console.log('[BudgetScreen] Total percentage:', totalPercentage);
+	}, [budgets, totalBudgetSummary, totalPercentage]);
 
 	// ==========================================
 	// Animation Setup
@@ -178,13 +248,92 @@ export default function BudgetScreen() {
 	}, [isModalVisible, isEditModalVisible, isOptionsModalVisible]);
 
 	// ==========================================
-	// Loading Screen Component
+	// Empty State Component
 	// ==========================================
-	const LoadingScreen = () => (
-		<View style={styles.loadingContainer}>
-			<View style={styles.loadingContent}>
-				<ActivityIndicator size="large" color="#00a2ff" />
-				<Text style={styles.loadingText}>Loading budgets...</Text>
+	const EmptyState = () => (
+		<View style={styles.emptyContainer}>
+			<View style={styles.emptyContent}>
+				<Ionicons name="wallet-outline" size={64} color="#e0e0e0" />
+				<Text style={styles.emptyTitle}>No Budgets Yet</Text>
+				<Text style={styles.emptySubtext}>
+					Create your first budget to start tracking your spending
+				</Text>
+				<View style={styles.emptyButtonsContainer}>
+					<RectButton style={styles.emptyAddButton} onPress={showModal}>
+						<Ionicons name="add" size={20} color="#fff" />
+						<Text style={styles.emptyAddButtonText}>Add Budget</Text>
+					</RectButton>
+					<RectButton
+						style={styles.emptyRefreshButton}
+						onPress={handleRefresh}
+						enabled={!refreshing}
+					>
+						<Ionicons
+							name={refreshing ? 'sync' : 'refresh'}
+							size={20}
+							color="#00a2ff"
+							style={
+								refreshing ? { transform: [{ rotate: '360deg' }] } : undefined
+							}
+						/>
+						<Text style={styles.emptyRefreshButtonText}>
+							{refreshing ? 'Refreshing...' : 'Refresh'}
+						</Text>
+					</RectButton>
+				</View>
+			</View>
+		</View>
+	);
+
+	// ==========================================
+	// Total Budget Summary Component
+	// ==========================================
+	const TotalBudgetSummary = () => (
+		<View style={styles.totalBudgetCard}>
+			<View style={styles.totalBudgetHeader}>
+				<View style={styles.totalBudgetIconWrapper}>
+					<Ionicons name="wallet-outline" size={24} color="#00a2ff" />
+				</View>
+				<Text style={styles.totalBudgetTitle}>Total Budget</Text>
+			</View>
+
+			<View style={styles.totalBudgetAmounts}>
+				<Text style={styles.totalBudgetSpentText}>
+					${totalBudgetSummary.totalSpent.toFixed(2)}
+				</Text>
+				<Text style={styles.totalBudgetAllocatedText}>
+					/ ${totalBudgetSummary.totalAllocated.toFixed(2)}
+				</Text>
+			</View>
+
+			<View style={styles.totalBudgetProgressBarBackground}>
+				<View
+					style={[
+						styles.totalBudgetProgressBarFill,
+						{
+							width: `${totalPercentage}%`,
+							backgroundColor:
+								totalPercentage > 90
+									? '#E53935'
+									: totalPercentage > 75
+									? '#FB8C00'
+									: '#00a2ff',
+						},
+					]}
+				/>
+			</View>
+
+			<View style={styles.totalBudgetFooter}>
+				<Text style={styles.totalBudgetPercentageText}>
+					{totalPercentage.toFixed(0)}% used
+				</Text>
+				<Text style={styles.totalBudgetRemainingText}>
+					$
+					{(
+						totalBudgetSummary.totalAllocated - totalBudgetSummary.totalSpent
+					).toFixed(2)}{' '}
+					remaining
+				</Text>
 			</View>
 		</View>
 	);
@@ -193,8 +342,8 @@ export default function BudgetScreen() {
 	// Budget Management
 	// ==========================================
 	const handleAddBudget = async () => {
-		if (!newBudget.category || !newBudget.allocated) {
-			console.log('Validation failed: missing category or allocated amount');
+		if (!newBudget.name || !newBudget.amount) {
+			console.log('Validation failed: missing name or amount');
 			return;
 		}
 
@@ -202,12 +351,15 @@ export default function BudgetScreen() {
 
 		try {
 			const result = await addBudget({
-				category: newBudget.category,
-				allocated: parseFloat(newBudget.allocated),
+				name: newBudget.name,
+				amount: parseFloat(newBudget.amount),
 				icon: newBudget.icon,
 				color: newBudget.color,
 				categories: [],
 				period: newBudget.period,
+				weekStartDay: newBudget.weekStartDay,
+				monthStartDay: newBudget.monthStartDay,
+				rollover: newBudget.rollover,
 			});
 
 			console.log('Budget added successfully:', result);
@@ -216,41 +368,66 @@ export default function BudgetScreen() {
 			// Update the URL to remove the openModal parameter
 			router.setParams({ openModal: 'false' });
 			setNewBudget({
-				category: '',
-				allocated: '',
+				name: '',
+				amount: '',
 				icon: 'cart-outline',
 				color: COLOR_PALETTE.blue.base,
 				period: 'monthly',
+				weekStartDay: 1,
+				monthStartDay: 1,
+				rollover: false,
 			});
 		} catch (error) {
 			console.error('Error adding budget:', error);
+
+			// Show user-friendly error message
+			let errorMessage = 'Failed to create budget. Please try again.';
+
+			if (error instanceof Error) {
+				if (error.message.includes('already have a budget for')) {
+					errorMessage = error.message;
+				} else if (error.message.includes('duplicate')) {
+					errorMessage =
+						'A budget with this name already exists. Please choose a different name.';
+				}
+			}
+
+			// Show error to user
+			Alert.alert('Error', errorMessage);
+			console.log('User error:', errorMessage);
 		}
 	};
 
 	const handleEditBudget = async () => {
-		if (!editingBudget || !newBudget.category || !newBudget.allocated) {
+		if (!editingBudget || !newBudget.name || !newBudget.amount) {
 			return;
 		}
 
 		try {
 			await updateBudget(editingBudget.id, {
-				category: newBudget.category,
-				allocated: parseFloat(newBudget.allocated),
+				name: newBudget.name,
+				amount: parseFloat(newBudget.amount),
 				icon: newBudget.icon,
 				color: newBudget.color,
 				categories: [],
 				period: newBudget.period,
+				weekStartDay: newBudget.weekStartDay,
+				monthStartDay: newBudget.monthStartDay,
+				rollover: newBudget.rollover,
 			});
 
 			hideEditModal();
 			// Update the URL to remove the openModal parameter
 			router.setParams({ openModal: 'false' });
 			setNewBudget({
-				category: '',
-				allocated: '',
+				name: '',
+				amount: '',
 				icon: 'cart-outline',
 				color: COLOR_PALETTE.blue.base,
 				period: 'monthly',
+				weekStartDay: 1,
+				monthStartDay: 1,
+				rollover: false,
 			});
 			setEditingBudget(null);
 		} catch (error) {
@@ -272,16 +449,21 @@ export default function BudgetScreen() {
 	const showModal = () => {
 		console.log('showModal called - resetting newBudget state');
 		setNewBudget({
-			category: '',
-			allocated: '',
+			name: '',
+			amount: '',
 			icon: 'cart-outline' as keyof typeof Ionicons.glyphMap,
 			color: COLOR_PALETTE.blue.base,
 			period: 'monthly',
+			weekStartDay: 1,
+			monthStartDay: 1,
+			rollover: false,
 		});
 		setShowColorPicker(false);
 		setShowIconPicker(false);
 		setShowCustomAmount(false);
+		console.log('About to set isModalVisible to true');
 		setIsModalVisible(true);
+		console.log('Setting isModalVisible to true');
 	};
 
 	const hideModal = () => {
@@ -339,17 +521,37 @@ export default function BudgetScreen() {
 		setSelectedBudgetForTransaction(null);
 	};
 
+	const handleTransactionAdded = () => {
+		// Refresh budgets when a transaction is added
+		console.log('[BudgetScreen] Transaction added, refreshing budgets...');
+		refetch();
+	};
+
+	const handleRefresh = async () => {
+		setRefreshing(true);
+		try {
+			await refetch();
+		} catch (error) {
+			console.error('Error refreshing budgets:', error);
+		} finally {
+			setRefreshing(false);
+		}
+	};
+
 	const showEditModal = (budget: Budget) => {
 		console.log('showEditModal called with budget:', budget);
 		console.log('Current isEditModalVisible state:', isEditModalVisible);
 
 		setEditingBudget(budget);
 		setNewBudget({
-			category: budget.category,
-			allocated: budget.allocated.toString(),
+			name: budget.name || '',
+			amount: budget.amount?.toString() || '0',
 			icon: budget.icon as keyof typeof Ionicons.glyphMap,
-			color: budget.color,
+			color: budget.color || COLOR_PALETTE.blue.base,
 			period: budget.period || 'monthly',
+			weekStartDay: budget.weekStartDay || 1,
+			monthStartDay: budget.monthStartDay || 1,
+			rollover: budget.rollover || false,
 		});
 		setShowColorPicker(false);
 		setShowIconPicker(false);
@@ -579,11 +781,12 @@ export default function BudgetScreen() {
 	// Render Functions
 	// ==========================================
 	const renderItem = ({ item }: { item: Budget }) => {
-		const percent = Math.min((item.spent / item.allocated) * 100, 100);
+		const percent = Math.min(((item.spent || 0) / item.amount) * 100, 100);
+		const isOverAlertThreshold = item.shouldAlert || false;
 
 		return (
 			<RectButton
-				style={styles.card}
+				style={[styles.card, isOverAlertThreshold && styles.alertCard]}
 				onPress={() => handleQuickAddTransaction(item)}
 			>
 				<View style={styles.cardHeader}>
@@ -592,21 +795,26 @@ export default function BudgetScreen() {
 					>
 						<Ionicons name={item.icon as any} size={24} color={item.color} />
 					</View>
-					<Text style={styles.categoryText}>{item.category}</Text>
-					<BorderlessButton
-						style={styles.optionsButton}
-						onPress={() => showOptionsModal(item)}
-						onActiveStateChange={setIsPressed}
-					>
-						<Ionicons name="ellipsis-horizontal" size={20} color="#757575" />
-					</BorderlessButton>
+					<Text style={styles.categoryText}>{item.name}</Text>
+					<View style={styles.cardActions}>
+						{isOverAlertThreshold && (
+							<View style={styles.alertIndicator}>
+								<Ionicons name="warning" size={16} color="#E53935" />
+							</View>
+						)}
+						<BorderlessButton
+							style={styles.optionsButton}
+							onPress={() => showOptionsModal(item)}
+							onActiveStateChange={setIsPressed}
+						>
+							<Ionicons name="ellipsis-horizontal" size={20} color="#757575" />
+						</BorderlessButton>
+					</View>
 				</View>
 
 				<View style={styles.amounts}>
-					<Text style={styles.spentText}>${item.spent.toFixed(2)}</Text>
-					<Text style={styles.allocatedText}>
-						/ ${item.allocated.toFixed(2)}
-					</Text>
+					<Text style={styles.spentText}>${(item.spent || 0).toFixed(2)}</Text>
+					<Text style={styles.allocatedText}>/ ${item.amount.toFixed(2)}</Text>
 				</View>
 
 				<View style={styles.progressBarBackground}>
@@ -615,18 +823,32 @@ export default function BudgetScreen() {
 							styles.progressBarFill,
 							{
 								width: `${percent}%`,
-								backgroundColor: item.color,
+								backgroundColor: isOverAlertThreshold ? '#E53935' : item.color,
 							},
 						]}
 					/>
 				</View>
 
 				<View style={styles.budgetFooter}>
-					<Text style={styles.percentageText}>{percent.toFixed(0)}%</Text>
+					<Text
+						style={[
+							styles.percentageText,
+							isOverAlertThreshold && styles.alertPercentageText,
+						]}
+					>
+						{percent.toFixed(0)}%
+					</Text>
 					<Text style={styles.periodText}>
 						{item.period === 'weekly' ? 'Weekly' : 'Monthly'}
 					</Text>
 				</View>
+
+				{isOverAlertThreshold && (
+					<View style={styles.alertBanner}>
+						<Ionicons name="notifications" size={14} color="#E53935" />
+						<Text style={styles.alertBannerText}>Budget alert triggered</Text>
+					</View>
+				)}
 			</RectButton>
 		);
 	};
@@ -634,56 +856,69 @@ export default function BudgetScreen() {
 	// ==========================================
 	// Main Render
 	// ==========================================
-	// Show loading screen while data is being loaded
-	if (isLoading) {
-		return <LoadingScreen />;
-	}
-
-	// Add the "Add Budget" card to the data
+	// Show empty state if no budgets, otherwise show budgets with add button
 	const budgetsWithAdd = [
 		...budgets,
 		{
 			id: 'add',
-			category: 'Add Budget',
-			allocated: 0,
+			name: 'Add Budget',
+			amount: 0,
 			spent: 0,
 			icon: 'add-circle-outline',
 			color: '#00a2ff',
+			period: 'monthly',
 		} as Budget,
 	];
 
 	return (
 		<View style={styles.mainContainer}>
-			<FlatList
-				data={budgetsWithAdd}
-				keyExtractor={(item) => item.id}
-				renderItem={({ item }) => {
-					if (item.id === 'add') {
-						return (
-							<RectButton style={styles.card} onPress={showModal}>
-								<View style={styles.cardHeader}>
-									<View
-										style={[
-											styles.iconWrapper,
-											{ backgroundColor: `${item.color}20` },
-										]}
-									>
-										<Ionicons
-											name={item.icon as any}
-											size={24}
-											color={item.color}
-										/>
-									</View>
-									<Text style={styles.categoryText}>{item.category}</Text>
-								</View>
-							</RectButton>
-						);
+			{isLoading && !hasLoaded ? (
+				<View style={styles.loadingContainer}>
+					<Text style={styles.loadingText}>Loading budgets...</Text>
+				</View>
+			) : budgets.length === 0 ? (
+				<EmptyState />
+			) : (
+				<FlatList
+					data={budgetsWithAdd}
+					keyExtractor={(item) => item.id}
+					ListHeaderComponent={TotalBudgetSummary}
+					refreshControl={
+						<RefreshControl
+							refreshing={refreshing}
+							onRefresh={handleRefresh}
+							tintColor="#00a2ff"
+							colors={['#00a2ff']}
+						/>
 					}
-					return renderItem({ item });
-				}}
-				contentContainerStyle={styles.listContent}
-				showsVerticalScrollIndicator={false}
-			/>
+					renderItem={({ item }) => {
+						if (item.id === 'add') {
+							return (
+								<RectButton style={styles.card} onPress={showModal}>
+									<View style={styles.cardHeader}>
+										<View
+											style={[
+												styles.iconWrapper,
+												{ backgroundColor: `${item.color}20` },
+											]}
+										>
+											<Ionicons
+												name={item.icon as any}
+												size={24}
+												color={item.color}
+											/>
+										</View>
+										<Text style={styles.categoryText}>{item.name}</Text>
+									</View>
+								</RectButton>
+							);
+						}
+						return renderItem({ item });
+					}}
+					contentContainerStyle={styles.listContent}
+					showsVerticalScrollIndicator={false}
+				/>
+			)}
 
 			{/* Add Budget Modal */}
 			<RNModal
@@ -693,139 +928,136 @@ export default function BudgetScreen() {
 				style={styles.modal}
 				animationIn="slideInUp"
 				animationOut="slideOutDown"
+				backdropOpacity={0.5}
+				backdropColor="#000"
 				useNativeDriver
 			>
-				<KeyboardAvoidingView
-					behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-					style={styles.modalContainer}
-				>
-					<View style={styles.modalContent}>
-						<View style={styles.modalHeader}>
-							<Text style={styles.modalTitle}>Add New Budget</Text>
-							<BorderlessButton
-								onActiveStateChange={setIsPressed}
-								onPress={hideModal}
-							>
-								<Ionicons name="close" size={24} color="#757575" />
-							</BorderlessButton>
-						</View>
-						<ScrollView
-							showsVerticalScrollIndicator={false}
-							contentContainerStyle={{
-								paddingBottom: 24,
-								justifyContent: 'flex-end',
-							}}
+				<View style={styles.modalContent}>
+					<View style={styles.modalHeader}>
+						<Text style={styles.modalTitle}>Add New Budget</Text>
+						<BorderlessButton
+							onActiveStateChange={setIsPressed}
+							onPress={hideModal}
 						>
-							<View style={styles.formGroup}>
-								<Text style={styles.label}>Category Name</Text>
-								<TextInput
-									style={styles.input}
-									value={newBudget.category}
-									onChangeText={(text) =>
-										setNewBudget({ ...newBudget, category: text })
-									}
-									placeholder="e.g., Groceries"
-									placeholderTextColor="#9E9E9E"
-									autoComplete="off"
-									autoCorrect={false}
-								/>
-							</View>
+							<Ionicons name="close" size={24} color="#757575" />
+						</BorderlessButton>
+					</View>
+					<ScrollView
+						showsVerticalScrollIndicator={false}
+						contentContainerStyle={{
+							paddingBottom: 24,
+							justifyContent: 'flex-end',
+						}}
+					>
+						<View style={styles.formGroup}>
+							<Text style={styles.label}>Budget Name</Text>
+							<TextInput
+								style={styles.input}
+								value={newBudget.name}
+								onChangeText={(text) =>
+									setNewBudget({ ...newBudget, name: text })
+								}
+								placeholder="e.g., Groceries"
+								placeholderTextColor="#9E9E9E"
+								autoComplete="off"
+								autoCorrect={false}
+							/>
+						</View>
 
-							<View style={styles.formGroup}>
-								<Text style={styles.label}>Budget Amount</Text>
-								<Text style={styles.amountSubtext}>
-									Set your monthly spending limit for this category
-								</Text>
+						<View style={styles.formGroup}>
+							<Text style={styles.label}>Budget Amount</Text>
+							<Text style={styles.amountSubtext}>
+								Set your monthly spending limit for this category
+							</Text>
 
-								{/* Quick Amount Presets */}
-								<View style={styles.amountPresetsContainer}>
-									{amountPresets.map((amount) => (
-										<RectButton
-											key={amount}
-											style={[
-												styles.amountPreset,
-												newBudget.allocated === amount.toString() &&
-													styles.selectedAmountPreset,
-											]}
-											onPress={() => {
-												setNewBudget({
-													...newBudget,
-													allocated: amount.toString(),
-												});
-												setShowCustomAmount(false);
-											}}
-										>
-											<Text
-												style={[
-													styles.amountPresetText,
-													newBudget.allocated === amount.toString() &&
-														styles.selectedAmountPresetText,
-												]}
-											>
-												${amount}
-											</Text>
-										</RectButton>
-									))}
-
-									{/* Custom Amount Button */}
+							{/* Quick Amount Presets */}
+							<View style={styles.amountPresetsContainer}>
+								{amountPresets.map((amount) => (
 									<RectButton
+										key={amount}
 										style={[
 											styles.amountPreset,
-											showCustomAmount && styles.selectedAmountPreset,
+											newBudget.amount === amount.toString() &&
+												styles.selectedAmountPreset,
 										]}
 										onPress={() => {
-											setShowCustomAmount(!showCustomAmount);
-											if (!showCustomAmount) {
-												setNewBudget({
-													...newBudget,
-													allocated: '',
-												});
-											}
+											setNewBudget({
+												...newBudget,
+												amount: amount.toString(),
+											});
+											setShowCustomAmount(false);
 										}}
 									>
 										<Text
 											style={[
 												styles.amountPresetText,
-												showCustomAmount && styles.selectedAmountPresetText,
+												newBudget.amount === amount.toString() &&
+													styles.selectedAmountPresetText,
 											]}
 										>
-											Custom
+											${amount}
 										</Text>
 									</RectButton>
-								</View>
+								))}
 
-								{/* Custom Amount Input */}
-								{showCustomAmount && (
-									<>
-										<Text style={styles.inputLabel}>Enter custom amount</Text>
-										<TextInput
-											style={styles.input}
-											value={newBudget.allocated}
-											onChangeText={(text) =>
-												setNewBudget({ ...newBudget, allocated: text })
-											}
-											placeholder="e.g., 500"
-											keyboardType="numeric"
-											placeholderTextColor="#9E9E9E"
-											autoComplete="off"
-										/>
-									</>
-								)}
+								{/* Custom Amount Button */}
+								<RectButton
+									style={[
+										styles.amountPreset,
+										showCustomAmount && styles.selectedAmountPreset,
+									]}
+									onPress={() => {
+										setShowCustomAmount(!showCustomAmount);
+										if (!showCustomAmount) {
+											setNewBudget({
+												...newBudget,
+												amount: '',
+											});
+										}
+									}}
+								>
+									<Text
+										style={[
+											styles.amountPresetText,
+											showCustomAmount && styles.selectedAmountPresetText,
+										]}
+									>
+										Custom
+									</Text>
+								</RectButton>
 							</View>
 
-							<IconPicker />
-							<ColorPicker />
-							<PeriodPicker />
+							{/* Custom Amount Input */}
+							{showCustomAmount && (
+								<>
+									<Text style={styles.inputLabel}>Enter custom amount</Text>
+									<TextInput
+										style={styles.input}
+										value={newBudget.amount}
+										onChangeText={(text) =>
+											setNewBudget({ ...newBudget, amount: text })
+										}
+										placeholder="e.g., 500"
+										keyboardType="numeric"
+										placeholderTextColor="#9E9E9E"
+										autoComplete="off"
+									/>
+								</>
+							)}
+						</View>
 
-							<RectButton
-								style={[styles.addButton, { backgroundColor: newBudget.color }]}
-								onPress={handleAddBudget}
-							>
-								<Text style={styles.addButtonText}>Add Budget</Text>
-							</RectButton>
-						</ScrollView>
-					</View>
-				</KeyboardAvoidingView>
+						<IconPicker />
+						<ColorPicker />
+						<PeriodPicker />
+
+						<RectButton
+							style={[styles.addButton, { backgroundColor: newBudget.color }]}
+							onPress={handleAddBudget}
+						>
+							<Text style={styles.addButtonText}>Add Budget</Text>
+						</RectButton>
+					</ScrollView>
+				</View>
 			</RNModal>
 
 			{/* Edit Budget Modal */}
@@ -835,6 +1067,8 @@ export default function BudgetScreen() {
 				onBackButtonPress={hideEditModal}
 				animationIn="slideInUp"
 				animationOut="slideOutDown"
+				backdropOpacity={0.5}
+				backdropColor="#000"
 				useNativeDriver
 				style={styles.modal}
 			>
@@ -860,12 +1094,12 @@ export default function BudgetScreen() {
 							}}
 						>
 							<View style={styles.formGroup}>
-								<Text style={styles.label}>Category Name</Text>
+								<Text style={styles.label}>Budget Name</Text>
 								<TextInput
 									style={styles.input}
-									value={newBudget.category}
+									value={newBudget.name}
 									onChangeText={(text) =>
-										setNewBudget({ ...newBudget, category: text })
+										setNewBudget({ ...newBudget, name: text })
 									}
 									placeholder="e.g., Groceries"
 									placeholderTextColor="#9E9E9E"
@@ -887,13 +1121,13 @@ export default function BudgetScreen() {
 											key={amount}
 											style={[
 												styles.amountPreset,
-												newBudget.allocated === amount.toString() &&
+												newBudget.amount === amount.toString() &&
 													styles.selectedAmountPreset,
 											]}
 											onPress={() => {
 												setNewBudget({
 													...newBudget,
-													allocated: amount.toString(),
+													amount: amount.toString(),
 												});
 												setShowCustomAmount(false);
 											}}
@@ -901,7 +1135,7 @@ export default function BudgetScreen() {
 											<Text
 												style={[
 													styles.amountPresetText,
-													newBudget.allocated === amount.toString() &&
+													newBudget.amount === amount.toString() &&
 														styles.selectedAmountPresetText,
 												]}
 											>
@@ -921,7 +1155,7 @@ export default function BudgetScreen() {
 											if (!showCustomAmount) {
 												setNewBudget({
 													...newBudget,
-													allocated: '',
+													amount: '',
 												});
 											}
 										}}
@@ -943,9 +1177,9 @@ export default function BudgetScreen() {
 										<Text style={styles.inputLabel}>Enter custom amount</Text>
 										<TextInput
 											style={styles.input}
-											value={newBudget.allocated}
+											value={newBudget.amount}
 											onChangeText={(text) =>
-												setNewBudget({ ...newBudget, allocated: text })
+												setNewBudget({ ...newBudget, amount: text })
 											}
 											placeholder="e.g., 500"
 											keyboardType="numeric"
@@ -979,11 +1213,13 @@ export default function BudgetScreen() {
 				onModalHide={handleOptionsModalHide}
 				animationIn="slideInUp"
 				animationOut="slideOutDown"
+				backdropOpacity={0.5}
+				backdropColor="#000"
 				useNativeDriver
 				style={styles.optionsModal}
 			>
 				<View style={styles.optionsModalContent}>
-					<Text style={styles.optionsTitle}>{selectedBudget?.category}</Text>
+					<Text style={styles.optionsTitle}>{selectedBudget?.name}</Text>
 
 					<RectButton
 						style={styles.optionButton}
@@ -1021,8 +1257,9 @@ export default function BudgetScreen() {
 				isVisible={showQuickAddModal}
 				onClose={handleCloseQuickAddModal}
 				budgetId={selectedBudgetForTransaction?.id}
-				budgetName={selectedBudgetForTransaction?.category}
+				budgetName={selectedBudgetForTransaction?.name}
 				budgetColor={selectedBudgetForTransaction?.color}
+				onTransactionAdded={handleTransactionAdded}
 			/>
 		</View>
 	);
@@ -1036,23 +1273,8 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: '#fff',
 	},
-	loadingContainer: {
-		flex: 1,
-		backgroundColor: '#fff',
-		justifyContent: 'center',
-		alignItems: 'center',
-	},
-	loadingContent: {
-		alignItems: 'center',
-	},
-	loadingText: {
-		marginTop: 16,
-		fontSize: 16,
-		color: '#757575',
-		fontWeight: '500',
-	},
 	listContent: {
-		paddingHorizontal: 24,
+		paddingHorizontal: 0,
 		marginTop: 8,
 	},
 	card: {
@@ -1060,6 +1282,7 @@ const styles = StyleSheet.create({
 		borderRadius: 16,
 		padding: 16,
 		marginVertical: 8,
+		marginHorizontal: 24,
 		// iOS shadow
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 2 },
@@ -1067,6 +1290,11 @@ const styles = StyleSheet.create({
 		shadowRadius: 8,
 		// Android shadow
 		elevation: 2,
+	},
+	alertCard: {
+		borderWidth: 2,
+		borderColor: '#E53935',
+		borderStyle: 'dashed',
 	},
 	cardHeader: {
 		flexDirection: 'row',
@@ -1128,6 +1356,10 @@ const styles = StyleSheet.create({
 		color: '#757575',
 		textAlign: 'right',
 	},
+	alertPercentageText: {
+		color: '#E53935',
+		fontWeight: '600',
+	},
 	modal: {
 		margin: 0,
 		justifyContent: 'flex-end',
@@ -1139,15 +1371,13 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 	modalContainer: {
-		flex: 1,
+		justifyContent: 'flex-end',
 	},
 	modalContent: {
-		flex: 1,
 		backgroundColor: '#ffffff',
 		borderTopLeftRadius: 20,
 		borderTopRightRadius: 20,
 		padding: 24,
-		marginTop: 80,
 	},
 	modalHeader: {
 		flexDirection: 'row',
@@ -1506,5 +1736,174 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		fontWeight: '500',
 		color: '#757575',
+	},
+	totalBudgetCard: {
+		backgroundColor: '#ffffff',
+		borderRadius: 16,
+		padding: 20,
+		marginVertical: 12,
+		marginHorizontal: 24,
+		// iOS shadow
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.05,
+		shadowRadius: 8,
+		// Android shadow
+		elevation: 2,
+	},
+	totalBudgetHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginBottom: 12,
+	},
+	totalBudgetIconWrapper: {
+		width: 40,
+		height: 40,
+		borderRadius: 12,
+		justifyContent: 'center',
+		alignItems: 'center',
+		backgroundColor: '#e0f7fa',
+		marginRight: 12,
+	},
+	totalBudgetTitle: {
+		fontSize: 18,
+		fontWeight: '600',
+		color: '#212121',
+	},
+	totalBudgetAmounts: {
+		flexDirection: 'row',
+		alignItems: 'baseline',
+		marginBottom: 8,
+	},
+	totalBudgetSpentText: {
+		fontSize: 24,
+		fontWeight: '700',
+		color: '#212121',
+	},
+	totalBudgetAllocatedText: {
+		marginLeft: 8,
+		fontSize: 16,
+		color: '#757575',
+	},
+	totalBudgetProgressBarBackground: {
+		width: '100%',
+		height: 8,
+		backgroundColor: '#e0e0e0',
+		borderRadius: 4,
+		overflow: 'hidden',
+	},
+	totalBudgetProgressBarFill: {
+		height: '100%',
+		borderRadius: 4,
+	},
+	totalBudgetFooter: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		marginTop: 12,
+	},
+	totalBudgetPercentageText: {
+		fontSize: 14,
+		fontWeight: '500',
+		color: '#757575',
+	},
+	totalBudgetRemainingText: {
+		fontSize: 14,
+		fontWeight: '500',
+		color: '#757575',
+	},
+	alertIndicator: {
+		width: 24,
+		height: 24,
+		borderRadius: 12,
+		backgroundColor: '#FFF4F4',
+		justifyContent: 'center',
+		alignItems: 'center',
+		marginRight: 8,
+	},
+	alertBanner: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#FFF4F4',
+		borderRadius: 8,
+		paddingVertical: 8,
+		paddingHorizontal: 12,
+		marginTop: 8,
+		alignSelf: 'flex-start',
+	},
+	alertBannerText: {
+		fontSize: 12,
+		fontWeight: '500',
+		color: '#E53935',
+		marginLeft: 8,
+	},
+	emptyContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		paddingHorizontal: 24,
+	},
+	emptyContent: {
+		alignItems: 'center',
+		maxWidth: 280,
+	},
+	emptyTitle: {
+		fontSize: 24,
+		fontWeight: '600',
+		color: '#212121',
+		marginTop: 16,
+		marginBottom: 8,
+		textAlign: 'center',
+	},
+	emptySubtext: {
+		fontSize: 16,
+		color: '#757575',
+		textAlign: 'center',
+		marginBottom: 32,
+		lineHeight: 22,
+	},
+	emptyAddButton: {
+		backgroundColor: '#00a2ff',
+		borderRadius: 12,
+		paddingVertical: 16,
+		paddingHorizontal: 24,
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+	},
+	emptyAddButtonText: {
+		fontSize: 16,
+		color: '#fff',
+		fontWeight: '600',
+	},
+	emptyButtonsContainer: {
+		flexDirection: 'row',
+		gap: 12,
+	},
+	emptyRefreshButton: {
+		borderRadius: 12,
+		paddingVertical: 16,
+		paddingHorizontal: 24,
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		borderWidth: 1,
+		borderColor: '#00a2ff',
+		backgroundColor: 'transparent',
+	},
+	emptyRefreshButtonText: {
+		fontSize: 16,
+		color: '#00a2ff',
+		fontWeight: '600',
+	},
+	loadingContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	loadingText: {
+		fontSize: 16,
+		color: '#757575',
+		marginTop: 12,
 	},
 });

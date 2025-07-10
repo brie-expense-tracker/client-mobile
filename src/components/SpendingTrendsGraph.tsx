@@ -7,7 +7,6 @@ interface Transaction {
 	type: 'income' | 'expense';
 	amount: number;
 	date: string;
-	category?: string;
 }
 
 interface SpendingTrendsGraphProps {
@@ -153,19 +152,6 @@ const SpendingTrendsGraph: React.FC<SpendingTrendsGraphProps> = ({
 	const netIncome = totalIncome - totalExpense;
 	const avgDailyExpense = totalExpense / Math.max(chartData.length, 1);
 
-	// Get top spending categories
-	const categorySpending = new Map<string, number>();
-	filteredTransactions
-		.filter((tx) => tx.type === 'expense' && tx.category)
-		.forEach((tx) => {
-			const current = categorySpending.get(tx.category!) || 0;
-			categorySpending.set(tx.category!, current + tx.amount);
-		});
-
-	const topCategories = Array.from(categorySpending.entries())
-		.sort(([, a], [, b]) => b - a)
-		.slice(0, 3);
-
 	// Color scheme
 	const colors = {
 		income: '#4CAF50',
@@ -271,40 +257,7 @@ const SpendingTrendsGraph: React.FC<SpendingTrendsGraphProps> = ({
 					<Text style={styles.metricLabel}>Avg Daily Expense</Text>
 					<Text style={styles.metricValue}>${avgDailyExpense.toFixed(0)}</Text>
 				</View>
-
-				{topCategories.length > 0 && (
-					<View style={styles.metricItem}>
-						<Text style={styles.metricLabel}>Top Category</Text>
-						<Text style={styles.metricValue}>{topCategories[0][0]}</Text>
-						<Text style={styles.metricSubtext}>
-							${topCategories[0][1].toFixed(0)}
-						</Text>
-					</View>
-				)}
 			</View>
-
-			{/* Top Categories */}
-			{topCategories.length > 0 && (
-				<View style={styles.categoriesContainer}>
-					<Text style={styles.categoriesTitle}>Top Spending Categories</Text>
-					{topCategories.map(([category, amount], index) => (
-						<View key={category} style={styles.categoryItem}>
-							<View style={styles.categoryRank}>
-								<Text style={styles.categoryRankText}>{index + 1}</Text>
-							</View>
-							<View style={styles.categoryInfo}>
-								<Text style={styles.categoryName}>{category}</Text>
-								<Text style={styles.categoryAmount}>${amount.toFixed(0)}</Text>
-							</View>
-							<View style={styles.categoryPercentage}>
-								<Text style={styles.categoryPercentageText}>
-									{((amount / totalExpense) * 100).toFixed(1)}%
-								</Text>
-							</View>
-						</View>
-					))}
-				</View>
-			)}
 		</View>
 	);
 };

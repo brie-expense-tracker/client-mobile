@@ -170,8 +170,6 @@ export default function Signup() {
 					</BorderlessButton>
 				</View>
 			</View>
-
-			<Stack.Screen options={{ headerShown: false }} />
 		</SafeAreaView>
 	);
 }
@@ -327,5 +325,21 @@ const styles = StyleSheet.create({
 	},
 	buttonDisabled: {
 		backgroundColor: '#E2E8F0',
+	},
+	tokenContainer: {
+		padding: 16,
+		backgroundColor: '#f3f4f6',
+		borderTopWidth: 1,
+		borderTopColor: '#e5e7eb',
+	},
+	tokenText: {
+		fontSize: 12,
+		fontFamily: 'monospace',
+		marginBottom: 8,
+		color: '#000000',
+	},
+	errorText: {
+		fontSize: 12,
+		fontWeight: 'bold',
 	},
 });

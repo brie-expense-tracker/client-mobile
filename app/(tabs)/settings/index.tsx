@@ -100,14 +100,10 @@ export default function SettingsScreen() {
 							<Text style={styles.settingsHeader}>Finance</Text>
 							<Setting
 								icon="card-outline"
-								label="Income & Budgets"
-								onPress={() => router.push('./settings/incomeBudget')}
+								label="Budgets"
+								onPress={() => router.push('./settings/budgets')}
 							/>
-							<Setting
-								icon="albums-outline"
-								label="Categories"
-								onPress={() => router.push('./settings/categories')}
-							/>
+
 							<Setting
 								icon="trophy-outline"
 								label="Goals"

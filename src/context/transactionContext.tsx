@@ -4,25 +4,21 @@ import React, {
 	useEffect,
 	useCallback,
 	useMemo,
+	useRef,
 	ReactNode,
 	useContext,
 } from 'react';
 import { Transaction } from '../data/transactions';
 import { ApiService } from '../services/apiService';
-import {
-	Category,
-	transactions as localTransactions,
-} from '../data/transactions';
+import { transactions as localTransactions } from '../data/transactions';
 import { useBudget } from './budgetContext';
 import { useGoal } from './goalContext';
 
 interface TransactionContextType {
 	transactions: Transaction[];
-	categories: Category[];
 	isLoading: boolean;
-	categoriesLoading: boolean;
 	refetch: () => Promise<void>;
-	refetchCategories: () => Promise<void>;
+	refreshTransactions: () => void; // Add this new function
 	deleteTransaction: (id: string) => Promise<void>;
 	addTransaction: (
 		transactionData: Omit<Transaction, 'id'>
@@ -31,23 +27,13 @@ interface TransactionContextType {
 		id: string,
 		transactionData: Partial<Omit<Transaction, 'id'>>
 	) => Promise<Transaction>;
-	// Category management
-	getCategories: () => Category[];
-	addCategory: (category: Category) => Promise<Category>;
-	deleteCategory: (categoryId: string) => Promise<void>;
-	updateCategory: (
-		categoryId: string,
-		updates: Partial<Category>
-	) => Promise<Category>;
 }
 
 export const TransactionContext = createContext<TransactionContextType>({
 	transactions: [],
-	categories: [],
 	isLoading: true,
-	categoriesLoading: true,
 	refetch: async () => {},
-	refetchCategories: async () => {},
+	refreshTransactions: () => {}, // Add this new function
 	deleteTransaction: async () => {},
 	addTransaction: async () => {
 		throw new Error('addTransaction not implemented');
@@ -55,32 +41,48 @@ export const TransactionContext = createContext<TransactionContextType>({
 	updateTransaction: async () => {
 		throw new Error('updateTransaction not implemented');
 	},
-	getCategories: () => [],
-	addCategory: async () => {
-		throw new Error('addCategory not implemented');
-	},
-	deleteCategory: async () => {},
-	updateCategory: async () => {
-		throw new Error('updateCategory not implemented');
-	},
 });
 
 export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 	const [transactions, setTransactions] = useState<Transaction[]>([]);
-	const [categories, setCategories] = useState<Category[]>([]);
 	const [isLoading, setIsLoading] = useState<boolean>(true);
-	const [categoriesLoading, setCategoriesLoading] = useState<boolean>(true);
 
 	// Get budget and goal context functions
-	const { updateBudgetSpent, budgets } = useBudget();
-	const { updateGoalCurrent, goals } = useGoal();
+	const { budgets, refetch: refetchBudgets } = useBudget();
+	const { goals, refetch: refetchGoals } = useGoal();
+
+	// Use refs to store the refetch functions to avoid dependency issues
+	const refetchBudgetsRef = useRef(refetchBudgets);
+	const refetchGoalsRef = useRef(refetchGoals);
+
+	// Update refs when functions change
+	useEffect(() => {
+		refetchBudgetsRef.current = refetchBudgets;
+	}, [refetchBudgets]);
+
+	useEffect(() => {
+		refetchGoalsRef.current = refetchGoals;
+	}, [refetchGoals]);
 
 	const refetch = useCallback(async () => {
+		console.log('[TransactionContext] refetch called');
 		setIsLoading(true);
 		try {
 			const response = await ApiService.get<Transaction[]>('/transactions');
+			console.log('[TransactionContext] API response received:', response);
+
 			if (response.success && response.data) {
-				const formatted: Transaction[] = response.data.map((tx: any) => {
+				// Handle double-wrapped response
+				let transactionArray: any[] = [];
+				if (Array.isArray(response.data)) {
+					transactionArray = response.data;
+				} else if (
+					response.data &&
+					Array.isArray((response.data as any).data)
+				) {
+					transactionArray = (response.data as any).data;
+				}
+				const formatted: Transaction[] = transactionArray.map((tx: any) => {
 					// Safely convert amount to number with fallback
 					let amount = 0;
 					if (tx.amount !== null && tx.amount !== undefined) {
@@ -88,23 +90,35 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 						amount = isNaN(parsedAmount) ? 0 : parsedAmount;
 					}
 
+					// Handle populated target data
+					let targetId = undefined;
+					let targetModel = undefined;
+
+					if (tx.target) {
+						// If target is populated (has _id and other fields), extract the ID
+						if (tx.target._id) {
+							targetId = tx.target._id;
+							targetModel = tx.targetModel;
+						} else {
+							// If target is just an ID string
+							targetId = tx.target;
+							targetModel = tx.targetModel;
+						}
+					}
+
 					return {
 						id: tx._id ?? tx.id,
 						description: tx.description ?? '',
 						amount: amount,
 						date: tx.date ?? new Date().toISOString().split('T')[0],
-						categories: Array.isArray(tx.categories)
-							? tx.categories.map((cat: any) => ({
-									name: cat.name ?? 'Other',
-									type: cat.type ?? 'expense',
-									color: cat.color,
-									icon: cat.icon,
-							  }))
-							: [{ name: 'Other', type: 'expense' }],
 						type: tx.type ?? 'expense',
+						target: targetId,
+						targetModel: targetModel,
 					};
 				});
 				setTransactions(formatted);
+			} else {
+				setTransactions([]);
 			}
 		} catch (err) {
 			console.warn(
@@ -117,113 +131,59 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 		}
 	}, []);
 
-	const refetchCategories = useCallback(async () => {
-		setCategoriesLoading(true);
-		try {
-			const response = await ApiService.get<Category[]>('/categories');
-			if (response.success && response.data) {
-				const formatted: Category[] = response.data.map((cat: any) => ({
-					id: cat._id ?? cat.id,
-					name: cat.name,
-					type: cat.type,
-					color: cat.color,
-					icon: cat.icon,
-					isDefault: cat.isDefault,
-				}));
-				setCategories(formatted);
-			}
-		} catch (err) {
-			console.warn(
-				'[Categories] Failed to fetch categories, using empty array',
-				err
-			);
-			setCategories([]);
-		} finally {
-			setCategoriesLoading(false);
-		}
-	}, []);
-
 	// Helper function to update budgets and goals
 	const updateBudgetsAndGoals = useCallback(
 		async (transaction: Transaction) => {
 			try {
-				// Update budgets for expense transactions based on category mapping
-				if (
-					transaction.type === 'expense' &&
-					transaction.categories.length > 0
-				) {
-					// Find budgets that have the transaction's category in their categories array
-					const matchingBudgets = budgets.filter(
-						(budget) =>
-							budget.categories &&
-							budget.categories.some((budgetCategory) =>
-								transaction.categories.some(
-									(txCategory) => txCategory.name === budgetCategory
-								)
-							)
-					);
-
-					if (matchingBudgets.length > 0) {
-						// Update each matching budget
-						for (const budget of matchingBudgets) {
-							try {
-								await updateBudgetSpent(budget.category, transaction.amount);
-								console.log(
-									`Updated budget: ${budget.category} with ${transaction.amount}`
-								);
-							} catch (error) {
-								console.warn(
-									`Failed to update budget ${budget.category}:`,
-									error
-								);
-							}
-						}
-					} else {
-						console.log('No budgets found matching transaction categories');
+				console.log(
+					'[TransactionContext] updateBudgetsAndGoals called with transaction:',
+					{
+						id: transaction.id,
+						target: transaction.target,
+						targetModel: transaction.targetModel,
+						type: transaction.type,
+						amount: transaction.amount,
 					}
-				}
+				);
 
-				// Update goals for income transactions based on category mapping
-				if (
-					transaction.type === 'income' &&
-					transaction.categories.length > 0
-				) {
-					// Find goals that have the transaction's category in their categories array
-					const matchingGoals = goals.filter(
-						(goal) =>
-							goal.categories &&
-							goal.categories.some((goalCategory) =>
-								transaction.categories.some(
-									(txCategory) => txCategory.name === goalCategory
-								)
-							)
-					);
-
-					if (matchingGoals.length > 0) {
-						// Distribute the income amount among matching goals
-						const amountPerGoal = transaction.amount / matchingGoals.length;
-
-						for (const goal of matchingGoals) {
-							try {
-								await updateGoalCurrent(goal.id, amountPerGoal);
-								console.log(`Updated goal: ${goal.name} with ${amountPerGoal}`);
-							} catch (error) {
-								console.warn(`Failed to update goal ${goal.name}:`, error);
-							}
-						}
-					} else {
-						console.log('No goals found matching transaction categories');
+				// Only update if transaction has a specific target
+				if (transaction.target && transaction.targetModel) {
+					if (transaction.targetModel === 'Budget') {
+						// Backend now handles budget updates automatically when creating transactions
+						// So we just need to refresh the budgets to get the latest data
+						console.log(
+							`[TransactionContext] Backend handled budget update for ${transaction.target}, refreshing budgets...`
+						);
+						await refetchBudgetsRef.current();
+						console.log('[TransactionContext] Budgets refreshed successfully');
+					} else if (transaction.targetModel === 'Goal') {
+						// Backend now handles goal updates automatically when creating transactions
+						// So we just need to refresh the goals to get the latest data
+						console.log(
+							`[TransactionContext] Backend handled goal update for ${transaction.target}, refreshing goals...`
+						);
+						await refetchGoalsRef.current();
+						console.log('[TransactionContext] Goals refreshed successfully');
 					}
+				} else {
+					console.log(
+						'Transaction has no specific target, skipping budget/goal updates'
+					);
 				}
 			} catch (error) {
 				console.error('Error updating budgets and goals:', error);
 			}
 		},
-		[updateBudgetSpent, updateGoalCurrent, goals, budgets]
+		[] // No dependencies needed since we use refs
 	);
 
 	const addTransaction = useCallback(
 		async (transactionData: Omit<Transaction, 'id'>) => {
+			console.log(
+				'[TransactionContext] addTransaction called with:',
+				transactionData
+			);
+
 			// Create a temporary ID for optimistic update
 			const tempId = `temp-${Date.now()}-${Math.random()}`;
 			const newTransaction: Transaction = {
@@ -231,14 +191,28 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 				...transactionData,
 			};
 
+			console.log(
+				'[TransactionContext] Optimistic transaction:',
+				newTransaction
+			);
+
 			// Optimistically add to UI
-			setTransactions((prev) => [newTransaction, ...prev]);
+			setTransactions((prev) => {
+				const updated = [newTransaction, ...prev];
+				console.log(
+					'[TransactionContext] Optimistic update - transactions count:',
+					updated.length
+				);
+				return updated;
+			});
 
 			try {
 				const response = await ApiService.post<any>(
 					'/transactions',
 					transactionData
 				);
+
+				console.log('[TransactionContext] API response:', response);
 
 				if (response.success && response.data) {
 					// Safely convert amount to number with fallback
@@ -253,6 +227,22 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 							: parsedAmount;
 					}
 
+					// Handle populated target data from server response
+					let targetId = null;
+					let targetModel = null;
+
+					if (response.data.target) {
+						// If target is populated (has _id and other fields), extract the ID
+						if (response.data.target._id) {
+							targetId = response.data.target._id;
+							targetModel = response.data.targetModel;
+						} else {
+							// If target is just an ID string
+							targetId = response.data.target;
+							targetModel = response.data.targetModel;
+						}
+					}
+
 					// Update with the real ID from the server
 					const serverTransaction: Transaction = {
 						id: response.data._id ?? response.data.id ?? tempId,
@@ -260,23 +250,34 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 							response.data.description ?? transactionData.description,
 						amount: amount,
 						date: response.data.date ?? transactionData.date,
-						categories: Array.isArray(response.data.categories)
-							? response.data.categories.map((cat: any) => ({
-									name: cat.name ?? 'Other',
-									type: cat.type ?? 'expense',
-									color: cat.color,
-									icon: cat.icon,
-							  }))
-							: transactionData.categories,
 						type: response.data.type ?? transactionData.type,
+						target: targetId,
+						targetModel: targetModel,
 					};
 
-					// Replace the temporary transaction with the real one
-					setTransactions((prev) =>
-						prev.map((t) => (t.id === tempId ? serverTransaction : t))
+					console.log(
+						'[TransactionContext] Server transaction:',
+						serverTransaction
+					);
+					console.log(
+						'[TransactionContext] Original transaction data:',
+						transactionData
 					);
 
+					// Replace the temporary transaction with the real one
+					setTransactions((prev) => {
+						const updated = prev.map((t) =>
+							t.id === tempId ? serverTransaction : t
+						);
+						console.log(
+							'[TransactionContext] Server update - transactions count:',
+							updated.length
+						);
+						return updated;
+					});
+
 					// Auto-update budgets and goals based on transaction
+					console.log('[TransactionContext] Updating budgets and goals...');
 					await updateBudgetsAndGoals(serverTransaction);
 
 					return serverTransaction;
@@ -285,7 +286,14 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 				}
 			} catch (error) {
 				// Remove the optimistic transaction on error
-				setTransactions((prev) => prev.filter((t) => t.id !== tempId));
+				setTransactions((prev) => {
+					const updated = prev.filter((t) => t.id !== tempId);
+					console.log(
+						'[TransactionContext] Error cleanup - transactions count:',
+						updated.length
+					);
+					return updated;
+				});
 				throw error;
 			}
 		},
@@ -308,17 +316,28 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 		[refetch]
 	);
 
+	// Use a ref to access current transactions without causing re-renders
+	const transactionsRef = useRef<Transaction[]>([]);
+
+	// Update ref whenever transactions change
+	useEffect(() => {
+		transactionsRef.current = transactions;
+	}, [transactions]);
+
 	const updateTransaction = useCallback(
 		async (id: string, transactionData: Partial<Omit<Transaction, 'id'>>) => {
-			// Optimistically update UI with proper category handling
+			// Store the original transaction for rollback in case of error
+			const originalTransaction = transactionsRef.current.find(
+				(t) => t.id === id
+			);
+
+			// Optimistically update UI
 			setTransactions((prev) =>
 				prev.map((t) =>
 					t.id === id
 						? {
 								...t,
 								...transactionData,
-								// Ensure categories are properly handled in optimistic update
-								categories: transactionData.categories || t.categories,
 						  }
 						: t
 				)
@@ -331,22 +350,107 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 				);
 
 				if (response.success && response.data) {
+					// Handle populated target data from server response
+					let targetId = null;
+					let targetModel = null;
+
+					console.log('[TransactionContext] Processing server response:', {
+						hasTarget: !!response.data.target,
+						targetType: typeof response.data.target,
+						targetValue: response.data.target,
+						targetModel: response.data.targetModel,
+					});
+
+					if (response.data.target) {
+						console.log('[TransactionContext] Target object details:', {
+							hasId: !!response.data.target._id,
+							idValue: response.data.target._id,
+							targetKeys: Object.keys(response.data.target),
+						});
+
+						// If target is populated (has _id and other fields), extract the ID
+						if (response.data.target._id) {
+							targetId = response.data.target._id;
+							targetModel = response.data.targetModel;
+							console.log(
+								'[TransactionContext] Extracted target from populated object:',
+								{ targetId, targetModel }
+							);
+						} else if (typeof response.data.target === 'string') {
+							// If target is just an ID string
+							targetId = response.data.target;
+							targetModel = response.data.targetModel;
+							console.log(
+								'[TransactionContext] Extracted target from ID string:',
+								{ targetId, targetModel }
+							);
+						} else {
+							// If target is an object but doesn't have _id, try to find an id field
+							const targetKeys = Object.keys(response.data.target);
+							const idKey = targetKeys.find((key) =>
+								key.toLowerCase().includes('id')
+							);
+							if (idKey && response.data.target[idKey]) {
+								targetId = response.data.target[idKey];
+								targetModel = response.data.targetModel;
+								console.log(
+									'[TransactionContext] Extracted target from object with id field:',
+									{ targetId, targetModel, idKey }
+								);
+							}
+						}
+					} else {
+						console.log('[TransactionContext] No target in response');
+					}
+
+					// Fallback: if we still don't have target data, try to get it from the original transactionData
+					if (!targetId && transactionData.target) {
+						targetId = transactionData.target;
+						targetModel = transactionData.targetModel;
+						console.log(
+							'[TransactionContext] Using target data from transactionData:',
+							{ targetId, targetModel }
+						);
+					}
+
+					// Additional fallback: check if targetModel is provided but target is missing
+					if (
+						!targetId &&
+						response.data.targetModel &&
+						transactionData.target
+					) {
+						targetId = transactionData.target;
+						targetModel = response.data.targetModel;
+						console.log(
+							'[TransactionContext] Using target data from transactionData with targetModel from response:',
+							{ targetId, targetModel }
+						);
+					}
+
 					const updatedTransaction: Transaction = {
 						id: response.data._id ?? response.data.id ?? id,
 						description:
 							response.data.description ?? transactionData.description,
 						amount: response.data.amount ?? transactionData.amount,
 						date: response.data.date ?? transactionData.date,
-						categories: Array.isArray(response.data.categories)
-							? response.data.categories.map((cat: any) => ({
-									name: cat.name ?? 'Other',
-									type: cat.type ?? 'expense',
-									color: cat.color,
-									icon: cat.icon,
-							  }))
-							: transactionData.categories,
 						type: response.data.type ?? transactionData.type,
+						target: targetId,
+						targetModel: targetModel,
 					};
+
+					console.log(
+						'[TransactionContext] Updated transaction with target data:',
+						{
+							targetId,
+							targetModel,
+							fullResponse: response.data,
+						}
+					);
+
+					console.log(
+						'[TransactionContext] Final updatedTransaction:',
+						updatedTransaction
+					);
 
 					// Update the local state with the server response
 					setTransactions((prev) =>
@@ -362,128 +466,49 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 				}
 			} catch (error) {
 				console.error('Error in updateTransaction:', error);
-				// Rollback or just refetch
-				await refetch();
+
+				// Rollback to original transaction state on error
+				if (originalTransaction) {
+					setTransactions((prev) =>
+						prev.map((t) => (t.id === id ? originalTransaction : t))
+					);
+				} else {
+					// If we don't have the original, just refetch
+					await refetch();
+				}
+
 				throw error;
 			}
 		},
 		[refetch, updateBudgetsAndGoals]
 	);
 
-	// Category management functions
-	const getCategories = useCallback(() => {
-		return categories;
-	}, [categories]);
-
-	const addCategory = useCallback(async (category: Category) => {
-		try {
-			const response = await ApiService.post<any>('/categories', {
-				name: category.name,
-				type: category.type,
-				color: category.color,
-				icon: category.icon,
-			});
-
-			if (response.success && response.data) {
-				const newCategory: Category = {
-					id: response.data._id,
-					name: response.data.name,
-					type: response.data.type,
-					color: response.data.color,
-					icon: response.data.icon,
-					isDefault: response.data.isDefault,
-				};
-
-				setCategories((prev) => [...prev, newCategory]);
-				return newCategory;
-			} else {
-				throw new Error('Failed to create category');
-			}
-		} catch (error) {
-			console.error('Failed to add category:', error);
-			throw error;
-		}
-	}, []);
-
-	const updateCategory = useCallback(
-		async (categoryId: string, updates: Partial<Category>) => {
-			try {
-				const response = await ApiService.put<any>(
-					`/categories/${categoryId}`,
-					updates
-				);
-
-				if (response.success && response.data) {
-					const updatedCategory: Category = {
-						id: response.data._id,
-						name: response.data.name,
-						type: response.data.type,
-						color: response.data.color,
-						icon: response.data.icon,
-						isDefault: response.data.isDefault,
-					};
-
-					setCategories((prev) =>
-						prev.map((cat) => (cat.id === categoryId ? updatedCategory : cat))
-					);
-
-					return updatedCategory;
-				} else {
-					throw new Error('Failed to update category');
-				}
-			} catch (error) {
-				console.error('Failed to update category:', error);
-				throw error;
-			}
-		},
-		[]
-	);
-
-	const deleteCategory = useCallback(async (categoryId: string) => {
-		try {
-			await ApiService.delete(`/categories/${categoryId}`);
-			setCategories((prev) => prev.filter((cat) => cat.id !== categoryId));
-		} catch (error) {
-			console.error('Failed to delete category:', error);
-			throw error;
-		}
-	}, []);
+	const refreshTransactions = useCallback(() => {
+		refetch();
+	}, [refetch]);
 
 	useEffect(() => {
 		refetch();
-		refetchCategories();
-	}, [refetch, refetchCategories]);
+	}, [refetch]);
 
 	const value = useMemo(
 		() => ({
 			transactions,
-			categories,
 			isLoading,
-			categoriesLoading,
 			refetch,
-			refetchCategories,
+			refreshTransactions,
 			deleteTransaction,
 			addTransaction,
 			updateTransaction,
-			getCategories,
-			addCategory,
-			deleteCategory,
-			updateCategory,
 		}),
 		[
 			transactions,
-			categories,
 			isLoading,
-			categoriesLoading,
 			refetch,
-			refetchCategories,
+			refreshTransactions,
 			deleteTransaction,
 			addTransaction,
 			updateTransaction,
-			getCategories,
-			addCategory,
-			deleteCategory,
-			updateCategory,
 		]
 	);
 

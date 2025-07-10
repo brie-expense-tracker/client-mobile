@@ -13,7 +13,6 @@ import {
 	BudgetOverviewGraph,
 	GoalsProgressGraph,
 	SpendingTrendsGraph,
-	CategoryBreakdownGraph,
 	FinancialDashboard,
 } from '../../../src/components';
 
@@ -23,7 +22,6 @@ interface Transaction {
 	type: 'income' | 'expense';
 	amount: number;
 	date: string;
-	category?: string;
 }
 
 // Sample data for demonstration
@@ -290,13 +288,7 @@ export default function GraphsDemoScreen() {
 						title="Spending Trends"
 					/>
 				);
-			case 'categories':
-				return (
-					<CategoryBreakdownGraph
-						transactions={sampleTransactions}
-						title="Category Breakdown"
-					/>
-				);
+
 			default:
 				return null;
 		}
