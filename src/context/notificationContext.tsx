@@ -5,6 +5,7 @@ import React, {
 	useEffect,
 	useRef,
 	ReactNode,
+	useCallback,
 } from 'react';
 import * as Notifications from 'expo-notifications';
 import {
@@ -65,7 +66,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 	const responseListener = useRef<Notifications.EventSubscription | null>(null);
 
 	// Initialize notification service
-	const initialize = async () => {
+	const initialize = useCallback(async () => {
 		try {
 			setError(null);
 			const token = await notificationService.initialize();
@@ -93,25 +94,31 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 					: new Error('Failed to initialize notifications')
 			);
 		}
-	};
+	}, []);
 
-	const getNotifications = async (page: number = 1, limit: number = 20) => {
-		try {
-			setLoading(true);
-			const response = await notificationService.getNotifications(page, limit);
-			if (response) {
-				setNotifications(response.notifications);
+	const getNotifications = useCallback(
+		async (page: number = 1, limit: number = 20) => {
+			try {
+				setLoading(true);
+				const response = await notificationService.getNotifications(
+					page,
+					limit
+				);
+				if (response) {
+					setNotifications(response.notifications);
+				}
+			} catch (err) {
+				setError(
+					err instanceof Error ? err : new Error('Failed to get notifications')
+				);
+			} finally {
+				setLoading(false);
 			}
-		} catch (err) {
-			setError(
-				err instanceof Error ? err : new Error('Failed to get notifications')
-			);
-		} finally {
-			setLoading(false);
-		}
-	};
+		},
+		[]
+	);
 
-	const markAsRead = async (notificationId: string) => {
+	const markAsRead = useCallback(async (notificationId: string) => {
 		try {
 			await notificationService.markAsRead(notificationId);
 			setNotifications((prev) =>
@@ -125,9 +132,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 					: new Error('Failed to mark notification as read')
 			);
 		}
-	};
+	}, []);
 
-	const markAllAsRead = async () => {
+	const markAllAsRead = useCallback(async () => {
 		try {
 			await notificationService.markAllAsRead();
 			setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
@@ -139,9 +146,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 					: new Error('Failed to mark all notifications as read')
 			);
 		}
-	};
+	}, []);
 
-	const deleteNotification = async (notificationId: string) => {
+	const deleteNotification = useCallback(async (notificationId: string) => {
 		try {
 			await notificationService.deleteNotification(notificationId);
 			setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
@@ -151,9 +158,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 				err instanceof Error ? err : new Error('Failed to delete notification')
 			);
 		}
-	};
+	}, []);
 
-	const deleteAllNotifications = async () => {
+	const deleteAllNotifications = useCallback(async () => {
 		try {
 			await notificationService.deleteAllNotifications();
 			setNotifications([]);
@@ -165,9 +172,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 					: new Error('Failed to delete all notifications')
 			);
 		}
-	};
+	}, []);
 
-	const sendTestNotification = async () => {
+	const sendTestNotification = useCallback(async () => {
 		try {
 			await notificationService.sendTestNotification();
 		} catch (err) {
@@ -177,37 +184,35 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 					: new Error('Failed to send test notification')
 			);
 		}
-	};
+	}, []);
 
-	const refreshUnreadCount = async () => {
+	const refreshUnreadCount = useCallback(async () => {
 		try {
 			const count = await notificationService.getUnreadCount();
 			setUnreadCount(count);
 		} catch (err) {
 			console.error('Failed to refresh unread count:', err);
 		}
-	};
+	}, []);
 
 	useEffect(() => {
 		initialize();
 		return () => {
 			if (notificationListener.current) {
-				Notifications.removeNotificationSubscription(
-					notificationListener.current
-				);
+				notificationListener.current.remove();
 			}
 			if (responseListener.current) {
-				Notifications.removeNotificationSubscription(responseListener.current);
+				responseListener.current.remove();
 			}
 		};
-	}, []);
+	}, [initialize]);
 
 	useEffect(() => {
 		if (expoPushToken) {
 			getNotifications();
 			refreshUnreadCount();
 		}
-	}, [expoPushToken]);
+	}, [expoPushToken, getNotifications, refreshUnreadCount]);
 
 	return (
 		<NotificationContext.Provider

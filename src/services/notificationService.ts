@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 
 export interface NotificationData {
 	id?: string;
+	_id?: string;
 	title: string;
 	message: string;
 	type?:
@@ -16,9 +17,13 @@ export interface NotificationData {
 		| 'system'
 		| 'reminder';
 	priority?: 'low' | 'medium' | 'high';
+	read?: boolean;
+	timeAgo?: string;
 	data?: any;
 	scheduledFor?: Date;
 	expiresAt?: Date;
+	createdAt?: string;
+	updatedAt?: string;
 }
 
 export interface NotificationResponse {

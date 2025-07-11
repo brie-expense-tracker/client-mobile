@@ -51,12 +51,7 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 		}
 	}, [isVisible]);
 
-	// Auto-set transaction type to income when goal is selected
-	useEffect(() => {
-		if (goalId && transaction.type === 'expense') {
-			setTransaction((prev) => ({ ...prev, type: 'income' }));
-		}
-	}, [goalId]);
+	// No longer auto-setting transaction type - allow both income and expense for goals
 
 	// Focus amount input when modal opens
 	useEffect(() => {
@@ -114,14 +109,8 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 			return;
 		}
 
-		// For goals, only income transactions should be allowed
-		if (goalId && transaction.type === 'expense') {
-			Alert.alert(
-				'Invalid Transaction Type',
-				'Only income transactions can contribute to goal progress. Please change to income.'
-			);
-			return;
-		}
+		// For goals, both income and expense transactions are now allowed
+		// Income adds to goal progress, expense subtracts from goal progress
 
 		try {
 			// Validate that we have a goalId for proper linking
@@ -240,36 +229,21 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 									transaction.type === 'expense' && {
 										backgroundColor: '#E53935',
 									},
-									goalId && styles.disabledTypeButton,
 								]}
 								onPress={() => {
-									if (goalId) {
-										Alert.alert(
-											'Goal Transactions',
-											'Only income transactions can contribute to goal progress. Please use income for goals.'
-										);
-										return;
-									}
 									setTransaction((prev) => ({ ...prev, type: 'expense' }));
 								}}
 							>
 								<Ionicons
 									name="arrow-down-circle"
 									size={20}
-									color={
-										transaction.type === 'expense'
-											? 'white'
-											: goalId
-											? '#CCCCCC'
-											: '#757575'
-									}
+									color={transaction.type === 'expense' ? 'white' : '#757575'}
 								/>
 								<Text
 									style={[
 										styles.typeButtonText,
 										transaction.type === 'expense' &&
 											styles.activeTypeButtonText,
-										goalId && styles.disabledTypeButtonText,
 									]}
 								>
 									Expense
@@ -286,7 +260,8 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 									color="#757575"
 								/>
 								<Text style={styles.helpText}>
-									Only income transactions contribute to goal progress
+									Income adds to goal progress, expense subtracts from goal
+									progress
 								</Text>
 							</View>
 						)}
@@ -295,7 +270,7 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 						<View style={styles.formGroup}>
 							<Text style={styles.label}>Amount</Text>
 							<View style={styles.amountInputContainer}>
-								<Ionicons name="logo-usd" size={24} color="#757575" />
+								<Ionicons name="logo-usd" size={20} color="#757575" />
 								<TextInput
 									ref={amountInputRef}
 									style={styles.amountInput}
@@ -329,7 +304,7 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 
 						{/* Submit Button */}
 						<RectButton
-							style={[styles.submitButton, { backgroundColor: '#00a2ff' }]}
+							style={[styles.submitButton, { backgroundColor: goalColor }]}
 							onPress={handleSubmit}
 						>
 							<Text style={styles.submitButtonText}>Add Transaction</Text>
@@ -374,7 +349,7 @@ const styles = StyleSheet.create({
 	typeToggleContainer: {
 		flexDirection: 'row',
 		gap: 12,
-		marginBottom: 24,
+		marginBottom: 12,
 	},
 	typeButton: {
 		flex: 1,
@@ -416,7 +391,7 @@ const styles = StyleSheet.create({
 	},
 	amountInput: {
 		flex: 1,
-		fontSize: 24,
+		fontSize: 16,
 		fontWeight: '600',
 		color: '#212121',
 		marginLeft: 12,
@@ -441,24 +416,20 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		fontWeight: '600',
 	},
-	disabledTypeButton: {
-		opacity: 0.7,
-	},
-	disabledTypeButtonText: {
-		color: '#CCCCCC',
-	},
+
 	helpTextContainer: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		backgroundColor: '#F5F5F5',
 		borderRadius: 12,
 		padding: 12,
-		marginTop: 16,
+		marginBottom: 12,
 		gap: 8,
 	},
 	helpText: {
 		fontSize: 14,
 		color: '#757575',
+		width: '80%',
 	},
 });
 

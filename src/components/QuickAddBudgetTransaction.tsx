@@ -255,11 +255,26 @@ const QuickAddBudgetTransaction: React.FC<QuickAddBudgetTransactionProps> = ({
 							</RectButton>
 						</View>
 
+						{/* Help text for goal transactions */}
+						{budgetId && (
+							<View style={styles.helpTextContainer}>
+								<Ionicons
+									name="information-circle-outline"
+									size={16}
+									color="#757575"
+								/>
+								<Text style={styles.helpText}>
+									Income adds to budget progress, expense subtracts from budget
+									progress
+								</Text>
+							</View>
+						)}
+
 						{/* Amount Input */}
 						<View style={styles.formGroup}>
 							<Text style={styles.label}>Amount</Text>
 							<View style={styles.amountInputContainer}>
-								<Ionicons name="logo-usd" size={24} color="#757575" />
+								<Ionicons name="logo-usd" size={20} color="#757575" />
 								<TextInput
 									ref={amountInputRef}
 									style={styles.amountInput}
@@ -363,7 +378,7 @@ const styles = StyleSheet.create({
 	typeToggleContainer: {
 		flexDirection: 'row',
 		gap: 12,
-		marginBottom: 24,
+		marginBottom: 12,
 	},
 	typeButton: {
 		flex: 1,
@@ -405,7 +420,7 @@ const styles = StyleSheet.create({
 	},
 	amountInput: {
 		flex: 1,
-		fontSize: 24,
+		fontSize: 16,
 		fontWeight: '600',
 		color: '#212121',
 		marginLeft: 12,
@@ -428,6 +443,20 @@ const styles = StyleSheet.create({
 		color: '#FFFFFF',
 		fontSize: 16,
 		fontWeight: '600',
+	},
+	helpTextContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#F5F5F5',
+		borderRadius: 12,
+		padding: 12,
+		marginBottom: 12,
+		gap: 8,
+	},
+	helpText: {
+		fontSize: 14,
+		color: '#757575',
+		width: '80%',
 	},
 });
 
