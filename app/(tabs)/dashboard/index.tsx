@@ -26,6 +26,9 @@ import {
 import { TransactionContext } from '../../../src/context/transactionContext';
 import { useBudget } from '../../../src/context/budgetContext';
 import { useGoal } from '../../../src/context/goalContext';
+import { AIInsightsSummary } from '../../../src/components';
+import { useProfile } from '@/src/context/profileContext';
+import { useNotification } from '@/src/context/notificationContext';
 
 /**
  * -----------------------------------------------------------------------------
@@ -38,7 +41,6 @@ const currency = new Intl.NumberFormat('en-US', {
 	currency: 'USD',
 }).format;
 
-// Date handling utilities (from ledger)
 const getLocalIsoDate = (): string => {
 	const today = new Date();
 	// Adjust for timezone offset to ensure we get the correct local date
@@ -217,16 +219,12 @@ const SimpleBalanceWidget: React.FC<BalanceWidgetProps> = ({
  * -----------------------------------------------------------------------------
  */
 const AISuggestionBox = () => (
-	<View style={styles.suggestionBox}>
-		<View style={styles.suggestionHeader}>
-			<Ionicons name="bulb-outline" size={20} color="#007AFF" />
-			<Text style={styles.suggestionTitle}>AI Insights</Text>
-		</View>
-		<Text style={styles.suggestionText}>
-			Based on your spending patterns, consider setting aside 20% of your income
-			for savings this month.
-		</Text>
-	</View>
+	<AIInsightsSummary
+		maxInsights={1}
+		showGenerateButton={false}
+		compact={false}
+		title="AI Insights"
+	/>
 );
 
 /**
@@ -283,7 +281,9 @@ const TransactionHistory: React.FC<{
 				return 'Unknown Goal';
 			}
 		}
-		return 'Other';
+
+		// Fallback: show transaction type when no target is specified
+		return transaction.type === 'income' ? 'Income' : 'Expense';
 	};
 
 	// Helper function to get transaction context (icon and color from target)
@@ -309,10 +309,18 @@ const TransactionHistory: React.FC<{
 		}
 
 		// Fallback for transactions without target or when target not found
-		return {
-			icon: 'cash' as keyof typeof Ionicons.glyphMap,
-			color: transaction.type === 'income' ? '#16a34a' : '#dc2626',
-		};
+		// Use more descriptive icons based on transaction type
+		if (transaction.type === 'income') {
+			return {
+				icon: 'trending-up-outline' as keyof typeof Ionicons.glyphMap,
+				color: '#16a34a', // Green for income
+			};
+		} else {
+			return {
+				icon: 'trending-down-outline' as keyof typeof Ionicons.glyphMap,
+				color: '#dc2626', // Red for expense
+			};
+		}
 	};
 
 	return (
@@ -400,6 +408,8 @@ const Dashboard: React.FC = () => {
 	const { transactions, isLoading, refetch } = useContext(TransactionContext);
 	const { budgets } = useBudget();
 	const { goals } = useGoal();
+	const { profile, loading: profileLoading } = useProfile();
+	const { unreadCount } = useNotification();
 	const [isPressed, setIsPressed] = useState(false);
 	const [refreshing, setRefreshing] = useState(false);
 
@@ -507,6 +517,33 @@ const Dashboard: React.FC = () => {
 	return (
 		<SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
 			<GestureHandlerRootView style={{ flex: 1 }}>
+				{/* -------------------------------------------------- */}
+				{/* Sticky Header */}
+				{/* -------------------------------------------------- */}
+				<View style={styles.stickyHeader}>
+					<Image
+						source={require('../../../src/assets/images/brie-logos.png')}
+						style={styles.logo}
+						resizeMode="contain"
+					/>
+
+					<TouchableOpacity
+						onPress={() => router.push('/dashboard/notifications')}
+						style={styles.notificationButton}
+					>
+						<View>
+							<Ionicons name="notifications-outline" color="#333" size={24} />
+							{unreadCount > 0 && (
+								<View style={styles.notificationAlertButton}>
+									<Text style={styles.notificationBadgeText}>
+										{unreadCount > 99 ? '99+' : unreadCount}
+									</Text>
+								</View>
+							)}
+						</View>
+					</TouchableOpacity>
+				</View>
+
 				<ScrollView
 					style={styles.scrollView}
 					showsVerticalScrollIndicator={false}
@@ -521,31 +558,6 @@ const Dashboard: React.FC = () => {
 					}
 				>
 					<View style={[styles.contentContainer]}>
-						{/* -------------------------------------------------- */}
-						{/* Header */}
-						{/* -------------------------------------------------- */}
-						<View style={styles.headerContainer}>
-							<Image
-								source={require('../../../src/assets/images/brie-logos.png')}
-								style={styles.logo}
-								resizeMode="contain"
-							/>
-
-							<TouchableOpacity
-								onPress={() => router.push('/dashboard/notifications')}
-								style={styles.notificationButton}
-							>
-								<View>
-									<Ionicons
-										name="notifications-outline"
-										color="#333"
-										size={24}
-									/>
-									<View style={styles.notificationAlertButton} />
-								</View>
-							</TouchableOpacity>
-						</View>
-
 						{/* -------------------------------------------------- */}
 						{/* Balance card */}
 						{/* -------------------------------------------------- */}
@@ -618,6 +630,13 @@ const styles = StyleSheet.create({
 		paddingTop: 0,
 	},
 	/** Header **/
+	stickyHeader: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		paddingHorizontal: 24,
+		zIndex: 1000,
+	},
 	headerContainer: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
@@ -634,14 +653,23 @@ const styles = StyleSheet.create({
 	},
 	notificationAlertButton: {
 		position: 'absolute',
-		top: -2,
-		right: -2,
-		width: 8,
-		height: 8,
-		borderRadius: 4,
-		backgroundColor: '#FF6A00',
-		borderWidth: 1,
+		top: -4,
+		right: -4,
+		minWidth: 16,
+		height: 16,
+		borderRadius: 8,
+		backgroundColor: '#dc2626',
+		borderWidth: 2,
 		borderColor: 'white',
+		justifyContent: 'center',
+		alignItems: 'center',
+		paddingHorizontal: 4,
+	},
+	notificationBadgeText: {
+		color: 'white',
+		fontSize: 10,
+		fontWeight: 'bold',
+		textAlign: 'center',
 	},
 	/** Balance card **/
 	headerCard: {
@@ -781,31 +809,6 @@ const styles = StyleSheet.create({
 	},
 	incomeAmount: { color: '#16a34a' },
 	expenseAmount: { color: '#dc2626' },
-	/** AI box **/
-	suggestionBox: {
-		backgroundColor: '#f8f9fa',
-		borderRadius: 12,
-		padding: 20,
-		marginBottom: 24,
-		borderWidth: 1,
-		borderColor: '#e9ecef',
-	},
-	suggestionHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginBottom: 12,
-	},
-	suggestionTitle: {
-		fontSize: 16,
-		fontWeight: '600',
-		color: '#333',
-		marginLeft: 8,
-	},
-	suggestionText: {
-		fontSize: 14,
-		color: '#666',
-		lineHeight: 20,
-	},
 	logo: {
 		height: 30,
 		width: 80,

@@ -5,6 +5,9 @@ export { default as SpendingTrendsGraph } from './SpendingTrendsGraph';
 
 export { default as FinancialDashboard } from './FinancialDashboard';
 
+// AI Insights Components
+export { default as AIInsightsSummary } from './AIInsightsSummary';
+
 // Existing Components
 export { default as ProfitGraph } from './ProfitGraph';
 export { default as ProfitLossGraph } from './ProfitLossGraph';

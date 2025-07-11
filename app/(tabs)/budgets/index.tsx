@@ -21,6 +21,8 @@ import QuickAddBudgetTransaction from '../../../src/components/QuickAddBudgetTra
 // ==========================================
 // Types
 // ==========================================
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 type ColorOption = {
 	base: string;
 	pastel: string;
@@ -385,6 +387,8 @@ export default function BudgetScreen() {
 
 			if (error instanceof Error) {
 				if (error.message.includes('already have a budget for')) {
+					errorMessage = error.message;
+				} else if (error.message.includes('already exists')) {
 					errorMessage = error.message;
 				} else if (error.message.includes('duplicate')) {
 					errorMessage =
@@ -923,140 +927,138 @@ export default function BudgetScreen() {
 			{/* Add Budget Modal */}
 			<RNModal
 				isVisible={isModalVisible}
-				onBackdropPress={hideModal}
-				onBackButtonPress={hideModal}
 				style={styles.modal}
 				animationIn="slideInUp"
 				animationOut="slideOutDown"
-				backdropOpacity={0.5}
-				backdropColor="#000"
 				useNativeDriver
 			>
 				<View style={styles.modalContent}>
-					<View style={styles.modalHeader}>
-						<Text style={styles.modalTitle}>Add New Budget</Text>
-						<BorderlessButton
-							onActiveStateChange={setIsPressed}
-							onPress={hideModal}
-						>
-							<Ionicons name="close" size={24} color="#757575" />
-						</BorderlessButton>
-					</View>
-					<ScrollView
-						showsVerticalScrollIndicator={false}
-						contentContainerStyle={{
-							paddingBottom: 24,
-							justifyContent: 'flex-end',
-						}}
-					>
-						<View style={styles.formGroup}>
-							<Text style={styles.label}>Budget Name</Text>
-							<TextInput
-								style={styles.input}
-								value={newBudget.name}
-								onChangeText={(text) =>
-									setNewBudget({ ...newBudget, name: text })
-								}
-								placeholder="e.g., Groceries"
-								placeholderTextColor="#9E9E9E"
-								autoComplete="off"
-								autoCorrect={false}
-							/>
+					<SafeAreaView style={styles.modalContainer}>
+						<View style={styles.modalHeader}>
+							<Text style={styles.modalTitle}>Add New Budget</Text>
+							<BorderlessButton
+								onActiveStateChange={setIsPressed}
+								onPress={hideModal}
+							>
+								<Ionicons name="close" size={24} color="#757575" />
+							</BorderlessButton>
 						</View>
+						<ScrollView
+							showsVerticalScrollIndicator={false}
+							contentContainerStyle={{
+								paddingBottom: 24,
+								justifyContent: 'flex-end',
+							}}
+						>
+							<View style={styles.formGroup}>
+								<Text style={styles.label}>Budget Name</Text>
+								<TextInput
+									style={styles.input}
+									value={newBudget.name}
+									onChangeText={(text) =>
+										setNewBudget({ ...newBudget, name: text })
+									}
+									placeholder="e.g., Groceries"
+									placeholderTextColor="#9E9E9E"
+									autoComplete="off"
+									autoCorrect={false}
+								/>
+							</View>
 
-						<View style={styles.formGroup}>
-							<Text style={styles.label}>Budget Amount</Text>
-							<Text style={styles.amountSubtext}>
-								Set your monthly spending limit for this category
-							</Text>
+							<View style={styles.formGroup}>
+								<Text style={styles.label}>Budget Amount</Text>
+								<Text style={styles.amountSubtext}>
+									Set your monthly spending limit for this category
+								</Text>
 
-							{/* Quick Amount Presets */}
-							<View style={styles.amountPresetsContainer}>
-								{amountPresets.map((amount) => (
+								{/* Quick Amount Presets */}
+								<View style={styles.amountPresetsContainer}>
+									{amountPresets.map((amount) => (
+										<RectButton
+											key={amount}
+											style={[
+												styles.amountPreset,
+												newBudget.amount === amount.toString() &&
+													styles.selectedAmountPreset,
+											]}
+											onPress={() => {
+												setNewBudget({
+													...newBudget,
+													amount: amount.toString(),
+												});
+												setShowCustomAmount(false);
+											}}
+										>
+											<Text
+												style={[
+													styles.amountPresetText,
+													newBudget.amount === amount.toString() &&
+														styles.selectedAmountPresetText,
+												]}
+											>
+												${amount}
+											</Text>
+										</RectButton>
+									))}
+
+									{/* Custom Amount Button */}
 									<RectButton
-										key={amount}
 										style={[
 											styles.amountPreset,
-											newBudget.amount === amount.toString() &&
-												styles.selectedAmountPreset,
+											showCustomAmount && styles.selectedAmountPreset,
 										]}
 										onPress={() => {
-											setNewBudget({
-												...newBudget,
-												amount: amount.toString(),
-											});
-											setShowCustomAmount(false);
+											setShowCustomAmount(!showCustomAmount);
+											if (!showCustomAmount) {
+												setNewBudget({
+													...newBudget,
+													amount: '',
+												});
+											}
 										}}
 									>
 										<Text
 											style={[
 												styles.amountPresetText,
-												newBudget.amount === amount.toString() &&
-													styles.selectedAmountPresetText,
+												showCustomAmount && styles.selectedAmountPresetText,
 											]}
 										>
-											${amount}
+											Custom
 										</Text>
 									</RectButton>
-								))}
+								</View>
 
-								{/* Custom Amount Button */}
-								<RectButton
-									style={[
-										styles.amountPreset,
-										showCustomAmount && styles.selectedAmountPreset,
-									]}
-									onPress={() => {
-										setShowCustomAmount(!showCustomAmount);
-										if (!showCustomAmount) {
-											setNewBudget({
-												...newBudget,
-												amount: '',
-											});
-										}
-									}}
-								>
-									<Text
-										style={[
-											styles.amountPresetText,
-											showCustomAmount && styles.selectedAmountPresetText,
-										]}
-									>
-										Custom
-									</Text>
-								</RectButton>
+								{/* Custom Amount Input */}
+								{showCustomAmount && (
+									<>
+										<Text style={styles.inputLabel}>Enter custom amount</Text>
+										<TextInput
+											style={styles.input}
+											value={newBudget.amount}
+											onChangeText={(text) =>
+												setNewBudget({ ...newBudget, amount: text })
+											}
+											placeholder="e.g., 500"
+											keyboardType="numeric"
+											placeholderTextColor="#9E9E9E"
+											autoComplete="off"
+										/>
+									</>
+								)}
 							</View>
 
-							{/* Custom Amount Input */}
-							{showCustomAmount && (
-								<>
-									<Text style={styles.inputLabel}>Enter custom amount</Text>
-									<TextInput
-										style={styles.input}
-										value={newBudget.amount}
-										onChangeText={(text) =>
-											setNewBudget({ ...newBudget, amount: text })
-										}
-										placeholder="e.g., 500"
-										keyboardType="numeric"
-										placeholderTextColor="#9E9E9E"
-										autoComplete="off"
-									/>
-								</>
-							)}
-						</View>
+							<IconPicker />
+							<ColorPicker />
+							<PeriodPicker />
 
-						<IconPicker />
-						<ColorPicker />
-						<PeriodPicker />
-
-						<RectButton
-							style={[styles.addButton, { backgroundColor: newBudget.color }]}
-							onPress={handleAddBudget}
-						>
-							<Text style={styles.addButtonText}>Add Budget</Text>
-						</RectButton>
-					</ScrollView>
+							<RectButton
+								style={[styles.addButton, { backgroundColor: newBudget.color }]}
+								onPress={handleAddBudget}
+							>
+								<Text style={styles.addButtonText}>Add Budget</Text>
+							</RectButton>
+						</ScrollView>
+					</SafeAreaView>
 				</View>
 			</RNModal>
 
@@ -1371,13 +1373,15 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 	modalContainer: {
-		justifyContent: 'flex-end',
+		flex: 1,
 	},
 	modalContent: {
+		flex: 1,
 		backgroundColor: '#ffffff',
 		borderTopLeftRadius: 20,
 		borderTopRightRadius: 20,
 		padding: 24,
+		marginTop: 80,
 	},
 	modalHeader: {
 		flexDirection: 'row',

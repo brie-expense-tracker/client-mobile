@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
 	View,
 	Text,
@@ -8,6 +8,8 @@ import {
 	TouchableOpacity,
 	Alert,
 	Button,
+	ActivityIndicator,
+	RefreshControl,
 } from 'react-native';
 import { useTheme } from '@react-navigation/native';
 import { Stack } from 'expo-router';
@@ -27,35 +29,16 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useNotification } from '@/src/context/notificationContext';
-
-interface Notification {
-	id: string;
-	title: string;
-	message: string;
-	timestamp: string;
-}
-
-const mockNotifications: Notification[] = [
-	{
-		id: '1',
-		title: 'New Message',
-		message: 'You have received a new message from John',
-		timestamp: '2 hours ago',
-	},
-	{
-		id: '2',
-		title: 'System Update',
-		message: 'Your app has been updated to the latest version',
-		timestamp: '1 day ago',
-	},
-];
+import { NotificationData } from '@/src/services/notificationService';
 
 const NotificationItem = ({
 	item,
 	onDelete,
+	onMarkAsRead,
 }: {
-	item: Notification;
+	item: NotificationData;
 	onDelete: (id: string, resetAnimation: () => void) => void;
+	onMarkAsRead: (id: string) => void;
 }) => {
 	const { colors } = useTheme();
 	const translateX = useSharedValue(0);
@@ -65,7 +48,7 @@ const NotificationItem = ({
 	const iconScale = useSharedValue(1);
 
 	const handleDelete = () => {
-		onDelete(item.id, resetAnimation);
+		onDelete(item.id!, resetAnimation);
 	};
 
 	const resetAnimation = () => {
@@ -135,26 +118,46 @@ const NotificationItem = ({
 		transform: [{ scale: iconScale.value }],
 	}));
 
+	const handlePress = () => {
+		if (!item.read && item.id) {
+			onMarkAsRead(item.id);
+		}
+	};
+
 	return (
 		<View style={styles.txRowContainer}>
 			<View style={styles.deleteAction}>
 				<Animated.View style={trashIconStyle}>
-					<TouchableOpacity onPress={() => onDelete(item.id, resetAnimation)}>
+					<TouchableOpacity onPress={() => onDelete(item.id!, resetAnimation)}>
 						<Ionicons name="trash-outline" size={18} color="#fff" />
 					</TouchableOpacity>
 				</Animated.View>
 			</View>
 			<GestureDetector gesture={panGesture}>
-				<Animated.View style={[styles.notificationItem, animatedStyle]}>
-					<Text style={[styles.title, { color: colors.text }]}>
-						{item.title}
-					</Text>
-					<Text style={[styles.message, { color: colors.text }]}>
-						{item.message}
-					</Text>
-					<Text style={[styles.timestamp, { color: colors.text }]}>
-						{item.timestamp}
-					</Text>
+				<Animated.View
+					style={[
+						styles.notificationItem,
+						animatedStyle,
+						!item.read && styles.unreadNotification,
+					]}
+				>
+					<TouchableOpacity
+						onPress={handlePress}
+						style={styles.notificationContent}
+					>
+						<View style={styles.notificationHeader}>
+							<Text style={[styles.title, { color: colors.text }]}>
+								{item.title}
+							</Text>
+							{!item.read && <View style={styles.unreadDot} />}
+						</View>
+						<Text style={[styles.message, { color: colors.text }]}>
+							{item.message}
+						</Text>
+						<Text style={[styles.timestamp, { color: colors.text }]}>
+							{item.timeAgo || 'Just now'}
+						</Text>
+					</TouchableOpacity>
 				</Animated.View>
 			</GestureDetector>
 		</View>
@@ -162,34 +165,50 @@ const NotificationItem = ({
 };
 
 export default function NotificationsScreen() {
-	const { notification, expoPushToken, error } = useNotification();
 	const { colors } = useTheme();
-	const [notifications, setNotifications] =
-		useState<Notification[]>(mockNotifications);
+	const [refreshing, setRefreshing] = useState(false);
 
-	const sendPushNotification = async (expoPushToken: string) => {
-		const message = {
-			to: expoPushToken,
-			sound: 'default',
-			title: 'Test Notification',
-			body: 'This is a test notification from your app!',
-			data: { someData: 'goes here' },
-		};
+	// Get notification context - will throw if not within provider
+	const notificationContext = useNotification();
 
-		try {
-			await fetch('https://exp.host/--/api/v2/push/send', {
-				method: 'POST',
-				headers: {
-					Accept: 'application/json',
-					'Accept-encoding': 'gzip, deflate',
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(message),
-			});
-			Alert.alert('Success', 'Test notification sent!');
-		} catch (error) {
-			Alert.alert('Error', 'Failed to send notification');
+	// Destructure with default values to prevent undefined errors
+	const {
+		notifications = [],
+		unreadCount = 0,
+		loading = false,
+		error = null,
+		getNotifications = async () => {},
+		markAsRead = async () => {},
+		deleteNotification = async () => {},
+		deleteAllNotifications = async () => {},
+		refreshUnreadCount = async () => {},
+	} = notificationContext || {};
+
+	// Removed useEffect to prevent infinite loop - notifications are fetched by the context
+
+	// Early return if context is not available
+	if (!notificationContext) {
+		return (
+			<SafeAreaView style={styles.container}>
+				<View style={styles.loadingContainer}>
+					<ActivityIndicator size="large" color={colors.primary} />
+					<Text style={[styles.loadingText, { color: colors.text }]}>
+						Loading notifications...
+					</Text>
+				</View>
+			</SafeAreaView>
+		);
+	}
+
+	const onRefresh = async () => {
+		setRefreshing(true);
+		if (getNotifications) {
+			await getNotifications();
 		}
+		if (refreshUnreadCount) {
+			await refreshUnreadCount();
+		}
+		setRefreshing(false);
 	};
 
 	const handleDelete = (id: string, resetAnimation: () => void) => {
@@ -205,8 +224,10 @@ export default function NotificationsScreen() {
 				{
 					text: 'Delete',
 					style: 'destructive',
-					onPress: () =>
-						setNotifications((prev) => prev.filter((n) => n.id !== id)),
+					onPress: async () => {
+						await deleteNotification(id);
+						resetAnimation();
+					},
 				},
 			]
 		);
@@ -221,46 +242,95 @@ export default function NotificationsScreen() {
 				{
 					text: 'Clear All',
 					style: 'destructive',
-					onPress: () => setNotifications([]),
+					onPress: async () => {
+						await deleteAllNotifications();
+					},
 				},
 			]
 		);
 	};
 
+	const handleMarkAsRead = async (id: string) => {
+		if (markAsRead) {
+			await markAsRead(id);
+		}
+	};
+
+	if (loading && (!notifications || notifications.length === 0)) {
+		return (
+			<SafeAreaView style={styles.container}>
+				<View style={styles.loadingContainer}>
+					<ActivityIndicator size="large" color={colors.primary} />
+					<Text style={[styles.loadingText, { color: colors.text }]}>
+						Loading notifications...
+					</Text>
+				</View>
+			</SafeAreaView>
+		);
+	}
+
 	return (
 		<GestureHandlerRootView style={{ flex: 1 }}>
 			<SafeAreaView style={styles.container}>
+				{notifications && notifications.length > 0 && (
+					<View style={styles.clearAllContainer}>
+						<TouchableOpacity
+							onPress={handleClearAll}
+							style={styles.clearButton}
+						>
+							<Text style={[styles.clearButtonText, { color: colors.primary }]}>
+								Clear All
+							</Text>
+						</TouchableOpacity>
+					</View>
+				)}
+
 				<FlatList
-					data={notifications}
+					data={notifications || []}
 					renderItem={({ item }) => (
-						<NotificationItem item={item} onDelete={handleDelete} />
+						<NotificationItem
+							item={item}
+							onDelete={handleDelete}
+							onMarkAsRead={handleMarkAsRead}
+						/>
 					)}
-					keyExtractor={(item) => item.id}
+					keyExtractor={(item) =>
+						item.id || item._id || Math.random().toString()
+					}
 					contentContainerStyle={styles.listContainer}
+					refreshControl={
+						<RefreshControl
+							refreshing={refreshing}
+							onRefresh={onRefresh}
+							colors={[colors.primary]}
+							tintColor={colors.primary}
+						/>
+					}
 					ListEmptyComponent={() => (
 						<View style={styles.emptyContainer}>
+							<Ionicons
+								name="notifications-outline"
+								size={64}
+								color={colors.text}
+								style={styles.emptyIcon}
+							/>
 							<Text style={[styles.emptyText, { color: colors.text }]}>
 								No notifications
+							</Text>
+							<Text style={[styles.emptySubtext, { color: colors.text }]}>
+								You&apos;re all caught up!
 							</Text>
 						</View>
 					)}
 				/>
-				<View style={styles.tokenContainer}>
-					<Text style={[styles.tokenText, { color: colors.text }]}>
-						Your push token: {expoPushToken || 'Loading...'}
-					</Text>
-					{error && (
+
+				{error && (
+					<View style={styles.errorContainer}>
 						<Text style={[styles.errorText, { color: '#dc2626' }]}>
-							Error: {error.toString()}
+							Error: {error?.toString() || 'Unknown error'}
 						</Text>
-					)}
-					{expoPushToken && (
-						<Button
-							title="Send Test Notification"
-							onPress={() => sendPushNotification(expoPushToken)}
-						/>
-					)}
-				</View>
+					</View>
+				)}
 			</SafeAreaView>
 		</GestureHandlerRootView>
 	);
@@ -268,7 +338,35 @@ export default function NotificationsScreen() {
 
 const styles = StyleSheet.create({
 	container: { flex: 1, backgroundColor: '#f9fafb' },
-	listContainer: { paddingVertical: 8 },
+	clearAllContainer: {
+		flexDirection: 'row',
+		justifyContent: 'flex-end',
+		paddingHorizontal: 16,
+		paddingVertical: 12,
+		borderBottomWidth: 1,
+		borderBottomColor: '#e5e7eb',
+	},
+	clearButton: {
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+	},
+	clearButtonText: {
+		fontSize: 14,
+		fontWeight: '500',
+	},
+	listContainer: {
+		paddingVertical: 8,
+		flexGrow: 1,
+	},
+	loadingContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	loadingText: {
+		marginTop: 16,
+		fontSize: 16,
+	},
 	txRowContainer: {
 		overflow: 'hidden',
 	},
@@ -277,6 +375,26 @@ const styles = StyleSheet.create({
 		backgroundColor: '#f9fafb',
 		borderBottomWidth: 1,
 		borderBottomColor: '#e5e7eb',
+	},
+	unreadNotification: {
+		backgroundColor: '#f0f9ff',
+		borderLeftWidth: 4,
+		borderLeftColor: '#3b82f6',
+	},
+	notificationContent: {
+		flex: 1,
+	},
+	notificationHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		marginBottom: 4,
+	},
+	unreadDot: {
+		width: 8,
+		height: 8,
+		borderRadius: 4,
+		backgroundColor: '#3b82f6',
 	},
 	deleteAction: {
 		position: 'absolute',
@@ -293,25 +411,33 @@ const styles = StyleSheet.create({
 		flex: 1,
 		justifyContent: 'center',
 		alignItems: 'center',
-		paddingVertical: 32,
+		paddingVertical: 64,
 	},
-	emptyText: { fontSize: 16, opacity: 0.7 },
-	title: { fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
-	message: { fontSize: 14, marginBottom: 8 },
+	emptyIcon: {
+		opacity: 0.5,
+		marginBottom: 16,
+	},
+	emptyText: {
+		fontSize: 18,
+		fontWeight: '600',
+		marginBottom: 4,
+	},
+	emptySubtext: {
+		fontSize: 14,
+		opacity: 0.7,
+	},
+	title: { fontSize: 16, fontWeight: 'bold', marginBottom: 4, flex: 1 },
+	message: { fontSize: 14, marginBottom: 8, lineHeight: 20 },
 	timestamp: { fontSize: 12, opacity: 0.7 },
-	tokenContainer: {
+	errorContainer: {
 		padding: 16,
-		backgroundColor: '#f3f4f6',
+		backgroundColor: '#fef2f2',
 		borderTopWidth: 1,
-		borderTopColor: '#e5e7eb',
-	},
-	tokenText: {
-		fontSize: 12,
-		fontFamily: 'monospace',
-		marginBottom: 8,
+		borderTopColor: '#fecaca',
 	},
 	errorText: {
-		fontSize: 12,
-		fontWeight: 'bold',
+		fontSize: 14,
+		fontWeight: '500',
+		textAlign: 'center',
 	},
 });
