@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
 	View,
 	Text,
@@ -7,8 +7,14 @@ import {
 	Alert,
 	Modal,
 	ScrollView,
+	ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { IntelligentActions } from './IntelligentActions';
+import {
+	IntelligentActionService,
+	IntelligentAction,
+} from '../services/intelligentActionService';
 
 interface AIInsight {
 	_id: string;
@@ -64,15 +70,22 @@ interface AISuggestionsListProps {
 	suggestions: AIInsight[];
 	onApplySuggestion?: (suggestion: any) => void;
 	onInsightPress?: (insight: AIInsight) => void;
+	showSmartActions?: boolean;
 }
 
 const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
 	suggestions,
 	onApplySuggestion,
 	onInsightPress,
+	showSmartActions = true,
 }) => {
 	const [selectedSuggestion, setSelectedSuggestion] = useState<any>(null);
 	const [modalVisible, setModalVisible] = useState(false);
+	const [smartActionsVisible, setSmartActionsVisible] = useState(false);
+	const [selectedInsight, setSelectedInsight] = useState<AIInsight | null>(
+		null
+	);
+	const [loadingActions, setLoadingActions] = useState(false);
 
 	const getInsightIcon = (insightType: string) => {
 		switch (insightType) {
@@ -124,6 +137,11 @@ const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
 		setModalVisible(true);
 	};
 
+	const handleSmartActions = async (insight: AIInsight) => {
+		setSelectedInsight(insight);
+		setSmartActionsVisible(true);
+	};
+
 	const confirmApplySuggestion = () => {
 		if (onApplySuggestion && selectedSuggestion) {
 			onApplySuggestion(selectedSuggestion);
@@ -133,16 +151,38 @@ const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
 		setSelectedSuggestion(null);
 	};
 
+	const handleActionExecuted = (action: IntelligentAction, result: any) => {
+		console.log('Smart action executed:', action, result);
+
+		// Show success message
+		if (result.success) {
+			Alert.alert(
+				'Success',
+				result.message || 'Action completed successfully!'
+			);
+		}
+
+		// Close smart actions modal
+		setSmartActionsVisible(false);
+		setSelectedInsight(null);
+	};
+
 	const renderSuggestionCard = (insight: AIInsight) => {
 		// Convert actionItems to suggestions format
-		const suggestions = insight.actionItems.map(item => ({
+		const suggestions = insight.actionItems.map((item) => ({
 			title: item.title,
 			description: item.description,
 			action: item.completed ? 'Completed' : 'Apply',
 			type: (() => {
-				if (item.title.toLowerCase().includes('budget')) return 'budget' as const;
-				if (item.title.toLowerCase().includes('goal') || item.title.toLowerCase().includes('save')) return 'goal' as const;
-				if (item.title.toLowerCase().includes('remind')) return 'reminder' as const;
+				if (item.title.toLowerCase().includes('budget'))
+					return 'budget' as const;
+				if (
+					item.title.toLowerCase().includes('goal') ||
+					item.title.toLowerCase().includes('save')
+				)
+					return 'goal' as const;
+				if (item.title.toLowerCase().includes('remind'))
+					return 'reminder' as const;
 				return 'tip' as const;
 			})(),
 		}));
@@ -166,7 +206,17 @@ const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
 							{new Date(insight.generatedAt).toLocaleDateString()}
 						</Text>
 					</View>
-					{!insight.isRead && <View style={styles.unreadDot} />}
+					<View style={styles.headerActions}>
+						{!insight.isRead && <View style={styles.unreadDot} />}
+						{showSmartActions && (
+							<TouchableOpacity
+								style={styles.smartActionsButton}
+								onPress={() => handleSmartActions(insight)}
+							>
+								<Ionicons name="sparkles" size={16} color="#4A90E2" />
+							</TouchableOpacity>
+						)}
+					</View>
 				</View>
 
 				<Text style={styles.insightMessage}>{insight.message}</Text>
@@ -217,7 +267,7 @@ const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
 
 	return (
 		<View style={styles.container}>
-			<Text style={styles.title}>AI Suggestions</Text>
+			<Text style={styles.title}>AI Coach</Text>
 
 			{suggestions.length > 0 ? (
 				suggestions.map(renderSuggestionCard)
@@ -294,6 +344,38 @@ const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
 					</View>
 				</View>
 			</Modal>
+
+			{/* Smart Actions Modal */}
+			<Modal
+				animationType="slide"
+				transparent={true}
+				visible={smartActionsVisible}
+				onRequestClose={() => setSmartActionsVisible(false)}
+			>
+				<View style={styles.modalOverlay}>
+					<View style={styles.smartActionsModalContent}>
+						<View style={styles.modalHeader}>
+							<Text style={styles.modalTitle}>Smart Actions</Text>
+							<TouchableOpacity
+								onPress={() => setSmartActionsVisible(false)}
+								style={styles.closeButton}
+							>
+								<Ionicons name="close" size={24} color="#666" />
+							</TouchableOpacity>
+						</View>
+
+						{selectedInsight && (
+							<View style={styles.smartActionsBody}>
+								<IntelligentActions
+									insight={selectedInsight}
+									onActionExecuted={handleActionExecuted}
+									onClose={() => setSmartActionsVisible(false)}
+								/>
+							</View>
+						)}
+					</View>
+				</View>
+			</Modal>
 		</View>
 	);
 };
@@ -348,11 +430,21 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		color: '#666',
 	},
+	headerActions: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+	},
 	unreadDot: {
 		width: 8,
 		height: 8,
 		borderRadius: 4,
 		backgroundColor: '#FF9500',
+	},
+	smartActionsButton: {
+		padding: 4,
+		borderRadius: 4,
+		backgroundColor: '#F0F8FF',
 	},
 	insightMessage: {
 		fontSize: 14,
@@ -441,6 +533,13 @@ const styles = StyleSheet.create({
 		maxHeight: '80%',
 		width: '90%',
 	},
+	smartActionsModalContent: {
+		backgroundColor: '#fff',
+		borderRadius: 16,
+		margin: 20,
+		maxHeight: '90%',
+		width: '95%',
+	},
 	modalHeader: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
@@ -459,6 +558,9 @@ const styles = StyleSheet.create({
 	},
 	modalBody: {
 		padding: 20,
+	},
+	smartActionsBody: {
+		flex: 1,
 	},
 	modalSuggestion: {
 		alignItems: 'center',
