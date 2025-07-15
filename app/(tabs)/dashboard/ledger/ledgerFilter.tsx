@@ -82,11 +82,11 @@ export default function LedgerFilterScreen() {
 					))}
 				</Section>
 
-				<View style={styles.divider} />
-
 				{/* Goals */}
 				<Section title="Goals">
-					<SectionSubtext>Select which goals to include (income transactions)</SectionSubtext>
+					<SectionSubtext>
+						Select which goals to include (income transactions)
+					</SectionSubtext>
 
 					{/* "All" option */}
 					<OptionRow
@@ -109,11 +109,11 @@ export default function LedgerFilterScreen() {
 					)}
 				</Section>
 
-				<View style={styles.divider} />
-
 				{/* Budgets */}
 				<Section title="Budgets">
-					<SectionSubtext>Select which budgets to include (expense transactions)</SectionSubtext>
+					<SectionSubtext>
+						Select which budgets to include (expense transactions)
+					</SectionSubtext>
 
 					{/* "All" option */}
 					<OptionRow
@@ -126,7 +126,7 @@ export default function LedgerFilterScreen() {
 						budgets.map((budget) => (
 							<OptionRow
 								key={budget.id}
-								label={budget.category}
+								label={budget.name}
 								selected={localSelectedBudgets.includes(budget.id)}
 								onPress={() => handleBudgetToggle(budget.id)}
 							/>

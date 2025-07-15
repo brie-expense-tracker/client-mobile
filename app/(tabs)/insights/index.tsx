@@ -1,6 +1,6 @@
 // app/(tabs)/insights.tsx
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback, useContext } from 'react';
 import {
 	SafeAreaView,
 	ScrollView,
@@ -8,355 +8,108 @@ import {
 	Pressable,
 	StyleSheet,
 	ActivityIndicator,
-	Alert,
 	View,
 	TouchableOpacity,
 	RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import {
-	InsightsService,
-	AIInsight,
-} from '../../../src/services/insightsService';
-import useAuth from '../../../src/context/AuthContext';
+import { AIInsight } from '../../../src/services/insightsService';
+import { TransactionContext } from '../../../src/context/transactionContext';
 import { useBudget } from '../../../src/context/budgetContext';
 import { useGoal } from '../../../src/context/goalContext';
-import { ApiService } from '../../../src/services/apiService';
 import {
 	BudgetOverviewGraph,
 	GoalsProgressGraph,
 	SpendingTrendsGraph,
+	IncomeExpenseGraph,
+	CategoryBreakdownChart,
+	SummaryCards,
+	AISuggestionsList,
+	RecentTransactionsList,
+	ExportReportButtons,
 } from '../../../src/components';
-
-interface Transaction {
-	id: string;
-	type: 'income' | 'expense';
-	amount: number;
-	date: string;
-	updatedAt?: string;
-}
+import { useInsightsHub, Period } from '../../../src/hooks';
 
 export default function InsightsHubScreen() {
 	const router = useRouter();
-	const { user, firebaseUser, profile } = useAuth();
+	const { transactions, isLoading: transactionsLoading } =
+		useContext(TransactionContext);
 	const { budgets } = useBudget();
 	const { goals } = useGoal();
-	const [insights, setInsights] = useState<AIInsight[] | null>(null);
-	const [transactions, setTransactions] = useState<Transaction[]>([]);
-	const [loading, setLoading] = useState(true);
-	const [generating, setGenerating] = useState(false);
-	const [refreshing, setRefreshing] = useState(false);
-	const [selectedPeriod, setSelectedPeriod] = useState<
-		'week' | 'month' | 'quarter'
-	>('month');
+
+	const [selectedPeriod, setSelectedPeriod] = useState<Period>('month');
 	const [showGraphs, setShowGraphs] = useState(false);
 
-	useEffect(() => {
-		fetchInsights();
-		fetchTransactions();
-	}, []);
+	const {
+		summary,
+		reportData,
+		insights,
+		loadingInsights,
+		generating,
+		refreshing,
+		onRefresh,
+		generateNewInsights,
+		markInsightAsRead,
+	} = useInsightsHub(selectedPeriod);
 
-	const onRefresh = useCallback(async () => {
-		setRefreshing(true);
-		try {
-			await Promise.all([fetchInsights(), fetchTransactions()]);
-		} catch (error) {
-			console.error('Error refreshing data:', error);
-		} finally {
-			setRefreshing(false);
-		}
-	}, []);
-
-	async function fetchTransactions() {
-		try {
-			const response = await ApiService.get<any>('/transactions');
-
-			if (response.success && response.data) {
-				const transactionData = response.data.data || response.data;
-				const formattedTransactions: Transaction[] = transactionData.map(
-					(tx: any) => ({
-						id: tx._id || tx.id,
-						type: tx.type,
-						amount: Number(tx.amount) || 0,
-						date: tx.date,
-						updatedAt: tx.updatedAt ?? tx.createdAt ?? new Date().toISOString(),
-					})
-				);
-
-				// Sort transactions by date first, then by updatedAt time when dates are the same
-				const sortedTransactions = formattedTransactions.sort((a, b) => {
-					// First, compare by date (newest first)
-					const dateA = new Date(a.date);
-					const dateB = new Date(b.date);
-
-					if (dateA.getTime() !== dateB.getTime()) {
-						return dateB.getTime() - dateA.getTime(); // Newest date first
-					}
-
-					// If dates are the same, compare by updatedAt time (newest first)
-					const updatedAtA = a.updatedAt ? new Date(a.updatedAt) : new Date(0);
-					const updatedAtB = b.updatedAt ? new Date(b.updatedAt) : new Date(0);
-
-					return updatedAtB.getTime() - updatedAtA.getTime(); // Newest time first
-				});
-
-				setTransactions(sortedTransactions);
-			}
-		} catch (error) {
-			console.error('Error fetching transactions:', error);
-		}
-	}
-
-	async function fetchInsights() {
-		try {
-			setLoading(true);
-			// Set a timeout to prevent long loading
-			const timeoutPromise = new Promise((_, reject) => {
-				setTimeout(() => reject(new Error('Request timeout')), 5000); // 5 second timeout
-			});
-
-			// Try to get existing insights with timeout
-			const insightsPromise = Promise.allSettled([
-				InsightsService.getInsights('daily'),
-				InsightsService.getInsights('weekly'),
-				InsightsService.getInsights('monthly'),
-			]);
-
-			const results = (await Promise.race([
-				insightsPromise,
-				timeoutPromise,
-			])) as PromiseSettledResult<any>[];
-
-			const [dailyResponse, weeklyResponse, monthlyResponse] = results.map(
-				(result: PromiseSettledResult<any>) =>
-					result.status === 'fulfilled'
-						? result.value
-						: {
-								success: false,
-								data: [],
-								error: result.reason?.message || 'Request failed',
-						  }
-			);
-
-			// Log responses for debugging
-			console.log('Daily insights response:', dailyResponse);
-			console.log('Weekly insights response:', weeklyResponse);
-			console.log('Monthly insights response:', monthlyResponse);
-
-			const allInsights = [
-				...(dailyResponse.success &&
-				dailyResponse.data &&
-				Array.isArray(dailyResponse.data)
-					? dailyResponse.data.slice(0, 1) // Only take 1 insight per period
-					: []),
-				...(weeklyResponse.success &&
-				weeklyResponse.data &&
-				Array.isArray(weeklyResponse.data)
-					? weeklyResponse.data.slice(0, 1)
-					: []),
-				...(monthlyResponse.success &&
-				monthlyResponse.data &&
-				Array.isArray(monthlyResponse.data)
-					? monthlyResponse.data.slice(0, 1)
-					: []),
-			];
-
-			// Sort by most recent
-			allInsights.sort(
-				(a, b) =>
-					new Date(b.generatedAt).getTime() - new Date(a.generatedAt).getTime()
-			);
-
-			// Take the most recent 3 insights
-			const recentInsights = allInsights.slice(0, 3);
-
-			if (recentInsights.length === 0) {
-				// Check if any of the responses had specific errors
-				const errors = [
-					dailyResponse.error,
-					weeklyResponse.error,
-					monthlyResponse.error,
-				].filter(Boolean);
-
-				if (errors.length > 0) {
-					console.log('Insights fetch errors:', errors);
-					// Don't show alert, just set empty insights
-					setInsights([]);
-				} else {
-					// Only generate one insight quickly instead of all three
-					await generateQuickInsight();
+	// Memoize callback functions to prevent unnecessary re-renders
+	const handleInsightPress = useCallback(
+		async (insight: AIInsight) => {
+			try {
+				// Mark as read if not already read
+				if (!insight.isRead) {
+					await markInsightAsRead(insight._id);
 				}
-			} else {
-				setInsights(recentInsights);
+
+				// Navigate to the period detail
+				router.push(`/insights/${insight.period}`);
+			} catch (error) {
+				console.error('Error marking insight as read:', error);
+				// Still navigate even if marking as read fails
+				router.push(`/insights/${insight.period}`);
 			}
-		} catch (error) {
-			console.error('Error fetching insights:', error);
-			// Don't show alert, just set empty insights
-			setInsights([]);
-		} finally {
-			setLoading(false);
-		}
-	}
+		},
+		[markInsightAsRead, router]
+	);
 
-	async function generateQuickInsight() {
-		try {
-			setGenerating(true);
-			// Only generate one insight quickly (weekly is usually fastest)
-			const response = await InsightsService.generateInsights('weekly');
-			console.log('Quick insight generation response:', response);
+	const handleCardPress = useCallback((cardType: string) => {
+		console.log('Card pressed:', cardType);
+		// Handle card press - could navigate to specific sections
+	}, []);
 
-			if (response.success && response.data && Array.isArray(response.data)) {
-				setInsights(response.data.slice(0, 1));
-			} else {
-				setInsights([]);
-			}
-		} catch (error) {
-			console.error('Error generating quick insight:', error);
-			setInsights([]);
-		} finally {
-			setGenerating(false);
-		}
-	}
+	const handleApplySuggestion = useCallback((suggestion: any) => {
+		console.log('Apply suggestion:', suggestion);
+		// Handle applying suggestions
+	}, []);
 
-	async function testInsightsAPI() {
-		try {
-			console.log('Testing insights API...');
+	const handleViewAllTransactions = useCallback(() => {
+		router.push('/dashboard/ledger');
+	}, [router]);
 
-			// Test 1: Check if we can reach the insights endpoint
-			const testResponse = await ApiService.get('/insights/weekly');
-			console.log('Test 1 - Weekly insights response:', testResponse);
+	const handleTransactionPress = useCallback((transaction: any) => {
+		console.log('Transaction pressed:', transaction);
+		// Could navigate to transaction detail
+	}, []);
 
-			// Test 2: Check if user has transactions
-			const transactionsResponse = await ApiService.get('/transactions');
-			console.log('Test 2 - Transactions response:', transactionsResponse);
+	const handleExport = useCallback((type: string) => {
+		console.log('Export:', type);
+		// Handle export success
+	}, []);
 
-			// Test 3: Try to generate a single insight
-			const generateResponse = await ApiService.post(
-				'/insights/generate/weekly',
-				{}
-			);
-			console.log(
-				'Test 3 - Generate weekly insight response:',
-				generateResponse
-			);
+	const handlePeriodChange = useCallback((period: Period) => {
+		setSelectedPeriod(period);
+	}, []);
 
-			const message =
-				`Test 1 (GET insights): ${
-					testResponse.success ? 'Success' : 'Failed'
-				}\n` +
-				`Test 2 (GET transactions): ${
-					transactionsResponse.success ? 'Success' : 'Failed'
-				}\n` +
-				`Test 3 (POST generate): ${
-					generateResponse.success ? 'Success' : 'Failed'
-				}\n\n` +
-				`Transactions count: ${
-					(transactionsResponse.data as any)?.data?.length || 0
-				}\n` +
-				`Error details: ${generateResponse.error || 'None'}`;
+	const handleGraphToggle = useCallback(() => {
+		setShowGraphs(!showGraphs);
+	}, [showGraphs]);
 
-			Alert.alert('API Test Results', message, [{ text: 'OK' }]);
-		} catch (error) {
-			console.error('API test error:', error);
-			Alert.alert(
-				'API Test Error',
-				error instanceof Error ? error.message : 'Unknown error'
-			);
-		}
-	}
+	const handleRefresh = useCallback(() => {
+		onRefresh();
+	}, [onRefresh]);
 
-	async function generateNewInsights() {
-		try {
-			console.log('generateNewInsights - Starting generation process...');
-			setGenerating(true);
-
-			// Generate insights for all periods
-			console.log(
-				'generateNewInsights - Calling generateInsights for all periods...'
-			);
-			const [dailyGen, weeklyGen, monthlyGen] = await Promise.all([
-				InsightsService.generateInsights('daily'),
-				InsightsService.generateInsights('weekly'),
-				InsightsService.generateInsights('monthly'),
-			]);
-
-			console.log('Generation responses:', {
-				dailyGen: {
-					success: dailyGen.success,
-					dataLength: dailyGen.data?.length,
-					error: dailyGen.error,
-				},
-				weeklyGen: {
-					success: weeklyGen.success,
-					dataLength: weeklyGen.data?.length,
-					error: weeklyGen.error,
-				},
-				monthlyGen: {
-					success: monthlyGen.success,
-					dataLength: monthlyGen.data?.length,
-					error: monthlyGen.error,
-				},
-			});
-
-			// Collect all generated insights
-			const allInsights = [
-				...(dailyGen.success && dailyGen.data && Array.isArray(dailyGen.data)
-					? dailyGen.data
-					: []),
-				...(weeklyGen.success && weeklyGen.data && Array.isArray(weeklyGen.data)
-					? weeklyGen.data
-					: []),
-				...(monthlyGen.success &&
-				monthlyGen.data &&
-				Array.isArray(monthlyGen.data)
-					? monthlyGen.data
-					: []),
-			];
-
-			console.log(
-				'generateNewInsights - Collected insights:',
-				allInsights.length
-			);
-
-			// Sort by most recent and take top 3
-			allInsights.sort(
-				(a, b) =>
-					new Date(b.generatedAt).getTime() - new Date(a.generatedAt).getTime()
-			);
-
-			const recentInsights = allInsights.slice(0, 3);
-			console.log(
-				'generateNewInsights - Setting insights:',
-				recentInsights.length
-			);
-			setInsights(recentInsights);
-
-			// If we have insights, show success message
-			if (recentInsights.length > 0) {
-				console.log(
-					'generateNewInsights - Success! Generated insights:',
-					recentInsights.length
-				);
-				Alert.alert(
-					'Success',
-					`Generated ${recentInsights.length} new insights!`,
-					[{ text: 'OK' }]
-				);
-			} else {
-				// If no insights were generated, try to fetch existing ones
-				console.log('No insights generated, fetching existing ones...');
-				await fetchInsights();
-			}
-		} catch (error) {
-			console.error('Error generating insights:', error);
-			Alert.alert('Error', 'Failed to generate insights. Please try again.');
-		} finally {
-			setGenerating(false);
-		}
-	}
-
-	if (loading) {
+	if (loadingInsights || transactionsLoading) {
 		return (
 			<SafeAreaView style={styles.center}>
 				<ActivityIndicator size="large" />
@@ -373,7 +126,7 @@ export default function InsightsHubScreen() {
 					{/* Refresh Button */}
 					<TouchableOpacity
 						style={styles.refreshButton}
-						onPress={onRefresh}
+						onPress={handleRefresh}
 						disabled={refreshing}
 					>
 						<Ionicons
@@ -387,11 +140,11 @@ export default function InsightsHubScreen() {
 					{/* Graph Toggle */}
 					<TouchableOpacity
 						style={styles.graphToggle}
-						onPress={() => setShowGraphs(!showGraphs)}
+						onPress={handleGraphToggle}
 					>
 						<Ionicons
 							name={showGraphs ? 'list' : 'analytics'}
-							size={24}
+							size={20}
 							color="#2E78B7"
 						/>
 					</TouchableOpacity>
@@ -403,69 +156,105 @@ export default function InsightsHubScreen() {
 				refreshControl={
 					<RefreshControl
 						refreshing={refreshing}
-						onRefresh={onRefresh}
+						onRefresh={handleRefresh}
 						colors={['#2E78B7']}
 						tintColor="#2E78B7"
 					/>
 				}
 			>
+				{/* Period Selector */}
+				<View style={styles.periodSelector}>
+					{[
+						{ key: 'week', label: 'Week', icon: 'calendar-outline' },
+						{ key: 'month', label: 'Month', icon: 'calendar' },
+						{ key: 'quarter', label: 'Quarter', icon: 'calendar-clear' },
+					].map((option) => (
+						<TouchableOpacity
+							key={option.key}
+							style={[
+								styles.periodOption,
+								selectedPeriod === option.key && styles.periodOptionActive,
+							]}
+							onPress={() => handlePeriodChange(option.key as Period)}
+						>
+							<Ionicons
+								name={option.icon as any}
+								size={16}
+								color={selectedPeriod === option.key ? '#FFFFFF' : '#666'}
+							/>
+							<Text
+								style={[
+									styles.periodOptionText,
+									selectedPeriod === option.key &&
+										styles.periodOptionTextActive,
+								]}
+							>
+								{option.label}
+							</Text>
+						</TouchableOpacity>
+					))}
+				</View>
+
+				{/* 1. Summary Cards */}
+				<SummaryCards data={summary} onCardPress={handleCardPress} />
+
 				{showGraphs ? (
 					// Graph View
 					<View>
-						{/* Period Selector */}
-						<View style={styles.periodSelector}>
-							{[
-								{ key: 'week', label: 'Week', icon: 'calendar-outline' },
-								{ key: 'month', label: 'Month', icon: 'calendar' },
-								{ key: 'quarter', label: 'Quarter', icon: 'calendar-clear' },
-							].map((option) => (
-								<TouchableOpacity
-									key={option.key}
-									style={[
-										styles.periodOption,
-										selectedPeriod === option.key && styles.periodOptionActive,
-									]}
-									onPress={() => setSelectedPeriod(option.key as any)}
-								>
-									<Ionicons
-										name={option.icon as any}
-										size={16}
-										color={selectedPeriod === option.key ? '#FFFFFF' : '#666'}
-									/>
-									<Text
-										style={[
-											styles.periodOptionText,
-											selectedPeriod === option.key &&
-												styles.periodOptionTextActive,
-										]}
-									>
-										{option.label}
-									</Text>
-								</TouchableOpacity>
-							))}
-						</View>
-
-						{/* Spending Trends Graph */}
+						{/* 2. Trend Graphs */}
 						{transactions.length > 0 && (
-							<SpendingTrendsGraph
+							<>
+								<SpendingTrendsGraph
+									transactions={transactions}
+									title={`${
+										selectedPeriod.charAt(0).toUpperCase() +
+										selectedPeriod.slice(1)
+									}ly Spending Trends`}
+									period={selectedPeriod}
+								/>
+
+								<IncomeExpenseGraph
+									transactions={transactions}
+									title={`Income vs Expenses`}
+									period={selectedPeriod}
+									chartType="line"
+								/>
+							</>
+						)}
+
+						{/* 3. Category Breakdown */}
+						{transactions.length > 0 && (
+							<CategoryBreakdownChart
 								transactions={transactions}
-								title={`${
-									selectedPeriod.charAt(0).toUpperCase() +
-									selectedPeriod.slice(1)
-								}ly Spending Trends`}
+								budgets={budgets}
+								title="Spending by Category"
 								period={selectedPeriod}
 							/>
 						)}
 
-						{/* Budget Overview Graph */}
+						{/* 4. Budget Overview */}
 						{budgets.length > 0 && (
 							<BudgetOverviewGraph budgets={budgets} title="Budget Overview" />
 						)}
 
-						{/* Goals Progress Graph */}
+						{/* 5. Goal Progress */}
 						{goals.length > 0 && (
 							<GoalsProgressGraph goals={goals} title="Goals Progress" />
 						)}
+
+						{/* 8. Recent Transactions */}
+						<RecentTransactionsList
+							transactions={transactions}
+							maxItems={10}
+							onViewAll={handleViewAllTransactions}
+							onTransactionPress={handleTransactionPress}
+						/>
+
+						{/* 9. Export & Share */}
+						<ExportReportButtons
+							reportData={reportData}
+							onExport={handleExport}
+						/>
 
 						{/* Empty State for Graphs */}
 						{transactions.length === 0 &&
@@ -484,24 +273,29 @@ export default function InsightsHubScreen() {
 				) : (
 					// AI Insights View
 					<View>
-						{insights && insights.length > 0 ? (
-							insights.map((insight) => (
-								<Pressable
-									key={insight._id}
-									style={styles.card}
-									onPress={() => {
-										router.push(`/insights/${insight.period}`);
-									}}
-								>
-									<Text style={styles.periodLabel}>
-										{insight.period.charAt(0).toUpperCase() +
-											insight.period.slice(1)}
-									</Text>
-									<Text style={styles.message}>{insight.message}</Text>
-									<Text style={styles.cta}>Tap to explore →</Text>
-								</Pressable>
-							))
-						) : (
+						{/* 6. AI-Driven Suggestions */}
+						<AISuggestionsList
+							suggestions={insights || []}
+							onApplySuggestion={handleApplySuggestion}
+							onInsightPress={handleInsightPress}
+						/>
+
+						{/* 8. Recent Transactions */}
+						<RecentTransactionsList
+							transactions={transactions}
+							maxItems={5}
+							onViewAll={handleViewAllTransactions}
+							onTransactionPress={handleTransactionPress}
+						/>
+
+						{/* 9. Export & Share */}
+						<ExportReportButtons
+							reportData={reportData}
+							onExport={handleExport}
+						/>
+
+						{/* Fallback for no insights */}
+						{(!insights || insights.length === 0) && (
 							<View style={styles.emptyState}>
 								<Text style={styles.emptyText}>No insights available yet.</Text>
 								<Text style={styles.emptySubtext}>
@@ -524,17 +318,6 @@ export default function InsightsHubScreen() {
 										</Text>
 									)}
 								</Pressable>
-
-								{/* Test Button */}
-								<Pressable
-									style={[
-										styles.generateButton,
-										{ backgroundColor: '#666', marginTop: 8 },
-									]}
-									onPress={testInsightsAPI}
-								>
-									<Text style={styles.generateButtonText}>Test API</Text>
-								</Pressable>
 							</View>
 						)}
 					</View>
@@ -545,13 +328,14 @@ export default function InsightsHubScreen() {
 }
 
 const styles = StyleSheet.create({
-	safe: { flex: 1, backgroundColor: '#f9f9f9' },
+	safe: { flex: 1, backgroundColor: '#ffffff' },
 	header: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
-		alignItems: 'center',
+		alignItems: 'flex-end',
 		paddingHorizontal: 16,
-		paddingVertical: 16,
+		paddingBottom: 8,
+		backgroundColor: '#ffffff',
 	},
 	headerTitle: {
 		fontSize: 28,
@@ -619,12 +403,23 @@ const styles = StyleSheet.create({
 		shadowRadius: 8,
 		elevation: 2,
 	},
+	cardHeader: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		marginBottom: 8,
+	},
 	periodLabel: {
 		fontSize: 14,
 		fontWeight: '500',
 		color: '#666',
 		textTransform: 'uppercase',
-		marginBottom: 8,
+	},
+	unreadDot: {
+		width: 8,
+		height: 8,
+		borderRadius: 4,
+		backgroundColor: '#FF9500',
 	},
 	message: {
 		fontSize: 16,

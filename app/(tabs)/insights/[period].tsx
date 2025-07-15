@@ -57,6 +57,35 @@ export default function InsightDetail() {
 		}
 	}, [insights]);
 
+	// Mark insights as read when they are viewed
+	useEffect(() => {
+		const markInsightsAsRead = async () => {
+			if (insights.length > 0) {
+				try {
+					// Mark all insights as read
+					const markPromises = insights
+						.filter((insight) => !insight.isRead)
+						.map((insight) => InsightsService.markInsightAsRead(insight._id));
+
+					if (markPromises.length > 0) {
+						await Promise.all(markPromises);
+
+						// Update local state to mark as read
+						setInsights((prevInsights) =>
+							prevInsights.map((insight) => ({ ...insight, isRead: true }))
+						);
+					}
+				} catch (error) {
+					console.error('Error marking insights as read:', error);
+				}
+			}
+		};
+
+		// Mark as read after a short delay to ensure the screen is fully loaded
+		const timer = setTimeout(markInsightsAsRead, 500);
+		return () => clearTimeout(timer);
+	}, [insights]);
+
 	if (loading) {
 		return (
 			<SafeAreaView style={styles.center}>
@@ -127,7 +156,7 @@ export default function InsightDetail() {
 			case 'actions':
 				return (
 					<View style={styles.stepContainer}>
-						<Text style={styles.sectionTitle}>Let's take action</Text>
+						<Text style={styles.sectionTitle}>{"Let's take action"}</Text>
 						{insight.actionItems.map((a, i) => (
 							<RectButton
 								key={i}
@@ -258,7 +287,7 @@ export default function InsightDetail() {
 									[
 										{
 											text: 'OK',
-											onPress: () => router.back(),
+											onPress: () => router.push('/insights'),
 										},
 									]
 								);

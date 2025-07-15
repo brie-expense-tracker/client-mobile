@@ -653,11 +653,11 @@ export default function _layout() {
 				}}
 			/>
 			<Stack.Screen
-				name="dataandprivacy/index"
+				name="data/index"
 				options={{
 					headerShown: true,
 					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: 'Data & Privacy',
+					headerTitle: 'Data Handling',
 					headerShadowVisible: false,
 					headerTitleStyle: {
 						fontSize: 20,
@@ -680,7 +680,7 @@ export default function _layout() {
 				}}
 			/>
 			<Stack.Screen
-				name="dataandprivacy/exportData"
+				name="data/exportData"
 				options={{
 					headerShown: true,
 					headerBackButtonDisplayMode: 'minimal',

@@ -12,6 +12,21 @@ const GoalsProgressGraph: React.FC<GoalsProgressGraphProps> = ({
 	goals,
 	title = 'Goals Progress',
 }) => {
+	// Early return if no goals
+	if (!goals || goals.length === 0) {
+		return (
+			<View style={styles.container}>
+				<Text style={styles.title}>{title}</Text>
+				<View style={styles.emptyState}>
+					<Text style={styles.emptyText}>No goals available</Text>
+					<Text style={styles.emptySubtext}>
+						Add some goals to see your progress here
+					</Text>
+				</View>
+			</View>
+		);
+	}
+
 	const screenWidth = Dimensions.get('window').width;
 	const chartSize = Math.min(screenWidth - 120, 250); // Account for parent ScrollView padding (40px) + component padding (40px) + extra margin (40px)
 
@@ -21,20 +36,22 @@ const GoalsProgressGraph: React.FC<GoalsProgressGraphProps> = ({
 	// Transform goals data for the pie chart
 	const pieData = activeGoals
 		.map((goal) => {
-			const progress = goal.current / goal.target;
+			const current = goal.current || 0;
+			const target = goal.target || 0;
+			const progress = target > 0 ? current / target : 0;
 			const remaining = 1 - progress;
 
 			return [
 				{
-					value: goal.current,
+					value: current,
 					color: goal.color,
-					text: `${goal.name}\n$${goal.current.toFixed(0)}`,
+					text: `${goal.name}\n$${current.toFixed(0)}`,
 					textColor: '#FFFFFF',
 					textSize: 12,
 					fontWeight: '600',
 				},
 				{
-					value: goal.target - goal.current,
+					value: target - current,
 					color: `${goal.color}40`, // 40% opacity for remaining
 					text: '',
 				},
@@ -43,13 +60,18 @@ const GoalsProgressGraph: React.FC<GoalsProgressGraphProps> = ({
 		.flat();
 
 	// Calculate overall progress
-	const totalTarget = goals.reduce((sum, goal) => sum + goal.target, 0);
-	const totalCurrent = goals.reduce((sum, goal) => sum + goal.current, 0);
+	const totalTarget = goals.reduce((sum, goal) => sum + (goal.target || 0), 0);
+	const totalCurrent = goals.reduce(
+		(sum, goal) => sum + (goal.current || 0),
+		0
+	);
 	const overallProgress =
 		totalTarget > 0 ? (totalCurrent / totalTarget) * 100 : 0;
 
 	// Get completed goals
-	const completedGoals = goals.filter((goal) => goal.current >= goal.target);
+	const completedGoals = goals.filter(
+		(goal) => (goal.current || 0) >= (goal.target || 0)
+	);
 
 	return (
 		<View style={styles.container}>
@@ -110,8 +132,11 @@ const GoalsProgressGraph: React.FC<GoalsProgressGraphProps> = ({
 			{/* Goals List */}
 			<View style={styles.goalsList}>
 				{goals.map((goal, index) => {
-					const progress = Math.min((goal.current / goal.target) * 100, 100);
-					const isCompleted = goal.current >= goal.target;
+					const current = goal.current || 0;
+					const target = goal.target || 0;
+					const progress =
+						target > 0 ? Math.min((current / target) * 100, 100) : 0;
+					const isCompleted = current >= target;
 
 					return (
 						<View key={goal.id} style={styles.goalItem}>
@@ -129,7 +154,7 @@ const GoalsProgressGraph: React.FC<GoalsProgressGraphProps> = ({
 								<View style={styles.goalInfo}>
 									<Text style={styles.goalName}>{goal.name}</Text>
 									<Text style={styles.goalAmount}>
-										${goal.current.toFixed(0)} / ${goal.target.toFixed(0)}
+										${current.toFixed(0)} / ${target.toFixed(0)}
 									</Text>
 								</View>
 								<View style={styles.goalProgress}>

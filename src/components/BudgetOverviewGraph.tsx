@@ -12,22 +12,38 @@ const BudgetOverviewGraph: React.FC<BudgetOverviewGraphProps> = ({
 	budgets,
 	title = 'Budget Overview',
 }) => {
+	// Early return if no budgets
+	if (!budgets || budgets.length === 0) {
+		return (
+			<View style={styles.container}>
+				<Text style={styles.title}>{title}</Text>
+				<View style={styles.emptyState}>
+					<Text style={styles.emptyText}>No budgets available</Text>
+					<Text style={styles.emptySubtext}>
+						Add some budgets to see your overview here
+					</Text>
+				</View>
+			</View>
+		);
+	}
+
 	const screenWidth = Dimensions.get('window').width;
 	const chartWidth = screenWidth - 100; // More conservative to ensure x-axis fits
 
 	// Transform budget data for the chart
 	const chartData = budgets.map((budget) => {
-		const spentPercentage =
-			budget.allocated > 0 ? (budget.spent / budget.allocated) * 100 : 0;
+		const spent = budget.spent || 0;
+		const allocated = budget.amount || 0;
+		const spentPercentage = allocated > 0 ? (spent / allocated) * 100 : 0;
 		const isOverBudget = spentPercentage > 100;
 
 		return {
-			value: budget.spent,
-			label: budget.category,
-			frontColor: isOverBudget ? '#FF6B6B' : budget.color,
+			value: spent,
+			label: budget.name || budget.categories?.[0] || 'Unknown',
+			frontColor: isOverBudget ? '#FF6B6B' : budget.color || '#2E78B7',
 			topLabelComponent: () => (
 				<View style={styles.topLabel}>
-					<Text style={styles.topLabelText}>${budget.spent.toFixed(0)}</Text>
+					<Text style={styles.topLabelText}>${spent.toFixed(0)}</Text>
 				</View>
 			),
 			topLabelContainerStyle: {
@@ -39,7 +55,7 @@ const BudgetOverviewGraph: React.FC<BudgetOverviewGraphProps> = ({
 
 	// Calculate max value for chart scaling
 	const maxValue = Math.max(
-		...budgets.map((b) => Math.max(b.spent, b.allocated)),
+		...budgets.map((b) => Math.max(b.spent || 0, b.amount || 0)),
 		100 // Minimum value to ensure chart is visible
 	);
 
@@ -52,10 +68,10 @@ const BudgetOverviewGraph: React.FC<BudgetOverviewGraphProps> = ({
 
 	// Create legend data
 	const legendData = budgets.map((budget) => ({
-		title: budget.category,
-		color: budget.color,
-		allocated: budget.allocated,
-		spent: budget.spent,
+		title: budget.name || budget.categories?.[0] || 'Unknown',
+		color: budget.color || '#2E78B7',
+		allocated: budget.amount || 0,
+		spent: budget.spent || 0,
 	}));
 
 	return (
@@ -118,7 +134,10 @@ const BudgetOverviewGraph: React.FC<BudgetOverviewGraphProps> = ({
 							</Text>
 						</View>
 						<Text style={styles.legendPercentage}>
-							{((item.spent / item.allocated) * 100).toFixed(0)}%
+							{item.allocated > 0
+								? ((item.spent / item.allocated) * 100).toFixed(0)
+								: '0'}
+							%
 						</Text>
 					</View>
 				))}
@@ -218,6 +237,20 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		fontWeight: '500',
 		color: '#666',
+	},
+	emptyState: {
+		alignItems: 'center',
+		padding: 20,
+	},
+	emptyText: {
+		fontSize: 18,
+		fontWeight: '600',
+		color: '#666',
+		marginBottom: 5,
+	},
+	emptySubtext: {
+		fontSize: 14,
+		color: '#999',
 	},
 });
 

@@ -118,7 +118,7 @@ const AIInsightsSummary: React.FC<AIInsightsSummaryProps> = ({
 		}
 	}, [maxInsights]);
 
-	const generateQuickInsight = async () => {
+	const generateQuickInsight = useCallback(async () => {
 		try {
 			setGenerating(true);
 			// Only generate one insight quickly (weekly is usually fastest)
@@ -136,19 +136,40 @@ const AIInsightsSummary: React.FC<AIInsightsSummaryProps> = ({
 		} finally {
 			setGenerating(false);
 		}
-	};
+	}, []);
 
-	const generateNewInsights = async () => {
+	const generateNewInsights = useCallback(async () => {
 		try {
 			console.log('generateNewInsights - Starting generation process...');
 			setGenerating(true);
 
 			// Generate insights for all periods
+			console.log(
+				'generateNewInsights - Calling generateInsights for all periods...'
+			);
 			const [dailyGen, weeklyGen, monthlyGen] = await Promise.all([
 				InsightsService.generateInsights('daily'),
 				InsightsService.generateInsights('weekly'),
 				InsightsService.generateInsights('monthly'),
 			]);
+
+			console.log('Generation responses:', {
+				dailyGen: {
+					success: dailyGen.success,
+					dataLength: dailyGen.data?.length,
+					error: dailyGen.error,
+				},
+				weeklyGen: {
+					success: weeklyGen.success,
+					dataLength: weeklyGen.data?.length,
+					error: weeklyGen.error,
+				},
+				monthlyGen: {
+					success: monthlyGen.success,
+					dataLength: monthlyGen.data?.length,
+					error: monthlyGen.error,
+				},
+			});
 
 			// Collect all generated insights
 			const allInsights = [
@@ -165,6 +186,11 @@ const AIInsightsSummary: React.FC<AIInsightsSummaryProps> = ({
 					: []),
 			];
 
+			console.log(
+				'generateNewInsights - Collected insights:',
+				allInsights.length
+			);
+
 			// Sort by most recent and take top insights
 			allInsights.sort(
 				(a, b) =>
@@ -172,10 +198,18 @@ const AIInsightsSummary: React.FC<AIInsightsSummaryProps> = ({
 			);
 
 			const recentInsights = allInsights.slice(0, maxInsights);
+			console.log(
+				'generateNewInsights - Setting insights:',
+				recentInsights.length
+			);
 			setInsights(recentInsights);
 
 			// If we have insights, show success message
 			if (recentInsights.length > 0) {
+				console.log(
+					'generateNewInsights - Success! Generated insights:',
+					recentInsights.length
+				);
 				Alert.alert(
 					'Success',
 					`Generated ${recentInsights.length} new insights!`,
@@ -183,6 +217,7 @@ const AIInsightsSummary: React.FC<AIInsightsSummaryProps> = ({
 				);
 			} else {
 				// If no insights were generated, try to fetch existing ones
+				console.log('No insights generated, fetching existing ones...');
 				await fetchInsights();
 			}
 		} catch (error) {
@@ -191,27 +226,38 @@ const AIInsightsSummary: React.FC<AIInsightsSummaryProps> = ({
 		} finally {
 			setGenerating(false);
 		}
-	};
+	}, [maxInsights, fetchInsights]);
 
-	const handleInsightPress = (insight: AIInsight) => {
-		if (onInsightPress) {
-			onInsightPress(insight);
-		} else {
-			// Default behavior: navigate to insights page
-			router.push('/insights');
-		}
-	};
+	// Handle insight press - mark as read and navigate or call custom handler
+	const handleInsightPress = async (insight: AIInsight) => {
+		try {
+			// Mark as read if not already read
+			if (!insight.isRead) {
+				await InsightsService.markInsightAsRead(insight._id);
 
-	const getPriorityColor = (priority: string) => {
-		switch (priority) {
-			case 'high':
-				return '#dc2626';
-			case 'medium':
-				return '#f59e0b';
-			case 'low':
-				return '#10b981';
-			default:
-				return '#6b7280';
+				// Update local state to mark as read
+				setInsights(
+					(prevInsights) =>
+						prevInsights?.map((ins) =>
+							ins._id === insight._id ? { ...ins, isRead: true } : ins
+						) || null
+				);
+			}
+
+			// Call custom handler if provided, otherwise navigate
+			if (onInsightPress) {
+				onInsightPress(insight);
+			} else {
+				router.push(`/insights/${insight.period}`);
+			}
+		} catch (error) {
+			console.error('Error marking insight as read:', error);
+			// Still call handler or navigate even if marking as read fails
+			if (onInsightPress) {
+				onInsightPress(insight);
+			} else {
+				router.push(`/insights/${insight.period}`);
+			}
 		}
 	};
 
@@ -237,14 +283,11 @@ const AIInsightsSummary: React.FC<AIInsightsSummaryProps> = ({
 					<Text style={[styles.title, compact && styles.titleCompact]}>
 						{title}
 					</Text>
-					<ActivityIndicator size="small" color="#007AFF" />
 				</View>
-				{!compact && (
-					<View style={styles.loadingContainer}>
-						<ActivityIndicator size="small" color="#007AFF" />
-						<Text style={styles.loadingText}>Loading insights...</Text>
-					</View>
-				)}
+				<View style={styles.loadingContainer}>
+					<ActivityIndicator size="small" color="#2E78B7" />
+					<Text style={styles.loadingText}>Loading insights...</Text>
+				</View>
 			</View>
 		);
 	}
@@ -277,12 +320,10 @@ const AIInsightsSummary: React.FC<AIInsightsSummaryProps> = ({
 									{insight.period.charAt(0).toUpperCase() +
 										insight.period.slice(1)}
 								</Text>
-								<View
-									style={[
-										styles.priorityIndicator,
-										{ backgroundColor: getPriorityColor(insight.priority) },
-									]}
-								/>
+								<View style={styles.headerRight}>
+									{/* Orange dot for unread insights */}
+									{!insight.isRead && <View style={styles.unreadDot} />}
+								</View>
 							</View>
 							<Text
 								style={[
@@ -307,17 +348,9 @@ const AIInsightsSummary: React.FC<AIInsightsSummaryProps> = ({
 					))}
 				</View>
 			) : (
-				<View
-					style={[
-						styles.emptyContainer,
-						compact && styles.emptyContainerCompact,
-					]}
-				>
-					{!compact && <Ionicons name="bulb-outline" size={32} color="#ccc" />}
-					<Text style={[styles.emptyText, compact && styles.emptyTextCompact]}>
-						{compact ? 'No insights' : 'No insights available'}
-					</Text>
-					{showGenerateButton && !compact && (
+				<View style={styles.emptyState}>
+					<Text style={styles.emptyText}>No insights available</Text>
+					{showGenerateButton && (
 						<TouchableOpacity
 							style={[
 								styles.generateButton,
@@ -341,7 +374,14 @@ const AIInsightsSummary: React.FC<AIInsightsSummaryProps> = ({
 
 const styles = StyleSheet.create({
 	container: {
+		backgroundColor: '#fff',
+		borderRadius: 12,
+		padding: 16,
 		marginBottom: 16,
+		shadowColor: '#000',
+		shadowOpacity: 0.05,
+		shadowRadius: 8,
+		elevation: 2,
 	},
 	containerCompact: {
 		padding: 12,
@@ -356,20 +396,10 @@ const styles = StyleSheet.create({
 	title: {
 		fontSize: 18,
 		fontWeight: '600',
-		color: '#333',
+		color: '#1f2937',
 	},
 	titleCompact: {
 		fontSize: 16,
-	},
-	viewAllButton: {
-		flexDirection: 'row',
-		alignItems: 'center',
-	},
-	viewAllText: {
-		color: '#007AFF',
-		fontSize: 14,
-		fontWeight: '500',
-		marginRight: 4,
 	},
 	loadingContainer: {
 		flexDirection: 'row',
@@ -380,22 +410,17 @@ const styles = StyleSheet.create({
 	loadingText: {
 		marginLeft: 8,
 		fontSize: 14,
-		color: '#666',
+		color: '#6b7280',
 	},
 	insightsContainer: {
-		gap: 12,
+		gap: 8,
 	},
 	insightCard: {
-		backgroundColor: '#f8f9fa',
-		borderRadius: 12,
+		backgroundColor: '#f9fafb',
+		borderRadius: 8,
 		padding: 12,
-		borderWidth: 1,
-		borderColor: '#e9ecef',
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.05,
-		shadowRadius: 8,
-		elevation: 2,
+		borderLeftWidth: 3,
+		borderLeftColor: '#2E78B7',
 	},
 	insightCardCompact: {
 		padding: 8,
@@ -403,73 +428,61 @@ const styles = StyleSheet.create({
 	insightHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		marginBottom: 8,
+		marginBottom: 6,
 	},
 	insightIconContainer: {
-		width: 24,
-		height: 24,
-		borderRadius: 12,
-		backgroundColor: '#e3f2fd',
-		justifyContent: 'center',
-		alignItems: 'center',
-		marginRight: 8,
+		marginRight: 6,
 	},
 	periodLabel: {
 		fontSize: 12,
 		fontWeight: '500',
-		color: '#666',
+		color: '#6b7280',
 		textTransform: 'uppercase',
 		flex: 1,
 	},
-	priorityIndicator: {
+	headerRight: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+	},
+	unreadDot: {
 		width: 8,
 		height: 8,
 		borderRadius: 4,
+		backgroundColor: '#FF9500',
 	},
 	insightMessage: {
 		fontSize: 14,
-		color: '#333',
-		lineHeight: 18,
-		marginBottom: 8,
+		fontWeight: '400',
+		color: '#1f2937',
+		lineHeight: 20,
 	},
 	insightMessageCompact: {
 		fontSize: 13,
-		lineHeight: 16,
-		marginBottom: 0,
+		lineHeight: 18,
 	},
 	actionItemsContainer: {
-		flexDirection: 'row',
-		alignItems: 'center',
+		marginTop: 6,
 	},
 	actionItemsLabel: {
 		fontSize: 12,
-		color: '#007AFF',
+		color: '#6b7280',
 		fontWeight: '500',
 	},
-	emptyContainer: {
+	emptyState: {
 		alignItems: 'center',
 		paddingVertical: 20,
 	},
-	emptyContainerCompact: {
-		paddingVertical: 8,
-		alignItems: 'flex-start',
-	},
 	emptyText: {
-		marginTop: 8,
 		fontSize: 14,
-		color: '#666',
-		fontWeight: '500',
-	},
-	emptyTextCompact: {
-		marginTop: 0,
-		fontSize: 13,
+		color: '#6b7280',
+		marginBottom: 12,
 	},
 	generateButton: {
-		backgroundColor: '#007AFF',
+		backgroundColor: '#2E78B7',
 		paddingHorizontal: 16,
 		paddingVertical: 8,
 		borderRadius: 6,
-		marginTop: 12,
 	},
 	generateButtonDisabled: {
 		opacity: 0.6,
