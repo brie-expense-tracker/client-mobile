@@ -9,17 +9,22 @@ interface Transaction {
 	date: string;
 }
 
-interface SpendingTrendsGraphProps {
+interface IncomeExpenseGraphProps {
 	transactions: Transaction[];
-	title?: string;
-	period?: 'week' | 'month' | 'quarter' | 'year';
+	title: string;
+	period: 'week' | 'month' | 'quarter';
+	chartType?: 'line' | 'bar';
 }
 
-const SpendingTrendsGraph: React.FC<SpendingTrendsGraphProps> = ({
+const IncomeExpenseGraph: React.FC<IncomeExpenseGraphProps> = ({
 	transactions,
-	title = 'Spending Trends',
-	period = 'month',
+	title,
+	period,
+	chartType = 'line',
 }) => {
+	const screenWidth = Dimensions.get('window').width;
+	const chartWidth = screenWidth - 120;
+
 	// Early return if no transactions
 	if (!transactions || transactions.length === 0) {
 		return (
@@ -28,15 +33,12 @@ const SpendingTrendsGraph: React.FC<SpendingTrendsGraphProps> = ({
 				<View style={styles.emptyState}>
 					<Text style={styles.emptyText}>No transactions available</Text>
 					<Text style={styles.emptySubtext}>
-						Add some transactions to see your spending trends
+						Add some transactions to see your income vs expenses
 					</Text>
 				</View>
 			</View>
 		);
 	}
-
-	const screenWidth = Dimensions.get('window').width;
-	const chartWidth = screenWidth - 120; // More conservative to ensure it fits
 
 	// Get date range based on period
 	const getDateRange = () => {
@@ -52,9 +54,6 @@ const SpendingTrendsGraph: React.FC<SpendingTrendsGraphProps> = ({
 				break;
 			case 'quarter':
 				start.setMonth(now.getMonth() - 3);
-				break;
-			case 'year':
-				start.setFullYear(now.getFullYear() - 1);
 				break;
 		}
 
@@ -94,7 +93,7 @@ const SpendingTrendsGraph: React.FC<SpendingTrendsGraphProps> = ({
 		groupedByDate.set(dateKey, existing);
 	});
 
-	// Convert to chart data with alternating labels
+	// Convert to chart data for gifted-charts
 	const chartData = Array.from(groupedByDate.entries())
 		.sort(([a], [b]) => a.localeCompare(b))
 		.map(([date, data], index) => {
@@ -102,12 +101,45 @@ const SpendingTrendsGraph: React.FC<SpendingTrendsGraphProps> = ({
 			const label =
 				period === 'week'
 					? dateObj.toLocaleDateString('en-US', { weekday: 'short' })
-					: period === 'month'
-					? dateObj.toLocaleDateString('en-US', { day: 'numeric' })
-					: dateObj.toLocaleDateString('en-US', {
-							month: 'short',
-							day: 'numeric',
-					  });
+					: dateObj.toLocaleDateString('en-US', { day: 'numeric' });
+
+			// Show label every 3rd point or at the end
+			const shouldShowLabel =
+				index % 3 === 0 || index === groupedByDate.size - 1;
+
+			return {
+				value: data.income,
+				...(shouldShowLabel && {
+					labelComponent: () => (
+						<Text
+							style={{
+								fontSize: 11,
+								fontWeight: '500',
+								color: '#666',
+								textAlign: 'center',
+							}}
+						>
+							{label}
+						</Text>
+					),
+				}),
+				...(index % 2 === 0
+					? { customDataPoint: incomeDataPoint }
+					: { hideDataPoint: true }),
+				date,
+				income: data.income,
+				expense: data.expense,
+			};
+		});
+
+	const expenseChartData = Array.from(groupedByDate.entries())
+		.sort(([a], [b]) => a.localeCompare(b))
+		.map(([date, data], index) => {
+			const dateObj = new Date(date);
+			const label =
+				period === 'week'
+					? dateObj.toLocaleDateString('en-US', { weekday: 'short' })
+					: dateObj.toLocaleDateString('en-US', { day: 'numeric' });
 
 			// Show label every 3rd point or at the end
 			const shouldShowLabel =
@@ -130,17 +162,16 @@ const SpendingTrendsGraph: React.FC<SpendingTrendsGraphProps> = ({
 					),
 				}),
 				...(index % 2 === 0
-					? { customDataPoint: dPoint }
+					? { customDataPoint: expenseDataPoint }
 					: { hideDataPoint: true }),
 				date,
 				income: data.income,
 				expense: data.expense,
-				net: data.income - data.expense,
 			};
 		});
 
-	// Custom data point component
-	const dPoint = () => {
+	// Custom data point components
+	const incomeDataPoint = () => {
 		return (
 			<View
 				style={{
@@ -149,13 +180,28 @@ const SpendingTrendsGraph: React.FC<SpendingTrendsGraphProps> = ({
 					backgroundColor: 'white',
 					borderWidth: 3,
 					borderRadius: 7,
-					borderColor: colors.expense,
+					borderColor: '#4CAF50',
 				}}
 			/>
 		);
 	};
 
-	// Calculate summary statistics
+	const expenseDataPoint = () => {
+		return (
+			<View
+				style={{
+					width: 14,
+					height: 14,
+					backgroundColor: 'white',
+					borderWidth: 3,
+					borderRadius: 7,
+					borderColor: '#FF6B6B',
+				}}
+			/>
+		);
+	};
+
+	// Calculate totals for summary
 	const totalIncome = filteredTransactions
 		.filter((tx) => tx.type === 'income')
 		.reduce((sum, tx) => sum + tx.amount, 0);
@@ -165,18 +211,13 @@ const SpendingTrendsGraph: React.FC<SpendingTrendsGraphProps> = ({
 		.reduce((sum, tx) => sum + tx.amount, 0);
 
 	const netIncome = totalIncome - totalExpense;
-	const avgDailyExpense = totalExpense / Math.max(chartData.length, 1);
 
 	// Color scheme
 	const colors = {
 		income: '#4CAF50',
 		expense: '#FF6B6B',
 		net: '#2E78B7',
-		background: '#F8F9FA',
 	};
-
-	// Use the full chart width available
-	const adjustedChartWidth = chartWidth;
 
 	return (
 		<View style={styles.container}>
@@ -223,11 +264,12 @@ const SpendingTrendsGraph: React.FC<SpendingTrendsGraphProps> = ({
 			{/* Chart */}
 			{chartData.length > 0 ? (
 				<View style={styles.chartContainer}>
+					{/* Income Line */}
 					<View style={styles.chartWrapper}>
 						<LineChart
 							isAnimated
 							thickness={3}
-							color={colors.expense}
+							color={colors.income}
 							maxValue={
 								Math.max(
 									...chartData.map((d) => Math.max(d.income, d.expense))
@@ -241,8 +283,8 @@ const SpendingTrendsGraph: React.FC<SpendingTrendsGraphProps> = ({
 							yAxisTextStyle={styles.yAxisText}
 							data={chartData}
 							hideDataPoints
-							startFillColor={colors.expense + '40'}
-							endFillColor={colors.expense + '10'}
+							startFillColor={colors.income + '40'}
+							endFillColor={colors.income + '10'}
 							startOpacity={0.4}
 							endOpacity={0.1}
 							spacing={22}
@@ -252,7 +294,42 @@ const SpendingTrendsGraph: React.FC<SpendingTrendsGraphProps> = ({
 							initialSpacing={10}
 							yAxisColor="#E0E0E0"
 							xAxisColor="#E0E0E0"
-							width={adjustedChartWidth}
+							width={chartWidth}
+							height={220}
+						/>
+					</View>
+
+					{/* Expense Line (overlay) */}
+					<View style={[styles.chartWrapper, styles.overlayChart]}>
+						<LineChart
+							isAnimated
+							thickness={3}
+							color={colors.expense}
+							maxValue={
+								Math.max(
+									...expenseChartData.map((d) => Math.max(d.income, d.expense))
+								) * 1.2
+							}
+							noOfSections={4}
+							animateOnDataChange
+							animationDuration={1000}
+							onDataChangeAnimationDuration={300}
+							areaChart
+							yAxisTextStyle={styles.yAxisText}
+							data={expenseChartData}
+							hideDataPoints
+							startFillColor={colors.expense + '40'}
+							endFillColor={colors.expense + '10'}
+							startOpacity={0.4}
+							endOpacity={0.1}
+							spacing={22}
+							backgroundColor="transparent"
+							rulesColor="transparent"
+							rulesType="solid"
+							initialSpacing={10}
+							yAxisColor="transparent"
+							xAxisColor="transparent"
+							width={chartWidth}
 							height={220}
 						/>
 					</View>
@@ -261,16 +338,24 @@ const SpendingTrendsGraph: React.FC<SpendingTrendsGraphProps> = ({
 				<View style={styles.emptyState}>
 					<Text style={styles.emptyText}>No data available</Text>
 					<Text style={styles.emptySubtext}>
-						Add some transactions to see your spending trends
+						Add some transactions to see your income vs expenses
 					</Text>
 				</View>
 			)}
 
-			{/* Additional Metrics */}
-			<View style={styles.metricsContainer}>
-				<View style={styles.metricItem}>
-					<Text style={styles.metricLabel}>Avg Daily Expense</Text>
-					<Text style={styles.metricValue}>${avgDailyExpense.toFixed(0)}</Text>
+			{/* Legend */}
+			<View style={styles.legend}>
+				<View style={styles.legendItem}>
+					<View
+						style={[styles.legendDot, { backgroundColor: colors.income }]}
+					/>
+					<Text style={styles.legendText}>Income</Text>
+				</View>
+				<View style={styles.legendItem}>
+					<View
+						style={[styles.legendDot, { backgroundColor: colors.expense }]}
+					/>
+					<Text style={styles.legendText}>Expenses</Text>
 				</View>
 			</View>
 		</View>
@@ -279,38 +364,36 @@ const SpendingTrendsGraph: React.FC<SpendingTrendsGraphProps> = ({
 
 const styles = StyleSheet.create({
 	container: {
-		backgroundColor: '#FFFFFF',
-		borderRadius: 16,
-		padding: 20,
-		marginVertical: 10,
+		backgroundColor: '#fff',
+		borderRadius: 12,
+		padding: 16,
+		marginBottom: 16,
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 2 },
 		shadowOpacity: 0.1,
-		shadowRadius: 8,
-		elevation: 4,
+		shadowRadius: 4,
+		elevation: 3,
 	},
 	title: {
-		fontSize: 20,
-		fontWeight: '700',
-		color: '#1A1A1A',
-		marginBottom: 20,
-		textAlign: 'center',
+		fontSize: 18,
+		fontWeight: '600',
+		marginBottom: 16,
+		color: '#333',
 	},
 	summaryContainer: {
 		flexDirection: 'row',
-		justifyContent: 'space-between',
-		marginBottom: 20,
+		marginBottom: 16,
 	},
 	summaryCard: {
 		flex: 1,
 		padding: 12,
-		borderRadius: 12,
-		alignItems: 'center',
+		borderRadius: 8,
 		marginHorizontal: 4,
+		alignItems: 'center',
 	},
 	summaryLabel: {
 		fontSize: 12,
-		fontWeight: '600',
+		fontWeight: '500',
 		marginBottom: 4,
 	},
 	summaryValue: {
@@ -319,9 +402,8 @@ const styles = StyleSheet.create({
 	},
 	chartContainer: {
 		alignItems: 'center',
-		marginBottom: 20,
-		width: '100%',
-		overflow: 'visible',
+		marginBottom: 16,
+		position: 'relative',
 	},
 	chartWrapper: {
 		overflow: 'visible',
@@ -329,103 +411,53 @@ const styles = StyleSheet.create({
 		paddingBottom: 5,
 		alignItems: 'center',
 	},
+	overlayChart: {
+		position: 'absolute',
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
+	},
 	yAxisText: {
 		fontSize: 11,
 		color: '#666',
 	},
 	emptyState: {
 		alignItems: 'center',
-		paddingVertical: 40,
+		padding: 32,
 	},
 	emptyText: {
+		marginTop: 8,
 		fontSize: 16,
-		fontWeight: '600',
+		fontWeight: '500',
 		color: '#666',
-		marginBottom: 8,
 	},
 	emptySubtext: {
+		marginTop: 4,
 		fontSize: 14,
 		color: '#999',
 		textAlign: 'center',
 	},
-	metricsContainer: {
+	legend: {
 		flexDirection: 'row',
-		justifyContent: 'space-around',
-		marginBottom: 20,
-		paddingVertical: 15,
-		backgroundColor: '#F8F9FA',
-		borderRadius: 12,
-	},
-	metricItem: {
-		alignItems: 'center',
-	},
-	metricLabel: {
-		fontSize: 12,
-		color: '#666',
-		marginBottom: 4,
-	},
-	metricValue: {
-		fontSize: 16,
-		fontWeight: '700',
-		color: '#2E78B7',
-	},
-	metricSubtext: {
-		fontSize: 12,
-		color: '#666',
-		marginTop: 2,
-	},
-	categoriesContainer: {
-		marginTop: 10,
-	},
-	categoriesTitle: {
-		fontSize: 16,
-		fontWeight: '600',
-		color: '#1A1A1A',
-		marginBottom: 12,
-	},
-	categoryItem: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginBottom: 8,
-		paddingVertical: 8,
-	},
-	categoryRank: {
-		width: 24,
-		height: 24,
-		borderRadius: 12,
-		backgroundColor: '#2E78B7',
-		alignItems: 'center',
 		justifyContent: 'center',
-		marginRight: 12,
+		gap: 24,
 	},
-	categoryRankText: {
-		color: 'white',
-		fontSize: 12,
-		fontWeight: '700',
+	legendItem: {
+		flexDirection: 'row',
+		alignItems: 'center',
 	},
-	categoryInfo: {
-		flex: 1,
+	legendDot: {
+		width: 12,
+		height: 12,
+		borderRadius: 6,
+		marginRight: 8,
 	},
-	categoryName: {
+	legendText: {
 		fontSize: 14,
-		fontWeight: '600',
-		color: '#1A1A1A',
-		flexShrink: 1,
-	},
-	categoryAmount: {
-		fontSize: 12,
 		color: '#666',
-		marginTop: 2,
-		flexShrink: 1,
-	},
-	categoryPercentage: {
-		alignItems: 'flex-end',
-	},
-	categoryPercentageText: {
-		fontSize: 14,
-		fontWeight: '700',
-		color: '#2E78B7',
+		fontWeight: '500',
 	},
 });
 
-export default SpendingTrendsGraph;
+export default IncomeExpenseGraph;

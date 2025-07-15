@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
 	View,
 	Text,
@@ -7,12 +7,10 @@ import {
 	SafeAreaView,
 	TouchableOpacity,
 	Alert,
-	Button,
 	ActivityIndicator,
 	RefreshControl,
 } from 'react-native';
 import { useTheme } from '@react-navigation/native';
-import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
 	Gesture,

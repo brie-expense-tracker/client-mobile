@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_BASE_URL = __DEV__
-	? 'http://localhost:3000/api' // Your computer's local IP address
-	: 'https://your-production-api.com/api';
+	? process.env.EXPO_PUBLIC_LOCAL_SIM_API_URL // Your computer's local IP address
+	: process.env.EXPO_PUBLIC_PRODUCTION_API_URL;
 
 export interface ApiResponse<T = any> {
 	success: boolean;
@@ -124,7 +124,7 @@ export class ApiService {
 		}
 	}
 
-			static async put<T>(endpoint: string, body: any): Promise<ApiResponse<T>> {
+	static async put<T>(endpoint: string, body: any): Promise<ApiResponse<T>> {
 		try {
 			const headers = await this.getAuthHeaders();
 			const url = `${API_BASE_URL}${endpoint}`;
@@ -156,11 +156,14 @@ export class ApiService {
 				console.error('ApiService PUT - Response not ok:', {
 					status: response.status,
 					statusText: response.statusText,
-					data: data
+					data: data,
 				});
 				return {
 					success: false,
-					error: data.error || data.message || `HTTP error! status: ${response.status}`,
+					error:
+						data.error ||
+						data.message ||
+						`HTTP error! status: ${response.status}`,
 				};
 			}
 

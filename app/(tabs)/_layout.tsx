@@ -1,6 +1,5 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { TransactionProvider } from '../../src/context/transactionContext';
 import { BudgetProvider } from '../../src/context/budgetContext';
 import { GoalProvider } from '../../src/context/goalContext';
 import { ProfileProvider } from '../../src/context/profileContext';
@@ -31,7 +30,6 @@ export default function TabLayout() {
 		<ProfileProvider>
 			<BudgetProvider>
 				<GoalProvider>
-					<TransactionProvider>
 						<Tabs
 							screenOptions={{
 								tabBarStyle: {
@@ -163,7 +161,6 @@ export default function TabLayout() {
 								</RectButton>
 							</View>
 						</RNModal>
-					</TransactionProvider>
 				</GoalProvider>
 			</BudgetProvider>
 		</ProfileProvider>

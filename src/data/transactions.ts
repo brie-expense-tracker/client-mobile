@@ -16,6 +16,10 @@ const generateDummyTransactions = (): Transaction[] => {
 	const startDate = new Date();
 	startDate.setMonth(startDate.getMonth() - 6);
 
+	// Sample budget and goal IDs for linking transactions
+	const sampleBudgetIds = ['budget-1', 'budget-2', 'budget-3'];
+	const sampleGoalIds = ['goal-1', 'goal-2'];
+
 	// Regular monthly transactions
 	const regularTransactions = [
 		{
@@ -27,21 +31,29 @@ const generateDummyTransactions = (): Transaction[] => {
 			description: 'Rent',
 			amount: 1200,
 			type: 'expense' as const,
+			target: sampleBudgetIds[0], // Housing budget
+			targetModel: 'Budget' as const,
 		},
 		{
 			description: 'Internet Bill',
 			amount: 65,
 			type: 'expense' as const,
+			target: sampleBudgetIds[1], // Utilities budget
+			targetModel: 'Budget' as const,
 		},
 		{
 			description: 'Phone Bill',
 			amount: 75,
 			type: 'expense' as const,
+			target: sampleBudgetIds[1], // Utilities budget
+			targetModel: 'Budget' as const,
 		},
 		{
 			description: 'Gym Membership',
 			amount: 45,
 			type: 'expense' as const,
+			target: sampleBudgetIds[2], // Health budget
+			targetModel: 'Budget' as const,
 		},
 	];
 
@@ -67,26 +79,36 @@ const generateDummyTransactions = (): Transaction[] => {
 					description: 'Coffee Shop',
 					amount: 4.75,
 					type: 'expense' as const,
+					target: sampleBudgetIds[2], // Health budget (food)
+					targetModel: 'Budget' as const,
 				},
 				{
 					description: 'Restaurant Dinner',
 					amount: 45.8,
 					type: 'expense' as const,
+					target: sampleBudgetIds[2], // Health budget (food)
+					targetModel: 'Budget' as const,
 				},
 				{
 					description: 'Grocery Shopping',
 					amount: 85.5,
 					type: 'expense' as const,
+					target: sampleBudgetIds[2], // Health budget (food)
+					targetModel: 'Budget' as const,
 				},
 				{
 					description: 'Gas Station',
 					amount: 45.0,
 					type: 'expense' as const,
+					target: sampleBudgetIds[1], // Utilities budget (transportation)
+					targetModel: 'Budget' as const,
 				},
 				{
 					description: 'Uber Ride',
 					amount: 25.75,
 					type: 'expense' as const,
+					target: sampleBudgetIds[1], // Utilities budget (transportation)
+					targetModel: 'Budget' as const,
 				},
 			];
 
@@ -107,16 +129,22 @@ const generateDummyTransactions = (): Transaction[] => {
 					description: 'Freelance Project',
 					amount: 750,
 					type: 'income' as const,
+					target: sampleGoalIds[0], // Emergency fund goal
+					targetModel: 'Goal' as const,
 				},
 				{
 					description: 'Consulting Work',
 					amount: 1200,
 					type: 'income' as const,
+					target: sampleGoalIds[1], // Vacation goal
+					targetModel: 'Goal' as const,
 				},
 				{
 					description: 'Investment Dividend',
 					amount: 120.75,
 					type: 'income' as const,
+					target: sampleGoalIds[0], // Emergency fund goal
+					targetModel: 'Goal' as const,
 				},
 			];
 

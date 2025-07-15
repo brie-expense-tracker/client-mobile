@@ -12,7 +12,10 @@
 			"bundleIdentifier": "com.brie.mobile",
 			"googleServicesFile": "./GoogleService-Info.plist",
 			"infoPlist": {
-				"ITSAppUsesNonExemptEncryption": false
+				"ITSAppUsesNonExemptEncryption": false,
+				"NSAppTransportSecurity": {
+					"NSAllowsLocalNetworking": true
+				}
 			}
 		},
 		"android": {
@@ -46,8 +49,6 @@
 		},
 		"assetBundlePatterns": ["./assets/**/*"],
 		"extra": {
-			"router": {},
-			"API_URL": "http://localhost:3000",
 			"eas": {
 				"projectId": "5c37bf2f-48a8-4081-bddb-eb7ed5783845"
 			}

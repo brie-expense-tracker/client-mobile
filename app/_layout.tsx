@@ -1,12 +1,14 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import './global.css';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import { ActivityIndicator, Text, View, StyleSheet } from 'react-native';
 import { AuthProvider } from '../src/context/AuthContext';
 import { OnboardingProvider } from '../src/context/OnboardingContext';
 import { ProfileProvider } from '../src/context/profileContext';
 import { NotificationProvider } from '../src/context/notificationContext';
+import { TransactionProvider } from '../src/context/transactionContext';
+
 import useAuth from '../src/context/AuthContext';
 import { useOnboarding } from '../src/context/OnboardingContext';
 import * as Notifications from 'expo-notifications';
@@ -174,7 +176,9 @@ export default function RootLayout() {
 			<AuthProvider>
 				<OnboardingProvider>
 					<ProfileProvider>
-						<RootLayoutContent />
+						<TransactionProvider>
+							<RootLayoutContent />
+						</TransactionProvider>
 					</ProfileProvider>
 				</OnboardingProvider>
 			</AuthProvider>

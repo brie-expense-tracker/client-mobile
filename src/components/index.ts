@@ -2,11 +2,19 @@
 export { default as BudgetOverviewGraph } from './BudgetOverviewGraph';
 export { default as GoalsProgressGraph } from './GoalsProgressGraph';
 export { default as SpendingTrendsGraph } from './SpendingTrendsGraph';
+export { default as IncomeExpenseGraph } from './IncomeExpenseGraph';
+export { default as CategoryBreakdownChart } from './CategoryBreakdownChart';
 
 export { default as FinancialDashboard } from './FinancialDashboard';
 
 // AI Insights Components
 export { default as AIInsightsSummary } from './AIInsightsSummary';
+export { default as AISuggestionsList } from './AISuggestionsList';
+
+// Summary & Export Components
+export { default as SummaryCards } from './SummaryCards';
+export { default as RecentTransactionsList } from './RecentTransactionsList';
+export { default as ExportReportButtons } from './ExportReportButtons';
 
 // Existing Components
 export { default as ProfitGraph } from './ProfitGraph';
