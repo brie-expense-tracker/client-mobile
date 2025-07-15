@@ -10,6 +10,7 @@ export { default as FinancialDashboard } from './FinancialDashboard';
 // AI Insights Components
 export { default as AIInsightsSummary } from './AIInsightsSummary';
 export { default as AISuggestionsList } from './AISuggestionsList';
+export { default as AICoach } from './AICoach';
 
 // Summary & Export Components
 export { default as SummaryCards } from './SummaryCards';

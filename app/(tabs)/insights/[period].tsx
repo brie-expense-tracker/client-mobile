@@ -11,14 +11,24 @@ import {
 	View,
 } from 'react-native';
 import { RectButton } from 'react-native-gesture-handler';
-import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
+import {
+	useLocalSearchParams,
+	Stack,
+	useRouter,
+	useFocusEffect,
+} from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialCommunityIcons, FontAwesome } from '@expo/vector-icons';
+import {
+	MaterialCommunityIcons,
+	FontAwesome,
+	Ionicons,
+} from '@expo/vector-icons';
 import {
 	InsightsService,
 	AIInsight,
 } from '../../../src/services/insightsService';
 import HistoricalComparison from '../../../src/components/HistoricalComparison';
+import IntelligentActions from '../../../src/components/IntelligentActions';
 
 export default function InsightDetail() {
 	const router = useRouter();
@@ -29,6 +39,7 @@ export default function InsightDetail() {
 	const [loading, setLoading] = useState(true);
 	const [activeStep, setActiveStep] = useState(0);
 	const [completedActions, setCompletedActions] = useState<boolean[]>([]);
+	const [showIntelligentActions, setShowIntelligentActions] = useState(false);
 
 	useEffect(() => {
 		async function load() {
@@ -86,6 +97,17 @@ export default function InsightDetail() {
 		return () => clearTimeout(timer);
 	}, [insights]);
 
+	// Refresh insights when returning to the screen
+	useFocusEffect(
+		React.useCallback(() => {
+			// Refresh insights when the screen comes into focus
+			if (insights.length > 0) {
+				// Trigger a refresh of the intelligent actions
+				setShowIntelligentActions(true);
+			}
+		}, [insights.length])
+	);
+
 	if (loading) {
 		return (
 			<SafeAreaView style={styles.center}>
@@ -114,11 +136,18 @@ export default function InsightDetail() {
 	const insight = insights[0];
 
 	// Calculate steps array
-	const steps: ('intro' | 'details' | 'actions' | 'summary' | 'comparison')[] =
-		['intro', 'details'];
+	const steps: (
+		| 'intro'
+		| 'details'
+		| 'actions'
+		| 'summary'
+		| 'comparison'
+		| 'intelligent'
+	)[] = ['intro', 'details'];
 	if (insight?.isActionable) steps.push('actions');
 	if (insight?.metadata) steps.push('summary');
 	if (insight?.metadata?.historicalComparison) steps.push('comparison');
+	steps.push('intelligent'); // Always show intelligent actions
 	const totalSteps = steps.length;
 
 	const toggleAction = (i: number) => {
@@ -229,6 +258,39 @@ export default function InsightDetail() {
 								No historical comparison data available for this period.
 							</Text>
 						)}
+					</View>
+				);
+			case 'intelligent':
+				return (
+					<View style={styles.stepContainer}>
+						<View style={styles.intelligentHeader}>
+							<Ionicons name="sparkles" size={24} color="#4A90E2" />
+							<Text style={styles.sectionTitle}>Smart Actions</Text>
+						</View>
+						<Text style={styles.bodyText}>
+							Based on this insight, here are some intelligent actions you can
+							take to improve your financial health:
+						</Text>
+						<IntelligentActions
+							insight={insight}
+							onActionExecuted={(action, result) => {
+								console.log('Action executed:', action, result);
+
+								// If a detection action was completed, navigate to relevant screen
+								if (action.type === 'detect_completion' && result.success) {
+									// Navigate directly based on the detection type
+									if (action.detectionType === 'transaction_count') {
+										router.push('/(tabs)/transaction');
+									} else if (action.detectionType === 'budget_created') {
+										router.push('/(tabs)/budgets');
+									} else if (action.detectionType === 'goal_created') {
+										router.push('/(tabs)/budgets/goals');
+									} else if (action.detectionType === 'preferences_updated') {
+										router.push('/(tabs)/settings/aiInsights');
+									}
+								}
+							}}
+						/>
 					</View>
 				);
 		}
@@ -431,4 +493,9 @@ const styles = StyleSheet.create({
 	},
 	navDisabled: { backgroundColor: '#aacbe1' },
 	navText: { color: '#fff', fontWeight: '600', fontSize: 16 },
+	intelligentHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginBottom: 12,
+	},
 });
