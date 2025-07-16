@@ -82,9 +82,14 @@ export default function IntelligentActions({
 					? generatedActions
 					: [];
 
-				// Add detection actions for common scenarios
-				const detectionActions = generateDetectionActions(insight);
-				const allActions = [...safeGeneratedActions, ...detectionActions];
+				// Only add detection actions if we don't have enough variety from the backend
+				let allActions = [...safeGeneratedActions];
+
+				if (safeGeneratedActions.length < 2) {
+					// Add minimal detection actions only if backend didn't provide enough
+					const detectionActions = generateMinimalDetectionActions(insight);
+					allActions = [...safeGeneratedActions, ...detectionActions];
+				}
 
 				console.log('All actions:', allActions);
 				console.log('All actions length:', allActions.length);
@@ -109,10 +114,6 @@ export default function IntelligentActions({
 						safeUserActions
 					);
 
-				console.log('Actions with status from MongoDB:', actionsWithStatus);
-				console.log('Actions with status length:', actionsWithStatus.length);
-
-				// Ensure actionsWithStatus is an array
 				const safeActionsWithStatus = Array.isArray(actionsWithStatus)
 					? actionsWithStatus
 					: [];
@@ -120,82 +121,92 @@ export default function IntelligentActions({
 				setActions(safeActionsWithStatus);
 			}
 		} catch (error) {
-			console.error('Error analyzing insight for actions:', error);
-			// Set empty array as fallback
-			setActions([]);
+			console.error('Error analyzing insight:', error);
+			// Fallback to minimal detection actions if everything fails
+			const fallbackActions = generateMinimalDetectionActions(insight);
+			setActions(fallbackActions);
 		} finally {
 			setLoading(false);
 		}
 	};
 
-	const generateDetectionActions = (
+	// Generate minimal detection actions only when needed
+	const generateMinimalDetectionActions = (
 		insight: AIInsight
 	): IntelligentAction[] => {
 		const detectionActions: IntelligentAction[] = [];
 
-		// Detect if user has added their first transaction
-		detectionActions.push({
-			id: `detect_first_transaction_${Date.now()}`,
-			type: 'detect_completion',
-			title: 'Add Your First Transaction',
-			description:
-				'Start tracking your finances by adding your first transaction.',
-			parameters: {},
-			priority: 'high',
-			requiresConfirmation: false,
-			executed: false,
-			detectionType: 'transaction_count',
-			detectionCriteria: {
-				threshold: 1,
-				timeframe: 'all_time',
-			},
-		});
-
-		// Detect if user has created their first budget
-		detectionActions.push({
-			id: `detect_first_budget_${Date.now()}`,
-			type: 'detect_completion',
-			title: 'Create Your First Budget',
-			description:
-				'Set up a budget to start managing your spending effectively.',
-			parameters: {},
-			priority: 'high',
-			requiresConfirmation: false,
-			executed: false,
-			detectionType: 'budget_created',
-			detectionCriteria: {},
-		});
-
-		// Detect if user has created their first goal
-		detectionActions.push({
-			id: `detect_first_goal_${Date.now()}`,
-			type: 'detect_completion',
-			title: 'Set Your First Goal',
-			description: 'Create a financial goal to work towards your dreams.',
-			parameters: {},
-			priority: 'medium',
-			requiresConfirmation: false,
-			executed: false,
-			detectionType: 'goal_created',
-			detectionCriteria: {},
-		});
-
-		// Detect if user has enabled AI insights
-		detectionActions.push({
-			id: `detect_ai_insights_${Date.now()}`,
-			type: 'detect_completion',
-			title: 'Enable AI Insights',
-			description: 'Get personalized financial advice by enabling AI insights.',
-			parameters: {},
-			priority: 'low',
-			requiresConfirmation: false,
-			executed: false,
-			detectionType: 'preferences_updated',
-			detectionCriteria: {
-				section: 'aiInsights',
-				preference: 'enabled',
-			},
-		});
+		// Only add the most relevant detection action based on insight type
+		switch (insight.insightType) {
+			case 'spending':
+				// For spending insights, suggest adding transactions if they haven't
+				detectionActions.push({
+					id: `detect_transaction_count_${Date.now()}`,
+					type: 'detect_completion',
+					title: 'Track Your Spending',
+					description:
+						'Add your daily transactions to get better spending insights.',
+					parameters: {},
+					priority: 'high',
+					requiresConfirmation: false,
+					executed: false,
+					detectionType: 'transaction_count',
+					detectionCriteria: {
+						threshold: 5,
+						timeframe: 'last_7_days',
+					},
+				});
+				break;
+			case 'budgeting':
+				// For budgeting insights, suggest creating a budget
+				detectionActions.push({
+					id: `detect_budget_created_${Date.now()}`,
+					type: 'detect_completion',
+					title: 'Create Your First Budget',
+					description:
+						'Set up a budget to start managing your spending effectively.',
+					parameters: {},
+					priority: 'high',
+					requiresConfirmation: false,
+					executed: false,
+					detectionType: 'budget_created',
+					detectionCriteria: {},
+				});
+				break;
+			case 'savings':
+				// For savings insights, suggest creating a goal
+				detectionActions.push({
+					id: `detect_goal_created_${Date.now()}`,
+					type: 'detect_completion',
+					title: 'Set Your First Goal',
+					description: 'Create a financial goal to work towards your dreams.',
+					parameters: {},
+					priority: 'medium',
+					requiresConfirmation: false,
+					executed: false,
+					detectionType: 'goal_created',
+					detectionCriteria: {},
+				});
+				break;
+			default:
+				// For general insights, suggest enabling AI features
+				detectionActions.push({
+					id: `detect_ai_insights_${Date.now()}`,
+					type: 'detect_completion',
+					title: 'Enable AI Insights',
+					description:
+						'Get personalized financial advice by enabling AI insights.',
+					parameters: {},
+					priority: 'low',
+					requiresConfirmation: false,
+					executed: false,
+					detectionType: 'preferences_updated',
+					detectionCriteria: {
+						section: 'aiInsights',
+						preference: 'enabled',
+					},
+				});
+		}
 
 		return detectionActions;
 	};
@@ -420,16 +431,6 @@ export default function IntelligentActions({
 
 	return (
 		<View style={styles.container}>
-			<LinearGradient colors={['#4A90E2', '#50C9CE']} style={styles.header}>
-				<View style={styles.headerContent}>
-					<Ionicons name="sparkles" size={24} color="#fff" />
-					<Text style={styles.headerTitle}>Smart Actions</Text>
-				</View>
-				<Text style={styles.headerSubtitle}>
-					AI-powered recommendations based on your insight
-				</Text>
-			</LinearGradient>
-
 			<ScrollView
 				style={styles.actionsList}
 				showsVerticalScrollIndicator={false}
@@ -643,30 +644,9 @@ const styles = StyleSheet.create({
 		textAlign: 'center',
 		marginTop: 8,
 	},
-	header: {
-		padding: 20,
-		paddingTop: 60,
-		borderBottomLeftRadius: 20,
-		borderBottomRightRadius: 20,
-	},
-	headerContent: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginBottom: 8,
-	},
-	headerTitle: {
-		fontSize: 24,
-		fontWeight: '700',
-		color: '#fff',
-		marginLeft: 8,
-	},
-	headerSubtitle: {
-		fontSize: 14,
-		color: '#e0eaf0',
-	},
 	actionsList: {
 		flex: 1,
-		padding: 16,
+
 	},
 	actionCard: {
 		backgroundColor: '#fff',

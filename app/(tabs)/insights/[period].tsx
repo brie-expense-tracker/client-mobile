@@ -1,6 +1,6 @@
 // app/(tabs)/insights/[period].tsx
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
 	SafeAreaView,
 	Text,
@@ -9,6 +9,8 @@ import {
 	ScrollView,
 	Alert,
 	View,
+	TouchableOpacity,
+	Animated,
 } from 'react-native';
 import { RectButton } from 'react-native-gesture-handler';
 import {
@@ -17,7 +19,7 @@ import {
 	useRouter,
 	useFocusEffect,
 } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
+
 import {
 	MaterialCommunityIcons,
 	FontAwesome,
@@ -38,8 +40,21 @@ export default function InsightDetail() {
 	const [insights, setInsights] = useState<AIInsight[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [activeStep, setActiveStep] = useState(0);
-	const [completedActions, setCompletedActions] = useState<boolean[]>([]);
 	const [showIntelligentActions, setShowIntelligentActions] = useState(false);
+	const [expandedSections, setExpandedSections] = useState({
+		summary: true,
+		comparison: false,
+	});
+
+	// Animation values
+	const fadeAnim = useRef(new Animated.Value(0)).current;
+	const slideAnim = useRef(new Animated.Value(50)).current;
+
+	// Initialize animation values
+	useEffect(() => {
+		fadeAnim.setValue(0);
+		slideAnim.setValue(50);
+	}, []);
 
 	useEffect(() => {
 		async function load() {
@@ -61,12 +76,28 @@ export default function InsightDetail() {
 		load();
 	}, [period]);
 
-	// Initialize completedActions when insight is available
+	// Animate step changes and initial load
 	useEffect(() => {
-		if (insights.length > 0 && insights[0]?.isActionable) {
-			setCompletedActions(Array(insights[0].actionItems.length).fill(false));
+		// Reset animation values when insights change
+		if (insights.length > 0) {
+			fadeAnim.setValue(0);
+			slideAnim.setValue(50);
+
+			// Start animation immediately
+			Animated.parallel([
+				Animated.timing(fadeAnim, {
+					toValue: 1,
+					duration: 300,
+					useNativeDriver: true,
+				}),
+				Animated.timing(slideAnim, {
+					toValue: 0,
+					duration: 300,
+					useNativeDriver: true,
+				}),
+			]).start();
 		}
-	}, [insights]);
+	}, [activeStep, insights.length]); // Also trigger when insights load
 
 	// Mark insights as read when they are viewed
 	useEffect(() => {
@@ -135,26 +166,22 @@ export default function InsightDetail() {
 	// We'll guide through the first insight step-by-step
 	const insight = insights[0];
 
-	// Calculate steps array
-	const steps: (
-		| 'intro'
-		| 'details'
-		| 'actions'
-		| 'summary'
-		| 'comparison'
-		| 'intelligent'
-	)[] = ['intro', 'details'];
-	if (insight?.isActionable) steps.push('actions');
-	if (insight?.metadata) steps.push('summary');
-	if (insight?.metadata?.historicalComparison) steps.push('comparison');
-	steps.push('intelligent'); // Always show intelligent actions
+	// Calculate steps array - simplified flow: intro → review → actions
+	const steps: ('intro' | 'review' | 'actions')[] = ['intro'];
+
+	// Only add review step if there's metadata or historical comparison
+	if (insight?.metadata) {
+		steps.push('review');
+	}
+	steps.push('actions'); // Always show intelligent actions
+
 	const totalSteps = steps.length;
 
-	const toggleAction = (i: number) => {
-		const copy = [...completedActions];
-		copy[i] = !copy[i];
-		setCompletedActions(copy);
-	};
+	// Debug logging
+	console.log('Steps array:', steps);
+	console.log('Active step:', activeStep);
+	console.log('Current step:', steps[activeStep]);
+	console.log('Total steps:', totalSteps);
 
 	const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 	const headerDate = insight.generatedAt
@@ -164,112 +191,179 @@ export default function InsightDetail() {
 	// Progress bar width
 	const progressPercent = ((activeStep + 1) / totalSteps) * 100;
 
+	// Toggle section expansion
+	const toggleSection = (section: 'summary' | 'comparison') => {
+		setExpandedSections((prev) => ({
+			...prev,
+			[section]: !prev[section],
+		}));
+	};
+
 	// Render current step
 	const renderStep = () => {
 		const step = steps[activeStep];
+		console.log('Rendering step:', step);
+
+		// Fallback to intro if step is undefined
+		if (!step) {
+			console.log('Step is undefined, falling back to intro');
+			return (
+				<View style={styles.stepContainer}>
+					<Text style={styles.stepTitle}>{insight.title}</Text>
+					<Text style={styles.stepMessage}>{insight.message}</Text>
+					{insight.detailedExplanation &&
+						insight.detailedExplanation !== insight.message && (
+							<Text style={styles.bodyText}>{insight.detailedExplanation}</Text>
+						)}
+				</View>
+			);
+		}
+
 		switch (step) {
 			case 'intro':
 				return (
-					<View style={styles.stepContainer}>
+					<Animated.View
+						style={[
+							styles.stepContainer,
+							{
+								opacity: fadeAnim,
+								transform: [{ translateY: slideAnim }],
+							},
+						]}
+					>
 						<Text style={styles.stepTitle}>{insight.title}</Text>
 						<Text style={styles.stepMessage}>{insight.message}</Text>
-					</View>
+						{/* Include detailed explanation in intro if it's not redundant */}
+						{insight.detailedExplanation &&
+							insight.detailedExplanation !== insight.message && (
+								<Text style={styles.bodyText}>
+									{insight.detailedExplanation}
+								</Text>
+							)}
+					</Animated.View>
 				);
-			case 'details':
+
+			case 'review':
 				return (
-					<View style={styles.stepContainer}>
-						<Text style={styles.sectionTitle}>Details</Text>
-						<Text style={styles.bodyText}>{insight.detailedExplanation}</Text>
-					</View>
+					<Animated.View
+						style={[
+							styles.stepContainer,
+							{
+								opacity: fadeAnim,
+								transform: [{ translateY: slideAnim }],
+							},
+						]}
+					>
+						<Text style={styles.sectionTitle}>Review Your Data</Text>
+
+						{/* Summary Section */}
+						{insight.metadata && (
+							<View style={styles.reviewSection}>
+								<TouchableOpacity
+									style={styles.sectionHeader}
+									onPress={() => toggleSection('summary')}
+								>
+									<Text style={styles.sectionHeaderText}>
+										Financial Summary
+									</Text>
+									<Ionicons
+										name={
+											expandedSections.summary ? 'chevron-up' : 'chevron-down'
+										}
+										size={20}
+										color="#666"
+									/>
+								</TouchableOpacity>
+
+								{expandedSections.summary && (
+									<View style={styles.sectionContent}>
+										<MetadataRow
+											label="Income"
+											icon="arrow-down"
+											value={`$${insight.metadata.totalIncome.toFixed(2)}`}
+										/>
+										<MetadataRow
+											label="Expenses"
+											icon="arrow-up"
+											value={`$${insight.metadata.totalExpenses.toFixed(2)}`}
+										/>
+										<MetadataRow
+											label="Net"
+											icon={
+												insight.metadata.netIncome >= 0
+													? 'arrow-up'
+													: 'arrow-down'
+											}
+											value={`$${insight.metadata.netIncome.toFixed(2)}`}
+											valueStyle={{
+												color:
+													insight.metadata.netIncome >= 0
+														? '#66BB6A'
+														: '#FF6B6B',
+											}}
+										/>
+									</View>
+								)}
+							</View>
+						)}
+
+						{/* Historical Comparison Section */}
+						{insight.metadata?.historicalComparison && (
+							<View style={styles.reviewSection}>
+								<TouchableOpacity
+									style={styles.sectionHeader}
+									onPress={() => toggleSection('comparison')}
+								>
+									<Text style={styles.sectionHeaderText}>
+										Historical Comparison
+									</Text>
+									<Ionicons
+										name={
+											expandedSections.comparison
+												? 'chevron-up'
+												: 'chevron-down'
+										}
+										size={20}
+										color="#666"
+									/>
+								</TouchableOpacity>
+
+								{expandedSections.comparison && (
+									<View style={styles.sectionContent}>
+										<HistoricalComparison
+											historicalComparison={
+												insight.metadata.historicalComparison
+											}
+											period={period}
+										/>
+									</View>
+								)}
+							</View>
+						)}
+
+						{/* Fallback if no metadata */}
+						{!insight.metadata && (
+							<Text style={styles.bodyText}>
+								No review data available for this insight.
+							</Text>
+						)}
+					</Animated.View>
 				);
+
 			case 'actions':
 				return (
-					<View style={styles.stepContainer}>
-						<Text style={styles.sectionTitle}>{"Let's take action"}</Text>
-						{insight.actionItems.map((a, i) => (
-							<RectButton
-								key={i}
-								style={styles.checkboxRow}
-								onPress={() => toggleAction(i)}
-							>
-								<MaterialCommunityIcons
-									name={
-										completedActions[i]
-											? 'checkbox-marked'
-											: 'checkbox-blank-outline'
-									}
-									size={24}
-									color="#4A90E2"
-								/>
-								<View style={styles.checkboxContent}>
-									<Text style={styles.actionTitle}>{a.title}</Text>
-									<Text style={styles.bodyText}>{a.description}</Text>
-								</View>
-							</RectButton>
-						))}
-					</View>
-				);
-			case 'summary':
-				return (
-					<View style={styles.stepContainer}>
-						<Text style={styles.sectionTitle}>Your Summary</Text>
-						{insight.metadata ? (
-							<>
-								<MetadataRow
-									label="Income"
-									icon="arrow-down"
-									value={`$${insight.metadata.totalIncome.toFixed(2)}`}
-								/>
-								<MetadataRow
-									label="Expenses"
-									icon="arrow-up"
-									value={`$${insight.metadata.totalExpenses.toFixed(2)}`}
-								/>
-								<MetadataRow
-									label="Net"
-									icon={
-										insight.metadata.netIncome >= 0 ? 'arrow-up' : 'arrow-down'
-									}
-									value={`$${insight.metadata.netIncome.toFixed(2)}`}
-									valueStyle={{
-										color:
-											insight.metadata.netIncome >= 0 ? '#66BB6A' : '#FF6B6B',
-									}}
-								/>
-							</>
-						) : (
-							<Text style={styles.bodyText}>
-								No summary data available for this insight.
-							</Text>
-						)}
-					</View>
-				);
-			case 'comparison':
-				return (
-					<View style={styles.stepContainer}>
-						<Text style={styles.sectionTitle}>Historical Comparison</Text>
-						{insight.metadata?.historicalComparison ? (
-							<HistoricalComparison
-								historicalComparison={insight.metadata.historicalComparison}
-								period={period}
-							/>
-						) : (
-							<Text style={styles.bodyText}>
-								No historical comparison data available for this period.
-							</Text>
-						)}
-					</View>
-				);
-			case 'intelligent':
-				return (
-					<View style={styles.stepContainer}>
-						<View style={styles.intelligentHeader}>
-							<Ionicons name="sparkles" size={24} color="#4A90E2" />
-							<Text style={styles.sectionTitle}>Smart Actions</Text>
-						</View>
+					<Animated.View
+						style={[
+							styles.stepContainer,
+							{
+								opacity: fadeAnim,
+								transform: [{ translateY: slideAnim }],
+							},
+						]}
+					>
+						<Text style={styles.sectionTitle}>Take Action</Text>
 						<Text style={styles.bodyText}>
-							Based on this insight, here are some intelligent actions you can
-							take to improve your financial health:
+							Ready to improve your financial health? Choose an action below:
 						</Text>
 						<IntelligentActions
 							insight={insight}
@@ -291,22 +385,24 @@ export default function InsightDetail() {
 								}
 							}}
 						/>
-					</View>
+					</Animated.View>
 				);
 		}
 	};
 
 	return (
 		<View style={styles.container}>
-			<LinearGradient
-				colors={['#4A90E2', '#50C9CE']}
-				style={styles.gradientHeader}
-			>
-				<Text style={styles.headerTitle}>{cap(period)} Guide</Text>
+			<View style={styles.header}>
+				<View style={styles.headerContent}>
+					<View style={styles.titleSection}>
+						<Ionicons name="analytics" size={24} color="#fff" />
+						<Text style={styles.headerTitle}>{cap(period)} Guide</Text>
+					</View>
+				</View>
 				{headerDate ? (
 					<Text style={styles.headerDate}>Generated on {headerDate}</Text>
 				) : null}
-			</LinearGradient>
+			</View>
 			<ScrollView
 				style={styles.scrollView}
 				contentContainerStyle={styles.content}
@@ -328,7 +424,10 @@ export default function InsightDetail() {
 					<RectButton
 						onPress={() => setActiveStep((s) => Math.max(s - 1, 0))}
 						enabled={activeStep !== 0}
-						style={[styles.navButton, activeStep === 0 && styles.navDisabled]}
+						style={[
+							styles.navBackButton,
+							activeStep === 0 && styles.navDisabled,
+						]}
 					>
 						<Text style={styles.navText}>Back</Text>
 					</RectButton>
@@ -349,7 +448,7 @@ export default function InsightDetail() {
 									[
 										{
 											text: 'OK',
-											onPress: () => router.push('/insights'),
+											onPress: () => router.replace('/insights'),
 										},
 									]
 								);
@@ -406,28 +505,71 @@ const styles = StyleSheet.create({
 		textAlign: 'center',
 		marginHorizontal: 16,
 	},
-
-	gradientHeader: {
+	header: {
 		padding: 16,
-		paddingTop: 80,
-		marginBottom: 16,
-		borderBottomLeftRadius: 20,
-		borderBottomRightRadius: 20,
+		paddingBottom: 20,
+		paddingTop: 70,
+		backgroundColor: '#2E78B7',
+		elevation: 5,
+		shadowColor: '#000',
+		shadowOpacity: 0.15,
+		shadowOffset: { width: 0, height: 4 },
+		shadowRadius: 10,
 	},
-	headerTitle: { fontSize: 32, fontWeight: '700', color: '#fff' },
-	headerDate: { fontSize: 14, color: '#e0eaf0', marginTop: 4 },
+	headerContent: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		marginBottom: 8,
+	},
+	titleSection: {
+		flexDirection: 'row',
+		alignItems: 'center',
+	},
+	headerTitle: {
+		fontSize: 24,
+		fontWeight: '700',
+		color: '#fff',
+		marginLeft: 12,
+	},
+	headerDate: {
+		fontSize: 14,
+		color: '#e0eaf0',
+	},
+
+	stepIndicator: {
+		textAlign: 'center',
+		color: '#888',
+		marginBottom: 12,
+		fontSize: 14,
+		fontWeight: '500',
+	},
 
 	progressBarContainer: {
-		height: 4,
+		height: 6,
 		backgroundColor: '#ddd',
 		marginHorizontal: 16,
-		borderRadius: 2,
+		borderRadius: 3,
 		overflow: 'hidden',
 		marginBottom: 16,
 	},
-	progressBar: { height: 4, backgroundColor: '#4A90E2' },
+	progressBar: {
+		height: 6,
+		backgroundColor: '#0095FF',
+		borderRadius: 3,
+	},
 
-	stepContainer: { paddingHorizontal: 16, marginBottom: 24 },
+	stepContainer: {
+		padding: 16,
+		backgroundColor: '#fafafa',
+		borderRadius: 12,
+		elevation: 2,
+		shadowColor: '#000',
+		shadowOpacity: 0.05,
+		shadowOffset: { width: 0, height: 2 },
+		shadowRadius: 8,
+		marginBottom: 24,
+	},
 	stepTitle: {
 		fontSize: 24,
 		fontWeight: '600',
@@ -437,33 +579,40 @@ const styles = StyleSheet.create({
 	stepMessage: { fontSize: 16, color: '#555', lineHeight: 22 },
 
 	sectionTitle: {
-		fontSize: 18,
-		fontWeight: '600',
-		color: '#333',
-		marginBottom: 8,
-	},
-	bodyText: { fontSize: 14, color: '#555', lineHeight: 20 },
-
-	checkboxRow: {
-		flexDirection: 'row',
-		alignItems: 'flex-start',
+		fontSize: 20,
+		fontWeight: '700',
+		color: '#222',
 		marginBottom: 12,
-		paddingHorizontal: 16,
 	},
-	checkboxContent: { marginLeft: 12, flex: 1 },
+	bodyText: { fontSize: 14, color: '#555', lineHeight: 20, marginBottom: 8 },
 
-	actionTitle: {
+	reviewSection: {
+		marginBottom: 16,
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: '#e0e0e0',
+		backgroundColor: '#fafafa',
+	},
+	sectionHeader: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		padding: 16,
+	},
+	sectionHeaderText: {
 		fontSize: 16,
 		fontWeight: '600',
-		color: '#222',
-		marginBottom: 4,
+		color: '#333',
+	},
+	sectionContent: {
+		paddingHorizontal: 16,
+		paddingBottom: 16,
 	},
 
 	metaRow: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
-		paddingHorizontal: 16,
-		marginBottom: 12,
+		paddingVertical: 8,
 	},
 	metaLabelRow: { flexDirection: 'row', alignItems: 'center' },
 	metaLabel: { fontSize: 14, color: '#555' },
@@ -478,7 +627,13 @@ const styles = StyleSheet.create({
 		borderTopWidth: 1,
 		borderTopColor: '#ffffff',
 		paddingVertical: 16,
-		paddingBottom: 32, // Extra padding for safe area
+		// paddingBottom: 32, // Extra padding for safe area
+
+		elevation: 8,
+		shadowColor: '#000',
+		shadowOpacity: 0.1,
+		shadowOffset: { width: 0, height: -2 },
+		shadowRadius: 8,
 	},
 	navRow: {
 		flexDirection: 'row',
@@ -486,16 +641,27 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 16,
 	},
 	navButton: {
-		backgroundColor: '#4A90E2',
+		backgroundColor: '#007ACC',
 		borderRadius: 8,
 		paddingVertical: 12,
 		paddingHorizontal: 24,
+		elevation: 2,
+		shadowColor: '#000',
+		shadowOpacity: 0.1,
+		shadowOffset: { width: 0, height: 2 },
+		shadowRadius: 4,
+	},
+	navBackButton: {
+		backgroundColor: '#4097d1',
+		borderRadius: 8,
+		paddingVertical: 12,
+		paddingHorizontal: 24,
+		elevation: 2,
+		shadowColor: '#000',
+		shadowOpacity: 0.1,
+		shadowOffset: { width: 0, height: 2 },
+		shadowRadius: 4,
 	},
 	navDisabled: { backgroundColor: '#aacbe1' },
 	navText: { color: '#fff', fontWeight: '600', fontSize: 16 },
-	intelligentHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginBottom: 12,
-	},
 });
