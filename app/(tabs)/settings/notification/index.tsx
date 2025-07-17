@@ -7,6 +7,8 @@ interface NotificationSettings {
 	overspendingAlert: boolean;
 	aiSuggestion: boolean;
 	budgetMilestones: boolean;
+	monthlyFinancialCheck: boolean;
+	monthlySavingsTransfer: boolean;
 }
 
 const NotificationSettingsScreen: React.FC = () => {
@@ -16,6 +18,8 @@ const NotificationSettingsScreen: React.FC = () => {
 		overspendingAlert: false,
 		aiSuggestion: true,
 		budgetMilestones: false,
+		monthlyFinancialCheck: true,
+		monthlySavingsTransfer: true,
 	});
 	const [loading, setLoading] = useState(false);
 
@@ -139,6 +143,30 @@ const NotificationSettingsScreen: React.FC = () => {
 								disabled={loading}
 							/>
 						</View>
+						<View style={styles.row}>
+							<Text style={styles.label}>Monthly Financial Health Check</Text>
+							<Switch
+								value={settings.monthlyFinancialCheck}
+								onValueChange={() => toggleSetting('monthlyFinancialCheck')}
+								disabled={loading}
+							/>
+						</View>
+						<Text style={styles.settingDescription}>
+							Get monthly reminders to review your financial progress, adjust
+							budgets, and update goals
+						</Text>
+						<View style={styles.row}>
+							<Text style={styles.label}>Monthly Savings Transfer</Text>
+							<Switch
+								value={settings.monthlySavingsTransfer}
+								onValueChange={() => toggleSetting('monthlySavingsTransfer')}
+								disabled={loading}
+							/>
+						</View>
+						<Text style={styles.settingDescription}>
+							Receive reminders to transfer your monthly savings to your savings
+							account
+						</Text>
 					</View>
 				</View>
 			</ScrollView>
@@ -189,6 +217,12 @@ const styles = StyleSheet.create({
 	label: {
 		fontSize: 16,
 		fontWeight: '400',
+	},
+	settingDescription: {
+		fontSize: 12,
+		color: '#8b8b8b',
+		marginTop: 8,
+		marginLeft: 24,
 	},
 });
 

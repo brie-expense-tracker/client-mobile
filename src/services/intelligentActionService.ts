@@ -22,7 +22,8 @@ export interface IntelligentAction {
 		| 'transaction_count'
 		| 'budget_created'
 		| 'goal_created'
-		| 'preferences_updated';
+		| 'preferences_updated'
+		| 'health_check_completed'; // <-- Added new detection type
 	detectionCriteria?: {
 		threshold?: number;
 		timeframe?: string; // 'daily', 'weekly', 'monthly', 'all_time'
@@ -63,12 +64,18 @@ export class IntelligentActionService {
 		status?: string;
 		type?: string;
 		limit?: number;
+		includeCompleted?: boolean;
 	}): Promise<IntelligentAction[]> {
 		try {
 			const queryParams = new URLSearchParams();
 			if (params?.status) queryParams.append('status', params.status);
 			if (params?.type) queryParams.append('type', params.type);
 			if (params?.limit) queryParams.append('limit', params.limit.toString());
+			if (params?.includeCompleted !== undefined)
+				queryParams.append(
+					'includeCompleted',
+					params.includeCompleted.toString()
+				);
 
 			const response = await ApiService.get(
 				`/intelligent-actions?${queryParams.toString()}`
@@ -144,16 +151,39 @@ export class IntelligentActionService {
 		actionIds: string[]
 	): Promise<IntelligentAction[]> {
 		try {
+			console.log('Refreshing action status for IDs:', actionIds);
+
 			const response = await ApiService.post('/intelligent-actions/refresh', {
 				actionIds,
 			});
 
-			if (response.success && Array.isArray(response.data)) {
-				return response.data;
+			console.log('Refresh response:', response);
+
+			// Handle different response formats
+			if (response.success) {
+				// Check if response.data exists and is an array
+				if (response.data && Array.isArray(response.data)) {
+					console.log('Successfully refreshed actions:', response.data.length);
+					return response.data;
+				} else if (response.data && typeof response.data === 'object') {
+					// Handle nested data structure
+					const nestedData = (response.data as any).data;
+					if (nestedData && Array.isArray(nestedData)) {
+						console.log(
+							'Successfully refreshed actions (nested):',
+							nestedData.length
+						);
+						return nestedData;
+					}
+				}
+
+				// If no valid data found, return empty array
+				console.log('No valid action data in response, returning empty array');
+				return [];
 			} else {
 				console.error(
 					'Error refreshing action status:',
-					response.error || 'Invalid response format'
+					response.error || 'Server returned failure'
 				);
 				return [];
 			}
@@ -254,6 +284,8 @@ export class IntelligentActionService {
 					return await this.checkGoalCreated(detectionCriteria);
 				case 'preferences_updated':
 					return await this.checkPreferencesUpdated(detectionCriteria);
+				case 'health_check_completed':
+					return await this.checkHealthCheckCompleted(detectionCriteria);
 				default:
 					return {
 						isCompleted: false,
@@ -582,6 +614,47 @@ export class IntelligentActionService {
 	}
 
 	/**
+	 * Check if user has completed the monthly financial health check
+	 */
+	private static async checkHealthCheckCompleted(
+		criteria: any
+	): Promise<CompletionDetectionResult> {
+		try {
+			// Get user's profile/preferences
+			const response = await ApiService.get('/profiles/me');
+
+			if (!response.success) {
+				return {
+					isCompleted: false,
+					message: 'Unable to fetch profile',
+				};
+			}
+
+			const profile = response.data as any;
+			const isCompleted =
+				profile.preferences?.notifications?.monthlyFinancialCheck === true;
+
+			return {
+				isCompleted,
+				completionDate: isCompleted ? new Date().toISOString() : undefined,
+				completionDetails: {
+					monthlyFinancialCheck:
+						profile.preferences?.notifications?.monthlyFinancialCheck,
+				},
+				message: isCompleted
+					? 'Monthly Financial Health Check is enabled and completed.'
+					: 'Monthly Financial Health Check is not yet completed.',
+			};
+		} catch (error) {
+			console.error('Error checking health check completion:', error);
+			return {
+				isCompleted: false,
+				message: 'Error checking health check completion',
+			};
+		}
+	}
+
+	/**
 	 * Refresh completion status for a list of actions using MongoDB
 	 */
 	static async refreshCompletionStatus(
@@ -615,13 +688,24 @@ export class IntelligentActionService {
 			// Handle MongoDB actions
 			let updatedActions: IntelligentAction[] = [];
 			if (mongoDBActions.length > 0) {
-				const mongoDBActionIds = mongoDBActions.map((action) => action.id);
-				const refreshedMongoDBActions = await this.refreshActionStatus(
-					mongoDBActionIds
-				);
+				try {
+					const mongoDBActionIds = mongoDBActions.map((action) => action.id);
+					const refreshedMongoDBActions = await this.refreshActionStatus(
+						mongoDBActionIds
+					);
 
-				if (Array.isArray(refreshedMongoDBActions)) {
-					updatedActions = [...refreshedMongoDBActions];
+					if (Array.isArray(refreshedMongoDBActions)) {
+						updatedActions = [...refreshedMongoDBActions];
+					} else {
+						console.warn(
+							'refreshActionStatus did not return an array, using original actions'
+						);
+						updatedActions = [...mongoDBActions];
+					}
+				} catch (error) {
+					console.error('Error refreshing MongoDB actions:', error);
+					// Fall back to original actions if refresh fails
+					updatedActions = [...mongoDBActions];
 				}
 			}
 
@@ -668,7 +752,8 @@ export class IntelligentActionService {
 			return mergedActions;
 		} catch (error) {
 			console.error('Error refreshing completion status:', error);
-			return Array.isArray(actions) ? (actions as IntelligentAction[]) : []; // Return original actions if refresh fails
+			// Return original actions if refresh fails completely
+			return Array.isArray(actions) ? (actions as IntelligentAction[]) : [];
 		}
 	}
 

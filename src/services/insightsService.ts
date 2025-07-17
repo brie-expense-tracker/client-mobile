@@ -199,4 +199,42 @@ export class InsightsService {
 	static async getUnreadCount(): Promise<UnreadCountResponse> {
 		return ApiService.get<{ unreadCount: number }>('/insights/unread/count');
 	}
+
+	// Refresh insights after actions are completed
+	static async refreshInsightsAfterActions(
+		period: 'daily' | 'weekly' | 'monthly'
+	): Promise<InsightsResponse> {
+		try {
+			console.log(
+				`InsightsService.refreshInsightsAfterActions(${period}) - Starting refresh...`
+			);
+
+			// First, try to generate new insights based on updated financial state
+			const generateResponse = await this.generateInsights(period);
+
+			if (
+				generateResponse.success &&
+				generateResponse.data &&
+				Array.isArray(generateResponse.data)
+			) {
+				console.log(
+					`InsightsService.refreshInsightsAfterActions(${period}) - Generated ${generateResponse.data.length} new insights`
+				);
+				return generateResponse;
+			}
+
+			// If generation fails, fall back to fetching existing insights
+			console.log(
+				`InsightsService.refreshInsightsAfterActions(${period}) - Generation failed, fetching existing insights`
+			);
+			return await this.getInsights(period);
+		} catch (error) {
+			console.error(
+				`InsightsService.refreshInsightsAfterActions(${period}) - Error:`,
+				error
+			);
+			// Fall back to fetching existing insights
+			return await this.getInsights(period);
+		}
+	}
 }

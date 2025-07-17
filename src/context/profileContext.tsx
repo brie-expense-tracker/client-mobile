@@ -20,6 +20,8 @@ interface ProfilePreferences {
 		overspendingAlert: boolean;
 		aiSuggestion: boolean;
 		budgetMilestones: boolean;
+		monthlyFinancialCheck: boolean;
+		monthlySavingsTransfer: boolean;
 	};
 	aiInsights: {
 		enabled: boolean;
@@ -31,6 +33,9 @@ interface ProfilePreferences {
 			expenseReduction: boolean;
 			incomeSuggestions: boolean;
 		};
+		defaultView?: 'aiCoach' | 'traditional';
+		maxInsights?: 3 | 5 | 10;
+		showHighPriorityOnly?: boolean;
 	};
 	budgetSettings: {
 		cycleType: 'monthly' | 'weekly' | 'biweekly';
@@ -221,6 +226,8 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 						overspendingAlert: false,
 						aiSuggestion: true,
 						budgetMilestones: false,
+						monthlyFinancialCheck: true,
+						monthlySavingsTransfer: true,
 					},
 					aiInsights: {
 						enabled: true,
@@ -232,6 +239,9 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 							expenseReduction: true,
 							incomeSuggestions: true,
 						},
+						defaultView: 'aiCoach',
+						maxInsights: 3,
+						showHighPriorityOnly: false,
 					},
 					budgetSettings: {
 						cycleType: 'monthly',
@@ -302,6 +312,19 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 			throw new Error('User not authenticated');
 		}
 
+		// Store the previous state for potential rollback
+		const previousProfile = profile;
+
+		// Optimistically update the profile state immediately
+		setProfile((prev) =>
+			prev
+				? {
+						...prev,
+						...updates,
+				  }
+				: null
+		);
+
 		try {
 			setError(null);
 
@@ -311,14 +334,17 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 			);
 
 			if (response.success && response.data) {
-				// Handle nested data structure: response.data.data
-				const profileData = response.data.data || response.data;
-				setProfile(profileData);
+				// The optimistic update was correct, no need to update again
+				console.log('Profile updated successfully');
 			} else {
+				// API call failed, revert to previous state
+				setProfile(previousProfile);
 				throw new Error(response.error || 'Failed to update profile');
 			}
 		} catch (err) {
 			console.error('Error updating profile:', err);
+			// Revert to previous state on error
+			setProfile(previousProfile);
 			setError(err instanceof Error ? err.message : 'Failed to update profile');
 			throw err;
 		}
@@ -331,6 +357,19 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 			throw new Error('User not authenticated');
 		}
 
+		// Store the previous state for potential rollback
+		const previousProfile = profile;
+
+		// Optimistically update the profile state immediately
+		setProfile((prev) =>
+			prev
+				? {
+						...prev,
+						preferences: { ...prev.preferences, ...preferences },
+				  }
+				: null
+		);
+
 		try {
 			setError(null);
 
@@ -340,20 +379,17 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 			);
 
 			if (response.success && response.data) {
-				// Update the profile state with new preferences
-				setProfile((prev) =>
-					prev
-						? {
-								...prev,
-								preferences: { ...prev.preferences, ...response.data },
-						  }
-						: null
-				);
+				// The optimistic update was correct, no need to update again
+				console.log('Preferences updated successfully');
 			} else {
+				// API call failed, revert to previous state
+				setProfile(previousProfile);
 				throw new Error(response.error || 'Failed to update preferences');
 			}
 		} catch (err) {
 			console.error('Error updating preferences:', err);
+			// Revert to previous state on error
+			setProfile(previousProfile);
 			setError(
 				err instanceof Error ? err.message : 'Failed to update preferences'
 			);
@@ -368,6 +404,25 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 			throw new Error('User not authenticated');
 		}
 
+		// Store the previous state for potential rollback
+		const previousProfile = profile;
+
+		// Optimistically update the profile state immediately
+		setProfile((prev) =>
+			prev
+				? {
+						...prev,
+						preferences: {
+							...prev.preferences,
+							notifications: {
+								...prev.preferences.notifications,
+								...settings,
+							},
+						},
+				  }
+				: null
+		);
+
 		try {
 			setError(null);
 
@@ -376,28 +431,19 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 			>('/profiles/notifications', settings);
 
 			if (response.success && response.data) {
-				// Update the profile state with new notification settings
-				setProfile((prev) =>
-					prev
-						? {
-								...prev,
-								preferences: {
-									...prev.preferences,
-									notifications: {
-										...prev.preferences.notifications,
-										...response.data,
-									},
-								},
-						  }
-						: null
-				);
+				// The optimistic update was correct, no need to update again
+				console.log('Notification settings updated successfully');
 			} else {
+				// API call failed, revert to previous state
+				setProfile(previousProfile);
 				throw new Error(
 					response.error || 'Failed to update notification settings'
 				);
 			}
 		} catch (err) {
 			console.error('Error updating notification settings:', err);
+			// Revert to previous state on error
+			setProfile(previousProfile);
 			setError(
 				err instanceof Error
 					? err.message
@@ -414,6 +460,25 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 			throw new Error('User not authenticated');
 		}
 
+		// Store the previous state for potential rollback
+		const previousProfile = profile;
+
+		// Optimistically update the profile state immediately
+		setProfile((prev) =>
+			prev
+				? {
+						...prev,
+						preferences: {
+							...prev.preferences,
+							aiInsights: {
+								...prev.preferences.aiInsights,
+								...settings,
+							},
+						},
+				  }
+				: null
+		);
+
 		try {
 			setError(null);
 
@@ -423,28 +488,20 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 			);
 
 			if (response.success && response.data) {
-				// Update the profile state with new AI insights settings
-				setProfile((prev) =>
-					prev
-						? {
-								...prev,
-								preferences: {
-									...prev.preferences,
-									aiInsights: {
-										...prev.preferences.aiInsights,
-										...response.data,
-									},
-								},
-						  }
-						: null
-				);
+				// The optimistic update was correct, no need to update again
+				// The profile state is already updated with the new settings
+				console.log('AI insights settings updated successfully');
 			} else {
+				// API call failed, revert to previous state
+				setProfile(previousProfile);
 				throw new Error(
 					response.error || 'Failed to update AI insights settings'
 				);
 			}
 		} catch (err) {
 			console.error('Error updating AI insights settings:', err);
+			// Revert to previous state on error
+			setProfile(previousProfile);
 			setError(
 				err instanceof Error
 					? err.message
@@ -461,6 +518,28 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 			throw new Error('User not authenticated');
 		}
 
+		// Store the previous state for potential rollback
+		const previousProfile = profile;
+
+		// Optimistically update the profile state immediately
+		setProfile((prev) => {
+			if (!prev) {
+				console.warn('Profile not loaded, cannot update local state');
+				return null;
+			}
+
+			return {
+				...prev,
+				preferences: {
+					...prev.preferences,
+					budgetSettings: {
+						...prev.preferences.budgetSettings,
+						...settings,
+					},
+				},
+			};
+		});
+
 		try {
 			setError(null);
 
@@ -473,30 +552,18 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 			console.log('Budget settings update response:', response);
 
 			if (response.success && response.data) {
-				// Update the profile state with new budget settings
-				setProfile((prev) => {
-					if (!prev) {
-						console.warn('Profile not loaded, cannot update local state');
-						return null;
-					}
-
-					return {
-						...prev,
-						preferences: {
-							...prev.preferences,
-							budgetSettings: {
-								...prev.preferences.budgetSettings,
-								...response.data,
-							},
-						},
-					};
-				});
+				// The optimistic update was correct, no need to update again
+				console.log('Budget settings updated successfully');
 			} else {
+				// API call failed, revert to previous state
+				setProfile(previousProfile);
 				console.error('Budget settings update failed:', response.error);
 				throw new Error(response.error || 'Failed to update budget settings');
 			}
 		} catch (err) {
 			console.error('Error updating budget settings:', err);
+			// Revert to previous state on error
+			setProfile(previousProfile);
 			const errorMessage =
 				err instanceof Error ? err.message : 'Failed to update budget settings';
 			setError(errorMessage);
@@ -511,6 +578,25 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 			throw new Error('User not authenticated');
 		}
 
+		// Store the previous state for potential rollback
+		const previousProfile = profile;
+
+		// Optimistically update the profile state immediately
+		setProfile((prev) =>
+			prev
+				? {
+						...prev,
+						preferences: {
+							...prev.preferences,
+							goalSettings: {
+								...prev.preferences.goalSettings,
+								...settings,
+							},
+						},
+				  }
+				: null
+		);
+
 		try {
 			setError(null);
 
@@ -520,26 +606,17 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 			);
 
 			if (response.success && response.data) {
-				// Update the profile state with new goal settings
-				setProfile((prev) =>
-					prev
-						? {
-								...prev,
-								preferences: {
-									...prev.preferences,
-									goalSettings: {
-										...prev.preferences.goalSettings,
-										...response.data,
-									},
-								},
-						  }
-						: null
-				);
+				// The optimistic update was correct, no need to update again
+				console.log('Goal settings updated successfully');
 			} else {
+				// API call failed, revert to previous state
+				setProfile(previousProfile);
 				throw new Error(response.error || 'Failed to update goal settings');
 			}
 		} catch (err) {
 			console.error('Error updating goal settings:', err);
+			// Revert to previous state on error
+			setProfile(previousProfile);
 			setError(
 				err instanceof Error ? err.message : 'Failed to update goal settings'
 			);

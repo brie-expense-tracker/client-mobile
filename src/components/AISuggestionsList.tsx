@@ -9,8 +9,9 @@ import {
 	ScrollView,
 	ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { IntelligentActions } from './IntelligentActions';
+import IntelligentActions from './IntelligentActions';
 import {
 	IntelligentActionService,
 	IntelligentAction,
@@ -71,13 +72,15 @@ interface AISuggestionsListProps {
 	onApplySuggestion?: (suggestion: any) => void;
 	onInsightPress?: (insight: AIInsight) => void;
 	showSmartActions?: boolean;
+	onAllActionsCompleted?: () => void; // Add new prop
 }
 
 const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
 	suggestions,
 	onApplySuggestion,
 	onInsightPress,
-	showSmartActions = true,
+	showSmartActions = false,
+	onAllActionsCompleted, // Add new prop
 }) => {
 	const [selectedSuggestion, setSelectedSuggestion] = useState<any>(null);
 	const [modalVisible, setModalVisible] = useState(false);
@@ -154,17 +157,18 @@ const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
 	const handleActionExecuted = (action: IntelligentAction, result: any) => {
 		console.log('Smart action executed:', action, result);
 
-		// Show success message
-		if (result.success) {
-			Alert.alert(
-				'Success',
-				result.message || 'Action completed successfully!'
-			);
-		}
+		// Don't show success message here - let parent components handle it
+		// if (result.success) {
+		// 	Alert.alert(
+		// 		'Success',
+		// 		result.message || 'Action completed successfully!'
+		// 	);
+		// }
 
-		// Close smart actions modal
-		setSmartActionsVisible(false);
-		setSelectedInsight(null);
+		// Don't close the modal - let the user see the completion status
+		// The modal will only close when the user manually closes it
+		// setSmartActionsVisible(false);
+		// setSelectedInsight(null);
 	};
 
 	const renderSuggestionCard = (insight: AIInsight) => {
@@ -352,7 +356,7 @@ const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
 				visible={smartActionsVisible}
 				onRequestClose={() => setSmartActionsVisible(false)}
 			>
-				<View style={styles.modalOverlay}>
+				<SafeAreaView style={styles.modalOverlay}>
 					<View style={styles.smartActionsModalContent}>
 						<View style={styles.modalHeader}>
 							<Text style={styles.modalTitle}>Smart Actions</Text>
@@ -368,13 +372,15 @@ const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
 							<View style={styles.smartActionsBody}>
 								<IntelligentActions
 									insight={selectedInsight}
+									period={selectedInsight.period || 'weekly'}
 									onActionExecuted={handleActionExecuted}
 									onClose={() => setSmartActionsVisible(false)}
+									onAllActionsCompleted={onAllActionsCompleted} // Pass through the callback
 								/>
 							</View>
 						)}
 					</View>
-				</View>
+				</SafeAreaView>
 			</Modal>
 		</View>
 	);
@@ -525,6 +531,8 @@ const styles = StyleSheet.create({
 		backgroundColor: 'rgba(0, 0, 0, 0.5)',
 		justifyContent: 'center',
 		alignItems: 'center',
+		paddingTop: 20,
+		paddingBottom: 20,
 	},
 	modalContent: {
 		backgroundColor: '#fff',
@@ -537,8 +545,10 @@ const styles = StyleSheet.create({
 		backgroundColor: '#fff',
 		borderRadius: 16,
 		margin: 20,
-		maxHeight: '90%',
+		maxHeight: '80%',
 		width: '95%',
+		flex: 1,
+		minHeight: 400,
 	},
 	modalHeader: {
 		flexDirection: 'row',
@@ -561,6 +571,8 @@ const styles = StyleSheet.create({
 	},
 	smartActionsBody: {
 		flex: 1,
+		paddingHorizontal: 20,
+		paddingBottom: 20,
 	},
 	modalSuggestion: {
 		alignItems: 'center',

@@ -11,6 +11,9 @@ import {
 	Dimensions,
 	ScrollView,
 	Alert,
+	KeyboardAvoidingView,
+	Platform,
+	Keyboard,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -212,6 +215,8 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 					overspendingAlert: false,
 					aiSuggestion: true,
 					budgetMilestones: false,
+					monthlyFinancialCheck: true,
+					monthlySavingsTransfer: true,
 				},
 				aiInsights: {
 					enabled: true,
@@ -301,6 +306,8 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 						<ScrollView
 							contentContainerStyle={styles.scrollContent}
 							showsVerticalScrollIndicator={false}
+							keyboardShouldPersistTaps="handled"
+							keyboardDismissMode="interactive"
 						>
 							<View style={styles.welcomeCard}>
 								<View style={styles.welcomeIllustration}>
@@ -311,8 +318,8 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 									Set up your budgets and goals to track your progress
 								</Text>
 								<Text style={styles.welcomeDescription}>
-									Let's create your first budget and financial goal to get you
-									started on your financial journey.
+									Let&apos;s create your first budget and financial goal to get
+									you started on your financial journey.
 								</Text>
 							</View>
 						</ScrollView>
@@ -324,8 +331,10 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 						<ScrollView
 							contentContainerStyle={styles.scrollContent}
 							showsVerticalScrollIndicator={false}
+							keyboardShouldPersistTaps="handled"
+							keyboardDismissMode="interactive"
 						>
-							<Text style={styles.title}>Let's get to know you</Text>
+							<Text style={styles.title}>Let&apos;s get to know you</Text>
 							<View style={styles.inputContainer}>
 								<Text style={styles.label}>First Name</Text>
 								<Text style={styles.subtext}>
@@ -409,6 +418,8 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 						<ScrollView
 							contentContainerStyle={styles.scrollContent}
 							showsVerticalScrollIndicator={false}
+							keyboardShouldPersistTaps="handled"
+							keyboardDismissMode="interactive"
 						>
 							<Text style={styles.title}>Your Financial Goals</Text>
 							<View style={styles.inputContainer}>
@@ -509,6 +520,8 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 						<ScrollView
 							contentContainerStyle={styles.scrollContent}
 							showsVerticalScrollIndicator={false}
+							keyboardShouldPersistTaps="handled"
+							keyboardDismissMode="interactive"
 						>
 							<Text style={styles.title}>Your Financial Status</Text>
 							<View style={styles.inputContainer}>
@@ -618,6 +631,8 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 						<ScrollView
 							contentContainerStyle={styles.scrollContent}
 							showsVerticalScrollIndicator={false}
+							keyboardShouldPersistTaps="handled"
+							keyboardDismissMode="interactive"
 						>
 							<Text style={styles.title}>Final Preferences</Text>
 							<View style={styles.inputContainer}>
@@ -668,6 +683,9 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 	};
 
 	const handleNext = () => {
+		// Dismiss keyboard when continuing to next slide
+		Keyboard.dismiss();
+
 		if (currentIndex < 4) {
 			flatListRef.current?.scrollToIndex({
 				index: currentIndex + 1,
@@ -689,63 +707,70 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 
 	return (
 		<SafeAreaView style={styles.container}>
-			<View style={styles.header}>
-				<View style={styles.logoContainer}>
-					<Image
-						style={styles.logoImage}
-						source={require('../../src/assets/images/brie-logos.png')}
-					/>
+			<KeyboardAvoidingView
+				style={styles.keyboardAvoidingView}
+				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+				keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+			>
+				<View style={styles.header}>
+					<View style={styles.logoContainer}>
+						<Image
+							style={styles.logoImage}
+							source={require('../../src/assets/images/brie-logos.png')}
+						/>
+					</View>
+					<Pressable style={styles.skipButton} onPress={handleSkip}>
+						<Text style={styles.skipButtonText}></Text>
+					</Pressable>
 				</View>
-				<Pressable style={styles.skipButton} onPress={handleSkip}>
-					<Text style={styles.skipButtonText}></Text>
-				</Pressable>
-			</View>
-			<FlatList
-				ref={flatListRef}
-				data={[1, 2, 3, 4, 5]}
-				renderItem={renderItem}
-				horizontal
-				pagingEnabled
-				showsHorizontalScrollIndicator={false}
-				onMomentumScrollEnd={(e) => {
-					const newIndex = Math.round(e.nativeEvent.contentOffset.x / width);
-					setCurrentIndex(newIndex);
-				}}
-				style={styles.flatList}
-			/>
-			<View style={styles.paginationContainer}>
-				{[0, 1, 2, 3, 4].map((index) => (
-					<View
-						key={index}
-						style={[
-							styles.paginationDot,
-							(index === currentIndex ||
-								(currentIndex > 0 && index === currentIndex - 1) ||
-								index === currentIndex - 2 ||
-								index === currentIndex - 3 ||
-								index === currentIndex - 4) &&
-								styles.paginationDotActive,
-						]}
-					/>
-				))}
-			</View>
-			<View style={styles.navigationButtons}>
-				{currentIndex > 0 ? (
-					<Pressable onPress={handleBack} style={styles.navButton}>
-						<Text style={styles.navButtonBackText}>← Back</Text>
-					</Pressable>
-				) : (
-					<View style={styles.navButton} />
-				)}
-				{currentIndex < 4 && (
-					<Pressable
-						onPress={handleNext}
-						style={[styles.navButton, styles.nextButton]}
-					>
-						<Text style={styles.navButtonText}>Continue</Text>
-					</Pressable>
-				)}
-			</View>
+				<FlatList
+					ref={flatListRef}
+					data={[1, 2, 3, 4, 5]}
+					renderItem={renderItem}
+					horizontal
+					pagingEnabled
+					showsHorizontalScrollIndicator={false}
+					onMomentumScrollEnd={(e) => {
+						const newIndex = Math.round(e.nativeEvent.contentOffset.x / width);
+						setCurrentIndex(newIndex);
+					}}
+					style={styles.flatList}
+					keyboardShouldPersistTaps="handled"
+				/>
+				<View style={styles.paginationContainer}>
+					{[0, 1, 2, 3, 4].map((index) => (
+						<View
+							key={index}
+							style={[
+								styles.paginationDot,
+								(index === currentIndex ||
+									(currentIndex > 0 && index === currentIndex - 1) ||
+									index === currentIndex - 2 ||
+									index === currentIndex - 3 ||
+									index === currentIndex - 4) &&
+									styles.paginationDotActive,
+							]}
+						/>
+					))}
+				</View>
+				<View style={styles.navigationButtons}>
+					{currentIndex > 0 ? (
+						<Pressable onPress={handleBack} style={styles.navButton}>
+							<Text style={styles.navButtonBackText}>← Back</Text>
+						</Pressable>
+					) : (
+						<View style={styles.navButton} />
+					)}
+					{currentIndex < 4 && (
+						<Pressable
+							onPress={handleNext}
+							style={[styles.navButton, styles.nextButton]}
+						>
+							<Text style={styles.navButtonText}>Continue</Text>
+						</Pressable>
+					)}
+				</View>
+			</KeyboardAvoidingView>
 		</SafeAreaView>
 	);
 };
@@ -755,6 +780,9 @@ const styles = StyleSheet.create({
 		width: '100%',
 		height: '100%',
 		backgroundColor: 'white',
+	},
+	keyboardAvoidingView: {
+		flex: 1,
 	},
 	header: {
 		flexDirection: 'row',
@@ -793,6 +821,7 @@ const styles = StyleSheet.create({
 	},
 	scrollContent: {
 		padding: 24,
+		paddingBottom: 100, // Extra padding for keyboard
 		flexGrow: 1,
 	},
 	title: {

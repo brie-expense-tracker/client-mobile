@@ -30,137 +30,127 @@ export default function TabLayout() {
 		<ProfileProvider>
 			<BudgetProvider>
 				<GoalProvider>
-						<Tabs
-							screenOptions={{
-								tabBarStyle: {
-									elevation: 5,
-									paddingTop: 10,
-									height: 80,
-								},
+					<Tabs
+						screenOptions={{
+							tabBarStyle: {
+								elevation: 5,
+								paddingTop: 10,
+								height: 80,
+							},
 
-								tabBarLabelStyle: {
-									fontSize: 16,
-									paddingBottom: 10,
-									paddingTop: 2,
-								},
-								tabBarInactiveTintColor: '#000',
-								tabBarActiveTintColor: '#007ACC',
-								headerShown: false,
+							tabBarLabelStyle: {
+								fontSize: 16,
+								paddingBottom: 10,
+								paddingTop: 2,
+							},
+							tabBarInactiveTintColor: '#000',
+							tabBarActiveTintColor: '#007ACC',
+							headerShown: false,
+						}}
+					>
+						<Tabs.Screen
+							name="dashboard"
+							options={{
+								tabBarIcon: ({ color, size }) => (
+									<Ionicons name="home-outline" color={color} size={size} />
+								),
+								tabBarShowLabel: false,
+								tabBarLabel: 'Home',
 							}}
-						>
-							<Tabs.Screen
-								name="dashboard"
-								options={{
-									tabBarIcon: ({ color, size }) => (
-										<Ionicons name="home-outline" color={color} size={size} />
-									),
-									tabBarShowLabel: false,
-									tabBarLabel: 'Home',
-								}}
-							/>
-							<Tabs.Screen
-								name="insights"
-								options={{
-									tabBarIcon: ({ color, size }) => (
-										<Ionicons name="timer-outline" color={color} size={size} />
-									),
-									tabBarShowLabel: false,
-									tabBarLabel: 'Insights',
-								}}
-							/>
-							<Tabs.Screen
-								name="transaction"
-								options={{
-									tabBarIcon: ({ color, size }) => (
-										<Ionicons
-											name="add-circle-outline"
-											color={color}
-											size={size}
-										/>
-									),
-									tabBarShowLabel: false,
-									tabBarLabel: 'Transaction',
-								}}
-								listeners={{
-									tabPress: (e) => {
-										e.preventDefault();
-										handleTransactionTabPress();
-									},
-								}}
-							/>
-							<Tabs.Screen
-								name="budgets"
-								options={{
-									tabBarIcon: ({ color, size }) => (
-										<Ionicons name="wallet-outline" color={color} size={size} />
-									),
-									tabBarShowLabel: false,
-									tabBarLabel: 'Budgets',
-								}}
-							/>
-							<Tabs.Screen
-								name="settings"
-								options={{
-									tabBarIcon: ({ color, size }) => (
-										<Ionicons
-											name="settings-outline"
-											color={color}
-											size={size}
-										/>
-									),
-									tabBarShowLabel: false,
-									tabBarLabel: 'Settings',
-								}}
-							/>
-						</Tabs>
-
-						{/* Transaction Choice Modal */}
-						<RNModal
-							isVisible={showTransactionModal}
-							onBackdropPress={() => setShowTransactionModal(false)}
-							animationIn="slideInUp"
-							animationOut="slideOutDown"
-							backdropOpacity={0.5}
-							useNativeDriver
-							style={styles.modal}
-						>
-							<View style={styles.modalContent}>
-								<Text style={styles.modalTitle}>
-									What would you like to do?
-								</Text>
-
-								<RectButton
-									style={styles.modalButton}
-									onPress={navigateToAddTransaction}
-								>
+						/>
+						<Tabs.Screen
+							name="insights"
+							options={{
+								tabBarIcon: ({ color, size }) => (
+									<Ionicons name="sparkles-outline" color={color} size={size} />
+								),
+								tabBarShowLabel: false,
+								tabBarLabel: 'Insights',
+							}}
+						/>
+						<Tabs.Screen
+							name="transaction"
+							options={{
+								tabBarIcon: ({ color, size }) => (
 									<Ionicons
 										name="add-circle-outline"
-										size={24}
-										color="#0095FF"
+										color={color}
+										size={size}
 									/>
-									<Text style={styles.modalButtonText}>Add Income</Text>
-								</RectButton>
+								),
+								tabBarShowLabel: false,
+								tabBarLabel: 'Transaction',
+							}}
+							listeners={{
+								tabPress: (e) => {
+									e.preventDefault();
+									handleTransactionTabPress();
+								},
+							}}
+						/>
+						<Tabs.Screen
+							name="budgets"
+							options={{
+								tabBarIcon: ({ color, size }) => (
+									<Ionicons name="wallet-outline" color={color} size={size} />
+								),
+								tabBarShowLabel: false,
+								tabBarLabel: 'Budgets',
+							}}
+						/>
+						<Tabs.Screen
+							name="settings"
+							options={{
+								tabBarIcon: ({ color, size }) => (
+									<Ionicons name="settings-outline" color={color} size={size} />
+								),
+								tabBarShowLabel: false,
+								tabBarLabel: 'Settings',
+							}}
+						/>
+					</Tabs>
 
-								<RectButton
-									style={styles.modalButton}
-									onPress={navigateToAddExpense}
-								>
-									<Ionicons
-										name="remove-circle-outline"
-										size={24}
-										color="#0095FF"
-									/>
-									<Text style={styles.modalButtonText}>Add Expense</Text>
-								</RectButton>
+					{/* Transaction Choice Modal */}
+					<RNModal
+						isVisible={showTransactionModal}
+						onBackdropPress={() => setShowTransactionModal(false)}
+						animationIn="slideInUp"
+						animationOut="slideOutDown"
+						backdropOpacity={0.5}
+						useNativeDriver
+						style={styles.modal}
+					>
+						<View style={styles.modalContent}>
+							<Text style={styles.modalTitle}>What would you like to do?</Text>
 
-								<RectButton
-									style={styles.cancelButton}
-									onPress={() => setShowTransactionModal(false)}
-								>
-									<Text style={styles.cancelButtonText}>Cancel</Text>
-								</RectButton>
-							</View>
-						</RNModal>
+							<RectButton
+								style={styles.modalButton}
+								onPress={navigateToAddTransaction}
+							>
+								<Ionicons name="add-circle-outline" size={24} color="#0095FF" />
+								<Text style={styles.modalButtonText}>Add Income</Text>
+							</RectButton>
+
+							<RectButton
+								style={styles.modalButton}
+								onPress={navigateToAddExpense}
+							>
+								<Ionicons
+									name="remove-circle-outline"
+									size={24}
+									color="#0095FF"
+								/>
+								<Text style={styles.modalButtonText}>Add Expense</Text>
+							</RectButton>
+
+							<RectButton
+								style={styles.cancelButton}
+								onPress={() => setShowTransactionModal(false)}
+							>
+								<Text style={styles.cancelButtonText}>Cancel</Text>
+							</RectButton>
+						</View>
+					</RNModal>
 				</GoalProvider>
 			</BudgetProvider>
 		</ProfileProvider>

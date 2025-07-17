@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, FC } from 'react';
+import React, { useState, FC } from 'react';
 import {
 	View,
 	Text,
@@ -9,6 +9,7 @@ import {
 	ActivityIndicator,
 	Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AIInsight } from '../services/insightsService';
@@ -16,14 +17,21 @@ import { IntelligentAction } from '../services/intelligentActionService';
 import IntelligentActions from './IntelligentActions';
 
 interface AICoachProps {
-	insights?: AIInsight[] | null;
+	insights: AIInsight[];
 	onInsightPress?: (insight: AIInsight) => void;
 	onRefresh?: () => void;
 	loading?: boolean;
+	onAllActionsCompleted?: () => void; // Add new prop
 }
 
 const AICoach: FC<AICoachProps> = (props) => {
-	const { insights = [], onInsightPress, onRefresh, loading = false } = props;
+	const {
+		insights = [],
+		onInsightPress,
+		onRefresh,
+		loading = false,
+		onAllActionsCompleted,
+	} = props;
 
 	// Ensure insights is always an array and handle any potential issues
 	const safeInsights = Array.isArray(insights) ? insights : [];
@@ -32,6 +40,7 @@ const AICoach: FC<AICoachProps> = (props) => {
 		null
 	);
 	const [smartActionsVisible, setSmartActionsVisible] = useState(false);
+	const [hasShownCompletionAlert, setHasShownCompletionAlert] = useState(false);
 
 	const handleInsightPress = (insight: AIInsight) => {
 		if (onInsightPress) {
@@ -42,20 +51,42 @@ const AICoach: FC<AICoachProps> = (props) => {
 	const handleSmartActions = (insight: AIInsight) => {
 		setSelectedInsight(insight);
 		setSmartActionsVisible(true);
+		// Reset completion alert state when opening new smart actions
+		setHasShownCompletionAlert(false);
 	};
 
 	const handleActionExecuted = (action: IntelligentAction, result: any) => {
 		console.log('Smart action executed:', action, result);
 
-		if (result.success) {
+		// Don't show individual success messages when onAllActionsCompleted is provided
+		// The completion callback will handle bulk completion feedback
+		if (result.success && !onAllActionsCompleted) {
 			Alert.alert(
 				'Success',
 				result.message || 'Action completed successfully!'
 			);
 		}
 
-		setSmartActionsVisible(false);
-		setSelectedInsight(null);
+		// Don't close the modal - let the user see the completion status
+		// The modal will only close when the user manually closes it
+		// setSmartActionsVisible(false);
+		// setSelectedInsight(null);
+	};
+
+	// Handle when all actions are completed
+	const handleAllActionsCompleted = () => {
+		// Show the completion alert only the first time
+		if (!hasShownCompletionAlert) {
+			Alert.alert(
+				'All Actions Completed!',
+				'Great job! All smart actions have been completed. Your insights will be updated.',
+				[{ text: 'OK' }]
+			);
+			setHasShownCompletionAlert(true);
+		}
+
+		// Don't close the modal - let the user see the completion status
+		// The modal will only close when the user manually closes it
 	};
 
 	const renderInsightCard = (insight: AIInsight) => {
@@ -153,7 +184,7 @@ const AICoach: FC<AICoachProps> = (props) => {
 				visible={smartActionsVisible}
 				onRequestClose={() => setSmartActionsVisible(false)}
 			>
-				<View style={styles.modalOverlay}>
+				<SafeAreaView style={styles.modalOverlay}>
 					<View style={styles.modalContent}>
 						<View style={styles.modalHeader}>
 							<Text style={styles.modalTitle}>Smart Actions</Text>
@@ -169,13 +200,15 @@ const AICoach: FC<AICoachProps> = (props) => {
 							<View style={styles.modalBody}>
 								<IntelligentActions
 									insight={selectedInsight}
+									period={selectedInsight.period || 'weekly'}
 									onActionExecuted={handleActionExecuted}
 									onClose={() => setSmartActionsVisible(false)}
+									onAllActionsCompleted={handleAllActionsCompleted} // Use local handler
 								/>
 							</View>
 						)}
 					</View>
-				</View>
+				</SafeAreaView>
 			</Modal>
 		</View>
 	);
@@ -317,13 +350,17 @@ const styles = StyleSheet.create({
 		backgroundColor: 'rgba(0, 0, 0, 0.5)',
 		justifyContent: 'center',
 		alignItems: 'center',
+		paddingTop: 20,
+		paddingBottom: 20,
 	},
 	modalContent: {
 		backgroundColor: '#fff',
 		borderRadius: 16,
 		margin: 20,
-		maxHeight: '90%',
+		maxHeight: '80%',
 		width: '95%',
+		flex: 1,
+		minHeight: 400,
 	},
 	modalHeader: {
 		flexDirection: 'row',
@@ -343,6 +380,8 @@ const styles = StyleSheet.create({
 	},
 	modalBody: {
 		flex: 1,
+		paddingBottom: 20,
+		paddingHorizontal: 20,
 	},
 });
 

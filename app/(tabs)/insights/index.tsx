@@ -1,6 +1,12 @@
 // app/(tabs)/insights.tsx
 
-import React, { useState, useCallback, useContext } from 'react';
+import React, {
+	useState,
+	useCallback,
+	useContext,
+	useEffect,
+	useMemo,
+} from 'react';
 import {
 	SafeAreaView,
 	ScrollView,
@@ -20,6 +26,7 @@ import { AIInsight } from '../../../src/services/insightsService';
 import { TransactionContext } from '../../../src/context/transactionContext';
 import { useBudget } from '../../../src/context/budgetContext';
 import { useGoal } from '../../../src/context/goalContext';
+import { useProfile } from '../../../src/context/profileContext';
 import {
 	BudgetOverviewGraph,
 	GoalsProgressGraph,
@@ -34,6 +41,10 @@ import {
 import AICoach from '../../../src/components/AICoach';
 import { useInsightsHub, Period } from '../../../src/hooks';
 import { IntelligentAction } from '../../../src/services/intelligentActionService';
+import {
+	navigateToBudgetsWithModal,
+	navigateToGoalsWithModal,
+} from '../../../src/utils/navigationUtils';
 
 export default function InsightsHubScreen() {
 	const router = useRouter();
@@ -41,10 +52,46 @@ export default function InsightsHubScreen() {
 		useContext(TransactionContext);
 	const { budgets } = useBudget();
 	const { goals } = useGoal();
+	const { profile } = useProfile();
 
-	const [selectedPeriod, setSelectedPeriod] = useState<Period>('month');
+	// Get user preferences
+	const aiInsightsEnabled = profile?.preferences?.aiInsights?.enabled ?? true;
+	const userFrequency = profile?.preferences?.aiInsights?.frequency ?? 'weekly';
+	const insightTypes = useMemo(
+		() =>
+			profile?.preferences?.aiInsights?.insightTypes ?? {
+				budgetingTips: true,
+				expenseReduction: true,
+				incomeSuggestions: true,
+			},
+		[profile?.preferences?.aiInsights?.insightTypes]
+	);
+	const defaultView =
+		profile?.preferences?.aiInsights?.defaultView ?? 'aiCoach';
+	const maxInsights = profile?.preferences?.aiInsights?.maxInsights ?? 3;
+	const showHighPriorityOnly =
+		profile?.preferences?.aiInsights?.showHighPriorityOnly ?? false;
+
+	// Map user frequency to Period type
+	const getDefaultPeriod = (): Period => {
+		switch (userFrequency) {
+			case 'daily':
+				return 'week';
+			case 'weekly':
+				return 'month';
+			case 'monthly':
+				return 'quarter';
+			default:
+				return 'month';
+		}
+	};
+
+	const [selectedPeriod, setSelectedPeriod] = useState<Period>(
+		getDefaultPeriod()
+	);
 	const [showGraphs, setShowGraphs] = useState(false);
-	const [useAICoach, setUseAICoach] = useState(true); // Toggle between AI Coach and traditional view
+	const [useAICoach, setUseAICoach] = useState(defaultView === 'aiCoach'); // Toggle between AI Coach and traditional view
+	const [completionAlertShown, setCompletionAlertShown] = useState(false); // Prevent duplicate alerts
 
 	const {
 		summary,
@@ -56,7 +103,53 @@ export default function InsightsHubScreen() {
 		onRefresh,
 		generateNewInsights,
 		markInsightAsRead,
+		fetchInsights, // Add fetchInsights to destructuring
 	} = useInsightsHub(selectedPeriod);
+
+	// Update selected period when user frequency changes
+	useEffect(() => {
+		setSelectedPeriod(getDefaultPeriod());
+	}, [userFrequency]);
+
+	// Filter insights based on user preferences
+	const filteredInsights = useCallback(() => {
+		if (!insights || !aiInsightsEnabled) return [];
+
+		let filtered = insights.filter((insight) => {
+			// Filter by insight type if available
+			if (insight.insightType) {
+				switch (insight.insightType) {
+					case 'budgeting':
+						return insightTypes.budgetingTips;
+					case 'savings':
+						return insightTypes.expenseReduction;
+					case 'income':
+						return insightTypes.incomeSuggestions;
+					case 'spending':
+						return insightTypes.expenseReduction;
+					case 'general':
+						return true; // Show general insights
+					default:
+						return true; // Show if type is not recognized
+				}
+			}
+			return true; // Show if no type specified
+		});
+
+		// Apply priority filter if enabled
+		if (showHighPriorityOnly) {
+			filtered = filtered.filter((insight) => insight.priority === 'high');
+		}
+
+		// Limit to max insights
+		return filtered.slice(0, maxInsights);
+	}, [
+		insights,
+		aiInsightsEnabled,
+		insightTypes,
+		showHighPriorityOnly,
+		maxInsights,
+	]);
 
 	// Memoize callback functions to prevent unnecessary re-renders
 	const handleInsightPress = useCallback(
@@ -96,24 +189,19 @@ export default function InsightsHubScreen() {
 		(action: IntelligentAction, result: any) => {
 			console.log('Smart action executed:', action, result);
 
-			// Show success message
-			if (result.success) {
-				Alert.alert(
-					'Success',
-					result.message || 'Action completed successfully!'
-				);
+			// Don't show individual success messages - only show the comprehensive alert when all actions are completed
+			// Individual success messages are handled by the completion alert
 
-				// Navigate based on action type
-				if (action.type === 'detect_completion' && result.success) {
-					if (action.detectionType === 'transaction_count') {
-						router.push('/(tabs)/transaction');
-					} else if (action.detectionType === 'budget_created') {
-						router.push('/(tabs)/budgets');
-					} else if (action.detectionType === 'goal_created') {
-						router.push('/(tabs)/budgets/goals');
-					} else if (action.detectionType === 'preferences_updated') {
-						router.push('/(tabs)/settings/aiInsights');
-					}
+			// Navigate based on action type
+			if (action.type === 'detect_completion' && result.success) {
+				if (action.detectionType === 'transaction_count') {
+					router.push('/(tabs)/transaction');
+				} else if (action.detectionType === 'budget_created') {
+					navigateToBudgetsWithModal();
+				} else if (action.detectionType === 'goal_created') {
+					navigateToGoalsWithModal();
+				} else if (action.detectionType === 'preferences_updated') {
+					router.push('/(tabs)/settings/aiInsights');
 				}
 			}
 		},
@@ -150,11 +238,113 @@ export default function InsightsHubScreen() {
 		setUseAICoach(!useAICoach);
 	}, [useAICoach]);
 
+	// Handle when all smart actions are completed
+	const handleAllActionsCompleted = useCallback(async () => {
+		// Prevent duplicate alerts
+		if (completionAlertShown) return;
+		setCompletionAlertShown(true);
+
+		try {
+			// Refresh insights to get updated recommendations
+			await fetchInsights();
+
+			// Show single comprehensive success message
+			Alert.alert(
+				'All Actions Completed! 🎉',
+				'Your actions have been completed successfully and your insights have been refreshed with new recommendations.',
+				[{ text: 'OK' }]
+			);
+		} catch (error) {
+			console.error(
+				'Error refreshing insights after actions completed:',
+				error
+			);
+			// Show fallback message if refresh fails
+			Alert.alert(
+				'Actions Completed! ✅',
+				'Your actions have been completed successfully!',
+				[{ text: 'OK' }]
+			);
+		} finally {
+			// Reset the flag after a delay to allow for future completions
+			setTimeout(() => {
+				setCompletionAlertShown(false);
+			}, 5000); // Reset after 5 seconds
+		}
+	}, [fetchInsights, completionAlertShown]);
+
+	// Reset completion alert flag when insights change
+	useEffect(() => {
+		setCompletionAlertShown(false);
+	}, [insights?.length]); // Reset when insights array changes
+
 	if (loadingInsights || transactionsLoading) {
 		return (
 			<SafeAreaView style={styles.center}>
 				<ActivityIndicator size="large" />
 				<Text style={styles.loadingText}>Loading insights...</Text>
+			</SafeAreaView>
+		);
+	}
+
+	// Show disabled state if AI insights are turned off
+	if (!aiInsightsEnabled) {
+		return (
+			<SafeAreaView style={styles.safeArea}>
+				<LinearGradient
+					colors={['#2E78B7', '#e24a4a']}
+					style={styles.headerGradient}
+				>
+					<View style={styles.header}>
+						<View style={styles.headerContent}>
+							<View style={styles.titleSection}>
+								<Ionicons name="bulb" size={24} color="#fff" />
+								<Text style={styles.headerTitle}>AI Coach</Text>
+							</View>
+							<View style={styles.headerActions}>
+								<TouchableOpacity
+									style={styles.settingsButton}
+									onPress={() => router.push('/(tabs)/settings/aiInsights')}
+								>
+									<Ionicons name="settings-outline" size={20} color="#fff" />
+								</TouchableOpacity>
+							</View>
+						</View>
+						<Text style={styles.headerSubtitle}>
+							AI insights are currently disabled
+						</Text>
+					</View>
+				</LinearGradient>
+
+				<View style={styles.disabledContainer}>
+					<Ionicons name="bulb-outline" size={64} color="#CCC" />
+					<Text style={styles.disabledTitle}>AI Insights Disabled</Text>
+					<Text style={styles.disabledText}>
+						Enable AI insights in your settings to get personalized financial
+						recommendations and smart actions.
+					</Text>
+
+					<TouchableOpacity
+						style={styles.enableButton}
+						onPress={() => router.push('/(tabs)/settings/aiInsights')}
+					>
+						<Text style={styles.enableButtonText}>Enable AI Insights</Text>
+					</TouchableOpacity>
+
+					{/* Show graphs-only view as alternative */}
+					<View style={styles.alternativeSection}>
+						<Text style={styles.alternativeTitle}>View Financial Data</Text>
+						<Text style={styles.alternativeText}>
+							You can still view your financial graphs and summaries.
+						</Text>
+						<TouchableOpacity
+							style={styles.graphsButton}
+							onPress={() => setShowGraphs(true)}
+						>
+							<Text style={styles.graphsButtonText}>View Graphs</Text>
+						</TouchableOpacity>
+					</View>
+				</View>
 			</SafeAreaView>
 		);
 	}
@@ -197,10 +387,23 @@ export default function InsightsHubScreen() {
 									/>
 								</TouchableOpacity>
 							)}
+
+							{/* AI Insights Settings */}
+							<TouchableOpacity
+								style={styles.settingsButton}
+								onPress={() => router.push('/(tabs)/settings/aiInsights')}
+							>
+								<Ionicons name="settings-outline" size={20} color="#fff" />
+							</TouchableOpacity>
 						</View>
 					</View>
 					<Text style={styles.headerSubtitle}>
 						Personalized financial insights and smart actions
+					</Text>
+					{/* Show current frequency setting */}
+					<Text style={styles.frequencyText}>
+						Updates:{' '}
+						{userFrequency.charAt(0).toUpperCase() + userFrequency.slice(1)}
 					</Text>
 				</View>
 			</LinearGradient>
@@ -208,10 +411,11 @@ export default function InsightsHubScreen() {
 			{/* Use AI Coach for a more integrated experience */}
 			{useAICoach && !showGraphs ? (
 				<AICoach
-					insights={insights ?? []}
+					insights={filteredInsights()}
 					onInsightPress={handleInsightPress}
 					onRefresh={onRefresh}
 					loading={loadingInsights}
+					onAllActionsCompleted={handleAllActionsCompleted} // Add new callback
 				/>
 			) : (
 				<ScrollView
@@ -342,10 +546,11 @@ export default function InsightsHubScreen() {
 						<View>
 							{/* 6. AI-Driven Suggestions with Smart Actions */}
 							<AISuggestionsList
-								suggestions={insights ?? []}
+								suggestions={filteredInsights()}
 								onApplySuggestion={handleApplySuggestion}
 								onInsightPress={handleInsightPress}
 								showSmartActions={true}
+								onAllActionsCompleted={handleAllActionsCompleted} // Add new callback
 							/>
 
 							{/* 8. Recent Transactions */}
@@ -363,7 +568,7 @@ export default function InsightsHubScreen() {
 							/>
 
 							{/* Fallback for no insights */}
-							{(!insights || insights.length === 0) && (
+							{(!filteredInsights() || filteredInsights().length === 0) && (
 								<View style={styles.emptyState}>
 									<Text style={styles.emptyText}>
 										No insights available yet.
@@ -388,6 +593,28 @@ export default function InsightsHubScreen() {
 											</Text>
 										)}
 									</Pressable>
+
+									{/* AI Insights Settings Link */}
+									<TouchableOpacity
+										style={styles.aiInsightsSettingsLink}
+										onPress={() => router.push('/(tabs)/settings/aiInsights')}
+									>
+										<View style={styles.aiInsightsSettingsLinkContent}>
+											<Ionicons
+												name="settings-outline"
+												size={16}
+												color="#007ACC"
+											/>
+											<Text style={styles.aiInsightsSettingsLinkText}>
+												Customize AI Insights Settings
+											</Text>
+										</View>
+										<Ionicons
+											name="chevron-forward"
+											size={16}
+											color="#007ACC"
+										/>
+									</TouchableOpacity>
 								</View>
 							)}
 						</View>
@@ -440,6 +667,12 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		color: '#e0eaf0',
 	},
+	frequencyText: {
+		fontSize: 12,
+		color: '#e0eaf0',
+		marginTop: 4,
+		fontStyle: 'italic',
+	},
 	headerActions: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -458,6 +691,11 @@ const styles = StyleSheet.create({
 		backgroundColor: 'rgba(255, 255, 255, 0.2)',
 	},
 	graphToggle: {
+		padding: 8,
+		borderRadius: 8,
+		backgroundColor: 'rgba(255, 255, 255, 0.2)',
+	},
+	settingsButton: {
 		padding: 8,
 		borderRadius: 8,
 		backgroundColor: 'rgba(255, 255, 255, 0.2)',
@@ -577,5 +815,98 @@ const styles = StyleSheet.create({
 		color: '#fff',
 		fontSize: 16,
 		fontWeight: '500',
+	},
+	aiInsightsSettingsLink: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		paddingVertical: 12,
+		paddingHorizontal: 16,
+		marginTop: 16,
+		backgroundColor: '#f8f9fa',
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: '#e9ecef',
+	},
+	aiInsightsSettingsLinkContent: {
+		flexDirection: 'row',
+		alignItems: 'center',
+	},
+	aiInsightsSettingsLinkText: {
+		fontSize: 14,
+		fontWeight: '500',
+		color: '#007ACC',
+		marginLeft: 8,
+	},
+	// New styles for disabled state
+	disabledContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		paddingHorizontal: 32,
+		backgroundColor: '#fff',
+	},
+	disabledTitle: {
+		fontSize: 24,
+		fontWeight: '600',
+		color: '#333',
+		marginTop: 24,
+		marginBottom: 16,
+		textAlign: 'center',
+	},
+	disabledText: {
+		fontSize: 16,
+		color: '#666',
+		textAlign: 'center',
+		lineHeight: 24,
+		marginBottom: 32,
+	},
+	enableButton: {
+		backgroundColor: '#2E78B7',
+		paddingHorizontal: 32,
+		paddingVertical: 16,
+		borderRadius: 12,
+		marginBottom: 32,
+	},
+	enableButtonText: {
+		color: '#fff',
+		fontSize: 16,
+		fontWeight: '600',
+		textAlign: 'center',
+	},
+	alternativeSection: {
+		width: '100%',
+		padding: 24,
+		backgroundColor: '#f8f9fa',
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#e9ecef',
+	},
+	alternativeTitle: {
+		fontSize: 18,
+		fontWeight: '600',
+		color: '#333',
+		marginBottom: 8,
+		textAlign: 'center',
+	},
+	alternativeText: {
+		fontSize: 14,
+		color: '#666',
+		textAlign: 'center',
+		marginBottom: 16,
+	},
+	graphsButton: {
+		backgroundColor: '#fff',
+		paddingHorizontal: 24,
+		paddingVertical: 12,
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: '#2E78B7',
+	},
+	graphsButtonText: {
+		color: '#2E78B7',
+		fontSize: 14,
+		fontWeight: '500',
+		textAlign: 'center',
 	},
 });

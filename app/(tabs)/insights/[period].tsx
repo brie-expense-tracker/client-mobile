@@ -1,6 +1,6 @@
 // app/(tabs)/insights/[period].tsx
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
 	SafeAreaView,
 	Text,
@@ -13,12 +13,7 @@ import {
 	Animated,
 } from 'react-native';
 import { RectButton } from 'react-native-gesture-handler';
-import {
-	useLocalSearchParams,
-	Stack,
-	useRouter,
-	useFocusEffect,
-} from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 
 import {
 	MaterialCommunityIcons,
@@ -31,6 +26,10 @@ import {
 } from '../../../src/services/insightsService';
 import HistoricalComparison from '../../../src/components/HistoricalComparison';
 import IntelligentActions from '../../../src/components/IntelligentActions';
+import {
+	navigateToBudgetsWithModal,
+	navigateToGoalsWithModal,
+} from '../../../src/utils/navigationUtils';
 
 export default function InsightDetail() {
 	const router = useRouter();
@@ -40,11 +39,12 @@ export default function InsightDetail() {
 	const [insights, setInsights] = useState<AIInsight[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [activeStep, setActiveStep] = useState(0);
-	const [showIntelligentActions, setShowIntelligentActions] = useState(false);
 	const [expandedSections, setExpandedSections] = useState({
 		summary: true,
 		comparison: false,
 	});
+	const [refreshingInsights, setRefreshingInsights] = useState(false); // Add state for insights refresh
+	const [completionAlertShown, setCompletionAlertShown] = useState(false); // Prevent duplicate alerts
 
 	// Animation values
 	const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -54,7 +54,7 @@ export default function InsightDetail() {
 	useEffect(() => {
 		fadeAnim.setValue(0);
 		slideAnim.setValue(50);
-	}, []);
+	}, []); // Only run once on mount
 
 	useEffect(() => {
 		async function load() {
@@ -78,26 +78,31 @@ export default function InsightDetail() {
 
 	// Animate step changes and initial load
 	useEffect(() => {
-		// Reset animation values when insights change
-		if (insights.length > 0) {
+		// Only animate if insights are loaded and not in loading state
+		if (insights.length > 0 && !loading) {
+			// Reset animation values
 			fadeAnim.setValue(0);
 			slideAnim.setValue(50);
 
-			// Start animation immediately
-			Animated.parallel([
-				Animated.timing(fadeAnim, {
-					toValue: 1,
-					duration: 300,
-					useNativeDriver: true,
-				}),
-				Animated.timing(slideAnim, {
-					toValue: 0,
-					duration: 300,
-					useNativeDriver: true,
-				}),
-			]).start();
+			// Start animation with a small delay to ensure smooth transition
+			const animationTimer = setTimeout(() => {
+				Animated.parallel([
+					Animated.timing(fadeAnim, {
+						toValue: 1,
+						duration: 300,
+						useNativeDriver: true,
+					}),
+					Animated.timing(slideAnim, {
+						toValue: 0,
+						duration: 300,
+						useNativeDriver: true,
+					}),
+				]).start();
+			}, 50); // Small delay to prevent glitch
+
+			return () => clearTimeout(animationTimer);
 		}
-	}, [activeStep, insights.length]); // Also trigger when insights load
+	}, [activeStep, insights.length, loading]); // Remove fadeAnim and slideAnim from dependencies
 
 	// Mark insights as read when they are viewed
 	useEffect(() => {
@@ -132,12 +137,65 @@ export default function InsightDetail() {
 	useFocusEffect(
 		React.useCallback(() => {
 			// Refresh insights when the screen comes into focus
-			if (insights.length > 0) {
-				// Trigger a refresh of the intelligent actions
-				setShowIntelligentActions(true);
-			}
-		}, [insights.length])
+			// This could be used to refresh data if needed
+		}, [])
 	);
+
+	// Handle when all smart actions are completed
+	const handleAllActionsCompleted = useCallback(async () => {
+		// Prevent duplicate alerts
+		if (completionAlertShown) return;
+		setCompletionAlertShown(true);
+
+		try {
+			setRefreshingInsights(true);
+
+			// Use the specialized refresh method for post-action insights
+			const response = await InsightsService.refreshInsightsAfterActions(
+				period
+			);
+
+			if (response.success && response.data && Array.isArray(response.data)) {
+				// Update insights with new data
+				setInsights(response.data);
+
+				// Show single comprehensive success message
+				Alert.alert(
+					'All Actions Completed! 🎉',
+					'Your actions have been completed successfully and your insights have been refreshed with new recommendations.',
+					[{ text: 'OK' }]
+				);
+
+				// Reset to intro step to show new insights
+				setActiveStep(0);
+			} else {
+				// Show fallback message if refresh fails
+				Alert.alert(
+					'Actions Completed! ✅',
+					'Your actions have been completed successfully!',
+					[{ text: 'OK' }]
+				);
+			}
+		} catch (error) {
+			console.error(
+				'Error refreshing insights after actions completed:',
+				error
+			);
+			// Show fallback message if refresh fails
+			Alert.alert(
+				'Actions Completed! ✅',
+				'Your actions have been completed successfully!',
+				[{ text: 'OK' }]
+			);
+		} finally {
+			setRefreshingInsights(false);
+		}
+	}, [period, completionAlertShown]);
+
+	// Reset completion alert flag when insight changes
+	useEffect(() => {
+		setCompletionAlertShown(false);
+	}, [insights[0]?._id]); // Reset when current insight changes
 
 	if (loading) {
 		return (
@@ -231,6 +289,14 @@ export default function InsightDetail() {
 							},
 						]}
 					>
+						{/* Show refresh indicator if refreshing insights */}
+						{refreshingInsights && (
+							<View style={styles.refreshIndicator}>
+								<ActivityIndicator size="small" color="#2E78B7" />
+								<Text style={styles.refreshText}>Updating insights...</Text>
+							</View>
+						)}
+
 						<Text style={styles.stepTitle}>{insight.title}</Text>
 						<Text style={styles.stepMessage}>{insight.message}</Text>
 						{/* Include detailed explanation in intro if it's not redundant */}
@@ -302,6 +368,28 @@ export default function InsightDetail() {
 														: '#FF6B6B',
 											}}
 										/>
+
+										{/* AI Insights Link */}
+										<TouchableOpacity
+											style={styles.aiInsightsLink}
+											onPress={() => router.push('/(tabs)/settings/aiInsights')}
+										>
+											<View style={styles.aiInsightsLinkContent}>
+												<Ionicons
+													name="settings-outline"
+													size={16}
+													color="#007ACC"
+												/>
+												<Text style={styles.aiInsightsLinkText}>
+													Customize AI Insights
+												</Text>
+											</View>
+											<Ionicons
+												name="chevron-forward"
+												size={16}
+												color="#007ACC"
+											/>
+										</TouchableOpacity>
 									</View>
 								)}
 							</View>
@@ -343,9 +431,29 @@ export default function InsightDetail() {
 
 						{/* Fallback if no metadata */}
 						{!insight.metadata && (
-							<Text style={styles.bodyText}>
-								No review data available for this insight.
-							</Text>
+							<View>
+								<Text style={styles.bodyText}>
+									No review data available for this insight.
+								</Text>
+
+								{/* AI Insights Link for fallback case */}
+								<TouchableOpacity
+									style={styles.aiInsightsLink}
+									onPress={() => router.push('/(tabs)/settings/aiInsights')}
+								>
+									<View style={styles.aiInsightsLinkContent}>
+										<Ionicons
+											name="settings-outline"
+											size={16}
+											color="#007ACC"
+										/>
+										<Text style={styles.aiInsightsLinkText}>
+											Customize AI Insights
+										</Text>
+									</View>
+									<Ionicons name="chevron-forward" size={16} color="#007ACC" />
+								</TouchableOpacity>
+							</View>
 						)}
 					</Animated.View>
 				);
@@ -367,6 +475,7 @@ export default function InsightDetail() {
 						</Text>
 						<IntelligentActions
 							insight={insight}
+							period={period}
 							onActionExecuted={(action, result) => {
 								console.log('Action executed:', action, result);
 
@@ -376,14 +485,15 @@ export default function InsightDetail() {
 									if (action.detectionType === 'transaction_count') {
 										router.push('/(tabs)/transaction');
 									} else if (action.detectionType === 'budget_created') {
-										router.push('/(tabs)/budgets');
+										navigateToBudgetsWithModal();
 									} else if (action.detectionType === 'goal_created') {
-										router.push('/(tabs)/budgets/goals');
+										navigateToGoalsWithModal();
 									} else if (action.detectionType === 'preferences_updated') {
 										router.push('/(tabs)/settings/aiInsights');
 									}
 								}
 							}}
+							onAllActionsCompleted={handleAllActionsCompleted} // Add new callback
 						/>
 					</Animated.View>
 				);
@@ -442,16 +552,7 @@ export default function InsightDetail() {
 					) : (
 						<RectButton
 							onPress={() => {
-								Alert.alert(
-									'Great job!',
-									"You've completed this insight guide.",
-									[
-										{
-											text: 'OK',
-											onPress: () => router.replace('/insights'),
-										},
-									]
-								);
+								router.replace('/insights');
 							}}
 							style={styles.navButton}
 						>
@@ -555,19 +656,14 @@ const styles = StyleSheet.create({
 	},
 	progressBar: {
 		height: 6,
-		backgroundColor: '#0095FF',
+		backgroundColor: '#007ACC',
 		borderRadius: 3,
 	},
 
 	stepContainer: {
 		padding: 16,
-		backgroundColor: '#fafafa',
+		backgroundColor: '#ffffff',
 		borderRadius: 12,
-		elevation: 2,
-		shadowColor: '#000',
-		shadowOpacity: 0.05,
-		shadowOffset: { width: 0, height: 2 },
-		shadowRadius: 8,
 		marginBottom: 24,
 	},
 	stepTitle: {
@@ -664,4 +760,43 @@ const styles = StyleSheet.create({
 	},
 	navDisabled: { backgroundColor: '#aacbe1' },
 	navText: { color: '#fff', fontWeight: '600', fontSize: 16 },
+
+	aiInsightsLink: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		paddingVertical: 12,
+		paddingHorizontal: 16,
+		marginTop: 16,
+		backgroundColor: '#f8f9fa',
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: '#e9ecef',
+	},
+	aiInsightsLinkContent: {
+		flexDirection: 'row',
+		alignItems: 'center',
+	},
+	aiInsightsLinkText: {
+		fontSize: 14,
+		fontWeight: '500',
+		color: '#007ACC',
+		marginLeft: 8,
+	},
+	refreshIndicator: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#E3F2FD',
+		padding: 12,
+		borderRadius: 8,
+		marginBottom: 16,
+		borderWidth: 1,
+		borderColor: '#2196F3',
+	},
+	refreshText: {
+		marginLeft: 8,
+		color: '#1976D2',
+		fontSize: 14,
+		fontWeight: '500',
+	},
 });
