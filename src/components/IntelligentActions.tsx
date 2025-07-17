@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
 	View,
 	Text,
@@ -11,27 +11,37 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import {
 	IntelligentActionService,
 	IntelligentAction,
 	ActionExecutionResult,
 } from '../services/intelligentActionService';
 import { AIInsight } from '../services/insightsService';
+import {
+	navigateToBudgetsWithModal,
+	navigateToGoalsWithModal,
+} from '../utils/navigationUtils';
 
 interface IntelligentActionsProps {
 	insight: AIInsight;
+	period: 'daily' | 'weekly' | 'monthly';
 	onActionExecuted?: (
 		action: IntelligentAction,
 		result: ActionExecutionResult
 	) => void;
 	onClose?: () => void;
+	onAllActionsCompleted?: () => void; // New prop for when all actions are completed
 }
 
 export default function IntelligentActions({
 	insight,
+	period,
 	onActionExecuted,
 	onClose,
+	onAllActionsCompleted, // Add new prop
 }: IntelligentActionsProps) {
+	const router = useRouter();
 	const [actions, setActions] = useState<IntelligentAction[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [executingAction, setExecutingAction] = useState<string | null>(null);
@@ -39,6 +49,9 @@ export default function IntelligentActions({
 		useState<IntelligentAction | null>(null);
 	const [modalVisible, setModalVisible] = useState(false);
 	const [refreshing, setRefreshing] = useState(false);
+	const [allActionsCompleted, setAllActionsCompleted] = useState(false); // Track completion status
+	const [completionCallbackTriggered, setCompletionCallbackTriggered] =
+		useState(false); // Prevent duplicate alerts
 
 	useEffect(() => {
 		analyzeInsight();
@@ -53,6 +66,43 @@ export default function IntelligentActions({
 		return () => clearInterval(interval);
 	}, [actions]);
 
+	// Function to check if this is the last action being completed
+	const checkIfLastActionCompleted = useCallback(
+		(completedActionId: string) => {
+			if (actions.length === 0) return false;
+
+			// Check if all actions are completed
+			const allCompleted = actions.every((action) => action.executed);
+			setAllActionsCompleted(allCompleted);
+
+			// If all actions are completed and we haven't triggered the callback yet
+			if (
+				allCompleted &&
+				onAllActionsCompleted &&
+				!completionCallbackTriggered
+			) {
+				setCompletionCallbackTriggered(true); // Mark as triggered to prevent duplicates
+				onAllActionsCompleted();
+				return true;
+			}
+
+			return false;
+		},
+		[actions, onAllActionsCompleted, completionCallbackTriggered]
+	);
+
+	// Reset completion callback flag when actions change (new insight loaded)
+	useEffect(() => {
+		setCompletionCallbackTriggered(false);
+		setAllActionsCompleted(false); // Also reset completion status
+	}, [insight._id]); // Reset when insight changes
+
+	// Reset completion callback flag when component mounts (modal opened)
+	useEffect(() => {
+		setCompletionCallbackTriggered(false);
+		setAllActionsCompleted(false);
+	}, []); // Reset when component mounts
+
 	const analyzeInsight = async () => {
 		try {
 			setLoading(true);
@@ -60,6 +110,7 @@ export default function IntelligentActions({
 			// Get actions from MongoDB instead of generating them locally
 			const userActions = await IntelligentActionService.getUserActions({
 				limit: 50,
+				includeCompleted: true,
 			});
 
 			console.log('User actions from MongoDB:', userActions);
@@ -87,7 +138,10 @@ export default function IntelligentActions({
 
 				if (safeGeneratedActions.length < 2) {
 					// Add minimal detection actions only if backend didn't provide enough
-					const detectionActions = generateMinimalDetectionActions(insight);
+					const detectionActions = generateMinimalDetectionActions(
+						insight,
+						period
+					);
 					allActions = [...safeGeneratedActions, ...detectionActions];
 				}
 
@@ -123,7 +177,7 @@ export default function IntelligentActions({
 		} catch (error) {
 			console.error('Error analyzing insight:', error);
 			// Fallback to minimal detection actions if everything fails
-			const fallbackActions = generateMinimalDetectionActions(insight);
+			const fallbackActions = generateMinimalDetectionActions(insight, period);
 			setActions(fallbackActions);
 		} finally {
 			setLoading(false);
@@ -132,7 +186,8 @@ export default function IntelligentActions({
 
 	// Generate minimal detection actions only when needed
 	const generateMinimalDetectionActions = (
-		insight: AIInsight
+		insight: AIInsight,
+		period: 'daily' | 'weekly' | 'monthly'
 	): IntelligentAction[] => {
 		const detectionActions: IntelligentAction[] = [];
 
@@ -140,31 +195,86 @@ export default function IntelligentActions({
 		switch (insight.insightType) {
 			case 'spending':
 				// For spending insights, suggest adding transactions if they haven't
+				// Use period-appropriate timeframe
+				let timeframe: string;
+				let threshold: number;
+				let description: string;
+
+				switch (period) {
+					case 'daily':
+						timeframe = 'daily';
+						threshold = 2;
+						description =
+							'Add your daily transactions to get better spending insights.';
+						break;
+					case 'weekly':
+						timeframe = 'weekly';
+						threshold = 5;
+						description =
+							'Add your weekly transactions to get better spending insights.';
+						break;
+					case 'monthly':
+						timeframe = 'monthly';
+						threshold = 15;
+						description =
+							'Add your monthly transactions to get better spending insights.';
+						break;
+					default:
+						timeframe = 'weekly';
+						threshold = 5;
+						description =
+							'Add your transactions to get better spending insights.';
+				}
+
 				detectionActions.push({
 					id: `detect_transaction_count_${Date.now()}`,
 					type: 'detect_completion',
 					title: 'Track Your Spending',
-					description:
-						'Add your daily transactions to get better spending insights.',
+					description: description,
 					parameters: {},
 					priority: 'high',
 					requiresConfirmation: false,
 					executed: false,
 					detectionType: 'transaction_count',
 					detectionCriteria: {
-						threshold: 5,
-						timeframe: 'last_7_days',
+						threshold: threshold,
+						timeframe: timeframe,
 					},
 				});
 				break;
 			case 'budgeting':
 				// For budgeting insights, suggest creating a budget
+				// Use period-appropriate messaging
+				let budgetTitle: string;
+				let budgetDescription: string;
+
+				switch (period) {
+					case 'daily':
+						budgetTitle = 'Create Your Daily Budget';
+						budgetDescription =
+							'Set up a daily budget to track your spending throughout the day.';
+						break;
+					case 'weekly':
+						budgetTitle = 'Create Your Weekly Budget';
+						budgetDescription =
+							'Set up a weekly budget to manage your spending effectively.';
+						break;
+					case 'monthly':
+						budgetTitle = 'Create Your Monthly Budget';
+						budgetDescription =
+							'Set up a monthly budget to plan your finances for the month.';
+						break;
+					default:
+						budgetTitle = 'Create Your First Budget';
+						budgetDescription =
+							'Set up a budget to start managing your spending effectively.';
+				}
+
 				detectionActions.push({
 					id: `detect_budget_created_${Date.now()}`,
 					type: 'detect_completion',
-					title: 'Create Your First Budget',
-					description:
-						'Set up a budget to start managing your spending effectively.',
+					title: budgetTitle,
+					description: budgetDescription,
 					parameters: {},
 					priority: 'high',
 					requiresConfirmation: false,
@@ -175,11 +285,37 @@ export default function IntelligentActions({
 				break;
 			case 'savings':
 				// For savings insights, suggest creating a goal
+				// Use period-appropriate messaging
+				let goalTitle: string;
+				let goalDescription: string;
+
+				switch (period) {
+					case 'daily':
+						goalTitle = 'Set Your Daily Savings Goal';
+						goalDescription =
+							'Create a daily savings target to build good habits.';
+						break;
+					case 'weekly':
+						goalTitle = 'Set Your Weekly Savings Goal';
+						goalDescription =
+							'Create a weekly savings goal to work towards your dreams.';
+						break;
+					case 'monthly':
+						goalTitle = 'Set Your Monthly Savings Goal';
+						goalDescription =
+							'Create a monthly savings goal to achieve your financial objectives.';
+						break;
+					default:
+						goalTitle = 'Set Your First Goal';
+						goalDescription =
+							'Create a financial goal to work towards your dreams.';
+				}
+
 				detectionActions.push({
 					id: `detect_goal_created_${Date.now()}`,
 					type: 'detect_completion',
-					title: 'Set Your First Goal',
-					description: 'Create a financial goal to work towards your dreams.',
+					title: goalTitle,
+					description: goalDescription,
 					parameters: {},
 					priority: 'medium',
 					requiresConfirmation: false,
@@ -218,6 +354,7 @@ export default function IntelligentActions({
 			// Get fresh actions from MongoDB
 			const userActions = await IntelligentActionService.getUserActions({
 				limit: 50,
+				includeCompleted: true,
 			});
 
 			// Ensure userActions is an array
@@ -232,74 +369,199 @@ export default function IntelligentActions({
 				? updatedActions
 				: [];
 
-			setActions(safeUpdatedActions);
+			// Only update state if we got valid actions back
+			if (safeUpdatedActions.length > 0) {
+				setActions(safeUpdatedActions);
+			} else {
+				console.warn(
+					'No valid actions returned from refresh, keeping current actions'
+				);
+			}
 		} catch (error) {
 			console.error('Error refreshing detection actions:', error);
+			// Don't update state on error, keep current actions
 		} finally {
 			setRefreshing(false);
 		}
 	};
 
 	const handleActionPress = async (action: IntelligentAction) => {
+		// For detection actions, check completion status and navigate intelligently
 		if (action.type === 'detect_completion') {
-			// For detection actions, check completion status and trigger callback
 			try {
 				setRefreshing(true);
+				const result = await IntelligentActionService.detectActionCompletion(
+					action
+				);
 
-				let updatedAction: IntelligentAction | null = null;
-
-				// Check if this is a locally generated detection action
-				if (action.id.startsWith('detect_')) {
-					// For locally generated actions, check completion status directly
-					const completionResult =
-						await IntelligentActionService.checkCompletionStatus(action);
-					updatedAction = {
+				if (result.success) {
+					// Update the action with completion status
+					const updatedAction: IntelligentAction = {
 						...action,
-						executed: completionResult.isCompleted,
-						completionDetails: completionResult.completionDetails,
-						status: completionResult.isCompleted ? 'completed' : 'pending',
+						executed: true,
+						executedAt: new Date().toISOString(),
+						completionDetails: result.data,
 					};
-				} else {
-					// For MongoDB actions, refresh from server
-					const updatedActions =
-						await IntelligentActionService.refreshActionStatus([action.id]);
-					const safeUpdatedActions = Array.isArray(updatedActions)
-						? updatedActions
-						: [];
-					updatedAction =
-						safeUpdatedActions.find((a) => a.id === action.id) || null;
-				}
 
-				if (updatedAction) {
 					// Update actions list
 					setActions((prev) =>
-						prev.map((a) => (a.id === action.id ? updatedAction! : a))
+						prev.map((a) => (a.id === action.id ? updatedAction : a))
 					);
 
-					// If action was completed, trigger callback
-					if (updatedAction.executed && onActionExecuted) {
-						onActionExecuted(updatedAction, {
-							success: true,
-							data: updatedAction.completionDetails,
-							message:
-								updatedAction.completionDetails?.message ||
-								'Action completed successfully',
-						});
+					// Trigger callback
+					if (onActionExecuted) {
+						onActionExecuted(updatedAction, result);
 					}
+
+					// Check if this was the last action completed
+					checkIfLastActionCompleted(action.id);
+				} else {
+					// If not completed, navigate to the appropriate screen to help user complete it
+					handleIntelligentNavigation(action);
 				}
 			} catch (error) {
 				console.error('Error checking detection action:', error);
+				// Don't update state on error, keep current actions
 			} finally {
 				setRefreshing(false);
 			}
 			return;
 		}
 
+		// For auto-completed actions (like Monthly Financial Health Check), show completion message
+		if (
+			action.executed &&
+			action.completionDetails?.reason === 'auto_completed'
+		) {
+			// Show completion message explaining why it was auto-completed
+			Alert.alert(
+				'Already Completed',
+				action.completionDetails?.message ||
+					'This action has already been completed based on your current settings.',
+				[
+					{ text: 'OK' },
+					{
+						text: 'View Settings',
+						onPress: () => {
+							// Navigate to notification settings where the user can change the underlying preference
+							router.push('/(tabs)/settings/notification');
+						},
+					},
+				]
+			);
+			return;
+		}
+
+		// For other action types that require confirmation or execution
 		if (action.requiresConfirmation) {
 			setSelectedAction(action);
 			setModalVisible(true);
 		} else {
 			executeAction(action);
+		}
+	};
+
+	// New function to handle intelligent navigation based on action type
+	const handleIntelligentNavigation = (action: IntelligentAction) => {
+		switch (action.detectionType) {
+			case 'transaction_count':
+				// Navigate to transaction screen to add transactions
+				router.push('/(tabs)/transaction');
+				break;
+			case 'budget_created':
+				// Navigate to budgets screen with modal open
+				navigateToBudgetsWithModal();
+				break;
+			case 'goal_created':
+				// Navigate to goals screen with modal open
+				navigateToGoalsWithModal();
+				break;
+			case 'preferences_updated':
+				// Navigate to AI insights settings
+				router.push('/(tabs)/settings/aiInsights');
+				break;
+			case 'health_check_completed':
+				// Navigate to notification settings for health check preferences
+				router.push('/(tabs)/settings/notification');
+				break;
+			default:
+				// For unknown detection types, show a helpful message
+				Alert.alert(
+					'Action Required',
+					action.description || 'Please complete this action to continue.',
+					[{ text: 'OK' }]
+				);
+		}
+	};
+
+	// Function to handle intelligent navigation after action execution
+	const handleIntelligentNavigationAfterExecution = (
+		action: IntelligentAction
+	) => {
+		switch (action.type) {
+			case 'create_budget':
+				// Navigate to budgets screen to see the created budget
+				router.push('/(tabs)/budgets');
+				break;
+			case 'create_goal':
+				// Navigate to goals screen to see the created goal
+				router.push('/(tabs)/budgets/goals');
+				break;
+			case 'set_reminder':
+				// Navigate to notification settings
+				router.push('/(tabs)/settings/notification');
+				break;
+			case 'update_preferences':
+				// Navigate to AI insights settings
+				router.push('/(tabs)/settings/aiInsights');
+				break;
+			case 'export_data':
+				// Navigate to data export screen
+				router.push('/(tabs)/settings/data/exportData');
+				break;
+			default:
+				// For other action types, stay on current screen
+				break;
+		}
+	};
+
+	// Function to handle refresh and intelligent navigation
+	const handleRefreshAndNavigate = async (action: IntelligentAction) => {
+		try {
+			setRefreshing(true);
+			const result = await IntelligentActionService.detectActionCompletion(
+				action
+			);
+
+			if (result.success) {
+				// Update the action with completion status
+				const updatedAction: IntelligentAction = {
+					...action,
+					executed: true,
+					executedAt: new Date().toISOString(),
+					completionDetails: result.data,
+				};
+
+				// Update actions list
+				setActions((prev) =>
+					prev.map((a) => (a.id === action.id ? updatedAction : a))
+				);
+
+				// Trigger callback
+				if (onActionExecuted) {
+					onActionExecuted(updatedAction, result);
+				}
+
+				// Check if this was the last action completed
+				checkIfLastActionCompleted(action.id);
+			} else {
+				// If not completed, navigate to the appropriate screen to help user complete it
+				handleIntelligentNavigation(action);
+			}
+		} catch (error) {
+			console.error('Error refreshing and navigating:', error);
+		} finally {
+			setRefreshing(false);
 		}
 	};
 
@@ -321,20 +583,22 @@ export default function IntelligentActions({
 				prev.map((a) => (a.id === action.id ? updatedAction : a))
 			);
 
-			// Show result to user
-			Alert.alert(result.success ? 'Success' : 'Error', result.message, [
-				{ text: 'OK' },
-			]);
+			// Don't show success message here - let parent components handle it through onActionExecuted callback
+			// Alert.alert(result.success ? 'Success' : 'Error', result.message, [{ text: 'OK' }]);
 
 			// Call callback
 			if (onActionExecuted) {
 				onActionExecuted(updatedAction, result);
 			}
 
-			// Close modal if open
-			if (modalVisible) {
-				setModalVisible(false);
-				setSelectedAction(null);
+			// Check if this was the last action completed
+			if (result.success) {
+				checkIfLastActionCompleted(action.id);
+			}
+
+			// Handle intelligent navigation after successful execution
+			if (result.success) {
+				handleIntelligentNavigationAfterExecution(action);
 			}
 		} catch (error) {
 			console.error('Error executing action:', error);
@@ -431,6 +695,8 @@ export default function IntelligentActions({
 
 	return (
 		<View style={styles.container}>
+			{/* Don't show completion banner in modal - let parent handle completion feedback */}
+
 			<ScrollView
 				style={styles.actionsList}
 				showsVerticalScrollIndicator={false}
@@ -441,6 +707,7 @@ export default function IntelligentActions({
 						style={[
 							styles.actionCard,
 							action.executed && styles.actionCardExecuted,
+							action.executed && styles.actionCardCompleted,
 						]}
 						onPress={() => handleActionPress(action)}
 						disabled={
@@ -448,6 +715,16 @@ export default function IntelligentActions({
 							(action.executed || executingAction === action.id)
 						}
 					>
+						{action.executed && (
+							<View style={styles.completionBanner}>
+								<Ionicons name="checkmark-circle" size={16} color="#27AE60" />
+								<Text style={styles.completionBannerText}>
+									{action.type === 'detect_completion'
+										? 'Completed'
+										: 'Action Completed'}
+								</Text>
+							</View>
+						)}
 						<View style={styles.actionHeader}>
 							<View
 								style={[
@@ -462,7 +739,14 @@ export default function IntelligentActions({
 								/>
 							</View>
 							<View style={styles.actionInfo}>
-								<Text style={styles.actionTitle}>{action.title}</Text>
+								<Text
+									style={[
+										styles.actionTitle,
+										action.executed && styles.actionTitleCompleted,
+									]}
+								>
+									{action.title}
+								</Text>
 								<View style={styles.actionMeta}>
 									<View
 										style={[
@@ -502,27 +786,77 @@ export default function IntelligentActions({
 											</Text>
 										</View>
 									)}
+									{action.executed && action.type !== 'detect_completion' && (
+										<View
+											style={[
+												styles.statusBadge,
+												{ backgroundColor: '#E8F5E8' },
+											]}
+										>
+											<Ionicons
+												name="checkmark-circle"
+												size={12}
+												color="#27AE60"
+											/>
+											<Text style={[styles.statusText, { color: '#27AE60' }]}>
+												Completed
+											</Text>
+										</View>
+									)}
 									{action.requiresConfirmation && (
-										<View style={styles.confirmationBadge}>
+										<TouchableOpacity
+											style={styles.confirmationBadge}
+											onPress={() => {
+												Alert.alert(
+													'Review Required',
+													'This action requires your review before execution. Tap the action to see details and confirm.',
+													[{ text: 'OK' }]
+												);
+											}}
+										>
 											<Ionicons
 												name="shield-checkmark"
 												size={12}
 												color="#4A90E2"
 											/>
 											<Text style={styles.confirmationText}>
-												Confirmation Required
+												Review Required
 											</Text>
-										</View>
+											<Ionicons
+												name="information-circle"
+												size={12}
+												color="#4A90E2"
+												style={{ marginLeft: 4 }}
+											/>
+										</TouchableOpacity>
 									)}
 								</View>
 							</View>
 							{action.executed ? (
-								<Ionicons name="checkmark-circle" size={24} color="#66BB6A" />
+								// For auto-completed actions, show toggle button
+								action.completionDetails?.reason === 'auto_completed' ? (
+									<TouchableOpacity
+										onPress={() => handleActionPress(action)}
+										disabled={executingAction === action.id}
+									>
+										{executingAction === action.id ? (
+											<ActivityIndicator size="small" color="#4A90E2" />
+										) : (
+											<Ionicons
+												name="checkmark-circle"
+												size={24}
+												color="#66BB6A"
+											/>
+										)}
+									</TouchableOpacity>
+								) : (
+									<Ionicons name="checkmark-circle" size={24} color="#66BB6A" />
+								)
 							) : executingAction === action.id ? (
 								<ActivityIndicator size="small" color="#4A90E2" />
 							) : action.type === 'detect_completion' ? (
 								<TouchableOpacity
-									onPress={() => refreshDetectionActions()}
+									onPress={() => handleRefreshAndNavigate(action)}
 									disabled={refreshing}
 								>
 									{refreshing ? (
@@ -535,13 +869,37 @@ export default function IntelligentActions({
 								<Ionicons name="chevron-forward" size={20} color="#CCC" />
 							)}
 						</View>
-						<Text style={styles.actionDescription}>{action.description}</Text>
+						<Text
+							style={[
+								styles.actionDescription,
+								action.executed && styles.actionDescriptionCompleted,
+							]}
+						>
+							{action.description}
+						</Text>
 						{action.executed && action.executedAt && (
 							<Text style={styles.executedText}>
 								{action.type === 'detect_completion' ? 'Completed' : 'Executed'}{' '}
 								on {new Date(action.executedAt).toLocaleDateString()}
 							</Text>
 						)}
+						{/* Show auto-completion message */}
+						{action.executed &&
+							action.completionDetails?.reason === 'auto_completed' && (
+								<View style={styles.autoCompletedMessage}>
+									<Ionicons name="checkmark-circle" size={16} color="#66BB6A" />
+									<Text style={styles.autoCompletedText}>
+										{action.completionDetails?.message ||
+											'Automatically completed based on your settings'}
+									</Text>
+									<TouchableOpacity
+										style={styles.settingsLink}
+										onPress={() => router.push('/(tabs)/settings/notification')}
+									>
+										<Text style={styles.settingsLinkText}>Change Settings</Text>
+									</TouchableOpacity>
+								</View>
+							)}
 						{action.error && (
 							<Text style={styles.errorText}>Error: {action.error}</Text>
 						)}
@@ -614,6 +972,7 @@ const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 		backgroundColor: '#fff',
+		paddingTop: 8,
 	},
 	loadingContainer: {
 		flex: 1,
@@ -646,7 +1005,6 @@ const styles = StyleSheet.create({
 	},
 	actionsList: {
 		flex: 1,
-
 	},
 	actionCard: {
 		backgroundColor: '#fff',
@@ -664,6 +1022,18 @@ const styles = StyleSheet.create({
 	actionCardExecuted: {
 		backgroundColor: '#f8f9fa',
 		borderColor: '#e9ecef',
+		opacity: 0.8,
+	},
+	actionCardCompleted: {
+		backgroundColor: '#E8F5E8',
+		borderColor: '#66BB6A',
+		borderWidth: 2,
+		shadowColor: '#66BB6A',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.1,
+		shadowRadius: 4,
+		elevation: 4,
+		position: 'relative',
 	},
 	actionHeader: {
 		flexDirection: 'row',
@@ -686,6 +1056,10 @@ const styles = StyleSheet.create({
 		fontWeight: '600',
 		color: '#333',
 		marginBottom: 4,
+	},
+	actionTitleCompleted: {
+		textDecorationLine: 'line-through',
+		color: '#999',
 	},
 	actionMeta: {
 		flexDirection: 'row',
@@ -733,11 +1107,20 @@ const styles = StyleSheet.create({
 		color: '#666',
 		lineHeight: 20,
 	},
+	actionDescriptionCompleted: {
+		textDecorationLine: 'line-through',
+		color: '#999',
+	},
 	executedText: {
 		fontSize: 12,
 		color: '#66BB6A',
 		marginTop: 8,
 		fontWeight: '500',
+		backgroundColor: '#E8F5E8',
+		paddingHorizontal: 8,
+		paddingVertical: 4,
+		borderRadius: 4,
+		alignSelf: 'flex-start',
 	},
 	errorText: {
 		fontSize: 12,
@@ -815,5 +1198,56 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		fontWeight: '600',
 		color: '#fff',
+	},
+	completionBanner: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#E8F5E8',
+		padding: 8,
+		borderRadius: 6,
+		marginBottom: 12,
+		borderWidth: 1,
+		borderColor: '#66BB6A',
+	},
+	completionText: {
+		marginLeft: 8,
+		color: '#2E7D32',
+		fontSize: 14,
+		fontWeight: '500',
+	},
+	completionBannerText: {
+		marginLeft: 8,
+		fontSize: 13,
+		color: '#27AE60',
+		fontWeight: '600',
+		textTransform: 'uppercase',
+		letterSpacing: 0.5,
+	},
+	autoCompletedMessage: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#E8F5E8',
+		padding: 8,
+		borderRadius: 6,
+		marginTop: 8,
+		borderWidth: 1,
+		borderColor: '#66BB6A',
+	},
+	autoCompletedText: {
+		flex: 1,
+		fontSize: 12,
+		color: '#2E7D32',
+		marginLeft: 4,
+	},
+	settingsLink: {
+		paddingHorizontal: 8,
+		paddingVertical: 4,
+		backgroundColor: '#66BB6A',
+		borderRadius: 4,
+	},
+	settingsLinkText: {
+		fontSize: 11,
+		color: '#fff',
+		fontWeight: '500',
 	},
 });

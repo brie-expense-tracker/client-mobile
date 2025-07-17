@@ -260,29 +260,10 @@ export default function BudgetScreen() {
 				<Text style={styles.emptySubtext}>
 					Create your first budget to start tracking your spending
 				</Text>
-				<View style={styles.emptyButtonsContainer}>
-					<RectButton style={styles.emptyAddButton} onPress={showModal}>
-						<Ionicons name="add" size={20} color="#fff" />
-						<Text style={styles.emptyAddButtonText}>Add Budget</Text>
-					</RectButton>
-					<RectButton
-						style={styles.emptyRefreshButton}
-						onPress={handleRefresh}
-						enabled={!refreshing}
-					>
-						<Ionicons
-							name={refreshing ? 'sync' : 'refresh'}
-							size={20}
-							color="#00a2ff"
-							style={
-								refreshing ? { transform: [{ rotate: '360deg' }] } : undefined
-							}
-						/>
-						<Text style={styles.emptyRefreshButtonText}>
-							{refreshing ? 'Refreshing...' : 'Refresh'}
-						</Text>
-					</RectButton>
-				</View>
+				<RectButton style={styles.emptyAddButton} onPress={showModal}>
+					<Ionicons name="add" size={20} color="#fff" />
+					<Text style={styles.emptyAddButtonText}>Add Budget</Text>
+				</RectButton>
 			</View>
 		</View>
 	);

@@ -3,7 +3,7 @@ import { router, Stack } from 'expo-router';
 import { BorderlessButton } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function _layout() {
+export default function Layout() {
 	const [isPressed, setIsPressed] = useState(false);
 	return (
 		<Stack>

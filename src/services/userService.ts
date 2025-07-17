@@ -42,6 +42,8 @@ export interface Profile {
 			overspendingAlert: boolean;
 			aiSuggestion: boolean;
 			budgetMilestones: boolean;
+			monthlyFinancialCheck: boolean;
+			monthlySavingsTransfer: boolean;
 		};
 		budgetSettings?: {
 			cycleType: 'monthly' | 'weekly' | 'biweekly';
