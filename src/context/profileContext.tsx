@@ -7,6 +7,7 @@ import React, {
 } from 'react';
 import { ApiService } from '../services/apiService';
 import useAuth from './AuthContext';
+import { ProgressionData } from '../services/progressionService';
 
 interface ProfilePreferences {
 	adviceFrequency: string;
@@ -98,8 +99,11 @@ interface Profile {
 	debt: number;
 	riskProfile: RiskProfile;
 	preferences: ProfilePreferences;
+	progression?: ProgressionData;
 	phone?: string;
 	email?: string;
+	tutorialCompleted?: boolean;
+	aiCoachSeen?: boolean;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -125,6 +129,7 @@ interface ProfileContextType {
 	updateGoalSettings: (
 		settings: Partial<ProfilePreferences['goalSettings']>
 	) => Promise<void>;
+	markAICoachSeen: () => Promise<void>;
 	refreshProfile: () => Promise<void>;
 }
 
@@ -624,6 +629,12 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 		}
 	};
 
+	const markAICoachSeen = async () => {
+		if (profile) {
+			await updateProfile({ aiCoachSeen: true });
+		}
+	};
+
 	const refreshProfile = async () => {
 		await fetchProfile();
 	};
@@ -654,6 +665,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 		updateAIInsightsSettings,
 		updateBudgetSettings,
 		updateGoalSettings,
+		markAICoachSeen,
 		refreshProfile,
 	};
 

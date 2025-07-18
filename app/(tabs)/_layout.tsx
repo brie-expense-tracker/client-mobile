@@ -1,28 +1,29 @@
-import { Tabs } from 'expo-router';
+import { Tabs , router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { BudgetProvider } from '../../src/context/budgetContext';
 import { GoalProvider } from '../../src/context/goalContext';
 import { ProfileProvider } from '../../src/context/profileContext';
-import React, { useState } from 'react';
+import { useTransactionModal } from '../../src/context/transactionModalContext';
+import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import RNModal from 'react-native-modal';
-import { router } from 'expo-router';
 import { RectButton } from 'react-native-gesture-handler';
 
 export default function TabLayout() {
-	const [showTransactionModal, setShowTransactionModal] = useState(false);
+	const { isModalVisible, showTransactionModal, hideTransactionModal } =
+		useTransactionModal();
 
 	const handleTransactionTabPress = () => {
-		setShowTransactionModal(true);
+		showTransactionModal();
 	};
 
 	const navigateToAddTransaction = () => {
-		setShowTransactionModal(false);
+		hideTransactionModal();
 		router.replace('/transaction');
 	};
 
 	const navigateToAddExpense = () => {
-		setShowTransactionModal(false);
+		hideTransactionModal();
 		router.replace('/transaction/expense');
 	};
 
@@ -112,8 +113,8 @@ export default function TabLayout() {
 
 					{/* Transaction Choice Modal */}
 					<RNModal
-						isVisible={showTransactionModal}
-						onBackdropPress={() => setShowTransactionModal(false)}
+						isVisible={isModalVisible}
+						onBackdropPress={hideTransactionModal}
 						animationIn="slideInUp"
 						animationOut="slideOutDown"
 						backdropOpacity={0.5}
@@ -145,7 +146,7 @@ export default function TabLayout() {
 
 							<RectButton
 								style={styles.cancelButton}
-								onPress={() => setShowTransactionModal(false)}
+								onPress={hideTransactionModal}
 							>
 								<Text style={styles.cancelButtonText}>Cancel</Text>
 							</RectButton>

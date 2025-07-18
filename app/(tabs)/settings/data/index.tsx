@@ -8,8 +8,7 @@ import {
 	StyleSheet,
 	Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Stack } from 'expo-router';
+import { useRouter , Stack } from 'expo-router';
 import { RectButton } from 'react-native-gesture-handler';
 import { useProfile } from '../../../../src/context/profileContext';
 

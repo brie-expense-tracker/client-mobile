@@ -22,6 +22,8 @@ import {
 	navigateToBudgetsWithModal,
 	navigateToGoalsWithModal,
 } from '../utils/navigationUtils';
+import { useTransactionModal } from '../context/transactionModalContext';
+import { useProgression } from '../context/progressionContext';
 
 interface IntelligentActionsProps {
 	insight: AIInsight;
@@ -42,6 +44,8 @@ export default function IntelligentActions({
 	onAllActionsCompleted, // Add new prop
 }: IntelligentActionsProps) {
 	const router = useRouter();
+	const { showTransactionModal } = useTransactionModal();
+	const { checkProgression } = useProgression();
 	const [actions, setActions] = useState<IntelligentAction[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [executingAction, setExecutingAction] = useState<string | null>(null);
@@ -52,28 +56,40 @@ export default function IntelligentActions({
 	const [allActionsCompleted, setAllActionsCompleted] = useState(false); // Track completion status
 	const [completionCallbackTriggered, setCompletionCallbackTriggered] =
 		useState(false); // Prevent duplicate alerts
+	const [globalRefreshing, setGlobalRefreshing] = useState(false); // For global refresh
+
+	// Helper function to safely get action ID
+	const getActionId = (action: IntelligentAction): string => {
+		return (
+			action.id ||
+			(action as any)._id ||
+			`action_${Date.now()}_${Math.random()}`
+		);
+	};
 
 	useEffect(() => {
 		analyzeInsight();
 	}, [insight]);
 
-	// Auto-refresh detection actions every 30 seconds
-	useEffect(() => {
-		const interval = setInterval(() => {
-			refreshDetectionActions();
-		}, 30000);
-
-		return () => clearInterval(interval);
-	}, [actions]);
-
 	// Function to check if this is the last action being completed
 	const checkIfLastActionCompleted = useCallback(
-		(completedActionId: string) => {
+		async (completedActionId: string) => {
 			if (actions.length === 0) return false;
 
 			// Check if all actions are completed
 			const allCompleted = actions.every((action) => action.executed);
 			setAllActionsCompleted(allCompleted);
+
+			// Trigger progression update when any action is completed
+			try {
+				console.log('🔄 Triggering progression update after action completion');
+				await checkProgression();
+			} catch (error) {
+				console.error(
+					'Error updating progression after action completion:',
+					error
+				);
+			}
 
 			// If all actions are completed and we haven't triggered the callback yet
 			if (
@@ -88,7 +104,12 @@ export default function IntelligentActions({
 
 			return false;
 		},
-		[actions, onAllActionsCompleted, completionCallbackTriggered]
+		[
+			actions,
+			onAllActionsCompleted,
+			completionCallbackTriggered,
+			checkProgression,
+		]
 	);
 
 	// Reset completion callback flag when actions change (new insight loaded)
@@ -102,6 +123,55 @@ export default function IntelligentActions({
 		setCompletionCallbackTriggered(false);
 		setAllActionsCompleted(false);
 	}, []); // Reset when component mounts
+
+	// Calculate completion statistics
+	const completionStats = {
+		total: actions.length,
+		completed: actions.filter((action) => action.executed).length,
+		pending: actions.filter((action) => !action.executed).length,
+		percentage:
+			actions.length > 0
+				? Math.round(
+						(actions.filter((action) => action.executed).length /
+							actions.length) *
+							100
+				  )
+				: 0,
+	};
+
+	// Global refresh function
+	const handleGlobalRefresh = async () => {
+		try {
+			setGlobalRefreshing(true);
+			await refreshDetectionActions();
+
+			// Recalculate stats after refresh
+			const updatedStats = {
+				total: actions.length,
+				completed: actions.filter((action) => action.executed).length,
+				pending: actions.filter((action) => !action.executed).length,
+				percentage:
+					actions.length > 0
+						? Math.round(
+								(actions.filter((action) => action.executed).length /
+									actions.length) *
+									100
+						  )
+						: 0,
+			};
+
+			// No alert shown on successful refresh
+		} catch (error) {
+			console.error('Error during global refresh:', error);
+			// Only show error alert if refresh fails
+			Alert.alert(
+				'Refresh Error',
+				'Failed to refresh action status. Please try again.'
+			);
+		} finally {
+			setGlobalRefreshing(false);
+		}
+	};
 
 	const analyzeInsight = async () => {
 		try {
@@ -403,9 +473,11 @@ export default function IntelligentActions({
 						completionDetails: result.data,
 					};
 
-					// Update actions list
+					// Update actions list immediately
 					setActions((prev) =>
-						prev.map((a) => (a.id === action.id ? updatedAction : a))
+						prev.map((a) =>
+							getActionId(a) === getActionId(action) ? updatedAction : a
+						)
 					);
 
 					// Trigger callback
@@ -414,14 +486,28 @@ export default function IntelligentActions({
 					}
 
 					// Check if this was the last action completed
-					checkIfLastActionCompleted(action.id);
+					await checkIfLastActionCompleted(getActionId(action));
+
+					// Show immediate feedback
+					setTimeout(() => {
+						Alert.alert(
+							'✅ Action Completed!',
+							`${action.title}\n\n${
+								result.message || 'Action has been completed!'
+							}`,
+							[{ text: 'OK' }]
+						);
+					}, 100);
 				} else {
 					// If not completed, navigate to the appropriate screen to help user complete it
 					handleIntelligentNavigation(action);
 				}
 			} catch (error) {
 				console.error('Error checking detection action:', error);
-				// Don't update state on error, keep current actions
+				Alert.alert(
+					'Error',
+					'Failed to check action status. Please try again.'
+				);
 			} finally {
 				setRefreshing(false);
 			}
@@ -465,8 +551,8 @@ export default function IntelligentActions({
 	const handleIntelligentNavigation = (action: IntelligentAction) => {
 		switch (action.detectionType) {
 			case 'transaction_count':
-				// Navigate to transaction screen to add transactions
-				router.push('/(tabs)/transaction');
+				// Show transaction modal instead of navigating directly
+				showTransactionModal();
 				break;
 			case 'budget_created':
 				// Navigate to budgets screen with modal open
@@ -525,8 +611,8 @@ export default function IntelligentActions({
 		}
 	};
 
-	// Function to handle refresh and intelligent navigation
-	const handleRefreshAndNavigate = async (action: IntelligentAction) => {
+	// Function to handle refresh of action status
+	const handleRefreshActionStatus = async (action: IntelligentAction) => {
 		try {
 			setRefreshing(true);
 			const result = await IntelligentActionService.detectActionCompletion(
@@ -542,9 +628,11 @@ export default function IntelligentActions({
 					completionDetails: result.data,
 				};
 
-				// Update actions list
+				// Update actions list immediately
 				setActions((prev) =>
-					prev.map((a) => (a.id === action.id ? updatedAction : a))
+					prev.map((a) =>
+						getActionId(a) === getActionId(action) ? updatedAction : a
+					)
 				);
 
 				// Trigger callback
@@ -553,13 +641,38 @@ export default function IntelligentActions({
 				}
 
 				// Check if this was the last action completed
-				checkIfLastActionCompleted(action.id);
+				await checkIfLastActionCompleted(getActionId(action));
+
+				// Show immediate feedback for successful detection
+				setTimeout(() => {
+					Alert.alert(
+						'✅ Action Detected as Completed!',
+						`${action.title}\n\n${
+							result.message || 'Action has been completed!'
+						}`,
+						[{ text: 'OK' }]
+					);
+				}, 100);
 			} else {
-				// If not completed, navigate to the appropriate screen to help user complete it
-				handleIntelligentNavigation(action);
+				// If not completed, show helpful message
+				Alert.alert(
+					'⏳ Action Not Yet Completed',
+					`${action.title}\n\n${
+						result.message ||
+						'This action has not been completed yet. Complete the required steps and try refreshing again.'
+					}`,
+					[
+						{ text: 'OK' },
+						{
+							text: 'Navigate to Complete',
+							onPress: () => handleIntelligentNavigation(action),
+						},
+					]
+				);
 			}
 		} catch (error) {
-			console.error('Error refreshing and navigating:', error);
+			console.error('Error refreshing action status:', error);
+			Alert.alert('Error', 'Failed to check action status. Please try again.');
 		} finally {
 			setRefreshing(false);
 		}
@@ -567,7 +680,7 @@ export default function IntelligentActions({
 
 	const executeAction = async (action: IntelligentAction) => {
 		try {
-			setExecutingAction(action.id);
+			setExecutingAction(getActionId(action));
 			const result = await IntelligentActionService.executeAction(action);
 
 			// Update the action with execution result
@@ -576,15 +689,21 @@ export default function IntelligentActions({
 				executed: result.success,
 				executedAt: result.success ? new Date().toISOString() : undefined,
 				error: result.success ? undefined : result.error,
+				completionDetails: result.success
+					? {
+							reason: 'executed',
+							message: result.message,
+							timestamp: new Date().toISOString(),
+					  }
+					: undefined,
 			};
 
-			// Update actions list
+			// Update actions list immediately
 			setActions((prev) =>
-				prev.map((a) => (a.id === action.id ? updatedAction : a))
+				prev.map((a) =>
+					getActionId(a) === getActionId(action) ? updatedAction : a
+				)
 			);
-
-			// Don't show success message here - let parent components handle it through onActionExecuted callback
-			// Alert.alert(result.success ? 'Success' : 'Error', result.message, [{ text: 'OK' }]);
 
 			// Call callback
 			if (onActionExecuted) {
@@ -593,12 +712,26 @@ export default function IntelligentActions({
 
 			// Check if this was the last action completed
 			if (result.success) {
-				checkIfLastActionCompleted(action.id);
+				await checkIfLastActionCompleted(getActionId(action));
 			}
 
 			// Handle intelligent navigation after successful execution
 			if (result.success) {
 				handleIntelligentNavigationAfterExecution(action);
+			}
+
+			// Show immediate feedback for successful execution
+			if (result.success) {
+				// Small delay to ensure UI updates are visible
+				setTimeout(() => {
+					Alert.alert(
+						'✅ Action Completed!',
+						`${action.title}\n\n${
+							result.message || 'Action completed successfully!'
+						}`,
+						[{ text: 'OK' }]
+					);
+				}, 100);
 			}
 		} catch (error) {
 			console.error('Error executing action:', error);
@@ -695,216 +828,308 @@ export default function IntelligentActions({
 
 	return (
 		<View style={styles.container}>
-			{/* Don't show completion banner in modal - let parent handle completion feedback */}
+			{/* Completion Summary Section */}
+			{actions.length > 0 && (
+				<View style={styles.completionSummary}>
+					<View style={styles.summaryHeader}>
+						<Text style={styles.summaryTitle}>Progress Summary</Text>
+						<TouchableOpacity
+							onPress={handleGlobalRefresh}
+							disabled={globalRefreshing}
+							style={styles.refreshButton}
+						>
+							{globalRefreshing ? (
+								<ActivityIndicator size="small" color="#4A90E2" />
+							) : (
+								<Ionicons name="refresh" size={16} color="#4A90E2" />
+							)}
+						</TouchableOpacity>
+					</View>
+					<View style={styles.progressBar}>
+						<View
+							style={[
+								styles.progressFill,
+								{ width: `${completionStats.percentage}%` },
+							]}
+						/>
+					</View>
+					<View style={styles.statsRow}>
+						<View style={styles.statItem}>
+							<Text style={styles.statNumber}>{completionStats.completed}</Text>
+							<Text style={styles.statLabel}>Completed</Text>
+						</View>
+						<View style={styles.statItem}>
+							<Text style={styles.statNumber}>{completionStats.pending}</Text>
+							<Text style={styles.statLabel}>Pending</Text>
+						</View>
+						<View style={styles.statItem}>
+							<Text style={styles.statNumber}>
+								{completionStats.percentage}%
+							</Text>
+							<Text style={styles.statLabel}>Progress</Text>
+						</View>
+					</View>
+				</View>
+			)}
 
 			<ScrollView
 				style={styles.actionsList}
 				showsVerticalScrollIndicator={false}
 			>
-				{actions.map((action) => (
-					<TouchableOpacity
-						key={action.id}
-						style={[
-							styles.actionCard,
-							action.executed && styles.actionCardExecuted,
-							action.executed && styles.actionCardCompleted,
-						]}
-						onPress={() => handleActionPress(action)}
-						disabled={
-							action.type !== 'detect_completion' &&
-							(action.executed || executingAction === action.id)
-						}
-					>
-						{action.executed && (
-							<View style={styles.completionBanner}>
-								<Ionicons name="checkmark-circle" size={16} color="#27AE60" />
-								<Text style={styles.completionBannerText}>
-									{action.type === 'detect_completion'
-										? 'Completed'
-										: 'Action Completed'}
-								</Text>
-							</View>
-						)}
-						<View style={styles.actionHeader}>
-							<View
+				{actions
+					.sort((a, b) => {
+						// Sort by completion status: uncompleted first, then completed
+						if (a.executed && !b.executed) return 1;
+						if (!a.executed && b.executed) return -1;
+						// If both have same completion status, maintain original order
+						return 0;
+					})
+					.map((action, index) => {
+						// Ensure each action has a unique key
+						const actionKey = getActionId(action);
+
+						return (
+							<TouchableOpacity
+								key={actionKey}
 								style={[
-									styles.actionIconContainer,
-									{ backgroundColor: getActionColor(action.type) + '20' },
+									styles.actionCard,
+									action.executed && styles.actionCardExecuted,
+									action.executed && styles.actionCardCompleted,
 								]}
+								onPress={() => handleActionPress(action)}
+								disabled={
+									action.type !== 'detect_completion' &&
+									(action.executed || executingAction === actionKey)
+								}
 							>
-								<Ionicons
-									name={getActionIcon(action.type)}
-									size={20}
-									color={getActionColor(action.type)}
-								/>
-							</View>
-							<View style={styles.actionInfo}>
-								<Text
-									style={[
-										styles.actionTitle,
-										action.executed && styles.actionTitleCompleted,
-									]}
-								>
-									{action.title}
-								</Text>
-								<View style={styles.actionMeta}>
-									<View
-										style={[
-											styles.priorityBadge,
-											{ backgroundColor: getPriorityColor(action.priority) },
-										]}
-									>
-										<Text style={styles.priorityText}>
-											{action.priority.toUpperCase()}
+								{action.executed && (
+									<View style={styles.completionBanner}>
+										<Ionicons
+											name="checkmark-circle"
+											size={16}
+											color="#27AE60"
+										/>
+										<Text style={styles.completionBannerText}>
+											{action.type === 'detect_completion'
+												? 'Completed'
+												: 'Action Completed'}
 										</Text>
 									</View>
-									{action.type === 'detect_completion' && (
-										<View
+								)}
+								{(executingAction === actionKey || refreshing) && (
+									<View style={styles.processingBanner}>
+										<ActivityIndicator size="small" color="#4A90E2" />
+										<Text style={styles.processingBannerText}>
+											{executingAction === actionKey
+												? 'Processing...'
+												: 'Checking...'}
+										</Text>
+									</View>
+								)}
+								<View style={styles.actionHeader}>
+									<View
+										style={[
+											styles.actionIconContainer,
+											{ backgroundColor: getActionColor(action.type) + '20' },
+										]}
+									>
+										<Ionicons
+											name={getActionIcon(action.type)}
+											size={20}
+											color={getActionColor(action.type)}
+										/>
+									</View>
+									<View style={styles.actionInfo}>
+										<Text
 											style={[
-												styles.statusBadge,
-												{
-													backgroundColor: action.executed
-														? '#E8F5E8'
-														: '#FFF3CD',
-												},
+												styles.actionTitle,
+												action.executed && styles.actionTitleCompleted,
 											]}
 										>
-											<Ionicons
-												name={
-													action.executed ? 'checkmark-circle' : 'time-outline'
-												}
-												size={12}
-												color={action.executed ? '#27AE60' : '#F39C12'}
-											/>
-											<Text
+											{action.title}
+										</Text>
+										<View style={styles.actionMeta}>
+											<View
 												style={[
-													styles.statusText,
-													{ color: action.executed ? '#27AE60' : '#F39C12' },
+													styles.priorityBadge,
+													{
+														backgroundColor: getPriorityColor(action.priority),
+													},
 												]}
 											>
-												{getActionStatusText(action)}
-											</Text>
+												<Text style={styles.priorityText}>
+													{action.priority.toUpperCase()}
+												</Text>
+											</View>
+											{action.type === 'detect_completion' && (
+												<View
+													style={[
+														styles.statusBadge,
+														{
+															backgroundColor: action.executed
+																? '#E8F5E8'
+																: '#FFF3CD',
+														},
+													]}
+												>
+													<Ionicons
+														name={
+															action.executed
+																? 'checkmark-circle'
+																: 'time-outline'
+														}
+														size={12}
+														color={action.executed ? '#27AE60' : '#F39C12'}
+													/>
+													<Text
+														style={[
+															styles.statusText,
+															{
+																color: action.executed ? '#27AE60' : '#F39C12',
+															},
+														]}
+													>
+														{getActionStatusText(action)}
+													</Text>
+												</View>
+											)}
+											{action.executed &&
+												action.type !== 'detect_completion' && (
+													<View
+														style={[
+															styles.statusBadge,
+															{ backgroundColor: '#E8F5E8' },
+														]}
+													>
+														<Ionicons
+															name="checkmark-circle"
+															size={12}
+															color="#27AE60"
+														/>
+														<Text
+															style={[styles.statusText, { color: '#27AE60' }]}
+														>
+															Completed
+														</Text>
+													</View>
+												)}
+											{action.requiresConfirmation && (
+												<TouchableOpacity
+													style={styles.confirmationBadge}
+													onPress={() => {
+														Alert.alert(
+															'Review Required',
+															'This action requires your review before execution. Tap the action to see details and confirm.',
+															[{ text: 'OK' }]
+														);
+													}}
+												>
+													<Ionicons
+														name="shield-checkmark"
+														size={12}
+														color="#4A90E2"
+													/>
+													<Text style={styles.confirmationText}>
+														Review Required
+													</Text>
+													<Ionicons
+														name="information-circle"
+														size={12}
+														color="#4A90E2"
+														style={{ marginLeft: 4 }}
+													/>
+												</TouchableOpacity>
+											)}
 										</View>
-									)}
-									{action.executed && action.type !== 'detect_completion' && (
-										<View
-											style={[
-												styles.statusBadge,
-												{ backgroundColor: '#E8F5E8' },
-											]}
-										>
-											<Ionicons
-												name="checkmark-circle"
-												size={12}
-												color="#27AE60"
-											/>
-											<Text style={[styles.statusText, { color: '#27AE60' }]}>
-												Completed
-											</Text>
-										</View>
-									)}
-									{action.requiresConfirmation && (
-										<TouchableOpacity
-											style={styles.confirmationBadge}
-											onPress={() => {
-												Alert.alert(
-													'Review Required',
-													'This action requires your review before execution. Tap the action to see details and confirm.',
-													[{ text: 'OK' }]
-												);
-											}}
-										>
-											<Ionicons
-												name="shield-checkmark"
-												size={12}
-												color="#4A90E2"
-											/>
-											<Text style={styles.confirmationText}>
-												Review Required
-											</Text>
-											<Ionicons
-												name="information-circle"
-												size={12}
-												color="#4A90E2"
-												style={{ marginLeft: 4 }}
-											/>
-										</TouchableOpacity>
-									)}
-								</View>
-							</View>
-							{action.executed ? (
-								// For auto-completed actions, show toggle button
-								action.completionDetails?.reason === 'auto_completed' ? (
-									<TouchableOpacity
-										onPress={() => handleActionPress(action)}
-										disabled={executingAction === action.id}
-									>
-										{executingAction === action.id ? (
-											<ActivityIndicator size="small" color="#4A90E2" />
+									</View>
+									{action.executed ? (
+										// For auto-completed actions, show toggle button
+										action.completionDetails?.reason === 'auto_completed' ? (
+											<TouchableOpacity
+												onPress={() => handleActionPress(action)}
+												disabled={executingAction === actionKey}
+											>
+												{executingAction === actionKey ? (
+													<ActivityIndicator size="small" color="#4A90E2" />
+												) : (
+													<Ionicons
+														name="checkmark-circle"
+														size={24}
+														color="#66BB6A"
+													/>
+												)}
+											</TouchableOpacity>
 										) : (
 											<Ionicons
 												name="checkmark-circle"
 												size={24}
 												color="#66BB6A"
 											/>
-										)}
-									</TouchableOpacity>
-								) : (
-									<Ionicons name="checkmark-circle" size={24} color="#66BB6A" />
-								)
-							) : executingAction === action.id ? (
-								<ActivityIndicator size="small" color="#4A90E2" />
-							) : action.type === 'detect_completion' ? (
-								<TouchableOpacity
-									onPress={() => handleRefreshAndNavigate(action)}
-									disabled={refreshing}
-								>
-									{refreshing ? (
+										)
+									) : executingAction === actionKey ? (
 										<ActivityIndicator size="small" color="#4A90E2" />
+									) : action.type === 'detect_completion' ? (
+										<TouchableOpacity
+											onPress={() => handleRefreshActionStatus(action)}
+											disabled={refreshing}
+										>
+											{refreshing ? (
+												<ActivityIndicator size="small" color="#4A90E2" />
+											) : (
+												<Ionicons name="refresh" size={20} color="#4A90E2" />
+											)}
+										</TouchableOpacity>
 									) : (
-										<Ionicons name="refresh" size={20} color="#4A90E2" />
+										<Ionicons name="chevron-forward" size={20} color="#CCC" />
 									)}
-								</TouchableOpacity>
-							) : (
-								<Ionicons name="chevron-forward" size={20} color="#CCC" />
-							)}
-						</View>
-						<Text
-							style={[
-								styles.actionDescription,
-								action.executed && styles.actionDescriptionCompleted,
-							]}
-						>
-							{action.description}
-						</Text>
-						{action.executed && action.executedAt && (
-							<Text style={styles.executedText}>
-								{action.type === 'detect_completion' ? 'Completed' : 'Executed'}{' '}
-								on {new Date(action.executedAt).toLocaleDateString()}
-							</Text>
-						)}
-						{/* Show auto-completion message */}
-						{action.executed &&
-							action.completionDetails?.reason === 'auto_completed' && (
-								<View style={styles.autoCompletedMessage}>
-									<Ionicons name="checkmark-circle" size={16} color="#66BB6A" />
-									<Text style={styles.autoCompletedText}>
-										{action.completionDetails?.message ||
-											'Automatically completed based on your settings'}
-									</Text>
-									<TouchableOpacity
-										style={styles.settingsLink}
-										onPress={() => router.push('/(tabs)/settings/notification')}
-									>
-										<Text style={styles.settingsLinkText}>Change Settings</Text>
-									</TouchableOpacity>
 								</View>
-							)}
-						{action.error && (
-							<Text style={styles.errorText}>Error: {action.error}</Text>
-						)}
-					</TouchableOpacity>
-				))}
+								<Text
+									style={[
+										styles.actionDescription,
+										action.executed && styles.actionDescriptionCompleted,
+									]}
+								>
+									{action.description}
+								</Text>
+								{action.executed && action.executedAt && (
+									<Text style={styles.executedText}>
+										{action.type === 'detect_completion'
+											? 'Completed'
+											: 'Executed'}{' '}
+										on {new Date(action.executedAt).toLocaleDateString()}
+									</Text>
+								)}
+								{/* Show auto-completion message */}
+								{action.executed &&
+									action.completionDetails?.reason === 'auto_completed' && (
+										<View style={styles.autoCompletedMessage}>
+											<Ionicons
+												name="checkmark-circle"
+												size={16}
+												color="#66BB6A"
+											/>
+											<Text style={styles.autoCompletedText}>
+												{action.completionDetails?.message ||
+													'Automatically completed based on your settings'}
+											</Text>
+											<TouchableOpacity
+												style={styles.settingsLink}
+												onPress={() =>
+													router.push('/(tabs)/settings/notification')
+												}
+											>
+												<Text style={styles.settingsLinkText}>
+													Change Settings
+												</Text>
+											</TouchableOpacity>
+										</View>
+									)}
+								{action.error && (
+									<Text style={styles.errorText}>Error: {action.error}</Text>
+								)}
+							</TouchableOpacity>
+						);
+					})}
 			</ScrollView>
 
 			{/* Confirmation Modal */}
@@ -1249,5 +1474,80 @@ const styles = StyleSheet.create({
 		fontSize: 11,
 		color: '#fff',
 		fontWeight: '500',
+	},
+	// Completion Summary Styles
+	completionSummary: {
+		backgroundColor: '#f8f9fa',
+		borderRadius: 12,
+		padding: 16,
+		marginBottom: 16,
+		borderWidth: 1,
+		borderColor: '#e9ecef',
+	},
+	summaryHeader: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		marginBottom: 12,
+	},
+	summaryTitle: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#333',
+	},
+	refreshButton: {
+		padding: 8,
+		borderRadius: 8,
+		backgroundColor: '#fff',
+		borderWidth: 1,
+		borderColor: '#e9ecef',
+	},
+	progressBar: {
+		height: 8,
+		backgroundColor: '#e9ecef',
+		borderRadius: 4,
+		marginBottom: 12,
+		overflow: 'hidden',
+	},
+	progressFill: {
+		height: '100%',
+		backgroundColor: '#4CAF50',
+		borderRadius: 4,
+	},
+	statsRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-around',
+	},
+	statItem: {
+		alignItems: 'center',
+	},
+	statNumber: {
+		fontSize: 18,
+		fontWeight: '700',
+		color: '#333',
+		marginBottom: 2,
+	},
+	statLabel: {
+		fontSize: 12,
+		color: '#666',
+		fontWeight: '500',
+	},
+	processingBanner: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#E3F2FD',
+		padding: 8,
+		borderRadius: 6,
+		marginBottom: 12,
+		borderWidth: 1,
+		borderColor: '#4A90E2',
+	},
+	processingBannerText: {
+		marginLeft: 8,
+		fontSize: 13,
+		color: '#1976D2',
+		fontWeight: '600',
+		textTransform: 'uppercase',
+		letterSpacing: 0.5,
 	},
 });

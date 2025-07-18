@@ -28,20 +28,20 @@ interface AIInsight {
 	priority: 'low' | 'medium' | 'high';
 	isRead: boolean;
 	isActionable: boolean;
-	actionItems: Array<{
+	actionItems: {
 		title: string;
 		description: string;
 		completed: boolean;
-	}>;
+	}[];
 	metadata: {
 		totalIncome: number;
 		totalExpenses: number;
 		netIncome: number;
-		topCategories: Array<{
+		topCategories: {
 			name: string;
 			amount: number;
 			percentage: number;
-		}>;
+		}[];
 		comparisonPeriod: string;
 		percentageChange: number;
 		historicalComparison?: {
@@ -49,11 +49,11 @@ interface AIInsight {
 				totalIncome: number;
 				totalExpenses: number;
 				netIncome: number;
-				topCategories: Array<{
+				topCategories: {
 					name: string;
 					amount: number;
 					percentage: number;
-				}>;
+				}[];
 			};
 			percentageChanges: {
 				income: number;
@@ -73,6 +73,7 @@ interface AISuggestionsListProps {
 	onInsightPress?: (insight: AIInsight) => void;
 	showSmartActions?: boolean;
 	onAllActionsCompleted?: () => void; // Add new prop
+	compact?: boolean; // Add compact mode for quick actions
 }
 
 const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
@@ -81,6 +82,7 @@ const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
 	onInsightPress,
 	showSmartActions = false,
 	onAllActionsCompleted, // Add new prop
+	compact = false, // Add compact mode
 }) => {
 	const [selectedSuggestion, setSelectedSuggestion] = useState<any>(null);
 	const [modalVisible, setModalVisible] = useState(false);
@@ -191,6 +193,72 @@ const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
 			})(),
 		}));
 
+		// If compact mode, show simplified version
+		if (compact) {
+			return (
+				<View key={insight._id} style={styles.compactInsightCard}>
+					<View style={styles.compactInsightHeader}>
+						<View style={styles.compactInsightIconContainer}>
+							<Ionicons
+								name={getInsightIcon(insight.insightType)}
+								size={16}
+								color="#2E78B7"
+							/>
+						</View>
+						<View style={styles.compactInsightInfo}>
+							<Text style={styles.compactInsightTitle}>{insight.title}</Text>
+							<Text style={styles.compactInsightPeriod}>
+								{insight.period.charAt(0).toUpperCase() +
+									insight.period.slice(1)}
+							</Text>
+						</View>
+						<View style={styles.compactInsightActions}>
+							{!insight.isRead && <View style={styles.unreadDot} />}
+							{showSmartActions && (
+								<TouchableOpacity
+									style={styles.compactSmartActionsButton}
+									onPress={() => handleSmartActions(insight)}
+								>
+									<Ionicons name="sparkles" size={14} color="#4A90E2" />
+								</TouchableOpacity>
+							)}
+						</View>
+					</View>
+					<Text style={styles.compactInsightMessage}>{insight.message}</Text>
+					{/* Show first 2 suggestions in compact mode */}
+					<View style={styles.compactSuggestionsContainer}>
+						{suggestions.slice(0, 2).map((suggestion, index) => (
+							<TouchableOpacity
+								key={index}
+								style={styles.compactSuggestionItem}
+								onPress={() => handleApplySuggestion(suggestion)}
+							>
+								<Ionicons
+									name={getSuggestionIcon(suggestion.type)}
+									size={14}
+									color={getSuggestionColor(suggestion.type)}
+								/>
+								<Text style={styles.compactSuggestionTitle}>
+									{suggestion.title}
+								</Text>
+							</TouchableOpacity>
+						))}
+						{suggestions.length > 2 && (
+							<TouchableOpacity
+								style={styles.compactMoreButton}
+								onPress={() => onInsightPress?.(insight)}
+							>
+								<Text style={styles.compactMoreButtonText}>
+									+{suggestions.length - 2} more actions
+								</Text>
+							</TouchableOpacity>
+						)}
+					</View>
+				</View>
+			);
+		}
+
+		// Full version
 		return (
 			<View key={insight._id} style={styles.insightCard}>
 				<View style={styles.insightHeader}>
@@ -260,7 +328,17 @@ const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
 				{onInsightPress && (
 					<TouchableOpacity
 						style={styles.exploreButton}
-						onPress={() => onInsightPress(insight)}
+						onPress={() => {
+							console.log(
+								'🎯 AISuggestionsList: Explore More pressed for insight:',
+								insight
+							);
+							console.log(
+								'🎯 AISuggestionsList: Calling onInsightPress with insight:',
+								insight
+							);
+							onInsightPress(insight);
+						}}
 					>
 						<Text style={styles.exploreButtonText}>Explore More →</Text>
 					</TouchableOpacity>
@@ -270,8 +348,8 @@ const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
 	};
 
 	return (
-		<View style={styles.container}>
-			<Text style={styles.title}>AI Coach</Text>
+		<View style={[styles.container, compact && styles.compactContainer]}>
+			{!compact && <Text style={styles.title}>AI Coach</Text>}
 
 			{suggestions.length > 0 ? (
 				suggestions.map(renderSuggestionCard)
@@ -397,6 +475,12 @@ const styles = StyleSheet.create({
 		shadowOpacity: 0.1,
 		shadowRadius: 4,
 		elevation: 3,
+	},
+	compactContainer: {
+		padding: 0,
+		backgroundColor: 'transparent',
+		shadowOpacity: 0,
+		elevation: 0,
 	},
 	title: {
 		fontSize: 18,
@@ -619,6 +703,87 @@ const styles = StyleSheet.create({
 	confirmButtonText: {
 		color: '#fff',
 		fontSize: 16,
+		fontWeight: '500',
+	},
+	// Compact mode styles
+	compactInsightCard: {
+		backgroundColor: '#F8F9FA',
+		borderRadius: 8,
+		padding: 12,
+		marginBottom: 8,
+	},
+	compactInsightHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginBottom: 6,
+	},
+	compactInsightIconContainer: {
+		width: 28,
+		height: 28,
+		borderRadius: 14,
+		backgroundColor: '#E3F2FD',
+		justifyContent: 'center',
+		alignItems: 'center',
+		marginRight: 8,
+	},
+	compactInsightInfo: {
+		flex: 1,
+	},
+	compactInsightTitle: {
+		fontSize: 14,
+		fontWeight: '600',
+		color: '#333',
+		marginBottom: 2,
+	},
+	compactInsightPeriod: {
+		fontSize: 11,
+		color: '#666',
+	},
+	compactInsightActions: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+	},
+	compactSmartActionsButton: {
+		padding: 2,
+		borderRadius: 3,
+		backgroundColor: '#F0F8FF',
+	},
+	compactInsightMessage: {
+		fontSize: 12,
+		color: '#666',
+		lineHeight: 16,
+		marginBottom: 8,
+	},
+	compactSuggestionsContainer: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		gap: 6,
+	},
+	compactSuggestionItem: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#fff',
+		paddingHorizontal: 8,
+		paddingVertical: 4,
+		borderRadius: 6,
+		borderWidth: 1,
+		borderColor: '#E0E0E0',
+	},
+	compactSuggestionTitle: {
+		fontSize: 11,
+		color: '#333',
+		marginLeft: 4,
+	},
+	compactMoreButton: {
+		paddingHorizontal: 8,
+		paddingVertical: 4,
+		borderRadius: 6,
+		backgroundColor: '#E3F2FD',
+	},
+	compactMoreButtonText: {
+		fontSize: 11,
+		color: '#2E78B7',
 		fontWeight: '500',
 	},
 });
