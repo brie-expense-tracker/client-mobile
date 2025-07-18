@@ -36,6 +36,9 @@ export default function InsightDetail() {
 	const { period } = useLocalSearchParams<{
 		period: 'daily' | 'weekly' | 'monthly';
 	}>();
+
+	console.log('🎯 [period].tsx: Component loaded with period:', period);
+	console.log('🎯 [period].tsx: useLocalSearchParams result:', { period });
 	const [insights, setInsights] = useState<AIInsight[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [activeStep, setActiveStep] = useState(0);
@@ -58,16 +61,19 @@ export default function InsightDetail() {
 
 	useEffect(() => {
 		async function load() {
+			console.log('🎯 [period].tsx: Loading insights for period:', period);
 			try {
 				const res = await InsightsService.getInsights(period);
+				console.log('🎯 [period].tsx: Get insights response:', res);
 				const data =
 					res.success && Array.isArray(res.data) && res.data.length > 0
 						? res.data
 						: ((await InsightsService.generateInsights(period))
 								.data as AIInsight[]);
+				console.log('🎯 [period].tsx: Final insights data:', data);
 				setInsights(data);
 			} catch (err) {
-				console.warn(err);
+				console.warn('🎯 [period].tsx: Error loading insights:', err);
 				Alert.alert('Error', 'Could not load insights.');
 			} finally {
 				setLoading(false);
@@ -552,7 +558,7 @@ export default function InsightDetail() {
 					) : (
 						<RectButton
 							onPress={() => {
-								router.replace('/insights');
+								router.replace('/(tabs)/insights');
 							}}
 							style={styles.navButton}
 						>

@@ -2,6 +2,7 @@ import { ApiService } from './apiService';
 
 export interface IntelligentAction {
 	id: string;
+	_id?: string; // MongoDB ID field
 	type:
 		| 'create_budget'
 		| 'create_goal'
@@ -200,8 +201,13 @@ export class IntelligentActionService {
 		action: IntelligentAction
 	): Promise<ActionExecutionResult> {
 		try {
+			console.log(`🚀 Executing action: ${action.title} (${action.type})`);
+
 			// Handle detection type actions differently
 			if (action.type === 'detect_completion') {
+				console.log(
+					`🔍 Detection action detected, calling detectActionCompletion`
+				);
 				return await this.detectActionCompletion(action);
 			}
 
@@ -211,12 +217,16 @@ export class IntelligentActionService {
 			});
 
 			if (response.success) {
+				console.log(`✅ Action executed successfully: ${action.title}`);
 				return {
 					success: true,
 					data: response.data,
 					message: response.message || 'Action executed successfully',
 				};
 			} else {
+				console.log(
+					`❌ Action execution failed: ${action.title} - ${response.error}`
+				);
 				return {
 					success: false,
 					error: response.error,
@@ -240,15 +250,52 @@ export class IntelligentActionService {
 		action: IntelligentAction
 	): Promise<ActionExecutionResult> {
 		try {
+			console.log(`🔍 Detecting completion for action: ${action.title}`);
+			console.log(`🔍 Detection type: ${action.detectionType}`);
+			console.log(`🔍 Detection criteria:`, action.detectionCriteria);
+
+			// First check if the action is actually completed
 			const detectionResult = await this.checkCompletionStatus(action);
 
 			if (detectionResult.isCompleted) {
-				return {
-					success: true,
-					data: detectionResult,
-					message: detectionResult.message || 'Action has been completed!',
-				};
+				console.log(`✅ Action completed: ${action.title}`);
+				console.log(
+					`✅ Completion details:`,
+					detectionResult.completionDetails
+				);
+
+				// Now call the backend to mark the action as completed in the database
+				const response = await ApiService.post(
+					'/intelligent-actions/detect-completion',
+					{
+						actionType: 'detect_completion',
+						parameters: { actionId: action.id },
+					}
+				);
+
+				if (response.success) {
+					console.log(
+						`✅ Action marked as completed in database: ${action.title}`
+					);
+					return {
+						success: true,
+						data: { ...detectionResult, action: response.data },
+						message: detectionResult.message || 'Action has been completed!',
+					};
+				} else {
+					console.log(
+						`❌ Failed to mark action as completed in database: ${action.title}`
+					);
+					return {
+						success: false,
+						error: response.error,
+						message: 'Action completed but failed to save to database',
+					};
+				}
 			} else {
+				console.log(
+					`❌ Action not completed: ${action.title} - ${detectionResult.message}`
+				);
 				return {
 					success: false,
 					error: 'Action not completed',
@@ -673,23 +720,34 @@ export class IntelligentActionService {
 				actionsArray.length
 			);
 
+			// Helper function to safely get action ID
+			const getActionId = (action: any): string => {
+				// Handle both MongoDB _id and regular id
+				return (
+					action.id || action._id || `action_${Date.now()}_${Math.random()}`
+				);
+			};
+
 			// Separate MongoDB actions from locally generated detection actions
 			const mongoDBActions = actionsArray.filter(
 				(action) =>
 					action.type === 'detect_completion' &&
-					!action.id.startsWith('detect_') // MongoDB actions don't have this prefix
+					!getActionId(action).startsWith('detect_') // MongoDB actions don't have this prefix
 			);
 
 			const localDetectionActions = actionsArray.filter(
 				(action) =>
-					action.type === 'detect_completion' && action.id.startsWith('detect_') // Locally generated detection actions
+					action.type === 'detect_completion' &&
+					getActionId(action).startsWith('detect_') // Locally generated detection actions
 			);
 
 			// Handle MongoDB actions
 			let updatedActions: IntelligentAction[] = [];
 			if (mongoDBActions.length > 0) {
 				try {
-					const mongoDBActionIds = mongoDBActions.map((action) => action.id);
+					const mongoDBActionIds = mongoDBActions.map((action) =>
+						getActionId(action)
+					);
 					const refreshedMongoDBActions = await this.refreshActionStatus(
 						mongoDBActionIds
 					);
@@ -716,6 +774,7 @@ export class IntelligentActionService {
 						const completionResult = await this.checkCompletionStatus(action);
 						return {
 							...action,
+							id: getActionId(action), // Ensure id is set
 							executed: completionResult.isCompleted,
 							completionDetails: completionResult.completionDetails,
 							status: completionResult.isCompleted
@@ -724,10 +783,13 @@ export class IntelligentActionService {
 						} as IntelligentAction;
 					} catch (error) {
 						console.error(
-							`Error checking completion for action ${action.id}:`,
+							`Error checking completion for action ${getActionId(action)}:`,
 							error
 						);
-						return action;
+						return {
+							...action,
+							id: getActionId(action), // Ensure id is set
+						};
 					}
 				})
 			);
@@ -737,15 +799,19 @@ export class IntelligentActionService {
 
 			// Create a map of updated actions by ID
 			const updatedActionsMap = new Map(
-				allUpdatedActions.map((action) => [action.id, action])
+				allUpdatedActions.map((action) => [getActionId(action), action])
 			);
 
 			// Merge updated actions with original actions
 			const mergedActions = actionsArray.map((action) => {
-				if (updatedActionsMap.has(action.id)) {
-					return updatedActionsMap.get(action.id)!;
+				const actionId = getActionId(action);
+				if (updatedActionsMap.has(actionId)) {
+					return updatedActionsMap.get(actionId)!;
 				}
-				return action;
+				return {
+					...action,
+					id: actionId, // Ensure id is set
+				};
 			});
 
 			console.log('Updated actions:', mergedActions.length);

@@ -5,7 +5,6 @@ import {
 	TouchableOpacity,
 	StyleSheet,
 	ActivityIndicator,
-	Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -16,38 +15,29 @@ import {
 } from '../services/insightsService';
 import { useProfile } from '../context/profileContext';
 
-interface AIInsightsSummaryProps {
+interface InsightsSummaryProps {
 	maxInsights?: number;
-	showGenerateButton?: boolean;
-	onInsightPress?: (insight: AIInsight) => void;
 	compact?: boolean;
 	title?: string;
 }
 
-const AIInsightsSummary: React.FC<AIInsightsSummaryProps> = ({
-	maxInsights = 2,
-	showGenerateButton = false,
-	onInsightPress,
+const InsightsSummary: React.FC<InsightsSummaryProps> = ({
+	maxInsights = 1,
 	compact = false,
 	title = 'AI Insights',
 }) => {
 	const [insights, setInsights] = useState<AIInsight[] | null>(null);
-	const [loading, setLoading] = useState(true); // Changed to true to auto-load
-	const [generating, setGenerating] = useState(false);
+	const [loading, setLoading] = useState(true);
 	const { profile } = useProfile();
 
 	// Check if AI insights are enabled for this user
 	const aiInsightsEnabled = profile?.preferences?.aiInsights?.enabled ?? false;
 
-	// Automatically fetch insights when component mounts
-	useEffect(() => {
-		fetchInsights();
-	}, [fetchInsights]);
-
 	const fetchInsights = useCallback(async () => {
 		// Don't fetch if AI insights are disabled
 		if (!aiInsightsEnabled) {
 			setInsights([]);
+			setLoading(false);
 			return;
 		}
 
@@ -58,7 +48,7 @@ const AIInsightsSummary: React.FC<AIInsightsSummaryProps> = ({
 				setTimeout(() => reject(new Error('Request timeout')), 5000);
 			});
 
-			// Only fetch insights for weekly period (most common)
+			// Fetch insights for weekly period (most common)
 			const insightsPromise = InsightsService.getInsights('weekly');
 
 			const response = (await Promise.race([
@@ -78,14 +68,7 @@ const AIInsightsSummary: React.FC<AIInsightsSummaryProps> = ({
 
 				setInsights(sortedInsights);
 			} else {
-				// Check if response had specific errors
-				if (response.error) {
-					console.log('Insights fetch errors:', response.error);
-					setInsights([]);
-				} else {
-					// Only generate one insight quickly instead of all three
-					await generateQuickInsight();
-				}
+				setInsights([]);
 			}
 		} catch (error) {
 			console.error('Error fetching insights:', error);
@@ -95,101 +78,12 @@ const AIInsightsSummary: React.FC<AIInsightsSummaryProps> = ({
 		}
 	}, [maxInsights, aiInsightsEnabled]);
 
-	const generateQuickInsight = useCallback(async () => {
-		// Don't generate if AI insights are disabled
-		if (!aiInsightsEnabled) {
-			setInsights([]);
-			return;
-		}
+	// Automatically fetch insights when component mounts
+	useEffect(() => {
+		fetchInsights();
+	}, [fetchInsights]);
 
-		try {
-			setGenerating(true);
-			// Only generate one insight quickly (weekly is usually fastest)
-			const response = await InsightsService.generateInsights('weekly');
-			console.log('Quick insight generation response:', response);
-
-			if (response.success && response.data && Array.isArray(response.data)) {
-				setInsights(response.data.slice(0, 1));
-			} else {
-				setInsights([]);
-			}
-		} catch (error) {
-			console.error('Error generating quick insight:', error);
-			setInsights([]);
-		} finally {
-			setGenerating(false);
-		}
-	}, [aiInsightsEnabled]);
-
-	const generateNewInsights = useCallback(async () => {
-		// Don't generate if AI insights are disabled
-		if (!aiInsightsEnabled) {
-			Alert.alert(
-				'AI Insights Disabled',
-				'Please enable AI insights in Settings to generate insights.'
-			);
-			return;
-		}
-
-		try {
-			console.log('generateNewInsights - Starting generation process...');
-			setGenerating(true);
-
-			// Generate insights only for weekly period (most common)
-			console.log(
-				'generateNewInsights - Calling generateInsights for weekly period...'
-			);
-
-			const response = await InsightsService.generateInsights('weekly');
-
-			console.log('Generation response:', {
-				success: response.success,
-				dataLength: response.data?.length,
-				error: response.error,
-			});
-
-			if (response.success && response.data && Array.isArray(response.data)) {
-				// Sort by most recent and take top insights
-				const sortedInsights = response.data
-					.sort(
-						(a, b) =>
-							new Date(b.generatedAt).getTime() -
-							new Date(a.generatedAt).getTime()
-					)
-					.slice(0, maxInsights);
-
-				console.log(
-					'generateNewInsights - Setting insights:',
-					sortedInsights.length
-				);
-				setInsights(sortedInsights);
-
-				// If we have insights, show success message
-				if (sortedInsights.length > 0) {
-					console.log(
-						'generateNewInsights - Success! Generated insights:',
-						sortedInsights.length
-					);
-					Alert.alert(
-						'Success',
-						`Generated ${sortedInsights.length} new insights!`,
-						[{ text: 'OK' }]
-					);
-				}
-			} else {
-				// If no insights were generated, try to fetch existing ones
-				console.log('No insights generated, fetching existing ones...');
-				await fetchInsights();
-			}
-		} catch (error) {
-			console.error('Error generating insights:', error);
-			Alert.alert('Error', 'Failed to generate insights. Please try again.');
-		} finally {
-			setGenerating(false);
-		}
-	}, [maxInsights, fetchInsights, aiInsightsEnabled]);
-
-	// Handle insight press - mark as read and navigate or call custom handler
+	// Handle insight press - mark as read and navigate to smart actions
 	const handleInsightPress = async (insight: AIInsight) => {
 		try {
 			// Mark as read if not already read
@@ -205,20 +99,12 @@ const AIInsightsSummary: React.FC<AIInsightsSummaryProps> = ({
 				);
 			}
 
-			// Call custom handler if provided, otherwise navigate
-			if (onInsightPress) {
-				onInsightPress(insight);
-			} else {
-				router.push(`/insights/${insight.period}`);
-			}
+			// Navigate to smart actions for this insight
+			router.push(`/insights/${insight.period}?insightId=${insight._id}`);
 		} catch (error) {
 			console.error('Error marking insight as read:', error);
-			// Still call handler or navigate even if marking as read fails
-			if (onInsightPress) {
-				onInsightPress(insight);
-			} else {
-				router.push(`/insights/${insight.period}`);
-			}
+			// Still navigate even if marking as read fails
+			router.push(`/insights/${insight.period}?insightId=${insight._id}`);
 		}
 	};
 
@@ -234,6 +120,19 @@ const AIInsightsSummary: React.FC<AIInsightsSummaryProps> = ({
 				return 'cash-outline';
 			default:
 				return 'bulb-outline';
+		}
+	};
+
+	const getPriorityColor = (priority: string) => {
+		switch (priority) {
+			case 'high':
+				return '#dc2626';
+			case 'medium':
+				return '#f59e0b';
+			case 'low':
+				return '#10b981';
+			default:
+				return '#6b7280';
 		}
 	};
 
@@ -277,10 +176,26 @@ const AIInsightsSummary: React.FC<AIInsightsSummaryProps> = ({
 										color="#007AFF"
 									/>
 								</View>
-								<Text style={styles.periodLabel}>
-									{insight.period.charAt(0).toUpperCase() +
-										insight.period.slice(1)}
-								</Text>
+								<View style={styles.insightMeta}>
+									<Text style={styles.periodLabel}>
+										{insight.period.charAt(0).toUpperCase() +
+											insight.period.slice(1)}{' '}
+										Insight
+									</Text>
+									<View style={styles.priorityContainer}>
+										<View
+											style={[
+												styles.priorityDot,
+												{ backgroundColor: getPriorityColor(insight.priority) },
+											]}
+										/>
+										<Text style={styles.priorityText}>
+											{insight.priority.charAt(0).toUpperCase() +
+												insight.priority.slice(1)}{' '}
+											Priority
+										</Text>
+									</View>
+								</View>
 								<View style={styles.headerRight}>
 									{/* Orange dot for unread insights */}
 									{!insight.isRead && <View style={styles.unreadDot} />}
@@ -288,23 +203,28 @@ const AIInsightsSummary: React.FC<AIInsightsSummaryProps> = ({
 							</View>
 							<Text
 								style={[
-									styles.insightMessage,
-									compact && styles.insightMessageCompact,
+									styles.insightTitle,
+									compact && styles.insightTitleCompact,
 								]}
 								numberOfLines={compact ? 1 : 2}
 							>
+								{insight.title}
+							</Text>
+							<Text
+								style={[
+									styles.insightMessage,
+									compact && styles.insightMessageCompact,
+								]}
+								numberOfLines={compact ? 2 : 3}
+							>
 								{insight.message}
 							</Text>
-							{!compact &&
-								insight.isActionable &&
-								insight.actionItems.length > 0 && (
-									<View style={styles.actionItemsContainer}>
-										<Text style={styles.actionItemsLabel}>
-											{insight.actionItems.length} action item
-											{insight.actionItems.length !== 1 ? 's' : ''}
-										</Text>
-									</View>
-								)}
+							{!compact && insight.isActionable && (
+								<View style={styles.actionableIndicator}>
+									<Ionicons name="checkmark-circle" size={14} color="#10b981" />
+									<Text style={styles.actionableText}>Actionable</Text>
+								</View>
+							)}
 						</TouchableOpacity>
 					))}
 				</View>
@@ -317,7 +237,9 @@ const AIInsightsSummary: React.FC<AIInsightsSummaryProps> = ({
 								style={styles.generateButton}
 								onPress={() => router.push('/settings/aiInsights')}
 							>
-								<Text style={styles.generateButtonText}>Enable AI Insights</Text>
+								<Text style={styles.generateButtonText}>
+									Enable AI Insights
+								</Text>
 							</TouchableOpacity>
 						</>
 					) : (
@@ -327,7 +249,7 @@ const AIInsightsSummary: React.FC<AIInsightsSummaryProps> = ({
 								style={styles.generateButton}
 								onPress={() => router.push('/insights')}
 							>
-								<Text style={styles.generateButtonText}>Go to AI Coach</Text>
+								<Text style={styles.generateButtonText}>Generate Insights</Text>
 							</TouchableOpacity>
 						</>
 					)}
@@ -393,17 +315,35 @@ const styles = StyleSheet.create({
 	insightHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		marginBottom: 6,
+		marginBottom: 8,
 	},
 	insightIconContainer: {
-		marginRight: 6,
+		marginRight: 8,
+	},
+	insightMeta: {
+		flex: 1,
 	},
 	periodLabel: {
 		fontSize: 12,
 		fontWeight: '500',
 		color: '#6b7280',
 		textTransform: 'uppercase',
-		flex: 1,
+	},
+	priorityContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginTop: 2,
+	},
+	priorityDot: {
+		width: 6,
+		height: 6,
+		borderRadius: 3,
+		marginRight: 4,
+	},
+	priorityText: {
+		fontSize: 10,
+		color: '#6b7280',
+		fontWeight: '400',
 	},
 	headerRight: {
 		flexDirection: 'row',
@@ -416,22 +356,36 @@ const styles = StyleSheet.create({
 		borderRadius: 4,
 		backgroundColor: '#FF9500',
 	},
-	insightMessage: {
+	insightTitle: {
 		fontSize: 14,
-		fontWeight: '400',
+		fontWeight: '600',
 		color: '#1f2937',
-		lineHeight: 20,
-	},
-	insightMessageCompact: {
-		fontSize: 13,
+		marginBottom: 4,
 		lineHeight: 18,
 	},
-	actionItemsContainer: {
-		marginTop: 6,
+	insightTitleCompact: {
+		fontSize: 13,
+		lineHeight: 16,
 	},
-	actionItemsLabel: {
+	insightMessage: {
+		fontSize: 13,
+		fontWeight: '400',
+		color: '#374151',
+		lineHeight: 18,
+	},
+	insightMessageCompact: {
 		fontSize: 12,
-		color: '#6b7280',
+		lineHeight: 16,
+	},
+	actionableIndicator: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginTop: 6,
+		gap: 4,
+	},
+	actionableText: {
+		fontSize: 11,
+		color: '#10b981',
 		fontWeight: '500',
 	},
 	emptyState: {
@@ -449,9 +403,6 @@ const styles = StyleSheet.create({
 		paddingVertical: 8,
 		borderRadius: 6,
 	},
-	generateButtonDisabled: {
-		opacity: 0.6,
-	},
 	generateButtonText: {
 		color: '#fff',
 		fontSize: 14,
@@ -459,4 +410,4 @@ const styles = StyleSheet.create({
 	},
 });
 
-export default AIInsightsSummary;
+export default InsightsSummary;

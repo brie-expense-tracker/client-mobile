@@ -186,6 +186,17 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 			}
 		}
 
+		// Determine AI insights settings based on advice frequency choice
+		const isAIInsightsEnabled = adviceFrequency !== 'No advice';
+		const aiInsightsFrequency =
+			adviceFrequency === 'Daily snapshot'
+				? 'daily'
+				: adviceFrequency === 'Weekly summary'
+				? 'weekly'
+				: adviceFrequency === 'Monthly report'
+				? 'monthly'
+				: 'weekly';
+
 		const profileData = {
 			firstName,
 			lastName,
@@ -213,15 +224,15 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 					enableNotifications: true,
 					weeklySummary: true,
 					overspendingAlert: false,
-					aiSuggestion: true,
+					aiSuggestion: false, // Disable AI suggestions by default
 					budgetMilestones: false,
 					monthlyFinancialCheck: true,
 					monthlySavingsTransfer: true,
 				},
 				aiInsights: {
-					enabled: true,
+					enabled: true, // Enable AI insights by default
 					frequency: 'weekly' as 'weekly' | 'monthly' | 'daily',
-					pushNotifications: true,
+					pushNotifications: true, // Enable push notifications for AI insights
 					emailAlerts: false,
 					insightTypes: {
 						budgetingTips: true,
@@ -244,7 +255,7 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 						currency: 'USD',
 					},
 					ai: {
-						enabled: true,
+						enabled: false, // Disable AI for goals by default
 						tone: 'friendly' as 'friendly' | 'technical' | 'minimal',
 						frequency: 'medium' as 'low' | 'medium' | 'high',
 						whatIf: true,
@@ -270,6 +281,15 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 		try {
 			// Update profile using profileContext
 			await updateProfile(profileData);
+
+			// Generate tutorial actions for the new user
+			try {
+				await ApiService.post('/tutorial/generate-actions', {});
+				console.log('Tutorial actions generated successfully');
+			} catch (tutorialError) {
+				console.error('Error generating tutorial actions:', tutorialError);
+				// Continue with onboarding even if tutorial generation fails
+			}
 
 			// Mark onboarding as complete and navigate to main app
 			await markOnboardingComplete();
@@ -641,28 +661,31 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 									How often would you like to receive financial insights?
 								</Text>
 								<View style={styles.frequencyContainer}>
-									{['Daily snapshot', 'Weekly summary', 'Monthly report'].map(
-										(freq) => (
-											<Pressable
-												key={freq}
-												onPress={() => setAdviceFrequency(freq)}
+									{[
+										'Daily snapshot',
+										'Weekly summary',
+										'Monthly report',
+										'No advice',
+									].map((freq) => (
+										<Pressable
+											key={freq}
+											onPress={() => setAdviceFrequency(freq)}
+											style={[
+												styles.frequencyButton,
+												adviceFrequency === freq && styles.selectedFrequency,
+											]}
+										>
+											<Text
 												style={[
-													styles.frequencyButton,
-													adviceFrequency === freq && styles.selectedFrequency,
+													styles.frequencyText,
+													adviceFrequency === freq &&
+														styles.selectedFrequencyText,
 												]}
 											>
-												<Text
-													style={[
-														styles.frequencyText,
-														adviceFrequency === freq &&
-															styles.selectedFrequencyText,
-													]}
-												>
-													{freq}
-												</Text>
-											</Pressable>
-										)
-									)}
+												{freq}
+											</Text>
+										</Pressable>
+									))}
 								</View>
 							</View>
 

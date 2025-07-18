@@ -1,12 +1,33 @@
 import { useState, useEffect, useCallback, useMemo, useContext } from 'react';
 import { Alert } from 'react-native';
-import { InsightsService, AIInsight } from '../services/insightsService';
+import {
+	InsightsService,
+	AIInsight,
+	InsightsResponse,
+} from '../services/insightsService';
 import { useBudget } from '../context/budgetContext';
 import { useGoal } from '../context/goalContext';
 import { TransactionContext } from '../context/transactionContext';
 import { Transaction } from '../data/transactions';
+import { useProfile } from '../context/profileContext';
 
 export type Period = 'week' | 'month' | 'quarter';
+
+// Helper function to convert Period to insights period
+const convertPeriodToInsightsPeriod = (
+	period: Period
+): 'daily' | 'weekly' | 'monthly' => {
+	switch (period) {
+		case 'week':
+			return 'weekly';
+		case 'month':
+			return 'monthly';
+		case 'quarter':
+			return 'monthly'; // Use monthly for quarter since daily/weekly/monthly are the only options
+		default:
+			return 'weekly';
+	}
+};
 
 export interface SummaryData {
 	totalIncome: number;
@@ -54,11 +75,15 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 		isLoading: transactionsLoading,
 		refetch: refetchTransactions,
 	} = useContext(TransactionContext);
+	const { profile } = useProfile();
 
 	const [insights, setInsights] = useState<AIInsight[] | null>(null);
-	const [loadingInsights, setLoadingInsights] = useState(true);
+	const [loadingInsights, setLoadingInsights] = useState(false); // Changed to false to not auto-load
 	const [generating, setGenerating] = useState(false);
 	const [refreshing, setRefreshing] = useState(false);
+
+	// Check if AI insights are enabled for this user
+	const aiInsightsEnabled = profile?.preferences?.aiInsights?.enabled ?? false;
 
 	// Calculate summary data for the selected period
 	const summary = useMemo((): SummaryData => {
@@ -155,86 +180,61 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 	}, [period, summary, transactions, budgets, goals]);
 
 	const fetchInsights = useCallback(async () => {
+		if (!aiInsightsEnabled) {
+			console.log('AI insights are disabled for this user. Skipping fetch.');
+			return;
+		}
+
 		try {
 			setLoadingInsights(true);
+			console.log(
+				`🔍 Fetching insights for period: ${period}, AI insights enabled: ${aiInsightsEnabled}`
+			);
+
 			// Set a timeout to prevent long loading
 			const timeoutPromise = new Promise((_, reject) => {
 				setTimeout(() => reject(new Error('Request timeout')), 5000); // 5 second timeout
 			});
 
-			// Try to get existing insights with timeout
-			const insightsPromise = Promise.allSettled([
-				InsightsService.getInsights('daily'),
-				InsightsService.getInsights('weekly'),
-				InsightsService.getInsights('monthly'),
-			]);
+			// Only fetch insights for the selected period instead of all periods
+			const insightsPeriod = convertPeriodToInsightsPeriod(period);
+			const insightsPromise = InsightsService.getInsights(insightsPeriod);
 
-			const results = (await Promise.race([
+			const response = (await Promise.race([
 				insightsPromise,
 				timeoutPromise,
-			])) as PromiseSettledResult<any>[];
+			])) as InsightsResponse;
 
-			const [dailyResponse, weeklyResponse, monthlyResponse] = results.map(
-				(result: PromiseSettledResult<any>) =>
-					result.status === 'fulfilled'
-						? result.value
-						: {
-								success: false,
-								data: [],
-								error: result.reason?.message || 'Request failed',
-						  }
-			);
+			// Log response for debugging
+			console.log(`${period} insights response:`, {
+				success: response.success,
+				dataLength: response.data?.length,
+				error: response.error,
+			});
 
-			// Log responses for debugging
-			console.log('Daily insights response:', dailyResponse);
-			console.log('Weekly insights response:', weeklyResponse);
-			console.log('Monthly insights response:', monthlyResponse);
+			if (response.success && response.data && Array.isArray(response.data)) {
+				// Sort by most recent and take top 3
+				const sortedInsights = response.data
+					.sort(
+						(a: AIInsight, b: AIInsight) =>
+							new Date(b.generatedAt).getTime() -
+							new Date(a.generatedAt).getTime()
+					)
+					.slice(0, 3);
 
-			const allInsights = [
-				...(dailyResponse.success &&
-				dailyResponse.data &&
-				Array.isArray(dailyResponse.data)
-					? dailyResponse.data.slice(0, 1) // Only take 1 insight per period
-					: []),
-				...(weeklyResponse.success &&
-				weeklyResponse.data &&
-				Array.isArray(weeklyResponse.data)
-					? weeklyResponse.data.slice(0, 1)
-					: []),
-				...(monthlyResponse.success &&
-				monthlyResponse.data &&
-				Array.isArray(monthlyResponse.data)
-					? monthlyResponse.data.slice(0, 1)
-					: []),
-			];
-
-			// Sort by most recent
-			allInsights.sort(
-				(a, b) =>
-					new Date(b.generatedAt).getTime() - new Date(a.generatedAt).getTime()
-			);
-
-			// Take the most recent 3 insights
-			const recentInsights = allInsights.slice(0, 3);
-
-			if (recentInsights.length === 0) {
-				// Check if any of the responses had specific errors
-				const errors = [
-					dailyResponse.error,
-					weeklyResponse.error,
-					monthlyResponse.error,
-				].filter(Boolean);
-
-				if (errors.length > 0) {
-					console.log('Insights fetch errors:', errors);
-					// Don't show alert, just set empty insights
+				console.log(
+					`✅ Setting ${sortedInsights.length} insights for ${period}`
+				);
+				setInsights(sortedInsights);
+			} else {
+				// Check if response had specific errors
+				if (response.error) {
+					console.log('Insights fetch error:', response.error);
 					setInsights([]);
 				} else {
-					// Only generate one insight quickly instead of all three
-					await generateQuickInsight();
+					console.log('No insights found, setting empty array');
+					setInsights([]);
 				}
-			} else {
-				setInsights(recentInsights);
 			}
 		} catch (error) {
 			console.error('Error fetching insights:', error);
@@ -243,109 +243,68 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 		} finally {
 			setLoadingInsights(false);
 		}
-	}, []);
+	}, [period, aiInsightsEnabled]); // Add selectedPeriod and aiInsightsEnabled as dependencies
 
-	const generateQuickInsight = useCallback(async () => {
-		try {
-			setGenerating(true);
-			// Only generate one insight quickly (weekly is usually fastest)
-			const response = await InsightsService.generateInsights('weekly');
-			console.log('Quick insight generation response:', response);
 
-			if (response.success && response.data && Array.isArray(response.data)) {
-				setInsights(response.data.slice(0, 1));
-			} else {
-				setInsights([]);
-			}
-		} catch (error) {
-			console.error('Error generating quick insight:', error);
-			setInsights([]);
-		} finally {
-			setGenerating(false);
-		}
-	}, []);
 
 	const generateNewInsights = useCallback(async () => {
+		if (!aiInsightsEnabled) {
+			console.log(
+				'AI insights are disabled for this user. Skipping new insights generation.'
+			);
+			return;
+		}
+
 		try {
 			console.log('generateNewInsights - Starting generation process...');
 			setGenerating(true);
 
-			// Generate insights for all periods
+			// Generate insights only for the selected period
+			const insightsPeriod = convertPeriodToInsightsPeriod(period);
 			console.log(
-				'generateNewInsights - Calling generateInsights for all periods...'
+				`generateNewInsights - Calling generateInsights for ${insightsPeriod} period...`
 			);
-			const [dailyGen, weeklyGen, monthlyGen] = await Promise.all([
-				InsightsService.generateInsights('daily'),
-				InsightsService.generateInsights('weekly'),
-				InsightsService.generateInsights('monthly'),
-			]);
 
-			console.log('Generation responses:', {
-				dailyGen: {
-					success: dailyGen.success,
-					dataLength: dailyGen.data?.length,
-					error: dailyGen.error,
-				},
-				weeklyGen: {
-					success: weeklyGen.success,
-					dataLength: weeklyGen.data?.length,
-					error: weeklyGen.error,
-				},
-				monthlyGen: {
-					success: monthlyGen.success,
-					dataLength: monthlyGen.data?.length,
-					error: monthlyGen.error,
-				},
+			const response = await InsightsService.generateInsights(insightsPeriod);
+
+			console.log('Generation response:', {
+				success: response.success,
+				dataLength: response.data?.length,
+				error: response.error,
 			});
 
-			// Collect all generated insights
-			const allInsights = [
-				...(dailyGen.success && dailyGen.data && Array.isArray(dailyGen.data)
-					? dailyGen.data
-					: []),
-				...(weeklyGen.success && weeklyGen.data && Array.isArray(weeklyGen.data)
-					? weeklyGen.data
-					: []),
-				...(monthlyGen.success &&
-				monthlyGen.data &&
-				Array.isArray(monthlyGen.data)
-					? monthlyGen.data
-					: []),
-			];
+			if (response.success && response.data && Array.isArray(response.data)) {
+				// Sort by most recent and take top 3
+				const sortedInsights = response.data
+					.sort(
+						(a, b) =>
+							new Date(b.generatedAt).getTime() -
+							new Date(a.generatedAt).getTime()
+					)
+					.slice(0, 3);
 
-			console.log(
-				'generateNewInsights - Collected insights:',
-				allInsights.length
-			);
-
-			// Sort by most recent and take top 3
-			allInsights.sort(
-				(a, b) =>
-					new Date(b.generatedAt).getTime() - new Date(a.generatedAt).getTime()
-			);
-
-			const recentInsights = allInsights.slice(0, 3);
-			console.log(
-				'generateNewInsights - Setting insights:',
-				recentInsights.length
-			);
-			setInsights(recentInsights);
-
-			// If we have insights, show success message
-			if (recentInsights.length > 0) {
 				console.log(
-					'generateNewInsights - Success! Generated insights:',
-					recentInsights.length
+					'generateNewInsights - Setting insights:',
+					sortedInsights.length
 				);
-				Alert.alert(
-					'Success',
-					`Generated ${recentInsights.length} new insights!`,
-					[{ text: 'OK' }]
-				);
+				setInsights(sortedInsights);
+
+				// If we have insights, show success message
+				if (sortedInsights.length > 0) {
+					console.log(
+						'generateNewInsights - Success! Generated insights:',
+						sortedInsights.length
+					);
+					Alert.alert(
+						'Success',
+						`Generated ${sortedInsights.length} new insights!`,
+						[{ text: 'OK' }]
+					);
+				}
 			} else {
-				// If no insights were generated, try to fetch existing ones
-				console.log('No insights generated, fetching existing ones...');
-				await fetchInsights();
+				// If no insights were generated, just set empty array instead of calling fetchInsights
+				console.log('No insights generated, setting empty array');
+				setInsights([]);
 			}
 		} catch (error) {
 			console.error('Error generating insights:', error);
@@ -353,39 +312,92 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 		} finally {
 			setGenerating(false);
 		}
-	}, [fetchInsights]);
+	}, [period, aiInsightsEnabled]); // Remove fetchInsights from dependencies
 
-	const markInsightAsRead = useCallback(async (insightId: string) => {
-		try {
-			await InsightsService.markInsightAsRead(insightId);
+	const markInsightAsRead = useCallback(
+		async (insightId: string) => {
+			if (!aiInsightsEnabled) {
+				console.log(
+					'AI insights are disabled for this user. Skipping mark as read.'
+				);
+				return;
+			}
 
-			// Update local state to mark as read
-			setInsights(
-				(prevInsights) =>
-					prevInsights?.map((ins) =>
-						ins._id === insightId ? { ...ins, isRead: true } : ins
-					) || null
-			);
-		} catch (error) {
-			console.error('Error marking insight as read:', error);
-		}
-	}, []);
+			try {
+				await InsightsService.markInsightAsRead(insightId);
+
+				// Update local state to mark as read
+				setInsights(
+					(prevInsights) =>
+						prevInsights?.map((ins) =>
+							ins._id === insightId ? { ...ins, isRead: true } : ins
+						) || null
+				);
+			} catch (error) {
+				console.error('Error marking insight as read:', error);
+			}
+		},
+		[aiInsightsEnabled]
+	);
 
 	const onRefresh = useCallback(async () => {
+		if (!aiInsightsEnabled) {
+			console.log('AI insights are disabled for this user. Skipping refresh.');
+			return;
+		}
+
 		setRefreshing(true);
 		try {
-			await Promise.all([fetchInsights(), refetchTransactions()]);
+			// Only refresh insights, don't refresh transactions to avoid triggering dashboard refresh
+			try {
+				setLoadingInsights(true);
+				console.log(
+					`🔍 Refreshing insights for period: ${period}, AI insights enabled: ${aiInsightsEnabled}`
+				);
+
+				// Set a timeout to prevent long loading
+				const timeoutPromise = new Promise((_, reject) => {
+					setTimeout(() => reject(new Error('Request timeout')), 5000);
+				});
+
+				const insightsPeriod = convertPeriodToInsightsPeriod(period);
+				const insightsPromise = InsightsService.getInsights(insightsPeriod);
+
+				const response = (await Promise.race([
+					insightsPromise,
+					timeoutPromise,
+				])) as InsightsResponse;
+
+				if (response.success && response.data && Array.isArray(response.data)) {
+					const sortedInsights = response.data
+						.sort(
+							(a: AIInsight, b: AIInsight) =>
+								new Date(b.generatedAt).getTime() -
+								new Date(a.generatedAt).getTime()
+						)
+						.slice(0, 3);
+
+					console.log(
+						`✅ Refreshed ${sortedInsights.length} insights for ${period}`
+					);
+					setInsights(sortedInsights);
+				} else {
+					setInsights([]);
+				}
+			} catch (error) {
+				console.error('Error refreshing insights:', error);
+				setInsights([]);
+			} finally {
+				setLoadingInsights(false);
+			}
 		} catch (error) {
 			console.error('Error refreshing data:', error);
 		} finally {
 			setRefreshing(false);
 		}
-	}, [fetchInsights, refetchTransactions]);
+	}, [period, aiInsightsEnabled]); // Remove refetchTransactions from dependencies
 
-	// Initial fetch
-	useEffect(() => {
-		fetchInsights();
-	}, [fetchInsights]);
+	// Removed automatic fetch - now controlled by useFocusEffect in components
 
 	return {
 		summary,

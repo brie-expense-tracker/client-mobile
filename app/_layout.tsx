@@ -3,14 +3,14 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import './global.css';
 import React, { useEffect, useState, useContext } from 'react';
 import { ActivityIndicator, Text, View, StyleSheet } from 'react-native';
-import { AuthProvider } from '../src/context/AuthContext';
-import { OnboardingProvider } from '../src/context/OnboardingContext';
+import useAuth, { AuthProvider } from '../src/context/AuthContext';
+import { OnboardingProvider , useOnboarding } from '../src/context/OnboardingContext';
 import { ProfileProvider } from '../src/context/profileContext';
 import { NotificationProvider } from '../src/context/notificationContext';
 import { TransactionProvider } from '../src/context/transactionContext';
+import { ProgressionProvider } from '../src/context/progressionContext';
+import { TransactionModalProvider } from '../src/context/transactionModalContext';
 
-import useAuth from '../src/context/AuthContext';
-import { useOnboarding } from '../src/context/OnboardingContext';
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
 
@@ -177,7 +177,11 @@ export default function RootLayout() {
 				<OnboardingProvider>
 					<ProfileProvider>
 						<TransactionProvider>
-							<RootLayoutContent />
+							<ProgressionProvider>
+								<TransactionModalProvider>
+									<RootLayoutContent />
+								</TransactionModalProvider>
+							</ProgressionProvider>
 						</TransactionProvider>
 					</ProfileProvider>
 				</OnboardingProvider>

@@ -11,20 +11,20 @@ export interface AIInsight {
 	priority: 'low' | 'medium' | 'high';
 	isRead: boolean;
 	isActionable: boolean;
-	actionItems: Array<{
+	actionItems: {
 		title: string;
 		description: string;
 		completed: boolean;
-	}>;
+	}[];
 	metadata: {
 		totalIncome: number;
 		totalExpenses: number;
 		netIncome: number;
-		topCategories: Array<{
+		topCategories: {
 			name: string;
 			amount: number;
 			percentage: number;
-		}>;
+		}[];
 		comparisonPeriod: string;
 		percentageChange: number;
 		historicalComparison?: {
@@ -32,11 +32,11 @@ export interface AIInsight {
 				totalIncome: number;
 				totalExpenses: number;
 				netIncome: number;
-				topCategories: Array<{
+				topCategories: {
 					name: string;
 					amount: number;
 					percentage: number;
-				}>;
+				}[];
 			};
 			percentageChanges: {
 				income: number;
@@ -74,7 +74,7 @@ export class InsightsService {
 	static async getInsights(
 		period: 'daily' | 'weekly' | 'monthly'
 	): Promise<InsightsResponse> {
-		const response = await ApiService.get<AIInsight[]>(`/insights/${period}`);
+		const response = await ApiService.get<any>(`/insights/${period}`);
 
 		// Debug: Log the response to see what we're getting
 		console.log(
@@ -82,40 +82,86 @@ export class InsightsService {
 			JSON.stringify(response, null, 2)
 		);
 
-		// Handle double-nested response structure
-		let arr: any = response.data;
+		// Handle double-nested response structure that the server actually returns
+		let insightsArray: AIInsight[] = [];
 
-		// First level: check if response.data is a nested response object
-		if (arr && typeof arr === 'object' && arr.success !== undefined) {
-			// Second level: check if arr.data is the actual array or another nested response
-			if (arr.data && Array.isArray(arr.data)) {
-				arr = arr.data;
-			} else if (
-				arr.data &&
-				typeof arr.data === 'object' &&
-				arr.data.success !== undefined
+		console.log(
+			`InsightsService.getInsights(${period}) - Processing response.data:`,
+			response.data
+		);
+		console.log(
+			`InsightsService.getInsights(${period}) - response.data type:`,
+			typeof response.data
+		);
+		console.log(
+			`InsightsService.getInsights(${period}) - response.data isArray:`,
+			Array.isArray(response.data)
+		);
+
+		if (response.data) {
+			// Check if response.data is a nested response object
+			if (
+				typeof response.data === 'object' &&
+				response.data.success !== undefined
 			) {
-				// Handle double-nested case
-				if (Array.isArray(arr.data.data)) {
-					arr = arr.data.data;
-				} else {
-					arr = [];
+				console.log(
+					`InsightsService.getInsights(${period}) - Found nested response object`
+				);
+				// First level nesting
+				if (response.data.data && Array.isArray(response.data.data)) {
+					console.log(
+						`InsightsService.getInsights(${period}) - Found first level array with ${response.data.data.length} items`
+					);
+					insightsArray = response.data.data;
+				} else if (
+					response.data.data &&
+					typeof response.data.data === 'object' &&
+					response.data.data.success !== undefined
+				) {
+					console.log(
+						`InsightsService.getInsights(${period}) - Found second level nesting`
+					);
+					// Second level nesting
+					if (
+						response.data.data.data &&
+						Array.isArray(response.data.data.data)
+					) {
+						console.log(
+							`InsightsService.getInsights(${period}) - Found second level array with ${response.data.data.data.length} items`
+						);
+						insightsArray = response.data.data.data;
+					}
 				}
-			} else {
-				arr = [];
+			} else if (Array.isArray(response.data)) {
+				console.log(
+					`InsightsService.getInsights(${period}) - Found direct array with ${response.data.length} items`
+				);
+				// Direct array
+				insightsArray = response.data;
 			}
 		}
 
-		if (!Array.isArray(arr)) {
+		console.log(
+			`InsightsService.getInsights(${period}) - Final insightsArray:`,
+			insightsArray
+		);
+
+		if (!Array.isArray(insightsArray)) {
 			console.warn(
 				`InsightsService.getInsights(${period}) - Data is not an array:`,
 				response.data
 			);
-			arr = [];
+			insightsArray = [];
 		}
-		response.data = arr;
 
-		return response;
+		const result = {
+			success: response.success,
+			data: insightsArray,
+			error: response.error,
+		};
+
+		console.log(`InsightsService.getInsights(${period}) - Returning:`, result);
+		return result;
 	}
 
 	// Get insight detail by ID
@@ -132,7 +178,7 @@ export class InsightsService {
 				`InsightsService.generateInsights(${period}) - Starting generation...`
 			);
 
-			const response = await ApiService.post<AIInsight[]>(
+			const response = await ApiService.post<any>(
 				`/insights/generate/${period}`,
 				{}
 			);
@@ -143,47 +189,134 @@ export class InsightsService {
 				JSON.stringify(response, null, 2)
 			);
 
-			// Handle double-nested response structure
-			let arr: any = response.data;
+			// Handle double-nested response structure that the server actually returns
+			let insightsArray: AIInsight[] = [];
 
-			// First level: check if response.data is a nested response object
-			if (arr && typeof arr === 'object' && arr.success !== undefined) {
-				// Second level: check if arr.data is the actual array or another nested response
-				if (arr.data && Array.isArray(arr.data)) {
-					arr = arr.data;
-				} else if (
-					arr.data &&
-					typeof arr.data === 'object' &&
-					arr.data.success !== undefined
+			if (response.data) {
+				// Check if response.data is a nested response object
+				if (
+					typeof response.data === 'object' &&
+					response.data.success !== undefined
 				) {
-					// Handle double-nested case
-					if (Array.isArray(arr.data.data)) {
-						arr = arr.data.data;
-					} else {
-						arr = [];
+					// First level nesting
+					if (response.data.data && Array.isArray(response.data.data)) {
+						insightsArray = response.data.data;
+					} else if (
+						response.data.data &&
+						typeof response.data.data === 'object' &&
+						response.data.data.success !== undefined
+					) {
+						// Second level nesting
+						if (
+							response.data.data.data &&
+							Array.isArray(response.data.data.data)
+						) {
+							insightsArray = response.data.data.data;
+						}
 					}
-				} else {
-					arr = [];
+				} else if (Array.isArray(response.data)) {
+					// Direct array
+					insightsArray = response.data;
 				}
 			}
 
-			if (!Array.isArray(arr)) {
+			if (!Array.isArray(insightsArray)) {
 				console.warn(
 					`InsightsService.generateInsights(${period}) - Data is not an array:`,
 					response.data
 				);
-				arr = [];
+				insightsArray = [];
 			}
-			response.data = arr;
 
 			console.log(
 				`InsightsService.generateInsights(${period}) - Final processed data:`,
-				arr
+				insightsArray
 			);
-			return response;
+
+			return {
+				success: response.success,
+				data: insightsArray,
+				error: response.error,
+			};
 		} catch (error) {
 			console.error(
 				`InsightsService.generateInsights(${period}) - Error:`,
+				error
+			);
+			throw error;
+		}
+	}
+
+	// Generate profile-based weekly insights using user profile data
+	static async generateProfileBasedWeeklyInsights(): Promise<InsightsResponse> {
+		try {
+			console.log(
+				'InsightsService.generateProfileBasedWeeklyInsights() - Starting generation...'
+			);
+
+			const response = await ApiService.post<any>(
+				'/insights/profile-based/weekly',
+				{}
+			);
+
+			// Debug: Log the response to see what we're getting
+			console.log(
+				'InsightsService.generateProfileBasedWeeklyInsights() - Response:',
+				JSON.stringify(response, null, 2)
+			);
+
+			// Handle double-nested response structure that the server actually returns
+			let insightsArray: AIInsight[] = [];
+
+			if (response.data) {
+				// Check if response.data is a nested response object
+				if (
+					typeof response.data === 'object' &&
+					response.data.success !== undefined
+				) {
+					// First level nesting
+					if (response.data.data && Array.isArray(response.data.data)) {
+						insightsArray = response.data.data;
+					} else if (
+						response.data.data &&
+						typeof response.data.data === 'object' &&
+						response.data.data.success !== undefined
+					) {
+						// Second level nesting
+						if (
+							response.data.data.data &&
+							Array.isArray(response.data.data.data)
+						) {
+							insightsArray = response.data.data.data;
+						}
+					}
+				} else if (Array.isArray(response.data)) {
+					// Direct array
+					insightsArray = response.data;
+				}
+			}
+
+			if (!Array.isArray(insightsArray)) {
+				console.warn(
+					'InsightsService.generateProfileBasedWeeklyInsights() - Data is not an array:',
+					response.data
+				);
+				insightsArray = [];
+			}
+
+			console.log(
+				'InsightsService.generateProfileBasedWeeklyInsights() - Final processed data:',
+				insightsArray
+			);
+
+			return {
+				success: response.success,
+				data: insightsArray,
+				error: response.error,
+			};
+		} catch (error) {
+			console.error(
+				'InsightsService.generateProfileBasedWeeklyInsights() - Error:',
 				error
 			);
 			throw error;

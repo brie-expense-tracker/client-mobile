@@ -180,9 +180,17 @@ export default function BudgetScreen() {
 	const [refreshing, setRefreshing] = useState(false);
 
 	// ==========================================
-	// Calculate Total Budget Summary
+	// Separate budgets by period
 	// ==========================================
-	const totalBudgetSummary = budgets.reduce(
+	const monthlyBudgets = budgets.filter(
+		(budget) => budget.period === 'monthly'
+	);
+	const weeklyBudgets = budgets.filter((budget) => budget.period === 'weekly');
+
+	// ==========================================
+	// Calculate Budget Summaries by Period
+	// ==========================================
+	const monthlyBudgetSummary = monthlyBudgets.reduce(
 		(acc, budget) => {
 			acc.totalAllocated += budget.amount;
 			acc.totalSpent += budget.spent || 0;
@@ -191,10 +199,30 @@ export default function BudgetScreen() {
 		{ totalAllocated: 0, totalSpent: 0 }
 	);
 
-	const totalPercentage =
-		totalBudgetSummary.totalAllocated > 0
+	const weeklyBudgetSummary = weeklyBudgets.reduce(
+		(acc, budget) => {
+			acc.totalAllocated += budget.amount;
+			acc.totalSpent += budget.spent || 0;
+			return acc;
+		},
+		{ totalAllocated: 0, totalSpent: 0 }
+	);
+
+	const monthlyPercentage =
+		monthlyBudgetSummary.totalAllocated > 0
 			? Math.min(
-					(totalBudgetSummary.totalSpent / totalBudgetSummary.totalAllocated) *
+					(monthlyBudgetSummary.totalSpent /
+						monthlyBudgetSummary.totalAllocated) *
+						100,
+					100
+			  )
+			: 0;
+
+	const weeklyPercentage =
+		weeklyBudgetSummary.totalAllocated > 0
+			? Math.min(
+					(weeklyBudgetSummary.totalSpent /
+						weeklyBudgetSummary.totalAllocated) *
 						100,
 					100
 			  )
@@ -205,9 +233,17 @@ export default function BudgetScreen() {
 	// ==========================================
 	useEffect(() => {
 		console.log('[BudgetScreen] Current budgets:', budgets);
-		console.log('[BudgetScreen] Total summary:', totalBudgetSummary);
-		console.log('[BudgetScreen] Total percentage:', totalPercentage);
-	}, [budgets, totalBudgetSummary, totalPercentage]);
+		console.log('[BudgetScreen] Monthly budgets:', monthlyBudgets);
+		console.log('[BudgetScreen] Weekly budgets:', weeklyBudgets);
+		console.log('[BudgetScreen] Monthly summary:', monthlyBudgetSummary);
+		console.log('[BudgetScreen] Weekly summary:', weeklyBudgetSummary);
+	}, [
+		budgets,
+		monthlyBudgets,
+		weeklyBudgets,
+		monthlyBudgetSummary,
+		weeklyBudgetSummary,
+	]);
 
 	// ==========================================
 	// Animation Setup
@@ -269,36 +305,36 @@ export default function BudgetScreen() {
 	);
 
 	// ==========================================
-	// Total Budget Summary Component
+	// Budget Summary Components
 	// ==========================================
-	const TotalBudgetSummary = () => (
-		<View style={styles.totalBudgetCard}>
-			<View style={styles.totalBudgetHeader}>
-				<View style={styles.totalBudgetIconWrapper}>
-					<Ionicons name="wallet-outline" size={24} color="#00a2ff" />
+	const MonthlyBudgetSummary = () => (
+		<View style={styles.budgetSummaryCard}>
+			<View style={styles.budgetSummaryHeader}>
+				<View style={styles.budgetSummaryIconWrapper}>
+					<Ionicons name="calendar-outline" size={24} color="#00a2ff" />
 				</View>
-				<Text style={styles.totalBudgetTitle}>Total Budget</Text>
+				<Text style={styles.budgetSummaryTitle}>Monthly Budgets</Text>
 			</View>
 
-			<View style={styles.totalBudgetAmounts}>
-				<Text style={styles.totalBudgetSpentText}>
-					${totalBudgetSummary.totalSpent.toFixed(2)}
+			<View style={styles.budgetSummaryAmounts}>
+				<Text style={styles.budgetSummarySpentText}>
+					${monthlyBudgetSummary.totalSpent.toFixed(2)}
 				</Text>
-				<Text style={styles.totalBudgetAllocatedText}>
-					/ ${totalBudgetSummary.totalAllocated.toFixed(2)}
+				<Text style={styles.budgetSummaryAllocatedText}>
+					/ ${monthlyBudgetSummary.totalAllocated.toFixed(2)}
 				</Text>
 			</View>
 
-			<View style={styles.totalBudgetProgressBarBackground}>
+			<View style={styles.budgetSummaryProgressBarBackground}>
 				<View
 					style={[
-						styles.totalBudgetProgressBarFill,
+						styles.budgetSummaryProgressBarFill,
 						{
-							width: `${totalPercentage}%`,
+							width: `${monthlyPercentage}%`,
 							backgroundColor:
-								totalPercentage > 90
+								monthlyPercentage > 90
 									? '#E53935'
-									: totalPercentage > 75
+									: monthlyPercentage > 75
 									? '#FB8C00'
 									: '#00a2ff',
 						},
@@ -306,14 +342,65 @@ export default function BudgetScreen() {
 				/>
 			</View>
 
-			<View style={styles.totalBudgetFooter}>
-				<Text style={styles.totalBudgetPercentageText}>
-					{totalPercentage.toFixed(0)}% used
+			<View style={styles.budgetSummaryFooter}>
+				<Text style={styles.budgetSummaryPercentageText}>
+					{monthlyPercentage.toFixed(0)}% used
 				</Text>
-				<Text style={styles.totalBudgetRemainingText}>
+				<Text style={styles.budgetSummaryRemainingText}>
 					$
 					{(
-						totalBudgetSummary.totalAllocated - totalBudgetSummary.totalSpent
+						monthlyBudgetSummary.totalAllocated -
+						monthlyBudgetSummary.totalSpent
+					).toFixed(2)}{' '}
+					remaining
+				</Text>
+			</View>
+		</View>
+	);
+
+	const WeeklyBudgetSummary = () => (
+		<View style={styles.budgetSummaryCard}>
+			<View style={styles.budgetSummaryHeader}>
+				<View style={styles.budgetSummaryIconWrapper}>
+					<Ionicons name="calendar-clear-outline" size={24} color="#00a2ff" />
+				</View>
+				<Text style={styles.budgetSummaryTitle}>Weekly Budgets</Text>
+			</View>
+
+			<View style={styles.budgetSummaryAmounts}>
+				<Text style={styles.budgetSummarySpentText}>
+					${weeklyBudgetSummary.totalSpent.toFixed(2)}
+				</Text>
+				<Text style={styles.budgetSummaryAllocatedText}>
+					/ ${weeklyBudgetSummary.totalAllocated.toFixed(2)}
+				</Text>
+			</View>
+
+			<View style={styles.budgetSummaryProgressBarBackground}>
+				<View
+					style={[
+						styles.budgetSummaryProgressBarFill,
+						{
+							width: `${weeklyPercentage}%`,
+							backgroundColor:
+								weeklyPercentage > 90
+									? '#E53935'
+									: weeklyPercentage > 75
+									? '#FB8C00'
+									: '#00a2ff',
+						},
+					]}
+				/>
+			</View>
+
+			<View style={styles.budgetSummaryFooter}>
+				<Text style={styles.budgetSummaryPercentageText}>
+					{weeklyPercentage.toFixed(0)}% used
+				</Text>
+				<Text style={styles.budgetSummaryRemainingText}>
+					$
+					{(
+						weeklyBudgetSummary.totalAllocated - weeklyBudgetSummary.totalSpent
 					).toFixed(2)}{' '}
 					remaining
 				</Text>
@@ -842,8 +929,10 @@ export default function BudgetScreen() {
 	// Main Render
 	// ==========================================
 	// Show empty state if no budgets, otherwise show budgets with add button
-	const budgetsWithAdd = [
-		...budgets,
+	// Ensure monthly budgets come before weekly budgets
+	const allBudgets = [...monthlyBudgets, ...weeklyBudgets];
+	const allBudgetsWithAdd = [
+		...allBudgets,
 		{
 			id: 'add',
 			name: 'Add Budget',
@@ -855,6 +944,59 @@ export default function BudgetScreen() {
 		} as Budget,
 	];
 
+	// Custom header component (now empty since summaries will be inline)
+	const BudgetHeader = () => <View />;
+
+	// Create a properly structured data array with section separators and summaries
+	const createStructuredData = () => {
+		const data: (| Budget
+			| { id: string; type: 'section'; title: string }
+			| { id: string; type: 'summary'; period: 'monthly' | 'weekly' })[] = [];
+
+		// Add monthly budgets first
+		if (monthlyBudgets.length > 0) {
+			data.push({
+				id: 'monthly-section',
+				type: 'section',
+				title: 'MONTHLY',
+			});
+			data.push({
+				id: 'monthly-summary',
+				type: 'summary',
+				period: 'monthly',
+			});
+			data.push(...monthlyBudgets);
+		}
+
+		// Add weekly budgets
+		if (weeklyBudgets.length > 0) {
+			data.push({
+				id: 'weekly-section',
+				type: 'section',
+				title: 'Weekly',
+			});
+			data.push({
+				id: 'weekly-summary',
+				type: 'summary',
+				period: 'weekly',
+			});
+			data.push(...weeklyBudgets);
+		}
+
+		// Add the "Add Budget" button at the end
+		data.push({
+			id: 'add',
+			name: 'Add Budget',
+			amount: 0,
+			spent: 0,
+			icon: 'add-circle-outline',
+			color: '#00a2ff',
+			period: 'monthly',
+		} as Budget);
+
+		return data;
+	};
+
 	return (
 		<View style={styles.mainContainer}>
 			{isLoading && !hasLoaded ? (
@@ -865,9 +1007,9 @@ export default function BudgetScreen() {
 				<EmptyState />
 			) : (
 				<FlatList
-					data={budgetsWithAdd}
+					data={createStructuredData()}
 					keyExtractor={(item) => item.id}
-					ListHeaderComponent={TotalBudgetSummary}
+					ListHeaderComponent={BudgetHeader}
 					refreshControl={
 						<RefreshControl
 							refreshing={refreshing}
@@ -877,28 +1019,51 @@ export default function BudgetScreen() {
 						/>
 					}
 					renderItem={({ item }) => {
-						if (item.id === 'add') {
+						// Handle section separators
+						if ('type' in item && item.type === 'section') {
+							return (
+								<View style={styles.sectionHeader}>
+									<Text style={styles.sectionHeaderText}>{item.title}</Text>
+								</View>
+							);
+						}
+
+						// Handle summary items
+						if ('type' in item && item.type === 'summary') {
+							if (item.period === 'monthly') {
+								return <MonthlyBudgetSummary />;
+							} else if (item.period === 'weekly') {
+								return <WeeklyBudgetSummary />;
+							}
+						}
+
+						// Handle add budget button
+						if (item.id === 'add' && 'name' in item) {
 							return (
 								<RectButton style={styles.card} onPress={showModal}>
 									<View style={styles.cardHeader}>
 										<View
 											style={[
 												styles.iconWrapper,
-												{ backgroundColor: `${item.color}20` },
+												{ backgroundColor: `${(item as Budget).color}20` },
 											]}
 										>
 											<Ionicons
-												name={item.icon as any}
+												name={(item as Budget).icon as any}
 												size={24}
-												color={item.color}
+												color={(item as Budget).color}
 											/>
 										</View>
-										<Text style={styles.categoryText}>{item.name}</Text>
+										<Text style={styles.categoryText}>
+											{(item as Budget).name}
+										</Text>
 									</View>
 								</RectButton>
 							);
 						}
-						return renderItem({ item });
+
+						// Handle regular budget items
+						return renderItem({ item: item as Budget });
 					}}
 					contentContainerStyle={styles.listContent}
 					showsVerticalScrollIndicator={false}
@@ -1722,7 +1887,7 @@ const styles = StyleSheet.create({
 		fontWeight: '500',
 		color: '#757575',
 	},
-	totalBudgetCard: {
+	budgetSummaryCard: {
 		backgroundColor: '#ffffff',
 		borderRadius: 16,
 		padding: 20,
@@ -1736,12 +1901,12 @@ const styles = StyleSheet.create({
 		// Android shadow
 		elevation: 2,
 	},
-	totalBudgetHeader: {
+	budgetSummaryHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		marginBottom: 12,
 	},
-	totalBudgetIconWrapper: {
+	budgetSummaryIconWrapper: {
 		width: 40,
 		height: 40,
 		borderRadius: 12,
@@ -1750,49 +1915,49 @@ const styles = StyleSheet.create({
 		backgroundColor: '#e0f7fa',
 		marginRight: 12,
 	},
-	totalBudgetTitle: {
+	budgetSummaryTitle: {
 		fontSize: 18,
 		fontWeight: '600',
 		color: '#212121',
 	},
-	totalBudgetAmounts: {
+	budgetSummaryAmounts: {
 		flexDirection: 'row',
 		alignItems: 'baseline',
 		marginBottom: 8,
 	},
-	totalBudgetSpentText: {
+	budgetSummarySpentText: {
 		fontSize: 24,
 		fontWeight: '700',
 		color: '#212121',
 	},
-	totalBudgetAllocatedText: {
+	budgetSummaryAllocatedText: {
 		marginLeft: 8,
 		fontSize: 16,
 		color: '#757575',
 	},
-	totalBudgetProgressBarBackground: {
+	budgetSummaryProgressBarBackground: {
 		width: '100%',
 		height: 8,
 		backgroundColor: '#e0e0e0',
 		borderRadius: 4,
 		overflow: 'hidden',
 	},
-	totalBudgetProgressBarFill: {
+	budgetSummaryProgressBarFill: {
 		height: '100%',
 		borderRadius: 4,
 	},
-	totalBudgetFooter: {
+	budgetSummaryFooter: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
 		marginTop: 12,
 	},
-	totalBudgetPercentageText: {
+	budgetSummaryPercentageText: {
 		fontSize: 14,
 		fontWeight: '500',
 		color: '#757575',
 	},
-	totalBudgetRemainingText: {
+	budgetSummaryRemainingText: {
 		fontSize: 14,
 		fontWeight: '500',
 		color: '#757575',
@@ -1890,5 +2055,16 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		color: '#757575',
 		marginTop: 12,
+	},
+	sectionHeader: {
+		paddingHorizontal: 24,
+		backgroundColor: '#ffffff',
+		marginTop: 12,
+	},
+	sectionHeaderText: {
+		fontSize: 14,
+		fontWeight: '700',
+		color: '#686868',
+		textTransform: 'uppercase',
 	},
 });

@@ -8,7 +8,7 @@ interface Transaction {
 	type: 'income' | 'expense';
 	amount: number;
 	date: string;
-	categories?: Array<{ name: string; color?: string }>;
+	categories?: { name: string; color?: string }[];
 }
 
 interface Budget {
