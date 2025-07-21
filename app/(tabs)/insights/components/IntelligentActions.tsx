@@ -10,20 +10,19 @@ import {
 	ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import {
 	IntelligentActionService,
 	IntelligentAction,
 	ActionExecutionResult,
-} from '../services/intelligentActionService';
-import { AIInsight } from '../services/insightsService';
+} from '../../../../src/services/intelligentActionService';
+import { AIInsight } from '../../../../src/services/insightsService';
 import {
 	navigateToBudgetsWithModal,
 	navigateToGoalsWithModal,
-} from '../utils/navigationUtils';
-import { useTransactionModal } from '../context/transactionModalContext';
-import { useProgression } from '../context/progressionContext';
+} from '../../../../src/utils/navigationUtils';
+import { useTransactionModal } from '../../../../src/context/transactionModalContext';
+import { useProgression } from '../../../../src/context/progressionContext';
 
 interface IntelligentActionsProps {
 	insight: AIInsight;

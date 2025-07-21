@@ -13,16 +13,18 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { InsightsService } from '../services/insightsService';
-import { useProfile } from '../context/profileContext';
-import { useProgression } from '../context/progressionContext';
-import { useInsightsHub, Period } from '../hooks';
-import { useBudget } from '../context/budgetContext';
-import { useGoal } from '../context/goalContext';
+import {
+	InsightsService,
+	AIInsight,
+} from '../../../../src/services/insightsService';
+import { useProfile } from '../../../../src/context/profileContext';
+import { useProgression } from '../../../../src/context/progressionContext';
+import { useInsightsHub, Period } from '../../../../src/hooks';
+import { useBudget } from '../../../../src/context/budgetContext';
+import { useGoal } from '../../../../src/context/goalContext';
 import { useContext } from 'react';
-import { TransactionContext } from '../context/transactionContext';
+import { TransactionContext } from '../../../../src/context/transactionContext';
 import ProgressionSystem from './ProgressionSystem';
-import { AIInsight } from '../services/insightsService';
 
 interface AICoachProps {
 	// Component now uses user's AI insights frequency preference
@@ -862,49 +864,7 @@ const AICoach: FC<AICoachProps> = ({ period: propPeriod }) => {
 				</View>
 
 				{/* Action Buttons */}
-				<View style={styles.actionsSection}>
-					<TouchableOpacity
-						style={[
-							styles.actionButton,
-							{ backgroundColor: stageContent.color },
-							localGenerating && styles.actionButtonDisabled,
-						]}
-						onPress={handleGenerateInsights}
-						disabled={localGenerating}
-					>
-						{localGenerating ? (
-							<ActivityIndicator size="small" color="#fff" />
-						) : (
-							<Ionicons name="refresh" size={20} color="#fff" />
-						)}
-						<Text style={styles.actionButtonText}>
-							{localGenerating
-								? 'Generating...'
-								: displayInsights && displayInsights.length > 0
-								? `Refresh ${currentFrequencyInfo.label} Insights`
-								: `Generate ${currentFrequencyInfo.label} Insights`}
-						</Text>
-					</TouchableOpacity>
-
-					<TouchableOpacity
-						style={[
-							styles.actionButton,
-							styles.secondaryButton,
-							{ borderColor: stageContent.color },
-						]}
-						onPress={() => router.push('/(tabs)/insights')}
-					>
-						<Ionicons name="list" size={20} color={stageContent.color} />
-						<Text
-							style={[
-								styles.secondaryButtonText,
-								{ color: stageContent.color },
-							]}
-						>
-							View All Insights
-						</Text>
-					</TouchableOpacity>
-				</View>
+				{/* Removed manual insights generation and view all buttons as requested */}
 			</ScrollView>
 
 			{/* Progression System Modal */}

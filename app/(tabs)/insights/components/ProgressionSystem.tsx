@@ -10,8 +10,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useProgression } from '../context/progressionContext';
-import { useProfile } from '../context/profileContext';
+import { useProgression } from '../../../../src/context/progressionContext';
+import { useProfile } from '../../../../src/context/profileContext';
 
 interface ProgressionSystemProps {
 	visible: boolean;

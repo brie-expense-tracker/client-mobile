@@ -12,8 +12,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { BorderlessButton, RectButton } from 'react-native-gesture-handler';
 import RNModal from 'react-native-modal';
-import { TransactionContext } from '../context/transactionContext';
-import { Transaction } from '../data/transactions';
+import { TransactionContext } from '../../../../src/context/transactionContext';
+import { Transaction } from '../../../../src/data/transactions';
 
 interface QuickAddTransactionProps {
 	isVisible: boolean;

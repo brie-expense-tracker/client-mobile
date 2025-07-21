@@ -26,7 +26,7 @@ import { TransactionContext } from '../../../../src/context/transactionContext';
 import { FilterContext } from '../../../../src/context/filterContext';
 import { useBudget } from '../../../../src/context/budgetContext';
 import { useGoal } from '../../../../src/context/goalContext';
-import { TransactionRow } from '../../../../src/components/transactionRow';
+import { TransactionRow } from './components/transactionRow';
 
 // =============================================
 // Utility Functions
