@@ -15,7 +15,7 @@ import IntelligentActions from './IntelligentActions';
 import {
 	IntelligentActionService,
 	IntelligentAction,
-} from '../services/intelligentActionService';
+} from '../../../../src/services/intelligentActionService';
 
 interface AIInsight {
 	_id: string;

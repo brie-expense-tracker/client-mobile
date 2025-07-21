@@ -18,7 +18,7 @@ import { useGoal, Goal } from '../../../src/context/goalContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import RNModal from 'react-native-modal';
-import QuickAddTransaction from '../../../src/components/QuickAddTransaction';
+import QuickAddTransaction from './components/QuickAddTransaction';
 
 const { width } = Dimensions.get('window');
 

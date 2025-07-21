@@ -24,8 +24,8 @@ import {
 	InsightsService,
 	AIInsight,
 } from '../../../src/services/insightsService';
-import HistoricalComparison from '../../../src/components/HistoricalComparison';
-import IntelligentActions from '../../../src/components/IntelligentActions';
+import HistoricalComparison from './components/HistoricalComparison';
+import IntelligentActions from './components/IntelligentActions';
 import {
 	navigateToBudgetsWithModal,
 	navigateToGoalsWithModal,

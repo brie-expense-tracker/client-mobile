@@ -12,9 +12,9 @@ import Animated, {
 	Easing,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import type { Transaction } from '../data/transactions';
-import { useBudget } from '../context/budgetContext';
-import { useGoal } from '../context/goalContext';
+import type { Transaction } from '../../../../../src/data/transactions';
+import { useBudget } from '../../../../../src/context/budgetContext';
+import { useGoal } from '../../../../../src/context/goalContext';
 
 // Helper function to format date without time
 const formatDateWithoutTime = (dateString: string): string => {

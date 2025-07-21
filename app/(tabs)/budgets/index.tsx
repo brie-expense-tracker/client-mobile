@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BorderlessButton, RectButton } from 'react-native-gesture-handler';
 import { useBudget, Budget } from '../../../src/context/budgetContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import QuickAddBudgetTransaction from '../../../src/components/QuickAddBudgetTransaction';
+import QuickAddBudgetTransaction from './components/QuickAddBudgetTransaction';
 
 // ==========================================
 // Types

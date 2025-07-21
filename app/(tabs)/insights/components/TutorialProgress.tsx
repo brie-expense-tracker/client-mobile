@@ -10,8 +10,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useTutorialProgress } from '../hooks/useTutorialProgress';
-import { useTransactionModal } from '../context/transactionModalContext';
+import { useTutorialProgress } from '../../../../src/hooks/useTutorialProgress';
+import { useTransactionModal } from '../../../../src/context/transactionModalContext';
 
 interface TutorialProgressProps {
 	onTutorialCompleted?: () => void;
