@@ -1,4 +1,4 @@
-import React, { FC, useState, useCallback, useEffect } from 'react';
+import React, { FC, useState, useCallback, useEffect, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
 	View,
@@ -11,7 +11,6 @@ import {
 	RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import {
 	InsightsService,
@@ -29,9 +28,13 @@ import ProgressionSystem from './ProgressionSystem';
 interface AICoachProps {
 	// Component now uses user's AI insights frequency preference
 	period?: 'daily' | 'weekly' | 'monthly'; // Optional period override
+	isFirstTime?: boolean; // Indicates if this is the first time showing AI Coach after tutorial completion
 }
 
-const AICoach: FC<AICoachProps> = ({ period: propPeriod }) => {
+const AICoach: FC<AICoachProps> = ({
+	period: propPeriod,
+	isFirstTime = false,
+}) => {
 	const { profile } = useProfile();
 	const { currentStage, xp, completedActions, checkProgression } =
 		useProgression();
@@ -56,11 +59,11 @@ const AICoach: FC<AICoachProps> = ({ period: propPeriod }) => {
 				case 'daily':
 					return 'week';
 				case 'weekly':
-					return 'month';
+					return 'week';
 				case 'monthly':
-					return 'quarter';
-				default:
 					return 'month';
+				default:
+					return 'week';
 			}
 		}
 
@@ -69,11 +72,11 @@ const AICoach: FC<AICoachProps> = ({ period: propPeriod }) => {
 			case 'daily':
 				return 'week';
 			case 'weekly':
-				return 'month';
+				return 'week';
 			case 'monthly':
-				return 'quarter';
-			default:
 				return 'month';
+			default:
+				return 'week';
 		}
 	};
 
@@ -286,33 +289,19 @@ const AICoach: FC<AICoachProps> = ({ period: propPeriod }) => {
 
 	// Filter insights based on user preferences
 	const filteredInsights = useCallback(() => {
-		console.log('🔍 Filtering insights:', {
-			insightsLength: insights?.length,
-			aiInsightsEnabled,
-			showHighPriorityOnly,
-			maxInsights,
-		});
-
 		if (!insights || !aiInsightsEnabled) {
-			console.log(
-				'🔍 No insights or AI insights disabled, returning empty array'
-			);
 			return [];
 		}
 
 		let filtered = insights;
 
-		console.log('🔍 After type filtering:', filtered.length);
-
 		// Apply priority filter if enabled
 		if (showHighPriorityOnly) {
 			filtered = filtered.filter((insight) => insight.priority === 'high');
-			console.log('🔍 After priority filtering:', filtered.length);
 		}
 
 		// Limit to max insights
 		const result = filtered.slice(0, maxInsights);
-		console.log('🔍 Final filtered insights:', result.length);
 		return result;
 	}, [insights, aiInsightsEnabled, showHighPriorityOnly, maxInsights]);
 
@@ -344,24 +333,6 @@ const AICoach: FC<AICoachProps> = ({ period: propPeriod }) => {
 			}
 		},
 		[markInsightAsRead, router]
-	);
-
-	// Handle when insights are generated
-	const handleInsightsGenerated = useCallback(
-		async (newInsights: any[]) => {
-			try {
-				console.log('🎯 Insights generated from AI Coach:', newInsights.length);
-
-				// Refresh insights to get the latest data
-				await fetchInsights();
-
-				// Show success message (already shown in AICoach component)
-				console.log('✅ Insights refreshed after generation');
-			} catch (error) {
-				console.error('Error refreshing insights after generation:', error);
-			}
-		},
-		[fetchInsights]
 	);
 
 	// Helper function to get icon for insight type
@@ -416,49 +387,51 @@ const AICoach: FC<AICoachProps> = ({ period: propPeriod }) => {
 
 	// Get stage-specific content
 	const getStageContent = () => {
-		switch (currentStage) {
-			case 'level2':
+		console.log('[AICoach] currentStage:', currentStage); // Debugging: log currentStage
+		switch ((currentStage || '').toLowerCase()) {
+			case 'apprentice':
 				return {
-					title: 'Stage 2: Smart Actions',
-					subtitle: 'Personalized recommendations and smart actions',
+					title: 'Financial Foundations',
+					subtitle: 'Build strong money habits and unlock smart actions',
 					description:
-						"Great job! You've unlocked personalized smart actions. Complete missions to earn XP and unlock advanced features.",
+						"You're building your financial foundation! Complete missions to earn XP and unlock new features.",
 					color: '#4CAF50',
 					icon: 'sparkles',
 				};
-			case 'dynamic':
+			case 'practitioner':
 				return {
-					title: 'Stage 3: Dynamic Progression',
-					subtitle: 'Advanced AI insights and continuous optimization',
+					title: 'Growth & Optimization',
+					subtitle: 'Advanced insights and continuous improvement',
 					description:
-						"You've reached the advanced stage! Enjoy continuous optimization and advanced financial insights.",
+						"You're growing your financial skills! Enjoy advanced insights and optimize your progress.",
 					color: '#9C27B0',
 					icon: 'rocket',
 				};
-			case 'smartPath':
+			case 'expert':
 				return {
-					title: 'Stage 4: Smart Path Customization',
-					subtitle: 'Gamified skill trees and mastery paths',
+					title: 'Mastery Pathways',
+					subtitle: 'Customize your journey and master your finances',
 					description:
-						'Master your financial skills through customizable skill paths and unlock advanced mastery levels.',
+						'Customize your financial path and unlock mastery levels with advanced tools.',
 					color: '#E91E63',
 					icon: 'trophy',
 				};
-			case 'realtime':
+			case 'master':
 				return {
-					title: 'Stage 5: Real-time Reactivity',
-					subtitle: 'Ongoing monitoring and reactive prompts',
+					title: 'Real-Time Guidance',
+					subtitle: 'Live monitoring and adaptive coaching',
 					description:
-						"You've reached the pinnacle! Experience real-time financial monitoring and adaptive AI responses.",
+						"You've reached the top! Experience real-time financial monitoring and dynamic AI coaching.",
 					color: '#00BCD4',
 					icon: 'flash',
 				};
 			default:
 				return {
-					title: 'AI Coach',
-					subtitle: 'Your personal financial assistant',
+					title: 'Getting Started',
+					subtitle:
+						'Complete your profile or tutorial to unlock personalized insights',
 					description:
-						"Welcome to AI Coach! Let's get started with your financial journey.",
+						"You're at the beginning of your financial journey. Complete the onboarding steps to unlock actionable insights and smart recommendations!",
 					color: '#2196F3',
 					icon: 'bulb-outline',
 				};
@@ -466,109 +439,68 @@ const AICoach: FC<AICoachProps> = ({ period: propPeriod }) => {
 	};
 
 	const [localInsights, setLocalInsights] = useState<any[]>(filteredInsights());
-	const [localGenerating, setLocalGenerating] = useState(false);
 
 	// Update local insights when filtered insights change
 	useEffect(() => {
-		console.log(
-			'🎯 AICoach: Filtered insights changed:',
-			filteredInsights().length
-		);
 		setLocalInsights(filteredInsights());
 	}, [filteredInsights]);
 
-	// Only fetch insights when the screen is focused
+	// Only fetch insights when the screen is focused, with debouncing
+	const lastFetchRef = useRef<number>(0);
+	const hasTriggeredFirstTimeRef = useRef<boolean>(false);
+
 	useFocusEffect(
 		useCallback(() => {
-			console.log('🎯 AICoach: Screen focused, fetching insights...');
-			fetchInsights();
-		}, [fetchInsights])
-	);
+			const now = Date.now();
 
-	const handleGenerateInsights = useCallback(async () => {
-		// Check if AI insights are enabled
-		if (!profile?.preferences?.aiInsights?.enabled) {
-			Alert.alert(
-				'AI Insights Disabled',
-				'Please enable AI insights in Settings > AI Insights to generate personalized financial insights.',
-				[
-					{ text: 'Cancel', style: 'cancel' },
-					{
-						text: 'Go to Settings',
-						onPress: () => {
-							router.push('/(tabs)/settings/aiInsights');
-						},
-					},
-				]
-			);
-			return;
-		}
-
-		try {
-			setLocalGenerating(true);
-			console.log(
-				`🎯 AICoach: Starting insights generation for ${userFrequency} frequency...`
-			);
-
-			// Generate insights for the user's frequency preference
-			const response = await InsightsService.generateInsights(userFrequency);
-
-			console.log('🎯 AICoach: Generation response:', {
-				success: response.success,
-				dataLength: response.data?.length,
-				error: response.error,
-			});
-
-			if (response.success && response.data && Array.isArray(response.data)) {
-				// Sort by most recent
-				const sortedInsights = response.data.sort(
-					(a, b) =>
-						new Date(b.generatedAt).getTime() -
-						new Date(a.generatedAt).getTime()
-				);
-
+			// If this is the first time showing AI Coach after tutorial completion, trigger insight generation
+			if (isFirstTime && !hasTriggeredFirstTimeRef.current) {
 				console.log(
-					'🎯 AICoach: Success! Generated insights:',
-					sortedInsights.length
+					'🎯 AICoach: First time showing after tutorial completion, triggering insight generation...'
 				);
+				hasTriggeredFirstTimeRef.current = true;
 
-				// Update local insights immediately so user sees them
-				setLocalInsights(sortedInsights);
+				// Generate insights for the user with better error handling
+				const generateInitialInsights = async () => {
+					try {
+						const { InsightsService } = await import(
+							'../../../../src/services/insightsService'
+						);
+						const result = await InsightsService.generateInsights('weekly');
 
-				// Show success message
-				Alert.alert(
-					'Success! 🎉',
-					`Generated ${sortedInsights.length} personalized ${
-						getFrequencyInfo(userFrequency).label
-					} insights for you.`,
-					[{ text: 'Great!' }]
-				);
+						if (result.success) {
+							console.log('✅ Initial insights generated for new user!');
+						} else {
+							console.warn(
+								'⚠️ Initial insights generation returned success: false'
+							);
+						}
 
-				// Call the callback to update parent component
-				handleInsightsGenerated(sortedInsights);
-			} else {
-				console.log('🎯 AICoach: No insights generated');
-				Alert.alert(
-					'No Insights Generated',
-					'Unable to generate insights at this time. This might be because you need more transaction data. Try adding some transactions and try again.',
-					[{ text: 'OK' }]
-				);
+						// Fetch the newly generated insights
+						setTimeout(() => {
+							fetchInsights();
+						}, 2000); // Small delay to ensure insights are processed
+					} catch (error) {
+						console.error('❌ Error generating initial insights:', error);
+						// Fallback to regular fetch
+						fetchInsights();
+					}
+				};
+
+				generateInitialInsights();
+				return;
 			}
-		} catch (error) {
-			console.error('🎯 AICoach: Error generating insights:', error);
-			Alert.alert(
-				'Generation Failed',
-				'We encountered an issue generating your insights. Please check your internet connection and try again.',
-				[{ text: 'OK' }]
-			);
-		} finally {
-			setLocalGenerating(false);
-		}
-	}, [
-		profile?.preferences?.aiInsights?.enabled,
-		handleInsightsGenerated,
-		userFrequency,
-	]);
+
+			// Regular debounced fetch for subsequent visits
+			if (now - lastFetchRef.current > 5000) {
+				console.log('🎯 AICoach: Screen focused, fetching insights...');
+				lastFetchRef.current = now;
+				fetchInsights();
+			} else {
+				console.log('🎯 AICoach: Skipping fetch (debounced)');
+			}
+		}, [fetchInsights, isFirstTime])
+	);
 
 	// Use localInsights instead of props insights for display
 	const displayInsights = localInsights;
@@ -618,18 +550,125 @@ const AICoach: FC<AICoachProps> = ({ period: propPeriod }) => {
 					/>
 				}
 			>
+				{/* Welcome Section - Show for first-time users or when no insights exist */}
+				{(isFirstTime || !displayInsights || displayInsights.length === 0) && (
+					<View style={styles.welcomeSection}>
+						<View style={styles.welcomeCard}>
+							<View style={styles.welcomeHeader}>
+								<View style={styles.welcomeIconContainer}>
+									<Ionicons
+										name="sparkles"
+										size={28}
+										color={stageContent.color}
+									/>
+								</View>
+								<Text style={styles.welcomeTitle}>
+									{isFirstTime
+										? `Welcome to ${stageContent.title}! 🎉`
+										: `Welcome to ${stageContent.title}! 🎉`}
+								</Text>
+							</View>
+							<Text style={styles.welcomeText}>
+								{isFirstTime
+									? `Congratulations on completing the tutorial! Your personalized AI insights are being generated. This will take a moment to analyze your financial data and provide smart recommendations.`
+									: `You now have access to ${currentFrequencyInfo.label} insights and advanced features. Generate your first insights to get started!`}
+							</Text>
+							{isFirstTime && (
+								<View style={styles.generatingIndicator}>
+									<ActivityIndicator size="small" color={stageContent.color} />
+									<Text
+										style={[
+											styles.generatingText,
+											{ color: stageContent.color },
+										]}
+									>
+										Generating your personalized insights...
+									</Text>
+								</View>
+							)}
+						</View>
+					</View>
+				)}
+
+				{/* Stage Progress Header */}
+				<View style={styles.stageHeader}>
+					<View style={styles.stageHeaderCard}>
+						<View style={styles.stageHeaderContent}>
+							<View
+								style={[
+									styles.stageIconContainer,
+									{ backgroundColor: stageContent.color + '15' },
+								]}
+							>
+								<Ionicons
+									name={stageContent.icon as any}
+									size={28}
+									color={stageContent.color}
+								/>
+							</View>
+							<View style={styles.stageHeaderText}>
+								<Text style={styles.stageHeaderTitle}>
+									{stageContent.title}
+								</Text>
+								<Text style={styles.stageHeaderSubtitle}>
+									{stageContent.subtitle}
+								</Text>
+								{/* XP and Progress Display */}
+								<View style={styles.progressInfo}>
+									<View style={styles.progressItem}>
+										<Ionicons
+											name="star"
+											size={14}
+											color={stageContent.color}
+										/>
+										<Text
+											style={[styles.xpText, { color: stageContent.color }]}
+										>
+											XP: {xp}
+										</Text>
+									</View>
+									<View style={styles.progressItem}>
+										<Ionicons
+											name="checkmark-circle"
+											size={14}
+											color={stageContent.color}
+										/>
+										<Text
+											style={[
+												styles.actionsText,
+												{ color: stageContent.color },
+											]}
+										>
+											Actions: {completedActions}
+										</Text>
+									</View>
+								</View>
+							</View>
+							{/* Progression System Button */}
+							<TouchableOpacity
+								style={[
+									styles.progressionButton,
+									{ backgroundColor: stageContent.color + '15' },
+								]}
+								onPress={() => setShowProgressionSystem(true)}
+							>
+								<Ionicons name="trophy" size={20} color={stageContent.color} />
+							</TouchableOpacity>
+						</View>
+					</View>
+				</View>
+
 				{/* Adaptive Content Section */}
 				<View style={styles.adaptiveSection}>
 					<Text style={styles.sectionTitle}>Your Financial Health</Text>
 
 					{/* Overall Financial Health Card */}
 					<View style={styles.adaptiveCard}>
-						<LinearGradient
-							colors={[
-								getToneColor(adaptiveContent.overall.tone),
-								getToneColor(adaptiveContent.overall.tone) + '80',
+						<View
+							style={[
+								styles.adaptiveCardGradient,
+								{ backgroundColor: getToneColor(adaptiveContent.overall.tone) },
 							]}
-							style={styles.adaptiveCardGradient}
 						>
 							<View style={styles.adaptiveCardHeader}>
 								<Ionicons
@@ -645,7 +684,7 @@ const AICoach: FC<AICoachProps> = ({ period: propPeriod }) => {
 							<Text style={styles.adaptiveCardMessage}>
 								{adaptiveContent.overall.message}
 							</Text>
-						</LinearGradient>
+						</View>
 					</View>
 
 					{/* Metrics Grid */}
@@ -680,7 +719,7 @@ const AICoach: FC<AICoachProps> = ({ period: propPeriod }) => {
 								styles.metricCard,
 								{ borderColor: getToneColor(adaptiveContent.budget.tone) },
 							]}
-							onPress={() => router.push('/(tabs)/budgets')}
+							onPress={() => router.push('/(tabs)/budgets?tab=budgets')}
 						>
 							<View style={styles.metricCardHeader}>
 								<Ionicons
@@ -704,7 +743,7 @@ const AICoach: FC<AICoachProps> = ({ period: propPeriod }) => {
 								styles.metricCard,
 								{ borderColor: getToneColor(adaptiveContent.goals.tone) },
 							]}
-							onPress={() => router.push('/(tabs)/budgets/goals')}
+							onPress={() => router.push('/(tabs)/budgets?tab=goals')}
 						>
 							<View style={styles.metricCardHeader}>
 								<Ionicons
@@ -804,67 +843,6 @@ const AICoach: FC<AICoachProps> = ({ period: propPeriod }) => {
 						)}
 					</View>
 				)}
-
-				{/* Welcome Section - Only show if no insights exist */}
-				{(!displayInsights || displayInsights.length === 0) && (
-					<View style={styles.welcomeSection}>
-						<LinearGradient
-							colors={[stageContent.color, stageContent.color + '80']}
-							style={styles.welcomeCard}
-						>
-							<View style={styles.welcomeHeader}>
-								<Ionicons name="sparkles" size={32} color="#fff" />
-								<Text style={styles.welcomeTitle}>
-									{`Welcome to ${stageContent.title}! 🎉`}
-								</Text>
-							</View>
-							<Text style={styles.welcomeText}>
-								{`You now have access to ${currentFrequencyInfo.label} insights and advanced features. Generate your first insights to get started!`}
-							</Text>
-						</LinearGradient>
-					</View>
-				)}
-
-				{/* Stage Progress Header - Moved to bottom */}
-				<View style={styles.stageHeader}>
-					<LinearGradient
-						colors={[stageContent.color, stageContent.color + '80']}
-						style={styles.stageHeaderCard}
-					>
-						<View style={styles.stageHeaderContent}>
-							<Ionicons
-								name={stageContent.icon as any}
-								size={28}
-								color="#fff"
-							/>
-							<View style={styles.stageHeaderText}>
-								<Text style={styles.stageHeaderTitle}>
-									{stageContent.title}
-								</Text>
-								<Text style={styles.stageHeaderSubtitle}>
-									{stageContent.subtitle}
-								</Text>
-								{/* XP and Progress Display */}
-								<View style={styles.progressInfo}>
-									<Text style={styles.xpText}>XP: {xp}</Text>
-									<Text style={styles.actionsText}>
-										Actions: {completedActions}
-									</Text>
-								</View>
-							</View>
-							{/* Progression System Button */}
-							<TouchableOpacity
-								style={styles.progressionButton}
-								onPress={() => setShowProgressionSystem(true)}
-							>
-								<Ionicons name="trophy" size={20} color="#fff" />
-							</TouchableOpacity>
-						</View>
-					</LinearGradient>
-				</View>
-
-				{/* Action Buttons */}
-				{/* Removed manual insights generation and view all buttons as requested */}
 			</ScrollView>
 
 			{/* Progression System Modal */}
@@ -977,8 +955,11 @@ const styles = StyleSheet.create({
 		marginBottom: 16,
 	},
 	stageHeaderCard: {
+		backgroundColor: '#ffffff',
 		borderRadius: 16,
 		padding: 20,
+		borderWidth: 1,
+		borderColor: '#f0f0f0',
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 2 },
 		shadowOpacity: 0.1,
@@ -989,53 +970,74 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 	},
+	stageIconContainer: {
+		width: 56,
+		height: 56,
+		borderRadius: 28,
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginRight: 16,
+	},
 	stageHeaderText: {
-		marginLeft: 12,
 		flex: 1,
 	},
 	stageHeaderTitle: {
 		fontSize: 20,
 		fontWeight: '700',
-		color: '#fff',
+		color: '#333',
 		marginBottom: 4,
 	},
 	stageHeaderSubtitle: {
 		fontSize: 14,
-		color: '#fff',
-		opacity: 0.9,
+		color: '#666',
 		marginBottom: 8,
 	},
 	progressInfo: {
 		flexDirection: 'row',
 		gap: 16,
 	},
+	progressItem: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+	},
 	xpText: {
 		fontSize: 12,
-		color: '#fff',
 		fontWeight: '600',
 	},
 	actionsText: {
 		fontSize: 12,
-		color: '#fff',
 		fontWeight: '600',
 	},
 	progressionButton: {
-		padding: 8,
-		borderRadius: 8,
-		backgroundColor: 'rgba(255, 255, 255, 0.2)',
+		padding: 12,
+		borderRadius: 12,
 	},
 	welcomeSection: {
 		marginBottom: 20,
 	},
 	welcomeCard: {
-		borderRadius: 16,
+		backgroundColor: '#ffffff',
+		borderRadius: 20,
 		padding: 24,
+		borderWidth: 1,
+		borderColor: '#f0f0f0',
 		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
-		shadowRadius: 8,
-		elevation: 4,
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.08,
+		shadowRadius: 12,
+		elevation: 6,
 	},
+	welcomeIconContainer: {
+		width: 48,
+		height: 48,
+		borderRadius: 24,
+		backgroundColor: '#f8f9fa',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginRight: 16,
+	},
+
 	welcomeHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -1044,12 +1046,12 @@ const styles = StyleSheet.create({
 	welcomeTitle: {
 		fontSize: 20,
 		fontWeight: '700',
-		color: '#fff',
-		marginLeft: 12,
+		color: '#333',
+		marginLeft: 0,
 	},
 	welcomeText: {
 		fontSize: 16,
-		color: '#fff',
+		color: '#666',
 		lineHeight: 24,
 	},
 	insightsSection: {
@@ -1177,6 +1179,20 @@ const styles = StyleSheet.create({
 	secondaryButtonText: {
 		fontSize: 16,
 		fontWeight: '600',
+		marginLeft: 8,
+	},
+	generatingIndicator: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginTop: 16,
+		paddingVertical: 12,
+		backgroundColor: 'rgba(255, 255, 255, 0.1)',
+		borderRadius: 8,
+	},
+	generatingText: {
+		fontSize: 14,
+		fontWeight: '500',
 		marginLeft: 8,
 	},
 });

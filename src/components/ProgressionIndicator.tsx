@@ -20,16 +20,8 @@ const ProgressionIndicator: React.FC<ProgressionIndicatorProps> = ({
 	showDetails = false,
 	onPress,
 }) => {
-	const {
-		progressionStatus,
-		currentStage,
-		xp,
-		completedActions,
-		loading,
-		isInTutorialStage,
-		isInLevel2Stage,
-		isInDynamicStage,
-	} = useProgression();
+	const { progressionStatus, currentStage, xp, completedActions, loading } =
+		useProgression();
 
 	if (loading) {
 		return (
@@ -45,32 +37,48 @@ const ProgressionIndicator: React.FC<ProgressionIndicatorProps> = ({
 		const isCompleted = progressPercentage >= 100;
 
 		switch (currentStage) {
-			case 'tutorial':
+			case 'beginner':
 				return {
-					name: 'Tutorial Zone',
+					name: 'Beginner',
 					icon: 'school',
-					colors: ['#4CAF50', '#45a049'],
-					description: isCompleted ? 'Tutorial completed!' : 'Learn the basics',
+					colors: ['#FF9800', '#F57C00'],
+					description: isCompleted ? 'Beginner completed!' : 'Learn the basics',
 				};
-			case 'level2':
+			case 'apprentice':
 				return {
-					name: 'Level 2',
+					name: 'Apprentice',
 					icon: 'sparkles',
-					colors: ['#2196F3', '#1976D2'],
-					description: isCompleted ? 'Level 2 completed!' : 'Smart Actions',
+					colors: ['#4CAF50', '#45a049'],
+					description: isCompleted
+						? 'Apprentice completed!'
+						: 'Master smart actions',
 				};
-			case 'dynamic':
+			case 'practitioner':
 				return {
-					name: 'Dynamic',
+					name: 'Practitioner',
 					icon: 'trending-up',
+					colors: ['#2196F3', '#1976D2'],
+					description: 'Build consistent habits',
+				};
+			case 'expert':
+				return {
+					name: 'Expert',
+					icon: 'rocket',
 					colors: ['#9C27B0', '#7B1FA2'],
-					description: 'Advanced AI',
+					description: 'Optimize and accelerate',
+				};
+			case 'master':
+				return {
+					name: 'Master',
+					icon: 'trophy',
+					colors: ['#E91E63', '#C2185B'],
+					description: 'Financial mastery',
 				};
 			default:
 				return {
-					name: 'Tutorial',
+					name: 'Beginner',
 					icon: 'school',
-					colors: ['#4CAF50', '#45a049'],
+					colors: ['#FF9800', '#F57C00'],
 					description: 'Get started',
 				};
 		}
@@ -84,8 +92,8 @@ const ProgressionIndicator: React.FC<ProgressionIndicatorProps> = ({
 
 		const progression = progressionStatus.progression;
 
-		// Tutorial stage progress calculation
-		if (currentStage === 'tutorial') {
+		// Beginner stage progress calculation
+		if (currentStage === 'beginner') {
 			// If tutorial is already completed, show 100%
 			if (progression.tutorialCompleted) {
 				return 100;
@@ -95,27 +103,55 @@ const ProgressionIndicator: React.FC<ProgressionIndicatorProps> = ({
 			const tutorialSteps = progression.tutorialSteps || {};
 			const completedSteps =
 				Object.values(tutorialSteps).filter(Boolean).length;
-			const totalSteps = 4; // 4 smart actions required for tutorial
+			const totalSteps = 4; // 4 smart actions required for beginner
 
 			return (completedSteps / totalSteps) * 100;
 		}
 
-		// Level 2 stage progress calculation
-		if (currentStage === 'level2') {
-			// If 2+ level2 actions completed, show 100%
-			if (progression.level2ActionsCompleted >= 2) {
+		// Apprentice stage progress calculation
+		if (currentStage === 'apprentice') {
+			// If 3+ apprentice actions completed, show 100%
+			if (progression.level2ActionsCompleted >= 3) {
 				return 100;
 			}
 
-			// Calculate progress based on level2 actions completed
+			// Calculate progress based on apprentice actions completed
 			const completedActions = progression.level2ActionsCompleted || 0;
-			const requiredActions = 2; // 2 level2 actions required
+			const requiredActions = 3; // 3 apprentice actions required
 
 			return (completedActions / requiredActions) * 100;
 		}
 
-		// Dynamic stage - always 100% (final stage)
-		if (currentStage === 'dynamic') {
+		// Practitioner stage progress calculation
+		if (currentStage === 'practitioner') {
+			// If 5+ practitioner actions completed, show 100%
+			if (progression.completedActions >= 5) {
+				return 100;
+			}
+
+			// Calculate progress based on total actions completed
+			const completedActions = progression.completedActions || 0;
+			const requiredActions = 5; // 5 practitioner actions required
+
+			return (completedActions / requiredActions) * 100;
+		}
+
+		// Expert stage progress calculation
+		if (currentStage === 'expert') {
+			// If 10+ expert actions completed, show 100%
+			if (progression.completedActions >= 10) {
+				return 100;
+			}
+
+			// Calculate progress based on total actions completed
+			const completedActions = progression.completedActions || 0;
+			const requiredActions = 10; // 10 expert actions required
+
+			return (completedActions / requiredActions) * 100;
+		}
+
+		// Master stage - always 100% (final stage)
+		if (currentStage === 'master') {
 			return 100;
 		}
 
@@ -174,11 +210,15 @@ const ProgressionIndicator: React.FC<ProgressionIndicatorProps> = ({
 				<Text style={styles.progressText}>
 					{progressPercentage >= 100
 						? `${
-								currentStage === 'tutorial'
-									? 'Tutorial'
-									: currentStage === 'level2'
-									? 'Level 2'
-									: 'Dynamic'
+								currentStage === 'beginner'
+									? 'Beginner'
+									: currentStage === 'apprentice'
+									? 'Apprentice'
+									: currentStage === 'practitioner'
+									? 'Practitioner'
+									: currentStage === 'expert'
+									? 'Expert'
+									: 'Master'
 						  } completed!`
 						: `${Math.round(progressPercentage)}% to next stage`}
 				</Text>
@@ -190,10 +230,15 @@ const ProgressionIndicator: React.FC<ProgressionIndicatorProps> = ({
 					<View style={styles.nextStageContainer}>
 						<Text style={styles.nextStageText}>
 							Next:{' '}
-							{progressionStatus.nextStageRequirements.stage === 'level2'
-								? 'Level 2 - Advanced Smart Actions'
-								: progressionStatus.nextStageRequirements.stage === 'dynamic'
-								? 'Dynamic Progression'
+							{progressionStatus.nextStageRequirements.stage === 'apprentice'
+								? 'Apprentice - Smart Actions'
+								: progressionStatus.nextStageRequirements.stage ===
+								  'practitioner'
+								? 'Practitioner - Build Habits'
+								: progressionStatus.nextStageRequirements.stage === 'expert'
+								? 'Expert - Optimize Growth'
+								: progressionStatus.nextStageRequirements.stage === 'master'
+								? 'Master - Financial Mastery'
 								: 'Unknown Stage'}
 						</Text>
 					</View>
@@ -214,11 +259,11 @@ const ProgressionIndicator: React.FC<ProgressionIndicatorProps> = ({
 				</View>
 			)}
 
-			{/* Tutorial Steps Debug (only show in tutorial stage) */}
-			{currentStage === 'tutorial' &&
+			{/* Beginner Steps Debug (only show in beginner stage) */}
+			{currentStage === 'beginner' &&
 				progressionStatus?.progression?.tutorialSteps && (
 					<View style={styles.requirementsContainer}>
-						<Text style={styles.requirementsTitle}>Tutorial Progress:</Text>
+						<Text style={styles.requirementsTitle}>Beginner Progress:</Text>
 						{Object.entries(progressionStatus.progression.tutorialSteps).map(
 							([step, completed]) => (
 								<View key={step} style={styles.requirementItem}>
@@ -243,10 +288,10 @@ const ProgressionIndicator: React.FC<ProgressionIndicatorProps> = ({
 					</View>
 				)}
 
-			{/* Level 2 Progress Debug (only show in level2 stage) */}
-			{currentStage === 'level2' && (
+			{/* Apprentice Progress Debug (only show in apprentice stage) */}
+			{currentStage === 'apprentice' && (
 				<View style={styles.requirementsContainer}>
-					<Text style={styles.requirementsTitle}>Level 2 Progress:</Text>
+					<Text style={styles.requirementsTitle}>Apprentice Progress:</Text>
 					<View style={styles.requirementItem}>
 						<Ionicons
 							name={
@@ -270,8 +315,8 @@ const ProgressionIndicator: React.FC<ProgressionIndicatorProps> = ({
 									1 && styles.requirementCompleted,
 							]}
 						>
-							First Level 2 Action (
-							{progressionStatus?.progression?.level2ActionsCompleted || 0}/1)
+							First Smart Action (
+							{progressionStatus?.progression?.level2ActionsCompleted || 0}/3)
 						</Text>
 					</View>
 					<View style={styles.requirementItem}>
@@ -297,8 +342,35 @@ const ProgressionIndicator: React.FC<ProgressionIndicatorProps> = ({
 									2 && styles.requirementCompleted,
 							]}
 						>
-							Second Level 2 Action (
-							{progressionStatus?.progression?.level2ActionsCompleted || 0}/2)
+							Second Smart Action (
+							{progressionStatus?.progression?.level2ActionsCompleted || 0}/3)
+						</Text>
+					</View>
+					<View style={styles.requirementItem}>
+						<Ionicons
+							name={
+								(progressionStatus?.progression?.level2ActionsCompleted || 0) >=
+								3
+									? 'checkmark-circle'
+									: 'ellipse-outline'
+							}
+							size={16}
+							color={
+								(progressionStatus?.progression?.level2ActionsCompleted || 0) >=
+								3
+									? '#4CAF50'
+									: '#666'
+							}
+						/>
+						<Text
+							style={[
+								styles.requirementText,
+								(progressionStatus?.progression?.level2ActionsCompleted || 0) >=
+									3 && styles.requirementCompleted,
+							]}
+						>
+							Third Smart Action (
+							{progressionStatus?.progression?.level2ActionsCompleted || 0}/3)
 						</Text>
 					</View>
 				</View>

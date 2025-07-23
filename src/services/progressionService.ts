@@ -2,7 +2,12 @@ import { ApiService } from './apiService';
 
 export interface ProgressionData {
 	currentLevel: number;
-	currentStage: 'tutorial' | 'level2' | 'dynamic' | 'smartPath' | 'realtime';
+	currentStage:
+		| 'Tutorial'
+		| 'Apprentice'
+		| 'Practitioner'
+		| 'Expert'
+		| 'Master';
 	xp: number;
 	completedActions: number;
 	tutorialCompleted: boolean;
@@ -23,7 +28,7 @@ export interface ProgressionData {
 		name: string;
 		description: string;
 		unlockedAt: string;
-		category: 'tutorial' | 'level2' | 'dynamic' | 'smartPath' | 'realtime';
+		category: 'Tutorial' | 'Apprentice' | 'Practitioner' | 'Expert' | 'Master';
 	}[];
 	skillPaths: {
 		budgeting: { progress: number; unlocked: boolean };
@@ -97,7 +102,17 @@ export class ProgressionService {
 	static async getProgressionStatus(): Promise<ProgressionStatus> {
 		try {
 			const response = await ApiService.get('/progression/status');
-			return response;
+
+			// Handle nested response structure from server
+			const nestedData = response.data?.data || response.data;
+
+			return {
+				success: response.success,
+				progression: nestedData?.progression,
+				stageDetails: nestedData?.stageDetails,
+				nextStageRequirements: nestedData?.nextStageRequirements,
+				error: response.error,
+			};
 		} catch (error) {
 			console.error('Error getting progression status:', error);
 			return {
@@ -227,83 +242,84 @@ export class ProgressionService {
 	 */
 	static getStageInfo(currentStage: string) {
 		switch (currentStage) {
-			case 'tutorial':
+			case 'Tutorial':
 				return {
-					title: 'Stage 1: Tutorial Zone',
-					subtitle: 'Complete initial setup to unlock personalized insights',
+					title: 'Level 1: Beginner',
+					subtitle: 'Learn the basics of financial tracking',
 					description:
-						"You're in the tutorial zone! Complete the basic setup steps to unlock advanced AI features.",
+						'Welcome! Complete these basic steps to unlock smart actions and start your financial journey.',
 					color: '#FF9800',
 					icon: 'school-outline',
-					nextStage: 'Level 2 - Smart Actions',
+					nextStage: 'Apprentice',
 					requirements: [
 						'Add your first transaction',
 						'Create your first budget',
 						'Set a savings goal',
-						'Enable weekly updates',
+						'Enable AI insights',
 					],
 				};
-			case 'level2':
+			case 'Apprentice':
 				return {
-					title: 'Stage 2: Smart Actions',
-					subtitle: 'Personalized recommendations and smart actions',
+					title: 'Level 2: Apprentice',
+					subtitle: 'Master smart actions and basic financial habits',
 					description:
-						"Great job! You've unlocked personalized smart actions. Complete missions to earn XP and unlock advanced features.",
+						"Great job! You've unlocked smart actions. Complete missions to earn XP and build better financial habits.",
 					color: '#4CAF50',
 					icon: 'sparkles',
-					nextStage: 'Dynamic Progression',
+					nextStage: 'Practitioner',
 					requirements: [
-						'Complete 2+ additional smart actions',
-						'Follow AI-generated recommendations',
-						'Improve your financial habits',
+						'Complete 3 smart actions',
+						'Stay under budget for 1 week',
+						'Save money for 2 weeks',
+						'Follow 2 AI recommendations',
 					],
 				};
-			case 'dynamic':
+			case 'Practitioner':
 				return {
-					title: 'Stage 3: Dynamic Progression',
-					subtitle: 'Advanced AI insights and continuous optimization',
+					title: 'Level 3: Practitioner',
+					subtitle: 'Build consistent financial habits',
 					description:
-						"You've reached the advanced stage! Enjoy continuous optimization and advanced financial insights.",
+						"You're building great habits! Keep going to unlock advanced features and accelerate your financial growth.",
+					color: '#2196F3',
+					icon: 'trending-up',
+					nextStage: 'Expert',
+					requirements: [
+						'Complete 5 smart actions',
+						'Stay under budget for 1 month',
+						'Save money for 1 month',
+						'Achieve 1 financial goal',
+					],
+				};
+			case 'Expert':
+				return {
+					title: 'Level 4: Expert',
+					subtitle: 'Optimize and accelerate your financial growth',
+					description:
+						"You're an expert! Enjoy advanced insights and optimization features to maximize your financial success.",
 					color: '#9C27B0',
 					icon: 'rocket',
-					nextStage: 'Smart Path Customization',
+					nextStage: 'Master',
 					requirements: [
-						'Stay under budget consistently',
-						'Save money regularly',
-						'Improve weekly spending patterns',
-						'Achieve financial goals faster',
+						'Complete 10 smart actions',
+						'Stay under budget for 3 months',
+						'Save money for 3 months',
+						'Achieve 3 financial goals',
 					],
 				};
-			case 'smartPath':
+			case 'Master':
 				return {
-					title: 'Stage 4: Smart Path Customization',
-					subtitle: 'Gamified skill trees and mastery paths',
+					title: 'Level 5: Master',
+					subtitle: 'Achieve financial mastery and help others',
 					description:
-						'Master your financial skills through customizable skill paths and unlock advanced mastery levels.',
+						"You've reached the pinnacle! You're a financial master. Share your knowledge and help others succeed.",
 					color: '#E91E63',
 					icon: 'trophy',
-					nextStage: 'Real-time Reactivity',
-					requirements: [
-						'Master 3+ skill paths',
-						'Unlock advanced achievements',
-						'Complete skill tree objectives',
-						'Reach intermediate mastery level',
-					],
-				};
-			case 'realtime':
-				return {
-					title: 'Stage 5: Real-time Reactivity',
-					subtitle: 'Ongoing monitoring and reactive prompts',
-					description:
-						"You've reached the pinnacle! Experience real-time financial monitoring and adaptive AI responses.",
-					color: '#00BCD4',
-					icon: 'flash',
 					nextStage: null,
 					requirements: [
-						'Maintain consistent spending patterns',
-						'Use predictive budget management',
-						'Adapt goal progress dynamically',
-						'Achieve expert mastery level',
+						'Complete 20 smart actions',
+						'Stay under budget for 6 months',
+						'Save money for 6 months',
+						'Achieve 5 financial goals',
 					],
 				};
 			default:
@@ -314,7 +330,7 @@ export class ProgressionService {
 						"Welcome to AI Coach! Let's get started with your financial journey.",
 					color: '#2196F3',
 					icon: 'bulb-outline',
-					nextStage: 'Tutorial Zone',
+					nextStage: 'Beginner',
 					requirements: [],
 				};
 		}

@@ -293,16 +293,22 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 
 			// Mark onboarding as complete and navigate to main app
 			await markOnboardingComplete();
-			router.replace('/(tabs)/dashboard');
+			setTimeout(() => {
+				router.replace('/(tabs)/dashboard');
+			}, 100);
 		} catch (error) {
 			console.error('Error submitting profile:', error);
 			// Even if profile submission fails, mark onboarding as complete
 			try {
 				await markOnboardingComplete();
-				router.replace('/(tabs)/dashboard');
+				setTimeout(() => {
+					router.replace('/(tabs)/dashboard');
+				}, 100);
 			} catch (onboardingError) {
 				console.error('Error marking onboarding complete:', onboardingError);
-				router.replace('/(tabs)/dashboard');
+				setTimeout(() => {
+					router.replace('/(tabs)/dashboard');
+				}, 100);
 			}
 		}
 	};
@@ -310,11 +316,15 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 	const handleSkip = async () => {
 		try {
 			await markOnboardingComplete();
-			router.replace('/(tabs)/dashboard');
+			setTimeout(() => {
+				router.replace('/(tabs)/dashboard');
+			}, 100);
 		} catch (error) {
 			console.error('Error skipping onboarding:', error);
 			// Even if there's an error, try to navigate to dashboard
-			router.replace('/(tabs)/dashboard');
+			setTimeout(() => {
+				router.replace('/(tabs)/dashboard');
+			}, 100);
 		}
 	};
 

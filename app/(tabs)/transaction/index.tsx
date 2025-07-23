@@ -145,7 +145,6 @@ const AddTransactionScreen = () => {
 			await addTransaction(transactionData);
 
 			console.log('Transaction saved successfully!');
-			Alert.alert('Success', 'Transaction saved successfully!');
 
 			// Reset form values
 			setValue('description', '');

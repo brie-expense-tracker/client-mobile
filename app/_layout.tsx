@@ -4,7 +4,10 @@ import './global.css';
 import React, { useEffect, useState, useContext } from 'react';
 import { ActivityIndicator, Text, View, StyleSheet } from 'react-native';
 import useAuth, { AuthProvider } from '../src/context/AuthContext';
-import { OnboardingProvider , useOnboarding } from '../src/context/OnboardingContext';
+import {
+	OnboardingProvider,
+	useOnboarding,
+} from '../src/context/OnboardingContext';
 import { ProfileProvider } from '../src/context/profileContext';
 import { NotificationProvider } from '../src/context/notificationContext';
 import { TransactionProvider } from '../src/context/transactionContext';
@@ -48,6 +51,19 @@ TaskManager.defineTask(
 
 Notifications.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK);
 
+export default function RootLayout() {
+	return (
+		<NotificationProvider>
+			<AuthProvider>
+				<OnboardingProvider>
+					<RootLayoutContent />
+				</OnboardingProvider>
+			</AuthProvider>
+		</NotificationProvider>
+	);
+}
+
+// Refactored RootLayoutContent to conditionally mount providers
 function RootLayoutContent() {
 	const { user, firebaseUser, loading } = useAuth();
 	const { hasSeenOnboarding } = useOnboarding();
@@ -56,66 +72,40 @@ function RootLayoutContent() {
 	const [isMounted, setIsMounted] = useState(false);
 
 	useEffect(() => {
-		// Mark component as mounted after initial render
 		setIsMounted(true);
 	}, []);
 
 	useEffect(() => {
-		// Don't navigate until component is mounted
 		if (!isMounted) return;
-
-		// If demo mode is enabled, skip all authentication and go directly to main app
 		if (DEMO_MODE) {
 			if (segments[0] !== '(tabs)') {
-				console.log('Demo mode: Navigating directly to main app');
-				// Add a small delay to ensure navigation is ready
 				setTimeout(() => {
 					router.replace('/(tabs)/dashboard');
 				}, 100);
 			}
 			return;
 		}
-
 		if (loading || (user && hasSeenOnboarding === null)) return;
-
 		const inAuthGroup = segments[0] === '(auth)';
 		const inTabsGroup = segments[0] === '(tabs)';
 		const inOnboardingGroup = segments[0] === '(onboarding)';
-
-		// Navigation logic based on user state and onboarding status
 		if (firebaseUser && user) {
-			// User is authenticated in Firebase AND exists in MongoDB
 			if (!hasSeenOnboarding && !inOnboardingGroup) {
-				// User hasn't seen onboarding - show onboarding
-				console.log(
-					'User authenticated but needs onboarding, navigating to onboarding'
-				);
 				router.replace('/(onboarding)/onboardingThree');
 			} else if (hasSeenOnboarding && !inTabsGroup) {
-				// User has seen onboarding - show main app
-				console.log(
-					'User authenticated and has seen onboarding, navigating to dashboard'
-				);
 				router.replace('/(tabs)/dashboard');
 			}
 		} else if (firebaseUser && !user) {
-			// User is authenticated in Firebase but not in MongoDB - redirect to signup
 			if (!inAuthGroup) {
-				console.log(
-					'Firebase user exists but not in MongoDB, redirecting to signup'
-				);
 				router.replace('/(auth)/signup');
 			}
 		} else {
-			// User is not authenticated - show auth screens
 			if (!inAuthGroup) {
-				console.log('User not authenticated, redirecting to signup');
 				router.replace('/(auth)/signup');
 			}
 		}
 	}, [user, firebaseUser, loading, hasSeenOnboarding, segments, isMounted]);
 
-	// Show demo mode indicator if demo mode is enabled
 	if (DEMO_MODE) {
 		return (
 			<GestureHandlerRootView style={{ flex: 1 }}>
@@ -131,7 +121,6 @@ function RootLayoutContent() {
 		);
 	}
 
-	// Show spinner if loading auth, or if user is authenticated and onboarding status is loading
 	if (loading || (user && hasSeenOnboarding === null)) {
 		return (
 			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -141,6 +130,52 @@ function RootLayoutContent() {
 		);
 	}
 
+	// If user is authenticated, always wrap all screens in ProfileProvider
+	if (firebaseUser && user) {
+		return (
+			<ProfileProvider>
+				{/* Mount other providers for main app if onboarding is complete */}
+				{hasSeenOnboarding ? (
+					<TransactionProvider>
+						<ProgressionProvider>
+							<TransactionModalProvider>
+								<GestureHandlerRootView style={{ flex: 1 }}>
+									<Stack>
+										<Stack.Screen
+											name="(auth)"
+											options={{ headerShown: false }}
+										/>
+										<Stack.Screen
+											name="(onboarding)"
+											options={{ headerShown: false }}
+										/>
+										<Stack.Screen
+											name="(tabs)"
+											options={{ headerShown: false }}
+										/>
+									</Stack>
+								</GestureHandlerRootView>
+							</TransactionModalProvider>
+						</ProgressionProvider>
+					</TransactionProvider>
+				) : (
+					// Onboarding screens only need ProfileProvider
+					<GestureHandlerRootView style={{ flex: 1 }}>
+						<Stack>
+							<Stack.Screen name="(auth)" options={{ headerShown: false }} />
+							<Stack.Screen
+								name="(onboarding)"
+								options={{ headerShown: false }}
+							/>
+							<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+						</Stack>
+					</GestureHandlerRootView>
+				)}
+			</ProfileProvider>
+		);
+	}
+
+	// For unauthenticated or auth screens, just show the stack (no user-dependent providers)
 	return (
 		<GestureHandlerRootView style={{ flex: 1 }}>
 			<Stack>
@@ -169,23 +204,3 @@ const styles = StyleSheet.create({
 		fontWeight: 'bold',
 	},
 });
-
-export default function RootLayout() {
-	return (
-		<NotificationProvider>
-			<AuthProvider>
-				<OnboardingProvider>
-					<ProfileProvider>
-						<TransactionProvider>
-							<ProgressionProvider>
-								<TransactionModalProvider>
-									<RootLayoutContent />
-								</TransactionModalProvider>
-							</ProgressionProvider>
-						</TransactionProvider>
-					</ProfileProvider>
-				</OnboardingProvider>
-			</AuthProvider>
-		</NotificationProvider>
-	);
-}

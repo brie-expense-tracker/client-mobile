@@ -83,7 +83,7 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 	const [refreshing, setRefreshing] = useState(false);
 
 	// Check if AI insights are enabled for this user
-	const aiInsightsEnabled = profile?.preferences?.aiInsights?.enabled ?? false;
+	const aiInsightsEnabled = profile?.preferences?.aiInsights?.enabled ?? true;
 
 	// Calculate summary data for the selected period
 	const summary = useMemo((): SummaryData => {
@@ -181,15 +181,11 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 
 	const fetchInsights = useCallback(async () => {
 		if (!aiInsightsEnabled) {
-			console.log('AI insights are disabled for this user. Skipping fetch.');
 			return;
 		}
 
 		try {
 			setLoadingInsights(true);
-			console.log(
-				`🔍 Fetching insights for period: ${period}, AI insights enabled: ${aiInsightsEnabled}`
-			);
 
 			// Set a timeout to prevent long loading
 			const timeoutPromise = new Promise((_, reject) => {
@@ -205,13 +201,6 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 				timeoutPromise,
 			])) as InsightsResponse;
 
-			// Log response for debugging
-			console.log(`${period} insights response:`, {
-				success: response.success,
-				dataLength: response.data?.length,
-				error: response.error,
-			});
-
 			if (response.success && response.data && Array.isArray(response.data)) {
 				// Sort by most recent and take top 3
 				const sortedInsights = response.data
@@ -222,9 +211,6 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 					)
 					.slice(0, 3);
 
-				console.log(
-					`✅ Setting ${sortedInsights.length} insights for ${period}`
-				);
 				setInsights(sortedInsights);
 			} else {
 				// Check if response had specific errors
@@ -232,7 +218,6 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 					console.log('Insights fetch error:', response.error);
 					setInsights([]);
 				} else {
-					console.log('No insights found, setting empty array');
 					setInsights([]);
 				}
 			}
@@ -244,8 +229,6 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 			setLoadingInsights(false);
 		}
 	}, [period, aiInsightsEnabled]); // Add selectedPeriod and aiInsightsEnabled as dependencies
-
-
 
 	const generateNewInsights = useCallback(async () => {
 		if (!aiInsightsEnabled) {

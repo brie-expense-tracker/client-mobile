@@ -10,27 +10,20 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { RectButton } from 'react-native-gesture-handler';
-import {
-	getAuth,
-	deleteUser,
-	EmailAuthProvider,
-	reauthenticateWithCredential,
-} from '@react-native-firebase/auth';
-import { UserService } from '../../../../src/services/userService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import useAuth from '../../../../src/context/AuthContext';
 
 export default function DeleteAccountScreen() {
 	const router = useRouter();
 	const [confirmText, setConfirmText] = useState('');
 	const [password, setPassword] = useState('');
-	const [isLoading, setIsLoading] = useState(false);
 	const [isDeleted, setIsDeleted] = useState(false);
+	const { deleteAccount, loading } = useAuth();
 
 	const isDeleteButtonEnabled = () => {
 		return (
 			confirmText.trim().toLowerCase() === 'delete' &&
 			password.trim() !== '' &&
-			!isLoading
+			!loading
 		);
 	};
 
@@ -57,55 +50,21 @@ export default function DeleteAccountScreen() {
 					text: 'Delete Account',
 					style: 'destructive',
 					onPress: async () => {
-						setIsLoading(true);
 						try {
-							const user = getAuth().currentUser!;
-
-							// Debug: Log current user info
-							console.log('Current Firebase user:', {
-								uid: user.uid,
-								email: user.email,
-							});
-
-							// Debug: Check AsyncStorage
-							const storedFirebaseUID = await AsyncStorage.getItem(
-								'firebaseUID'
-							);
-							console.log(
-								'Stored Firebase UID in AsyncStorage:',
-								storedFirebaseUID
-							);
-
-							// Re-authenticate the user before deleting
-							const credential = EmailAuthProvider.credential(
-								user.email!,
-								password
-							);
-							await reauthenticateWithCredential(user, credential);
-
-							// First, delete all user data from the backend
-							await UserService.deleteUserAccount();
-
-							// Clear all local storage data
-							await AsyncStorage.clear();
-
-							// Then delete the Firebase user
-							await deleteUser(user);
+							await deleteAccount(password);
 							setIsDeleted(true);
-
 							Alert.alert(
 								'Account Deleted',
 								'Your account has been permanently deleted.',
 								[
 									{
 										text: 'OK',
+										onPress: () => router.replace('/(auth)/login'),
 									},
 								]
 							);
 						} catch (error: any) {
 							console.error('Error deleting account:', error);
-
-							// Handle specific Firebase auth errors
 							if (error.code === 'auth/wrong-password') {
 								Alert.alert(
 									'Authentication Error',
@@ -122,8 +81,6 @@ export default function DeleteAccountScreen() {
 									'Failed to delete account. Please try again.'
 								);
 							}
-						} finally {
-							setIsLoading(false);
 						}
 					},
 				},
@@ -145,7 +102,7 @@ export default function DeleteAccountScreen() {
 					</View>
 
 					<View style={styles.inputContainer}>
-						<Text style={styles.label}>Type "DELETE" to Confirm</Text>
+						<Text style={styles.label}>Type &quot;DELETE&quot; to Confirm</Text>
 						<TextInput
 							style={styles.textInput}
 							value={confirmText}
@@ -193,7 +150,7 @@ export default function DeleteAccountScreen() {
 						enabled={isDeleteButtonEnabled()}
 					>
 						<Text style={styles.deleteButtonText}>
-							{isLoading ? 'Deleting...' : 'Delete Account'}
+							{loading ? 'Deleting...' : 'Delete Account'}
 						</Text>
 					</RectButton>
 

@@ -4,6 +4,7 @@ import React, {
 	useMemo,
 	useEffect,
 	useContext,
+	useRef,
 } from 'react';
 import { useProgression } from '../context/progressionContext';
 import { useProfile } from '../context/profileContext';
@@ -38,6 +39,9 @@ export const useTutorialProgress = () => {
 		useState<TutorialProgress | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
+	const lastMismatchCheckRef = useRef<string>('');
+	const isUpdatingRef = useRef(false);
+	const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	// Use existing contexts
 	const {
@@ -52,13 +56,13 @@ export const useTutorialProgress = () => {
 	const { transactions, refetch: refetchTransactions } =
 		useContext(TransactionContext);
 
-	// Get progression data from either progression context or profile
+	// Always prioritize progression data from the progression context over profile
 	const effectiveProgression = progression || profile?.progression || null;
 
 	const tutorialSteps: TutorialStep[] = useMemo(
 		() => [
 			{
-				id: 'firstSmartAction',
+				id: 'firstTutorialAction',
 				title: 'Add Your First Transaction',
 				description:
 					'Start by adding a transaction to track your spending or income',
@@ -66,14 +70,14 @@ export const useTutorialProgress = () => {
 				action: () => {}, // Will be set by component
 			},
 			{
-				id: 'secondSmartAction',
+				id: 'secondTutorialAction',
 				title: 'Create Your First Budget',
 				description: 'Create a budget for your biggest expense category',
 				icon: 'wallet-outline',
 				action: () => {}, // Will be set by component
 			},
 			{
-				id: 'thirdSmartAction',
+				id: 'thirdTutorialAction',
 				title: 'Set Your First Financial Goal',
 				description:
 					'Create a savings goal to start building your financial future',
@@ -81,7 +85,7 @@ export const useTutorialProgress = () => {
 				action: () => {}, // Will be set by component
 			},
 			{
-				id: 'fourthSmartAction',
+				id: 'fourthTutorialAction',
 				title: 'Enable Weekly Updates',
 				description: 'Enable weekly financial insights and recommendations',
 				icon: 'bulb-outline',
@@ -116,16 +120,16 @@ export const useTutorialProgress = () => {
 			// Only use context-based checking if we don't have progression data
 			if (!tutorialProgress?.steps && profile) {
 				switch (stepId) {
-					case 'firstSmartAction':
+					case 'firstTutorialAction':
 						return transactions.length > 0 ? 'completed' : 'pending';
 
-					case 'secondSmartAction':
+					case 'secondTutorialAction':
 						return budgets.length > 0 ? 'completed' : 'pending';
 
-					case 'thirdSmartAction':
+					case 'thirdTutorialAction':
 						return goals.length > 0 ? 'completed' : 'pending';
 
-					case 'fourthSmartAction':
+					case 'fourthTutorialAction':
 						return profile.preferences?.aiInsights?.enabled
 							? 'completed'
 							: 'pending';
@@ -170,87 +174,96 @@ export const useTutorialProgress = () => {
 		};
 	}, [tutorialSteps, getStepStatus, getProgressPercentage]);
 
-	const refreshAllData = useCallback(async () => {
-		try {
-			setRefreshing(true);
-
-			// Force progression check and update
-			await checkProgression();
-
-			// Refresh all context data in parallel
-			await Promise.all([
-				refreshProfile(),
-				refetchGoals(),
-				refetchBudgets(),
-				refetchTransactions(),
-			]);
-		} catch (error) {
-			console.error('Error refreshing all data:', error);
-			throw error;
-		} finally {
-			setRefreshing(false);
-		}
-	}, [
-		checkProgression,
-		refreshProfile,
-		refetchGoals,
-		refetchBudgets,
-		refetchTransactions,
-	]);
-
 	const hasCompletedActions = useCallback((): boolean => {
 		if (!profile) return false;
 		return tutorialSteps.some((step) => getStepStatus(step.id) === 'completed');
 	}, [profile, tutorialSteps, getStepStatus]);
 
 	const isTutorialCompleted = useCallback((): boolean => {
-		return ProgressionService.isTutorialFullyCompleted(effectiveProgression);
+		const completed =
+			ProgressionService.isTutorialFullyCompleted(effectiveProgression);
+		return completed;
 	}, [effectiveProgression]);
 
-	// Force progression check when there's a mismatch between context data and progression data
-	const checkForDataMismatch = useCallback(() => {
-		if (!profile || !effectiveProgression) return;
-
-		// Check if there's a mismatch between context data and progression data
-		const contextBasedSteps = {
-			firstSmartAction: transactions.length > 0,
-			secondSmartAction: budgets.length > 0,
-			thirdSmartAction: goals.length > 0,
-			fourthSmartAction: profile.preferences?.aiInsights?.enabled,
-		};
-
-		const progressionSteps = effectiveProgression.tutorialSteps || {};
-		const hasMismatch = Object.keys(contextBasedSteps).some(
-			(step) =>
-				contextBasedSteps[step as keyof typeof contextBasedSteps] !==
-				progressionSteps[step as keyof typeof contextBasedSteps]
-		);
-
-		if (hasMismatch) {
-			console.log('🔍 Detected data mismatch, forcing progression check...');
-			// Force a progression check to get fresh data
-			checkProgression();
+	// Update tutorial progress when progression changes
+	useEffect(() => {
+		if (effectiveProgression) {
+			console.log(
+				'📱 TutorialProgress: Updating from effectiveProgression:',
+				effectiveProgression
+			);
+			updateTutorialProgressFromProgression();
 		}
+	}, [effectiveProgression, updateTutorialProgressFromProgression]);
+
+	// Check for data mismatch when context data changes - but only when we have both profile and progression data
+	useEffect(() => {
+		if (!profile || !effectiveProgression || isUpdatingRef.current) return;
+
+		// Clear any existing debounce timeout
+		if (debounceTimeoutRef.current) {
+			clearTimeout(debounceTimeoutRef.current);
+		}
+
+		// Debounce the mismatch check to prevent rapid successive calls
+		debounceTimeoutRef.current = setTimeout(() => {
+			// Create a hash of the current data state to check if it's changed
+			const currentDataHash = JSON.stringify({
+				transactionsLength: transactions.length,
+				budgetsLength: budgets.length,
+				goalsLength: goals.length,
+				aiInsightsEnabled: profile.preferences?.aiInsights?.enabled,
+				progressionSteps: effectiveProgression.tutorialSteps,
+			});
+
+			// Only check for mismatch if the data has actually changed
+			if (currentDataHash === lastMismatchCheckRef.current) return;
+			lastMismatchCheckRef.current = currentDataHash;
+
+			// Check if there's a mismatch between context data and progression data
+			const contextBasedSteps = {
+				firstSmartAction: transactions.length > 0,
+				secondSmartAction: budgets.length > 0,
+				thirdSmartAction: goals.length > 0,
+				fourthSmartAction: profile.preferences?.aiInsights?.enabled,
+			};
+
+			const progressionSteps = effectiveProgression.tutorialSteps || {};
+			const hasMismatch = Object.keys(contextBasedSteps).some(
+				(step) =>
+					contextBasedSteps[step as keyof typeof contextBasedSteps] !==
+					progressionSteps[step as keyof typeof contextBasedSteps]
+			);
+
+			// Only trigger progression check if there's a significant mismatch
+			// and we haven't checked recently (prevent infinite loops)
+			if (hasMismatch && !isUpdatingRef.current) {
+				console.log('🔍 Detected data mismatch, forcing progression check...');
+				// Set updating flag to prevent recursive calls
+				isUpdatingRef.current = true;
+				// Force a progression check to get fresh data
+				checkProgression().finally(() => {
+					// Reset updating flag after a delay to allow for state updates
+					setTimeout(() => {
+						isUpdatingRef.current = false;
+					}, 2000); // Increased delay to prevent rapid successive calls
+				});
+			}
+		}, 1000); // Increased debounce to 1 second
+
+		// Cleanup timeout on unmount or dependency change
+		return () => {
+			if (debounceTimeoutRef.current) {
+				clearTimeout(debounceTimeoutRef.current);
+			}
+		};
 	}, [
 		profile,
 		effectiveProgression,
 		transactions.length,
 		budgets.length,
 		goals.length,
-		checkProgression,
 	]);
-
-	// Update tutorial progress when progression changes
-	useEffect(() => {
-		if (effectiveProgression) {
-			updateTutorialProgressFromProgression();
-		}
-	}, [effectiveProgression, updateTutorialProgressFromProgression]);
-
-	// Check for data mismatch when context data changes
-	useEffect(() => {
-		checkForDataMismatch();
-	}, [checkForDataMismatch]);
 
 	// Set loading to false after initial data is loaded
 	useEffect(() => {
@@ -259,6 +272,20 @@ export const useTutorialProgress = () => {
 
 		// Check if we have the required data (profile is required, progression can come from profile)
 		const hasRequiredData = profile !== null;
+
+		console.log('📱 Tutorial progress: Loading check:', {
+			contextsLoaded,
+			hasRequiredData,
+			progressionLoading,
+			profileLoading,
+			hasProfile: profile !== null,
+			hasProgression: effectiveProgression !== null,
+			effectiveProgressionSource: progression
+				? 'context'
+				: profile?.progression
+				? 'profile'
+				: 'none',
+		});
 
 		if (contextsLoaded && hasRequiredData) {
 			console.log(
@@ -280,6 +307,36 @@ export const useTutorialProgress = () => {
 		}
 	}, [profile, effectiveProgression, progressionLoading, profileLoading]);
 
+	// Debug logging for the current state
+	useEffect(() => {
+		console.log('📱 TutorialProgress: Current state:', {
+			effectiveProgression,
+			tutorialProgress,
+			completionStats: getCompletionStats(),
+			isTutorialCompleted: isTutorialCompleted(),
+			stepStatuses: tutorialSteps.map((step) => ({
+				id: step.id,
+				status: getStepStatus(step.id),
+			})),
+		});
+	}, [
+		effectiveProgression,
+		tutorialProgress,
+		getCompletionStats,
+		isTutorialCompleted,
+		tutorialSteps,
+		getStepStatus,
+	]);
+
+	// Cleanup timeouts on unmount
+	useEffect(() => {
+		return () => {
+			if (debounceTimeoutRef.current) {
+				clearTimeout(debounceTimeoutRef.current);
+			}
+		};
+	}, []);
+
 	return {
 		// Data
 		tutorialProgress,
@@ -295,7 +352,6 @@ export const useTutorialProgress = () => {
 		hasCompletedActions: hasCompletedActions(),
 
 		// Actions
-		refreshAllData,
 		getStepStatus,
 		checkProgression,
 	};
