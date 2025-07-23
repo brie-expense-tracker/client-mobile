@@ -97,11 +97,11 @@ function RootLayoutContent() {
 			}
 		} else if (firebaseUser && !user) {
 			if (!inAuthGroup) {
-				router.replace('/(auth)/signup');
+				router.replace('/(auth)/login');
 			}
 		} else {
 			if (!inAuthGroup) {
-				router.replace('/(auth)/signup');
+				router.replace('/(auth)/login');
 			}
 		}
 	}, [user, firebaseUser, loading, hasSeenOnboarding, segments, isMounted]);

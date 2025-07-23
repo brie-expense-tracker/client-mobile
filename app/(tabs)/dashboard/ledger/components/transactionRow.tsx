@@ -303,6 +303,9 @@ export const TransactionRow = React.memo(
 	}
 );
 
+// Default export for React Router compatibility
+export default TransactionRow;
+
 const styles = StyleSheet.create({
 	container: { overflow: 'hidden' },
 	deleteBackground: {

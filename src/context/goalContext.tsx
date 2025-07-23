@@ -5,10 +5,8 @@ import React, {
 	useCallback,
 	useMemo,
 	ReactNode,
-	useContext,
 } from 'react';
 import { ApiService } from '../services/apiService';
-import { TransactionContext } from './transactionContext';
 
 // ==========================================
 // Types
@@ -78,7 +76,8 @@ export const GoalContext = createContext<GoalContextType>({
 export const GoalProvider = ({ children }: { children: ReactNode }) => {
 	const [goals, setGoals] = useState<Goal[]>([]);
 	const [isLoading, setIsLoading] = useState<boolean>(true);
-	const { refreshTransactions } = useContext(TransactionContext);
+	// Note: Transaction refresh is handled by the transaction context itself
+	// when goals are updated via the API
 
 	// Memoize the goals data to prevent unnecessary re-renders
 	const memoizedGoals = useMemo(() => goals, [goals]);
@@ -242,8 +241,8 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 
 					setGoals((prev) => prev.map((g) => (g.id === id ? updatedGoal : g)));
 
-					// Refresh transactions to update display names when goal name changes
-					refreshTransactions();
+					// Note: Transaction refresh is handled by the transaction context itself
+					// when goals are updated via the API
 
 					return updatedGoal;
 				} else {
@@ -254,7 +253,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 				throw error;
 			}
 		},
-		[refreshTransactions]
+		[]
 	);
 
 	const deleteGoal = useCallback(

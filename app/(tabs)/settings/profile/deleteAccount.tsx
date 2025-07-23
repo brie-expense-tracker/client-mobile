@@ -59,7 +59,10 @@ export default function DeleteAccountScreen() {
 								[
 									{
 										text: 'OK',
-										onPress: () => router.replace('/(auth)/login'),
+										onPress: () => {
+											// Let the AuthContext handle navigation automatically
+											// The onAuthStateChanged listener will redirect to signup
+										},
 									},
 								]
 							);

@@ -93,7 +93,7 @@ export default function SettingsScreen() {
 							<Setting
 								icon="person-outline"
 								label="Profile"
-								onPress={() => router.push('./settings/profile')}
+								onPress={() => router.push('./profile')}
 							/>
 
 							{/* FINANCE */}
@@ -101,13 +101,13 @@ export default function SettingsScreen() {
 							<Setting
 								icon="card-outline"
 								label="Budgets"
-								onPress={() => router.push('./settings/budgets')}
+								onPress={() => router.push('./budgets')}
 							/>
 
 							<Setting
 								icon="trophy-outline"
 								label="Goals"
-								onPress={() => router.push('./settings/goals')}
+								onPress={() => router.push('./goals')}
 							/>
 
 							{/* AI & PRIVACY */}
@@ -115,12 +115,12 @@ export default function SettingsScreen() {
 							<Setting
 								icon="bulb-outline"
 								label="AI Insights"
-								onPress={() => router.push('./settings/aiInsights')}
+								onPress={() => router.push('./aiInsights')}
 							/>
 							<Setting
 								icon="shield-outline"
 								label="Data & Privacy"
-								onPress={() => router.push('./settings/dataandprivacy')}
+								onPress={() => router.push('./dataandprivacy')}
 							/>
 
 							{/* APP PREFERENCES */}
@@ -128,7 +128,7 @@ export default function SettingsScreen() {
 							<Setting
 								icon="notifications-outline"
 								label="Notifications"
-								onPress={() => router.push('./settings/notification')}
+								onPress={() => router.push('./notification')}
 							/>
 
 							{/* LEGAL & SUPPORT */}
@@ -136,17 +136,17 @@ export default function SettingsScreen() {
 							<Setting
 								icon="help-circle-outline"
 								label="Help & Support"
-								onPress={() => router.push('./settings/help')}
+								onPress={() => router.push('./help')}
 							/>
 							<Setting
 								icon="information-circle-outline"
 								label="About"
-								onPress={() => router.push('./settings/about')}
+								onPress={() => router.push('./about')}
 							/>
 							<Setting
 								icon="document-text-outline"
 								label="Legal Documents"
-								onPress={() => router.push('./settings/legal')}
+								onPress={() => router.push('./legal')}
 							/>
 
 							{/* PLACEHOLDER / FUTURE */}

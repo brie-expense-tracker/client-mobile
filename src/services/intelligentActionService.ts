@@ -212,6 +212,7 @@ export class IntelligentActionService {
 			}
 
 			const response = await ApiService.post('/intelligent-actions/execute', {
+				actionId: action.id,
 				actionType: action.type,
 				parameters: action.parameters,
 			});

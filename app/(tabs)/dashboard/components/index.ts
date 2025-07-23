@@ -4,3 +4,6 @@ export { default as QuickFinancialSummary } from './QuickFinancialSummary';
 export { default as AICoachSection } from './AICoachSection';
 export { default as TransactionHistory } from './TransactionHistory';
 export { default as AiInsightsSummary } from './AiInsightsSummary';
+
+// Default export for React Router compatibility
+export { default } from './StatWidget';
