@@ -188,8 +188,20 @@ export default function IntelligentActions({
 			// Ensure userActions is an array
 			const safeUserActions = Array.isArray(userActions) ? userActions : [];
 
-			// If no actions exist for this insight, generate them
-			if (safeUserActions.length === 0) {
+			// Check if we have relevant actions for this insight type and period
+			const relevantActions = safeUserActions.filter((action) => {
+				// Check if action is relevant to current insight type and period
+				if (action.type === 'detect_completion') {
+					const actionId = action.id || '';
+					return (
+						actionId.includes(insight.insightType) && actionId.includes(period)
+					);
+				}
+				return true; // Keep non-detection actions
+			});
+
+			// If no relevant actions exist for this insight, generate them
+			if (relevantActions.length === 0) {
 				const generatedActions =
 					await IntelligentActionService.analyzeInsightForActions(insight);
 
@@ -231,10 +243,10 @@ export default function IntelligentActions({
 
 				setActions(safeActionsWithStatus);
 			} else {
-				// Use existing actions from MongoDB
+				// Use existing relevant actions from MongoDB
 				const actionsWithStatus =
 					await IntelligentActionService.refreshCompletionStatus(
-						safeUserActions
+						relevantActions
 					);
 
 				const safeActionsWithStatus = Array.isArray(actionsWithStatus)
@@ -296,7 +308,7 @@ export default function IntelligentActions({
 				}
 
 				detectionActions.push({
-					id: `detect_transaction_count_${Date.now()}`,
+					id: `detect_transaction_count_${insight.insightType}_${period}`,
 					type: 'detect_completion',
 					title: 'Track Your Spending',
 					description: description,
@@ -340,7 +352,7 @@ export default function IntelligentActions({
 				}
 
 				detectionActions.push({
-					id: `detect_budget_created_${Date.now()}`,
+					id: `detect_budget_created_${insight.insightType}_${period}`,
 					type: 'detect_completion',
 					title: budgetTitle,
 					description: budgetDescription,
@@ -381,7 +393,7 @@ export default function IntelligentActions({
 				}
 
 				detectionActions.push({
-					id: `detect_goal_created_${Date.now()}`,
+					id: `detect_goal_created_${insight.insightType}_${period}`,
 					type: 'detect_completion',
 					title: goalTitle,
 					description: goalDescription,
@@ -396,7 +408,7 @@ export default function IntelligentActions({
 			default:
 				// For general insights, suggest enabling AI features
 				detectionActions.push({
-					id: `detect_ai_insights_${Date.now()}`,
+					id: `detect_ai_insights_${insight.insightType}_${period}`,
 					type: 'detect_completion',
 					title: 'Enable AI Insights',
 					description:
@@ -742,6 +754,7 @@ export default function IntelligentActions({
 
 	const confirmAction = () => {
 		if (selectedAction) {
+			setModalVisible(false); // Close the modal immediately
 			executeAction(selectedAction);
 		}
 	};

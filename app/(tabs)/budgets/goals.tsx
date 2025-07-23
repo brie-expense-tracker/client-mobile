@@ -19,6 +19,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import RNModal from 'react-native-modal';
 import QuickAddTransaction from './components/QuickAddTransaction';
+import { useFocusEffect } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
 
@@ -39,21 +40,119 @@ const CARD_PADDING = 16;
 
 // Popular goal icons
 const goalIcons: (keyof typeof Ionicons.glyphMap)[] = [
+	// Achievement & Success
 	'flag-outline',
-	'home-outline',
-	'car-outline',
-	'airplane-outline',
-	'gift-outline',
-	'medical-outline',
-	'book-outline',
-	'fitness-outline',
-	'game-controller-outline',
-	'bag-outline',
-	'heart-outline',
+	'trophy-outline',
 	'star-outline',
 	'diamond-outline',
-	'trophy-outline',
+	'ribbon-outline',
+	'medal-outline',
+	'checkmark-circle-outline',
+
+	// Home & Property
+	'home-outline',
+	'business-outline',
+	'construct-outline',
+	'hammer-outline',
+	'key-outline',
+	'lock-open-outline',
+
+	// Transportation
+	'car-outline',
+	'airplane-outline',
+	'train-outline',
+	'bus-outline',
+	'bicycle-outline',
+	'boat-outline',
+
+	// Travel & Adventure
+	'compass-outline',
+	'map-outline',
+	'location-outline',
+	'camera-outline',
+	'bed-outline',
+	'umbrella-outline',
+	'globe-outline',
+
+	// Education & Career
+	'book-outline',
+	'school-outline',
+	'library-outline',
+	'briefcase-outline',
+	'laptop-outline',
+	'desktop-outline',
+
+	// Health & Fitness
+	'fitness-outline',
+	'medical-outline',
+	'heart-outline',
+	'medkit-outline',
+	'bandage-outline',
+	'body-outline',
+
+	// Entertainment & Hobbies
+	'game-controller-outline',
+	'musical-notes-outline',
+	'film-outline',
+	'color-palette-outline',
+
+	// Shopping & Fashion
+	'bag-outline',
+	'cart-outline',
+	'card-outline',
+	'wallet-outline',
+	'storefront-outline',
+	'cut-outline',
+
+	// Technology & Gadgets
+	'phone-portrait-outline',
+	'tablet-portrait-outline',
+	'watch-outline',
+	'headset-outline',
+	'wifi-outline',
+	'cloud-outline',
+
+	// Family & Relationships
+	'people-outline',
+	'person-outline',
+	'gift-outline',
+	'rose-outline',
+
+	// Sports & Recreation
+	'football-outline',
+	'basketball-outline',
+	'baseball-outline',
+	'golf-outline',
+	'tennisball-outline',
+	'snow-outline',
+
+	// Financial Goals
+	'calculator-outline',
+	'pie-chart-outline',
+	'trending-up-outline',
+	'shield-checkmark-outline',
+
+	// Special Occasions
+	'balloon-outline',
+	'cafe-outline',
+	'restaurant-outline',
+	'fast-food-outline',
+	'wine-outline',
+	'pizza-outline',
+
+	// Pets & Animals
+	'paw-outline',
+	'fish-outline',
+	'leaf-outline',
+
+	// Miscellaneous
 	'rocket-outline',
+	'flash-outline',
+	'bulb-outline',
+	'calendar-outline',
+	'time-outline',
+	'notifications-outline',
+	'settings-outline',
 ];
 
 // Quick target presets
@@ -166,8 +265,16 @@ export default function GoalsScreen() {
 	);
 
 	// ==========================================
-	// Auto-open modal on navigation
+	// Auto-open modal on navigation and refresh data
 	// ==========================================
+	useFocusEffect(
+		React.useCallback(() => {
+			// Refresh goals when screen comes into focus
+			refetch();
+		}, [refetch])
+	);
+
+	// Handle modal opening from URL parameters
 	useEffect(() => {
 		// Check if we should auto-open the modal
 		if (params.openModal === 'true') {

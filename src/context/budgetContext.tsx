@@ -5,11 +5,9 @@ import React, {
 	useCallback,
 	useMemo,
 	ReactNode,
-	useContext,
 } from 'react';
 import { ApiService } from '../services/apiService';
 import { useProfile } from './profileContext';
-import { TransactionContext } from './transactionContext';
 
 // ==========================================
 // Types
@@ -181,8 +179,8 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 	const [hasLoaded, setHasLoaded] = useState<boolean>(false); // Track if data has been loaded
 	const { profile } = useProfile();
 
-	// Get transaction context to refresh transactions when budgets are updated
-	const { refreshTransactions } = useContext(TransactionContext);
+	// Note: Transaction refresh is handled by the transaction context itself
+	// when budgets are updated via the API
 
 	const refetch = useCallback(async () => {
 		setIsLoading(true);
@@ -381,8 +379,8 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 						prev.map((b) => (b.id === id ? updatedBudget : b))
 					);
 
-					// Refresh transactions to update display names when budget name changes
-					refreshTransactions();
+					// Note: Transaction refresh is handled by the transaction context itself
+					// when budgets are updated via the API
 
 					return updatedBudget;
 				} else {
@@ -393,7 +391,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 				throw error;
 			}
 		},
-		[refreshTransactions]
+		[]
 	);
 
 	const deleteBudget = useCallback(

@@ -17,6 +17,7 @@ import { BorderlessButton, RectButton } from 'react-native-gesture-handler';
 import { useBudget, Budget } from '../../../src/context/budgetContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import QuickAddBudgetTransaction from './components/QuickAddBudgetTransaction';
+import { useFocusEffect } from '@react-navigation/native';
 
 // ==========================================
 // Types
@@ -35,21 +36,112 @@ type ColorOption = {
 
 // Popular budget icons
 const budgetIcons: (keyof typeof Ionicons.glyphMap)[] = [
+	// Food & Dining
 	'restaurant-outline',
+	'fast-food-outline',
+	'wine-outline',
+	'cafe-outline',
+	'pizza-outline',
+
+	// Shopping & Retail
 	'cart-outline',
-	'car-outline',
-	'home-outline',
-	'game-controller-outline',
-	'airplane-outline',
 	'bag-outline',
-	'fitness-outline',
-	'school-outline',
-	'gift-outline',
+	'card-outline',
+	'wallet-outline',
+	'storefront-outline',
+
+	// Transportation
+	'car-outline',
+	'airplane-outline',
+	'train-outline',
+	'bus-outline',
+	'bicycle-outline',
+	'boat-outline',
+
+	// Housing & Utilities
+	'home-outline',
 	'flash-outline',
-	'call-outline',
-	'medical-outline',
-	'book-outline',
+	'water-outline',
+	'thermometer-outline',
+	'construct-outline',
+	'hammer-outline',
+
+	// Entertainment & Leisure
+	'game-controller-outline',
 	'musical-notes-outline',
+	'film-outline',
+	'ticket-outline',
+	'bowling-ball-outline',
+	'golf-outline',
+	'tennisball-outline',
+
+	// Health & Fitness
+	'fitness-outline',
+	'medical-outline',
+	'heart-outline',
+	'medkit-outline',
+	'bandage-outline',
+
+	// Education & Work
+	'school-outline',
+	'book-outline',
+	'library-outline',
+	'briefcase-outline',
+	'laptop-outline',
+	'desktop-outline',
+
+	// Personal Care & Beauty
+	'cut-outline',
+	'color-palette-outline',
+	'body-outline',
+	'eyedrop-outline',
+	'rose-outline',
+
+	// Communication & Technology
+	'call-outline',
+	'phone-portrait-outline',
+	'wifi-outline',
+	'cellular-outline',
+	'cloud-outline',
+	'globe-outline',
+
+	// Gifts & Special Occasions
+	'gift-outline',
+	'star-outline',
+	'balloon-outline',
+
+	// Pets & Animals
+	'paw-outline',
+	'fish-outline',
+	'leaf-outline',
+
+	// Sports & Recreation
+	'football-outline',
+	'basketball-outline',
+	'baseball-outline',
+	'snow-outline',
+
+	// Travel & Tourism
+	'compass-outline',
+	'map-outline',
+	'location-outline',
+	'camera-outline',
+	'bed-outline',
+	'umbrella-outline',
+
+	// Financial & Insurance
+	'calculator-outline',
+	'pie-chart-outline',
+	'trending-up-outline',
+	'shield-checkmark-outline',
+
+	// Miscellaneous
+	'key-outline',
+	'lock-open-outline',
+	'calendar-outline',
+	'time-outline',
+	'notifications-outline',
+	'settings-outline',
 ];
 
 // Quick amount presets
@@ -251,8 +343,16 @@ export default function BudgetScreen() {
 	// Removed redundant animations since RNModal handles animations internally
 
 	// ==========================================
-	// Auto-open modal on navigation
+	// Auto-open modal on navigation and refresh data
 	// ==========================================
+	useFocusEffect(
+		React.useCallback(() => {
+			// Refresh budgets when screen comes into focus
+			refetch();
+		}, [refetch])
+	);
+
+	// Handle modal opening from URL parameters
 	useEffect(() => {
 		// Check if we should auto-open the modal
 		if (params.openModal === 'true') {
@@ -644,214 +744,244 @@ export default function BudgetScreen() {
 	// ==========================================
 	// Color Selection Component
 	// ==========================================
-	const ColorPicker = () => (
-		<View style={styles.colorPickerContainer}>
-			<Text style={styles.label}>Choose Color</Text>
-			<RectButton
-				style={styles.colorButton}
-				onPress={() => setShowColorPicker(!showColorPicker)}
-			>
-				<View style={styles.colorButtonContent}>
-					<View
-						style={[styles.colorPreview, { backgroundColor: newBudget.color }]}
-					/>
-					<Text style={styles.colorButtonText}>Choose Color</Text>
-					<Ionicons
-						name={showColorPicker ? 'chevron-up' : 'chevron-down'}
-						size={20}
-						color="#757575"
-					/>
-				</View>
-			</RectButton>
+	const ColorPicker = () => {
+		// Add null check for newBudget
+		if (!newBudget) {
+			return null;
+		}
 
-			{showColorPicker && (
-				<View style={styles.colorGrid}>
-					{Object.entries(COLOR_PALETTE).map(([name, colors]) => (
-						<View key={name} style={styles.colorColumn}>
-							<RectButton
-								style={styles.colorOptionContainer}
-								onPress={() => {
-									setNewBudget({ ...newBudget, color: colors.base });
-									setShowColorPicker(false);
-								}}
-							>
-								<View
-									style={[styles.colorSquare, { backgroundColor: colors.base }]}
+		return (
+			<View style={styles.colorPickerContainer}>
+				<Text style={styles.label}>Choose Color</Text>
+				<RectButton
+					style={styles.colorButton}
+					onPress={() => setShowColorPicker(!showColorPicker)}
+				>
+					<View style={styles.colorButtonContent}>
+						<View
+							style={[
+								styles.colorPreview,
+								{ backgroundColor: newBudget.color },
+							]}
+						/>
+						<Text style={styles.colorButtonText}>Choose Color</Text>
+						<Ionicons
+							name={showColorPicker ? 'chevron-up' : 'chevron-down'}
+							size={20}
+							color="#757575"
+						/>
+					</View>
+				</RectButton>
+
+				{showColorPicker && (
+					<View style={styles.colorGrid}>
+						{Object.entries(COLOR_PALETTE).map(([name, colors]) => (
+							<View key={name} style={styles.colorColumn}>
+								<RectButton
+									style={styles.colorOptionContainer}
+									onPress={() => {
+										setNewBudget({ ...newBudget, color: colors.base });
+										setShowColorPicker(false);
+									}}
 								>
-									{newBudget.color === colors.base && (
-										<View style={styles.selectedIndicator}>
-											<Ionicons name="checkmark" size={20} color="#FFF" />
-										</View>
-									)}
-								</View>
-							</RectButton>
-							<RectButton
-								style={styles.colorOptionContainer}
-								onPress={() => {
-									setNewBudget({ ...newBudget, color: colors.pastel });
-									setShowColorPicker(false);
-								}}
-							>
-								<View
-									style={[
-										styles.colorSquare,
-										{ backgroundColor: colors.pastel },
-									]}
+									<View
+										style={[
+											styles.colorSquare,
+											{ backgroundColor: colors.base },
+										]}
+									>
+										{newBudget.color === colors.base && (
+											<View style={styles.selectedIndicator}>
+												<Ionicons name="checkmark" size={20} color="#FFF" />
+											</View>
+										)}
+									</View>
+								</RectButton>
+								<RectButton
+									style={styles.colorOptionContainer}
+									onPress={() => {
+										setNewBudget({ ...newBudget, color: colors.pastel });
+										setShowColorPicker(false);
+									}}
 								>
-									{newBudget.color === colors.pastel && (
-										<View style={styles.selectedIndicator}>
-											<Ionicons name="checkmark" size={20} color="#000" />
-										</View>
-									)}
-								</View>
-							</RectButton>
-							<RectButton
-								style={styles.colorOptionContainer}
-								onPress={() => {
-									setNewBudget({ ...newBudget, color: colors.dark });
-									setShowColorPicker(false);
-								}}
-							>
-								<View
-									style={[styles.colorSquare, { backgroundColor: colors.dark }]}
+									<View
+										style={[
+											styles.colorSquare,
+											{ backgroundColor: colors.pastel },
+										]}
+									>
+										{newBudget.color === colors.pastel && (
+											<View style={styles.selectedIndicator}>
+												<Ionicons name="checkmark" size={20} color="#000" />
+											</View>
+										)}
+									</View>
+								</RectButton>
+								<RectButton
+									style={styles.colorOptionContainer}
+									onPress={() => {
+										setNewBudget({ ...newBudget, color: colors.dark });
+										setShowColorPicker(false);
+									}}
 								>
-									{newBudget.color === colors.dark && (
-										<View style={styles.selectedIndicator}>
-											<Ionicons name="checkmark" size={20} color="#FFF" />
-										</View>
-									)}
-								</View>
-							</RectButton>
-						</View>
-					))}
-				</View>
-			)}
-		</View>
-	);
+									<View
+										style={[
+											styles.colorSquare,
+											{ backgroundColor: colors.dark },
+										]}
+									>
+										{newBudget.color === colors.dark && (
+											<View style={styles.selectedIndicator}>
+												<Ionicons name="checkmark" size={20} color="#FFF" />
+											</View>
+										)}
+									</View>
+								</RectButton>
+							</View>
+						))}
+					</View>
+				)}
+			</View>
+		);
+	};
 
 	// ==========================================
 	// Period Selection Component
 	// ==========================================
-	const PeriodPicker = () => (
-		<View style={styles.periodPickerContainer}>
-			<Text style={styles.label}>Budget Period</Text>
-			<Text style={styles.periodSubtext}>
-				Choose how often this budget resets
-			</Text>
+	const PeriodPicker = () => {
+		// Add null check for newBudget
+		if (!newBudget) {
+			return null;
+		}
 
-			<View style={styles.periodOptionsContainer}>
-				<RectButton
-					style={[
-						styles.periodOption,
-						newBudget.period === 'monthly' && styles.selectedPeriodOption,
-					]}
-					onPress={() => setNewBudget({ ...newBudget, period: 'monthly' })}
-				>
-					<View style={styles.periodOptionContent}>
-						<Ionicons
-							name="calendar-outline"
-							size={20}
-							color={newBudget.period === 'monthly' ? '#fff' : '#757575'}
-						/>
-						<Text
-							style={[
-								styles.periodOptionText,
-								newBudget.period === 'monthly' &&
-									styles.selectedPeriodOptionText,
-							]}
-						>
-							Monthly
-						</Text>
-					</View>
-				</RectButton>
+		return (
+			<View style={styles.periodPickerContainer}>
+				<Text style={styles.label}>Budget Period</Text>
+				<Text style={styles.periodSubtext}>
+					Choose how often this budget resets
+				</Text>
 
-				<RectButton
-					style={[
-						styles.periodOption,
-						newBudget.period === 'weekly' && styles.selectedPeriodOption,
-					]}
-					onPress={() => setNewBudget({ ...newBudget, period: 'weekly' })}
-				>
-					<View style={styles.periodOptionContent}>
-						<Ionicons
-							name="calendar-clear-outline"
-							size={20}
-							color={newBudget.period === 'weekly' ? '#fff' : '#757575'}
-						/>
-						<Text
-							style={[
-								styles.periodOptionText,
-								newBudget.period === 'weekly' &&
-									styles.selectedPeriodOptionText,
-							]}
-						>
-							Weekly
-						</Text>
-					</View>
-				</RectButton>
+				<View style={styles.periodOptionsContainer}>
+					<RectButton
+						style={[
+							styles.periodOption,
+							newBudget.period === 'monthly' && styles.selectedPeriodOption,
+						]}
+						onPress={() => setNewBudget({ ...newBudget, period: 'monthly' })}
+					>
+						<View style={styles.periodOptionContent}>
+							<Ionicons
+								name="calendar-outline"
+								size={20}
+								color={newBudget.period === 'monthly' ? '#fff' : '#757575'}
+							/>
+							<Text
+								style={[
+									styles.periodOptionText,
+									newBudget.period === 'monthly' &&
+										styles.selectedPeriodOptionText,
+								]}
+							>
+								Monthly
+							</Text>
+						</View>
+					</RectButton>
+
+					<RectButton
+						style={[
+							styles.periodOption,
+							newBudget.period === 'weekly' && styles.selectedPeriodOption,
+						]}
+						onPress={() => setNewBudget({ ...newBudget, period: 'weekly' })}
+					>
+						<View style={styles.periodOptionContent}>
+							<Ionicons
+								name="calendar-clear-outline"
+								size={20}
+								color={newBudget.period === 'weekly' ? '#fff' : '#757575'}
+							/>
+							<Text
+								style={[
+									styles.periodOptionText,
+									newBudget.period === 'weekly' &&
+										styles.selectedPeriodOptionText,
+								]}
+							>
+								Weekly
+							</Text>
+						</View>
+					</RectButton>
+				</View>
 			</View>
-		</View>
-	);
+		);
+	};
 
 	// ==========================================
 	// Icon Selection Component
 	// ==========================================
-	const IconPicker = () => (
-		<View style={styles.iconPickerContainer}>
-			<Text style={styles.label}>Choose Icon</Text>
-			<RectButton
-				style={styles.iconButton}
-				onPress={() => setShowIconPicker(!showIconPicker)}
-			>
-				<View style={styles.iconButtonContent}>
-					<View
-						style={[
-							styles.iconPreview,
-							{ backgroundColor: newBudget.color + '20' },
-						]}
-					>
-						<Ionicons
-							name={newBudget.icon as any}
-							size={18}
-							color={newBudget.color}
-						/>
-					</View>
-					<Text style={styles.iconButtonText}>Choose Icon</Text>
-					<Ionicons
-						name={showIconPicker ? 'chevron-up' : 'chevron-down'}
-						size={20}
-						color="#757575"
-					/>
-				</View>
-			</RectButton>
+	const IconPicker = () => {
+		// Add null check for newBudget
+		if (!newBudget) {
+			return null;
+		}
 
-			{showIconPicker && (
-				<View style={styles.iconGrid}>
-					{budgetIcons.map((icon) => (
-						<RectButton
-							key={icon}
+		return (
+			<View style={styles.iconPickerContainer}>
+				<Text style={styles.label}>Choose Icon</Text>
+				<RectButton
+					style={styles.iconButton}
+					onPress={() => setShowIconPicker(!showIconPicker)}
+				>
+					<View style={styles.iconButtonContent}>
+						<View
 							style={[
-								styles.iconOption,
-								newBudget.icon === icon && {
-									backgroundColor: newBudget.color,
-								},
+								styles.iconPreview,
+								{ backgroundColor: newBudget.color + '20' },
 							]}
-							onPress={() => {
-								setNewBudget({ ...newBudget, icon });
-								setShowIconPicker(false);
-							}}
 						>
 							<Ionicons
-								name={icon as any}
-								size={24}
-								color={newBudget.icon === icon ? 'white' : newBudget.color}
+								name={newBudget.icon as any}
+								size={18}
+								color={newBudget.color}
 							/>
-						</RectButton>
-					))}
-				</View>
-			)}
-		</View>
-	);
+						</View>
+						<Text style={styles.iconButtonText}>Choose Icon</Text>
+						<Ionicons
+							name={showIconPicker ? 'chevron-up' : 'chevron-down'}
+							size={20}
+							color="#757575"
+						/>
+					</View>
+				</RectButton>
+
+				{showIconPicker && (
+					<View style={styles.iconGrid}>
+						{budgetIcons.map((icon) => (
+							<RectButton
+								key={icon}
+								style={[
+									styles.iconOption,
+									newBudget.icon === icon && {
+										backgroundColor: newBudget.color,
+									},
+								]}
+								onPress={() => {
+									setNewBudget({ ...newBudget, icon });
+									setShowIconPicker(false);
+								}}
+							>
+								<Ionicons
+									name={icon as any}
+									size={24}
+									color={newBudget.icon === icon ? 'white' : newBudget.color}
+								/>
+							</RectButton>
+						))}
+					</View>
+				)}
+			</View>
+		);
+	};
 
 	// ==========================================
 	// Render Functions

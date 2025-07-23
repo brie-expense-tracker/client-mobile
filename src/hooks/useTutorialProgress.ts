@@ -86,8 +86,9 @@ export const useTutorialProgress = () => {
 			},
 			{
 				id: 'fourthTutorialAction',
-				title: 'Enable Weekly Updates',
-				description: 'Enable weekly financial insights and recommendations',
+				title: 'Enable Automatic Updates',
+				description:
+					'Choose your preferred frequency for automatic financial insights and recommendations',
 				icon: 'bulb-outline',
 				action: () => {}, // Will be set by component
 			},
@@ -112,8 +113,22 @@ export const useTutorialProgress = () => {
 
 	const getStepStatus = useCallback(
 		(stepId: string): 'completed' | 'pending' => {
+			// Map tutorial step IDs to server progression step IDs
+			const stepIdMapping: Record<string, string> = {
+				firstTutorialAction: 'firstSmartAction',
+				secondTutorialAction: 'secondSmartAction',
+				thirdTutorialAction: 'thirdSmartAction',
+				fourthTutorialAction: 'fourthSmartAction',
+			};
+
+			const serverStepId = stepIdMapping[stepId];
+
 			// Always prioritize progression data from server
-			if (tutorialProgress?.steps && tutorialProgress.steps[stepId]) {
+			if (
+				tutorialProgress?.steps &&
+				serverStepId &&
+				tutorialProgress.steps[serverStepId]
+			) {
 				return 'completed';
 			}
 
@@ -130,7 +145,9 @@ export const useTutorialProgress = () => {
 						return goals.length > 0 ? 'completed' : 'pending';
 
 					case 'fourthTutorialAction':
-						return profile.preferences?.aiInsights?.enabled
+						// Check if AI insights are enabled and any frequency is set
+						const aiInsights = profile.preferences?.aiInsights;
+						return aiInsights?.enabled && aiInsights?.frequency
 							? 'completed'
 							: 'pending';
 
@@ -213,6 +230,7 @@ export const useTutorialProgress = () => {
 				budgetsLength: budgets.length,
 				goalsLength: goals.length,
 				aiInsightsEnabled: profile.preferences?.aiInsights?.enabled,
+				aiInsightsFrequency: profile.preferences?.aiInsights?.frequency,
 				progressionSteps: effectiveProgression.tutorialSteps,
 			});
 
@@ -225,7 +243,9 @@ export const useTutorialProgress = () => {
 				firstSmartAction: transactions.length > 0,
 				secondSmartAction: budgets.length > 0,
 				thirdSmartAction: goals.length > 0,
-				fourthSmartAction: profile.preferences?.aiInsights?.enabled,
+				fourthSmartAction:
+					profile.preferences?.aiInsights?.enabled &&
+					profile.preferences?.aiInsights?.frequency,
 			};
 
 			const progressionSteps = effectiveProgression.tutorialSteps || {};
@@ -263,6 +283,7 @@ export const useTutorialProgress = () => {
 		transactions.length,
 		budgets.length,
 		goals.length,
+		profile?.preferences?.aiInsights?.frequency,
 	]);
 
 	// Set loading to false after initial data is loaded
