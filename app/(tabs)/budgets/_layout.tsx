@@ -16,23 +16,15 @@ export default function BudgetLayout() {
 	const params = useLocalSearchParams();
 	const segments = useSegments();
 
-	// Auto-switch to appropriate tab if openModal parameter is present
+	// Auto-switch to appropriate tab based on tab parameter
 	useEffect(() => {
-		if (params.openModal === 'true') {
-			// Check if there's a specific tab parameter
-			if (params.tab === 'goals') {
-				setActiveTab('goals');
-			} else {
-				// Fallback to checking route segments
-				const currentSegments = segments.join('/');
-				if (currentSegments.includes('goals')) {
-					setActiveTab('goals');
-				} else {
-					setActiveTab('budgets');
-				}
-			}
+		if (params.tab === 'goals') {
+			setActiveTab('goals');
+		} else if (params.tab === 'budgets') {
+			setActiveTab('budgets');
 		}
-	}, [params.openModal, params.tab, segments]);
+		// Note: openModal parameter can be used for additional modal logic if needed
+	}, [params.tab]);
 
 	return (
 		<SafeAreaView style={styles.container}>

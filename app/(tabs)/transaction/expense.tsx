@@ -143,7 +143,6 @@ const AddTransactionScreen = () => {
 			await addTransaction(transactionData);
 
 			console.log('Expense saved successfully!');
-			Alert.alert('Success', 'Expense saved successfully!');
 
 			// Reset form values
 			setValue('description', '');
@@ -308,11 +307,13 @@ const AddTransactionScreen = () => {
 									/>
 								)}
 							/>
-							
+
 							{/* Budget Suggestions */}
 							{showSuggestions && budgetSuggestions.length > 0 && (
 								<View style={styles.suggestionsContainer}>
-									<Text style={styles.suggestionsTitle}>Suggested Budgets:</Text>
+									<Text style={styles.suggestionsTitle}>
+										Suggested Budgets:
+									</Text>
 									<ScrollView horizontal showsHorizontalScrollIndicator={false}>
 										{budgetSuggestions.map((budget) => (
 											<RectButton

@@ -6,12 +6,12 @@ import {
 	TouchableOpacity,
 	ScrollView,
 	Modal,
-	Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+// Removed LinearGradient import
 import { useProgression } from '../../../../src/context/progressionContext';
 import { useProfile } from '../../../../src/context/profileContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface ProgressionSystemProps {
 	visible: boolean;
@@ -50,13 +50,14 @@ const ProgressionSystem: React.FC<ProgressionSystemProps> = ({
 		completedActions,
 		isInTutorialStage,
 		isInLevel2Stage,
-		isInDynamicStage,
-		isInSmartPathStage,
-		isInRealtimeStage,
+		isInLevel3Stage,
+		isInLevel4Stage,
+		isInLevel5Stage,
 		getStageInfo,
 	} = useProgression();
 	const { profile } = useProfile();
 	const [selectedPath, setSelectedPath] = useState<string | null>(null);
+	const insets = useSafeAreaInsets();
 
 	// Define skill paths based on progression system
 	const skillPaths: SkillPath[] = [
@@ -136,9 +137,9 @@ const ProgressionSystem: React.FC<ProgressionSystemProps> = ({
 			maxProgress: 100,
 			unlocked:
 				isInLevel2Stage ||
-				isInDynamicStage ||
-				isInSmartPathStage ||
-				isInRealtimeStage,
+				isInLevel3Stage ||
+				isInLevel4Stage ||
+				isInLevel5Stage,
 			achievements: [
 				{
 					id: 'spending_optimizer',
@@ -166,9 +167,9 @@ const ProgressionSystem: React.FC<ProgressionSystemProps> = ({
 			maxProgress: 100,
 			unlocked:
 				isInLevel2Stage ||
-				isInDynamicStage ||
-				isInSmartPathStage ||
-				isInRealtimeStage,
+				isInLevel3Stage ||
+				isInLevel4Stage ||
+				isInLevel5Stage,
 			achievements: [
 				{
 					id: 'goal_achiever',
@@ -194,7 +195,7 @@ const ProgressionSystem: React.FC<ProgressionSystemProps> = ({
 			color: '#00BCD4',
 			progress: 0,
 			maxProgress: 100,
-			unlocked: isInSmartPathStage || isInRealtimeStage,
+			unlocked: isInLevel4Stage || isInLevel5Stage,
 			achievements: [
 				{
 					id: 'investment_planner',
@@ -355,21 +356,21 @@ const ProgressionSystem: React.FC<ProgressionSystemProps> = ({
 		>
 			<View style={styles.container}>
 				{/* Header */}
-				<LinearGradient
-					colors={[stageInfo.color, stageInfo.color + '80']}
-					style={styles.header}
-				>
-					<View style={styles.headerContent}>
+				<View style={[styles.header, { backgroundColor: stageInfo.color }]}>
+					{/* Use solid color */}
+					<View style={styles.headerCloseRow}>
 						<TouchableOpacity onPress={onClose} style={styles.closeButton}>
 							<Ionicons name="close" size={24} color="#fff" />
 						</TouchableOpacity>
+					</View>
+					<View style={styles.headerContent}>
 						<View style={styles.headerInfo}>
 							<Ionicons name={stageInfo.icon as any} size={28} color="#fff" />
 							<Text style={styles.headerTitle}>{stageInfo.title}</Text>
 							<Text style={styles.headerSubtitle}>{stageInfo.subtitle}</Text>
 						</View>
 					</View>
-				</LinearGradient>
+				</View>
 
 				<ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
 					{/* Current Stage Info */}
@@ -487,20 +488,25 @@ const styles = StyleSheet.create({
 		backgroundColor: '#f8f9fa',
 	},
 	header: {
-		paddingTop: 60,
+		paddingTop: 32,
 		paddingBottom: 20,
 		paddingHorizontal: 20,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	headerCloseRow: {
+		width: '100%',
+		flexDirection: 'row',
+		justifyContent: 'flex-end',
 	},
 	headerContent: {
-		flexDirection: 'row',
 		alignItems: 'center',
+		justifyContent: 'center',
 	},
 	closeButton: {
 		padding: 8,
-		marginRight: 12,
 	},
 	headerInfo: {
-		flex: 1,
 		alignItems: 'center',
 	},
 	headerTitle: {

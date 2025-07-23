@@ -7,8 +7,6 @@ export { default as IncomeExpenseGraph } from './IncomeExpenseGraph';
 export { default as FinancialDashboard } from './FinancialDashboard';
 
 // AI Insights Components
-export { default as AIInsightsSummary } from './AIInsightsSummary';
-export { default as InsightsSummary } from './InsightsSummary';
 export { default as SmartActionsSummary } from './SmartActionsSummary';
 export { default as AISuggestionsList } from '../../app/(tabs)/insights/components/AISuggestionsList';
 

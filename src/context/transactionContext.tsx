@@ -371,6 +371,24 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 					console.log('[TransactionContext] Updating budgets and goals...');
 					await updateBudgetsAndGoals(serverTransaction);
 
+					// Trigger progression check after successful transaction creation
+					try {
+						console.log(
+							'[TransactionContext] Triggering progression check after transaction creation...'
+						);
+						const { ProgressionService } = await import(
+							'../services/progressionService'
+						);
+						await ProgressionService.checkProgression();
+						console.log('[TransactionContext] Progression check completed');
+					} catch (progressionError) {
+						console.error(
+							'[TransactionContext] Error checking progression:',
+							progressionError
+						);
+						// Don't fail the transaction creation if progression check fails
+					}
+
 					return serverTransaction;
 				} else {
 					throw new Error('Failed to create transaction');

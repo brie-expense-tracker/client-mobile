@@ -670,9 +670,10 @@ export default function BudgetScreen() {
 						<View key={name} style={styles.colorColumn}>
 							<RectButton
 								style={styles.colorOptionContainer}
-								onPress={() =>
-									setNewBudget({ ...newBudget, color: colors.base })
-								}
+								onPress={() => {
+									setNewBudget({ ...newBudget, color: colors.base });
+									setShowColorPicker(false);
+								}}
 							>
 								<View
 									style={[styles.colorSquare, { backgroundColor: colors.base }]}
@@ -686,9 +687,10 @@ export default function BudgetScreen() {
 							</RectButton>
 							<RectButton
 								style={styles.colorOptionContainer}
-								onPress={() =>
-									setNewBudget({ ...newBudget, color: colors.pastel })
-								}
+								onPress={() => {
+									setNewBudget({ ...newBudget, color: colors.pastel });
+									setShowColorPicker(false);
+								}}
 							>
 								<View
 									style={[
@@ -705,9 +707,10 @@ export default function BudgetScreen() {
 							</RectButton>
 							<RectButton
 								style={styles.colorOptionContainer}
-								onPress={() =>
-									setNewBudget({ ...newBudget, color: colors.dark })
-								}
+								onPress={() => {
+									setNewBudget({ ...newBudget, color: colors.dark });
+									setShowColorPicker(false);
+								}}
 							>
 								<View
 									style={[styles.colorSquare, { backgroundColor: colors.dark }]}
@@ -835,6 +838,7 @@ export default function BudgetScreen() {
 							]}
 							onPress={() => {
 								setNewBudget({ ...newBudget, icon });
+								setShowIconPicker(false);
 							}}
 						>
 							<Ionicons
@@ -949,9 +953,11 @@ export default function BudgetScreen() {
 
 	// Create a properly structured data array with section separators and summaries
 	const createStructuredData = () => {
-		const data: (| Budget
+		const data: (
+			| Budget
 			| { id: string; type: 'section'; title: string }
-			| { id: string; type: 'summary'; period: 'monthly' | 'weekly' })[] = [];
+			| { id: string; type: 'summary'; period: 'monthly' | 'weekly' }
+		)[] = [];
 
 		// Add monthly budgets first
 		if (monthlyBudgets.length > 0) {

@@ -7,6 +7,7 @@ import {
 	ScrollView,
 	Alert,
 	ActivityIndicator,
+	RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -32,7 +33,6 @@ const TutorialProgress: React.FC<TutorialProgressProps> = ({
 		refreshing,
 		isTutorialCompleted,
 		getStepStatus,
-		refreshAllData,
 		checkProgression,
 	} = useTutorialProgress();
 
@@ -45,21 +45,28 @@ const TutorialProgress: React.FC<TutorialProgressProps> = ({
 		completionStats,
 	});
 
+	// Debug logging for tutorial completion check
+	console.log('📱 TutorialProgress: Tutorial completion check:', {
+		isTutorialCompleted,
+		completionStats,
+		allStepsCompleted: completionStats.completed === completionStats.total,
+	});
+
 	// Add navigation actions to tutorial steps
 	const stepsWithActions = tutorialSteps.map((step) => ({
 		...step,
 		action: () => {
 			switch (step.id) {
-				case 'firstSmartAction':
+				case 'firstTutorialAction':
 					showTransactionModal();
 					break;
-				case 'secondSmartAction':
-					router.push('/(tabs)/budgets?openModal=true');
+				case 'secondTutorialAction':
+					router.push('/(tabs)/budgets?openModal=true&tab=budgets');
 					break;
-				case 'thirdSmartAction':
-					router.push('/(tabs)/budgets/goals?openModal=true');
+				case 'thirdTutorialAction':
+					router.push('/(tabs)/budgets/goals?openModal=true&tab=goals');
 					break;
-				case 'fourthSmartAction':
+				case 'fourthTutorialAction':
 					router.push('/(tabs)/settings/aiInsights');
 					break;
 				default:
@@ -78,8 +85,8 @@ const TutorialProgress: React.FC<TutorialProgressProps> = ({
 		// Check progression after a short delay to allow for action completion
 		setTimeout(async () => {
 			try {
-				// Refresh all data to check for new items
-				await refreshAllData();
+				// Check progression (server now automatically updates when actions are completed)
+				await checkProgression();
 
 				// Check if this specific step was completed
 				const stepStatus = getStepStatus(stepId);
@@ -94,22 +101,56 @@ const TutorialProgress: React.FC<TutorialProgressProps> = ({
 							[{ text: 'Continue' }]
 						);
 					}, 100);
-				}
 
-				// Check if tutorial is now completed
-				if (isTutorialCompleted) {
-					Alert.alert(
-						'🎉 Tutorial Completed!',
-						"Congratulations! You've completed the tutorial and unlocked weekly updates. You'll now receive personalized financial insights and recommendations.",
-						[
-							{
-								text: 'Great!',
-								onPress: () => {
-									onTutorialCompleted?.();
-								},
-							},
-						]
+					// Check if this was the final step that completed the tutorial
+					// Use the same logic as getStepStatus to check if tutorial is now complete
+					const stepStatuses = tutorialSteps.map((step) => ({
+						id: step.id,
+						status: getStepStatus(step.id),
+					}));
+					const allStepsCompleted = stepStatuses.every(
+						(step) => step.status === 'completed'
 					);
+
+					console.log('🔍 Tutorial completion check:', {
+						stepStatuses,
+						allStepsCompleted,
+						isTutorialCompleted: isTutorialCompleted,
+					});
+
+					if (allStepsCompleted) {
+						// Show tutorial completion alert immediately
+						setTimeout(() => {
+							Alert.alert(
+								'🎉 Tutorial Completed!',
+								"Congratulations! You've completed the tutorial and unlocked weekly updates. You'll now receive personalized financial insights and recommendations.",
+								[
+									{
+										text: 'Show My Insights!',
+										onPress: async () => {
+											try {
+												// Force progression update first
+												console.log(
+													'🔄 Updating progression before calling completion callback...'
+												);
+												await checkProgression();
+
+												// Call the completion callback to trigger insight generation in parent
+												console.log(
+													'📱 TutorialProgress: Calling completion callback'
+												);
+												onTutorialCompleted?.();
+											} catch (error) {
+												console.error('Error updating progression:', error);
+												// Still proceed even if progression update fails
+												onTutorialCompleted?.();
+											}
+										},
+									},
+								]
+							);
+						}, 500); // Small delay to ensure step completion alert is shown first
+					}
 				}
 			} catch (error) {
 				console.error(
@@ -122,16 +163,11 @@ const TutorialProgress: React.FC<TutorialProgressProps> = ({
 		}, 2000);
 	};
 
-	// Global refresh function
+	// Global refresh function - now only needed for manual refresh
 	const handleGlobalRefresh = async () => {
 		try {
-			await refreshAllData();
-
-			// Show success message
-			Alert.alert(
-				'Refresh Complete',
-				'Tutorial progress has been refreshed with the latest data.'
-			);
+			console.log('📱 TutorialProgress: Manual global refresh requested');
+			await checkProgression();
 		} catch (error) {
 			console.error('Error during global refresh:', error);
 			// Only show error alert if refresh fails
@@ -139,6 +175,18 @@ const TutorialProgress: React.FC<TutorialProgressProps> = ({
 				'Refresh Error',
 				'Failed to refresh tutorial progress. Please try again.'
 			);
+		}
+	};
+
+	// Targeted refresh function for pull-to-refresh (only refreshes tutorial data)
+	const handleScrollableRefresh = async () => {
+		try {
+			console.log('📱 TutorialProgress: Pull-to-refresh requested');
+			// Only refresh progression and profile data, not transactions
+			await checkProgression();
+			// Don't refresh transactions to avoid triggering parent screen refresh
+		} catch (error) {
+			console.error('Error during scrollable refresh:', error);
 		}
 	};
 
@@ -152,8 +200,11 @@ const TutorialProgress: React.FC<TutorialProgressProps> = ({
 		);
 	}
 
-	// Show completed state if tutorial is completed
-	if (isTutorialCompleted) {
+	// Show completed state if tutorial is completed or all steps are completed
+	if (
+		isTutorialCompleted ||
+		completionStats.completed === completionStats.total
+	) {
 		return (
 			<View style={styles.completedContainer}>
 				<View style={styles.completedIcon}>
@@ -168,13 +219,22 @@ const TutorialProgress: React.FC<TutorialProgressProps> = ({
 				<TouchableOpacity
 					style={styles.refreshCompletedButton}
 					onPress={async () => {
-						await checkProgression();
-						// Call the completion callback to trigger view change
-						onTutorialCompleted?.();
+						try {
+							console.log(
+								'📱 TutorialProgress: Manual insight generation requested'
+							);
+							// Call the completion callback to trigger insight generation in parent
+							await checkProgression();
+							onTutorialCompleted?.();
+						} catch (error) {
+							console.error('Error during manual insight generation:', error);
+							// Still proceed even if there's an error
+							onTutorialCompleted?.();
+						}
 					}}
 				>
 					<Text style={styles.refreshCompletedButtonText}>
-						Continue to AI Coach
+						Generate My Insights
 					</Text>
 				</TouchableOpacity>
 			</View>
@@ -186,6 +246,14 @@ const TutorialProgress: React.FC<TutorialProgressProps> = ({
 			style={styles.container}
 			showsVerticalScrollIndicator={false}
 			contentContainerStyle={styles.scrollContent}
+			refreshControl={
+				<RefreshControl
+					refreshing={refreshing}
+					onRefresh={handleScrollableRefresh}
+					colors={['#2E78B7']}
+					tintColor="#2E78B7"
+				/>
+			}
 		>
 			<View style={styles.header}>
 				<Text style={styles.title}>Complete the Tutorial</Text>

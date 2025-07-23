@@ -8,6 +8,9 @@ import {
 	updatePassword,
 	createUserWithEmailAndPassword,
 	signInWithEmailAndPassword,
+	reauthenticateWithCredential,
+	deleteUser,
+	EmailAuthProvider,
 } from '@react-native-firebase/auth';
 import type { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import { UserService, User, Profile } from '../services/userService';
@@ -27,6 +30,7 @@ interface AuthContextType {
 	sendPasswordResetEmail: (email: string) => Promise<void>;
 	confirmPasswordReset: (code: string, newPassword: string) => Promise<void>;
 	updatePassword: (newPassword: string) => Promise<void>;
+	deleteAccount: (password: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -277,6 +281,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		}
 	};
 
+	const deleteAccount = async (password: string) => {
+		setLoading(true);
+		try {
+			const user = getAuth().currentUser;
+			if (!user) throw new Error('No user is currently signed in');
+			if (!user.email) throw new Error('User email is missing');
+
+			// Re-authenticate
+			const credential = EmailAuthProvider.credential(user.email, password);
+			await reauthenticateWithCredential(user, credential);
+
+			// Delete backend data
+			await UserService.deleteUserAccount();
+
+			// Delete Firebase user
+			await deleteUser(user);
+
+			// Clear AsyncStorage and context state
+			await AsyncStorage.clear();
+			setUser(null);
+			setProfile(null);
+			setFirebaseUser(null);
+		} catch (error) {
+			throw error;
+		} finally {
+			setLoading(false);
+		}
+	};
+
 	return (
 		<AuthContext.Provider
 			value={{
@@ -291,6 +324,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				sendPasswordResetEmail: sendPasswordResetEmailToUser,
 				confirmPasswordReset: confirmPasswordResetCode,
 				updatePassword: updatePasswordToUser,
+				deleteAccount,
 			}}
 		>
 			{children}

@@ -74,94 +74,61 @@ export class InsightsService {
 	static async getInsights(
 		period: 'daily' | 'weekly' | 'monthly'
 	): Promise<InsightsResponse> {
-		const response = await ApiService.get<any>(`/insights/${period}`);
+		try {
+			const response = await ApiService.get<any>(`/insights/${period}`);
 
-		// Debug: Log the response to see what we're getting
-		console.log(
-			`InsightsService.getInsights(${period}) - Response:`,
-			JSON.stringify(response, null, 2)
-		);
+			// Debug: Log the response to see what we're getting
+			console.log(
+				`InsightsService.getInsights(${period}) - Response:`,
+				JSON.stringify(response, null, 2)
+			);
 
-		// Handle double-nested response structure that the server actually returns
-		let insightsArray: AIInsight[] = [];
+			// Simplified response processing
+			let insightsArray: AIInsight[] = [];
 
-		console.log(
-			`InsightsService.getInsights(${period}) - Processing response.data:`,
-			response.data
-		);
-		console.log(
-			`InsightsService.getInsights(${period}) - response.data type:`,
-			typeof response.data
-		);
-		console.log(
-			`InsightsService.getInsights(${period}) - response.data isArray:`,
-			Array.isArray(response.data)
-		);
-
-		if (response.data) {
-			// Check if response.data is a nested response object
-			if (
-				typeof response.data === 'object' &&
-				response.data.success !== undefined
-			) {
-				console.log(
-					`InsightsService.getInsights(${period}) - Found nested response object`
-				);
-				// First level nesting
-				if (response.data.data && Array.isArray(response.data.data)) {
-					console.log(
-						`InsightsService.getInsights(${period}) - Found first level array with ${response.data.data.length} items`
-					);
-					insightsArray = response.data.data;
+			if (response.success && response.data) {
+				// Handle different response structures
+				if (Array.isArray(response.data)) {
+					// Direct array
+					insightsArray = response.data;
 				} else if (
-					response.data.data &&
-					typeof response.data.data === 'object' &&
-					response.data.data.success !== undefined
+					typeof response.data === 'object' &&
+					response.data.success !== undefined &&
+					response.data.data
 				) {
-					console.log(
-						`InsightsService.getInsights(${period}) - Found second level nesting`
-					);
-					// Second level nesting
-					if (
+					// Nested response object
+					if (Array.isArray(response.data.data)) {
+						insightsArray = response.data.data;
+					} else if (
+						typeof response.data.data === 'object' &&
+						response.data.data.success !== undefined &&
 						response.data.data.data &&
 						Array.isArray(response.data.data.data)
 					) {
-						console.log(
-							`InsightsService.getInsights(${period}) - Found second level array with ${response.data.data.data.length} items`
-						);
+						// Double nested
 						insightsArray = response.data.data.data;
 					}
 				}
-			} else if (Array.isArray(response.data)) {
-				console.log(
-					`InsightsService.getInsights(${period}) - Found direct array with ${response.data.length} items`
-				);
-				// Direct array
-				insightsArray = response.data;
 			}
-		}
 
-		console.log(
-			`InsightsService.getInsights(${period}) - Final insightsArray:`,
-			insightsArray
-		);
-
-		if (!Array.isArray(insightsArray)) {
-			console.warn(
-				`InsightsService.getInsights(${period}) - Data is not an array:`,
-				response.data
+			console.log(
+				`InsightsService.getInsights(${period}) - Final insightsArray:`,
+				insightsArray
 			);
-			insightsArray = [];
+
+			return {
+				success: response.success,
+				data: insightsArray,
+				error: response.error,
+			};
+		} catch (error) {
+			console.error(`InsightsService.getInsights(${period}) - Error:`, error);
+			return {
+				success: false,
+				data: [],
+				error: error instanceof Error ? error.message : 'Unknown error',
+			};
 		}
-
-		const result = {
-			success: response.success,
-			data: insightsArray,
-			error: response.error,
-		};
-
-		console.log(`InsightsService.getInsights(${period}) - Returning:`, result);
-		return result;
 	}
 
 	// Get insight detail by ID

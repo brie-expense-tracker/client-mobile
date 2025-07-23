@@ -3,7 +3,6 @@ import React, {
 	useContext,
 	useState,
 	useEffect,
-	ReactNode,
 	useRef,
 } from 'react';
 import {
@@ -27,9 +26,9 @@ interface ProgressionContextType {
 	forceProgressionUpdate: () => Promise<void>;
 	isInTutorialStage: boolean;
 	isInLevel2Stage: boolean;
-	isInDynamicStage: boolean;
-	isInSmartPathStage: boolean;
-	isInRealtimeStage: boolean;
+	isInLevel3Stage: boolean;
+	isInLevel4Stage: boolean;
+	isInLevel5Stage: boolean;
 	getStageInfo: (stage: string) => any;
 }
 
@@ -55,9 +54,7 @@ export const ProgressionProvider: React.FC<{ children: React.ReactNode }> = ({
 
 		try {
 			setLoading(true);
-			console.log('🔄 Refreshing progression for user:', user.firebaseUID);
 			const status = await ProgressionService.getProgressionStatus();
-			console.log('🔄 Progression status received:', status);
 			setProgressionStatus(status);
 		} catch (error) {
 			console.error('Error refreshing progression:', error);
@@ -77,23 +74,15 @@ export const ProgressionProvider: React.FC<{ children: React.ReactNode }> = ({
 		// Debounce the check to prevent rapid successive calls
 		checkProgressionTimeoutRef.current = setTimeout(async () => {
 			try {
-				console.log('🔄 Checking progression for user:', user.firebaseUID);
 				const result = await ProgressionService.checkProgression();
 
 				// Get progression data directly from result
 				const progressionData = result.progression;
 
-				console.log('🔄 Progression check result:', result);
-				console.log('🔄 Progression data:', progressionData);
-
 				if (result.success && progressionData) {
-					// Only refresh if there were actual changes to prevent infinite loops
-					if (result.hasChanges) {
-						console.log('🔄 Progression has changes, refreshing...');
-						await refreshProgression();
-					} else {
-						console.log('🔄 No progression changes detected');
-					}
+					// Always refresh to get the latest progression data, regardless of changes
+					// This ensures the client always has the most up-to-date progression state
+					await refreshProgression();
 				}
 			} catch (error) {
 				console.error('Error checking progression:', error);
@@ -168,16 +157,36 @@ export const ProgressionProvider: React.FC<{ children: React.ReactNode }> = ({
 		};
 	}, []);
 
+	// Helper function to map server stage names to client format
+	const mapStageName = (stage: string): string => {
+		switch (stage.toLowerCase()) {
+			case 'beginner':
+			case 'tutorial':
+				return 'Tutorial';
+			case 'apprentice':
+				return 'Apprentice';
+			case 'practitioner':
+				return 'Practitioner';
+			case 'expert':
+				return 'Expert';
+			case 'master':
+				return 'Master';
+			default:
+				return 'Tutorial';
+		}
+	};
+
 	// Computed values
 	const progression = progressionStatus?.progression || null;
-	const currentStage = progression?.currentStage || 'tutorial';
+	const rawCurrentStage = progression?.currentStage || 'Tutorial';
+	const currentStage = mapStageName(rawCurrentStage);
 	const xp = progression?.xp || 0;
 	const completedActions = progression?.completedActions || 0;
-	const isInTutorialStage = currentStage === 'tutorial';
-	const isInLevel2Stage = currentStage === 'level2';
-	const isInDynamicStage = currentStage === 'dynamic';
-	const isInSmartPathStage = currentStage === 'smartPath';
-	const isInRealtimeStage = currentStage === 'realtime';
+	const isInTutorialStage = currentStage === 'Tutorial';
+	const isInLevel2Stage = currentStage === 'Apprentice';
+	const isInLevel3Stage = currentStage === 'Practitioner';
+	const isInLevel4Stage = currentStage === 'Expert';
+	const isInLevel5Stage = currentStage === 'Master';
 
 	// Helper function to get stage information
 	const getStageInfo = (stage: string) => {
@@ -200,9 +209,9 @@ export const ProgressionProvider: React.FC<{ children: React.ReactNode }> = ({
 				forceProgressionUpdate,
 				isInTutorialStage,
 				isInLevel2Stage,
-				isInDynamicStage,
-				isInSmartPathStage,
-				isInRealtimeStage,
+				isInLevel3Stage,
+				isInLevel4Stage,
+				isInLevel5Stage,
 				getStageInfo,
 			}}
 		>
