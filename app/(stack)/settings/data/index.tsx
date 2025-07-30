@@ -67,7 +67,7 @@ export default function DataPrivacySettingsScreen() {
 					<ActionButton
 						label="Download my data"
 						onPress={() => {
-							router.push('/settings/dataandprivacy/exportData');
+							router.push('/(stack)/settings/data/exportData');
 						}}
 					/>
 				</Section>

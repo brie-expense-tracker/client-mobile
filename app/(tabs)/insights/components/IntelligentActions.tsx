@@ -541,7 +541,7 @@ export default function IntelligentActions({
 						text: 'View Settings',
 						onPress: () => {
 							// Navigate to notification settings where the user can change the underlying preference
-							router.push('/(tabs)/settings/notification');
+							router.push('/(stack)/settings/notification');
 						},
 					},
 				]
@@ -575,11 +575,11 @@ export default function IntelligentActions({
 				break;
 			case 'preferences_updated':
 				// Navigate to AI insights settings
-				router.push('/(tabs)/settings/aiInsights');
+				router.push('/(stack)/settings/aiInsights');
 				break;
 			case 'health_check_completed':
 				// Navigate to notification settings for health check preferences
-				router.push('/(tabs)/settings/notification');
+				router.push('/(stack)/settings/notification');
 				break;
 			default:
 				// For unknown detection types, show a helpful message
@@ -606,15 +606,15 @@ export default function IntelligentActions({
 				break;
 			case 'set_reminder':
 				// Navigate to notification settings
-				router.push('/(tabs)/settings/notification');
+				router.push('/(stack)/settings/notification');
 				break;
 			case 'update_preferences':
 				// Navigate to AI insights settings
-				router.push('/(tabs)/settings/aiInsights');
+				router.push('/(stack)/settings/aiInsights');
 				break;
 			case 'export_data':
 				// Navigate to data export screen
-				router.push('/(tabs)/settings/data/exportData');
+				router.push('/(stack)/settings/data/exportData');
 				break;
 			default:
 				// For other action types, stay on current screen
@@ -1127,7 +1127,7 @@ export default function IntelligentActions({
 											<TouchableOpacity
 												style={styles.settingsLink}
 												onPress={() =>
-													router.push('/(tabs)/settings/notification')
+													router.push('/(stack)/settings/notification')
 												}
 											>
 												<Text style={styles.settingsLinkText}>

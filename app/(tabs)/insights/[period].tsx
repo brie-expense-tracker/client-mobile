@@ -55,7 +55,7 @@ export default function InsightDetail() {
 	const [loading, setLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
 	const [activeTab, setActiveTab] = useState<
-		'overview' | 'progress' | 'history' | 'actions'
+		'overview' | 'progress' | 'history'
 	>('overview');
 
 	// Animation values
@@ -653,40 +653,6 @@ export default function InsightDetail() {
 					</Animated.View>
 				);
 
-			case 'actions':
-				return (
-					<Animated.View
-						style={[
-							styles.tabContent,
-							{
-								opacity: fadeAnim,
-								transform: [{ translateY: slideAnim }],
-							},
-						]}
-					>
-						<Text style={styles.sectionTitle}>Recommended Actions</Text>
-						<Text style={styles.sectionSubtitle}>
-							Take action to improve your financial health based on this
-							insight.
-						</Text>
-						<IntelligentActions
-							insight={insight}
-							period={period}
-							onActionExecuted={(action, result) => {
-								console.log('Action executed:', action, result);
-								// Handle action execution
-							}}
-							onAllActionsCompleted={() => {
-								Alert.alert(
-									'All Actions Completed! 🎉',
-									'Great job! Your financial health is improving.',
-									[{ text: 'OK' }]
-								);
-							}}
-						/>
-					</Animated.View>
-				);
-
 			default:
 				return null;
 		}
@@ -770,24 +736,6 @@ export default function InsightDetail() {
 						]}
 					>
 						History
-					</Text>
-				</TouchableOpacity>
-				<TouchableOpacity
-					style={[styles.tab, activeTab === 'actions' && styles.activeTab]}
-					onPress={() => setActiveTab('actions')}
-				>
-					<Ionicons
-						name="checkmark-circle"
-						size={20}
-						color={activeTab === 'actions' ? periodInfo.color : '#666'}
-					/>
-					<Text
-						style={[
-							styles.tabText,
-							activeTab === 'actions' && styles.activeTabText,
-						]}
-					>
-						Actions
 					</Text>
 				</TouchableOpacity>
 			</View>

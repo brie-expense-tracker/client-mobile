@@ -1,4 +1,11 @@
-import React, { FC, useState, useCallback, useEffect, useRef } from 'react';
+import React, {
+	FC,
+	useState,
+	useCallback,
+	useEffect,
+	useRef,
+	useMemo,
+} from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
 	View,
@@ -31,10 +38,8 @@ interface AICoachProps {
 	isFirstTime?: boolean; // Indicates if this is the first time showing AI Coach after tutorial completion
 }
 
-const AICoach: FC<AICoachProps> = ({
-	period: propPeriod,
-	isFirstTime = false,
-}) => {
+// Custom hook for AI Coach logic
+const useAICoach = (propPeriod?: string, isFirstTime?: boolean) => {
 	const { profile } = useProfile();
 	const { currentStage, xp, completedActions, checkProgression } =
 		useProgression();
@@ -42,7 +47,13 @@ const AICoach: FC<AICoachProps> = ({
 	const { goals } = useGoal();
 	const { transactions } = useContext(TransactionContext);
 
-	const [showProgressionSystem, setShowProgressionSystem] = useState(false);
+	// Consolidated state management
+	const [aiCoachState, setAiCoachState] = useState({
+		showProgressionSystem: false,
+		error: null as string | null,
+		retryCount: 0,
+		hasTriggeredFirstTime: false,
+	});
 
 	// Get user preferences
 	const aiInsightsEnabled = profile?.preferences?.aiInsights?.enabled ?? true;
@@ -52,8 +63,7 @@ const AICoach: FC<AICoachProps> = ({
 		profile?.preferences?.aiInsights?.showHighPriorityOnly ?? false;
 
 	// Convert user frequency to Period type for useInsightsHub
-	const getInsightsHubPeriod = (): Period => {
-		// If a specific period is provided as a prop, use that
+	const getInsightsHubPeriod = useCallback((): Period => {
 		if (propPeriod) {
 			switch (propPeriod) {
 				case 'daily':
@@ -67,7 +77,6 @@ const AICoach: FC<AICoachProps> = ({
 			}
 		}
 
-		// Otherwise use user's frequency preference
 		switch (userFrequency) {
 			case 'daily':
 				return 'week';
@@ -78,7 +87,7 @@ const AICoach: FC<AICoachProps> = ({
 			default:
 				return 'week';
 		}
-	};
+	}, [propPeriod, userFrequency]);
 
 	const {
 		insights,
@@ -89,14 +98,13 @@ const AICoach: FC<AICoachProps> = ({
 		fetchInsights,
 	} = useInsightsHub(getInsightsHubPeriod());
 
-	// Calculate user behavior metrics for adaptive content
-	const userMetrics = useCallback(() => {
+	// Memoized user metrics calculation
+	const userMetrics = useMemo(() => {
 		const now = new Date();
 		const start = new Date();
-
-		// Calculate for the last month
 		start.setMonth(now.getMonth() - 1);
 
+		// Memoize filtered transactions
 		const periodTransactions = transactions.filter((tx) => {
 			const txDate = new Date(tx.date);
 			return txDate >= start && txDate <= now;
@@ -155,9 +163,9 @@ const AICoach: FC<AICoachProps> = ({
 		};
 	}, [transactions, budgets, goals]);
 
-	// Generate adaptive content based on user metrics
-	const getAdaptiveContent = useCallback(() => {
-		const metrics = userMetrics();
+	// Memoized adaptive content generation
+	const adaptiveContent = useMemo(() => {
+		const metrics = userMetrics;
 
 		// Savings rate based content
 		let savingsMessage = '';
@@ -287,8 +295,8 @@ const AICoach: FC<AICoachProps> = ({
 		};
 	}, [userMetrics, goals.length]);
 
-	// Filter insights based on user preferences
-	const filteredInsights = useCallback(() => {
+	// Memoized filtered insights
+	const filteredInsights = useMemo(() => {
 		if (!insights || !aiInsightsEnabled) {
 			return [];
 		}
@@ -301,11 +309,31 @@ const AICoach: FC<AICoachProps> = ({
 		}
 
 		// Limit to max insights
-		const result = filtered.slice(0, maxInsights);
-		return result;
+		return filtered.slice(0, maxInsights);
 	}, [insights, aiInsightsEnabled, showHighPriorityOnly, maxInsights]);
 
-	// Handle insight press
+	// Error handling with retry logic
+	const handleError = useCallback(
+		(error: Error) => {
+			setAiCoachState((prev) => ({
+				...prev,
+				error: error.message,
+			}));
+
+			if (aiCoachState.retryCount < 3) {
+				setTimeout(() => {
+					setAiCoachState((prev) => ({
+						...prev,
+						retryCount: prev.retryCount + 1,
+					}));
+					fetchInsights();
+				}, 1000 * (aiCoachState.retryCount + 1));
+			}
+		},
+		[aiCoachState.retryCount, fetchInsights]
+	);
+
+	// Improved insight press handler with better error handling
 	const handleInsightPress = useCallback(
 		async (insight: AIInsight) => {
 			try {
@@ -317,42 +345,114 @@ const AICoach: FC<AICoachProps> = ({
 					await markInsightAsRead(insight._id);
 				}
 
-				// Navigate to the period detail using the correct Expo Router format
+				// Improved navigation with proper error handling
 				const route = `/(tabs)/insights/${insight.period}`;
 				console.log('🎯 Navigating to route:', route);
 
-				// Use router.push with the correct route format
-				router.push(route as any);
+				// Validate route before navigation
+				if (
+					insight.period &&
+					['daily', 'weekly', 'monthly'].includes(insight.period)
+				) {
+					router.push(route as any);
+				} else {
+					throw new Error('Invalid insight period');
+				}
 			} catch (error) {
 				console.error('Error handling insight press:', error);
-				// Show alert if navigation fails
 				Alert.alert(
 					'Navigation Error',
 					`Unable to navigate to ${insight.period} insights. Please try again.`
 				);
 			}
 		},
-		[markInsightAsRead, router]
+		[markInsightAsRead]
 	);
 
-	// Helper function to get icon for insight type
-	const getInsightIcon = (insightType: string) => {
-		switch (insightType) {
-			case 'budgeting':
-				return 'wallet-outline';
-			case 'savings':
-				return 'save-outline';
-			case 'spending':
-				return 'trending-down-outline';
-			case 'income':
-				return 'trending-up-outline';
-			default:
-				return 'bulb-outline';
-		}
-	};
+	// Optimized focus effect with better API coordination
+	const lastFetchRef = useRef<number>(0);
 
-	// Helper function to get frequency display info
-	const getFrequencyInfo = (frequency: string) => {
+	useFocusEffect(
+		useCallback(() => {
+			const now = Date.now();
+
+			// If this is the first time showing AI Coach after tutorial completion
+			if (isFirstTime && !aiCoachState.hasTriggeredFirstTime) {
+				console.log(
+					'🎯 AICoach: First time showing after tutorial completion, triggering insight generation...'
+				);
+
+				setAiCoachState((prev) => ({
+					...prev,
+					hasTriggeredFirstTime: true,
+				}));
+
+				// Generate insights for the user with better error handling
+				const generateInitialInsights = async () => {
+					try {
+						const { InsightsService } = await import(
+							'../../../../src/services/insightsService'
+						);
+						const result = await InsightsService.generateInsights('weekly');
+
+						if (result.success) {
+							console.log('✅ Initial insights generated for new user!');
+							// Fetch the newly generated insights immediately
+							await fetchInsights();
+						} else {
+							console.warn(
+								'⚠️ Initial insights generation returned success: false'
+							);
+							// Fallback to regular fetch
+							await fetchInsights();
+						}
+					} catch (error) {
+						console.error('❌ Error generating initial insights:', error);
+						handleError(error as Error);
+						// Fallback to regular fetch
+						await fetchInsights();
+					}
+				};
+
+				generateInitialInsights();
+				return;
+			}
+
+			// Regular debounced fetch for subsequent visits
+			if (now - lastFetchRef.current > 5000) {
+				console.log('🎯 AICoach: Screen focused, fetching insights...');
+				lastFetchRef.current = now;
+				fetchInsights().catch(handleError);
+			} else {
+				console.log('🎯 AICoach: Skipping fetch (debounced)');
+			}
+		}, [
+			fetchInsights,
+			isFirstTime,
+			aiCoachState.hasTriggeredFirstTime,
+			handleError,
+		])
+	);
+
+	// Helper functions
+	const getInsightIcon = useCallback((insightType: string) => {
+		switch (insightType) {
+			case 'spending':
+				return 'trending-down-outline' as any;
+			case 'savings':
+				return 'save-outline' as any;
+			case 'budget':
+				return 'pie-chart-outline' as any;
+			case 'goals':
+				return 'flag-outline' as any;
+			case 'income':
+				return 'trending-up-outline' as any;
+			default:
+				return 'bulb-outline' as any;
+		}
+	}, []);
+
+	const getFrequencyInfo = useCallback((frequency: string) => {
 		switch (frequency) {
 			case 'daily':
 				return {
@@ -383,11 +483,10 @@ const AICoach: FC<AICoachProps> = ({
 					color: '#2196F3',
 				};
 		}
-	};
+	}, []);
 
-	// Get stage-specific content
-	const getStageContent = () => {
-		console.log('[AICoach] currentStage:', currentStage); // Debugging: log currentStage
+	const getStageContent = useCallback(() => {
+		console.log('[AICoach] currentStage:', currentStage);
 		switch ((currentStage || '').toLowerCase()) {
 			case 'apprentice':
 				return {
@@ -436,80 +535,9 @@ const AICoach: FC<AICoachProps> = ({
 					icon: 'bulb-outline',
 				};
 		}
-	};
+	}, [currentStage]);
 
-	const [localInsights, setLocalInsights] = useState<any[]>(filteredInsights());
-
-	// Update local insights when filtered insights change
-	useEffect(() => {
-		setLocalInsights(filteredInsights());
-	}, [filteredInsights]);
-
-	// Only fetch insights when the screen is focused, with debouncing
-	const lastFetchRef = useRef<number>(0);
-	const hasTriggeredFirstTimeRef = useRef<boolean>(false);
-
-	useFocusEffect(
-		useCallback(() => {
-			const now = Date.now();
-
-			// If this is the first time showing AI Coach after tutorial completion, trigger insight generation
-			if (isFirstTime && !hasTriggeredFirstTimeRef.current) {
-				console.log(
-					'🎯 AICoach: First time showing after tutorial completion, triggering insight generation...'
-				);
-				hasTriggeredFirstTimeRef.current = true;
-
-				// Generate insights for the user with better error handling
-				const generateInitialInsights = async () => {
-					try {
-						const { InsightsService } = await import(
-							'../../../../src/services/insightsService'
-						);
-						const result = await InsightsService.generateInsights('weekly');
-
-						if (result.success) {
-							console.log('✅ Initial insights generated for new user!');
-						} else {
-							console.warn(
-								'⚠️ Initial insights generation returned success: false'
-							);
-						}
-
-						// Fetch the newly generated insights
-						setTimeout(() => {
-							fetchInsights();
-						}, 2000); // Small delay to ensure insights are processed
-					} catch (error) {
-						console.error('❌ Error generating initial insights:', error);
-						// Fallback to regular fetch
-						fetchInsights();
-					}
-				};
-
-				generateInitialInsights();
-				return;
-			}
-
-			// Regular debounced fetch for subsequent visits
-			if (now - lastFetchRef.current > 5000) {
-				console.log('🎯 AICoach: Screen focused, fetching insights...');
-				lastFetchRef.current = now;
-				fetchInsights();
-			} else {
-				console.log('🎯 AICoach: Skipping fetch (debounced)');
-			}
-		}, [fetchInsights, isFirstTime])
-	);
-
-	// Use localInsights instead of props insights for display
-	const displayInsights = localInsights;
-	const currentFrequencyInfo = getFrequencyInfo(userFrequency);
-	const stageContent = getStageContent();
-	const adaptiveContent = getAdaptiveContent();
-
-	// Helper function to get tone-based colors
-	const getToneColor = (tone: string) => {
+	const getToneColor = useCallback((tone: string) => {
 		switch (tone) {
 			case 'urgent':
 				return '#dc2626';
@@ -524,7 +552,383 @@ const AICoach: FC<AICoachProps> = ({
 			default:
 				return '#6b7280';
 		}
+	}, []);
+
+	// State setters
+	const setShowProgressionSystem = useCallback((show: boolean) => {
+		setAiCoachState((prev) => ({
+			...prev,
+			showProgressionSystem: show,
+		}));
+	}, []);
+
+	const clearError = useCallback(() => {
+		setAiCoachState((prev) => ({
+			...prev,
+			error: null,
+			retryCount: 0,
+		}));
+	}, []);
+
+	return {
+		// State
+		aiCoachState,
+		insights: filteredInsights,
+		loadingInsights,
+		refreshing,
+		error: aiCoachState.error,
+
+		// Data
+		currentStage,
+		xp,
+		completedActions,
+		adaptiveContent,
+		userMetrics,
+
+		// Functions
+		onRefresh,
+		handleInsightPress,
+		setShowProgressionSystem,
+		clearError,
+		getInsightIcon,
+		getFrequencyInfo,
+		getStageContent,
+		getToneColor,
+		userFrequency,
 	};
+};
+
+// Smaller, focused components
+const WelcomeSection: FC<{ isFirstTime: boolean; stageContent: any }> = ({
+	isFirstTime,
+	stageContent,
+}) => (
+	<View style={styles.welcomeSection}>
+		<View style={styles.welcomeCard}>
+			<View style={styles.welcomeHeader}>
+				<View style={styles.welcomeIconContainer}>
+					<Ionicons name="sparkles" size={28} color={stageContent.color} />
+				</View>
+				<Text style={styles.welcomeTitle}>
+					{isFirstTime
+						? `Welcome to ${stageContent.title}! 🎉`
+						: `Welcome to ${stageContent.title}! 🎉`}
+				</Text>
+			</View>
+			<Text style={styles.welcomeText}>
+				{isFirstTime
+					? `Congratulations on completing the tutorial! Your personalized AI insights are being generated. This will take a moment to analyze your financial data and provide smart recommendations.`
+					: `You now have access to personalized insights and advanced features. Generate your first insights to get started!`}
+			</Text>
+			{isFirstTime && (
+				<View style={styles.generatingIndicator}>
+					<ActivityIndicator size="small" color={stageContent.color} />
+					<Text style={[styles.generatingText, { color: stageContent.color }]}>
+						Generating your personalized insights...
+					</Text>
+				</View>
+			)}
+		</View>
+	</View>
+);
+
+const StageHeader: FC<{
+	stageContent: any;
+	xp: number;
+	completedActions: number;
+	onProgressionPress: () => void;
+}> = ({ stageContent, xp, completedActions, onProgressionPress }) => (
+	<View style={styles.stageHeader}>
+		<View style={styles.stageHeaderCard}>
+			<View style={styles.stageHeaderContent}>
+				<View
+					style={[
+						styles.stageIconContainer,
+						{ backgroundColor: stageContent.color + '15' },
+					]}
+				>
+					<Ionicons
+						name={stageContent.icon as any}
+						size={28}
+						color={stageContent.color}
+					/>
+				</View>
+				<View style={styles.stageHeaderText}>
+					<Text style={styles.stageHeaderTitle}>{stageContent.title}</Text>
+					<Text style={styles.stageHeaderSubtitle}>
+						{stageContent.subtitle}
+					</Text>
+					{/* XP and Progress Display */}
+					<View style={styles.progressInfo}>
+						<View style={styles.progressItem}>
+							<Ionicons name="star" size={14} color={stageContent.color} />
+							<Text style={[styles.xpText, { color: stageContent.color }]}>
+								XP: {xp}
+							</Text>
+						</View>
+						<View style={styles.progressItem}>
+							<Ionicons
+								name="checkmark-circle"
+								size={14}
+								color={stageContent.color}
+							/>
+							<Text style={[styles.actionsText, { color: stageContent.color }]}>
+								Actions: {completedActions}
+							</Text>
+						</View>
+					</View>
+				</View>
+				{/* Progression System Button */}
+				<TouchableOpacity
+					style={[
+						styles.progressionButton,
+						{ backgroundColor: stageContent.color + '15' },
+					]}
+					onPress={onProgressionPress}
+				>
+					<Ionicons name="trophy" size={20} color={stageContent.color} />
+				</TouchableOpacity>
+			</View>
+		</View>
+	</View>
+);
+
+const AdaptiveContent: FC<{
+	adaptiveContent: any;
+	getToneColor: (tone: string) => string;
+}> = ({ adaptiveContent, getToneColor }) => (
+	<View style={styles.adaptiveSection}>
+		<Text style={styles.sectionTitle}>Your Financial Health</Text>
+
+		{/* Overall Financial Health Card */}
+		<View style={styles.adaptiveCard}>
+			<View
+				style={[
+					styles.adaptiveCardGradient,
+					{ backgroundColor: getToneColor(adaptiveContent.overall.tone) },
+				]}
+			>
+				<View style={styles.adaptiveCardHeader}>
+					<Ionicons
+						name={adaptiveContent.overall.icon as any}
+						size={24}
+						color="#fff"
+					/>
+					<Text style={styles.adaptiveCardTitle}>Financial Health</Text>
+				</View>
+				<Text style={styles.adaptiveCardMessage}>
+					{adaptiveContent.overall.message}
+				</Text>
+			</View>
+		</View>
+
+		{/* Metrics Grid */}
+		<View style={styles.metricsGrid}>
+			{/* Savings Rate Card */}
+			<TouchableOpacity
+				style={[
+					styles.metricCard,
+					{ borderColor: getToneColor(adaptiveContent.savings.tone) },
+				]}
+				onPress={() => router.push('/(tabs)/dashboard')}
+			>
+				<View style={styles.metricCardHeader}>
+					<Ionicons
+						name={adaptiveContent.savings.icon as any}
+						size={20}
+						color={getToneColor(adaptiveContent.savings.tone)}
+					/>
+					<Text style={styles.metricCardTitle}>Savings Rate</Text>
+				</View>
+				<Text style={styles.metricCardValue}>
+					{adaptiveContent.metrics.savingsRate.toFixed(1)}%
+				</Text>
+				<Text style={styles.metricCardMessage} numberOfLines={2}>
+					{adaptiveContent.savings.message}
+				</Text>
+			</TouchableOpacity>
+
+			{/* Budget Health Card */}
+			<TouchableOpacity
+				style={[
+					styles.metricCard,
+					{ borderColor: getToneColor(adaptiveContent.budget.tone) },
+				]}
+				onPress={() => router.push('/(tabs)/budgets?tab=budgets')}
+			>
+				<View style={styles.metricCardHeader}>
+					<Ionicons
+						name={adaptiveContent.budget.icon as any}
+						size={20}
+						color={getToneColor(adaptiveContent.budget.tone)}
+					/>
+					<Text style={styles.metricCardTitle}>Budget Health</Text>
+				</View>
+				<Text style={styles.metricCardValue}>
+					{adaptiveContent.metrics.budgetUtilization.toFixed(1)}%
+				</Text>
+				<Text style={styles.metricCardMessage} numberOfLines={2}>
+					{adaptiveContent.budget.message}
+				</Text>
+			</TouchableOpacity>
+
+			{/* Goal Progress Card */}
+			<TouchableOpacity
+				style={[
+					styles.metricCard,
+					{ borderColor: getToneColor(adaptiveContent.goals.tone) },
+				]}
+				onPress={() => router.push('/(tabs)/budgets/goals')}
+			>
+				<View style={styles.metricCardHeader}>
+					<Ionicons
+						name={adaptiveContent.goals.icon as any}
+						size={20}
+						color={getToneColor(adaptiveContent.goals.tone)}
+					/>
+					<Text style={styles.metricCardTitle}>Goal Progress</Text>
+				</View>
+				<Text style={styles.metricCardValue}>
+					{adaptiveContent.metrics.goalProgress.toFixed(1)}%
+				</Text>
+				<Text style={styles.metricCardMessage} numberOfLines={2}>
+					{adaptiveContent.goals.message}
+				</Text>
+			</TouchableOpacity>
+		</View>
+	</View>
+);
+
+const InsightsList: FC<{
+	insights: any[];
+	currentFrequencyInfo: any;
+	getInsightIcon: (type: string) => string;
+	onInsightPress: (insight: any) => void;
+}> = ({ insights, currentFrequencyInfo, getInsightIcon, onInsightPress }) => (
+	<View style={styles.insightsSection}>
+		<Text style={styles.sectionTitle}>AI Financial Insights</Text>
+		{/* Display insight summary cards */}
+		<View style={styles.insightsList}>
+			{insights.slice(0, 3).map((insight, index) => (
+				<TouchableOpacity
+					key={insight._id || index}
+					style={styles.insightSummaryCard}
+					onPress={() => {
+						console.log('🎯 AICoach: Insight summary pressed:', insight);
+						onInsightPress(insight);
+					}}
+				>
+					<View style={styles.insightSummaryHeader}>
+						<View
+							style={[
+								styles.insightSummaryIconContainer,
+								{ backgroundColor: currentFrequencyInfo.color + '20' },
+							]}
+						>
+							<Ionicons
+								name={getInsightIcon(insight.insightType) as any}
+								size={18}
+								color={currentFrequencyInfo.color}
+							/>
+						</View>
+						<View style={styles.insightSummaryContent}>
+							<Text style={styles.insightSummaryTitle} numberOfLines={1}>
+								{insight.title}
+							</Text>
+							<Text style={styles.insightSummaryPeriod}>
+								{currentFrequencyInfo.label} Insight
+							</Text>
+						</View>
+						<View style={styles.insightSummaryActions}>
+							{insight.priority === 'high' && (
+								<View style={styles.priorityBadge}>
+									<Text style={styles.priorityText}>High</Text>
+								</View>
+							)}
+							<Ionicons name="chevron-forward" size={16} color="#666" />
+						</View>
+					</View>
+					<Text style={styles.insightSummaryMessage} numberOfLines={2}>
+						{insight.message}
+					</Text>
+				</TouchableOpacity>
+			))}
+		</View>
+
+		{/* Show more insights button if there are more than 3 */}
+		{insights.length > 3 && (
+			<TouchableOpacity
+				style={styles.viewMoreButton}
+				onPress={() => {
+					// Navigate to main insights page
+					router.push('/(tabs)/insights');
+				}}
+			>
+				<Text style={styles.viewMoreButtonText}>
+					View All {insights.length} {currentFrequencyInfo.label} Insights
+				</Text>
+				<Ionicons
+					name="chevron-forward"
+					size={16}
+					color={currentFrequencyInfo.color}
+				/>
+			</TouchableOpacity>
+		)}
+	</View>
+);
+
+const ErrorState: FC<{ error: string; onRetry: () => void }> = ({
+	error,
+	onRetry,
+}) => (
+	<View style={styles.errorContainer}>
+		<Ionicons name="alert-circle" size={48} color="#dc2626" />
+		<Text style={styles.errorTitle}>Something went wrong</Text>
+		<Text style={styles.errorMessage}>{error}</Text>
+		<TouchableOpacity style={styles.retryButton} onPress={onRetry}>
+			<Text style={styles.retryButtonText}>Try Again</Text>
+		</TouchableOpacity>
+	</View>
+);
+
+const AICoach: FC<AICoachProps> = ({
+	period: propPeriod,
+	isFirstTime = false,
+}) => {
+	const {
+		aiCoachState,
+		insights,
+		loadingInsights,
+		refreshing,
+		error,
+		currentStage,
+		xp,
+		completedActions,
+		adaptiveContent,
+		userMetrics,
+		onRefresh,
+		handleInsightPress,
+		setShowProgressionSystem,
+		clearError,
+		getInsightIcon,
+		getFrequencyInfo,
+		getStageContent,
+		getToneColor,
+		userFrequency,
+	} = useAICoach(propPeriod, isFirstTime);
+
+	// Get stage-specific content
+	const stageContent = getStageContent();
+	const currentFrequencyInfo = getFrequencyInfo(userFrequency);
+
+	// Show error state
+	if (error) {
+		return (
+			<View style={styles.container}>
+				<ErrorState error={error} onRetry={clearError} />
+			</View>
+		);
+	}
 
 	// Show loading state
 	if (loadingInsights) {
@@ -551,303 +955,41 @@ const AICoach: FC<AICoachProps> = ({
 				}
 			>
 				{/* Welcome Section - Show for first-time users or when no insights exist */}
-				{(isFirstTime || !displayInsights || displayInsights.length === 0) && (
-					<View style={styles.welcomeSection}>
-						<View style={styles.welcomeCard}>
-							<View style={styles.welcomeHeader}>
-								<View style={styles.welcomeIconContainer}>
-									<Ionicons
-										name="sparkles"
-										size={28}
-										color={stageContent.color}
-									/>
-								</View>
-								<Text style={styles.welcomeTitle}>
-									{isFirstTime
-										? `Welcome to ${stageContent.title}! 🎉`
-										: `Welcome to ${stageContent.title}! 🎉`}
-								</Text>
-							</View>
-							<Text style={styles.welcomeText}>
-								{isFirstTime
-									? `Congratulations on completing the tutorial! Your personalized AI insights are being generated. This will take a moment to analyze your financial data and provide smart recommendations.`
-									: `You now have access to ${currentFrequencyInfo.label} insights and advanced features. Generate your first insights to get started!`}
-							</Text>
-							{isFirstTime && (
-								<View style={styles.generatingIndicator}>
-									<ActivityIndicator size="small" color={stageContent.color} />
-									<Text
-										style={[
-											styles.generatingText,
-											{ color: stageContent.color },
-										]}
-									>
-										Generating your personalized insights...
-									</Text>
-								</View>
-							)}
-						</View>
-					</View>
+				{(isFirstTime || !insights || insights.length === 0) && (
+					<WelcomeSection
+						isFirstTime={isFirstTime}
+						stageContent={stageContent}
+					/>
 				)}
 
 				{/* Stage Progress Header */}
-				<View style={styles.stageHeader}>
-					<View style={styles.stageHeaderCard}>
-						<View style={styles.stageHeaderContent}>
-							<View
-								style={[
-									styles.stageIconContainer,
-									{ backgroundColor: stageContent.color + '15' },
-								]}
-							>
-								<Ionicons
-									name={stageContent.icon as any}
-									size={28}
-									color={stageContent.color}
-								/>
-							</View>
-							<View style={styles.stageHeaderText}>
-								<Text style={styles.stageHeaderTitle}>
-									{stageContent.title}
-								</Text>
-								<Text style={styles.stageHeaderSubtitle}>
-									{stageContent.subtitle}
-								</Text>
-								{/* XP and Progress Display */}
-								<View style={styles.progressInfo}>
-									<View style={styles.progressItem}>
-										<Ionicons
-											name="star"
-											size={14}
-											color={stageContent.color}
-										/>
-										<Text
-											style={[styles.xpText, { color: stageContent.color }]}
-										>
-											XP: {xp}
-										</Text>
-									</View>
-									<View style={styles.progressItem}>
-										<Ionicons
-											name="checkmark-circle"
-											size={14}
-											color={stageContent.color}
-										/>
-										<Text
-											style={[
-												styles.actionsText,
-												{ color: stageContent.color },
-											]}
-										>
-											Actions: {completedActions}
-										</Text>
-									</View>
-								</View>
-							</View>
-							{/* Progression System Button */}
-							<TouchableOpacity
-								style={[
-									styles.progressionButton,
-									{ backgroundColor: stageContent.color + '15' },
-								]}
-								onPress={() => setShowProgressionSystem(true)}
-							>
-								<Ionicons name="trophy" size={20} color={stageContent.color} />
-							</TouchableOpacity>
-						</View>
-					</View>
-				</View>
+				<StageHeader
+					stageContent={stageContent}
+					xp={xp}
+					completedActions={completedActions}
+					onProgressionPress={() => setShowProgressionSystem(true)}
+				/>
 
 				{/* Adaptive Content Section */}
-				<View style={styles.adaptiveSection}>
-					<Text style={styles.sectionTitle}>Your Financial Health</Text>
-
-					{/* Overall Financial Health Card */}
-					<View style={styles.adaptiveCard}>
-						<View
-							style={[
-								styles.adaptiveCardGradient,
-								{ backgroundColor: getToneColor(adaptiveContent.overall.tone) },
-							]}
-						>
-							<View style={styles.adaptiveCardHeader}>
-								<Ionicons
-									name={adaptiveContent.overall.icon as any}
-									size={24}
-									color="#fff"
-								/>
-								<Text style={styles.adaptiveCardTitle}>
-									Financial Health Score:{' '}
-									{adaptiveContent.metrics.financialHealthScore.toFixed(0)}%
-								</Text>
-							</View>
-							<Text style={styles.adaptiveCardMessage}>
-								{adaptiveContent.overall.message}
-							</Text>
-						</View>
-					</View>
-
-					{/* Metrics Grid */}
-					<View style={styles.metricsGrid}>
-						{/* Savings Rate Card */}
-						<TouchableOpacity
-							style={[
-								styles.metricCard,
-								{ borderColor: getToneColor(adaptiveContent.savings.tone) },
-							]}
-							onPress={() => router.push('/(tabs)/dashboard')}
-						>
-							<View style={styles.metricCardHeader}>
-								<Ionicons
-									name={adaptiveContent.savings.icon as any}
-									size={20}
-									color={getToneColor(adaptiveContent.savings.tone)}
-								/>
-								<Text style={styles.metricCardTitle}>Savings Rate</Text>
-							</View>
-							<Text style={styles.metricCardValue}>
-								{adaptiveContent.metrics.savingsRate.toFixed(1)}%
-							</Text>
-							<Text style={styles.metricCardMessage} numberOfLines={2}>
-								{adaptiveContent.savings.message}
-							</Text>
-						</TouchableOpacity>
-
-						{/* Budget Health Card */}
-						<TouchableOpacity
-							style={[
-								styles.metricCard,
-								{ borderColor: getToneColor(adaptiveContent.budget.tone) },
-							]}
-							onPress={() => router.push('/(tabs)/budgets?tab=budgets')}
-						>
-							<View style={styles.metricCardHeader}>
-								<Ionicons
-									name={adaptiveContent.budget.icon as any}
-									size={20}
-									color={getToneColor(adaptiveContent.budget.tone)}
-								/>
-								<Text style={styles.metricCardTitle}>Budget Health</Text>
-							</View>
-							<Text style={styles.metricCardValue}>
-								{adaptiveContent.metrics.budgetUtilization.toFixed(1)}%
-							</Text>
-							<Text style={styles.metricCardMessage} numberOfLines={2}>
-								{adaptiveContent.budget.message}
-							</Text>
-						</TouchableOpacity>
-
-						{/* Goal Progress Card */}
-						<TouchableOpacity
-							style={[
-								styles.metricCard,
-								{ borderColor: getToneColor(adaptiveContent.goals.tone) },
-							]}
-							onPress={() => router.push('/(tabs)/budgets?tab=goals')}
-						>
-							<View style={styles.metricCardHeader}>
-								<Ionicons
-									name={adaptiveContent.goals.icon as any}
-									size={20}
-									color={getToneColor(adaptiveContent.goals.tone)}
-								/>
-								<Text style={styles.metricCardTitle}>Goal Progress</Text>
-							</View>
-							<Text style={styles.metricCardValue}>
-								{adaptiveContent.metrics.goalProgress.toFixed(1)}%
-							</Text>
-							<Text style={styles.metricCardMessage} numberOfLines={2}>
-								{adaptiveContent.goals.message}
-							</Text>
-						</TouchableOpacity>
-					</View>
-				</View>
+				<AdaptiveContent
+					adaptiveContent={adaptiveContent}
+					getToneColor={getToneColor}
+				/>
 
 				{/* Current Insights Section */}
-				{displayInsights && displayInsights.length > 0 && (
-					<View style={styles.insightsSection}>
-						<Text style={styles.sectionTitle}>AI Financial Insights</Text>
-						{/* Display insight summary cards */}
-						<View style={styles.insightsList}>
-							{displayInsights.slice(0, 3).map((insight, index) => (
-								<TouchableOpacity
-									key={insight._id || index}
-									style={styles.insightSummaryCard}
-									onPress={() => {
-										console.log(
-											'🎯 AICoach: Insight summary pressed:',
-											insight
-										);
-										handleInsightPress(insight);
-									}}
-								>
-									<View style={styles.insightSummaryHeader}>
-										<View
-											style={[
-												styles.insightSummaryIconContainer,
-												{ backgroundColor: currentFrequencyInfo.color + '20' },
-											]}
-										>
-											<Ionicons
-												name={getInsightIcon(insight.insightType)}
-												size={18}
-												color={currentFrequencyInfo.color}
-											/>
-										</View>
-										<View style={styles.insightSummaryContent}>
-											<Text
-												style={styles.insightSummaryTitle}
-												numberOfLines={1}
-											>
-												{insight.title}
-											</Text>
-											<Text style={styles.insightSummaryPeriod}>
-												{currentFrequencyInfo.label} Insight
-											</Text>
-										</View>
-										<View style={styles.insightSummaryActions}>
-											{insight.priority === 'high' && (
-												<View style={styles.priorityBadge}>
-													<Text style={styles.priorityText}>High</Text>
-												</View>
-											)}
-											<Ionicons name="chevron-forward" size={16} color="#666" />
-										</View>
-									</View>
-									<Text style={styles.insightSummaryMessage} numberOfLines={2}>
-										{insight.message}
-									</Text>
-								</TouchableOpacity>
-							))}
-						</View>
-
-						{/* Show more insights button if there are more than 3 */}
-						{displayInsights.length > 3 && (
-							<TouchableOpacity
-								style={styles.viewMoreButton}
-								onPress={() => {
-									// Navigate to main insights page
-									router.push('/(tabs)/insights');
-								}}
-							>
-								<Text style={styles.viewMoreButtonText}>
-									View All {displayInsights.length} {currentFrequencyInfo.label}{' '}
-									Insights
-								</Text>
-								<Ionicons
-									name="chevron-forward"
-									size={16}
-									color={currentFrequencyInfo.color}
-								/>
-							</TouchableOpacity>
-						)}
-					</View>
+				{insights && insights.length > 0 && (
+					<InsightsList
+						insights={insights}
+						currentFrequencyInfo={currentFrequencyInfo}
+						getInsightIcon={getInsightIcon}
+						onInsightPress={handleInsightPress}
+					/>
 				)}
 			</ScrollView>
 
 			{/* Progression System Modal */}
 			<ProgressionSystem
-				visible={showProgressionSystem}
+				visible={aiCoachState.showProgressionSystem}
 				onClose={() => setShowProgressionSystem(false)}
 			/>
 		</>
@@ -860,7 +1002,7 @@ const styles = StyleSheet.create({
 		backgroundColor: '#ffffff',
 	},
 	content: {
-		padding: 16,
+		paddingVertical: 16,
 	},
 	loadingContainer: {
 		flex: 1,
@@ -1194,6 +1336,38 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		fontWeight: '500',
 		marginLeft: 8,
+	},
+	errorContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		padding: 20,
+		backgroundColor: '#ffffff',
+	},
+	errorTitle: {
+		fontSize: 20,
+		fontWeight: '700',
+		color: '#333',
+		marginTop: 10,
+		textAlign: 'center',
+	},
+	errorMessage: {
+		fontSize: 16,
+		color: '#666',
+		marginTop: 5,
+		textAlign: 'center',
+		marginBottom: 20,
+	},
+	retryButton: {
+		backgroundColor: '#4CAF50',
+		paddingVertical: 12,
+		paddingHorizontal: 24,
+		borderRadius: 8,
+	},
+	retryButtonText: {
+		color: '#fff',
+		fontSize: 16,
+		fontWeight: '600',
 	},
 });
 

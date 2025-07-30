@@ -105,10 +105,10 @@ const SmartActionsSummary: React.FC<SmartActionsSummaryProps> = ({
 				router.push('/budgets/goals');
 				break;
 			case 'set_reminder':
-				router.push('/settings/notification');
+				router.push('/(stack)/settings/notification');
 				break;
 			case 'update_preferences':
-				router.push('/settings/aiInsights');
+				router.push('/(stack)/settings/aiInsights');
 				break;
 			case 'detect_completion':
 				// For detection actions, navigate based on detection type
@@ -123,7 +123,7 @@ const SmartActionsSummary: React.FC<SmartActionsSummaryProps> = ({
 						router.push('/budgets/goals');
 						break;
 					case 'preferences_updated':
-						router.push('/settings/aiInsights');
+						router.push('/(stack)/settings/aiInsights');
 						break;
 					default:
 						router.push('/insights');
@@ -287,7 +287,7 @@ const SmartActionsSummary: React.FC<SmartActionsSummaryProps> = ({
 							<Text style={styles.emptyText}>AI Insights are disabled</Text>
 							<TouchableOpacity
 								style={styles.generateButton}
-								onPress={() => router.push('/settings/aiInsights')}
+								onPress={() => router.push('/(stack)/settings/aiInsights')}
 							>
 								<Text style={styles.generateButtonText}>
 									Enable AI Insights
