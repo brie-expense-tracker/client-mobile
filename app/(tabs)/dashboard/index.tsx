@@ -31,6 +31,7 @@ import {
 	QuickFinancialSummary,
 	AiInsightsSummary,
 	TransactionHistory,
+	SettingsBudgetsGoalsWidget,
 } from './components';
 
 /**
@@ -253,6 +254,9 @@ const Dashboard: React.FC = () => {
 							transactions={transactions}
 							onPress={setIsPressed}
 						/>
+
+						{/* Settings, Budgets & Goals Widget */}
+						<SettingsBudgetsGoalsWidget compact={true} />
 					</View>
 				</ScrollView>
 			</GestureHandlerRootView>
@@ -286,8 +290,8 @@ const styles = StyleSheet.create({
 		backgroundColor: '#fff',
 	},
 	contentContainer: {
-		padding: 24,
-		paddingTop: 0,
+		paddingHorizontal: 24,
+		paddingTop: 8,
 	},
 	/** Header **/
 	stickyHeader: {

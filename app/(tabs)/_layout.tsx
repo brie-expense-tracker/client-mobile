@@ -1,4 +1,4 @@
-import { Tabs , router } from 'expo-router';
+import { Tabs, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { BudgetProvider } from '../../src/context/budgetContext';
 import { GoalProvider } from '../../src/context/goalContext';
@@ -99,16 +99,6 @@ export default function TabLayout() {
 								tabBarLabel: 'Budgets',
 							}}
 						/>
-						<Tabs.Screen
-							name="settings"
-							options={{
-								tabBarIcon: ({ color, size }) => (
-									<Ionicons name="settings-outline" color={color} size={size} />
-								),
-								tabBarShowLabel: false,
-								tabBarLabel: 'Settings',
-							}}
-						/>
 					</Tabs>
 
 					{/* Transaction Choice Modal */}
@@ -157,7 +147,6 @@ export default function TabLayout() {
 		</ProfileProvider>
 	);
 }
-
 const styles = StyleSheet.create({
 	modal: {
 		margin: 0,

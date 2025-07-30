@@ -153,7 +153,7 @@ export default function AccountScreen() {
 								? `${profile.firstName} ${profile.lastName}`
 								: 'Not set'
 						}
-						onPress={() => router.push('/settings/profile/editName')}
+						onPress={() => router.push('/(stack)/settings/profile/editName')}
 					/>
 
 					<Setting
@@ -166,7 +166,9 @@ export default function AccountScreen() {
 						icon="key-outline"
 						label="Change Password"
 						value="••••••••"
-						onPress={() => router.push('/settings/profile/editPassword')}
+						onPress={() =>
+							router.push('/(stack)/settings/profile/editPassword')
+						}
 					/>
 				</View>
 			</View>
@@ -179,21 +181,27 @@ export default function AccountScreen() {
 						icon="cash-outline"
 						label="Monthly Income"
 						value={`$${profile.monthlyIncome?.toLocaleString() || '0'}`}
-						onPress={() => router.push('/settings/profile/editFinancial')}
+						onPress={() =>
+							router.push('/(stack)/settings/profile/editFinancial')
+						}
 					/>
 
 					<Setting
 						icon="trending-up-outline"
 						label="Total Savings"
 						value={`$${profile.savings?.toLocaleString() || '0'}`}
-						onPress={() => router.push('/settings/profile/editFinancial')}
+						onPress={() =>
+							router.push('/(stack)/settings/profile/editFinancial')
+						}
 					/>
 
 					<Setting
 						icon="trending-down-outline"
 						label="Total Debt"
 						value={`$${profile.debt?.toLocaleString() || '0'}`}
-						onPress={() => router.push('/settings/profile/editFinancial')}
+						onPress={() =>
+							router.push('/(stack)/settings/profile/editFinancial')
+						}
 					/>
 
 					{profile.expenses && (
@@ -203,7 +211,9 @@ export default function AccountScreen() {
 							value={`Housing: $${
 								profile.expenses.housing?.toLocaleString() || '0'
 							}`}
-							onPress={() => router.push('/settings/profile/editExpenses')}
+							onPress={() =>
+								router.push('/(stack)/settings/profile/editExpenses')
+							}
 						/>
 					)}
 				</View>
@@ -216,7 +226,9 @@ export default function AccountScreen() {
 					<Setting
 						icon="trash-outline"
 						label="Delete Account"
-						onPress={() => router.push('/settings/profile/deleteAccount')}
+						onPress={() =>
+							router.push('/(stack)/settings/profile/deleteAccount')
+						}
 					/>
 				</View>
 			</View>

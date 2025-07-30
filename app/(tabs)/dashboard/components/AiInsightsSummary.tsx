@@ -343,7 +343,7 @@ const InsightsSummary: React.FC<InsightsSummaryProps> = ({
 					<Text style={styles.emptyText}>AI Insights are disabled</Text>
 					<TouchableOpacity
 						style={styles.generateButton}
-						onPress={() => router.push('/settings/aiInsights')}
+						onPress={() => router.push('/(stack)/settings/aiInsights')}
 					>
 						<Text style={styles.generateButtonText}>Enable AI Insights</Text>
 					</TouchableOpacity>

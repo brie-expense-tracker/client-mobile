@@ -1,4 +1,8 @@
+/* eslint-disable import/no-unresolved */
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 import { Stack, useRouter, useSegments } from 'expo-router';
+// @ts-ignore - react-query types will be available after install
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import './global.css';
 import React, { useEffect, useState, useContext } from 'react';
@@ -51,15 +55,23 @@ TaskManager.defineTask(
 
 Notifications.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK);
 
+const queryClient = new QueryClient({
+	defaultOptions: {
+		queries: { staleTime: 1000 * 60 }, // 1 minute
+	},
+});
+
 export default function RootLayout() {
 	return (
-		<NotificationProvider>
-			<AuthProvider>
-				<OnboardingProvider>
-					<RootLayoutContent />
-				</OnboardingProvider>
-			</AuthProvider>
-		</NotificationProvider>
+		<QueryClientProvider client={queryClient}>
+			<NotificationProvider>
+				<AuthProvider>
+					<OnboardingProvider>
+						<RootLayoutContent />
+					</OnboardingProvider>
+				</AuthProvider>
+			</NotificationProvider>
+		</QueryClientProvider>
 	);
 }
 
@@ -89,10 +101,11 @@ function RootLayoutContent() {
 		const inAuthGroup = segments[0] === '(auth)';
 		const inTabsGroup = segments[0] === '(tabs)';
 		const inOnboardingGroup = segments[0] === '(onboarding)';
+		const inStackGroup = segments[0] === '(stack)';
 		if (firebaseUser && user) {
 			if (!hasSeenOnboarding && !inOnboardingGroup) {
 				router.replace('/(onboarding)/onboardingThree');
-			} else if (hasSeenOnboarding && !inTabsGroup) {
+			} else if (hasSeenOnboarding && !inTabsGroup && !inStackGroup) {
 				router.replace('/(tabs)/dashboard');
 			}
 		} else if (firebaseUser && !user) {
@@ -116,6 +129,7 @@ function RootLayoutContent() {
 					<Stack.Screen name="(auth)" options={{ headerShown: false }} />
 					<Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
 					<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+					<Stack.Screen name="(stack)" options={{ headerShown: false }} />
 				</Stack>
 			</GestureHandlerRootView>
 		);
@@ -153,6 +167,10 @@ function RootLayoutContent() {
 											name="(tabs)"
 											options={{ headerShown: false }}
 										/>
+										<Stack.Screen
+											name="(stack)"
+											options={{ headerShown: false }}
+										/>
 									</Stack>
 								</GestureHandlerRootView>
 							</TransactionModalProvider>
@@ -168,6 +186,7 @@ function RootLayoutContent() {
 								options={{ headerShown: false }}
 							/>
 							<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+							<Stack.Screen name="(stack)" options={{ headerShown: false }} />
 						</Stack>
 					</GestureHandlerRootView>
 				)}
@@ -182,6 +201,7 @@ function RootLayoutContent() {
 				<Stack.Screen name="(auth)" options={{ headerShown: false }} />
 				<Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
 				<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+				<Stack.Screen name="(stack)" options={{ headerShown: false }} />
 			</Stack>
 		</GestureHandlerRootView>
 	);

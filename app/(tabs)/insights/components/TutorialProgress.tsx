@@ -67,7 +67,7 @@ const TutorialProgress: React.FC<TutorialProgressProps> = ({
 					router.push('/(tabs)/budgets/goals?openModal=true&tab=goals');
 					break;
 				case 'fourthTutorialAction':
-					router.push('/(tabs)/settings/aiInsights');
+					router.push('/(stack)/settings/aiInsights');
 					break;
 				default:
 					break;
