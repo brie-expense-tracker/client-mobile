@@ -110,6 +110,12 @@ export default function SettingsScreen() {
 								onPress={() => router.push('./goals')}
 							/>
 
+							<Setting
+								icon="repeat-outline"
+								label="Recurring Expenses"
+								onPress={() => router.push('./recurringExpenses')}
+							/>
+
 							{/* AI & PRIVACY */}
 							<Text style={styles.settingsHeader}>AI & Privacy</Text>
 							<Setting
