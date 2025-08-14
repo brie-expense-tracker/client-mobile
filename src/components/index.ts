@@ -14,6 +14,9 @@ export { default as AISuggestionsList } from '../../app/(tabs)/insights/componen
 export { default as SummaryCards } from './SummaryCards';
 export { default as RecentTransactionsList } from './RecentTransactionsList';
 
+// Progress & UI Components
+export { default as LinearProgressBar } from '../../app/(tabs)/budgets/components/LinearProgressBar';
+
 // Existing Components
 export { default as ProfitGraph } from './ProfitGraph';
 export { default as ProfitLossGraph } from './ProfitLossGraph';

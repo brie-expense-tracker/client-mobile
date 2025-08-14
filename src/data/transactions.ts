@@ -7,6 +7,12 @@ export interface Transaction {
 	target?: string; // ObjectId of the target Budget or Goal
 	targetModel?: 'Budget' | 'Goal';
 	updatedAt?: string; // ISO string for sorting by time when dates are the same
+	recurringPattern?: {
+		patternId: string;
+		frequency: string;
+		confidence: number;
+		nextExpectedDate: string;
+	};
 }
 
 // Function to generate dummy transactions for the last 6 months

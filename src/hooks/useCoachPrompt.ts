@@ -1,5 +1,5 @@
-/* eslint-disable import/no-unresolved */
-/* eslint-disable @typescript-eslint/ban-ts-comment */
+ 
+ 
 import { useState, useCallback } from 'react';
 import { ApiService } from '../services/apiService';
 

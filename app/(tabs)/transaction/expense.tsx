@@ -19,13 +19,17 @@ import {
 import { RectButton, BorderlessButton } from 'react-native-gesture-handler';
 import { useForm, Controller } from 'react-hook-form';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import { TransactionContext } from '../../../src/context/transactionContext';
 import { useBudget, Budget } from '../../../src/context/budgetContext';
 import { navigateToBudgetsWithModal } from '../../../src/utils/navigationUtils';
 import { BudgetSuggestionService } from '../../../src/services/budgetSuggestionService';
+import {
+	RecurringExpenseService,
+	RecurringExpense,
+} from '../../../src/services/recurringExpenseService';
 
 interface TransactionFormData {
 	type: 'expense';
@@ -50,11 +54,22 @@ const getLocalIsoDate = (): string => {
 //  FUNCTIONS START======f=========================================
 const AddTransactionScreen = () => {
 	const router = useRouter();
+	const params = useLocalSearchParams<{
+		description?: string;
+		amount?: string;
+		recurringExpenseId?: string;
+	}>();
 	const amountInputRef = useRef<TextInput>(null);
 	const [selectedBudgets, setSelectedBudgets] = useState<Budget[]>([]);
 	const [resetNumberPad, setResetNumberPad] = useState(false);
 	const [budgetSuggestions, setBudgetSuggestions] = useState<Budget[]>([]);
 	const [showSuggestions, setShowSuggestions] = useState(false);
+	const [recurringExpenseMatches, setRecurringExpenseMatches] = useState<
+		RecurringExpense[]
+	>([]);
+	const [selectedRecurringExpense, setSelectedRecurringExpense] =
+		useState<RecurringExpense | null>(null);
+	const [showRecurringMatches, setShowRecurringMatches] = useState(false);
 	const [fontsLoaded] = useFonts({
 		...Ionicons.font,
 	});
@@ -66,8 +81,8 @@ const AddTransactionScreen = () => {
 		useForm<TransactionFormData>({
 			defaultValues: {
 				type: 'expense',
-				description: '',
-				amount: '',
+				description: params.description || '',
+				amount: params.amount || '',
 				budgets: [],
 				date: getLocalIsoDate(),
 				target: undefined,
@@ -76,6 +91,17 @@ const AddTransactionScreen = () => {
 		});
 
 	const amount = watch('amount');
+
+	// Handle recurring expense ID from URL params
+	useEffect(() => {
+		if (params.recurringExpenseId) {
+			console.log('Pre-filling form with recurring expense data:', {
+				description: params.description,
+				amount: params.amount,
+				recurringExpenseId: params.recurringExpenseId,
+			});
+		}
+	}, [params.recurringExpenseId, params.description, params.amount]);
 
 	// Memoize the setValue function to prevent infinite re-renders
 	const handleAmountChange = useCallback(
@@ -140,9 +166,46 @@ const AddTransactionScreen = () => {
 			}
 
 			// Use the context's addTransaction method
-			await addTransaction(transactionData);
+			const savedTransaction = await addTransaction(transactionData);
 
 			console.log('Expense saved successfully!');
+
+			// Link to recurring expense if selected or from URL params
+			const recurringExpenseId =
+				selectedRecurringExpense?.patternId || params.recurringExpenseId;
+			if (recurringExpenseId && savedTransaction) {
+				try {
+					console.log('Linking transaction to recurring expense:', {
+						transactionId: savedTransaction.id,
+						patternId: recurringExpenseId,
+					});
+
+					await RecurringExpenseService.linkTransactionToRecurring({
+						transactionId: savedTransaction.id,
+						patternId: recurringExpenseId,
+					});
+					console.log('Transaction linked to recurring expense successfully!');
+
+					// Show success message
+					const expenseName =
+						selectedRecurringExpense?.vendor || 'Recurring Expense';
+					Alert.alert(
+						'Success',
+						`Transaction linked to recurring expense: ${expenseName}`,
+						[{ text: 'OK' }]
+					);
+				} catch (error) {
+					console.error(
+						'Error linking transaction to recurring expense:',
+						error
+					);
+					// Show user-friendly error message
+					Alert.alert(
+						'Link Error',
+						'Transaction was saved but could not be linked to the recurring expense. You can link it manually later.'
+					);
+				}
+			}
 
 			// Reset form values
 			setValue('description', '');
@@ -198,6 +261,15 @@ const AddTransactionScreen = () => {
 			setBudgetSuggestions([]);
 			setShowSuggestions(false);
 		}
+
+		// Check for recurring expense matches if we have both description and amount
+		const currentAmount = parseFloat(amount);
+		if (text.trim().length >= 2 && !isNaN(currentAmount) && currentAmount > 0) {
+			await checkRecurringExpenseMatches(text, currentAmount);
+		} else {
+			setRecurringExpenseMatches([]);
+			setShowRecurringMatches(false);
+		}
 	};
 
 	// Auto-select budget from suggestions
@@ -206,6 +278,50 @@ const AddTransactionScreen = () => {
 		setValue('budgets', [budget]);
 		setShowSuggestions(false);
 		setBudgetSuggestions([]);
+	};
+
+	// Check for recurring expense matches
+	const checkRecurringExpenseMatches = async (
+		description: string,
+		amount: number
+	) => {
+		try {
+			const recurringExpenses =
+				await RecurringExpenseService.getRecurringExpenses();
+
+			// Filter for potential matches based on vendor name and amount
+			const matches = recurringExpenses.filter((expense) => {
+				const vendorMatch =
+					expense.vendor.toLowerCase().includes(description.toLowerCase()) ||
+					description.toLowerCase().includes(expense.vendor.toLowerCase());
+
+				// Allow for small variations in amount (within 5% or $1, whichever is greater)
+				const amountDifference = Math.abs(expense.amount - amount);
+				const amountThreshold = Math.max(expense.amount * 0.05, 1); // 5% or $1 minimum
+				const amountMatch = amountDifference <= amountThreshold;
+
+				return vendorMatch && amountMatch;
+			});
+
+			setRecurringExpenseMatches(matches);
+			setShowRecurringMatches(matches.length > 0);
+		} catch (error) {
+			console.error('Error checking recurring expense matches:', error);
+			setRecurringExpenseMatches([]);
+			setShowRecurringMatches(false);
+		}
+	};
+
+	// Select recurring expense match
+	const selectRecurringExpense = (expense: RecurringExpense) => {
+		setSelectedRecurringExpense(expense);
+		setShowRecurringMatches(false);
+	};
+
+	// Clear recurring expense selection
+	const clearRecurringExpenseSelection = () => {
+		setSelectedRecurringExpense(null);
+		setShowRecurringMatches(false);
 	};
 
 	//
@@ -331,6 +447,78 @@ const AddTransactionScreen = () => {
 											</RectButton>
 										))}
 									</ScrollView>
+								</View>
+							)}
+
+							{/* Recurring Expense Matches */}
+							{showRecurringMatches && recurringExpenseMatches.length > 0 && (
+								<View style={styles.suggestionsContainer}>
+									<Text style={styles.suggestionsTitle}>
+										Recurring Expense Matches:
+									</Text>
+									<ScrollView horizontal showsHorizontalScrollIndicator={false}>
+										{recurringExpenseMatches.map((expense) => (
+											<RectButton
+												key={expense.patternId}
+												style={[
+													styles.suggestionButton,
+													selectedRecurringExpense?.patternId ===
+														expense.patternId && styles.selectedRecurringButton,
+												]}
+												onPress={() => selectRecurringExpense(expense)}
+											>
+												<Ionicons
+													name="repeat"
+													size={16}
+													color={
+														selectedRecurringExpense?.patternId ===
+														expense.patternId
+															? '#fff'
+															: '#007ACC'
+													}
+													style={styles.suggestionIcon}
+												/>
+												<Text
+													style={[
+														styles.suggestionText,
+														selectedRecurringExpense?.patternId ===
+															expense.patternId && styles.selectedRecurringText,
+													]}
+												>
+													{expense.vendor}
+												</Text>
+												<Text
+													style={[
+														styles.suggestionText,
+														styles.amountText,
+														selectedRecurringExpense?.patternId ===
+															expense.patternId && styles.selectedRecurringText,
+													]}
+												>
+													${expense.amount}
+												</Text>
+											</RectButton>
+										))}
+									</ScrollView>
+								</View>
+							)}
+
+							{/* Selected Recurring Expense */}
+							{selectedRecurringExpense && (
+								<View style={styles.selectedRecurringContainer}>
+									<View style={styles.selectedRecurringInfo}>
+										<Ionicons name="repeat" size={16} color="#007ACC" />
+										<Text style={styles.selectedRecurringLabel}>
+											Linked to: {selectedRecurringExpense.vendor} ($
+											{selectedRecurringExpense.amount})
+										</Text>
+									</View>
+									<BorderlessButton
+										onPress={clearRecurringExpenseSelection}
+										style={styles.clearRecurringButton}
+									>
+										<Ionicons name="close-circle" size={20} color="#666" />
+									</BorderlessButton>
 								</View>
 							)}
 						</KeyboardAvoidingView>
@@ -674,6 +862,43 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		color: '#333',
 		fontWeight: '500',
+	},
+	amountText: {
+		fontSize: 12,
+		color: '#666',
+		marginLeft: 4,
+	},
+	selectedRecurringButton: {
+		backgroundColor: '#007ACC',
+		borderColor: '#007ACC',
+	},
+	selectedRecurringText: {
+		color: '#fff',
+	},
+	selectedRecurringContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		backgroundColor: '#f0f8ff',
+		padding: 12,
+		borderRadius: 8,
+		marginTop: 8,
+		borderWidth: 1,
+		borderColor: '#007ACC',
+	},
+	selectedRecurringInfo: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		flex: 1,
+	},
+	selectedRecurringLabel: {
+		fontSize: 14,
+		color: '#007ACC',
+		fontWeight: '500',
+		marginLeft: 6,
+	},
+	clearRecurringButton: {
+		padding: 4,
 	},
 });
 

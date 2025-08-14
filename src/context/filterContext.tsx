@@ -7,6 +7,8 @@ interface FilterContextType {
 	setSelectedBudgets: (budgets: string[]) => void;
 	dateFilterMode: string;
 	setDateFilterMode: (mode: string) => void;
+	selectedPatternId: string | null;
+	setSelectedPatternId: (patternId: string | null) => void;
 }
 
 export const FilterContext = createContext<FilterContextType>({
@@ -16,12 +18,17 @@ export const FilterContext = createContext<FilterContextType>({
 	setSelectedBudgets: () => {},
 	dateFilterMode: 'month',
 	setDateFilterMode: () => {},
+	selectedPatternId: null,
+	setSelectedPatternId: () => {},
 });
 
 export const FilterProvider = ({ children }: { children: ReactNode }) => {
 	const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
 	const [selectedBudgets, setSelectedBudgets] = useState<string[]>([]);
 	const [dateFilterMode, setDateFilterMode] = useState<string>('month');
+	const [selectedPatternId, setSelectedPatternId] = useState<string | null>(
+		null
+	);
 
 	const value = useMemo(
 		() => ({
@@ -31,8 +38,10 @@ export const FilterProvider = ({ children }: { children: ReactNode }) => {
 			setSelectedBudgets,
 			dateFilterMode,
 			setDateFilterMode,
+			selectedPatternId,
+			setSelectedPatternId,
 		}),
-		[selectedGoals, selectedBudgets, dateFilterMode]
+		[selectedGoals, selectedBudgets, dateFilterMode, selectedPatternId]
 	);
 
 	return (

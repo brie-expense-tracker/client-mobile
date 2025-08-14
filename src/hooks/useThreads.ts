@@ -6,17 +6,17 @@ interface Thread {
 	_id?: string;
 	title: string;
 	kpi?: string;
-	nextActions?: Array<{ id: string; title: string }>;
+	nextActions?: { id: string; title: string }[];
 	createdAt: string;
 	updatedAt?: string;
 	focusArea?: string;
-	messages?: Array<{
+	messages?: {
 		id: string;
 		type: 'insight' | 'user' | 'action';
 		content: string;
 		actionId?: string;
 		completed?: boolean;
-	}>;
+	}[];
 }
 
 export default function useThreads() {
@@ -71,7 +71,7 @@ export default function useThreads() {
 	// Generate next actions from thread messages
 	const generateNextActions = (
 		messages: any[] = []
-	): Array<{ id: string; title: string }> => {
+	): { id: string; title: string }[] => {
 		const actionMessages = messages.filter(
 			(msg) => msg.type === 'action' && !msg.completed
 		);

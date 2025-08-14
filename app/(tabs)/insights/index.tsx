@@ -2,6 +2,7 @@
 
 import React, {
 	useContext,
+	useEffect,
 	useMemo,
 	useState,
 	useRef,
@@ -22,7 +23,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+
 import { TransactionContext } from '../../../src/context/transactionContext';
 import { useProfile } from '../../../src/context/profileContext';
 import AICoach from './components/AICoach';
@@ -444,42 +445,39 @@ export default function UnifiedAIScreen() {
 		}
 	}, [aiExperienceState.lastRefreshTime, checkProgression, handleError]);
 
-	// Only refresh progression data when screen comes into focus if tutorial is not completed
-	useFocusEffect(
-		React.useCallback(() => {
-			const now = Date.now();
-			const timeSinceLastRefresh = now - lastRefreshTimeRef.current;
-			const progressionLastCheck = progression?.lastProgressionCheck;
-			const isProgressionRecent = progressionLastCheck
-				? now - new Date(progressionLastCheck).getTime() < 30000
-				: false;
+	// Refresh progression data when component mounts if tutorial is not completed
+	useEffect(() => {
+		const now = Date.now();
+		const timeSinceLastRefresh = now - lastRefreshTimeRef.current;
+		const progressionLastCheck = progression?.lastProgressionCheck;
+		const isProgressionRecent = progressionLastCheck
+			? now - new Date(progressionLastCheck).getTime() < 30000
+			: false;
 
-			if (
-				!isTutorialActuallyCompleted &&
-				timeSinceLastRefresh > 10000 &&
-				!isProgressionRecent
-			) {
-				console.log('📱 Unified AI: Screen focused, refreshing progression...');
-				lastRefreshTimeRef.current = now;
-				checkProgression()
-					.then(() => {
-						console.log('📱 Unified AI: Progression refresh completed');
-					})
-					.catch((error) => {
-						console.error(
-							'📱 Unified AI: Error refreshing progression:',
-							error
-						);
-						handleError(error as Error);
-					});
-			}
-		}, [
-			checkProgression,
-			isTutorialActuallyCompleted,
-			progression?.lastProgressionCheck,
-			handleError,
-		])
-	);
+		if (
+			!isTutorialActuallyCompleted &&
+			timeSinceLastRefresh > 10000 &&
+			!isProgressionRecent
+		) {
+			console.log(
+				'📱 Unified AI: Component mounted, refreshing progression...'
+			);
+			lastRefreshTimeRef.current = now;
+			checkProgression()
+				.then(() => {
+					console.log('📱 Unified AI: Progression refresh completed');
+				})
+				.catch((error) => {
+					console.error('📱 Unified AI: Error refreshing progression:', error);
+					handleError(error as Error);
+				});
+		}
+	}, [
+		checkProgression,
+		isTutorialActuallyCompleted,
+		progression?.lastProgressionCheck,
+		handleError,
+	]);
 
 	// Determine if this is the initial load
 	const isInitialLoad =

@@ -121,7 +121,7 @@ export default function TransactionScreen() {
 
 	const { transactions, isLoading, refetch, deleteTransaction } =
 		useContext(TransactionContext);
-	const { selectedGoals, selectedBudgets, dateFilterMode } =
+	const { selectedGoals, selectedBudgets, dateFilterMode, selectedPatternId } =
 		useContext(FilterContext);
 	const { goals } = useGoal();
 	const { budgets } = useBudget();
@@ -140,6 +140,7 @@ export default function TransactionScreen() {
 			})),
 			selectedGoals,
 			selectedBudgets,
+			selectedPatternId,
 			dateFilterMode,
 			selectedDate,
 			goalsCount: goals.length,
@@ -149,6 +150,7 @@ export default function TransactionScreen() {
 		transactions,
 		selectedGoals,
 		selectedBudgets,
+		selectedPatternId,
 		dateFilterMode,
 		selectedDate,
 		goals,
@@ -168,10 +170,36 @@ export default function TransactionScreen() {
 			dateFilterMode,
 			selectedDate,
 			searchQuery,
+			selectedPatternId,
 		});
 
 		return transactions
 			.filter((tx) => {
+				// pattern match
+				const patternMatch = (() => {
+					if (!selectedPatternId) {
+						return true;
+					}
+
+					// Check if transaction has a recurring pattern that matches
+					if (
+						tx.recurringPattern &&
+						tx.recurringPattern.patternId === selectedPatternId
+					) {
+						console.log(
+							'[Ledger] Transaction matches selected pattern:',
+							tx.description
+						);
+						return true;
+					}
+
+					console.log(
+						'[Ledger] Transaction filtered out by pattern filter:',
+						tx.description
+					);
+					return false;
+				})();
+
 				// goal/budget match
 				const goalBudgetMatch = (() => {
 					// If no goals or budgets are selected, show all transactions
@@ -284,7 +312,8 @@ export default function TransactionScreen() {
 					);
 				}
 
-				const shouldInclude = goalBudgetMatch && dateMatch && searchMatch;
+				const shouldInclude =
+					patternMatch && goalBudgetMatch && dateMatch && searchMatch;
 				if (shouldInclude) {
 					console.log('[Ledger] Transaction included:', tx.description);
 				}
@@ -310,6 +339,7 @@ export default function TransactionScreen() {
 		transactions,
 		selectedGoals,
 		selectedBudgets,
+		selectedPatternId,
 		goals,
 		budgets,
 		dateFilterMode,
@@ -453,6 +483,24 @@ export default function TransactionScreen() {
 							</TouchableOpacity>
 						) : null}
 					</View>
+
+					{/* Pattern Filter Indicator */}
+					{selectedPatternId && (
+						<View style={styles.patternFilterContainer}>
+							<View style={styles.patternFilterContent}>
+								<Ionicons name="repeat" size={16} color="#007ACC" />
+								<Text style={styles.patternFilterText}>
+									Filtered by recurring pattern
+								</Text>
+								<TouchableOpacity
+									onPress={() => setSelectedPatternId(null)}
+									style={styles.clearPatternButton}
+								>
+									<Ionicons name="close" size={16} color="#007ACC" />
+								</TouchableOpacity>
+							</View>
+						</View>
+					)}
 
 					{/* Date Header */}
 					{renderDateHeader()}
@@ -760,6 +808,30 @@ const styles = StyleSheet.create({
 		paddingVertical: 8,
 	},
 	clearButton: {
+		padding: 4,
+	},
+	patternFilterContainer: {
+		marginHorizontal: 24,
+		marginVertical: 8,
+	},
+	patternFilterContent: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#e3f2fd',
+		borderRadius: 8,
+		paddingHorizontal: 12,
+		paddingVertical: 8,
+		borderWidth: 1,
+		borderColor: '#007ACC',
+	},
+	patternFilterText: {
+		flex: 1,
+		marginLeft: 8,
+		fontSize: 14,
+		color: '#007ACC',
+		fontWeight: '500',
+	},
+	clearPatternButton: {
 		padding: 4,
 	},
 	modalContainer: {
