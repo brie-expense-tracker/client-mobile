@@ -1,5 +1,3 @@
-/* eslint-disable import/no-unresolved */
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 import { Stack, useRouter, useSegments } from 'expo-router';
 // @ts-ignore - react-query types will be available after install
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -17,6 +15,7 @@ import { NotificationProvider } from '../src/context/notificationContext';
 import { TransactionProvider } from '../src/context/transactionContext';
 import { ProgressionProvider } from '../src/context/progressionContext';
 import { TransactionModalProvider } from '../src/context/transactionModalContext';
+import { RecurringExpenseProvider } from '../src/context/recurringExpenseContext';
 
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
@@ -152,28 +151,30 @@ function RootLayoutContent() {
 				{hasSeenOnboarding ? (
 					<TransactionProvider>
 						<ProgressionProvider>
-							<TransactionModalProvider>
-								<GestureHandlerRootView style={{ flex: 1 }}>
-									<Stack>
-										<Stack.Screen
-											name="(auth)"
-											options={{ headerShown: false }}
-										/>
-										<Stack.Screen
-											name="(onboarding)"
-											options={{ headerShown: false }}
-										/>
-										<Stack.Screen
-											name="(tabs)"
-											options={{ headerShown: false }}
-										/>
-										<Stack.Screen
-											name="(stack)"
-											options={{ headerShown: false }}
-										/>
-									</Stack>
-								</GestureHandlerRootView>
-							</TransactionModalProvider>
+							<RecurringExpenseProvider>
+								<TransactionModalProvider>
+									<GestureHandlerRootView style={{ flex: 1 }}>
+										<Stack>
+											<Stack.Screen
+												name="(auth)"
+												options={{ headerShown: false }}
+											/>
+											<Stack.Screen
+												name="(onboarding)"
+												options={{ headerShown: false }}
+											/>
+											<Stack.Screen
+												name="(tabs)"
+												options={{ headerShown: false }}
+											/>
+											<Stack.Screen
+												name="(stack)"
+												options={{ headerShown: false }}
+											/>
+										</Stack>
+									</GestureHandlerRootView>
+								</TransactionModalProvider>
+							</RecurringExpenseProvider>
 						</ProgressionProvider>
 					</TransactionProvider>
 				) : (

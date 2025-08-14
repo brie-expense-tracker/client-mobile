@@ -32,6 +32,13 @@ const QuickAddBudgetTransaction: React.FC<QuickAddBudgetTransactionProps> = ({
 	budgetColor = '#00a2ff',
 	onTransactionAdded,
 }) => {
+	console.log('[QuickAddBudgetTransaction] Props received:', {
+		isVisible,
+		budgetId,
+		budgetName,
+		budgetColor,
+	});
+
 	const { addTransaction } = useContext(TransactionContext);
 	const [transaction, setTransaction] = useState({
 		type: 'expense' as 'income' | 'expense',

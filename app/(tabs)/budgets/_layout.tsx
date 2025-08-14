@@ -7,14 +7,14 @@ import {
 	SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useSegments } from 'expo-router';
+import { useLocalSearchParams, useSegments, router } from 'expo-router';
 import BudgetScreen from './index';
 import GoalsScreen from './goals';
+import RecurringExpensesScreen from './recurringExpenses';
 
 export default function BudgetLayout() {
 	const [activeTab, setActiveTab] = useState('budgets');
 	const params = useLocalSearchParams();
-	const segments = useSegments();
 
 	// Auto-switch to appropriate tab based on tab parameter
 	useEffect(() => {
@@ -22,8 +22,9 @@ export default function BudgetLayout() {
 			setActiveTab('goals');
 		} else if (params.tab === 'budgets') {
 			setActiveTab('budgets');
+		} else if (params.tab === 'recurring') {
+			setActiveTab('recurring');
 		}
-		// Note: openModal parameter can be used for additional modal logic if needed
 	}, [params.tab]);
 
 	return (
@@ -39,7 +40,7 @@ export default function BudgetLayout() {
 							<Ionicons
 								name="wallet-outline"
 								size={20}
-								color={activeTab === 'budgets' ? '#007ACC' : '#757575'}
+								color={activeTab === 'budgets' ? '#222222' : '#757575'}
 							/>
 							<Text
 								style={[
@@ -58,7 +59,7 @@ export default function BudgetLayout() {
 							<Ionicons
 								name="flag-outline"
 								size={20}
-								color={activeTab === 'goals' ? '#007ACC' : '#757575'}
+								color={activeTab === 'goals' ? '#222222' : '#757575'}
 							/>
 							<Text
 								style={[
@@ -69,12 +70,40 @@ export default function BudgetLayout() {
 								Goals
 							</Text>
 						</TouchableOpacity>
+
+						<TouchableOpacity
+							style={[
+								styles.tab,
+								activeTab === 'recurring' && styles.activeTab,
+							]}
+							onPress={() => setActiveTab('recurring')}
+						>
+							<Ionicons
+								name="repeat-outline"
+								size={20}
+								color={activeTab === 'recurring' ? '#222222' : '#757575'}
+							/>
+							<Text
+								style={[
+									styles.tabText,
+									activeTab === 'recurring' && styles.activeTabText,
+								]}
+							>
+								Recurring
+							</Text>
+						</TouchableOpacity>
 					</View>
 				</View>
 
 				{/* Content Area */}
 				<View style={styles.content}>
-					{activeTab === 'budgets' ? <BudgetScreen /> : <GoalsScreen />}
+					{activeTab === 'budgets' ? (
+						<BudgetScreen />
+					) : activeTab === 'goals' ? (
+						<GoalsScreen />
+					) : (
+						<RecurringExpensesScreen />
+					)}
 				</View>
 			</View>
 		</SafeAreaView>
@@ -104,17 +133,18 @@ const styles = StyleSheet.create({
 		marginHorizontal: 4,
 	},
 	activeTab: {
-		borderBottomWidth: 3,
-		borderBottomColor: '#007ACC',
+		borderBottomWidth: 2,
+		borderBottomColor: '#222222',
 	},
 	tabText: {
 		marginLeft: 8,
 		fontSize: 16,
-		fontWeight: '500',
+		fontWeight: '600',
 		color: '#757575',
 	},
+	
 	activeTabText: {
-		color: '#007ACC',
+		color: '#222222',
 	},
 	content: {
 		flex: 1,

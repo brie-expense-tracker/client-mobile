@@ -113,7 +113,7 @@ export default function SettingsScreen() {
 							<Setting
 								icon="repeat-outline"
 								label="Recurring Expenses"
-								onPress={() => router.push('./recurringExpenses')}
+								onPress={() => router.push('/(tabs)/budgets?tab=recurring')}
 							/>
 
 							{/* AI & PRIVACY */}

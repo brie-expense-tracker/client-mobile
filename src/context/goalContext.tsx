@@ -23,6 +23,11 @@ export interface Goal {
 	userId?: string;
 	createdAt?: string;
 	updatedAt?: string;
+	// Transformed properties added by transformGoalData
+	isCompleted?: boolean;
+	isOverdue?: boolean;
+	daysLeft?: number;
+	percent?: number;
 }
 
 export interface CreateGoalData {

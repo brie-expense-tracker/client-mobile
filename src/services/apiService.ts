@@ -1,8 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE_URL } from '../config/api';
 
-const API_BASE_URL = __DEV__
-	? process.env.EXPO_PUBLIC_LOCAL_SIM_API_URL // Your computer's local IP address
-	: process.env.EXPO_PUBLIC_PRODUCTION_API_URL;
+// Debug: Log the API configuration
+console.log('ApiService - Environment:', __DEV__ ? 'development' : 'production');
+console.log('ApiService - API_BASE_URL:', API_BASE_URL);
+console.log('ApiService - API_BASE_URL length:', API_BASE_URL.length);
+console.log('ApiService - API_BASE_URL ends with /api:', API_BASE_URL.endsWith('/api'));
+console.log('ApiService - API_BASE_URL ends with /api/:', API_BASE_URL.endsWith('/api/'));
 
 export interface ApiResponse<T = any> {
 	success: boolean;
@@ -36,47 +40,84 @@ export class ApiService {
 		return headers;
 	}
 
-	static async get<T>(endpoint: string): Promise<ApiResponse<T>> {
-		try {
-			const headers = await this.getAuthHeaders();
-			const url = `${API_BASE_URL}${endpoint}`;
+	static async get<T>(endpoint: string, retries: number = 2): Promise<ApiResponse<T>> {
+		let lastError: Error | null = null;
+		
+		for (let attempt = 0; attempt <= retries; attempt++) {
+			try {
+				const headers = await this.getAuthHeaders();
+				const url = `${API_BASE_URL}${endpoint}`;
 
-			// Debug: Log the request details
-			console.log('ApiService GET - URL:', url);
-			console.log('ApiService GET - Headers:', headers);
+				// Debug: Log the URL construction details
+				console.log(`ApiService GET - Attempt ${attempt + 1}/${retries + 1}`);
+				console.log('ApiService GET - API_BASE_URL:', API_BASE_URL);
+				console.log('ApiService GET - endpoint:', endpoint);
+				console.log('ApiService GET - constructed URL:', url);
+				console.log('ApiService GET - Headers:', headers);
 
-			const response = await fetch(url, {
-				method: 'GET',
-				headers,
-			});
+				// Debug: Log the request details
+				console.log(`ApiService GET - Attempt ${attempt + 1}/${retries + 1} - URL:`, url);
+				console.log('ApiService GET - Headers:', headers);
 
-			// Debug: Log the response status
-			console.log('ApiService GET - Response status:', response.status);
-			console.log('ApiService GET - Response ok:', response.ok);
+				// Add timeout to prevent infinite loading
+				const controller = new AbortController();
+				const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
-			const data = await response.json();
+				const response = await fetch(url, {
+					method: 'GET',
+					headers,
+					signal: controller.signal,
+				});
 
-			// Debug: Log the raw server response
-			console.log(
-				'ApiService GET - Raw server response:',
-				JSON.stringify(data, null, 2)
-			);
+				clearTimeout(timeoutId);
 
-			if (!response.ok) {
-				return {
-					success: false,
-					error: data.error || `HTTP error! status: ${response.status}`,
-				};
+				// Debug: Log the response status
+				console.log('ApiService GET - Response status:', response.status);
+				console.log('ApiService GET - Response ok:', response.ok);
+
+				const data = await response.json();
+
+				// Debug: Log the raw server response
+				console.log(
+					'ApiService GET - Raw server response:',
+					JSON.stringify(data, null, 2)
+				);
+
+				if (!response.ok) {
+					return {
+						success: false,
+						error: data.error || `HTTP error! status: ${response.status}`,
+					};
+				}
+
+				return { success: true, data };
+			} catch (error) {
+				lastError = error as Error;
+				console.error(`API GET error (attempt ${attempt + 1}/${retries + 1}):`, error);
+				
+				// Handle timeout errors specifically
+				if (error instanceof Error && error.name === 'AbortError') {
+					if (attempt === retries) {
+						return {
+							success: false,
+							error: 'Request timeout - server may be unavailable',
+						};
+					}
+					// Wait before retrying
+					await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+					continue;
+				}
+				
+				// For other errors, don't retry
+				break;
 			}
-
-			return { success: true, data };
-		} catch (error) {
-			console.error('API GET error:', error);
-			return {
-				success: false,
-				error: error instanceof Error ? error.message : 'Unknown error',
-			};
 		}
+		
+		// If we get here, all retries failed
+		return {
+			success: false,
+			error: lastError?.message || 'Failed to fetch data after multiple attempts',
+		};
 	}
 
 	static async post<T>(endpoint: string, body: any): Promise<ApiResponse<T>> {

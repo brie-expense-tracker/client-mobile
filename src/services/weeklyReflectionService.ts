@@ -24,15 +24,15 @@ export interface WeeklyReflection {
 export interface ReflectionStats {
 	totalReflections: number;
 	averageMoodRating: number;
-	moodTrend: Array<{
+	moodTrend: {
 		week: string;
 		rating: number;
-	}>;
+	}[];
 	completionRate: number;
-	mostCommonWins: Array<{
+	mostCommonWins: {
 		word: string;
 		count: number;
-	}>;
+	}[];
 }
 
 export interface SaveReflectionData {

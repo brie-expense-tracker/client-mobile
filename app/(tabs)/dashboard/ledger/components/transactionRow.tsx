@@ -155,11 +155,16 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 		onDelete(item.id, resetAnimation);
 	}, [item.id, onDelete, resetAnimation]);
 
+	const isPanning = useSharedValue(false);
+
 	const panGesture = useMemo(
 		() =>
 			Gesture.Pan()
 				.activeOffsetX([-15, 15])
 				.failOffsetY([-10, 10])
+				.onStart(() => {
+					isPanning.value = true;
+				})
 				.onUpdate(({ translationX }) => {
 					translateX.value = Math.min(0, translationX);
 					if (translateX.value < TRANSLATE_THRESHOLD && !hasHaptics.value) {
@@ -175,6 +180,7 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 					}
 				})
 				.onEnd(() => {
+					isPanning.value = false;
 					if (translateX.value < TRANSLATE_THRESHOLD) {
 						translateX.value = withTiming(
 							-DELETE_WIDTH,
@@ -188,21 +194,36 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 						iconScale.value = withSpring(1, { damping: 15, stiffness: 150 });
 					}
 				}),
-		[translateX, iconScale, hasHaptics, triggerHaptic, handleDeleteJS]
+		[
+			translateX,
+			iconScale,
+			hasHaptics,
+			triggerHaptic,
+			handleDeleteJS,
+			isPanning,
+		]
 	);
 
 	const tapGesture = useMemo(
 		() =>
-			Gesture.Tap().onEnd(() => {
-				if (onEdit) {
-					runOnJS(onEdit)(item);
-				}
-			}),
-		[onEdit, item]
+			Gesture.Tap()
+				.onBegin(() => {
+					// Cancel tap if panning is active
+					if (isPanning.value) {
+						return false;
+					}
+				})
+				.onEnd(() => {
+					// Only trigger edit if not panning
+					if (!isPanning.value && onEdit) {
+						runOnJS(onEdit)(item);
+					}
+				}),
+		[onEdit, item, isPanning]
 	);
 
 	const combinedGesture = useMemo(
-		() => Gesture.Simultaneous(panGesture, tapGesture),
+		() => Gesture.Race(panGesture, tapGesture),
 		[panGesture, tapGesture]
 	);
 

@@ -5,7 +5,8 @@ export { default as AiInsightsSummary } from './AiInsightsSummary';
 export { default as TransactionHistory } from './TransactionHistory';
 export { default as SettingsBudgetsGoalsWidget } from './SettingsBudgetsGoalsWidget';
 export { default as AICoachSection } from './AICoachSection';
-export { default as RecurringExpensesList } from './RecurringExpensesList';
+export { default as RecurringExpensesList } from '../../budgets/components/RecurringExpensesList';
+export { default as RecurringExpensesSummaryWidget } from './RecurringExpensesSummaryWidget';
 export { default as SpendingForecastCard } from './SpendingForecastCard';
 
 // Default export for React Router compatibility

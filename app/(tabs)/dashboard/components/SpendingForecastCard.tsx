@@ -63,13 +63,9 @@ const SpendingForecastCard: React.FC<SpendingForecastCardProps> = ({
 		);
 	}
 
+	// Hide the widget completely if there's no forecast data
 	if (!forecast) {
-		return (
-			<View style={styles.emptyContainer}>
-				<Ionicons name="trending-up" size={32} color="#ccc" />
-				<Text style={styles.emptyText}>No forecast data available</Text>
-			</View>
-		);
+		return null;
 	}
 
 	const status = SpendingForecastService.getForecastStatus(forecast);

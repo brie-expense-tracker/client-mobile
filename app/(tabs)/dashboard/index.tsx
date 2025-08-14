@@ -17,7 +17,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Transaction } from '../../../src/data/transactions';
 import { Ionicons } from '@expo/vector-icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { TransactionContext } from '../../../src/context/transactionContext';
@@ -25,14 +24,14 @@ import { useBudget } from '../../../src/context/budgetContext';
 import { useGoal } from '../../../src/context/goalContext';
 import { useProfile } from '@/src/context/profileContext';
 import { useNotification } from '@/src/context/notificationContext';
+import { useRecurringExpense } from '@/src/context/recurringExpenseContext';
 import {
-	StatWidget,
 	SimpleBalanceWidget,
 	QuickFinancialSummary,
 	AiInsightsSummary,
 	TransactionHistory,
 	SettingsBudgetsGoalsWidget,
-	RecurringExpensesList,
+	RecurringExpensesSummaryWidget,
 	SpendingForecastCard,
 } from './components';
 
@@ -64,11 +63,11 @@ const Dashboard: React.FC = () => {
 	const { transactions, isLoading, refetch } = useContext(TransactionContext);
 	const { budgets } = useBudget();
 	const { goals } = useGoal();
-	const { profile, loading: profileLoading } = useProfile();
+	const { profile } = useProfile();
 	const { unreadCount } = useNotification();
+
 	const [isPressed, setIsPressed] = useState(false);
 	const [refreshing, setRefreshing] = useState(false);
-	const [showRecurringExpenses, setShowRecurringExpenses] = useState(false);
 
 	// Debug logging
 	useEffect(() => {
@@ -203,6 +202,7 @@ const Dashboard: React.FC = () => {
 
 				<ScrollView
 					style={styles.scrollView}
+					contentContainerStyle={styles.scrollContentContainer}
 					showsVerticalScrollIndicator={false}
 					refreshControl={
 						<RefreshControl
@@ -213,6 +213,9 @@ const Dashboard: React.FC = () => {
 							progressBackgroundColor="#ffffff"
 						/>
 					}
+					scrollEventThrottle={16}
+					removeClippedSubviews={true}
+					keyboardShouldPersistTaps="handled"
 				>
 					<View style={[styles.contentContainer]}>
 						{/* -------------------------------------------------- */}
@@ -254,38 +257,12 @@ const Dashboard: React.FC = () => {
 							}}
 						/>
 
-						{/* Recurring Expenses - Show upcoming only */}
-						<View style={styles.sectionContainer}>
-							<View style={styles.sectionHeader}>
-								<Text style={styles.sectionTitle}>
-									Upcoming Recurring Expenses
-								</Text>
-								<TouchableOpacity
-									onPress={() =>
-										setShowRecurringExpenses(!showRecurringExpenses)
-									}
-									style={styles.expandButton}
-								>
-									<Ionicons
-										name={showRecurringExpenses ? 'chevron-up' : 'chevron-down'}
-										size={20}
-										color="#007ACC"
-									/>
-								</TouchableOpacity>
-							</View>
-							{showRecurringExpenses && (
-								<View style={styles.recurringExpensesContainer}>
-									<RecurringExpensesList
-										title=""
-										showUpcomingOnly={true}
-										onExpensePress={(expense) => {
-											// Navigate to transaction details or edit
-											console.log('Recurring expense pressed:', expense);
-										}}
-									/>
-								</View>
-							)}
-						</View>
+						{/* Recurring Expenses Summary Widget */}
+						<RecurringExpensesSummaryWidget
+							title="Recurring Expenses"
+							maxVisibleItems={3}
+							showViewAllButton={true}
+						/>
 
 						{/* AI Insights - Click to see Smart Actions */}
 						<AiInsightsSummary
@@ -333,6 +310,9 @@ const styles = StyleSheet.create({
 	scrollView: {
 		flex: 1,
 		backgroundColor: '#fff',
+	},
+	scrollContentContainer: {
+		flexGrow: 1,
 	},
 	contentContainer: {
 		paddingHorizontal: 24,
@@ -408,7 +388,7 @@ const styles = StyleSheet.create({
 	dailyChange: {
 		fontSize: 16,
 		fontWeight: '500',
-		marginVertical: 8,
+		marginTop: 8,
 	},
 	rowCenter: { flexDirection: 'row', alignItems: 'center' },
 	logo: {
@@ -416,37 +396,6 @@ const styles = StyleSheet.create({
 		width: 80,
 		alignSelf: 'center',
 		marginBottom: 12,
-	},
-	/** Recurring Expenses Section **/
-	sectionContainer: {
-		marginVertical: 24,
-		backgroundColor: '#fff',
-		borderRadius: 12,
-		padding: 20,
-		borderWidth: 1,
-		borderColor: '#efefef',
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.05,
-		shadowRadius: 8,
-		elevation: 2,
-	},
-	sectionHeader: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		marginBottom: 12,
-	},
-	sectionTitle: {
-		fontSize: 18,
-		fontWeight: '600',
-		color: '#333',
-	},
-	expandButton: {
-		padding: 5,
-	},
-	recurringExpensesContainer: {
-		// Add any specific styles for the container if needed
 	},
 });
 

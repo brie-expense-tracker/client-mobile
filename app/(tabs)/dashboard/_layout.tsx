@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { router, Stack } from 'expo-router';
 import { BorderlessButton } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
+import { View } from 'react-native';
 
 export default function DashboardLayout() {
 	const [sPressed, setIsPressed] = useState(false);

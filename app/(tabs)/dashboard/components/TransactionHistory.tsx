@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
 	transactionDescription: {
 		fontWeight: '500',
 		color: '#333',
-		fontSize: 16,
+		fontSize: 14,
 	},
 	transactionCategory: {
 		fontSize: 12,

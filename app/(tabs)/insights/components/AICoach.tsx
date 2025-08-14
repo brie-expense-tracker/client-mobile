@@ -5,8 +5,9 @@ import React, {
 	useEffect,
 	useRef,
 	useMemo,
+	useContext,
 } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+
 import {
 	View,
 	Text,
@@ -28,7 +29,6 @@ import { useProgression } from '../../../../src/context/progressionContext';
 import { useInsightsHub, Period } from '../../../../src/hooks';
 import { useBudget } from '../../../../src/context/budgetContext';
 import { useGoal } from '../../../../src/context/goalContext';
-import { useContext } from 'react';
 import { TransactionContext } from '../../../../src/context/transactionContext';
 import ProgressionSystem from './ProgressionSystem';
 
@@ -372,67 +372,65 @@ const useAICoach = (propPeriod?: string, isFirstTime?: boolean) => {
 	// Optimized focus effect with better API coordination
 	const lastFetchRef = useRef<number>(0);
 
-	useFocusEffect(
-		useCallback(() => {
-			const now = Date.now();
+	useEffect(() => {
+		const now = Date.now();
 
-			// If this is the first time showing AI Coach after tutorial completion
-			if (isFirstTime && !aiCoachState.hasTriggeredFirstTime) {
-				console.log(
-					'🎯 AICoach: First time showing after tutorial completion, triggering insight generation...'
-				);
+		// If this is the first time showing AI Coach after tutorial completion
+		if (isFirstTime && !aiCoachState.hasTriggeredFirstTime) {
+			console.log(
+				'🎯 AICoach: First time showing after tutorial completion, triggering insight generation...'
+			);
 
-				setAiCoachState((prev) => ({
-					...prev,
-					hasTriggeredFirstTime: true,
-				}));
+			setAiCoachState((prev) => ({
+				...prev,
+				hasTriggeredFirstTime: true,
+			}));
 
-				// Generate insights for the user with better error handling
-				const generateInitialInsights = async () => {
-					try {
-						const { InsightsService } = await import(
-							'../../../../src/services/insightsService'
+			// Generate insights for the user with better error handling
+			const generateInitialInsights = async () => {
+				try {
+					const { InsightsService } = await import(
+						'../../../../src/services/insightsService'
+					);
+					const result = await InsightsService.generateInsights('weekly');
+
+					if (result.success) {
+						console.log('✅ Initial insights generated for new user!');
+						// Fetch the newly generated insights immediately
+						await fetchInsights();
+					} else {
+						console.warn(
+							'⚠️ Initial insights generation returned success: false'
 						);
-						const result = await InsightsService.generateInsights('weekly');
-
-						if (result.success) {
-							console.log('✅ Initial insights generated for new user!');
-							// Fetch the newly generated insights immediately
-							await fetchInsights();
-						} else {
-							console.warn(
-								'⚠️ Initial insights generation returned success: false'
-							);
-							// Fallback to regular fetch
-							await fetchInsights();
-						}
-					} catch (error) {
-						console.error('❌ Error generating initial insights:', error);
-						handleError(error as Error);
 						// Fallback to regular fetch
 						await fetchInsights();
 					}
-				};
+				} catch (error) {
+					console.error('❌ Error generating initial insights:', error);
+					handleError(error as Error);
+					// Fallback to regular fetch
+					await fetchInsights();
+				}
+			};
 
-				generateInitialInsights();
-				return;
-			}
+			generateInitialInsights();
+			return;
+		}
 
-			// Regular debounced fetch for subsequent visits
-			if (now - lastFetchRef.current > 5000) {
-				console.log('🎯 AICoach: Screen focused, fetching insights...');
-				lastFetchRef.current = now;
-				fetchInsights().catch(handleError);
-			} else {
-				console.log('🎯 AICoach: Skipping fetch (debounced)');
-			}
-		}, [
-			fetchInsights,
-			isFirstTime,
-			aiCoachState.hasTriggeredFirstTime,
-			handleError,
-		])
-	);
+		// Regular debounced fetch for subsequent visits
+		if (now - lastFetchRef.current > 5000) {
+			console.log('🎯 AICoach: Component mounted, fetching insights...');
+			lastFetchRef.current = now;
+			fetchInsights().catch(handleError);
+		} else {
+			console.log('🎯 AICoach: Skipping fetch (debounced)');
+		}
+	}, [
+		fetchInsights,
+		isFirstTime,
+		aiCoachState.hasTriggeredFirstTime,
+		handleError,
+	]);
 
 	// Helper functions
 	const getInsightIcon = useCallback((insightType: string) => {

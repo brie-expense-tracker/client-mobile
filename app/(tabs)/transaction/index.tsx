@@ -58,24 +58,31 @@ const AddTransactionScreen = () => {
 		useContext(TransactionContext);
 	const { goals, isLoading: goalsLoading } = useGoal();
 
-	const { control, handleSubmit, setValue, watch } =
-		useForm<TransactionFormData>({
-			defaultValues: {
-				type: 'income',
-				description: '',
-				amount: '',
-				goals: [],
-				date: getLocalIsoDate(),
-				target: undefined,
-				targetModel: undefined,
-			},
-		});
+	const {
+		control,
+		handleSubmit,
+		setValue,
+		watch,
+		formState: { errors },
+	} = useForm<TransactionFormData>({
+		defaultValues: {
+			type: 'income',
+			description: '',
+			amount: '',
+			goals: [],
+			date: getLocalIsoDate(),
+			target: undefined,
+			targetModel: undefined,
+		},
+		mode: 'onChange',
+	});
 
 	const amount = watch('amount');
 
 	// Memoize the setValue function to prevent infinite re-renders
 	const handleAmountChange = useCallback(
 		(value: string) => {
+			console.log('[Transaction] handleAmountChange called with:', value);
 			setValue('amount', value);
 		},
 		[setValue]
@@ -113,10 +120,13 @@ const AddTransactionScreen = () => {
 	}
 
 	const onSubmit = async (data: TransactionFormData) => {
+		console.log('[Transaction] onSubmit called with data:', data);
 		try {
 			// Validate amount
 			const amount = parseFloat(data.amount);
+			console.log('[Transaction] Parsed amount:', amount);
 			if (isNaN(amount) || amount <= 0) {
+				console.log('[Transaction] Amount validation failed');
 				Alert.alert('Error', 'Please enter a valid amount greater than 0');
 				return;
 			}
@@ -284,6 +294,14 @@ const AddTransactionScreen = () => {
 							<RectButton
 								style={styles.transactionButton}
 								onPress={() => {
+									console.log('[Transaction] Made button pressed');
+									console.log('[Transaction] Current form values:', {
+										amount: watch('amount'),
+										description: watch('description'),
+										type: watch('type'),
+										date: watch('date'),
+									});
+									console.log('[Transaction] Form errors:', errors);
 									setValue('type', 'income');
 									handleSubmit(onSubmit)();
 								}}
@@ -297,6 +315,7 @@ const AddTransactionScreen = () => {
 					<NumberPad
 						onValueChange={handleAmountChange}
 						reset={resetNumberPad}
+						value={watch('amount')}
 					/>
 				</View>
 			</View>
@@ -309,21 +328,31 @@ const AddTransactionScreen = () => {
 const NumberPad: React.FC<{
 	onValueChange: (value: string) => void;
 	reset?: boolean;
-}> = ({ onValueChange, reset = false }) => {
-	const [value, setValue] = useState('');
+	value?: string;
+}> = ({ onValueChange, reset = false, value: externalValue = '' }) => {
+	const [internalValue, setInternalValue] = useState(externalValue);
 	const [pressed, setPressed] = useState(false);
+
+	// Sync with external value
+	useEffect(() => {
+		setInternalValue(externalValue);
+	}, [externalValue]);
 
 	// Reset the value when reset prop changes to true
 	useEffect(() => {
 		if (reset) {
-			setValue('');
+			setInternalValue('');
+			onValueChange('');
 		}
-	}, [reset]);
+	}, [reset, onValueChange]);
 
-	// Use useEffect to call onValueChange when value changes
+	// Use useEffect to call onValueChange when internal value changes
 	useEffect(() => {
-		onValueChange(value);
-	}, [value, onValueChange]);
+		if (internalValue !== externalValue) {
+			console.log('[NumberPad] Updating form value:', internalValue);
+			onValueChange(internalValue);
+		}
+	}, [internalValue, externalValue, onValueChange]);
 
 	const validateAmount = (newValue: string): boolean => {
 		// Check if empty
@@ -348,7 +377,7 @@ const NumberPad: React.FC<{
 	};
 
 	const handlePress = (num: string) => {
-		setValue((prev) => {
+		setInternalValue((prev) => {
 			let newValue = prev + num;
 
 			// If trying to add decimal point
@@ -369,7 +398,7 @@ const NumberPad: React.FC<{
 	};
 
 	const handleBackspace = () => {
-		setValue((prev) => {
+		setInternalValue((prev) => {
 			const newValue = prev.slice(0, -1);
 			return newValue;
 		});

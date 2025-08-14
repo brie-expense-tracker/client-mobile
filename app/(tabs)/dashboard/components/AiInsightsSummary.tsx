@@ -407,7 +407,7 @@ const styles = StyleSheet.create({
 		color: '#333',
 	},
 	titleCompact: {
-		fontSize: 20,
+		fontSize: 18,
 	},
 	loadingContainer: {
 		flexDirection: 'row',
