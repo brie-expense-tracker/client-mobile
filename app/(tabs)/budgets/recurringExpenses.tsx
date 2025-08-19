@@ -6,7 +6,7 @@ import {
 	ScrollView,
 	Alert,
 	RefreshControl,
-	TouchableOpacity,
+	ActivityIndicator,
 } from 'react-native';
 import CustomSlidingModal from './components/CustomSlidingModal';
 import { RectButton } from 'react-native-gesture-handler';
@@ -25,6 +25,20 @@ import {
 // Types
 // ==========================================
 
+// Extended interface for expenses with payment status
+interface RecurringExpenseWithPaymentStatus {
+	patternId: string;
+	vendor: string;
+	amount: number;
+	frequency: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+	nextExpectedDate: string;
+	confidence?: number;
+	transactions?: any[];
+	isPaid: boolean;
+	paymentDate?: string;
+	nextDueDate: string;
+}
+
 // ==========================================
 // Constants
 // ==========================================
@@ -33,26 +47,16 @@ const RecurringExpensesScreen: React.FC = () => {
 	const [refreshing, setRefreshing] = useState(false);
 	const [isOptionsModalVisible, setIsOptionsModalVisible] = useState(false);
 	const [selectedExpense, setSelectedExpense] =
-		useState<RecurringExpense | null>(null);
+		useState<RecurringExpenseWithPaymentStatus | null>(null);
 	const [activeView, setActiveView] = useState<'monthly' | 'weekly'>('monthly');
 
 	// Use only the hook, not both context and hook
-	const { expenses, summaryStats, refetch, markAsPaid } =
+	const { expenses, refetch, markAsPaid, isLoading, hasLoaded, error } =
 		useRecurringExpenses();
 
 	// ==========================================
 	// Memoized Calculations
 	// ==========================================
-	const amountsByFrequency = useMemo(() => {
-		return expenses.reduce((acc, expense) => {
-			const frequency = expense.frequency;
-			if (!acc[frequency]) {
-				acc[frequency] = 0;
-			}
-			acc[frequency] += expense.amount;
-			return acc;
-		}, {} as Record<string, number>);
-	}, [expenses]);
 
 	const overdueExpenses = useMemo(() => {
 		return expenses.filter((expense) => {
@@ -89,21 +93,6 @@ const RecurringExpensesScreen: React.FC = () => {
 		[dueThisWeekExpenses]
 	);
 
-	// Find next payment date
-	const nextPaymentDate = useMemo(() => {
-		if (expenses.length === 0) return '';
-
-		return expenses.reduce((earliest, expense) => {
-			const currentDays = RecurringExpenseService.getDaysUntilNext(
-				expense.nextExpectedDate
-			);
-			const earliestDays = RecurringExpenseService.getDaysUntilNext(
-				earliest.nextExpectedDate
-			);
-			return currentDays < earliestDays ? expense : earliest;
-		}).nextExpectedDate;
-	}, [expenses]);
-
 	const onRefresh = async () => {
 		setRefreshing(true);
 		try {
@@ -120,12 +109,28 @@ const RecurringExpensesScreen: React.FC = () => {
 		onRefresh();
 	}, []);
 
-	const handleExpensePress = (expense: any) => {
+	const handleExpensePress = (expense: RecurringExpenseWithPaymentStatus) => {
 		setSelectedExpense(expense);
 		setIsOptionsModalVisible(true);
 	};
 
-	const handleExpenseRowPress = (expense: RecurringExpense) => {
+	const handleExpenseMenuPress = (patternId: string) => {
+		const expense = expenses.find((e) => e.patternId === patternId);
+		if (expense) {
+			// Convert to payment status interface
+			const expenseWithStatus: RecurringExpenseWithPaymentStatus = {
+				...expense,
+				isPaid: false,
+				nextDueDate: expense.nextExpectedDate,
+			};
+			setSelectedExpense(expenseWithStatus);
+			setIsOptionsModalVisible(true);
+		}
+	};
+
+	const handleExpenseRowPress = (
+		expense: RecurringExpenseWithPaymentStatus
+	) => {
 		router.push({
 			pathname: '/(stack)/recurringExpenseDetails',
 			params: {
@@ -232,6 +237,79 @@ const RecurringExpensesScreen: React.FC = () => {
 		setActiveView(activeView === 'monthly' ? 'weekly' : 'monthly');
 	};
 
+	// ==========================================
+	// Loading State Component
+	// ==========================================
+	const LoadingState = () => (
+		<View style={styles.loadingContainer}>
+			<ActivityIndicator size="large" color="#00a2ff" />
+			<Text style={styles.loadingText}>Loading recurring expenses...</Text>
+		</View>
+	);
+
+	// ==========================================
+	// Error State Component
+	// ==========================================
+	const ErrorState = () => (
+		<View style={styles.errorContainer}>
+			<View style={styles.errorContent}>
+				<Ionicons name="warning-outline" size={64} color="#ff6b6b" />
+				<Text style={styles.errorTitle}>Unable to Load Expenses</Text>
+				<Text style={styles.errorSubtext}>
+					There was a problem connecting to the server. Please check your
+					connection and try again.
+				</Text>
+				<RectButton
+					style={styles.errorButton}
+					onPress={() => router.replace('/(tabs)/budgets/recurringExpenses')}
+				>
+					<Ionicons name="refresh" size={20} color="#fff" />
+					<Text style={styles.errorButtonText}>Retry</Text>
+				</RectButton>
+			</View>
+		</View>
+	);
+
+	// ==========================================
+	// Empty State Component
+	// ==========================================
+	const EmptyState = () => (
+		<View style={styles.emptyContainer}>
+			<View style={styles.emptyContent}>
+				<Ionicons name="repeat-outline" size={64} color="#e0e0e0" />
+				<Text style={styles.emptyTitle}>No Recurring Expenses</Text>
+				<Text style={styles.emptySubtext}>
+					Add your first recurring expense to start tracking regular payments
+				</Text>
+				<RectButton
+					style={styles.emptyAddButton}
+					onPress={handleAddRecurringExpense}
+				>
+					<Ionicons name="add" size={20} color="#fff" />
+					<Text style={styles.emptyAddButtonText}>Add Expense</Text>
+				</RectButton>
+			</View>
+		</View>
+	);
+
+	// ==========================================
+	// Main Render
+	// ==========================================
+	// Show loading state while fetching data
+	if (isLoading && !hasLoaded) {
+		return <LoadingState />;
+	}
+
+	// Show error state if there's an error
+	if (error && hasLoaded) {
+		return <ErrorState />;
+	}
+
+	// Show empty state if no expenses and data has loaded
+	if (expenses.length === 0 && hasLoaded) {
+		return <EmptyState />;
+	}
+
 	return (
 		<View style={styles.mainContainer}>
 			<ScrollView
@@ -263,7 +341,7 @@ const RecurringExpensesScreen: React.FC = () => {
 				{/* Recurring Expenses Feed */}
 				<RecurringExpensesFeed
 					expenses={expenses}
-					onPressMenu={handleExpensePress}
+					onPressMenu={handleExpenseMenuPress}
 					onPressRow={handleExpenseRowPress}
 					scrollEnabled={false}
 				/>
@@ -365,6 +443,100 @@ const styles = StyleSheet.create({
 		fontWeight: '500',
 		color: '#212121',
 		marginLeft: 12,
+	},
+
+	loadingContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		backgroundColor: '#fff',
+	},
+	loadingText: {
+		marginTop: 16,
+		fontSize: 16,
+		color: '#757575',
+	},
+
+	errorContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		paddingHorizontal: 24,
+		backgroundColor: '#fff',
+	},
+	errorContent: {
+		alignItems: 'center',
+		maxWidth: 280,
+	},
+	errorTitle: {
+		fontSize: 24,
+		fontWeight: '600',
+		color: '#212121',
+		marginTop: 16,
+		marginBottom: 8,
+		textAlign: 'center',
+	},
+	errorSubtext: {
+		fontSize: 16,
+		color: '#757575',
+		textAlign: 'center',
+		marginBottom: 32,
+		lineHeight: 22,
+	},
+	errorButton: {
+		backgroundColor: '#00a2ff',
+		borderRadius: 12,
+		paddingVertical: 16,
+		paddingHorizontal: 24,
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+	},
+	errorButtonText: {
+		color: '#FFFFFF',
+		fontSize: 16,
+		fontWeight: '600',
+	},
+
+	emptyContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		paddingHorizontal: 24,
+		backgroundColor: '#fff',
+	},
+	emptyContent: {
+		alignItems: 'center',
+		maxWidth: 280,
+	},
+	emptyTitle: {
+		fontSize: 24,
+		fontWeight: '600',
+		color: '#212121',
+		marginTop: 16,
+		marginBottom: 8,
+		textAlign: 'center',
+	},
+	emptySubtext: {
+		fontSize: 16,
+		color: '#757575',
+		textAlign: 'center',
+		marginBottom: 32,
+		lineHeight: 22,
+	},
+	emptyAddButton: {
+		backgroundColor: '#00a2ff',
+		borderRadius: 12,
+		paddingVertical: 16,
+		paddingHorizontal: 24,
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+	},
+	emptyAddButtonText: {
+		color: '#FFFFFF',
+		fontSize: 16,
+		fontWeight: '600',
 	},
 });
 

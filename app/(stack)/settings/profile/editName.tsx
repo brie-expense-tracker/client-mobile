@@ -27,10 +27,34 @@ export default function EditNameScreen() {
 	const hasLastNameChanges = lastName !== originalLastName;
 	const hasAnyNameChanges = hasFirstNameChanges || hasLastNameChanges;
 
-	// Validation function to allow only letters and spaces
+	// Enhanced validation function
 	const validateName = (text: string) => {
-		// Remove any non-letter characters (except spaces) and trim whitespace
-		return text.replace(/[^a-zA-Z\s]/g, '').trim();
+		// Remove any non-letter characters (except spaces, hyphens, and apostrophes) and trim whitespace
+		return text.replace(/[^a-zA-Z\s\-']/g, '').trim();
+	};
+
+	// Get validation error message
+	const getValidationError = (field: 'firstName' | 'lastName') => {
+		const value = field === 'firstName' ? firstName : lastName;
+		if (!value.trim()) {
+			return `${field === 'firstName' ? 'First' : 'Last'} name is required`;
+		}
+		if (value.length < 2) {
+			return `${
+				field === 'firstName' ? 'First' : 'Last'
+			} name must be at least 2 characters`;
+		}
+		if (value.length > 50) {
+			return `${
+				field === 'firstName' ? 'First' : 'Last'
+			} name must be less than 50 characters`;
+		}
+		if (!/^[a-zA-Z\s\-']+$/.test(value)) {
+			return `${
+				field === 'firstName' ? 'First' : 'Last'
+			} name can only contain letters, spaces, hyphens, and apostrophes`;
+		}
+		return null;
 	};
 
 	// Handle first name change with validation
@@ -43,6 +67,15 @@ export default function EditNameScreen() {
 	const handleLastNameChange = (text: string) => {
 		const validatedText = validateName(text);
 		setLastName(validatedText);
+	};
+
+	// Check if form is valid
+	const isFormValid = () => {
+		return (
+			!getValidationError('firstName') &&
+			!getValidationError('lastName') &&
+			hasAnyNameChanges
+		);
 	};
 
 	useEffect(() => {
@@ -143,7 +176,10 @@ export default function EditNameScreen() {
 
 						<View style={styles.inputContainer}>
 							<TextInput
-								style={styles.input}
+								style={[
+									styles.input,
+									getValidationError('firstName') && styles.inputError,
+								]}
 								value={firstName}
 								onChangeText={handleFirstNameChange}
 								placeholder="Enter new first name"
@@ -151,6 +187,11 @@ export default function EditNameScreen() {
 								autoCapitalize="words"
 								autoCorrect={false}
 							/>
+							{getValidationError('firstName') && (
+								<Text style={styles.validationErrorText}>
+									{getValidationError('firstName')}
+								</Text>
+							)}
 						</View>
 					</View>
 
@@ -161,7 +202,10 @@ export default function EditNameScreen() {
 						<View style={styles.inputContainer}>
 							{/* Current Last Name Display */}
 							<TextInput
-								style={styles.input}
+								style={[
+									styles.input,
+									getValidationError('lastName') && styles.inputError,
+								]}
 								value={lastName}
 								onChangeText={handleLastNameChange}
 								placeholder="Enter new last name"
@@ -169,6 +213,11 @@ export default function EditNameScreen() {
 								autoCapitalize="words"
 								autoCorrect={false}
 							/>
+							{getValidationError('lastName') && (
+								<Text style={styles.validationErrorText}>
+									{getValidationError('lastName')}
+								</Text>
+							)}
 						</View>
 					</View>
 
@@ -232,6 +281,10 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		color: '#333',
 		backgroundColor: '#fff',
+	},
+	inputError: {
+		borderColor: '#ff3b30',
+		backgroundColor: '#fff5f5',
 	},
 	saveButton: {
 		backgroundColor: '#0095FF',
@@ -306,5 +359,11 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		color: '#666',
 		marginTop: 8,
+	},
+	validationErrorText: {
+		marginTop: 4,
+		fontSize: 12,
+		color: '#ff3b30',
+		fontStyle: 'italic',
 	},
 });

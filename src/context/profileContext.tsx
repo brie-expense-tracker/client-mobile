@@ -7,7 +7,6 @@ import React, {
 } from 'react';
 import { ApiService } from '../services/apiService';
 import useAuth from './AuthContext';
-import { ProgressionData } from '../services/progressionService';
 
 interface ProfilePreferences {
 	adviceFrequency: string;
@@ -22,7 +21,6 @@ interface ProfilePreferences {
 		aiSuggestion: boolean;
 		budgetMilestones: boolean;
 		monthlyFinancialCheck: boolean;
-		monthlySavingsTransfer: boolean;
 	};
 	aiInsights: {
 		enabled: boolean;
@@ -34,9 +32,6 @@ interface ProfilePreferences {
 			expenseReduction: boolean;
 			incomeSuggestions: boolean;
 		};
-		defaultView?: 'aiCoach' | 'traditional';
-		maxInsights?: 3 | 5 | 10;
-		showHighPriorityOnly?: boolean;
 	};
 	budgetSettings: {
 		cycleType: 'monthly' | 'weekly' | 'biweekly';
@@ -99,11 +94,6 @@ interface Profile {
 	debt: number;
 	riskProfile: RiskProfile;
 	preferences: ProfilePreferences;
-	progression?: ProgressionData;
-	phone?: string;
-	email?: string;
-	tutorialCompleted?: boolean;
-	aiCoachSeen?: boolean;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -129,7 +119,6 @@ interface ProfileContextType {
 	updateGoalSettings: (
 		settings: Partial<ProfilePreferences['goalSettings']>
 	) => Promise<void>;
-	markAICoachSeen: () => Promise<void>;
 	refreshProfile: () => Promise<void>;
 }
 
@@ -232,7 +221,6 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 						aiSuggestion: true,
 						budgetMilestones: false,
 						monthlyFinancialCheck: true,
-						monthlySavingsTransfer: true,
 					},
 					aiInsights: {
 						enabled: true,
@@ -244,9 +232,6 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 							expenseReduction: true,
 							incomeSuggestions: true,
 						},
-						defaultView: 'aiCoach',
-						maxInsights: 3,
-						showHighPriorityOnly: false,
 					},
 					budgetSettings: {
 						cycleType: 'monthly',
@@ -629,12 +614,6 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 		}
 	};
 
-	const markAICoachSeen = async () => {
-		if (profile) {
-			await updateProfile({ aiCoachSeen: true });
-		}
-	};
-
 	const refreshProfile = async () => {
 		await fetchProfile();
 	};
@@ -665,7 +644,6 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 		updateAIInsightsSettings,
 		updateBudgetSettings,
 		updateGoalSettings,
-		markAICoachSeen,
 		refreshProfile,
 	};
 

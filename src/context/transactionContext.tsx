@@ -7,7 +7,23 @@ import React, {
 	useRef,
 	ReactNode,
 } from 'react';
-import { Transaction } from '../data/transactions';
+// Transaction interface defined inline since we removed the mock data file
+interface Transaction {
+	id: string;
+	description: string;
+	amount: number;
+	date: string; // ISO string
+	type: 'income' | 'expense';
+	target?: string; // ObjectId of the target Budget or Goal
+	targetModel?: 'Budget' | 'Goal';
+	updatedAt?: string; // ISO string for sorting by time when dates are the same
+	recurringPattern?: {
+		patternId: string;
+		frequency: string;
+		confidence: number;
+		nextExpectedDate: string;
+	};
+}
 import { ApiService } from '../services/apiService';
 import { useBudget } from './budgetContext';
 import { useGoal } from './goalContext';
@@ -370,24 +386,6 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 					// Auto-update budgets and goals based on transaction
 					console.log('[TransactionContext] Updating budgets and goals...');
 					await updateBudgetsAndGoals(serverTransaction);
-
-					// Trigger progression check after successful transaction creation
-					try {
-						console.log(
-							'[TransactionContext] Triggering progression check after transaction creation...'
-						);
-						const { ProgressionService } = await import(
-							'../services/progressionService'
-						);
-						await ProgressionService.checkProgression();
-						console.log('[TransactionContext] Progression check completed');
-					} catch (progressionError) {
-						console.error(
-							'[TransactionContext] Error checking progression:',
-							progressionError
-						);
-						// Don't fail the transaction creation if progression check fails
-					}
 
 					return serverTransaction;
 				} else {

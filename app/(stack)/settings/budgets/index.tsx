@@ -27,6 +27,11 @@ export default function BudgetSettingsScreen() {
 	const [carryOver, setCarryOver] = useState(false);
 	const [autoSync, setAutoSync] = useState(true);
 	const [saving, setSaving] = useState(false);
+	const [updatingCycleType, setUpdatingCycleType] = useState(false);
+	const [updatingCycleStart, setUpdatingCycleStart] = useState(false);
+	const [updatingAlertPct, setUpdatingAlertPct] = useState(false);
+	const [updatingCarryOver, setUpdatingCarryOver] = useState(false);
+	const [updatingAutoSync, setUpdatingAutoSync] = useState(false);
 	// Load settings from profile when available
 	useEffect(() => {
 		if (profile?.preferences?.budgetSettings) {
@@ -146,15 +151,27 @@ export default function BudgetSettingsScreen() {
 						label="Monthly"
 						subtext="Reset on the same day each month"
 						selected={cycleType === 'monthly'}
-						onPress={() => setCycleType('monthly')}
+						onPress={() => {
+							setUpdatingCycleType(true);
+							setCycleType('monthly');
+							// Simulate API call
+							setTimeout(() => setUpdatingCycleType(false), 500);
+						}}
 						icon="calendar-outline"
+						loading={updatingCycleType}
 					/>
 					<OptionRow
 						label="Weekly"
 						subtext="Reset on the same day each week"
 						selected={cycleType === 'weekly'}
-						onPress={() => setCycleType('weekly')}
+						onPress={() => {
+							setUpdatingCycleType(true);
+							setCycleType('weekly');
+							// Simulate API call
+							setTimeout(() => setUpdatingCycleType(false), 500);
+						}}
 						icon="calendar-clear-outline"
+						loading={updatingCycleType}
 					/>
 
 					{cycleType === 'weekly' && (
@@ -217,14 +234,26 @@ export default function BudgetSettingsScreen() {
 						label="Carry over unused budget"
 						subtext="Add leftover money to next period's budget"
 						value={carryOver}
-						onValueChange={setCarryOver}
+						onValueChange={(value) => {
+							setUpdatingCarryOver(true);
+							setCarryOver(value);
+							// Simulate API call
+							setTimeout(() => setUpdatingCarryOver(false), 500);
+						}}
+						loading={updatingCarryOver}
 					/>
 
 					<Row
 						label="Auto-sync from transactions"
 						subtext="Automatically update spent amounts from your transactions"
 						value={autoSync}
-						onValueChange={setAutoSync}
+						onValueChange={(value) => {
+							setUpdatingAutoSync(true);
+							setAutoSync(value);
+							// Simulate API call
+							setTimeout(() => setUpdatingAutoSync(false), 500);
+						}}
+						loading={updatingAutoSync}
 					/>
 				</Section>
 

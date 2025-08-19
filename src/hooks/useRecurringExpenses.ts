@@ -5,6 +5,19 @@ import {
 	RecurringExpense,
 } from '../services/recurringExpenseService';
 
+// Extended interface for transformed recurring expense data
+export interface TransformedRecurringExpense extends RecurringExpense {
+	daysUntilDue: number;
+	statusColor: string;
+	statusText: string;
+	formattedFrequency: string;
+	isOverdue: boolean;
+	isDueSoon: boolean;
+	isPaid: boolean;
+	paymentDate?: string;
+	nextDueDate: string;
+}
+
 // ==========================================
 // Recurring expense-specific API functions
 // ==========================================
@@ -56,6 +69,9 @@ const transformRecurringExpenseData = (expenses: RecurringExpense[]) => {
 			formattedFrequency: frequency,
 			isOverdue: daysUntilDue < 0,
 			isDueSoon: daysUntilDue <= 7 && daysUntilDue >= 0,
+			isPaid: false, // Will be updated by the widget
+			paymentDate: undefined, // Will be updated by the widget
+			nextDueDate: expense.nextExpectedDate, // Will be updated by the widget
 		};
 	});
 };

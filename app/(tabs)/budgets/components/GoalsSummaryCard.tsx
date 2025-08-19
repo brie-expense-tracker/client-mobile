@@ -34,7 +34,7 @@ const GoalsSummaryCard: React.FC<Props> = ({
 					</Text>
 				</View>
 				<TouchableOpacity style={styles.addButton} onPress={onAddGoal}>
-					<Ionicons name="add" size={20} color="#fff" />
+					<Ionicons name="add" size={20} color="#0f0f0f" />
 					<Text style={styles.addButtonText}>Add Goal</Text>
 				</TouchableOpacity>
 			</View>
@@ -144,17 +144,17 @@ const styles = StyleSheet.create({
 		textAlign: 'center',
 	},
 	addButton: {
-		backgroundColor: '#00a2ff',
+		backgroundColor: '#f7f7f7',
 		borderRadius: 12,
 		paddingVertical: 12,
-		paddingHorizontal: 16,
+		paddingHorizontal: 10,
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 8,
 		marginLeft: 16,
 	},
 	addButtonText: {
-		color: '#FFFFFF',
+		color: '#0f0f0f',
 		fontSize: 14,
 		fontWeight: '600',
 	},

@@ -1,11 +1,27 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
-import { Transaction } from '../../../../src/data/transactions';
 import { Ionicons } from '@expo/vector-icons';
 import { BorderlessButton } from 'react-native-gesture-handler';
 import { useBudget } from '../../../../src/context/budgetContext';
 import { useGoal } from '../../../../src/context/goalContext';
+
+interface Transaction {
+	id: string;
+	description: string;
+	amount: number;
+	date: string; // ISO string
+	type: 'income' | 'expense';
+	target?: string; // ObjectId of the target Budget or Goal
+	targetModel?: 'Budget' | 'Goal';
+	updatedAt?: string; // ISO string for sorting by time when dates are the same
+	recurringPattern?: {
+		patternId: string;
+		frequency: string;
+		confidence: number;
+		nextExpectedDate: string;
+	};
+}
 
 interface TransactionHistoryProps {
 	transactions: Transaction[];

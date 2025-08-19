@@ -1,7 +1,23 @@
 // _layout.tsx
 import { router, Stack } from 'expo-router';
 import { createContext, useState } from 'react';
-import { Transaction } from '../../../../src/data/transactions';
+// Transaction interface defined inline since we removed the mock data file
+interface Transaction {
+	id: string;
+	description: string;
+	amount: number;
+	date: string; // ISO string
+	type: 'income' | 'expense';
+	target?: string; // ObjectId of the target Budget or Goal
+	targetModel?: 'Budget' | 'Goal';
+	updatedAt?: string; // ISO string for sorting by time when dates are the same
+	recurringPattern?: {
+		patternId: string;
+		frequency: string;
+		confidence: number;
+		nextExpectedDate: string;
+	};
+}
 import { FilterProvider } from '../../../../src/context/filterContext';
 import { BorderlessButton } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';

@@ -1,22 +1,36 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+	View,
+	Text,
+	StyleSheet,
+	TouchableOpacity,
+	ActivityIndicator,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { RectButton } from 'react-native-gesture-handler';
+import { RecurringExpenseService } from '../../../../src/services/recurringExpenseService';
 
 interface RecurringExpense {
 	patternId: string;
 	vendor: string;
 	amount: number;
-	frequency: 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly';
+	frequency: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 	nextExpectedDate: string;
 	confidence?: number;
 	transactions?: any[];
 }
 
+// Extended interface for expenses with payment status
+interface RecurringExpenseWithPaymentStatus extends RecurringExpense {
+	isPaid: boolean;
+	paymentDate?: string;
+	nextDueDate: string;
+}
+
 interface Props {
 	expenses: RecurringExpense[];
 	monthlyBudget?: number;
-	onExpensePress?: (expense: RecurringExpense) => void;
+	onExpensePress?: (expense: RecurringExpenseWithPaymentStatus) => void;
 	activeView: 'monthly' | 'weekly';
 	onViewToggle: () => void;
 	onAddExpense: () => void;
@@ -38,12 +52,139 @@ const RecurringSummaryCard: React.FC<Props> = ({
 	overdueCount = 0,
 	dueThisWeekCount = 0,
 }) => {
+	const [expensesWithPaymentStatus, setExpensesWithPaymentStatus] = useState<
+		RecurringExpenseWithPaymentStatus[]
+	>([]);
+	const [isLoadingPaymentStatus, setIsLoadingPaymentStatus] = useState(false);
+
+	// Check payment status for all expenses
+	useEffect(() => {
+		const checkPaymentStatus = async () => {
+			if (expenses.length === 0) return;
+
+			setIsLoadingPaymentStatus(true);
+			try {
+				const expensesWithStatus = await Promise.all(
+					expenses.map(async (expense) => {
+						try {
+							const paymentStatus =
+								await RecurringExpenseService.isCurrentPeriodPaid(
+									expense.patternId
+								);
+
+							// Check if paid within 2 weeks of the monthly expense
+							let isPaidWithinTwoWeeks = false;
+							let paymentDate: string | undefined;
+							let nextDueDate: string = expense.nextExpectedDate;
+
+							if (paymentStatus.isPaid && paymentStatus.payment) {
+								const dueDate = new Date(expense.nextExpectedDate);
+								const paidDate = new Date(paymentStatus.payment.paidAt);
+
+								// Calculate days between due date and payment date
+								const daysDiff =
+									(paidDate.getTime() - dueDate.getTime()) /
+									(1000 * 60 * 60 * 24);
+
+								// Consider paid if within 2 weeks (14 days) AFTER the due date
+								// This allows for late payments to still be considered "paid" for that period
+								isPaidWithinTwoWeeks = daysDiff >= -14 && daysDiff <= 14;
+
+								if (isPaidWithinTwoWeeks) {
+									paymentDate = paidDate.toLocaleDateString();
+									// Calculate next due date based on frequency
+									nextDueDate = calculateNextDueDate(
+										expense.nextExpectedDate,
+										expense.frequency
+									);
+								} else {
+									// If not paid within 2 weeks, the next due date is the current expected date
+									nextDueDate = expense.nextExpectedDate;
+								}
+							}
+
+							return {
+								...expense,
+								isPaid: isPaidWithinTwoWeeks,
+								paymentDate,
+								nextDueDate,
+							};
+						} catch (error) {
+							console.error(
+								`Error checking payment status for ${expense.patternId}:`,
+								error
+							);
+							// Return expense with default unpaid status on error
+							return {
+								...expense,
+								isPaid: false,
+								nextDueDate: expense.nextExpectedDate,
+							};
+						}
+					})
+				);
+
+				setExpensesWithPaymentStatus(expensesWithStatus);
+			} catch (error) {
+				console.error('Error checking payment status:', error);
+				setExpensesWithPaymentStatus(
+					expenses.map((expense) => ({
+						...expense,
+						isPaid: false,
+						nextDueDate: expense.nextExpectedDate,
+					}))
+				);
+			} finally {
+				setIsLoadingPaymentStatus(false);
+			}
+		};
+
+		checkPaymentStatus();
+	}, [expenses]);
+
+	// Helper function to calculate next due date
+	const calculateNextDueDate = (
+		currentDate: string,
+		frequency: string
+	): string => {
+		const date = new Date(currentDate);
+
+		switch (frequency) {
+			case 'weekly':
+				date.setDate(date.getDate() + 7);
+				break;
+			case 'monthly':
+				date.setMonth(date.getMonth() + 1);
+				break;
+			case 'quarterly':
+				date.setMonth(date.getMonth() + 3);
+				break;
+			case 'yearly':
+				date.setFullYear(date.getFullYear() + 1);
+				break;
+		}
+
+		return date.toISOString();
+	};
+
+	// Use expenses with payment status if available, otherwise fall back to original expenses
+	const displayExpenses =
+		expensesWithPaymentStatus.length > 0 ? expensesWithPaymentStatus : expenses;
+
+	// Calculate payment status summary - only when we have payment status data
+	const paidCount =
+		expensesWithPaymentStatus.length > 0
+			? expensesWithPaymentStatus.filter((e) => e.isPaid).length
+			: 0;
+	const unpaidCount =
+		expensesWithPaymentStatus.length > 0
+			? expensesWithPaymentStatus.filter((e) => !e.isPaid).length
+			: 0;
+
 	const getMonthlyEquivalent = (amount: number, frequency: string) => {
 		switch (frequency) {
 			case 'weekly':
 				return (amount * 52) / 12;
-			case 'biweekly':
-				return (amount * 26) / 12;
 			case 'monthly':
 				return amount;
 			case 'quarterly':
@@ -59,20 +200,20 @@ const RecurringSummaryCard: React.FC<Props> = ({
 		switch (frequency) {
 			case 'weekly':
 				return amount;
-			case 'biweekly':
-				return amount / 2;
 			case 'monthly':
 			case 'quarterly':
 			case 'yearly':
-				return 0; // Only include weekly and biweekly expenses
+				return 0; // Only include weekly expenses
 			default:
 				return 0;
 		}
 	};
 
-	const getCurrentPeriodAmount = (expense: RecurringExpense) => {
+	const getCurrentPeriodAmount = (
+		expense: RecurringExpenseWithPaymentStatus
+	) => {
 		const now = new Date();
-		const nextDate = new Date(expense.nextExpectedDate);
+		const nextDate = new Date(expense.nextDueDate);
 		const daysUntilDue = Math.ceil(
 			(nextDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
 		);
@@ -85,8 +226,8 @@ const RecurringSummaryCard: React.FC<Props> = ({
 				return getMonthlyEquivalent(expense.amount, expense.frequency);
 			}
 		} else {
-			// For weekly view, only include weekly/biweekly expenses due this week
-			if (expense.frequency === 'weekly' || expense.frequency === 'biweekly') {
+			// For weekly view, only include weekly expenses due this week
+			if (expense.frequency === 'weekly') {
 				const endOfWeek = new Date(now);
 				endOfWeek.setDate(now.getDate() + 7);
 				if (nextDate <= endOfWeek) {
@@ -98,7 +239,9 @@ const RecurringSummaryCard: React.FC<Props> = ({
 	};
 
 	const totalPeriodAmount = (expenses || []).reduce(
-		(sum, expense) => sum + getCurrentPeriodAmount(expense),
+		(sum, expense) =>
+			sum +
+			getCurrentPeriodAmount(expense as RecurringExpenseWithPaymentStatus),
 		0
 	);
 
@@ -141,8 +284,8 @@ const RecurringSummaryCard: React.FC<Props> = ({
 		if (activeView === 'monthly') {
 			return sum + getMonthlyEquivalent(expense.amount, expense.frequency);
 		} else {
-			// For weekly view, only include weekly/biweekly expenses
-			if (expense.frequency === 'weekly' || expense.frequency === 'biweekly') {
+			// For weekly view, only include weekly expenses
+			if (expense.frequency === 'weekly') {
 				return sum + getWeeklyEquivalent(expense.amount, expense.frequency);
 			}
 			return sum;
@@ -153,8 +296,8 @@ const RecurringSummaryCard: React.FC<Props> = ({
 		if (activeView === 'monthly') {
 			return sum + getMonthlyEquivalent(expense.amount, expense.frequency);
 		} else {
-			// For weekly view, only include weekly/biweekly expenses
-			if (expense.frequency === 'weekly' || expense.frequency === 'biweekly') {
+			// For weekly view, only include weekly expenses
+			if (expense.frequency === 'weekly') {
 				return sum + getWeeklyEquivalent(expense.amount, expense.frequency);
 			}
 			return sum;
@@ -178,7 +321,7 @@ const RecurringSummaryCard: React.FC<Props> = ({
 
 				{/* Add Button - Inline with title */}
 				<TouchableOpacity style={styles.addButton} onPress={onAddExpense}>
-					<Ionicons name="add" size={20} color="#fff" />
+					<Ionicons name="add" size={20} color="#0f0f0f" />
 					<Text style={styles.addButtonText}>Add Expense</Text>
 				</TouchableOpacity>
 			</View>
@@ -240,6 +383,42 @@ const RecurringSummaryCard: React.FC<Props> = ({
 						</Text>
 					</View>
 				</View>
+
+				{/* Payment Status Summary */}
+				{expensesWithPaymentStatus.length > 0 && (
+					<View style={styles.paymentStatusSection}>
+						<View style={styles.paymentStatusHeader}>
+							<Ionicons
+								name="checkmark-circle-outline"
+								size={16}
+								color="#10b981"
+							/>
+							<Text style={styles.paymentStatusTitle}>Payment Status</Text>
+						</View>
+						<View style={styles.paymentStatusContent}>
+							<View style={styles.paymentStatusItem}>
+								<Ionicons name="checkmark-circle" size={16} color="#10b981" />
+								<Text style={styles.paymentStatusText}>{paidCount} paid</Text>
+							</View>
+							<View style={styles.paymentStatusItem}>
+								<Ionicons name="remove-circle" size={16} color="#f59e0b" />
+								<Text style={styles.paymentStatusText}>
+									{unpaidCount} upcoming
+								</Text>
+							</View>
+						</View>
+					</View>
+				)}
+
+				{/* Payment Status Loading */}
+				{isLoadingPaymentStatus && expenses.length > 0 && (
+					<View style={styles.paymentStatusLoading}>
+						<ActivityIndicator size="small" color="#007ACC" />
+						<Text style={styles.paymentStatusLoadingText}>
+							Checking payment status...
+						</Text>
+					</View>
+				)}
 
 				{/* Overdue Section */}
 				{(overdueAmount > 0 || overdueCount > 0) && (
@@ -338,16 +517,18 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 8,
 	},
 	addButton: {
-		backgroundColor: '#00a2ff',
+		backgroundColor: '#f7f7f7',
 		borderRadius: 12,
 		paddingVertical: 12,
-		paddingHorizontal: 16,
+		paddingHorizontal: 10,
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 8,
+		borderWidth: 1,
+		borderColor: '#e5e5e5',
 	},
 	addButtonText: {
-		color: '#FFFFFF',
+		color: '#0f0f0f',
 		fontSize: 14,
 		fontWeight: '600',
 	},
@@ -473,6 +654,80 @@ const styles = StyleSheet.create({
 	overdueCount: {
 		fontSize: 12,
 		color: '#dc2626',
+	},
+	paymentStatusSection: {
+		marginTop: 16,
+		padding: 16,
+		backgroundColor: '#f8fafc',
+		borderRadius: 16,
+		borderWidth: 1,
+		borderColor: '#e2e8f0',
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.05,
+		shadowRadius: 3,
+		elevation: 1,
+	},
+	paymentStatusHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginBottom: 12,
+		paddingBottom: 8,
+		borderBottomWidth: 1,
+		borderBottomColor: '#e2e8f0',
+	},
+	paymentStatusTitle: {
+		fontSize: 15,
+		fontWeight: '700',
+		color: '#1e293b',
+		marginLeft: 8,
+	},
+	paymentStatusContent: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		paddingHorizontal: 8,
+	},
+	paymentStatusItem: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		paddingVertical: 8,
+		paddingHorizontal: 12,
+		backgroundColor: '#ffffff',
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#e2e8f0',
+		flex: 1,
+		marginHorizontal: 4,
+		justifyContent: 'center',
+	},
+	paymentStatusText: {
+		fontSize: 13,
+		fontWeight: '600',
+		color: '#374151',
+	},
+	paymentStatusLoading: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginTop: 16,
+		paddingVertical: 16,
+		paddingHorizontal: 20,
+		backgroundColor: '#f8fafc',
+		borderRadius: 16,
+		borderWidth: 1,
+		borderColor: '#e2e8f0',
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.05,
+		shadowRadius: 3,
+		elevation: 1,
+	},
+	paymentStatusLoadingText: {
+		marginLeft: 12,
+		fontSize: 14,
+		fontWeight: '600',
+		color: '#64748b',
 	},
 });
 

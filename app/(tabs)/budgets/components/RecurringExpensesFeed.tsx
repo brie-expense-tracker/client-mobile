@@ -1,13 +1,15 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
 	View,
 	Text,
 	FlatList,
 	TouchableOpacity,
 	StyleSheet,
+	ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RecurringExpense } from '../../../../src/services/recurringExpenseService';
+import { RecurringExpense, RecurringExpenseService } from '../../../../src/services/recurringExpenseService';
+import { TransformedRecurringExpense } from '../../../../src/hooks/useRecurringExpenses';
 
 const currency = (n: number) =>
 	`$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
@@ -25,6 +27,35 @@ const getDaysUntilNext = (nextExpectedDate: string) => {
 	const next = new Date(nextExpectedDate).setHours(0, 0, 0, 0);
 	const now = new Date().setHours(0, 0, 0, 0);
 	return Math.ceil((next - now) / (1000 * 60 * 60 * 24));
+};
+
+// Extended interface for expenses with payment status
+interface RecurringExpenseWithPaymentStatus extends RecurringExpense {
+	isPaid: boolean;
+	paymentDate?: string;
+	nextDueDate: string;
+}
+
+// Helper function to calculate next due date
+const calculateNextDueDate = (currentDate: string, frequency: string): string => {
+	const date = new Date(currentDate);
+	
+	switch (frequency) {
+		case 'weekly':
+			date.setDate(date.getDate() + 7);
+			break;
+		case 'monthly':
+			date.setMonth(date.getMonth() + 1);
+			break;
+		case 'quarterly':
+			date.setMonth(date.getMonth() + 3);
+			break;
+		case 'yearly':
+			date.setFullYear(date.getFullYear() + 1);
+			break;
+	}
+	
+	return date.toISOString();
 };
 
 const getVendorIconAndColor = (
@@ -240,12 +271,36 @@ function RecurringExpenseRow({
 	onPressMenu,
 	onPressRow,
 }: {
-	expense: RecurringExpense;
+	expense: RecurringExpenseWithPaymentStatus;
 	onPressMenu?: (id: string) => void;
-	onPressRow?: (expense: RecurringExpense) => void;
+	onPressRow?: (expense: RecurringExpenseWithPaymentStatus) => void;
 }) {
-	const daysUntilNext = getDaysUntilNext(expense.nextExpectedDate);
+	const daysUntilNext = getDaysUntilNext(expense.nextDueDate);
 	const { icon, color } = getVendorIconAndColor(expense.vendor);
+
+	// Get status icon and text
+	const getStatusIcon = () => {
+		if (expense.isPaid) {
+			return { name: 'checkmark-circle', color: '#10b981' };
+		} else if (daysUntilNext < 0) {
+			return { name: 'close-circle', color: '#dc2626' };
+		} else if (daysUntilNext <= 7) {
+			return { name: 'remove-circle', color: '#f59e0b' };
+		} else {
+			return { name: 'remove-circle', color: '#f59e0b' };
+		}
+	};
+
+	const getStatusText = () => {
+		if (expense.isPaid && expense.paymentDate) {
+			return `Paid: ${expense.paymentDate}`;
+		} else {
+			return `Next due: ${formatDate(expense.nextDueDate)}`;
+		}
+	};
+
+	const statusIcon = getStatusIcon();
+	const statusText = getStatusText();
 
 	// Chip color by urgency
 	let chipColor = '#E8F5E9';
@@ -276,17 +331,25 @@ function RecurringExpenseRow({
 				<Text style={styles.subtitleGray}>
 					{expense.frequency.charAt(0).toUpperCase() +
 						expense.frequency.slice(1)}{' '}
-					• {formatDate(expense.nextExpectedDate)}
+					• {statusText}
 				</Text>
 			</View>
 
-			{/* Right side - Amount and Days */}
+			{/* Right side - Amount and Status */}
 			<View style={styles.rightSection}>
 				<Text style={styles.amountText}>{currency(expense.amount)}</Text>
-				<View style={[styles.chip, { backgroundColor: chipColor }]}>
-					<Text style={[styles.chipText, { color: chipText }]}>
-						{daysUntilNext}d
-					</Text>
+				<View style={styles.statusContainer}>
+					<Ionicons
+						name={statusIcon.name as any}
+						size={16}
+						color={statusIcon.color}
+						style={styles.statusIcon}
+					/>
+					<View style={[styles.chip, { backgroundColor: chipColor }]}>
+						<Text style={[styles.chipText, { color: chipText }]}>
+							{Math.abs(daysUntilNext)}d
+						</Text>
+					</View>
 				</View>
 			</View>
 
@@ -319,15 +382,119 @@ export default function RecurringExpensesFeed({
 }: {
 	scrollEnabled?: boolean;
 	onPressMenu?: (id: string) => void;
-	onPressRow?: (expense: RecurringExpense) => void;
+	onPressRow?: (expense: RecurringExpenseWithPaymentStatus) => void;
 	expenses?: RecurringExpense[];
 }) {
 	const [tab, setTab] = useState<TabKey>('all');
+	const [expensesWithPaymentStatus, setExpensesWithPaymentStatus] = useState<RecurringExpenseWithPaymentStatus[]>([]);
+	const [isLoadingPaymentStatus, setIsLoadingPaymentStatus] = useState(false);
+	const [paymentStatusError, setPaymentStatusError] = useState<string | null>(null);
+
+	// Check payment status for all expenses
+	useEffect(() => {
+		const checkPaymentStatus = async () => {
+			if (expenses.length === 0) return;
+			
+			setIsLoadingPaymentStatus(true);
+			setPaymentStatusError(null);
+			try {
+				const expensesWithStatus = await Promise.all(
+					expenses.map(async (expense) => {
+						try {
+							const paymentStatus = await RecurringExpenseService.isCurrentPeriodPaid(expense.patternId);
+							
+							// Check if paid within 2 weeks of the monthly expense
+							let isPaidWithinTwoWeeks = false;
+							let paymentDate: string | undefined;
+							let nextDueDate: string = expense.nextExpectedDate;
+							
+							if (paymentStatus.isPaid && paymentStatus.payment) {
+								const dueDate = new Date(expense.nextExpectedDate);
+								const paidDate = new Date(paymentStatus.payment.paidAt);
+								
+								// Calculate days between due date and payment date
+								const daysDiff = (paidDate.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24);
+								
+								// Consider paid if within 2 weeks (14 days) AFTER the due date
+								// This allows for late payments to still be considered "paid" for that period
+								isPaidWithinTwoWeeks = daysDiff >= -14 && daysDiff <= 14;
+								
+								if (isPaidWithinTwoWeeks) {
+									paymentDate = paidDate.toLocaleDateString();
+									// Calculate next due date based on frequency
+									nextDueDate = calculateNextDueDate(expense.nextExpectedDate, expense.frequency);
+								} else {
+									// If not paid within 2 weeks, the next due date is the current expected date
+									nextDueDate = expense.nextExpectedDate;
+								}
+							}
+							
+							return {
+								...expense,
+								isPaid: isPaidWithinTwoWeeks,
+								paymentDate,
+								nextDueDate,
+							};
+						} catch (error) {
+							console.error(`Error checking payment status for ${expense.patternId}:`, error);
+							// Return expense with default unpaid status on error
+							return {
+								...expense,
+								isPaid: false,
+								nextDueDate: expense.nextExpectedDate,
+							};
+						}
+					})
+				);
+				
+				setExpensesWithPaymentStatus(expensesWithStatus);
+			} catch (error) {
+				console.error('Error checking payment status:', error);
+				setPaymentStatusError('Failed to check payment status');
+				setExpensesWithPaymentStatus(expenses.map(expense => ({
+					...expense,
+					isPaid: false,
+					nextDueDate: expense.nextExpectedDate,
+				})));
+			} finally {
+				setIsLoadingPaymentStatus(false);
+			}
+		};
+
+		checkPaymentStatus();
+	}, [expenses]);
 
 	const filtered = useMemo(() => {
-		if (tab === 'all') return expenses;
-		return expenses.filter((expense) => expense.frequency === tab);
-	}, [tab, expenses]);
+		if (tab === 'all') return expensesWithPaymentStatus;
+		return expensesWithPaymentStatus.filter((expense) => expense.frequency === tab);
+	}, [tab, expensesWithPaymentStatus]);
+
+	// Show loading state while checking payment status
+	if (isLoadingPaymentStatus && expenses.length > 0) {
+		return (
+			<View style={styles.screen}>
+				<View style={styles.loadingContainer}>
+					<ActivityIndicator size="small" color="#007ACC" />
+					<Text style={styles.loadingText}>Checking payment status...</Text>
+				</View>
+			</View>
+		);
+	}
+
+	// Show error state if payment status check failed
+	if (paymentStatusError && expenses.length > 0) {
+		return (
+			<View style={styles.screen}>
+				<View style={styles.errorContainer}>
+					<Ionicons name="warning-outline" size={24} color="#f59e0b" />
+					<Text style={styles.errorText}>{paymentStatusError}</Text>
+					<TouchableOpacity style={styles.retryButton} onPress={() => setExpensesWithPaymentStatus([])}>
+						<Text style={styles.retryButtonText}>Retry</Text>
+					</TouchableOpacity>
+				</View>
+			</View>
+		);
+	}
 
 	return (
 		<View style={styles.screen}>
@@ -445,4 +612,47 @@ const styles = StyleSheet.create({
 	},
 
 	kebabHit: { paddingLeft: 4, paddingTop: 4, marginLeft: 4 },
+	statusContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+	},
+	statusIcon: {
+		marginTop: 2,
+	},
+	loadingContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		padding: 20,
+	},
+	loadingText: {
+		marginTop: 10,
+		color: '#52525b',
+		fontSize: 14,
+	},
+	errorContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		padding: 20,
+	},
+	errorText: {
+		marginTop: 10,
+		color: '#dc2626',
+		fontSize: 16,
+		textAlign: 'center',
+	},
+	retryButton: {
+		marginTop: 20,
+		paddingVertical: 10,
+		paddingHorizontal: 20,
+		backgroundColor: '#007ACC',
+		borderRadius: 8,
+	},
+	retryButtonText: {
+		color: '#ffffff',
+		fontSize: 16,
+		fontWeight: '600',
+	},
 });

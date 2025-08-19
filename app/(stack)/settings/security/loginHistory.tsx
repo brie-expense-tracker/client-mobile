@@ -26,49 +26,8 @@ export default function LoginHistoryScreen() {
 	const [loading, setLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
 
-	// Mock data - replace with actual API call
-	const mockLoginHistory: LoginSession[] = [
-		{
-			id: '1',
-			device: 'iPhone 15 Pro',
-			location: 'San Francisco, CA',
-			ipAddress: '192.168.1.100',
-			timestamp: '2024-01-15T10:30:00Z',
-			status: 'success',
-		},
-		{
-			id: '2',
-			device: 'MacBook Pro',
-			location: 'San Francisco, CA',
-			ipAddress: '192.168.1.101',
-			timestamp: '2024-01-14T15:45:00Z',
-			status: 'success',
-		},
-		{
-			id: '3',
-			device: 'Unknown Device',
-			location: 'New York, NY',
-			ipAddress: '203.0.113.45',
-			timestamp: '2024-01-13T08:20:00Z',
-			status: 'suspicious',
-		},
-		{
-			id: '4',
-			device: 'iPhone 15 Pro',
-			location: 'San Francisco, CA',
-			ipAddress: '192.168.1.100',
-			timestamp: '2024-01-12T22:15:00Z',
-			status: 'success',
-		},
-		{
-			id: '5',
-			device: 'Unknown Device',
-			location: 'Unknown',
-			ipAddress: '198.51.100.23',
-			timestamp: '2024-01-11T14:30:00Z',
-			status: 'failed',
-		},
-	];
+	// TODO: Implement actual API call when server endpoint is available
+	// For now, show empty state since we can't use mock data without server connection
 
 	useEffect(() => {
 		fetchLoginHistory();
@@ -76,16 +35,15 @@ export default function LoginHistoryScreen() {
 
 	const fetchLoginHistory = async () => {
 		try {
-			// TODO: Replace with actual API call
-			// const response = await fetch('/api/login-history');
-			// const data = await response.json();
-			// setLoginHistory(data);
+			// TODO: Replace with actual API call when server endpoint is available
+			// const response = await ApiService.get('/login-history');
+			// if (response.success && response.data) {
+			//   setLoginHistory(response.data);
+			// }
 
-			// Using mock data for now
-			setTimeout(() => {
-				setLoginHistory(mockLoginHistory);
-				setLoading(false);
-			}, 1000);
+			// For now, show empty state since we can't use mock data without server connection
+			setLoginHistory([]);
+			setLoading(false);
 		} catch (error) {
 			console.error('Error fetching login history:', error);
 			setLoading(false);

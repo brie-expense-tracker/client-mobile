@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useRecurringExpense } from '../../src/context/recurringExpenseContext';
+import { useRecurringExpenses } from '../../src/hooks/useRecurringExpenses';
 import { RecurringExpense } from '../../src/services/recurringExpenseService';
 import { RecurringExpenseService } from '../../src/services/recurringExpenseService';
 import LinearProgressBar from '../(tabs)/budgets/components/LinearProgressBar';
@@ -32,7 +32,7 @@ interface RecurringTransaction {
 const RecurringExpenseSummaryScreen: React.FC = () => {
 	const params = useLocalSearchParams();
 	const patternId = params.patternId as string;
-	const { expenses } = useRecurringExpense();
+	const { expenses } = useRecurringExpenses();
 	const [expense, setExpense] = useState<RecurringExpense | null>(null);
 	const [transactions, setTransactions] = useState<RecurringTransaction[]>([]);
 	const [loadingTransactions, setLoadingTransactions] = useState(false);

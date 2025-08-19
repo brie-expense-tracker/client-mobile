@@ -60,13 +60,13 @@ export default function TabLayout() {
 							}}
 						/>
 						<Tabs.Screen
-							name="insights"
+							name="assistant"
 							options={{
 								tabBarIcon: ({ color, size }) => (
 									<Ionicons name="sparkles-outline" color={color} size={size} />
 								),
 								tabBarShowLabel: false,
-								tabBarLabel: 'Insights',
+								tabBarLabel: 'Assistant',
 							}}
 						/>
 						<Tabs.Screen
