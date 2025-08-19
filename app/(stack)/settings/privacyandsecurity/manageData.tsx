@@ -31,7 +31,7 @@ export default function PrivacySecurityScreen() {
 			rows: [
 				{
 					label: 'Download your data',
-					route: './downloadData',
+					route: '/(stack)/settings/privacyandsecurity/downloadData',
 				},
 			],
 		},

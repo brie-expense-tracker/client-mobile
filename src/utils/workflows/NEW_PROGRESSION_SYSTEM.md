@@ -208,7 +208,7 @@ The new progression system replaces the confusing 5-stage system with a clear, i
 ### For Existing Users
 
 - Map old stages to new levels:
-  - `tutorial` → `beginner`
+  - `beginner` (tutorial system removed)
   - `level2` → `apprentice`
   - `dynamic` → `practitioner`
   - `smartPath` → `expert`

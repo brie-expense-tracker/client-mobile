@@ -1,10 +1,16 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 // @ts-ignore - react-query types will be available after install
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import './global.css';
-import React, { useEffect, useState, useContext } from 'react';
-import { ActivityIndicator, Text, View, StyleSheet } from 'react-native';
+import {
+	ActivityIndicator,
+	Text,
+	View,
+	StyleSheet,
+	StatusBar,
+} from 'react-native';
 import useAuth, { AuthProvider } from '../src/context/AuthContext';
 import {
 	OnboardingProvider,
@@ -13,9 +19,8 @@ import {
 import { ProfileProvider } from '../src/context/profileContext';
 import { NotificationProvider } from '../src/context/notificationContext';
 import { TransactionProvider } from '../src/context/transactionContext';
-import { ProgressionProvider } from '../src/context/progressionContext';
 import { TransactionModalProvider } from '../src/context/transactionModalContext';
-import { RecurringExpenseProvider } from '../src/context/recurringExpenseContext';
+// RecurringExpenseProvider removed - using useRecurringExpenses hook instead
 
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
@@ -63,6 +68,8 @@ const queryClient = new QueryClient({
 export default function RootLayout() {
 	return (
 		<QueryClientProvider client={queryClient}>
+			{/* Default status bar configuration for the entire app */}
+			<StatusBar barStyle="dark-content" backgroundColor="transparent" />
 			<NotificationProvider>
 				<AuthProvider>
 					<OnboardingProvider>
@@ -150,32 +157,28 @@ function RootLayoutContent() {
 				{/* Mount other providers for main app if onboarding is complete */}
 				{hasSeenOnboarding ? (
 					<TransactionProvider>
-						<ProgressionProvider>
-							<RecurringExpenseProvider>
-								<TransactionModalProvider>
-									<GestureHandlerRootView style={{ flex: 1 }}>
-										<Stack>
-											<Stack.Screen
-												name="(auth)"
-												options={{ headerShown: false }}
-											/>
-											<Stack.Screen
-												name="(onboarding)"
-												options={{ headerShown: false }}
-											/>
-											<Stack.Screen
-												name="(tabs)"
-												options={{ headerShown: false }}
-											/>
-											<Stack.Screen
-												name="(stack)"
-												options={{ headerShown: false }}
-											/>
-										</Stack>
-									</GestureHandlerRootView>
-								</TransactionModalProvider>
-							</RecurringExpenseProvider>
-						</ProgressionProvider>
+						<TransactionModalProvider>
+							<GestureHandlerRootView style={{ flex: 1 }}>
+								<Stack>
+									<Stack.Screen
+										name="(auth)"
+										options={{ headerShown: false }}
+									/>
+									<Stack.Screen
+										name="(onboarding)"
+										options={{ headerShown: false }}
+									/>
+									<Stack.Screen
+										name="(tabs)"
+										options={{ headerShown: false }}
+									/>
+									<Stack.Screen
+										name="(stack)"
+										options={{ headerShown: false }}
+									/>
+								</Stack>
+							</GestureHandlerRootView>
+						</TransactionModalProvider>
 					</TransactionProvider>
 				) : (
 					// Onboarding screens only need ProfileProvider

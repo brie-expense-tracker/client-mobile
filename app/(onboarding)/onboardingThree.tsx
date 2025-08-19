@@ -128,23 +128,11 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 	// Basic Info
 	const [firstName, setFirstName] = useState('');
 	const [lastName, setLastName] = useState('');
-	const [ageRange, setAgeRange] = useState('');
 	const [monthlyIncome, setMonthlyIncome] = useState('');
 
 	// Goals and Expenses
 	const [financialGoal, setFinancialGoal] = useState('');
 	const [housingExpense, setHousingExpense] = useState('');
-	const [loanPayments, setLoanPayments] = useState('');
-	const [subscriptions, setSubscriptions] = useState('');
-
-	// Savings and Risk
-	const [savingsBalance, setSavingsBalance] = useState('');
-	const [totalDebt, setTotalDebt] = useState('');
-	const [riskTolerance, setRiskTolerance] = useState(3);
-	const [investmentExperience, setInvestmentExperience] = useState(3);
-
-	// Preferences
-	const [adviceFrequency, setAdviceFrequency] = useState('');
 
 	const flatListRef = useRef<FlatList>(null);
 	const [currentIndex, setCurrentIndex] = useState(0);
@@ -168,10 +156,6 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 		const currencyFields = [
 			{ value: monthlyIncome, name: 'Monthly Income' },
 			{ value: housingExpense, name: 'Housing Expense' },
-			{ value: loanPayments, name: 'Loan Payments' },
-			{ value: subscriptions, name: 'Subscriptions' },
-			{ value: savingsBalance, name: 'Savings Balance' },
-			{ value: totalDebt, name: 'Total Debt' },
 		];
 
 		// Check if any currency field has invalid data
@@ -186,36 +170,24 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 			}
 		}
 
-		// Determine AI insights settings based on advice frequency choice
-		const isAIInsightsEnabled = adviceFrequency !== 'No advice';
-		const aiInsightsFrequency =
-			adviceFrequency === 'Daily snapshot'
-				? 'daily'
-				: adviceFrequency === 'Weekly summary'
-				? 'weekly'
-				: adviceFrequency === 'Monthly report'
-				? 'monthly'
-				: 'weekly';
-
 		const profileData = {
 			firstName,
 			lastName,
-			ageRange,
 			monthlyIncome: monthlyIncome ? parseFloat(monthlyIncome) : 0,
 			financialGoal,
 			expenses: {
 				housing: housingExpense ? parseFloat(housingExpense) : 0,
-				loans: loanPayments ? parseFloat(loanPayments) : 0,
-				subscriptions: subscriptions ? parseFloat(subscriptions) : 0,
+				loans: 0,
+				subscriptions: 0,
 			},
-			savings: savingsBalance ? parseFloat(savingsBalance) : 0,
-			debt: totalDebt ? parseFloat(totalDebt) : 0,
+			savings: 0,
+			debt: 0,
 			riskProfile: {
-				tolerance: riskTolerance.toString(),
-				experience: investmentExperience.toString(),
+				tolerance: '3',
+				experience: '3',
 			},
 			preferences: {
-				adviceFrequency,
+				adviceFrequency: 'Weekly summary',
 				autoSave: {
 					enabled: false,
 					amount: 0,
@@ -223,16 +195,16 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 				notifications: {
 					enableNotifications: true,
 					weeklySummary: true,
-					overspendingAlert: false,
-					aiSuggestion: false, // Disable AI suggestions by default
-					budgetMilestones: false,
+					overspendingAlert: true,
+					aiSuggestion: true,
+					budgetMilestones: true,
 					monthlyFinancialCheck: true,
-					monthlySavingsTransfer: true,
+					monthlySavingsTransfer: false,
 				},
 				aiInsights: {
-					enabled: true, // Enable AI insights by default
-					frequency: 'weekly' as 'weekly' | 'monthly' | 'daily',
-					pushNotifications: true, // Enable push notifications for AI insights
+					enabled: true,
+					frequency: 'weekly',
+					pushNotifications: true,
 					emailAlerts: false,
 					insightTypes: {
 						budgetingTips: true,
@@ -241,7 +213,7 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 					},
 				},
 				budgetSettings: {
-					cycleType: 'monthly' as 'monthly' | 'weekly' | 'biweekly',
+					cycleType: 'monthly',
 					cycleStart: 1,
 					alertPct: 80,
 					carryOver: false,
@@ -251,13 +223,13 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 					defaults: {
 						target: 1000,
 						dueDays: 90,
-						sortBy: 'percent' as 'percent' | 'name' | 'date',
+						sortBy: 'percent',
 						currency: 'USD',
 					},
 					ai: {
-						enabled: false, // Disable AI for goals by default
-						tone: 'friendly' as 'friendly' | 'technical' | 'minimal',
-						frequency: 'medium' as 'low' | 'medium' | 'high',
+						enabled: true,
+						tone: 'friendly',
+						frequency: 'medium',
 						whatIf: true,
 					},
 					notifications: {
@@ -268,7 +240,7 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 					display: {
 						showCompleted: true,
 						autoArchive: true,
-						rounding: '1' as 'none' | '1' | '5',
+						rounding: '1',
 					},
 					security: {
 						lockEdit: false,
@@ -281,15 +253,6 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 		try {
 			// Update profile using profileContext
 			await updateProfile(profileData);
-
-			// Generate tutorial actions for the new user
-			try {
-				await ApiService.post('/tutorial/generate-actions', {});
-				console.log('Tutorial actions generated successfully');
-			} catch (tutorialError) {
-				console.error('Error generating tutorial actions:', tutorialError);
-				// Continue with onboarding even if tutorial generation fails
-			}
 
 			// Mark onboarding as complete and navigate to main app
 			await markOnboardingComplete();
@@ -392,33 +355,6 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 								/>
 							</View>
 							<View style={styles.inputContainer}>
-								<Text style={styles.label}>Age Range</Text>
-								<Text style={styles.subtext}>
-									This helps us provide age-appropriate financial advice
-								</Text>
-								<View style={styles.ageRangeContainer}>
-									{['Under 25', '25-34', '35-44', '45+'].map((range) => (
-										<Pressable
-											key={range}
-											onPress={() => setAgeRange(range)}
-											style={[
-												styles.ageRangeButton,
-												ageRange === range && styles.selectedAgeRange,
-											]}
-										>
-											<Text
-												style={[
-													styles.ageRangeText,
-													ageRange === range && styles.selectedAgeRangeText,
-												]}
-											>
-												{range}
-											</Text>
-										</Pressable>
-									))}
-								</View>
-							</View>
-							<View style={styles.inputContainer}>
 								<Text style={styles.label}>Monthly Take-Home Income</Text>
 								<Text style={styles.subtext}>
 									Your after-tax income helps us calculate realistic budgets
@@ -486,11 +422,10 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 								</View>
 							</View>
 							<View style={styles.inputContainer}>
-								<Text style={styles.label}>Monthly Expenses</Text>
+								<Text style={styles.label}>Monthly Housing Expense</Text>
 								<Text style={styles.subtext}>
-									Track your biggest monthly expenses to create better budgets
+									Track your biggest monthly expense to create better budgets
 								</Text>
-								<Text style={styles.inputLabel}>Housing & Utilities</Text>
 								<View style={styles.inputWithIcon}>
 									<View style={styles.inputIcon}>
 										<Ionicons name="logo-usd" size={20} color="#6b7280" />
@@ -505,197 +440,6 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 										placeholderTextColor="#6b7280"
 										placeholder="0.00"
 									/>
-								</View>
-								<Text style={styles.inputLabel}>
-									Loan & Credit Card Payments
-								</Text>
-								<View style={styles.inputWithIcon}>
-									<View style={styles.inputIcon}>
-										<Ionicons name="logo-usd" size={20} color="#6b7280" />
-									</View>
-									<TextInput
-										value={loanPayments}
-										onChangeText={(text) =>
-											handleCurrencyInput(text, setLoanPayments)
-										}
-										keyboardType="numeric"
-										style={styles.inputWithIconText}
-										placeholderTextColor="#6b7280"
-										placeholder="0.00"
-									/>
-								</View>
-								<Text style={styles.inputLabel}>Subscriptions & Insurance</Text>
-								<View style={styles.inputWithIcon}>
-									<View style={styles.inputIcon}>
-										<Ionicons name="logo-usd" size={20} color="#6b7280" />
-									</View>
-									<TextInput
-										value={subscriptions}
-										onChangeText={(text) =>
-											handleCurrencyInput(text, setSubscriptions)
-										}
-										keyboardType="numeric"
-										style={styles.inputWithIconText}
-										placeholderTextColor="#6b7280"
-										placeholder="0.00"
-									/>
-								</View>
-							</View>
-						</ScrollView>
-					</View>
-				);
-			case 3:
-				return (
-					<View style={styles.slide}>
-						<ScrollView
-							contentContainerStyle={styles.scrollContent}
-							showsVerticalScrollIndicator={false}
-							keyboardShouldPersistTaps="handled"
-							keyboardDismissMode="interactive"
-						>
-							<Text style={styles.title}>Your Financial Status</Text>
-							<View style={styles.inputContainer}>
-								<Text style={styles.label}>Current Savings</Text>
-								<Text style={styles.subtext}>
-									Include checking, savings, and emergency fund balances
-								</Text>
-								<View style={styles.inputWithIcon}>
-									<View style={styles.inputIcon}>
-										<Ionicons name="logo-usd" size={20} color="#6b7280" />
-									</View>
-									<TextInput
-										value={savingsBalance}
-										onChangeText={(text) =>
-											handleCurrencyInput(text, setSavingsBalance)
-										}
-										keyboardType="numeric"
-										style={styles.inputWithIconText}
-										placeholderTextColor="#6b7280"
-										placeholder="0.00"
-									/>
-								</View>
-							</View>
-							<View style={styles.inputContainer}>
-								<Text style={styles.label}>Total Debt</Text>
-								<Text style={styles.subtext}>
-									Include credit cards, loans, and other outstanding balances
-								</Text>
-								<View style={styles.inputWithIcon}>
-									<View style={styles.inputIcon}>
-										<Ionicons name="logo-usd" size={20} color="#6b7280" />
-									</View>
-									<TextInput
-										value={totalDebt}
-										onChangeText={(text) =>
-											handleCurrencyInput(text, setTotalDebt)
-										}
-										keyboardType="numeric"
-										style={styles.inputWithIconText}
-										placeholderTextColor="#6b7280"
-										placeholder="0.00"
-									/>
-								</View>
-							</View>
-							<View style={styles.inputContainer}>
-								<Text style={styles.label}>Risk Tolerance (1-5)</Text>
-								<Text style={styles.subtext}>
-									1 = Very conservative, 5 = Very aggressive
-								</Text>
-								<View style={styles.ratingContainer}>
-									{[1, 2, 3, 4, 5].map((rating) => (
-										<Pressable
-											key={rating}
-											onPress={() => setRiskTolerance(rating)}
-											style={[
-												styles.ratingButton,
-												riskTolerance === rating && styles.selectedRating,
-											]}
-										>
-											<Text
-												style={[
-													styles.ratingText,
-													riskTolerance === rating && styles.selectedRatingText,
-												]}
-											>
-												{rating}
-											</Text>
-										</Pressable>
-									))}
-								</View>
-							</View>
-							<View style={styles.inputContainer}>
-								<Text style={styles.label}>Investment Experience (1-5)</Text>
-								<Text style={styles.subtext}>
-									1 = Beginner, 5 = Expert investor
-								</Text>
-								<View style={styles.ratingContainer}>
-									{[1, 2, 3, 4, 5].map((rating) => (
-										<Pressable
-											key={rating}
-											onPress={() => setInvestmentExperience(rating)}
-											style={[
-												styles.ratingButton,
-												investmentExperience === rating &&
-													styles.selectedRating,
-											]}
-										>
-											<Text
-												style={[
-													styles.ratingText,
-													investmentExperience === rating &&
-														styles.selectedRatingText,
-												]}
-											>
-												{rating}
-											</Text>
-										</Pressable>
-									))}
-								</View>
-							</View>
-						</ScrollView>
-					</View>
-				);
-			case 4:
-				return (
-					<View style={styles.slide}>
-						<ScrollView
-							contentContainerStyle={styles.scrollContent}
-							showsVerticalScrollIndicator={false}
-							keyboardShouldPersistTaps="handled"
-							keyboardDismissMode="interactive"
-						>
-							<Text style={styles.title}>Final Preferences</Text>
-							<View style={styles.inputContainer}>
-								<Text style={styles.label}>Advice Frequency</Text>
-								<Text style={styles.subtext}>
-									How often would you like to receive financial insights?
-								</Text>
-								<View style={styles.frequencyContainer}>
-									{[
-										'Daily snapshot',
-										'Weekly summary',
-										'Monthly report',
-										'No advice',
-									].map((freq) => (
-										<Pressable
-											key={freq}
-											onPress={() => setAdviceFrequency(freq)}
-											style={[
-												styles.frequencyButton,
-												adviceFrequency === freq && styles.selectedFrequency,
-											]}
-										>
-											<Text
-												style={[
-													styles.frequencyText,
-													adviceFrequency === freq &&
-														styles.selectedFrequencyText,
-												]}
-											>
-												{freq}
-											</Text>
-										</Pressable>
-									))}
 								</View>
 							</View>
 
@@ -719,7 +463,7 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 		// Dismiss keyboard when continuing to next slide
 		Keyboard.dismiss();
 
-		if (currentIndex < 4) {
+		if (currentIndex < 2) {
 			flatListRef.current?.scrollToIndex({
 				index: currentIndex + 1,
 				animated: true,
@@ -753,12 +497,12 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 						/>
 					</View>
 					<Pressable style={styles.skipButton} onPress={handleSkip}>
-						<Text style={styles.skipButtonText}></Text>
+						<Text style={styles.skipButtonText}>Skip</Text>
 					</Pressable>
 				</View>
 				<FlatList
 					ref={flatListRef}
-					data={[1, 2, 3, 4, 5]}
+					data={[1, 2, 3]}
 					renderItem={renderItem}
 					horizontal
 					pagingEnabled
@@ -771,16 +515,14 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 					keyboardShouldPersistTaps="handled"
 				/>
 				<View style={styles.paginationContainer}>
-					{[0, 1, 2, 3, 4].map((index) => (
+					{[0, 1, 2].map((index) => (
 						<View
 							key={index}
 							style={[
 								styles.paginationDot,
 								(index === currentIndex ||
 									(currentIndex > 0 && index === currentIndex - 1) ||
-									index === currentIndex - 2 ||
-									index === currentIndex - 3 ||
-									index === currentIndex - 4) &&
+									index === currentIndex - 2) &&
 									styles.paginationDotActive,
 							]}
 						/>
@@ -794,7 +536,7 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 					) : (
 						<View style={styles.navButton} />
 					)}
-					{currentIndex < 4 && (
+					{currentIndex < 2 && (
 						<Pressable
 							onPress={handleNext}
 							style={[styles.navButton, styles.nextButton]}

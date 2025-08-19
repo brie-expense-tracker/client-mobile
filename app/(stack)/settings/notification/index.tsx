@@ -1,5 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Switch, ScrollView } from 'react-native';
+import {
+	View,
+	Text,
+	StyleSheet,
+	Switch,
+	ScrollView,
+	Alert,
+} from 'react-native';
+import { useProfile } from '../../../../src/context/profileContext';
 
 interface NotificationSettings {
 	enableNotifications: boolean;
@@ -12,6 +20,7 @@ interface NotificationSettings {
 }
 
 const NotificationSettingsScreen: React.FC = () => {
+	const { profile, updateNotificationSettings, loading } = useProfile();
 	const [settings, setSettings] = useState<NotificationSettings>({
 		enableNotifications: true,
 		weeklySummary: true,
@@ -21,66 +30,66 @@ const NotificationSettingsScreen: React.FC = () => {
 		monthlyFinancialCheck: true,
 		monthlySavingsTransfer: true,
 	});
-	const [loading, setLoading] = useState(false);
+	const [saving, setSaving] = useState(false);
 
+	// Load settings from profile when available
 	useEffect(() => {
-		fetchNotificationSettings();
-	}, []);
-
-	const fetchNotificationSettings = async () => {
-		try {
-			setLoading(true);
-			const response = await fetch(
-				'http://192.168.1.222:3000/api/profiles/notifications'
-			);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.success && data.data) {
-					setSettings(data.data);
-				}
-			}
-		} catch (error) {
-			// UNCOMMENT THIS WHEN WE HAVE THE API
-			// console.error('Error fetching notification settings:', error);
-		} finally {
-			setLoading(false);
+		if (profile?.preferences?.notifications) {
+			setSettings(profile.preferences.notifications);
 		}
-	};
+	}, [profile?.preferences?.notifications]);
 
-	const updateNotificationSettings = async (
-		newSettings: NotificationSettings
+	const handleSettingChange = async (
+		key: keyof NotificationSettings,
+		value: boolean
 	) => {
 		try {
-			const response = await fetch(
-				'http://192.168.1.222:3000/api/profiles/notifications',
-				{
-					method: 'PUT',
-					headers: {
-						'Content-Type': 'application/json',
-					},
-					body: JSON.stringify(newSettings),
-				}
-			);
+			setSaving(true);
+			const newSettings = { ...settings, [key]: value };
+			setSettings(newSettings);
 
-			if (!response.ok) {
-				throw new Error('Failed to update notification settings');
-			}
-
-			const data = await response.json();
-			if (data.success) {
-				console.log('Notification settings updated successfully');
-			}
+			await updateNotificationSettings(newSettings);
 		} catch (error) {
-			// UNCOMMENT THIS WHEN WE HAVE THE API
-			// console.error('Error updating notification settings:', error);
-			//Alert.alert('Error', 'Failed to update notification settings');
-		}
-	};
+			console.error('Error updating notification settings:', error);
 
-	const toggleSetting = (key: keyof NotificationSettings) => {
-		const newSettings = { ...settings, [key]: !settings[key] };
-		setSettings(newSettings);
-		updateNotificationSettings(newSettings);
+			// Revert on error
+			setSettings(settings);
+
+			// Provide specific error messages based on error type
+			let errorMessage = 'Failed to update notification settings';
+			if (error instanceof Error) {
+				if (
+					error.message.includes('network') ||
+					error.message.includes('fetch')
+				) {
+					errorMessage =
+						'Network error. Please check your connection and try again.';
+				} else if (
+					error.message.includes('unauthorized') ||
+					error.message.includes('401')
+				) {
+					errorMessage = 'Session expired. Please sign in again.';
+				} else if (
+					error.message.includes('server') ||
+					error.message.includes('500')
+				) {
+					errorMessage = 'Server error. Please try again later.';
+				} else {
+					errorMessage = error.message;
+				}
+			}
+
+			Alert.alert('Update Failed', errorMessage, [
+				{ text: 'OK', style: 'default' },
+				{
+					text: 'Retry',
+					style: 'default',
+					onPress: () => handleSettingChange(key, value),
+				},
+			]);
+		} finally {
+			setSaving(false);
+		}
 	};
 
 	return (
@@ -93,8 +102,10 @@ const NotificationSettingsScreen: React.FC = () => {
 							<Text style={styles.label}>Enable Notifications</Text>
 							<Switch
 								value={settings.enableNotifications}
-								onValueChange={() => toggleSetting('enableNotifications')}
-								disabled={loading}
+								onValueChange={(value) =>
+									handleSettingChange('enableNotifications', value)
+								}
+								disabled={saving || loading}
 							/>
 						</View>
 					</View>
@@ -107,8 +118,10 @@ const NotificationSettingsScreen: React.FC = () => {
 							<Text style={styles.label}>AI Spending Suggestions</Text>
 							<Switch
 								value={settings.aiSuggestion}
-								onValueChange={() => toggleSetting('aiSuggestion')}
-								disabled={loading}
+								onValueChange={(value) =>
+									handleSettingChange('aiSuggestion', value)
+								}
+								disabled={saving || loading}
 							/>
 						</View>
 
@@ -116,8 +129,10 @@ const NotificationSettingsScreen: React.FC = () => {
 							<Text style={styles.label}>Overspending Alerts</Text>
 							<Switch
 								value={settings.overspendingAlert}
-								onValueChange={() => toggleSetting('overspendingAlert')}
-								disabled={loading}
+								onValueChange={(value) =>
+									handleSettingChange('overspendingAlert', value)
+								}
+								disabled={saving || loading}
 							/>
 						</View>
 
@@ -125,8 +140,10 @@ const NotificationSettingsScreen: React.FC = () => {
 							<Text style={styles.label}>Budget Milestones</Text>
 							<Switch
 								value={settings.budgetMilestones}
-								onValueChange={() => toggleSetting('budgetMilestones')}
-								disabled={loading}
+								onValueChange={(value) =>
+									handleSettingChange('budgetMilestones', value)
+								}
+								disabled={saving || loading}
 							/>
 						</View>
 					</View>
@@ -139,16 +156,20 @@ const NotificationSettingsScreen: React.FC = () => {
 							<Text style={styles.label}>Weekly Summary</Text>
 							<Switch
 								value={settings.weeklySummary}
-								onValueChange={() => toggleSetting('weeklySummary')}
-								disabled={loading}
+								onValueChange={(value) =>
+									handleSettingChange('weeklySummary', value)
+								}
+								disabled={saving || loading}
 							/>
 						</View>
 						<View style={styles.row}>
 							<Text style={styles.label}>Monthly Financial Health Check</Text>
 							<Switch
 								value={settings.monthlyFinancialCheck}
-								onValueChange={() => toggleSetting('monthlyFinancialCheck')}
-								disabled={loading}
+								onValueChange={(value) =>
+									handleSettingChange('monthlyFinancialCheck', value)
+								}
+								disabled={saving || loading}
 							/>
 						</View>
 						<Text style={styles.settingDescription}>
@@ -159,8 +180,10 @@ const NotificationSettingsScreen: React.FC = () => {
 							<Text style={styles.label}>Monthly Savings Transfer</Text>
 							<Switch
 								value={settings.monthlySavingsTransfer}
-								onValueChange={() => toggleSetting('monthlySavingsTransfer')}
-								disabled={loading}
+								onValueChange={(value) =>
+									handleSettingChange('monthlySavingsTransfer', value)
+								}
+								disabled={saving || loading}
 							/>
 						</View>
 						<Text style={styles.settingDescription}>

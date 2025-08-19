@@ -2,11 +2,20 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
 
 // Debug: Log the API configuration
-console.log('ApiService - Environment:', __DEV__ ? 'development' : 'production');
+console.log(
+	'ApiService - Environment:',
+	__DEV__ ? 'development' : 'production'
+);
 console.log('ApiService - API_BASE_URL:', API_BASE_URL);
 console.log('ApiService - API_BASE_URL length:', API_BASE_URL.length);
-console.log('ApiService - API_BASE_URL ends with /api:', API_BASE_URL.endsWith('/api'));
-console.log('ApiService - API_BASE_URL ends with /api/:', API_BASE_URL.endsWith('/api/'));
+console.log(
+	'ApiService - API_BASE_URL ends with /api:',
+	API_BASE_URL.endsWith('/api')
+);
+console.log(
+	'ApiService - API_BASE_URL ends with /api/:',
+	API_BASE_URL.endsWith('/api/')
+);
 
 export interface ApiResponse<T = any> {
 	success: boolean;
@@ -40,9 +49,12 @@ export class ApiService {
 		return headers;
 	}
 
-	static async get<T>(endpoint: string, retries: number = 2): Promise<ApiResponse<T>> {
+	static async get<T>(
+		endpoint: string,
+		retries: number = 2
+	): Promise<ApiResponse<T>> {
 		let lastError: Error | null = null;
-		
+
 		for (let attempt = 0; attempt <= retries; attempt++) {
 			try {
 				const headers = await this.getAuthHeaders();
@@ -56,7 +68,10 @@ export class ApiService {
 				console.log('ApiService GET - Headers:', headers);
 
 				// Debug: Log the request details
-				console.log(`ApiService GET - Attempt ${attempt + 1}/${retries + 1} - URL:`, url);
+				console.log(
+					`ApiService GET - Attempt ${attempt + 1}/${retries + 1} - URL:`,
+					url
+				);
 				console.log('ApiService GET - Headers:', headers);
 
 				// Add timeout to prevent infinite loading
@@ -75,7 +90,40 @@ export class ApiService {
 				console.log('ApiService GET - Response status:', response.status);
 				console.log('ApiService GET - Response ok:', response.ok);
 
-				const data = await response.json();
+				// Check if response is JSON before parsing
+				const contentType = response.headers.get('content-type');
+				let data: any;
+
+				if (contentType && contentType.includes('application/json')) {
+					try {
+						data = await response.json();
+					} catch (parseError) {
+						console.error('ApiService GET - JSON parse error:', parseError);
+						return {
+							success: false,
+							error: 'Invalid JSON response from server',
+						};
+					}
+				} else {
+					// Handle non-JSON responses (like HTML 404 pages)
+					const textResponse = await response.text();
+					console.log(
+						'ApiService GET - Non-JSON response:',
+						textResponse.substring(0, 200)
+					);
+
+					if (!response.ok) {
+						return {
+							success: false,
+							error: `HTTP error! status: ${response.status}`,
+						};
+					}
+
+					return {
+						success: false,
+						error: 'Server returned non-JSON response',
+					};
+				}
 
 				// Debug: Log the raw server response
 				console.log(
@@ -93,8 +141,11 @@ export class ApiService {
 				return { success: true, data };
 			} catch (error) {
 				lastError = error as Error;
-				console.error(`API GET error (attempt ${attempt + 1}/${retries + 1}):`, error);
-				
+				console.error(
+					`API GET error (attempt ${attempt + 1}/${retries + 1}):`,
+					error
+				);
+
 				// Handle timeout errors specifically
 				if (error instanceof Error && error.name === 'AbortError') {
 					if (attempt === retries) {
@@ -104,19 +155,22 @@ export class ApiService {
 						};
 					}
 					// Wait before retrying
-					await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+					await new Promise((resolve) =>
+						setTimeout(resolve, 1000 * (attempt + 1))
+					);
 					continue;
 				}
-				
+
 				// For other errors, don't retry
 				break;
 			}
 		}
-		
+
 		// If we get here, all retries failed
 		return {
 			success: false,
-			error: lastError?.message || 'Failed to fetch data after multiple attempts',
+			error:
+				lastError?.message || 'Failed to fetch data after multiple attempts',
 		};
 	}
 
@@ -140,7 +194,40 @@ export class ApiService {
 			console.log('ApiService POST - Response status:', response.status);
 			console.log('ApiService POST - Response ok:', response.ok);
 
-			const data = await response.json();
+			// Check if response is JSON before parsing
+			const contentType = response.headers.get('content-type');
+			let data: any;
+
+			if (contentType && contentType.includes('application/json')) {
+				try {
+					data = await response.json();
+				} catch (parseError) {
+					console.error('ApiService POST - JSON parse error:', parseError);
+					return {
+						success: false,
+						error: 'Invalid JSON response from server',
+					};
+				}
+			} else {
+				// Handle non-JSON responses (like HTML 404 pages)
+				const textResponse = await response.text();
+				console.log(
+					'ApiService POST - Non-JSON response:',
+					textResponse.substring(0, 200)
+				);
+
+				if (!response.ok) {
+					return {
+						success: false,
+						error: `HTTP error! status: ${response.status}`,
+					};
+				}
+
+				return {
+					success: false,
+					error: 'Server returned non-JSON response',
+				};
+			}
 
 			// Debug: Log the raw server response
 			console.log(
@@ -185,7 +272,40 @@ export class ApiService {
 			console.log('ApiService PUT - Response status:', response.status);
 			console.log('ApiService PUT - Response ok:', response.ok);
 
-			const data = await response.json();
+			// Check if response is JSON before parsing
+			const contentType = response.headers.get('content-type');
+			let data: any;
+
+			if (contentType && contentType.includes('application/json')) {
+				try {
+					data = await response.json();
+				} catch (parseError) {
+					console.error('ApiService PUT - JSON parse error:', parseError);
+					return {
+						success: false,
+						error: 'Invalid JSON response from server',
+					};
+				}
+			} else {
+				// Handle non-JSON responses (like HTML 404 pages)
+				const textResponse = await response.text();
+				console.log(
+					'ApiService PUT - Non-JSON response:',
+					textResponse.substring(0, 200)
+				);
+
+				if (!response.ok) {
+					return {
+						success: false,
+						error: `HTTP error! status: ${response.status}`,
+					};
+				}
+
+				return {
+					success: false,
+					error: 'Server returned non-JSON response',
+				};
+			}
 
 			// Debug: Log the raw server response
 			console.log(
@@ -226,7 +346,40 @@ export class ApiService {
 				headers,
 			});
 
-			const data = await response.json();
+			// Check if response is JSON before parsing
+			const contentType = response.headers.get('content-type');
+			let data: any;
+
+			if (contentType && contentType.includes('application/json')) {
+				try {
+					data = await response.json();
+				} catch (parseError) {
+					console.error('ApiService DELETE - JSON parse error:', parseError);
+					return {
+						success: false,
+						error: 'Invalid JSON response from server',
+					};
+				}
+			} else {
+				// Handle non-JSON responses (like HTML 404 pages)
+				const textResponse = await response.text();
+				console.log(
+					'ApiService DELETE - Non-JSON response:',
+					textResponse.substring(0, 200)
+				);
+
+				if (!response.ok) {
+					return {
+						success: false,
+						error: `HTTP error! status: ${response.status}`,
+					};
+				}
+
+				return {
+					success: false,
+					error: 'Server returned non-JSON response',
+				};
+			}
 
 			if (!response.ok) {
 				return {

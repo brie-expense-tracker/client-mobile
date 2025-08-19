@@ -6,7 +6,7 @@ The AI Coach implements a comprehensive 5-stage gamified progression system that
 
 ## Stage Progression Flow
 
-### Stage 1: Tutorial Zone 🎓
+### Stage 1: Beginner Zone 🎓
 
 **Objective**: Complete initial setup and education
 
@@ -21,12 +21,12 @@ The AI Coach implements a comprehensive 5-stage gamified progression system that
 
 - Basic smart actions for fundamental financial tasks
 - Educational content and guidance
-- Step-by-step tutorial progression
+- Basic setup progression
 - XP rewards for each completed step (50 XP per step)
 
 **Progression Requirements**:
 
-- Complete all 4 tutorial steps
+- Complete basic setup steps
 - Total XP: 200 (50 XP per step + 200 bonus for completion)
 
 **Unlocks**: Stage 2 - Level 2 Quests
@@ -39,7 +39,7 @@ The AI Coach implements a comprehensive 5-stage gamified progression system that
 
 **Triggers**:
 
-- Completion of Stage 1 tutorial
+- Completion of Stage 1 beginner setup
 - User engagement with smart actions
 - AI analysis of user financial patterns
 
@@ -53,7 +53,7 @@ The AI Coach implements a comprehensive 5-stage gamified progression system that
 
 **Progression Requirements**:
 
-- Complete 5+ additional smart actions beyond tutorial
+- Complete 5+ additional smart actions beyond basic setup
 - Follow AI-generated recommendations
 - Improve financial habits consistently
 
@@ -163,8 +163,8 @@ The AI Coach implements a comprehensive 5-stage gamified progression system that
 
 ### XP Rewards
 
-- **Tutorial Steps**: 50 XP each
-- **Tutorial Completion**: 200 XP bonus
+- **Basic Setup Steps**: 50 XP each
+- **Basic Setup Completion**: 200 XP bonus
 - **Level 2 Actions**: 75 XP each
 - **Dynamic Achievements**: 100-200 XP each
 - **Skill Path Mastery**: 150 XP each
@@ -173,7 +173,7 @@ The AI Coach implements a comprehensive 5-stage gamified progression system that
 
 ### Achievement Categories
 
-1. **Tutorial**: Basic setup and learning achievements
+1. **Beginner**: Basic setup and learning achievements
 2. **Level 2**: Smart action completion and habit formation
 3. **Dynamic**: Continuous optimization and improvement
 4. **Smart Path**: Skill mastery and customization
@@ -221,7 +221,7 @@ The AI Coach implements a comprehensive 5-stage gamified progression system that
 1. **AICoach**: Main progression interface
 2. **ProgressionSystem**: Skill tree and mastery visualization
 3. **ProgressionContext**: State management for progression data
-4. **TutorialProgress**: Tutorial step tracking
+4. **BasicSetupProgress**: Basic setup step tracking
 
 ### Data Flow
 
@@ -254,7 +254,7 @@ The AI Coach implements a comprehensive 5-stage gamified progression system that
 
 ## User Experience Flow
 
-1. **Onboarding**: User completes tutorial steps
+1. **Onboarding**: User completes basic setup steps
 2. **Engagement**: User interacts with smart actions
 3. **Progression**: User advances through stages
 4. **Mastery**: User develops financial skills

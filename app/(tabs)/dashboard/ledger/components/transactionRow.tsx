@@ -12,7 +12,23 @@ import Animated, {
 	Easing,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import type { Transaction } from '../../../../../src/data/transactions';
+// Transaction interface defined inline since we removed the mock data file
+interface Transaction {
+	id: string;
+	description: string;
+	amount: number;
+	date: string; // ISO string
+	type: 'income' | 'expense';
+	target?: string; // ObjectId of the target Budget or Goal
+	targetModel?: 'Budget' | 'Goal';
+	updatedAt?: string; // ISO string for sorting by time when dates are the same
+	recurringPattern?: {
+		patternId: string;
+		frequency: string;
+		confidence: number;
+		nextExpectedDate: string;
+	};
+}
 import { useBudget } from '../../../../../src/context/budgetContext';
 import { useGoal } from '../../../../../src/context/goalContext';
 

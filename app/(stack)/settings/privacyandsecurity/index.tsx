@@ -28,11 +28,11 @@ export default function PrivacySecurityScreen() {
 	const sections: Section[] = [
 		{
 			title: 'Security',
-			description: 'Protect your account with additional layers of security.',
+			description: 'Manage your account security and password.',
 			rows: [
 				{
 					label: 'Change Password',
-					route: './privacyandsecurity/changePassword',
+					route: '/(stack)/settings/privacyandsecurity/changePassword',
 				},
 			],
 		},
@@ -42,11 +42,7 @@ export default function PrivacySecurityScreen() {
 			rows: [
 				{
 					label: 'Download your data',
-					route: './privacyandsecurity/downloadData',
-				},
-				{
-					label: 'Privacy Policy',
-					route: './privacyandsecurity/privacyPolicy',
+					route: '/(stack)/settings/privacyandsecurity/downloadData',
 				},
 			],
 		},
@@ -120,8 +116,6 @@ const styles = StyleSheet.create({
 	sectionDesc: {
 		fontSize: 15,
 		color: '#555',
-		marginBottom: 16,
-		lineHeight: 21,
 	},
 
 	/* Card wrapper around rows */

@@ -19,42 +19,42 @@ export default function LegalDocumentsScreen() {
 			title: 'Terms of Service',
 			description: 'Our terms and conditions for using Brie',
 			icon: 'document-text-outline',
-			route: './legal/terms',
+			route: '/(stack)/settings/legal/terms',
 		},
 		{
 			id: 'privacy',
 			title: 'Privacy Policy',
 			description: 'How we collect, use, and protect your data',
 			icon: 'shield-checkmark-outline',
-			route: './legal/privacyPolicy',
+			route: '/(stack)/settings/legal/privacyPolicy',
 		},
 		{
 			id: 'license',
 			title: 'License Agreement',
 			description: 'Software license and usage terms',
 			icon: 'document-outline',
-			route: './legal/licenseAgreement',
+			route: '/(stack)/settings/legal/licenseAgreement',
 		},
 		{
 			id: 'cookies',
 			title: 'Cookie Policy',
 			description: 'How we use cookies and similar technologies',
 			icon: 'cafe-outline',
-			route: './legal/cookiePolicy',
+			route: '/(stack)/settings/legal/cookiePolicy',
 		},
 		{
 			id: 'disclaimer',
 			title: 'Disclaimer',
 			description: 'Important disclaimers and limitations',
 			icon: 'warning-outline',
-			route: './legal/disclaimer',
+			route: '/(stack)/settings/legal/disclaimer',
 		},
 		{
 			id: 'dataRightsCompliance',
 			title: 'Data Rights & Compliance',
 			description: 'Your rights under GDPR and data protection',
 			icon: 'shield-outline',
-			route: './legal/dataRightsCompliance',
+			route: '/(stack)/settings/legal/dataRightsCompliance',
 		},
 	];
 
@@ -76,63 +76,27 @@ export default function LegalDocumentsScreen() {
 			contentInsetAdjustmentBehavior="automatic"
 		>
 			{/* Legal Documents List */}
-			<View style={styles.section}>
-				<View style={styles.settingsContainer}>
-					{legalDocuments.map((document) => (
-						<TouchableOpacity
-							key={document.id}
-							style={styles.settingItem}
-							onPress={() => handleOpenDocument(document)}
-						>
-							<Ionicons
-								name={document.icon as keyof typeof Ionicons.glyphMap}
-								size={24}
-								color="#555"
-							/>
-							<View style={styles.settingContent}>
-								<Text style={styles.settingText}>{document.title}</Text>
-								<Text style={styles.settingDescription}>
-									{document.description}
-								</Text>
-							</View>
-							<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
-						</TouchableOpacity>
-					))}
-				</View>
-			</View>
-
-			{/* Additional Resources */}
-			<View style={styles.section}>
-				<Text style={styles.sectionTitle}>Additional Resources</Text>
-				<View style={styles.settingsContainer}>
-					{/* <TouchableOpacity
-						style={styles.settingItem}
-						onPress={() => handleOpenExternalLink('https://brie.finance/legal')}
-					>
-						<Ionicons name="globe-outline" size={24} color="#555" />
-						<View style={styles.settingContent}>
-							<Text style={styles.settingText}>Legal Website</Text>
-							<Text style={styles.settingDescription}>
-								View all legal documents on our website
-							</Text>
-						</View>
-						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
-					</TouchableOpacity> */}
-
+			<View style={styles.settingsContainer}>
+				{legalDocuments.map((document) => (
 					<TouchableOpacity
+						key={document.id}
 						style={styles.settingItem}
-						onPress={() => handleOpenExternalLink('mailto:legal@brie.finance')}
+						onPress={() => handleOpenDocument(document)}
 					>
-						<Ionicons name="mail-outline" size={24} color="#555" />
+						<Ionicons
+							name={document.icon as keyof typeof Ionicons.glyphMap}
+							size={24}
+							color="#555"
+						/>
 						<View style={styles.settingContent}>
-							<Text style={styles.settingText}>Contact Legal Team</Text>
+							<Text style={styles.settingText}>{document.title}</Text>
 							<Text style={styles.settingDescription}>
-								Get in touch with our legal department
+								{document.description}
 							</Text>
 						</View>
 						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
 					</TouchableOpacity>
-				</View>
+				))}
 			</View>
 
 			{/* Footer */}
@@ -149,37 +113,10 @@ export default function LegalDocumentsScreen() {
 const styles = StyleSheet.create({
 	scrollView: {
 		flex: 1,
-		backgroundColor: '#f7f7f7',
+		backgroundColor: '#ffffff',
 	},
 	scrollContent: {
 		paddingBottom: 40,
-	},
-	headerSection: {
-		paddingHorizontal: 20,
-		paddingTop: 20,
-		paddingBottom: 30,
-		backgroundColor: '#fff',
-	},
-	headerTitle: {
-		fontSize: 28,
-		fontWeight: '700',
-		color: '#333',
-		marginBottom: 8,
-	},
-	headerDescription: {
-		fontSize: 16,
-		color: '#666',
-		lineHeight: 22,
-	},
-	section: {
-		marginTop: 20,
-	},
-	sectionTitle: {
-		fontSize: 18,
-		fontWeight: '600',
-		color: '#333',
-		marginBottom: 12,
-		paddingHorizontal: 20,
 	},
 	settingsContainer: {
 		backgroundColor: '#fff',

@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
-import AiInsightsSummary from './AiInsightsSummary';
 import { useProfile } from '@/src/context/profileContext';
 
 const AICoachSection = () => {
@@ -13,7 +12,6 @@ const AICoachSection = () => {
 			<View style={styles.aiInsightsHeader}>
 				<Text style={styles.aiInsightsTitle}>AI Insights</Text>
 			</View>
-			<AiInsightsSummary maxInsights={1} compact={true} title="" />
 		</View>
 	);
 };

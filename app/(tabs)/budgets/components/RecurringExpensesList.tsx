@@ -13,7 +13,7 @@ import {
 	RecurringExpenseService,
 	RecurringExpense,
 } from '../../../../src/services/recurringExpenseService';
-import { useRecurringExpense } from '../../../../src/context/recurringExpenseContext';
+import { useRecurringExpenses } from '../../../../src/hooks/useRecurringExpenses';
 import { FilterContext } from '../../../../src/context/filterContext';
 import RecurringExpenseCard from './RecurringExpenseCard';
 
@@ -36,9 +36,8 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 	const {
 		expenses: allExpenses,
 		isLoading: loading,
-		expenseStatuses,
 		refetch,
-	} = useRecurringExpense();
+	} = useRecurringExpenses();
 	const [expenses, setExpenses] = useState<RecurringExpense[]>([]);
 	const [markingAsPaid, setMarkingAsPaid] = useState<string | null>(null);
 
@@ -121,14 +120,8 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 			expense.frequency
 		);
 
-		const expenseStatus = expenseStatuses[expense.patternId] || {
-			hasLinkedTransactions: false,
-			pendingCount: 0,
-			completedCount: 0,
-			latestTransaction: null,
-		};
-
-		const isPaid = expenseStatus.hasLinkedTransactions;
+		// Simplified status - using days until due to determine if overdue
+		const isPaid = daysUntilDue > 0; // If not overdue, consider it "paid" for display purposes
 		const isMarkingAsPaid = markingAsPaid === expense.patternId;
 
 		// Determine icon and color based on vendor

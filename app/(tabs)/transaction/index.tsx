@@ -20,6 +20,7 @@ import { RectButton, BorderlessButton } from 'react-native-gesture-handler';
 import { useForm, Controller } from 'react-hook-form';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import { TransactionContext } from '../../../src/context/transactionContext';
 import { useGoal, Goal } from '../../../src/context/goalContext';
@@ -109,14 +110,50 @@ const AddTransactionScreen = () => {
 		}
 	}, [amount]);
 
-	// Show loading screen if fonts are not loaded
-	if (!fontsLoaded || goalsLoading) {
-		return (
-			<View style={styles.loadingContainer}>
-				<ActivityIndicator size="large" color="#0095FF" />
-				<Text style={styles.loadingText}>Loading...</Text>
+	// ==========================================
+	// Loading State Component
+	// ==========================================
+	const LoadingState = () => (
+		<View style={styles.loadingContainer}>
+			<ActivityIndicator size="large" color="#00a2ff" />
+			<Text style={styles.loadingText}>Loading...</Text>
+		</View>
+	);
+
+	// ==========================================
+	// Error State Component
+	// ==========================================
+	const ErrorState = () => (
+		<View style={styles.errorContainer}>
+			<View style={styles.errorContent}>
+				<Ionicons name="warning-outline" size={64} color="#ff6b6b" />
+				<Text style={styles.errorTitle}>Unable to Load</Text>
+				<Text style={styles.errorSubtext}>
+					There was a problem loading the transaction form. Please try again.
+				</Text>
+				<RectButton
+					style={styles.errorButton}
+					onPress={() => router.replace('/(tabs)/transaction')}
+				>
+					<Ionicons name="refresh" size={20} color="#fff" />
+					<Text style={styles.errorButtonText}>Retry</Text>
+				</RectButton>
 			</View>
-		);
+		</View>
+	);
+
+	// ==========================================
+	// Main Render
+	// ==========================================
+	// Show loading state while fonts or goals are loading
+	if (!fontsLoaded || goalsLoading) {
+		return <LoadingState />;
+	}
+
+	// Show error state if there's a critical error
+	if (false) {
+		// Add actual error condition here if needed
+		return <ErrorState />;
 	}
 
 	const onSubmit = async (data: TransactionFormData) => {
@@ -193,132 +230,134 @@ const AddTransactionScreen = () => {
 	// MAIN COMPONENT===============================================
 	return (
 		<View style={styles.container}>
-			<View style={styles.mainContainer}>
-				<View style={styles.topContainer}>
-					<View style={styles.inputAmountContainer}>
-						<Ionicons
-							name="logo-usd"
-							size={24}
-							color="black"
-							style={styles.dollarIcon}
-						/>
-						<Controller
-							control={control}
-							name="amount"
-							render={({
-								field: { value, onChange },
-							}: {
-								field: { value: string; onChange: (value: string) => void };
-							}) => (
-								<TextInput
-									ref={amountInputRef}
-									style={styles.inputAmount}
-									placeholder="0"
-									placeholderTextColor={'#000000'}
-									value={value}
-									onChangeText={onChange}
-									showSoftInputOnFocus={false}
-								/>
-							)}
-						/>
-					</View>
-
-					{/* Goals Carousel */}
-					<View style={styles.carouselContainer}>
-						<Text style={styles.carouselLabel}>Goals (Optional)</Text>
-						<ScrollView horizontal showsHorizontalScrollIndicator={false}>
-							{goals.map((goal, index) => (
-								<RectButton
-									key={index}
-									onPress={() => toggleGoalSelection(goal)}
-									style={[
-										styles.carouselTextWrapper,
-										selectedGoals.some((g) => g.id === goal.id) &&
-											styles.selectedTag,
-									]}
-								>
-									<Ionicons
-										name={goal.icon as keyof typeof Ionicons.glyphMap}
-										size={16}
-										color={
-											selectedGoals.some((g) => g.id === goal.id)
-												? 'white'
-												: goal.color
-										}
-										style={styles.carouselIcon}
+			<SafeAreaView style={styles.safeArea} edges={['top']}>
+				<View style={styles.mainContainer}>
+					<View style={styles.topContainer}>
+						<View style={styles.inputAmountContainer}>
+							<Ionicons
+								name="logo-usd"
+								size={24}
+								color="black"
+								style={styles.dollarIcon}
+							/>
+							<Controller
+								control={control}
+								name="amount"
+								render={({
+									field: { value, onChange },
+								}: {
+									field: { value: string; onChange: (value: string) => void };
+								}) => (
+									<TextInput
+										ref={amountInputRef}
+										style={styles.inputAmount}
+										placeholder="0"
+										placeholderTextColor={'#000000'}
+										value={value}
+										onChangeText={onChange}
+										showSoftInputOnFocus={false}
 									/>
-									<Text
+								)}
+							/>
+						</View>
+
+						{/* Goals Carousel */}
+						<View style={styles.carouselContainer}>
+							<Text style={styles.carouselLabel}>Goals (Optional)</Text>
+							<ScrollView horizontal showsHorizontalScrollIndicator={false}>
+								{goals.map((goal, index) => (
+									<RectButton
+										key={index}
+										onPress={() => toggleGoalSelection(goal)}
 										style={[
-											styles.carouselText,
+											styles.carouselTextWrapper,
 											selectedGoals.some((g) => g.id === goal.id) &&
-												styles.selectedTagText,
+												styles.selectedTag,
 										]}
 									>
-										{goal.name}
-									</Text>
+										<Ionicons
+											name={goal.icon as keyof typeof Ionicons.glyphMap}
+											size={16}
+											color={
+												selectedGoals.some((g) => g.id === goal.id)
+													? 'white'
+													: goal.color
+											}
+											style={styles.carouselIcon}
+										/>
+										<Text
+											style={[
+												styles.carouselText,
+												selectedGoals.some((g) => g.id === goal.id) &&
+													styles.selectedTagText,
+											]}
+										>
+											{goal.name}
+										</Text>
+									</RectButton>
+								))}
+								<RectButton
+									onPress={navigateToGoalsWithModal}
+									style={styles.addButton}
+								>
+									<Ionicons name="add-outline" size={24} color="#757575" />
 								</RectButton>
-							))}
-							<RectButton
-								onPress={navigateToGoalsWithModal}
-								style={styles.addButton}
-							>
-								<Ionicons name="add-outline" size={24} color="grey" />
-							</RectButton>
-						</ScrollView>
-					</View>
+							</ScrollView>
+						</View>
 
-					<KeyboardAvoidingView
-						behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-					>
-						<Controller
-							control={control}
-							name="description"
-							render={({
-								field: { value, onChange },
-							}: {
-								field: { value: string; onChange: (value: string) => void };
-							}) => (
-								<TextInput
-									style={styles.inputDescription}
-									placeholder="What's this for?"
-									placeholderTextColor={'#a3a3a3'}
-									value={value}
-									onChangeText={onChange}
-								/>
-							)}
-						/>
-					</KeyboardAvoidingView>
+						<KeyboardAvoidingView
+							behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+						>
+							<Controller
+								control={control}
+								name="description"
+								render={({
+									field: { value, onChange },
+								}: {
+									field: { value: string; onChange: (value: string) => void };
+								}) => (
+									<TextInput
+										style={styles.inputDescription}
+										placeholder="What's this for?"
+										placeholderTextColor={'#a3a3a3'}
+										value={value}
+										onChangeText={onChange}
+									/>
+								)}
+							/>
+						</KeyboardAvoidingView>
 
-					<View style={styles.transactionButtonsContainer}>
-						<View style={styles.transactionButtonContainer}>
-							<RectButton
-								style={styles.transactionButton}
-								onPress={() => {
-									console.log('[Transaction] Made button pressed');
-									console.log('[Transaction] Current form values:', {
-										amount: watch('amount'),
-										description: watch('description'),
-										type: watch('type'),
-										date: watch('date'),
-									});
-									console.log('[Transaction] Form errors:', errors);
-									setValue('type', 'income');
-									handleSubmit(onSubmit)();
-								}}
-							>
-								<Text style={styles.transactionButtonText}>Made</Text>
-							</RectButton>
+						<View style={styles.transactionButtonsContainer}>
+							<View style={styles.transactionButtonContainer}>
+								<RectButton
+									style={styles.transactionButton}
+									onPress={() => {
+										console.log('[Transaction] Made button pressed');
+										console.log('[Transaction] Current form values:', {
+											amount: watch('amount'),
+											description: watch('description'),
+											type: watch('type'),
+											date: watch('date'),
+										});
+										console.log('[Transaction] Form errors:', errors);
+										setValue('type', 'income');
+										handleSubmit(onSubmit)();
+									}}
+								>
+									<Text style={styles.transactionButtonText}>Made</Text>
+								</RectButton>
+							</View>
 						</View>
 					</View>
+					<View style={styles.topNumPadContainer}>
+						<NumberPad
+							onValueChange={handleAmountChange}
+							reset={resetNumberPad}
+							value={watch('amount')}
+						/>
+					</View>
 				</View>
-				<View style={styles.topNumPadContainer}>
-					<NumberPad
-						onValueChange={handleAmountChange}
-						reset={resetNumberPad}
-						value={watch('amount')}
-					/>
-				</View>
-			</View>
+			</SafeAreaView>
 		</View>
 	);
 };
@@ -486,33 +525,37 @@ const styles = StyleSheet.create({
 	topContainer: {
 		flex: 1,
 		justifyContent: 'flex-end',
-		padding: 20,
-		paddingBottom: 10,
+		padding: 16,
+		paddingBottom: 16,
 	},
 	inputAmountContainer: {
 		flexDirection: 'row',
 		justifyContent: 'center',
 		alignItems: 'center',
-		flex: 1,
+		minHeight: 180,
+		maxHeight: 240,
 	},
 	dollarIcon: {
 		height: 40,
 	},
 	inputAmount: {
-		fontSize: 60,
-		fontWeight: 'bold',
+		fontSize: 48,
+		fontWeight: '600',
 		textAlign: 'left',
 		marginRight: 10,
+		color: '#212121',
 	},
 	inputDescription: {
 		height: 50,
-		fontSize: 20,
-		color: '#000000',
-		borderColor: '#a3a3a3',
-		borderRadius: 10,
+		fontSize: 16,
+		color: '#212121',
+		borderColor: '#e0e0e0',
+		borderRadius: 12,
 		borderWidth: 1,
-		marginBottom: 10,
-		paddingLeft: 8,
+		marginBottom: 16,
+		paddingHorizontal: 16,
+		paddingVertical: 12,
+		backgroundColor: '#fff',
 	},
 	success: {
 		color: 'green',
@@ -521,7 +564,7 @@ const styles = StyleSheet.create({
 	transactionButtonsContainer: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
-		gap: 10,
+		gap: 12,
 	},
 	transactionButtonContainer: {
 		flex: 1,
@@ -530,93 +573,149 @@ const styles = StyleSheet.create({
 		width: '100%',
 		alignItems: 'center',
 		justifyContent: 'center',
-		borderRadius: 10,
-		backgroundColor: '#0095FF',
-		padding: 16,
+		borderRadius: 12,
+		backgroundColor: '#00a2ff',
+		paddingVertical: 16,
+		paddingHorizontal: 24,
 	},
 	transactionButtonText: {
 		color: 'white',
 		fontWeight: '600',
-		fontSize: 18,
+		fontSize: 16,
 	},
 	topNumPadContainer: {
-		padding: 5,
+		padding: 8,
 		borderTopWidth: 1,
-		borderColor: '#ebebeb',
+		borderColor: '#e0e0e0',
+		backgroundColor: '#f8f9fa',
 	},
 	numPadContainer: {
 		justifyContent: 'center',
 	},
 	buttonNumLight: {
 		flex: 1,
-		paddingVertical: 6,
+		paddingVertical: 8,
 		justifyContent: 'center',
 		alignItems: 'center',
-		margin: 5,
-		borderRadius: 5,
+		margin: 4,
+		borderRadius: 8,
+		backgroundColor: '#fff',
 	},
 	buttonNumDark: {
 		flex: 1,
 		paddingVertical: 12,
 		justifyContent: 'center',
 		alignItems: 'center',
-		margin: 5,
-		borderRadius: 5,
+		margin: 4,
+		borderRadius: 8,
+		backgroundColor: '#f0f0f0',
 	},
 	buttonText: {
-		fontSize: 28,
+		fontSize: 24,
 		color: '#212121',
+		fontWeight: '500',
 	},
 	numPadRow: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 	},
 	carouselContainer: {
-		marginBottom: 10,
+		marginBottom: 16,
+	},
+	carouselLabel: {
+		fontSize: 16,
+		fontWeight: '600',
+		marginBottom: 12,
+		color: '#212121',
 	},
 	carouselTextWrapper: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		color: '#333',
-		padding: 8,
+		paddingVertical: 8,
+		paddingHorizontal: 12,
 		justifyContent: 'center',
 		borderRadius: 8,
-		marginRight: 5,
+		marginRight: 8,
+		backgroundColor: '#f8f9fa',
+		borderWidth: 1,
+		borderColor: '#e0e0e0',
 	},
 	selectedTag: {
-		backgroundColor: '#0095FF',
-		borderRadius: 8,
-		padding: 8,
+		backgroundColor: '#00a2ff',
+		borderColor: '#00a2ff',
 	},
 	selectedTagText: {
 		color: 'white',
+		fontWeight: '600',
 	},
 	addButton: {
 		padding: 8,
 		justifyContent: 'center',
 		alignItems: 'center',
 		borderRadius: 8,
+		backgroundColor: '#f8f9fa',
+		borderWidth: 1,
+		borderColor: '#e0e0e0',
 	},
 	loadingContainer: {
 		flex: 1,
 		justifyContent: 'center',
 		alignItems: 'center',
+		backgroundColor: '#fff',
 	},
 	loadingText: {
-		fontSize: 18,
-		fontWeight: 'bold',
-		marginTop: 10,
-	},
-	carouselLabel: {
-		fontSize: 18,
-		fontWeight: 'bold',
-		marginBottom: 10,
+		fontSize: 16,
+		fontWeight: '600',
+		marginTop: 16,
+		color: '#757575',
 	},
 	carouselIcon: {
 		marginRight: 8,
 	},
 	carouselText: {
+		fontSize: 14,
+		fontWeight: '500',
+		color: '#212121',
+	},
+	errorContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		paddingHorizontal: 24,
+		backgroundColor: '#fff',
+	},
+	errorContent: {
+		alignItems: 'center',
+		maxWidth: 280,
+	},
+	errorTitle: {
+		fontSize: 24,
+		fontWeight: '600',
+		color: '#212121',
+		marginTop: 16,
+		marginBottom: 8,
+		textAlign: 'center',
+	},
+	errorSubtext: {
 		fontSize: 16,
+		color: '#757575',
+		textAlign: 'center',
+		marginBottom: 32,
+		lineHeight: 22,
+	},
+	errorButton: {
+		backgroundColor: '#00a2ff',
+		borderRadius: 12,
+		paddingVertical: 16,
+		paddingHorizontal: 24,
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+	},
+	errorButtonText: {
+		color: '#FFFFFF',
+		fontSize: 16,
+		fontWeight: '600',
 	},
 });
 

@@ -7,15 +7,16 @@ import {
 	Alert,
 	TouchableOpacity,
 	RefreshControl,
+	ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { RectButton } from 'react-native-gesture-handler';
 import { useBudgets } from '../../../src/hooks/useBudgets';
 import { Budget } from '../../../src/context/budgetContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import MonthlyBudgetCircle from './components/MonthlyBudgetCircle';
-import WeeklyBudgetCircle from './components/WeeklyBudgetCircle';
-import AllBudgetCircle from './components/AllBudgetCircle';
+import MonthlyBudgetSummary from './components/MonthlyBudgetSummary';
+import WeeklyBudgetSummary from './components/WeeklyBudgetSummary';
+import AllBudgetSummary from './components/AllBudgetSummary';
 import BudgetsFeed from './components/BudgetsFeed';
 
 // ==========================================
@@ -28,17 +29,13 @@ export default function BudgetScreen() {
 	const {
 		budgets,
 		isLoading,
-		addBudget,
-		updateBudget,
-		deleteBudget,
 		refetch,
-		monthlyBudgets,
-		weeklyBudgets,
 		monthlySummary,
 		weeklySummary,
 		monthlyPercentage,
 		weeklyPercentage,
 		hasLoaded,
+		error,
 	} = useBudgets();
 
 	// ==========================================
@@ -92,6 +89,39 @@ export default function BudgetScreen() {
 	};
 
 	// ==========================================
+	// Loading State Component
+	// ==========================================
+	const LoadingState = () => (
+		<View style={styles.loadingContainer}>
+			<ActivityIndicator size="large" color="#00a2ff" />
+			<Text style={styles.loadingText}>Loading budgets...</Text>
+		</View>
+	);
+
+	// ==========================================
+	// Error State Component
+	// ==========================================
+	const ErrorState = () => (
+		<View style={styles.errorContainer}>
+			<View style={styles.errorContent}>
+				<Ionicons name="warning-outline" size={64} color="#ff6b6b" />
+				<Text style={styles.errorTitle}>Unable to Load Budgets</Text>
+				<Text style={styles.errorSubtext}>
+					There was a problem connecting to the server. Please check your
+					connection and try again.
+				</Text>
+				<RectButton
+					style={styles.errorButton}
+					onPress={() => router.replace('/(tabs)/budgets')}
+				>
+					<Ionicons name="refresh" size={20} color="#fff" />
+					<Text style={styles.errorButtonText}>Retry</Text>
+				</RectButton>
+			</View>
+		</View>
+	);
+
+	// ==========================================
 	// Empty State Component
 	// ==========================================
 	const EmptyState = () => (
@@ -113,8 +143,8 @@ export default function BudgetScreen() {
 	// ==========================================
 	// Budget Summary Components
 	// ==========================================
-	const AllBudgetsSummary = () => (
-		<AllBudgetCircle
+	const AllBudgetsSummaryComponent = () => (
+		<AllBudgetSummary
 			percentage={Math.min(
 				((monthlySummary.totalSpent + weeklySummary.totalSpent) /
 					(monthlySummary.totalAllocated + weeklySummary.totalAllocated)) *
@@ -128,8 +158,8 @@ export default function BudgetScreen() {
 		/>
 	);
 
-	const MonthlyBudgetSummary = () => (
-		<MonthlyBudgetCircle
+	const MonthlyBudgetSummaryComponent = () => (
+		<MonthlyBudgetSummary
 			percentage={monthlyPercentage}
 			spent={monthlySummary.totalSpent}
 			total={monthlySummary.totalAllocated}
@@ -138,8 +168,8 @@ export default function BudgetScreen() {
 		/>
 	);
 
-	const WeeklyBudgetSummary = () => (
-		<WeeklyBudgetCircle
+	const WeeklyBudgetSummaryComponent = () => (
+		<WeeklyBudgetSummary
 			percentage={weeklyPercentage}
 			spent={weeklySummary.totalSpent}
 			total={weeklySummary.totalAllocated}
@@ -184,80 +214,94 @@ export default function BudgetScreen() {
 		}
 	}, [budgets, activeTab]);
 
+	// ==========================================
+	// Main Render
+	// ==========================================
+	// Show loading state while fetching data
+	if (isLoading && !hasLoaded) {
+		return <LoadingState />;
+	}
+
+	// Show error state if there's an error
+	if (error && hasLoaded) {
+		return <ErrorState />;
+	}
+
+	// Show empty state if no budgets and data has loaded
+	if (budgets.length === 0 && hasLoaded) {
+		return <EmptyState />;
+	}
+
 	return (
 		<View style={styles.mainContainer}>
-			{budgets.length === 0 && !isLoading ? (
-				<EmptyState />
-			) : (
-				<ScrollView
-					showsVerticalScrollIndicator={false}
-					contentContainerStyle={{ paddingBottom: 24 }}
-					refreshControl={
-						<RefreshControl
-							refreshing={refreshing}
-							onRefresh={onRefresh}
-							tintColor="#00a2ff"
-							colors={['#00a2ff']}
-						/>
-					}
-				>
-					{/* Page Header with Add Button */}
-					<View style={styles.pageHeader}>
-						<View style={styles.pageHeaderContent}>
-							<Text style={styles.pageHeaderTitle}>Budgets Overview</Text>
-							<Text style={styles.pageHeaderSubtitle}>
-								Manage your spending across different categories
-							</Text>
-						</View>
-						<TouchableOpacity style={styles.addButton} onPress={showModal}>
-							<Ionicons name="add" size={20} color="#fff" />
-							<Text style={styles.addButtonText}>Add Budget</Text>
-						</TouchableOpacity>
+			<ScrollView
+				showsVerticalScrollIndicator={false}
+				contentContainerStyle={{ paddingBottom: 24 }}
+				refreshControl={
+					<RefreshControl
+						refreshing={refreshing}
+						onRefresh={onRefresh}
+						tintColor="#00a2ff"
+						colors={['#00a2ff']}
+					/>
+				}
+			>
+				{/* Page Header with Add Button */}
+				<View style={styles.pageHeader}>
+					<View style={styles.pageHeaderContent}>
+						<Text style={styles.pageHeaderTitle}>Budgets Overview</Text>
+						<Text style={styles.pageHeaderSubtitle}>
+							Manage your spending across different categories
+						</Text>
 					</View>
+					<TouchableOpacity style={styles.addButton} onPress={showModal}>
+						<Ionicons name="add" size={20} color="#0f0f0f" />
+						<Text style={styles.addButtonText}>Add Budget</Text>
+					</TouchableOpacity>
+				</View>
 
-					{/* Header */}
-					<View style={{ marginTop: 12 }}>
-						{activeTab === 'all' ? (
-							<AllBudgetsSummary />
-						) : activeTab === 'monthly' ? (
-							<MonthlyBudgetSummary />
-						) : (
-							<WeeklyBudgetSummary />
-						)}
-					</View>
-					<View
-						style={{
-							marginTop: 16,
-							borderTopWidth: 1,
-							borderTopColor: '#E0E0E0',
+				{/* Header */}
+				<View style={{ marginTop: 12 }}>
+					{activeTab === 'all' ? (
+						<AllBudgetsSummaryComponent />
+					) : activeTab === 'monthly' ? (
+						<MonthlyBudgetSummaryComponent />
+					) : (
+						<WeeklyBudgetSummaryComponent />
+					)}
+				</View>
+				<View
+					style={{
+						marginTop: 16,
+						borderTopWidth: 1,
+						borderTopColor: '#E0E0E0',
+					}}
+				>
+					<BudgetsFeed
+						scrollEnabled={false}
+						budgets={filteredBudgets}
+						onPressMenu={(id: string) => {
+							const b = budgets.find((bb) => bb.id === id);
+							if (b) {
+								Alert.alert(
+									'Budget Options',
+									`What would you like to do with "${b.name}"?`,
+									[
+										{
+											text: 'Edit',
+											onPress: () => showEditModal(b),
+										},
+										{
+											text: 'Cancel',
+											style: 'cancel',
+										},
+									]
+								);
+							}
 						}}
-					>
-						<BudgetsFeed
-							scrollEnabled={false}
-							budgets={filteredBudgets}
-							onPressMenu={(id: string) => {
-								const b = budgets.find((bb) => bb.id === id);
-								if (b) {
-									Alert.alert(
-										'Budget Options',
-										`What would you like to do with "${b.name}"?`,
-										[
-											{
-												text: 'Edit',
-												onPress: () => showEditModal(b),
-											},
-											{
-												text: 'Cancel',
-												style: 'cancel',
-											},
-										]
-									);
-								}
-							}}
-						/>
-					</View>
-				</ScrollView>
-			)}
+					/>
+				</View>
+			</ScrollView>
 		</View>
 	);
 }
@@ -330,17 +374,70 @@ const styles = StyleSheet.create({
 		marginTop: 4,
 	},
 	addButton: {
-		backgroundColor: '#00a2ff',
+		backgroundColor: '#f7f7f7',
 		borderRadius: 12,
 		paddingVertical: 12,
-		paddingHorizontal: 16,
+		paddingHorizontal: 10,
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		borderWidth: 1,
+		borderColor: '#e5e5e5',
+	},
+	addButtonText: {
+		color: '#0f0f0f',
+		fontSize: 14,
+		fontWeight: '600',
+	},
+	loadingContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		backgroundColor: '#fff',
+	},
+	loadingText: {
+		marginTop: 16,
+		fontSize: 16,
+		color: '#757575',
+	},
+	errorContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		paddingHorizontal: 24,
+		backgroundColor: '#fff',
+	},
+	errorContent: {
+		alignItems: 'center',
+		maxWidth: 280,
+	},
+	errorTitle: {
+		fontSize: 24,
+		fontWeight: '600',
+		color: '#212121',
+		marginTop: 16,
+		marginBottom: 8,
+		textAlign: 'center',
+	},
+	errorSubtext: {
+		fontSize: 16,
+		color: '#757575',
+		textAlign: 'center',
+		marginBottom: 32,
+		lineHeight: 22,
+	},
+	errorButton: {
+		backgroundColor: '#00a2ff',
+		borderRadius: 12,
+		paddingVertical: 16,
+		paddingHorizontal: 24,
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 8,
 	},
-	addButtonText: {
+	errorButtonText: {
 		color: '#FFFFFF',
-		fontSize: 14,
+		fontSize: 16,
 		fontWeight: '600',
 	},
 });

@@ -1,569 +1,411 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-	SafeAreaView,
-	ScrollView,
 	View,
 	Text,
-	Switch,
 	StyleSheet,
+	Switch,
 	TouchableOpacity,
+	ScrollView,
+	SafeAreaView,
 	Alert,
-	ActivityIndicator,
 } from 'react-native';
-
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useProfile } from '../../../../src/context/profileContext';
 
-const AIInsightsSettingsScreen = () => {
-	const { profile, updateAIInsightsSettings, loading } = useProfile();
-
-	// Loading states for individual switches
-	const [updatingAI, setUpdatingAI] = useState(false);
-	const [updatingFrequency, setUpdatingFrequency] = useState(false);
-	const [updatingPush, setUpdatingPush] = useState(false);
-	const [updatingEmail, setUpdatingEmail] = useState(false);
-	const [updatingBudgetingTips, setUpdatingBudgetingTips] = useState(false);
-	const [updatingExpenseReduction, setUpdatingExpenseReduction] =
-		useState(false);
-	const [updatingIncomeIdeas, setUpdatingIncomeIdeas] = useState(false);
-	const [updatingDefaultView, setUpdatingDefaultView] = useState(false);
-	const [updatingMaxInsights, setUpdatingMaxInsights] = useState(false);
-	const [updatingPriorityFilter, setUpdatingPriorityFilter] = useState(false);
-
-	// Memoize current values from profile with defaults to prevent unnecessary recalculations
-	const currentSettings = useMemo(() => {
-		const aiInsights = profile?.preferences?.aiInsights;
-		return {
-			aiEnabled: aiInsights?.enabled ?? true,
-			frequency: aiInsights?.frequency ?? 'weekly',
-			pushEnabled: aiInsights?.pushNotifications ?? true,
-			emailEnabled: aiInsights?.emailAlerts ?? false,
-			budgetingTips: aiInsights?.insightTypes?.budgetingTips ?? true,
-			incomeIdeas: aiInsights?.insightTypes?.incomeSuggestions ?? true,
-			expenseReduction: aiInsights?.insightTypes?.expenseReduction ?? true,
-			defaultView: aiInsights?.defaultView ?? 'aiCoach',
-			maxInsights: aiInsights?.maxInsights ?? 3,
-			showHighPriorityOnly: aiInsights?.showHighPriorityOnly ?? false,
-		};
-	}, [profile?.preferences?.aiInsights]);
-
-	// Destructure memoized values
-	const {
-		aiEnabled,
-		frequency,
-		pushEnabled,
-		emailEnabled,
-		budgetingTips,
-		incomeIdeas,
-		expenseReduction,
-		defaultView,
-		maxInsights,
-		showHighPriorityOnly,
-	} = currentSettings;
-
-	// Memoize the current insight types object to prevent unnecessary object creation
-	const currentInsightTypes = useMemo(() => {
-		return (
-			profile?.preferences?.aiInsights?.insightTypes || {
-				budgetingTips: true,
-				expenseReduction: true,
-				incomeSuggestions: true,
-			}
-		);
-	}, [profile?.preferences?.aiInsights?.insightTypes]);
-
-	// Handle AI enabled toggle
-	const handleAIEnabledChange = useCallback(
-		async (value: boolean) => {
-			console.log('AI Insights Settings: Toggling AI enabled to:', value);
-			if (updatingAI) return; // Prevent multiple simultaneous updates
-
-			setUpdatingAI(true);
-
-			try {
-				await updateAIInsightsSettings({ enabled: value });
-				console.log(
-					'AI Insights Settings: Successfully updated AI enabled to:',
-					value
-				);
-			} catch (error) {
-				console.error(
-					'AI Insights Settings: Error updating AI enabled:',
-					error
-				);
-				Alert.alert('Error', 'Failed to update AI insights settings');
-			} finally {
-				setUpdatingAI(false);
-			}
+// Simplified AI configuration presets
+const AI_PRESETS = {
+	basic: {
+		name: 'Basic Insights',
+		description: 'Weekly financial summaries and basic tips',
+		frequency: 'weekly',
+		insightTypes: {
+			budgetingTips: true,
+			expenseReduction: false,
+			incomeSuggestions: false,
 		},
-		[updatingAI, updateAIInsightsSettings]
-	);
-
-	// Handle frequency change
-	const handleFrequencyChange = useCallback(
-		async (newFrequency: 'daily' | 'weekly' | 'monthly') => {
-			if (updatingFrequency) return;
-
-			setUpdatingFrequency(true);
-
-			try {
-				await updateAIInsightsSettings({ frequency: newFrequency });
-			} catch (error) {
-				console.error('AI Insights Settings: Error updating frequency:', error);
-				Alert.alert('Error', 'Failed to update frequency setting');
-			} finally {
-				setUpdatingFrequency(false);
-			}
+		pushNotifications: true,
+		emailAlerts: false,
+	},
+	standard: {
+		name: 'Standard Insights',
+		description: 'Weekly insights with spending analysis and goal tracking',
+		frequency: 'weekly',
+		insightTypes: {
+			budgetingTips: true,
+			expenseReduction: true,
+			incomeSuggestions: false,
 		},
-		[updatingFrequency, updateAIInsightsSettings]
-	);
-
-	// Handle push notifications toggle
-	const handlePushNotificationsChange = useCallback(
-		async (value: boolean) => {
-			if (updatingPush) return;
-
-			setUpdatingPush(true);
-
-			try {
-				await updateAIInsightsSettings({ pushNotifications: value });
-			} catch (error) {
-				console.error(
-					'AI Insights Settings: Error updating push notifications:',
-					error
-				);
-				Alert.alert('Error', 'Failed to update push notification settings');
-			} finally {
-				setUpdatingPush(false);
-			}
+		pushNotifications: true,
+		emailAlerts: false,
+	},
+	premium: {
+		name: 'Premium Insights',
+		description: 'Comprehensive financial guidance with daily tips',
+		frequency: 'daily',
+		insightTypes: {
+			budgetingTips: true,
+			expenseReduction: true,
+			incomeSuggestions: true,
 		},
-		[updatingPush, updateAIInsightsSettings]
-	);
+		pushNotifications: true,
+		emailAlerts: true,
+	},
+};
 
-	// Handle email alerts toggle
-	const handleEmailAlertsChange = useCallback(
-		async (value: boolean) => {
-			if (updatingEmail) return;
+export default function AIInsightsSettings() {
+	const router = useRouter();
+	const { profile, updateProfile } = useProfile();
+	const [selectedPreset, setSelectedPreset] = useState<
+		'basic' | 'standard' | 'premium'
+	>('standard');
+	const [aiEnabled, setAiEnabled] = useState(true);
 
-			setUpdatingEmail(true);
+	useEffect(() => {
+		if (profile?.preferences?.aiInsights) {
+			const aiPrefs = profile.preferences.aiInsights;
+			setAiEnabled(aiPrefs.enabled);
 
-			try {
-				await updateAIInsightsSettings({ emailAlerts: value });
-			} catch (error) {
-				console.error(
-					'AI Insights Settings: Error updating email alerts:',
-					error
-				);
-				Alert.alert('Error', 'Failed to update email alert settings');
-			} finally {
-				setUpdatingEmail(false);
+			// Determine current preset based on settings
+			if (
+				aiPrefs.frequency === 'daily' &&
+				aiPrefs.insightTypes.incomeSuggestions
+			) {
+				setSelectedPreset('premium');
+			} else if (aiPrefs.insightTypes.expenseReduction) {
+				setSelectedPreset('standard');
+			} else {
+				setSelectedPreset('basic');
 			}
-		},
-		[updatingEmail, updateAIInsightsSettings]
-	);
+		}
+	}, [profile]);
 
-	// Handle insight types toggles
-	const handleBudgetingTipsChange = useCallback(
-		async (value: boolean) => {
-			if (updatingBudgetingTips) return;
+	const handlePresetChange = async (
+		preset: 'basic' | 'standard' | 'premium'
+	) => {
+		setSelectedPreset(preset);
 
-			setUpdatingBudgetingTips(true);
+		const presetConfig = AI_PRESETS[preset];
 
-			try {
-				await updateAIInsightsSettings({
-					insightTypes: {
-						...currentInsightTypes,
-						budgetingTips: value,
+		try {
+			await updateProfile({
+				...profile,
+				preferences: {
+					...profile?.preferences,
+					aiInsights: {
+						enabled: aiEnabled,
+						frequency: presetConfig.frequency,
+						pushNotifications: presetConfig.pushNotifications,
+						emailAlerts: presetConfig.emailAlerts,
+						insightTypes: presetConfig.insightTypes,
 					},
-				});
-			} catch (error) {
-				console.error(
-					'AI Insights Settings: Error updating budgeting tips:',
-					error
-				);
-				Alert.alert('Error', 'Failed to update budgeting tips setting');
-			} finally {
-				setUpdatingBudgetingTips(false);
-			}
-		},
-		[updatingBudgetingTips, updateAIInsightsSettings, currentInsightTypes]
-	);
+				},
+			});
 
-	const handleExpenseReductionChange = useCallback(
-		async (value: boolean) => {
-			if (updatingExpenseReduction) return;
+			Alert.alert('Success', `AI insights updated to ${presetConfig.name}`);
+		} catch (error) {
+			console.error('Error updating AI insights:', error);
+			Alert.alert('Error', 'Failed to update AI insights. Please try again.');
+		}
+	};
 
-			setUpdatingExpenseReduction(true);
+	const handleToggleAI = async (value: boolean) => {
+		setAiEnabled(value);
 
-			try {
-				await updateAIInsightsSettings({
-					insightTypes: {
-						...currentInsightTypes,
-						expenseReduction: value,
+		try {
+			await updateProfile({
+				...profile,
+				preferences: {
+					...profile?.preferences,
+					aiInsights: {
+						...profile?.preferences?.aiInsights,
+						enabled: value,
 					},
-				});
-			} catch (error) {
-				console.error(
-					'AI Insights Settings: Error updating expense reduction:',
-					error
-				);
-				Alert.alert('Error', 'Failed to update expense reduction setting');
-			} finally {
-				setUpdatingExpenseReduction(false);
-			}
-		},
-		[updatingExpenseReduction, updateAIInsightsSettings, currentInsightTypes]
-	);
-
-	const handleIncomeIdeasChange = useCallback(
-		async (value: boolean) => {
-			if (updatingIncomeIdeas) return;
-
-			setUpdatingIncomeIdeas(true);
-
-			try {
-				await updateAIInsightsSettings({
-					insightTypes: {
-						...currentInsightTypes,
-						incomeSuggestions: value,
-					},
-				});
-			} catch (error) {
-				console.error(
-					'AI Insights Settings: Error updating income suggestions:',
-					error
-				);
-				Alert.alert('Error', 'Failed to update income suggestions setting');
-			} finally {
-				setUpdatingIncomeIdeas(false);
-			}
-		},
-		[updatingIncomeIdeas, updateAIInsightsSettings, currentInsightTypes]
-	);
-
-	// Handle default view change
-	const handleDefaultViewChange = useCallback(
-		async (newView: 'aiCoach' | 'traditional') => {
-			if (updatingDefaultView) return;
-
-			setUpdatingDefaultView(true);
-
-			try {
-				await updateAIInsightsSettings({ defaultView: newView });
-			} catch (error) {
-				console.error(
-					'AI Insights Settings: Error updating default view:',
-					error
-				);
-				Alert.alert('Error', 'Failed to update default view setting');
-			} finally {
-				setUpdatingDefaultView(false);
-			}
-		},
-		[updatingDefaultView, updateAIInsightsSettings]
-	);
-
-	// Handle max insights change
-	const handleMaxInsightsChange = useCallback(
-		async (newMax: 3 | 5 | 10) => {
-			if (updatingMaxInsights) return;
-
-			setUpdatingMaxInsights(true);
-
-			try {
-				await updateAIInsightsSettings({ maxInsights: newMax });
-			} catch (error) {
-				console.error(
-					'AI Insights Settings: Error updating max insights:',
-					error
-				);
-				Alert.alert('Error', 'Failed to update max insights setting');
-			} finally {
-				setUpdatingMaxInsights(false);
-			}
-		},
-		[updatingMaxInsights, updateAIInsightsSettings]
-	);
-
-	// Handle priority filter change
-	const handlePriorityFilterChange = useCallback(
-		async (value: boolean) => {
-			if (updatingPriorityFilter) return;
-
-			setUpdatingPriorityFilter(true);
-
-			try {
-				await updateAIInsightsSettings({ showHighPriorityOnly: value });
-			} catch (error) {
-				console.error(
-					'AI Insights Settings: Error updating priority filter:',
-					error
-				);
-				Alert.alert('Error', 'Failed to update priority filter setting');
-			} finally {
-				setUpdatingPriorityFilter(false);
-			}
-		},
-		[updatingPriorityFilter, updateAIInsightsSettings]
-	);
-
-	if (loading) {
-		return (
-			<SafeAreaView style={styles.safe}>
-				<View style={styles.loadingContainer}>
-					<Text style={styles.loadingText}>
-						Loading AI insights settings...
-					</Text>
-				</View>
-			</SafeAreaView>
-		);
-	}
+				},
+			});
+		} catch (error) {
+			console.error('Error toggling AI insights:', error);
+			setAiEnabled(!value); // Revert on error
+		}
+	};
 
 	return (
-		<SafeAreaView style={styles.safe}>
-			<ScrollView contentContainerStyle={styles.container}>
-				{/* Main AI Toggle */}
-				<Section title="AI Insights">
-					<SectionSubtext>
-						Enable AI-powered insights to help you make better financial
-						decisions
-					</SectionSubtext>
-					<Row
-						label="Enable AI Insights"
-						value={aiEnabled}
-						onValueChange={handleAIEnabledChange}
-						loading={updatingAI}
-					/>
-				</Section>
+		<SafeAreaView style={styles.container}>
+			<ScrollView style={styles.scrollView}>
+				{/* Header */}
+				<View style={styles.header}>
+					<TouchableOpacity
+						onPress={() => router.back()}
+						style={styles.backButton}
+					>
+						<Ionicons name="arrow-back" size={24} color="#333" />
+					</TouchableOpacity>
+					<Text style={styles.headerTitle}>AI Insights</Text>
+					<View style={styles.placeholder} />
+				</View>
 
+				{/* Main Toggle */}
+				<View style={styles.section}>
+					<View style={styles.settingRow}>
+						<View style={styles.settingInfo}>
+							<Text style={styles.settingTitle}>Enable AI Insights</Text>
+							<Text style={styles.settingDescription}>
+								Get personalized financial guidance and insights
+							</Text>
+						</View>
+						<Switch
+							value={aiEnabled}
+							onValueChange={handleToggleAI}
+							trackColor={{ false: '#e5e7eb', true: '#0095FF' }}
+							thumbColor={aiEnabled ? '#fff' : '#f4f3f4'}
+						/>
+					</View>
+				</View>
+
+				{/* Preset Selection */}
 				{aiEnabled && (
-					<>
-						{/* Frequency Settings */}
-						<Section title="Suggestion Frequency">
-							<SectionSubtext>
-								{
-									"How often you'd like to receive AI-powered suggestions and insights "
-								}
-							</SectionSubtext>
-							<OptionRow
-								label="Daily"
-								selected={frequency === 'daily'}
-								onPress={() => handleFrequencyChange('daily')}
-								loading={updatingFrequency}
-							/>
-							<OptionRow
-								label="Weekly"
-								selected={frequency === 'weekly'}
-								onPress={() => handleFrequencyChange('weekly')}
-								loading={updatingFrequency}
-							/>
-							<OptionRow
-								label="Monthly"
-								selected={frequency === 'monthly'}
-								onPress={() => handleFrequencyChange('monthly')}
-								loading={updatingFrequency}
-							/>
-						</Section>
+					<View style={styles.section}>
+						<Text style={styles.sectionTitle}>Insight Level</Text>
+						<Text style={styles.sectionDescription}>
+							Choose how detailed you want your AI insights to be
+						</Text>
 
-						{/* Display Settings */}
-						<Section title="Display Preferences">
-							<SectionSubtext>
-								Customize how insights are displayed in the app
-							</SectionSubtext>
-							<OptionRow
-								label="AI Coach View (Recommended)"
-								selected={defaultView === 'aiCoach'}
-								onPress={() => handleDefaultViewChange('aiCoach')}
-								loading={updatingDefaultView}
-							/>
-							<OptionRow
-								label="Traditional List View"
-								selected={defaultView === 'traditional'}
-								onPress={() => handleDefaultViewChange('traditional')}
-								loading={updatingDefaultView}
-							/>
-							<OptionRow
-								label="Show 3 Insights"
-								selected={maxInsights === 3}
-								onPress={() => handleMaxInsightsChange(3)}
-								loading={updatingMaxInsights}
-							/>
-							<OptionRow
-								label="Show 5 Insights"
-								selected={maxInsights === 5}
-								onPress={() => handleMaxInsightsChange(5)}
-								loading={updatingMaxInsights}
-							/>
-							<OptionRow
-								label="Show 10 Insights"
-								selected={maxInsights === 10}
-								onPress={() => handleMaxInsightsChange(10)}
-								loading={updatingMaxInsights}
-							/>
-							<Row
-								label="Show High Priority Only"
-								value={showHighPriorityOnly}
-								onValueChange={handlePriorityFilterChange}
-								loading={updatingPriorityFilter}
-							/>
-						</Section>
-
-						{/* Insight Types */}
-						<Section title="Insight Types">
-							<SectionSubtext>
-								Choose which types of AI insights you want to receive
-							</SectionSubtext>
-							<Row
-								label="Budgeting Tips"
-								value={budgetingTips}
-								onValueChange={handleBudgetingTipsChange}
-								loading={updatingBudgetingTips}
-							/>
-							<Row
-								label="Expense Reduction Ideas"
-								value={expenseReduction}
-								onValueChange={handleExpenseReductionChange}
-								loading={updatingExpenseReduction}
-							/>
-							<Row
-								label="Income Suggestions"
-								value={incomeIdeas}
-								onValueChange={handleIncomeIdeasChange}
-								loading={updatingIncomeIdeas}
-							/>
-						</Section>
-
-						{/* Notification Methods */}
-						<Section title="Notification Methods">
-							<SectionSubtext>
-								Choose how you want to be notified about new AI insights
-							</SectionSubtext>
-							<Row
-								label="Push Notifications"
-								value={pushEnabled}
-								onValueChange={handlePushNotificationsChange}
-								loading={updatingPush}
-							/>
-							<Row
-								label="Email Alerts"
-								value={emailEnabled}
-								onValueChange={handleEmailAlertsChange}
-								loading={updatingEmail}
-							/>
-						</Section>
-					</>
+						{Object.entries(AI_PRESETS).map(([key, preset]) => (
+							<TouchableOpacity
+								key={key}
+								style={[
+									styles.presetCard,
+									selectedPreset === key && styles.presetCardSelected,
+								]}
+								onPress={() => handlePresetChange(key as any)}
+							>
+								<View style={styles.presetHeader}>
+									<Text
+										style={[
+											styles.presetName,
+											selectedPreset === key && styles.presetNameSelected,
+										]}
+									>
+										{preset.name}
+									</Text>
+									{selectedPreset === key && (
+										<Ionicons
+											name="checkmark-circle"
+											size={20}
+											color="#0095FF"
+										/>
+									)}
+								</View>
+								<Text style={styles.presetDescription}>
+									{preset.description}
+								</Text>
+								<View style={styles.presetFeatures}>
+									<Text style={styles.presetFeature}>
+										• {preset.frequency === 'daily' ? 'Daily' : 'Weekly'}{' '}
+										insights
+									</Text>
+									<Text style={styles.presetFeature}>
+										•{' '}
+										{preset.insightTypes.budgetingTips
+											? 'Budgeting tips'
+											: 'Basic guidance'}
+									</Text>
+									<Text style={styles.presetFeature}>
+										•{' '}
+										{preset.insightTypes.expenseReduction
+											? 'Spending analysis'
+											: 'Simple summaries'}
+									</Text>
+									{preset.insightTypes.incomeSuggestions && (
+										<Text style={styles.presetFeature}>
+											• Income optimization suggestions
+										</Text>
+									)}
+								</View>
+							</TouchableOpacity>
+						))}
+					</View>
 				)}
+
+				{/* Premium Upgrade */}
+				<View style={styles.section}>
+					<Text style={styles.sectionTitle}>Unlock Premium Features</Text>
+					<Text style={styles.sectionDescription}>
+						Get unlimited AI conversations, advanced insights, and personalized
+						recommendations
+					</Text>
+					<TouchableOpacity
+						style={styles.upgradeButton}
+						onPress={() => router.push('/(stack)/settings/upgrade')}
+					>
+						<View style={styles.upgradeButtonContent}>
+							<Ionicons name="sparkles" size={20} color="#8B5CF6" />
+							<Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
+							<Ionicons name="chevron-forward" size={20} color="#8B5CF6" />
+						</View>
+					</TouchableOpacity>
+				</View>
+
+				{/* Information */}
+				<View style={styles.infoSection}>
+					<View style={styles.infoCard}>
+						<Ionicons
+							name="information-circle-outline"
+							size={24}
+							color="#0095FF"
+						/>
+						<Text style={styles.infoText}>
+							AI insights are personalized based on your spending patterns,
+							budgets, and goals. You can change these settings anytime.
+						</Text>
+					</View>
+				</View>
 			</ScrollView>
 		</SafeAreaView>
 	);
-};
-
-const Section = React.memo(
-	({ title, children }: { title: string; children: React.ReactNode }) => (
-		<View style={{ marginBottom: 32 }}>
-			<Text style={styles.sectionHeader}>{title}</Text>
-			{children}
-		</View>
-	)
-);
-Section.displayName = 'Section';
-
-const SectionSubtext = React.memo(
-	({ children }: { children: React.ReactNode }) => (
-		<Text style={styles.sectionSubtext}>{children}</Text>
-	)
-);
-SectionSubtext.displayName = 'SectionSubtext';
-
-const Row = React.memo(
-	({
-		label,
-		value,
-		onValueChange,
-		loading = false,
-	}: {
-		label: string;
-		value: boolean;
-		onValueChange: (v: boolean) => void;
-		loading?: boolean;
-	}) => (
-		<View style={styles.row}>
-			<Text style={styles.rowLabel}>{label}</Text>
-			{loading ? (
-				<ActivityIndicator size="small" color="#007AFF" />
-			) : (
-				<Switch value={value} onValueChange={onValueChange} />
-			)}
-		</View>
-	)
-);
-Row.displayName = 'Row';
-
-const OptionRow = React.memo(
-	({
-		label,
-		selected,
-		onPress,
-		loading = false,
-	}: {
-		label: string;
-		selected: boolean;
-		onPress: () => void;
-		loading?: boolean;
-	}) => (
-		<TouchableOpacity
-			style={[styles.optionRow, loading && styles.optionRowDisabled]}
-			onPress={onPress}
-			disabled={loading}
-		>
-			<Text style={styles.optionLabel}>{label}</Text>
-			{loading ? (
-				<ActivityIndicator size="small" color="#007AFF" />
-			) : (
-				<Text style={[styles.checkmark, selected && styles.checkmarkSelected]}>
-					{selected ? '✓' : ''}
-				</Text>
-			)}
-		</TouchableOpacity>
-	)
-);
-OptionRow.displayName = 'OptionRow';
+}
 
 const styles = StyleSheet.create({
-	safe: { flex: 1, backgroundColor: '#fff' },
-	container: { padding: 24, paddingBottom: 48 },
-	loadingContainer: {
+	container: {
 		flex: 1,
-		justifyContent: 'center',
-		alignItems: 'center',
+		backgroundColor: '#fff',
 	},
-	loadingText: { fontSize: 16, color: '#666' },
-	sectionHeader: { fontSize: 18, fontWeight: '600', marginBottom: 12 },
-	sectionSubtext: { fontSize: 12, color: '#666', marginBottom: 12 },
-	row: {
+	scrollView: {
+		flex: 1,
+	},
+	header: {
 		flexDirection: 'row',
-		justifyContent: 'space-between',
 		alignItems: 'center',
-		paddingVertical: 12,
+		justifyContent: 'space-between',
+		paddingHorizontal: 20,
+		paddingVertical: 16,
 		borderBottomWidth: 1,
-		borderBottomColor: '#efefef',
+		borderBottomColor: '#e5e7eb',
 	},
-	rowLabel: { fontSize: 16, color: '#333', flexShrink: 1 },
-	optionRow: {
+	backButton: {
+		padding: 8,
+	},
+	headerTitle: {
+		fontSize: 20,
+		fontWeight: '600',
+		color: '#333',
+	},
+	placeholder: {
+		width: 40,
+	},
+	section: {
+		padding: 20,
+		borderBottomWidth: 1,
+		borderBottomColor: '#f3f4f6',
+	},
+	sectionTitle: {
+		fontSize: 18,
+		fontWeight: '600',
+		color: '#333',
+		marginBottom: 8,
+	},
+	sectionDescription: {
+		fontSize: 14,
+		color: '#6b7280',
+		marginBottom: 20,
+		lineHeight: 20,
+	},
+	settingRow: {
 		flexDirection: 'row',
-		justifyContent: 'space-between',
 		alignItems: 'center',
-		paddingVertical: 12,
-		paddingHorizontal: 4,
-		borderBottomWidth: 1,
-		borderBottomColor: '#efefef',
+		justifyContent: 'space-between',
 	},
-	optionRowDisabled: {
-		opacity: 0.6,
+	settingInfo: {
+		flex: 1,
+		marginRight: 16,
 	},
-	optionLabel: { fontSize: 16, color: '#333' },
-	checkmark: { fontSize: 18, color: '#ccc', fontWeight: 'bold' },
-	checkmarkSelected: { color: '#007AFF' },
+	settingTitle: {
+		fontSize: 16,
+		fontWeight: '500',
+		color: '#333',
+		marginBottom: 4,
+	},
+	settingDescription: {
+		fontSize: 14,
+		color: '#6b7280',
+		lineHeight: 20,
+	},
+	presetCard: {
+		backgroundColor: '#f8fafc',
+		borderRadius: 12,
+		padding: 16,
+		marginBottom: 12,
+		borderWidth: 2,
+		borderColor: 'transparent',
+	},
+	presetCardSelected: {
+		borderColor: '#0095FF',
+		backgroundColor: '#f0f9ff',
+	},
+	presetHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		marginBottom: 8,
+	},
+	presetName: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#333',
+	},
+	presetNameSelected: {
+		color: '#0095FF',
+	},
+	presetDescription: {
+		fontSize: 14,
+		color: '#6b7280',
+		marginBottom: 12,
+		lineHeight: 20,
+	},
+	presetFeatures: {
+		gap: 4,
+	},
+	presetFeature: {
+		fontSize: 13,
+		color: '#4b5563',
+		lineHeight: 18,
+	},
+	infoSection: {
+		padding: 20,
+	},
+	infoCard: {
+		flexDirection: 'row',
+		alignItems: 'flex-start',
+		backgroundColor: '#f0f9ff',
+		borderRadius: 12,
+		padding: 16,
+		gap: 12,
+	},
+	infoText: {
+		flex: 1,
+		fontSize: 14,
+		color: '#0369a1',
+		lineHeight: 20,
+	},
+	upgradeButton: {
+		backgroundColor: '#F8F7FF',
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#E0D7FF',
+		overflow: 'hidden',
+	},
+	upgradeButtonContent: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		padding: 16,
+	},
+	upgradeButtonText: {
+		flex: 1,
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#8B5CF6',
+		textAlign: 'center',
+		marginHorizontal: 12,
+	},
 });
-
-// Memoize the component to prevent unnecessary re-renders
-export default React.memo(AIInsightsSettingsScreen);

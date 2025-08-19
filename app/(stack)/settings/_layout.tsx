@@ -104,16 +104,39 @@ export default function Layout() {
 			/>
 
 			<Stack.Screen
+				name="privacyandsecurity/downloadData"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Download Data',
+					headerShadowVisible: false,
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+					headerLeft: () => (
+						<BorderlessButton
+							onPress={() => router.back()}
+							onActiveStateChange={setIsPressed}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</BorderlessButton>
+					),
+				}}
+			/>
+
+			<Stack.Screen
 				name="profile/index"
 				options={{
 					headerShown: true,
 					headerBackButtonDisplayMode: 'minimal',
 					headerTitle: 'Profile',
 					headerShadowVisible: false,
-					headerLargeTitle: true,
-					headerLargeStyle: {
-						backgroundColor: '#ffffff',
-					},
 					headerTitleStyle: {
 						fontSize: 20,
 						fontWeight: '600',
@@ -339,10 +362,6 @@ export default function Layout() {
 					headerBackButtonDisplayMode: 'minimal',
 					headerTitle: 'About',
 					headerShadowVisible: false,
-					headerLargeTitle: true,
-					headerLargeStyle: {
-						backgroundColor: '#ffffff',
-					},
 					headerTitleStyle: {
 						fontSize: 20,
 						fontWeight: '600',
@@ -365,16 +384,12 @@ export default function Layout() {
 			/>
 
 			<Stack.Screen
-				name="help/index"
+				name="faq/index"
 				options={{
 					headerShown: true,
 					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: 'Help & Support',
+					headerTitle: 'Frequently Asked Questions',
 					headerShadowVisible: false,
-					headerLargeTitle: true,
-					headerLargeStyle: {
-						backgroundColor: '#ffffff',
-					},
 					headerTitleStyle: {
 						fontSize: 20,
 						fontWeight: '600',
@@ -490,10 +505,6 @@ export default function Layout() {
 					headerBackButtonDisplayMode: 'minimal',
 					headerTitle: 'Legal Documents',
 					headerShadowVisible: false,
-					headerLargeTitle: true,
-					headerLargeStyle: {
-						backgroundColor: '#ffffff',
-					},
 					headerTitleStyle: {
 						fontSize: 20,
 						fontWeight: '600',
@@ -734,6 +745,34 @@ export default function Layout() {
 					headerShown: true,
 					headerBackButtonDisplayMode: 'minimal',
 					headerTitle: 'AI Insights',
+					headerShadowVisible: false,
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+
+					headerLeft: () => (
+						<BorderlessButton
+							onPress={() => router.back()}
+							onActiveStateChange={setIsPressed}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</BorderlessButton>
+					),
+				}}
+			/>
+
+			<Stack.Screen
+				name="recurringExpenses/index"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Recurring Expenses',
 					headerShadowVisible: false,
 					headerTitleStyle: {
 						fontSize: 20,

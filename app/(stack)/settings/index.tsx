@@ -1,33 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
 	SafeAreaView,
 	View,
 	Text,
 	StyleSheet,
-	TouchableOpacity,
 	Alert,
 	ScrollView,
 	ActivityIndicator,
 } from 'react-native';
-import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { BorderlessButton, RectButton } from 'react-native-gesture-handler';
+import { RectButton } from 'react-native-gesture-handler';
 import useAuth from '../../../src/context/AuthContext';
 import { useProfile } from '../../../src/context/profileContext';
-import Setting from '../../../src/components/Setting';
+import Setting from './components/settingItem';
 
 export default function SettingsScreen() {
 	const router = useRouter();
 	const { user, logout } = useAuth();
-	const {
-		profile,
-		loading: profileLoading,
-		error: profileError,
-	} = useProfile();
-	const [profileImage, setProfileImage] = useState(
-		require('../../../src/assets/images/profile.jpg')
-	);
+	const { loading: profileLoading } = useProfile();
 
 	const handleSignOut = async () => {
 		Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -63,28 +54,6 @@ export default function SettingsScreen() {
 		<View style={styles.mainContainer}>
 			<SafeAreaView style={styles.safeArea}>
 				<ScrollView>
-					{/* ——— Profile picture and balances ——— */}
-					<View style={styles.profilePicWrapper}>
-						<View style={styles.profilePicContainer}>
-							<Image
-								source={profileImage}
-								style={styles.profilePic}
-								contentFit="cover"
-							/>
-						</View>
-						<Text style={styles.userName}>
-							{profile
-								? `${profile.firstName} ${profile.lastName}`
-								: user?.email || '@user'}
-						</Text>
-						{profile && (
-							<Text style={styles.userDetails}>
-								Monthly Income: ${profile.monthlyIncome.toLocaleString()} |
-								Savings: ${profile.savings.toLocaleString()}
-							</Text>
-						)}
-					</View>
-
 					{/* ——— Settings ——— */}
 					<View style={styles.settingsContainerWrapper}>
 						<View style={styles.settingsContainer}>
@@ -93,7 +62,7 @@ export default function SettingsScreen() {
 							<Setting
 								icon="person-outline"
 								label="Profile"
-								onPress={() => router.push('./profile')}
+								onPress={() => router.push('/(stack)/settings/profile')}
 							/>
 
 							{/* FINANCE */}
@@ -101,65 +70,57 @@ export default function SettingsScreen() {
 							<Setting
 								icon="card-outline"
 								label="Budgets"
-								onPress={() => router.push('./budgets')}
+								onPress={() => router.push('/(stack)/settings/budgets')}
 							/>
 
 							<Setting
 								icon="trophy-outline"
 								label="Goals"
-								onPress={() => router.push('./goals')}
+								onPress={() => router.push('/(stack)/settings/goals')}
 							/>
 
 							<Setting
 								icon="repeat-outline"
 								label="Recurring Expenses"
-								onPress={() => router.push('/(tabs)/budgets?tab=recurring')}
+								onPress={() =>
+									router.push('/(stack)/settings/recurringExpenses')
+								}
 							/>
 
-							{/* AI & PRIVACY */}
-							<Text style={styles.settingsHeader}>AI & Privacy</Text>
+							{/* PREFERENCES & AI */}
+							<Text style={styles.settingsHeader}>Preferences & AI</Text>
 							<Setting
 								icon="bulb-outline"
 								label="AI Insights"
-								onPress={() => router.push('./aiInsights')}
+								onPress={() => router.push('/(stack)/settings/aiInsights')}
 							/>
-							<Setting
-								icon="shield-outline"
-								label="Data & Privacy"
-								onPress={() => router.push('./dataandprivacy')}
-							/>
-
-							{/* APP PREFERENCES */}
-							<Text style={styles.settingsHeader}>Preferences</Text>
 							<Setting
 								icon="notifications-outline"
 								label="Notifications"
-								onPress={() => router.push('./notification')}
+								onPress={() => router.push('/(stack)/settings/notification')}
 							/>
 
-							{/* LEGAL & SUPPORT */}
-							<Text style={styles.settingsHeader}>Support & Legal</Text>
+							{/* SUBSCRIPTION */}
+							<Text style={styles.settingsHeader}>Subscription</Text>
+							<Setting
+								icon="sparkles"
+								label="Upgrade to Premium"
+								onPress={() => router.push('/(stack)/settings/upgrade')}
+							/>
+
+							{/* SECURITY & SUPPORT */}
+							<Text style={styles.settingsHeader}>Security & Support</Text>
+							<Setting
+								icon="shield-outline"
+								label="Security & Privacy"
+								onPress={() =>
+									router.push('/(stack)/settings/privacyandsecurity')
+								}
+							/>
 							<Setting
 								icon="help-circle-outline"
-								label="Help & Support"
-								onPress={() => router.push('./help')}
-							/>
-							<Setting
-								icon="information-circle-outline"
-								label="About"
-								onPress={() => router.push('./about')}
-							/>
-							<Setting
-								icon="document-text-outline"
-								label="Legal Documents"
-								onPress={() => router.push('./legal')}
-							/>
-
-							{/* PLACEHOLDER / FUTURE */}
-							<Setting
-								icon="chatbox-ellipses-outline"
-								label="AI Chat"
-								trailing="Coming Soon"
+								label="Help & About"
+								onPress={() => router.push('/(stack)/settings/faq')}
 							/>
 						</View>
 					</View>
@@ -196,46 +157,6 @@ const styles = StyleSheet.create({
 		color: '#666',
 		fontWeight: '500',
 	},
-
-	/***** profile *****/
-	profilePicWrapper: {
-		alignItems: 'center',
-		paddingHorizontal: 24,
-		marginTop: 12,
-	},
-	profilePicContainer: { marginBottom: 12 },
-	profilePic: {
-		width: 100,
-		height: 100,
-		borderRadius: 50,
-		borderWidth: 2,
-		borderColor: '#ddd',
-	},
-	userName: { fontSize: 18, fontWeight: '500', color: '#666', marginBottom: 4 },
-	userDetails: { fontSize: 14, color: '#828282', marginBottom: 4 },
-
-	/***** stats *****/
-	statsContainer: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		marginTop: 12,
-		paddingHorizontal: 16,
-		gap: 12,
-	},
-	statCard: {
-		backgroundColor: '#0790ff',
-		padding: 16,
-		borderRadius: 12,
-		alignItems: 'center',
-		flex: 1,
-		elevation: 2,
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
-		shadowRadius: 3.84,
-	},
-	statValue: { fontSize: 20, fontWeight: '300', color: '#fff' },
-	statLabel: { fontSize: 12, fontWeight: '700', color: '#fff', marginTop: 4 },
 
 	/***** settings *****/
 	settingsContainerWrapper: { paddingHorizontal: 16 },

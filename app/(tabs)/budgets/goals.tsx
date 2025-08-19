@@ -17,10 +17,6 @@ import GoalsSummaryCard from './components/GoalsSummaryCard';
 import GoalsFeed from './components/GoalsFeed';
 
 // ==========================================
-// Constants
-// ==========================================
-
-// ==========================================
 // Main Component
 // ==========================================
 export default function GoalsScreen() {

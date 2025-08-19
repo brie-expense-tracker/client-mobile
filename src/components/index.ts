@@ -8,7 +8,7 @@ export { default as FinancialDashboard } from './FinancialDashboard';
 
 // AI Insights Components
 export { default as SmartActionsSummary } from './SmartActionsSummary';
-export { default as AISuggestionsList } from '../../app/(tabs)/insights/components/AISuggestionsList';
+export { default as AISuggestionsList } from '../../app/(tabs)/assistant/components/AISuggestionsList';
 
 // Summary & Export Components
 export { default as SummaryCards } from './SummaryCards';
@@ -21,4 +21,4 @@ export { default as LinearProgressBar } from '../../app/(tabs)/budgets/component
 export { default as ProfitGraph } from './ProfitGraph';
 export { default as ProfitLossGraph } from './ProfitLossGraph';
 export { default as AddTransaction } from './AddTransaction';
-export { default as Setting } from './Setting';
+export { default as Setting } from '../../app/(stack)/settings/components/settingItem';

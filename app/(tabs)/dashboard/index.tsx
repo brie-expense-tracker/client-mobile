@@ -22,13 +22,10 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { TransactionContext } from '../../../src/context/transactionContext';
 import { useBudget } from '../../../src/context/budgetContext';
 import { useGoal } from '../../../src/context/goalContext';
-import { useProfile } from '@/src/context/profileContext';
 import { useNotification } from '@/src/context/notificationContext';
-import { useRecurringExpense } from '@/src/context/recurringExpenseContext';
 import {
 	SimpleBalanceWidget,
 	QuickFinancialSummary,
-	AiInsightsSummary,
 	TransactionHistory,
 	SettingsBudgetsGoalsWidget,
 	RecurringExpensesSummaryWidget,
@@ -63,7 +60,6 @@ const Dashboard: React.FC = () => {
 	const { transactions, isLoading, refetch } = useContext(TransactionContext);
 	const { budgets } = useBudget();
 	const { goals } = useGoal();
-	const { profile } = useProfile();
 	const { unreadCount } = useNotification();
 
 	const [isPressed, setIsPressed] = useState(false);
@@ -248,27 +244,11 @@ const Dashboard: React.FC = () => {
 						{/* Quick Financial Health Summary */}
 						<QuickFinancialSummary transactions={transactions} />
 
-						{/* Spending Forecast Card */}
-						<SpendingForecastCard
-							showBudgetForecasts={true}
-							onPress={() => {
-								// Navigate to detailed forecast view
-								router.push('/(tabs)/insights');
-							}}
-						/>
-
 						{/* Recurring Expenses Summary Widget */}
 						<RecurringExpensesSummaryWidget
 							title="Recurring Expenses"
 							maxVisibleItems={3}
 							showViewAllButton={true}
-						/>
-
-						{/* AI Insights - Click to see Smart Actions */}
-						<AiInsightsSummary
-							maxInsights={1}
-							compact={true}
-							title="AI Insights"
 						/>
 
 						{/* Recent Transactions */}

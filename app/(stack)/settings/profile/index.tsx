@@ -1,76 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import {
 	View,
 	Text,
 	StyleSheet,
 	TouchableOpacity,
-	Alert,
 	ScrollView,
 	ActivityIndicator,
 } from 'react-native';
-import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
 import { useProfile } from '../../../../src/context/profileContext';
 import useAuth from '../../../../src/context/AuthContext';
-import Setting from '../../../../src/components/Setting';
+import Setting from '../components/settingItem';
 
 export default function AccountScreen() {
 	const router = useRouter();
 	const { profile, loading, error, fetchProfile } = useProfile();
 	const { user } = useAuth();
-	const [profileImage, setProfileImage] = useState(
-		require('../../../../src/assets/images/profile.jpg')
-	);
 
 	useEffect(() => {
 		fetchProfile();
 	}, []);
-
-	const pickImage = async () => {
-		const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-		if (status !== 'granted') {
-			Alert.alert(
-				'Permission needed',
-				'Please grant permission to access your photos'
-			);
-			return;
-		}
-
-		const result = await ImagePicker.launchImageLibraryAsync({
-			mediaTypes: ImagePicker.MediaTypeOptions.Images,
-			allowsEditing: true,
-			aspect: [1, 1],
-			quality: 1,
-		});
-
-		if (!result.canceled) {
-			setProfileImage({ uri: result.assets[0].uri });
-		}
-	};
-
-	const handleDeleteAccount = () => {
-		Alert.alert(
-			'Delete Account',
-			'Are you sure you want to delete your account? This action cannot be undone.',
-			[
-				{
-					text: 'Cancel',
-					style: 'cancel',
-				},
-				{
-					text: 'Delete',
-					style: 'destructive',
-					onPress: () => {
-						// Handle account deletion
-						Alert.alert('Account Deleted', 'Your account has been deleted.');
-					},
-				},
-			]
-		);
-	};
 
 	if (loading) {
 		return (
@@ -113,34 +63,7 @@ export default function AccountScreen() {
 			style={styles.scrollView}
 			contentContainerStyle={styles.scrollContent}
 			showsVerticalScrollIndicator={false}
-			contentInsetAdjustmentBehavior="automatic"
 		>
-			{/* Profile Section */}
-			<View style={styles.section}>
-				<View style={styles.profileSection}>
-					<View style={styles.profilePicContainer}>
-						<Image
-							source={profileImage}
-							style={styles.profilePic}
-							contentFit="cover"
-						/>
-						<TouchableOpacity
-							style={styles.editIconContainer}
-							onPress={pickImage}
-						>
-							<View style={styles.editIconBackground}>
-								<Ionicons name="camera" size={16} color="#fff" />
-							</View>
-						</TouchableOpacity>
-					</View>
-					<View style={styles.profileInfo}>
-						<Text style={styles.userName}>
-							{profile.firstName} {profile.lastName}
-						</Text>
-					</View>
-				</View>
-			</View>
-
 			{/* Account Details */}
 			<View style={styles.section}>
 				<Text style={styles.sectionTitle}>Account Details</Text>
@@ -160,15 +83,6 @@ export default function AccountScreen() {
 						icon="mail-outline"
 						label="Email"
 						value={user?.email || 'Not set'}
-					/>
-
-					<Setting
-						icon="key-outline"
-						label="Change Password"
-						value="••••••••"
-						onPress={() =>
-							router.push('/(stack)/settings/profile/editPassword')
-						}
 					/>
 				</View>
 			</View>
@@ -265,52 +179,7 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 4,
 		marginTop: 16,
 	},
-	profileSection: {
-		backgroundColor: '#fff',
-		borderRadius: 12,
-		padding: 6,
-		marginTop: 0,
-		alignItems: 'center',
-	},
-	profilePicContainer: {
-		position: 'relative',
-		marginBottom: 8,
-	},
-	profilePic: {
-		width: 80,
-		height: 80,
-		borderRadius: 40,
-		borderWidth: 2,
-		borderColor: '#ddd',
-	},
-	editIconContainer: {
-		position: 'absolute',
-		bottom: 0,
-		right: 0,
-	},
-	editIconBackground: {
-		backgroundColor: '#0095FF',
-		width: 28,
-		height: 28,
-		borderRadius: 14,
-		justifyContent: 'center',
-		alignItems: 'center',
-		borderWidth: 2,
-		borderColor: '#fff',
-	},
-	profileInfo: {
-		alignItems: 'center',
-	},
-	userName: {
-		fontSize: 20,
-		fontWeight: '600',
-		color: '#333',
-		marginBottom: 4,
-	},
-	username: {
-		fontSize: 16,
-		color: '#666',
-	},
+
 	settingsContainer: {
 		backgroundColor: '#fff',
 		overflow: 'hidden',

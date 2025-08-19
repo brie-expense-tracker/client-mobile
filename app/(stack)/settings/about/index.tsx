@@ -1,22 +1,12 @@
 import React from 'react';
-import {
-	View,
-	Text,
-	StyleSheet,
-	TouchableOpacity,
-	ScrollView,
-	Linking,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Linking } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 
 export default function AboutScreen() {
-	const router = useRouter();
-
 	const appInfo = {
 		name: 'Brie',
-		version: '1.0.0',
+		version: '0.0.1-alpha.N',
 		build: '2024.1.0',
 		description:
 			'Your personal finance companion for smarter money management.',
@@ -25,40 +15,13 @@ export default function AboutScreen() {
 		email: 'support@brie.finance',
 	};
 
-	const handleOpenLink = (url: string) => {
-		Linking.openURL(url).catch((err) =>
-			console.error('An error occurred', err)
-		);
-	};
-
-	const handleEmailSupport = () => {
-		Linking.openURL(`mailto:${appInfo.email}`).catch((err) =>
-			console.error('An error occurred', err)
-		);
-	};
-
 	return (
-		// <View style={styles.mainContainer}>
 		<ScrollView
 			style={styles.scrollView}
 			contentContainerStyle={styles.scrollContent}
 			showsVerticalScrollIndicator={false}
 			contentInsetAdjustmentBehavior="automatic"
 		>
-			{/* Sticky Header */}
-			{/* <View style={styles.stickyHeader}>
-				<TouchableOpacity
-					style={styles.backButton}
-					onPress={() => router.back()}
-				>
-					<Ionicons name="arrow-back" size={24} color="#333" />
-				</TouchableOpacity>
-				<Text style={styles.headerText}>About</Text>
-				<View style={styles.placeholder} />
-			</View> */}
-
-			{/* Scrollable Content */}
-
 			{/* App Info Section */}
 			<View style={styles.heroSection}>
 				<View style={styles.appInfoSection}>
@@ -67,8 +30,6 @@ export default function AboutScreen() {
 						style={styles.appIcon}
 						contentFit="contain"
 					/>
-					{/* <Text style={styles.appName}>{appInfo.name}</Text> */}
-					<Text style={styles.appVersion}>Version {appInfo.version}</Text>
 					<Text style={styles.appDescription}>{appInfo.description}</Text>
 				</View>
 			</View>
@@ -136,7 +97,6 @@ export default function AboutScreen() {
 				</Text>
 			</View>
 		</ScrollView>
-		// </View>
 	);
 }
 
@@ -174,17 +134,6 @@ const styles = StyleSheet.create({
 		width: 120,
 		height: 70,
 		borderRadius: 16,
-	},
-	appName: {
-		fontSize: 24,
-		fontWeight: '700',
-		color: '#333',
-		marginBottom: 8,
-	},
-	appVersion: {
-		fontSize: 16,
-		color: '#666',
-		marginBottom: 16,
 	},
 	appDescription: {
 		fontSize: 16,
