@@ -1,5 +1,5 @@
 // app/(tabs)/insights.tsx — Brie AI (clean, focused assistant)
-// Enhanced AI system with conversation context and intelligent responses
+// Enhanced AI system with unified interface and intelligent context switching
 
 import React, {
 	useState,
@@ -36,8 +36,10 @@ import { TransactionContext } from '../../../src/context/transactionContext';
 import { useProfile } from '../../../src/context/profileContext';
 import { useBudget } from '../../../src/context/budgetContext';
 import { useGoal } from '../../../src/context/goalContext';
-import { CustomGPTService } from '../../../src/services/customGPTService';
+import { CustomGPTService } from '../../../src/services';
 import PaywallModal from './components/PaywallModal';
+import MLInsightsPanel from './components/MLInsightsPanel';
+import useMLServices, { MLInsight } from '../../../src/hooks/useMLServices';
 
 if (
 	Platform.OS === 'android' &&
@@ -53,7 +55,14 @@ interface Message {
 	text: string;
 	isUser: boolean;
 	timestamp: Date;
-	type: 'text' | 'insight' | 'data' | 'action' | 'suggestion';
+	type:
+		| 'text'
+		| 'insight'
+		| 'data'
+		| 'action'
+		| 'suggestion'
+		| 'insight-card'
+		| 'action-panel';
 	data?: any;
 }
 
@@ -63,6 +72,9 @@ interface SuggestedPrompt {
 	icon: keyof typeof Ionicons.glyphMap;
 	category: 'spending' | 'budget' | 'goals' | 'general';
 }
+
+// Interface modes for the unified AI assistant
+type InterfaceMode = 'chat' | 'insights' | 'actions' | 'analytics';
 
 // ————————————————————————————————————————————————————————————
 // Hooks
@@ -84,9 +96,13 @@ const useReducedMotion = () => {
 const Header = ({
 	onOpenSettings,
 	currentUsage,
+	interfaceMode,
+	onModeChange,
 }: {
 	onOpenSettings: () => void;
 	currentUsage: any;
+	interfaceMode: InterfaceMode;
+	onModeChange: (mode: InterfaceMode) => void;
 }) => {
 	const [showUsageIndicator, setShowUsageIndicator] = useState(false);
 	const [usagePercent, setUsagePercent] = useState(0);
@@ -141,6 +157,36 @@ const Header = ({
 		}
 	}, [currentUsage]);
 
+	const getModeIcon = (mode: InterfaceMode) => {
+		switch (mode) {
+			case 'chat':
+				return 'chatbubbles';
+			case 'insights':
+				return 'analytics';
+			case 'actions':
+				return 'flash';
+			case 'analytics':
+				return 'trending-up';
+			default:
+				return 'sparkles';
+		}
+	};
+
+	const getModeColor = (mode: InterfaceMode) => {
+		switch (mode) {
+			case 'chat':
+				return '#3b82f6';
+			case 'insights':
+				return '#8b5cf6';
+			case 'actions':
+				return '#10b981';
+			case 'analytics':
+				return '#f59e0b';
+			default:
+				return '#3b82f6';
+		}
+	};
+
 	return (
 		<View style={styles.headerWrap}>
 			<SafeAreaView>
@@ -148,7 +194,25 @@ const Header = ({
 					<View style={styles.brandRow}>
 						<Ionicons name="sparkles" size={18} color="#1e293b" />
 						<Text style={styles.brandText}>Brie AI</Text>
+
+						{/* Mode indicator */}
+						<View style={styles.modeIndicator}>
+							<Ionicons
+								name={getModeIcon(interfaceMode)}
+								size={16}
+								color={getModeColor(interfaceMode)}
+							/>
+							<Text
+								style={[
+									styles.modeText,
+									{ color: getModeColor(interfaceMode) },
+								]}
+							>
+								{interfaceMode.charAt(0).toUpperCase() + interfaceMode.slice(1)}
+							</Text>
+						</View>
 					</View>
+
 					<TouchableOpacity
 						accessibilityRole="button"
 						onPress={onOpenSettings}
@@ -229,29 +293,10 @@ const SuggestedPrompts = ({ onPick }: { onPick: (prompt: string) => void }) => {
 		updateSuggestions();
 	}, []);
 
-	const prompts: SuggestedPrompt[] = suggestions.map((text, index) => ({
+	const prompts = suggestions.map((text, index) => ({
 		id: (index + 1).toString(),
 		text,
-		icon: [
-			'pie-chart',
-			'trending-up',
-			'flag',
-			'bulb',
-			'analytics',
-			'compass',
-			'add-circle',
-			'receipt',
-		][index] as keyof typeof Ionicons.glyphMap,
-		category: [
-			'budget',
-			'spending',
-			'goals',
-			'general',
-			'spending',
-			'general',
-			'budget',
-			'spending',
-		][index] as 'spending' | 'budget' | 'goals' | 'general',
+		color: '#3b82f6', // Blue for all prompts
 	}));
 
 	return (
@@ -265,13 +310,15 @@ const SuggestedPrompts = ({ onPick }: { onPick: (prompt: string) => void }) => {
 							console.log('🔍 [DEBUG] Prompt tapped:', prompt.text);
 							onPick(prompt.text);
 						}}
-						style={styles.promptCard}
-						activeOpacity={0.8}
+						style={[
+							styles.promptCard,
+							{ borderLeftWidth: 4, borderLeftColor: prompt.color },
+						]}
+						activeOpacity={0.7}
 					>
-						<View style={styles.promptIcon}>
-							<Ionicons name={prompt.icon} size={16} color="#2563eb" />
-						</View>
-						<Text style={styles.promptText}>{prompt.text}</Text>
+						<Text style={[styles.promptText, { color: prompt.color }]}>
+							{prompt.text}
+						</Text>
 					</TouchableOpacity>
 				))}
 			</View>
@@ -289,26 +336,22 @@ const WelcomeSuggestions = ({
 		{
 			id: '1',
 			text: 'Ask me about creating budgets or tracking expenses',
-			icon: 'pie-chart' as keyof typeof Ionicons.glyphMap,
-			category: 'budget' as const,
+			color: '#3b82f6', // Blue for budgets
 		},
 		{
 			id: '2',
 			text: 'Get help setting and achieving financial goals',
-			icon: 'flag' as keyof typeof Ionicons.glyphMap,
-			category: 'goals' as const,
+			color: '#3b82f6', // Blue for goals
 		},
 		{
 			id: '3',
 			text: 'Learn about saving strategies and spending patterns',
-			icon: 'trending-up' as keyof typeof Ionicons.glyphMap,
-			category: 'spending' as const,
+			color: '#3b82f6', // Blue for spending
 		},
 		{
 			id: '4',
 			text: 'Get personalized financial advice and tips',
-			icon: 'bulb' as keyof typeof Ionicons.glyphMap,
-			category: 'general' as const,
+			color: '#3b82f6', // Blue for advice
 		},
 	];
 
@@ -328,13 +371,15 @@ const WelcomeSuggestions = ({
 							);
 							onPick(suggestion.text);
 						}}
-						style={styles.promptCard}
-						activeOpacity={0.8}
+						style={[
+							styles.promptCard,
+							{ borderLeftWidth: 4, borderColor: suggestion.color },
+						]}
+						activeOpacity={0.7}
 					>
-						<View style={styles.promptIcon}>
-							<Ionicons name={suggestion.icon} size={16} color="#2563eb" />
-						</View>
-						<Text style={styles.promptText}>{suggestion.text}</Text>
+						<Text style={[styles.promptText, { color: suggestion.color }]}>
+							{suggestion.text}
+						</Text>
 					</TouchableOpacity>
 				))}
 			</View>
@@ -393,6 +438,11 @@ const MessageBubble = ({
 		if (m.data?.isWelcomeSuggestions) {
 			return <WelcomeSuggestions onPick={onPickPrompt!} />;
 		}
+		if (m.data?.isSmartSuggestions) {
+			return (
+				<SmartSuggestions onPick={onPickPrompt!} mode={m.data.mode || 'chat'} />
+			);
+		}
 		return <SuggestedPrompts onPick={onPickPrompt!} />;
 	}
 
@@ -431,11 +481,11 @@ const MessageBubble = ({
 					activeOpacity={0.7}
 				>
 					<View style={styles.premiumHintContent}>
-						<Ionicons name="sparkles" size={14} color="#8b5cf6" />
+						<Ionicons name="sparkles" size={14} color="#3b82f6" />
 						<Text style={styles.premiumHintText}>
 							Unlock advanced insights & unlimited conversations
 						</Text>
-						<Ionicons name="chevron-forward" size={14} color="#8b5cf6" />
+						<Ionicons name="chevron-forward" size={14} color="#3b82f6" />
 					</View>
 				</TouchableOpacity>
 			)}
@@ -466,13 +516,13 @@ const InsightsCard = ({
 	const getInsightColor = (type: string) => {
 		switch (type) {
 			case 'warning':
-				return '#ef4444';
+				return '#3b82f6';
 			case 'info':
 				return '#3b82f6';
 			case 'suggestion':
-				return '#10b981';
+				return '#3b82f6';
 			default:
-				return '#8b5cf6';
+				return '#3b82f6';
 		}
 	};
 
@@ -490,11 +540,11 @@ const InsightsCard = ({
 	const getSuggestionColor = (type: string) => {
 		switch (type) {
 			case 'action':
-				return '#f59e0b';
+				return '#3b82f6';
 			case 'tip':
-				return '#8b5cf6';
+				return '#3b82f6';
 			default:
-				return '#10b981';
+				return '#3b82f6';
 		}
 	};
 
@@ -504,7 +554,7 @@ const InsightsCard = ({
 			{insights.length > 0 && (
 				<View style={styles.insightsSection}>
 					<View style={styles.insightsHeader}>
-						<Ionicons name="sparkles" size={16} color="#8b5cf6" />
+						<Ionicons name="sparkles" size={16} color="#3b82f6" />
 						<Text style={styles.insightsTitle}>Quick Insights</Text>
 					</View>
 					<View style={styles.insightsList}>
@@ -540,7 +590,7 @@ const InsightsCard = ({
 				{suggestions.length > 0 && (
 					<View style={styles.suggestionsSection}>
 						<View style={styles.suggestionsHeader}>
-							<Ionicons name="flag" size={16} color="#f59e0b" />
+							<Ionicons name="flag" size={16} color="#3b82f6" />
 							<Text style={styles.suggestionsTitle}>Smart Suggestions</Text>
 						</View>
 						<View style={styles.suggestionsList}>
@@ -636,6 +686,78 @@ const TypingDots = () => {
 	);
 };
 
+// New component for smart suggestions based on current mode
+const SmartSuggestions = ({
+	onPick,
+	mode,
+}: {
+	onPick: (prompt: string) => void;
+	mode: InterfaceMode;
+}) => {
+	const getSuggestions = (): string[] => {
+		switch (mode) {
+			case 'insights':
+				return [
+					'Analyze my spending trends',
+					'Show me budget performance',
+					'What are my financial strengths?',
+					'Identify spending opportunities',
+				];
+			case 'actions':
+				return [
+					'Create a new budget',
+					'Set up a savings goal',
+					'Track my expenses',
+					'Optimize my spending',
+				];
+			case 'analytics':
+				return [
+					'Compare this month to last',
+					'Show me detailed breakdown',
+					'Predict future spending',
+					'Analyze goal progress',
+				];
+			default:
+				return [
+					'How am I doing with my budget?',
+					'What should I focus on financially?',
+					'Show me my spending patterns',
+					'Help me save more money',
+				];
+		}
+	};
+
+	const suggestions = getSuggestions();
+
+	return (
+		<View style={[styles.msgWrap, styles.msgAI]}>
+			<Text style={styles.promptsTitle}>
+				{`💡 Smart suggestions for ${mode} mode:`}
+			</Text>
+			<View style={styles.promptsGrid}>
+				{suggestions.map((text, index) => (
+					<TouchableOpacity
+						key={index}
+						onPress={() => {
+							console.log('🔍 [DEBUG] Smart suggestion tapped:', text);
+							onPick(text);
+						}}
+						style={[
+							styles.promptCard,
+							{ borderLeftWidth: 4, borderLeftColor: '#3b82f6' },
+						]}
+						activeOpacity={0.7}
+					>
+						<Text style={[styles.promptText, { color: '#3b82f6' }]}>
+							{text}
+						</Text>
+					</TouchableOpacity>
+				))}
+			</View>
+		</View>
+	);
+};
+
 // ————————————————————————————————————————————————————————————
 // Main Component
 export default function AIAssistant() {
@@ -645,10 +767,30 @@ export default function AIAssistant() {
 	const { goals } = useGoal();
 	const { transactions } = useContext(TransactionContext);
 
+	// ML Services integration
+	const {
+		status: mlStatus,
+		isLoading: mlLoading,
+		error: mlError,
+		getInsights,
+		getMetrics,
+		clearCache,
+		isReady: mlReady,
+		hasError: mlHasError,
+		reset: mlReset,
+	} = useMLServices();
+
 	const [messages, setMessages] = useState<Message[]>([]);
 	const [inputText, setInputText] = useState('');
 	const [isTyping, setIsTyping] = useState(false);
 	const [showFab, setShowFab] = useState(false);
+
+	// Unified interface state
+	const [interfaceMode, setInterfaceMode] = useState<InterfaceMode>('chat');
+	const [currentInsights, setCurrentInsights] = useState<MLInsight[]>([]);
+	const [showInsightsPanel, setShowInsightsPanel] = useState(false);
+	const [showActionsPanel, setShowActionsPanel] = useState(false);
+
 	// Generate session ID for this conversation
 	const sessionId = useMemo(
 		() =>
@@ -695,6 +837,146 @@ export default function AIAssistant() {
 			})) || []
 		);
 	}, [transactions]);
+
+	// Smart context detection - automatically determines the best interface mode
+	const detectInterfaceMode = useCallback(
+		(userInput: string): InterfaceMode => {
+			const input = userInput.toLowerCase();
+
+			// Insights and analysis requests
+			if (
+				input.includes('how am i doing') ||
+				input.includes('show me') ||
+				input.includes('analyze') ||
+				input.includes('insights') ||
+				input.includes('patterns') ||
+				input.includes('trends') ||
+				input.includes('summary') ||
+				input.includes('overview')
+			) {
+				return 'insights';
+			}
+
+			// Action and help requests
+			if (
+				input.includes('help me') ||
+				input.includes('what should i do') ||
+				input.includes('how can i') ||
+				input.includes('create') ||
+				input.includes('set up') ||
+				input.includes('adjust') ||
+				input.includes('fix') ||
+				input.includes('optimize')
+			) {
+				return 'actions';
+			}
+
+			// Analytics and detailed analysis
+			if (
+				input.includes('detailed') ||
+				input.includes('breakdown') ||
+				input.includes('compare') ||
+				input.includes('forecast') ||
+				input.includes('prediction') ||
+				input.includes('deep dive')
+			) {
+				return 'analytics';
+			}
+
+			// Default to chat for general questions
+			return 'chat';
+		},
+		[]
+	);
+
+	// Handle interface mode changes
+	const switchToMode = useCallback((mode: InterfaceMode, data?: any) => {
+		setInterfaceMode(mode);
+
+		// Handle mode-specific actions
+		switch (mode) {
+			case 'insights':
+				setShowInsightsPanel(true);
+				setShowActionsPanel(false);
+				if (data?.insights) {
+					setCurrentInsights(data.insights);
+				}
+				break;
+			case 'actions':
+				setShowActionsPanel(true);
+				setShowInsightsPanel(false);
+				break;
+			case 'analytics':
+				setShowInsightsPanel(true);
+				setShowActionsPanel(false);
+				break;
+			default:
+				setShowInsightsPanel(false);
+				setShowActionsPanel(false);
+		}
+	}, []);
+
+	// Generate ML insights for the current context
+	const generateMLInsights = useCallback(
+		async (context: string) => {
+			if (!mlReady) return;
+
+			try {
+				const insights = await getInsights(context, 'medium');
+				setCurrentInsights(insights);
+			} catch (error) {
+				console.warn('[AI Assistant] Failed to generate ML insights:', error);
+				// Fall back to basic insights
+				setCurrentInsights([
+					{
+						type: 'info',
+						title: 'Financial Overview',
+						message:
+							'Your financial data is ready for analysis. Ask me specific questions to get personalized insights.',
+						confidence: 0.7,
+						actionable: false,
+					},
+				]);
+			}
+		},
+		[mlReady, getInsights]
+	);
+
+	// Smart suggestions based on current mode and context
+	const getSmartSuggestions = useCallback((): string[] => {
+		const baseSuggestions = [
+			'How am I doing with my budget?',
+			'What should I focus on financially?',
+			'Show me my spending patterns',
+			'Help me save more money',
+		];
+
+		switch (interfaceMode) {
+			case 'insights':
+				return [
+					'Analyze my spending trends',
+					'Show me budget performance',
+					'What are my financial strengths?',
+					'Identify spending opportunities',
+				];
+			case 'actions':
+				return [
+					'Create a new budget',
+					'Set up a savings goal',
+					'Track my expenses',
+					'Optimize my spending',
+				];
+			case 'analytics':
+				return [
+					'Compare this month to last',
+					'Show me detailed breakdown',
+					'Predict future spending',
+					'Analyze goal progress',
+				];
+			default:
+				return baseSuggestions;
+		}
+	}, [interfaceMode]);
 
 	const [aiService] = useState(
 		() =>
@@ -762,45 +1044,7 @@ What would you like to know more about?`;
 					const context = await aiService.getConversationContext();
 					const { financial } = context;
 
-					let welcomeText = `Hey! I'm your financial copilot. I'm here to help you build better money habits and reach your financial goals. `;
-
-					if (
-						financial?.currentBudgets &&
-						financial.currentBudgets.length > 0
-					) {
-						const totalBudget = financial.currentBudgets.reduce(
-							(sum, b) => sum + b.remaining,
-							0
-						);
-						welcomeText += `I can see you have ${
-							financial.currentBudgets.length
-						} active budgets with $${totalBudget.toFixed(
-							2
-						)} remaining this period. `;
-					} else {
-						welcomeText += `Let's start by creating your first budget to track your spending! `;
-					}
-
-					if (financial?.activeGoals && financial.activeGoals.length > 0) {
-						const avgProgress =
-							financial.activeGoals.reduce((sum, g) => sum + g.progress, 0) /
-							financial.activeGoals.length;
-						welcomeText += `You're tracking ${
-							financial.activeGoals.length
-						} goals with an average progress of ${avgProgress.toFixed(1)}%. `;
-					} else {
-						welcomeText += `Setting financial goals will help you stay motivated and focused! `;
-					}
-
-					if (financial.monthlyOverview.savingsRate > 0) {
-						welcomeText += `Great job on your ${financial.monthlyOverview.savingsRate.toFixed(
-							1
-						)}% savings rate! `;
-					} else {
-						welcomeText += `Building an emergency fund is a great first step! `;
-					}
-
-					welcomeText += `\n\nWhat would you like to work on first?`;
+					let welcomeText = `Hey! I'm your financial copilot. I'm here to help you build better money habits and reach your financial goals.\n\nWhat would you like to work on first?`;
 
 					const welcomeMessage: Message = {
 						id: 'welcome',
@@ -820,7 +1064,21 @@ What would you like to know more about?`;
 						data: { isWelcomeSuggestions: true },
 					};
 
-					setMessages([welcomeMessage, welcomeSuggestionsMessage]);
+					// Add smart suggestions based on current context
+					const smartSuggestionsMessage: Message = {
+						id: 'smart-suggestions',
+						text: '',
+						isUser: false,
+						timestamp: new Date(),
+						type: 'suggestion',
+						data: { isSmartSuggestions: true, mode: interfaceMode },
+					};
+
+					setMessages([
+						welcomeMessage,
+						welcomeSuggestionsMessage,
+						smartSuggestionsMessage,
+					]);
 				} catch (error) {
 					console.log(
 						'[AI Assistant] Could not get context for welcome message:',
@@ -834,15 +1092,7 @@ What would you like to know more about?`;
 					);
 					const welcomeMessage: Message = {
 						id: 'welcome',
-						text: `Hey! I'm your financial copilot. I'm here to help you build better money habits and reach your financial goals.
-
-I can see you have ${
-							(transactions || []).length
-						} expenses totaling $${totalExpenses.toFixed(2)}. You've set up ${
-							(budgets || []).length
-						} budgets and are tracking ${(goals || []).length} goals.
-
-What would you like to work on first?`,
+						text: `Hey! I'm your financial copilot. I'm here to help you build better money habits and reach your financial goals.\n\nWhat would you like to work on first?`,
 						isUser: false,
 						timestamp: new Date(),
 						type: 'text',
@@ -858,13 +1108,27 @@ What would you like to work on first?`,
 						data: { isWelcomeSuggestions: true },
 					};
 
-					setMessages([welcomeMessage, welcomeSuggestionsMessage]);
+					// Add smart suggestions based on current context
+					const smartSuggestionsMessage: Message = {
+						id: 'smart-suggestions',
+						text: '',
+						isUser: false,
+						timestamp: new Date(),
+						type: 'suggestion',
+						data: { isSmartSuggestions: true, mode: interfaceMode },
+					};
+
+					setMessages([
+						welcomeMessage,
+						welcomeSuggestionsMessage,
+						smartSuggestionsMessage,
+					]);
 				}
 			};
 
 			initializeWelcomeMessage();
 		}
-	}, [transactions, budgets, goals, messages.length, aiService]);
+	}, [transactions, budgets, goals, messages.length, aiService, interfaceMode]);
 
 	// Add suggested prompts and contextual insights when starting conversation
 	useEffect(() => {
@@ -1033,6 +1297,10 @@ Ready to get started? Tap any of the quick action buttons below!`,
 				return newMessages;
 			});
 
+			// Smart context detection - automatically determine the best interface mode
+			const detectedMode = detectInterfaceMode(text.trim());
+			console.log('🔍 [DEBUG] Detected interface mode:', detectedMode);
+
 			// Scroll to bottom after user message
 			setTimeout(() => {
 				listRef.current?.scrollToEnd({ animated: true });
@@ -1104,6 +1372,7 @@ Ready to get started? Tap any of the quick action buttons below!`,
 						listRef.current?.scrollToEnd({ animated: true });
 					}, 100);
 				} else {
+					// Create the AI response message
 					const aiMessage: Message = {
 						id: (Date.now() + 1).toString(),
 						text:
@@ -1122,6 +1391,19 @@ Ready to get started? Tap any of the quick action buttons below!`,
 						);
 						return [...prev, aiMessage];
 					});
+
+					// Auto-switch to appropriate interface mode based on detected mode
+					if (detectedMode !== 'chat') {
+						// Add a small delay to let the user see the AI response first
+						setTimeout(() => {
+							switchToMode(detectedMode);
+
+							// If insights mode, try to get ML insights
+							if (detectedMode === 'insights' && mlReady) {
+								generateMLInsights(text.trim());
+							}
+						}, 1500);
+					}
 
 					// Scroll to bottom after AI message
 					setTimeout(() => {
@@ -1234,7 +1516,15 @@ Ready to get started? Tap any of the quick action buttons below!`,
 
 			Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 		},
-		[messages.length, aiService, currentUsage.subscriptionTier, showPremiumHint]
+		[
+			messages.length,
+			aiService,
+			currentUsage.subscriptionTier,
+			showPremiumHint,
+			detectInterfaceMode,
+			switchToMode,
+			mlReady,
+		]
 	);
 
 	const onScroll = useCallback((event: any) => {
@@ -1252,6 +1542,8 @@ Ready to get started? Tap any of the quick action buttons below!`,
 				<Header
 					onOpenSettings={() => router.push('/(stack)/settings/aiInsights')}
 					currentUsage={currentUsage}
+					interfaceMode={interfaceMode}
+					onModeChange={switchToMode}
 				/>
 				<View style={styles.centerState}>
 					<Ionicons name="sparkles" size={48} color="#9ca3af" />
@@ -1281,64 +1573,194 @@ Ready to get started? Tap any of the quick action buttons below!`,
 			<Header
 				onOpenSettings={() => router.push('/(stack)/settings/aiInsights')}
 				currentUsage={currentUsage}
+				interfaceMode={interfaceMode}
+				onModeChange={switchToMode}
 			/>
+
+			{/* Unified AI Assistant Interface */}
 			<KeyboardAvoidingView
 				style={styles.container}
 				behavior={Platform.OS === 'ios' ? 'padding' : undefined}
 			>
-				{/* ——— Chat */}
-				<FlatList
-					ref={listRef}
-					data={messages}
-					keyExtractor={(m) => m.id}
-					renderItem={({ item }) => (
-						<MessageBubble
-							m={item}
-							onPickPrompt={handleSendMessage}
-							onShowPremium={handleShowPremium}
-							showPremiumHint={showPremiumHint}
-						/>
-					)}
-					contentContainerStyle={styles.listContent}
-					style={styles.list}
-					onScroll={onScroll}
-					scrollEventThrottle={16}
-				/>
-				{isTyping && <TypingDots />}
-
-				{/* ——— Scroll to bottom FAB */}
-				<ScrollToBottomFab
-					visible={showFab}
-					onPress={() => listRef.current?.scrollToEnd({ animated: true })}
-				/>
-
-				{/* ——— Input */}
-				<View style={styles.inputBar}>
-					<TextInput
-						style={styles.input}
-						value={inputText}
-						onChangeText={setInputText}
-						placeholder="Ask about your finances..."
-						placeholderTextColor="#9aa3af"
-						maxLength={500}
-						multiline={true}
-						textAlignVertical="top"
+				{/* Dynamic Content Area */}
+				<View style={styles.contentArea}>
+					{/* Chat Messages */}
+					<FlatList
+						ref={listRef}
+						data={messages}
+						keyExtractor={(m) => m.id}
+						renderItem={({ item }) => (
+							<MessageBubble
+								m={item}
+								onPickPrompt={handleSendMessage}
+								onShowPremium={handleShowPremium}
+								showPremiumHint={showPremiumHint}
+							/>
+						)}
+						contentContainerStyle={styles.listContent}
+						style={styles.list}
+						onScroll={onScroll}
+						scrollEventThrottle={16}
 					/>
-					<TouchableOpacity
-						disabled={!inputText.trim()}
-						onPress={() => handleSendMessage(inputText)}
-						style={[
-							styles.sendBtn,
-							!inputText.trim() && styles.sendBtnDisabled,
-						]}
-						activeOpacity={0.9}
-					>
-						<Ionicons
-							name="send"
-							size={18}
-							color={inputText.trim() ? '#fff' : '#cbd5e1'}
+					{isTyping && <TypingDots />}
+
+					{/* Dynamic Interface Panels */}
+					{showInsightsPanel && (
+						<View style={styles.interfacePanel}>
+							<View style={styles.panelHeader}>
+								<Ionicons name="analytics" size={20} color="#3b82f6" />
+								<Text style={styles.panelTitle}>AI Insights</Text>
+								<TouchableOpacity
+									onPress={() => setShowInsightsPanel(false)}
+									style={styles.closeButton}
+								>
+									<Ionicons name="close" size={20} color="#6b7280" />
+								</TouchableOpacity>
+							</View>
+							<MLInsightsPanel
+								onInsightPress={(insight) => {
+									// Switch back to chat and send the insight as a message
+									setShowInsightsPanel(false);
+									handleSendMessage(insight.message);
+								}}
+								// showMetrics removed - users don't need to see technical metrics
+							/>
+
+							{/* Smart suggestions for insights mode */}
+							<SmartSuggestions onPick={handleSendMessage} mode="insights" />
+						</View>
+					)}
+
+					{showActionsPanel && (
+						<View style={styles.interfacePanel}>
+							<View style={styles.panelHeader}>
+								<Ionicons name="flash" size={20} color="#10b981" />
+								<Text style={styles.panelTitle}>Quick Actions</Text>
+								<TouchableOpacity
+									onPress={() => setShowActionsPanel(false)}
+									style={styles.closeButton}
+								>
+									<Ionicons name="close" size={20} color="#6b7280" />
+								</TouchableOpacity>
+							</View>
+							<View style={styles.actionsGrid}>
+								<TouchableOpacity
+									style={styles.actionButton}
+									onPress={() => {
+										setShowActionsPanel(false);
+										router.push('/(stack)/addBudget');
+									}}
+								>
+									<Ionicons name="add-circle" size={24} color="#3b82f6" />
+									<Text style={styles.actionText}>Create Budget</Text>
+								</TouchableOpacity>
+
+								<TouchableOpacity
+									style={styles.actionButton}
+									onPress={() => {
+										setShowActionsPanel(false);
+										router.push('/(stack)/addGoal');
+									}}
+								>
+									<Ionicons name="flag" size={24} color="#10b981" />
+									<Text style={styles.actionText}>Set Goal</Text>
+								</TouchableOpacity>
+
+								<TouchableOpacity
+									style={styles.actionButton}
+									onPress={() => {
+										setShowActionsPanel(false);
+										router.push('/(tabs)/transaction/expense');
+									}}
+								>
+									<Ionicons name="add" size={24} color="#f59e0b" />
+									<Text style={styles.actionText}>Add Expense</Text>
+								</TouchableOpacity>
+
+								<TouchableOpacity
+									style={styles.actionButton}
+									onPress={() => {
+										setShowActionsPanel(false);
+										handleSendMessage('Show me my spending analysis');
+									}}
+								>
+									<Ionicons name="analytics" size={24} color="#8b5cf6" />
+									<Text style={styles.actionText}>Analyze Spending</Text>
+								</TouchableOpacity>
+							</View>
+
+							{/* Smart suggestions for actions mode */}
+							<SmartSuggestions onPick={handleSendMessage} mode="actions" />
+						</View>
+					)}
+
+					{/* Scroll to bottom FAB */}
+					<ScrollToBottomFab
+						visible={showFab}
+						onPress={() => listRef.current?.scrollToEnd({ animated: true })}
+					/>
+
+					{/* Unified Input */}
+					<View style={styles.inputBar}>
+						{/* Mode indicator in input bar */}
+						<View style={styles.inputModeIndicator}>
+							<Ionicons
+								name={
+									interfaceMode === 'chat'
+										? 'chatbubbles'
+										: interfaceMode === 'insights'
+										? 'analytics'
+										: interfaceMode === 'actions'
+										? 'flash'
+										: 'trending-up'
+								}
+								size={16}
+								color={
+									interfaceMode === 'chat'
+										? '#3b82f6'
+										: interfaceMode === 'insights'
+										? '#8b5cf6'
+										: interfaceMode === 'actions'
+										? '#10b981'
+										: '#f59e0b'
+								}
+							/>
+						</View>
+
+						<TextInput
+							style={styles.input}
+							value={inputText}
+							onChangeText={setInputText}
+							placeholder={
+								interfaceMode === 'chat'
+									? "Ask about your finances or what you'd like to do..."
+									: interfaceMode === 'insights'
+									? 'Ask for specific insights or analysis...'
+									: interfaceMode === 'actions'
+									? 'What would you like me to help you with?'
+									: 'Ask for detailed analytics or comparisons...'
+							}
+							placeholderTextColor="#9aa3af"
+							maxLength={500}
+							multiline={true}
+							textAlignVertical="top"
 						/>
-					</TouchableOpacity>
+						<TouchableOpacity
+							disabled={!inputText.trim()}
+							onPress={() => handleSendMessage(inputText)}
+							style={[
+								styles.sendBtn,
+								!inputText.trim() && styles.sendBtnDisabled,
+							]}
+							activeOpacity={0.9}
+						>
+							<Ionicons
+								name="send"
+								size={18}
+								color={inputText.trim() ? '#fff' : '#cbd5e1'}
+							/>
+						</TouchableOpacity>
+					</View>
 				</View>
 			</KeyboardAvoidingView>
 
@@ -1443,36 +1865,40 @@ const styles = StyleSheet.create({
 	promptsGrid: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',
-		gap: 8,
-		justifyContent: 'space-between',
+		gap: 12,
+		justifyContent: 'center',
 	},
 	promptCard: {
-		width: '48%',
+		width: '46%',
 		backgroundColor: '#f8fafc',
 		borderRadius: 12,
 		padding: 12,
 		borderWidth: 1,
 		borderColor: '#e2e8f0',
 		shadowColor: '#000',
-		shadowOpacity: 0.04,
-		shadowRadius: 4,
-		shadowOffset: { width: 0, height: 2 },
-		elevation: 2,
+		shadowOpacity: 0.08,
+		shadowRadius: 8,
+		shadowOffset: { width: 0, height: 4 },
+		elevation: 4,
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
 	promptIcon: {
-		width: 32,
-		height: 32,
-		borderRadius: 16,
+		width: 24,
+		height: 24,
+		borderRadius: 12,
 		backgroundColor: '#eff6ff',
 		alignItems: 'center',
 		justifyContent: 'center',
-		marginBottom: 8,
+		marginRight: 8,
+		flexShrink: 0,
 	},
 	promptText: {
-		fontSize: 13,
+		fontSize: 12,
 		fontWeight: '600',
 		color: '#374151',
-		lineHeight: 18,
+		lineHeight: 16,
+		textAlign: 'center',
 	},
 
 	// FAB
@@ -1816,5 +2242,89 @@ const styles = StyleSheet.create({
 		fontWeight: '600',
 		color: '#0369a1',
 		textTransform: 'capitalize',
+	},
+
+	// Unified Interface Styles
+	contentArea: {
+		flex: 1,
+		backgroundColor: '#f8fafc',
+		borderTopLeftRadius: 24,
+		borderTopRightRadius: 24,
+		overflow: 'hidden',
+	},
+	interfacePanel: {
+		backgroundColor: '#ffffff',
+		borderBottomWidth: 1,
+		borderBottomColor: '#e2e8f0',
+		paddingHorizontal: 20,
+		paddingBottom: 20,
+		shadowColor: '#000',
+		shadowOpacity: 0.05,
+		shadowRadius: 8,
+		shadowOffset: { width: 0, height: -2 },
+		elevation: 3,
+	},
+	panelHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		marginBottom: 12,
+		paddingTop: 16,
+	},
+	panelTitle: {
+		fontSize: 18,
+		fontWeight: '700',
+		color: '#1e293b',
+		flex: 1,
+		textAlign: 'center',
+	},
+	closeButton: {
+		padding: 8,
+	},
+	actionsGrid: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		justifyContent: 'space-around',
+		gap: 12,
+	},
+	actionButton: {
+		flex: 1,
+		alignItems: 'center',
+		backgroundColor: '#f8fafc',
+		borderRadius: 12,
+		paddingVertical: 16,
+		paddingHorizontal: 12,
+		borderWidth: 1,
+		borderColor: '#e2e8f0',
+		shadowColor: '#000',
+		shadowOpacity: 0.04,
+		shadowRadius: 4,
+		shadowOffset: { width: 0, height: 1 },
+		elevation: 1,
+	},
+	actionText: {
+		fontSize: 12,
+		fontWeight: '600',
+		color: '#374151',
+		marginTop: 8,
+	},
+	// New styles for mode indicator
+	modeIndicator: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#eff6ff',
+		borderRadius: 12,
+		paddingHorizontal: 8,
+		paddingVertical: 4,
+		gap: 4,
+	},
+	modeText: {
+		fontSize: 12,
+		fontWeight: '600',
+	},
+
+	// Input bar mode indicator
+	inputModeIndicator: {
+		marginRight: 10,
 	},
 });

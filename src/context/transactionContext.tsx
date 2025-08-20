@@ -24,7 +24,7 @@ interface Transaction {
 		nextExpectedDate: string;
 	};
 }
-import { ApiService } from '../services/apiService';
+import { ApiService } from '../services';
 import { useBudget } from './budgetContext';
 import { useGoal } from './goalContext';
 

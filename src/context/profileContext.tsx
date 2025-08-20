@@ -5,7 +5,7 @@ import React, {
 	useEffect,
 	ReactNode,
 } from 'react';
-import { ApiService } from '../services/apiService';
+import { ApiService } from '../services';
 import useAuth from './AuthContext';
 
 interface ProfilePreferences {

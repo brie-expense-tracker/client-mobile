@@ -8,7 +8,10 @@ import {
 	ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RecurringExpense, RecurringExpenseService } from '../../../../src/services/recurringExpenseService';
+import {
+	RecurringExpense,
+	RecurringExpenseService,
+} from '../../../../src/services';
 import { TransformedRecurringExpense } from '../../../../src/hooks/useRecurringExpenses';
 
 const currency = (n: number) =>
@@ -37,9 +40,12 @@ interface RecurringExpenseWithPaymentStatus extends RecurringExpense {
 }
 
 // Helper function to calculate next due date
-const calculateNextDueDate = (currentDate: string, frequency: string): string => {
+const calculateNextDueDate = (
+	currentDate: string,
+	frequency: string
+): string => {
 	const date = new Date(currentDate);
-	
+
 	switch (frequency) {
 		case 'weekly':
 			date.setDate(date.getDate() + 7);
@@ -54,7 +60,7 @@ const calculateNextDueDate = (currentDate: string, frequency: string): string =>
 			date.setFullYear(date.getFullYear() + 1);
 			break;
 	}
-	
+
 	return date.toISOString();
 };
 
@@ -386,49 +392,61 @@ export default function RecurringExpensesFeed({
 	expenses?: RecurringExpense[];
 }) {
 	const [tab, setTab] = useState<TabKey>('all');
-	const [expensesWithPaymentStatus, setExpensesWithPaymentStatus] = useState<RecurringExpenseWithPaymentStatus[]>([]);
+	const [expensesWithPaymentStatus, setExpensesWithPaymentStatus] = useState<
+		RecurringExpenseWithPaymentStatus[]
+	>([]);
 	const [isLoadingPaymentStatus, setIsLoadingPaymentStatus] = useState(false);
-	const [paymentStatusError, setPaymentStatusError] = useState<string | null>(null);
+	const [paymentStatusError, setPaymentStatusError] = useState<string | null>(
+		null
+	);
 
 	// Check payment status for all expenses
 	useEffect(() => {
 		const checkPaymentStatus = async () => {
 			if (expenses.length === 0) return;
-			
+
 			setIsLoadingPaymentStatus(true);
 			setPaymentStatusError(null);
 			try {
 				const expensesWithStatus = await Promise.all(
 					expenses.map(async (expense) => {
 						try {
-							const paymentStatus = await RecurringExpenseService.isCurrentPeriodPaid(expense.patternId);
-							
+							const paymentStatus =
+								await RecurringExpenseService.isCurrentPeriodPaid(
+									expense.patternId
+								);
+
 							// Check if paid within 2 weeks of the monthly expense
 							let isPaidWithinTwoWeeks = false;
 							let paymentDate: string | undefined;
 							let nextDueDate: string = expense.nextExpectedDate;
-							
+
 							if (paymentStatus.isPaid && paymentStatus.payment) {
 								const dueDate = new Date(expense.nextExpectedDate);
 								const paidDate = new Date(paymentStatus.payment.paidAt);
-								
+
 								// Calculate days between due date and payment date
-								const daysDiff = (paidDate.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24);
-								
+								const daysDiff =
+									(paidDate.getTime() - dueDate.getTime()) /
+									(1000 * 60 * 60 * 24);
+
 								// Consider paid if within 2 weeks (14 days) AFTER the due date
 								// This allows for late payments to still be considered "paid" for that period
 								isPaidWithinTwoWeeks = daysDiff >= -14 && daysDiff <= 14;
-								
+
 								if (isPaidWithinTwoWeeks) {
 									paymentDate = paidDate.toLocaleDateString();
 									// Calculate next due date based on frequency
-									nextDueDate = calculateNextDueDate(expense.nextExpectedDate, expense.frequency);
+									nextDueDate = calculateNextDueDate(
+										expense.nextExpectedDate,
+										expense.frequency
+									);
 								} else {
 									// If not paid within 2 weeks, the next due date is the current expected date
 									nextDueDate = expense.nextExpectedDate;
 								}
 							}
-							
+
 							return {
 								...expense,
 								isPaid: isPaidWithinTwoWeeks,
@@ -436,7 +454,10 @@ export default function RecurringExpensesFeed({
 								nextDueDate,
 							};
 						} catch (error) {
-							console.error(`Error checking payment status for ${expense.patternId}:`, error);
+							console.error(
+								`Error checking payment status for ${expense.patternId}:`,
+								error
+							);
 							// Return expense with default unpaid status on error
 							return {
 								...expense,
@@ -446,16 +467,18 @@ export default function RecurringExpensesFeed({
 						}
 					})
 				);
-				
+
 				setExpensesWithPaymentStatus(expensesWithStatus);
 			} catch (error) {
 				console.error('Error checking payment status:', error);
 				setPaymentStatusError('Failed to check payment status');
-				setExpensesWithPaymentStatus(expenses.map(expense => ({
-					...expense,
-					isPaid: false,
-					nextDueDate: expense.nextExpectedDate,
-				})));
+				setExpensesWithPaymentStatus(
+					expenses.map((expense) => ({
+						...expense,
+						isPaid: false,
+						nextDueDate: expense.nextExpectedDate,
+					}))
+				);
 			} finally {
 				setIsLoadingPaymentStatus(false);
 			}
@@ -466,7 +489,9 @@ export default function RecurringExpensesFeed({
 
 	const filtered = useMemo(() => {
 		if (tab === 'all') return expensesWithPaymentStatus;
-		return expensesWithPaymentStatus.filter((expense) => expense.frequency === tab);
+		return expensesWithPaymentStatus.filter(
+			(expense) => expense.frequency === tab
+		);
 	}, [tab, expensesWithPaymentStatus]);
 
 	// Show loading state while checking payment status
@@ -488,7 +513,10 @@ export default function RecurringExpensesFeed({
 				<View style={styles.errorContainer}>
 					<Ionicons name="warning-outline" size={24} color="#f59e0b" />
 					<Text style={styles.errorText}>{paymentStatusError}</Text>
-					<TouchableOpacity style={styles.retryButton} onPress={() => setExpensesWithPaymentStatus([])}>
+					<TouchableOpacity
+						style={styles.retryButton}
+						onPress={() => setExpensesWithPaymentStatus([])}
+					>
 						<Text style={styles.retryButtonText}>Retry</Text>
 					</TouchableOpacity>
 				</View>

@@ -12,7 +12,7 @@ import {
 	SpendingForecastService,
 	MonthlyForecast,
 	BudgetForecast,
-} from '../../../../src/services/spendingForecastService';
+} from '../../../../src/services/feature/spendingForecastService';
 
 interface SpendingForecastCardProps {
 	showBudgetForecasts?: boolean;

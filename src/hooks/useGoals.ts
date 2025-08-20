@@ -1,7 +1,7 @@
 import { useMemo, useCallback } from 'react';
 import { useDataFetching } from './useDataFetching';
 import { Goal, CreateGoalData, UpdateGoalData } from '../context/goalContext';
-import { ApiService } from '../services/apiService';
+import { ApiService } from '../services';
 
 // ==========================================
 // Goal-specific API functions

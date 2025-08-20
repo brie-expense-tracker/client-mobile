@@ -27,7 +27,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useNotification } from '@/src/context/notificationContext';
-import { NotificationData } from '@/src/services/notificationService';
+import { NotificationData } from '@/src/services';
 
 const NotificationItem = ({
 	item,

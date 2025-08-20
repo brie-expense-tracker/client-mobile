@@ -19,7 +19,7 @@ import { useRecurringExpenses } from '../../../src/hooks/useRecurringExpenses';
 import {
 	RecurringExpense,
 	RecurringExpenseService,
-} from '../../../src/services/recurringExpenseService';
+} from '../../../src/services';
 
 // ==========================================
 // Types

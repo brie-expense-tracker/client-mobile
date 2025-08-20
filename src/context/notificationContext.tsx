@@ -12,7 +12,7 @@ import {
 	notificationService,
 	NotificationData,
 	NotificationResponse,
-} from '../services/notificationService';
+} from '../services';
 
 interface NotificationContextType {
 	expoPushToken: string | null;

@@ -15,8 +15,8 @@ import {
 	IntelligentActionService,
 	IntelligentAction,
 	ActionExecutionResult,
-} from '../../../../src/services/intelligentActionService';
-import { AIInsight } from '../../../../src/services/insightsService';
+} from '../../../../src/services/feature/intelligentActionService';
+import { AIInsight } from '../../../../src/services/feature/insightsService';
 import {
 	navigateToBudgetsWithModal,
 	navigateToGoalsWithModal,

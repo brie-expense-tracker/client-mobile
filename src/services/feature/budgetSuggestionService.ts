@@ -1,5 +1,5 @@
-import { ApiService } from './apiService';
-import { Budget } from '../context/budgetContext';
+import { ApiService } from '../core/apiService';
+import { Budget } from '../../context/budgetContext';
 
 export interface BudgetSuggestion {
 	id: string;

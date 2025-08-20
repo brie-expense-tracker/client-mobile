@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ApiService } from '../services/apiService';
+import { ApiService } from '../services';
 
 interface Action {
 	id: string;
@@ -26,30 +26,30 @@ export default function useActions() {
 		try {
 			const response = await ApiService.get('/intelligent-actions');
 
-					if (response.success && response.data && Array.isArray(response.data)) {
-			// Transform the data to match our interface
-			const transformedActions: Action[] = response.data.map(
-				(action: any) => ({
-					id: action._id,
-					_id: action._id,
-					title: action.title,
-					description: action.description,
-					priority: action.priority || 'medium',
-					completed: action.completed || false,
-					executed: action.executed || false,
-					actionType: action.actionType,
-					parameters: action.parameters,
-					insightId: action.insightId,
-					source: action.source,
-					createdAt: action.createdAt,
-					updatedAt: action.updatedAt,
-				})
-			);
+			if (response.success && response.data && Array.isArray(response.data)) {
+				// Transform the data to match our interface
+				const transformedActions: Action[] = response.data.map(
+					(action: any) => ({
+						id: action._id,
+						_id: action._id,
+						title: action.title,
+						description: action.description,
+						priority: action.priority || 'medium',
+						completed: action.completed || false,
+						executed: action.executed || false,
+						actionType: action.actionType,
+						parameters: action.parameters,
+						insightId: action.insightId,
+						source: action.source,
+						createdAt: action.createdAt,
+						updatedAt: action.updatedAt,
+					})
+				);
 
-			setActions(transformedActions);
-		} else {
-			setActions([]);
-		}
+				setActions(transformedActions);
+			} else {
+				setActions([]);
+			}
 		} catch (error) {
 			console.error('Failed to fetch actions:', error);
 			setActions([]);

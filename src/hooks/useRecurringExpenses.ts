@@ -1,9 +1,6 @@
 import { useMemo, useCallback } from 'react';
 import { useDataFetching } from './useDataFetching';
-import {
-	RecurringExpenseService,
-	RecurringExpense,
-} from '../services/recurringExpenseService';
+import { RecurringExpenseService, RecurringExpense } from '../services';
 
 // Extended interface for transformed recurring expense data
 export interface TransformedRecurringExpense extends RecurringExpense {

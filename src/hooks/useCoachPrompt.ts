@@ -1,7 +1,5 @@
- 
- 
 import { useState, useCallback } from 'react';
-import { ApiService } from '../services/apiService';
+import { ApiService } from '../services';
 
 interface CoachPromptResponse {
 	success: boolean;

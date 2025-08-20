@@ -17,11 +17,11 @@ import LinearProgressBar from '../(tabs)/budgets/components/LinearProgressBar';
 import {
 	BudgetAnalysisService,
 	BudgetAnalysis,
-} from '../../src/services/budgetAnalysisService';
+} from '../../src/services/feature/budgetAnalysisService';
 import {
 	FinancialSnapshotService,
 	BudgetHistoryItem,
-} from '../../src/services/financialSnapshotService';
+} from '../../src/services/feature/financialSnapshotService';
 import { useProfile } from '../../src/context/profileContext';
 
 const BudgetSummaryScreen: React.FC = () => {

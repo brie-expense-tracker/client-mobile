@@ -13,7 +13,7 @@ import {
 	EmailAuthProvider,
 } from '@react-native-firebase/auth';
 import type { FirebaseAuthTypes } from '@react-native-firebase/auth';
-import { UserService, User, Profile } from '../services/userService';
+import { UserService, User, Profile } from '../services';
 
 interface AuthContextType {
 	user: User | null;

@@ -25,11 +25,11 @@ import { useFonts } from 'expo-font';
 import { TransactionContext } from '../../../src/context/transactionContext';
 import { useBudget, Budget } from '../../../src/context/budgetContext';
 import { navigateToBudgetsWithModal } from '../../../src/utils/navigationUtils';
-import { BudgetSuggestionService } from '../../../src/services/budgetSuggestionService';
 import {
-	RecurringExpenseService,
+	BudgetSuggestionService,
 	RecurringExpense,
-} from '../../../src/services/recurringExpenseService';
+	RecurringExpenseService,
+} from '../../../src/services';
 
 interface TransactionFormData {
 	type: 'expense';
