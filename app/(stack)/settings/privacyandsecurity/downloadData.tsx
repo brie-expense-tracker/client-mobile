@@ -11,7 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useProfile } from '../../../../src/context/profileContext';
-import { ApiService } from '../../../../src/services/apiService';
+import { ApiService } from '../../../../src/services';
 
 export default function DownloadDataScreen() {
 	const router = useRouter();

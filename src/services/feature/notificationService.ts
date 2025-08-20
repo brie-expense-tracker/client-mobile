@@ -1,4 +1,4 @@
-import { ApiService } from './apiService';
+import { ApiService } from '../core/apiService';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';

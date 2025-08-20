@@ -1,4 +1,4 @@
-import { ApiService } from './apiService';
+import { ApiService } from '../core/apiService';
 
 export interface AIInsight {
 	_id: string;

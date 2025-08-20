@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { RectButton } from 'react-native-gesture-handler';
-import { RecurringExpenseService } from '../../../../src/services/recurringExpenseService';
+import { RecurringExpenseService } from '../../../../src/services';
 
 interface RecurringExpense {
 	patternId: string;

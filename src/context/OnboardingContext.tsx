@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { OnboardingService } from '../services/onboardingService';
+import { OnboardingService } from '../services';
 import useAuth from './AuthContext'; // Import useAuth
 
 interface OnboardingContextType {

@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { RecurringExpenseService } from '../../../../src/services/recurringExpenseService';
+import { RecurringExpenseService } from '../../../../src/services';
 import {
 	useRecurringExpenses,
 	TransformedRecurringExpense,

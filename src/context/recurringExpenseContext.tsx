@@ -6,10 +6,7 @@ import React, {
 	useEffect,
 	ReactNode,
 } from 'react';
-import {
-	RecurringExpenseService,
-	RecurringExpense,
-} from '../services/recurringExpenseService';
+import { RecurringExpenseService, RecurringExpense } from '../services';
 
 // ==========================================
 // DEPRECATION NOTICE

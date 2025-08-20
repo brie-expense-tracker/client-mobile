@@ -13,7 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { RecurringExpenseService } from '../../src/services/recurringExpenseService';
+import { RecurringExpenseService } from '../../src/services';
 
 const AddRecurringExpenseScreen: React.FC = () => {
 	const [vendor, setVendor] = useState('');

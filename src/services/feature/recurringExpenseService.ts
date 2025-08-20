@@ -1,4 +1,4 @@
-import { ApiService } from './apiService';
+import { ApiService } from '../core/apiService';
 
 export interface RecurringPattern {
 	patternId: string;

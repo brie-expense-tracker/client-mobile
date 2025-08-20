@@ -1,5 +1,5 @@
-import { ApiService } from './apiService';
-import { Budget, Goal, Transaction } from '../types';
+import { ApiService } from '../core/apiService';
+import { Budget, Goal, Transaction } from '../../types';
 
 export interface CustomGPTResponse {
 	response: string;

@@ -21,7 +21,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useOnboarding } from '../../src/context/OnboardingContext';
 import { useProfile } from '../../src/context/profileContext';
-import { ApiService } from '../../src/services/apiService';
+import { ApiService } from '../../src/services';
 
 type RootStackParamList = {
 	Home: undefined;

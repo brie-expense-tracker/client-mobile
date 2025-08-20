@@ -12,7 +12,7 @@ import { router } from 'expo-router';
 import {
 	RecurringExpenseService,
 	RecurringExpense,
-} from '../../../../src/services/recurringExpenseService';
+} from '../../../../src/services';
 import { useRecurringExpenses } from '../../../../src/hooks/useRecurringExpenses';
 import { FilterContext } from '../../../../src/context/filterContext';
 import RecurringExpenseCard from './RecurringExpenseCard';

@@ -5,7 +5,7 @@ import {
 	CreateBudgetData,
 	UpdateBudgetData,
 } from '../context/budgetContext';
-import { ApiService } from '../services/apiService';
+import { ApiService } from '../services';
 
 // ==========================================
 // Budget-specific API functions

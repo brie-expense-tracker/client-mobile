@@ -12,10 +12,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import IntelligentActions from './IntelligentActions';
-import {
-	IntelligentActionService,
-	IntelligentAction,
-} from '../../../../src/services/intelligentActionService';
+// Note: intelligentActionService was removed during reorganization
+// This component may need to be updated to use alternative services
 
 interface AIInsight {
 	_id: string;

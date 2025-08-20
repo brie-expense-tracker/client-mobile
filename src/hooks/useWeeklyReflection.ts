@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback, useContext } from 'react';
-import { WeeklyReflectionService, WeeklyReflection, SaveReflectionData } from '../services/weeklyReflectionService';
+import {
+	WeeklyReflectionService,
+	WeeklyReflection,
+	SaveReflectionData,
+} from '../services';
 import { TransactionContext } from '../context/transactionContext';
 import { useBudget } from '../context/budgetContext';
 import { useGoal } from '../context/goalContext';
@@ -16,7 +20,8 @@ export interface UseWeeklyReflectionReturn {
 }
 
 export function useWeeklyReflection(): UseWeeklyReflectionReturn {
-	const [currentReflection, setCurrentReflection] = useState<WeeklyReflection | null>(null);
+	const [currentReflection, setCurrentReflection] =
+		useState<WeeklyReflection | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -30,7 +35,8 @@ export function useWeeklyReflection(): UseWeeklyReflectionReturn {
 		try {
 			setLoading(true);
 			setError(null);
-			const reflection = await WeeklyReflectionService.getCurrentWeekReflection();
+			const reflection =
+				await WeeklyReflectionService.getCurrentWeekReflection();
 			setCurrentReflection(reflection);
 		} catch (err) {
 			console.error('Error fetching current reflection:', err);
@@ -41,52 +47,63 @@ export function useWeeklyReflection(): UseWeeklyReflectionReturn {
 	}, []);
 
 	// Save reflection data
-	const saveReflection = useCallback(async (data: SaveReflectionData) => {
-		try {
-			setSaving(true);
-			setError(null);
+	const saveReflection = useCallback(
+		async (data: SaveReflectionData) => {
+			try {
+				setSaving(true);
+				setError(null);
 
-			// Calculate financial metrics if not provided
-			if (!data.financialMetrics) {
-				data.financialMetrics = WeeklyReflectionService.calculateFinancialMetrics(
-					transactions,
-					budgets,
-					goals
-				);
+				// Calculate financial metrics if not provided
+				if (!data.financialMetrics) {
+					data.financialMetrics =
+						WeeklyReflectionService.calculateFinancialMetrics(
+							transactions,
+							budgets,
+							goals
+						);
+				}
+
+				const updatedReflection =
+					await WeeklyReflectionService.saveWeeklyReflection(data);
+				setCurrentReflection(updatedReflection);
+			} catch (err) {
+				console.error('Error saving reflection:', err);
+				setError('Failed to save weekly reflection');
+				throw err;
+			} finally {
+				setSaving(false);
 			}
-
-			const updatedReflection = await WeeklyReflectionService.saveWeeklyReflection(data);
-			setCurrentReflection(updatedReflection);
-		} catch (err) {
-			console.error('Error saving reflection:', err);
-			setError('Failed to save weekly reflection');
-			throw err;
-		} finally {
-			setSaving(false);
-		}
-	}, [transactions, budgets, goals]);
+		},
+		[transactions, budgets, goals]
+	);
 
 	// Update mood rating
-	const updateMoodRating = useCallback(async (rating: number) => {
-		if (!currentReflection) return;
-		
-		await saveReflection({
-			moodRating: rating,
-			winOfTheWeek: currentReflection.winOfTheWeek,
-			reflectionNotes: currentReflection.reflectionNotes
-		});
-	}, [currentReflection, saveReflection]);
+	const updateMoodRating = useCallback(
+		async (rating: number) => {
+			if (!currentReflection) return;
+
+			await saveReflection({
+				moodRating: rating,
+				winOfTheWeek: currentReflection.winOfTheWeek,
+				reflectionNotes: currentReflection.reflectionNotes,
+			});
+		},
+		[currentReflection, saveReflection]
+	);
 
 	// Update win of the week
-	const updateWinOfTheWeek = useCallback(async (win: string) => {
-		if (!currentReflection) return;
-		
-		await saveReflection({
-			moodRating: currentReflection.moodRating,
-			winOfTheWeek: win,
-			reflectionNotes: currentReflection.reflectionNotes
-		});
-	}, [currentReflection, saveReflection]);
+	const updateWinOfTheWeek = useCallback(
+		async (win: string) => {
+			if (!currentReflection) return;
+
+			await saveReflection({
+				moodRating: currentReflection.moodRating,
+				winOfTheWeek: win,
+				reflectionNotes: currentReflection.reflectionNotes,
+			});
+		},
+		[currentReflection, saveReflection]
+	);
 
 	// Refresh reflection data
 	const refreshReflection = useCallback(async () => {
@@ -106,6 +123,6 @@ export function useWeeklyReflection(): UseWeeklyReflectionReturn {
 		saveReflection,
 		updateMoodRating,
 		updateWinOfTheWeek,
-		refreshReflection
+		refreshReflection,
 	};
-} 
+}

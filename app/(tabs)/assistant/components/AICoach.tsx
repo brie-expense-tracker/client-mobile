@@ -20,10 +20,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import {
-	InsightsService,
-	AIInsight,
-} from '../../../../src/services/insightsService';
+import { InsightsService, AIInsight } from '../../../../src/services';
 import { useProfile } from '../../../../src/context/profileContext';
 import { useBudget } from '../../../../src/context/budgetContext';
 import { useGoal } from '../../../../src/context/goalContext';
@@ -474,9 +471,7 @@ const WelcomeSection: FC<{ stageContent: any }> = ({ stageContent }) => (
 				<View style={styles.welcomeIconContainer}>
 					<Ionicons name="sparkles" size={28} color="#0095FF" />
 				</View>
-				<Text style={styles.welcomeTitle}>
-					Welcome to AI Coach! 🎉
-				</Text>
+				<Text style={styles.welcomeTitle}>Welcome to AI Coach! 🎉</Text>
 			</View>
 			<Text style={styles.welcomeText}>
 				You now have access to personalized insights and advanced features.

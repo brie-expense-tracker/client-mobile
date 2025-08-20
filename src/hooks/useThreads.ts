@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ApiService } from '../services/apiService';
+import { ApiService } from '../services';
 
 interface Thread {
 	id: string;
@@ -28,27 +28,27 @@ export default function useThreads() {
 		try {
 			const response = await ApiService.get('/threads');
 
-					if (response.success && response.data && Array.isArray(response.data)) {
-			// Transform the data to match our interface
-			const transformedThreads: Thread[] = response.data.map(
-				(thread: any) => ({
-					id: thread._id,
-					_id: thread._id,
-					title: thread.title,
-					focusArea: thread.focusArea,
-					createdAt: thread.createdAt,
-					updatedAt: thread.updatedAt,
-					messages: thread.messages || [],
-					// Generate KPI and next actions from messages
-					kpi: generateKPI(thread.messages),
-					nextActions: generateNextActions(thread.messages),
-				})
-			);
+			if (response.success && response.data && Array.isArray(response.data)) {
+				// Transform the data to match our interface
+				const transformedThreads: Thread[] = response.data.map(
+					(thread: any) => ({
+						id: thread._id,
+						_id: thread._id,
+						title: thread.title,
+						focusArea: thread.focusArea,
+						createdAt: thread.createdAt,
+						updatedAt: thread.updatedAt,
+						messages: thread.messages || [],
+						// Generate KPI and next actions from messages
+						kpi: generateKPI(thread.messages),
+						nextActions: generateNextActions(thread.messages),
+					})
+				);
 
-			setThreads(transformedThreads);
-		} else {
-			setThreads([]);
-		}
+				setThreads(transformedThreads);
+			} else {
+				setThreads([]);
+			}
 		} catch (error) {
 			console.error('Failed to fetch threads:', error);
 			setThreads([]);

@@ -11,8 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRecurringExpenses } from '../../src/hooks/useRecurringExpenses';
-import { RecurringExpense } from '../../src/services/recurringExpenseService';
-import { RecurringExpenseService } from '../../src/services/recurringExpenseService';
+import { RecurringExpense, RecurringExpenseService } from '../../src/services';
 import LinearProgressBar from '../(tabs)/budgets/components/LinearProgressBar';
 
 const { width } = Dimensions.get('window');

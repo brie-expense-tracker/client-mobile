@@ -1,10 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useContext } from 'react';
 import { Alert } from 'react-native';
-import {
-	InsightsService,
-	AIInsight,
-	InsightsResponse,
-} from '../services/insightsService';
+import { InsightsService, AIInsight, InsightsResponse } from '../services';
 import { useBudget } from '../context/budgetContext';
 import { useGoal } from '../context/goalContext';
 import { TransactionContext } from '../context/transactionContext';
