@@ -146,10 +146,6 @@ const RecurringExpensesScreen: React.FC = () => {
 
 	const handleViewPaymentHistory = () => {
 		if (selectedExpense) {
-			console.log(
-				'View payment history for pattern:',
-				selectedExpense.patternId
-			);
 			// Navigate to the recurring expense summary screen
 			router.push({
 				pathname: '/(stack)/recurringExpenseDetails',
@@ -166,7 +162,6 @@ const RecurringExpensesScreen: React.FC = () => {
 
 	const handleEditExpense = () => {
 		if (selectedExpense) {
-			console.log('Edit expense:', selectedExpense.patternId);
 			Alert.alert('Coming Soon', 'Edit functionality will be available soon!');
 			hideOptionsModal();
 		}

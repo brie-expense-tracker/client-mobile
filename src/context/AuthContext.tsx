@@ -45,27 +45,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	useEffect(() => {
 		// Listen for Firebase auth state changes
 		const unsubscribe = onAuthStateChanged(getAuth(), async (firebaseUser) => {
-			console.log(
-				'AuthContext - Firebase auth state changed:',
-				firebaseUser ? 'User signed in' : 'User signed out'
-			);
-
 			setFirebaseUser(firebaseUser);
 
 			if (firebaseUser) {
-				console.log('AuthContext - User signed in, UID:', firebaseUser.uid);
 				// User is signed in - always store the Firebase UID
 				await AsyncStorage.setItem('firebaseUID', firebaseUser.uid);
-				console.log('AuthContext - Firebase UID stored in AsyncStorage');
 
 				try {
 					// Try to get user from MongoDB
-					console.log('AuthContext - Fetching user from MongoDB...');
 					const mongoUser = await UserService.getUserByFirebaseUID(
 						firebaseUser.uid
 					);
 					if (mongoUser) {
-						console.log('AuthContext - User found in MongoDB:', mongoUser._id);
 						setUser(mongoUser);
 						// Fetch the user's profile
 						const userProfile = await UserService.getProfileByUserId(
@@ -73,9 +64,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 						);
 						setProfile(userProfile);
 					} else {
-						console.log(
-							'AuthContext - User not found in MongoDB, will be handled during signup'
-						);
 						// User exists in Firebase but not in MongoDB
 						// This will be handled during signup flow
 						setUser(null);
@@ -91,7 +79,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 					// Note: Firebase UID is still stored in AsyncStorage above
 				}
 			} else {
-				console.log('AuthContext - User signed out, clearing data');
 				// User is signed out
 				setUser(null);
 				setProfile(null);
@@ -196,9 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				throw new Error('Firebase Auth is not initialized');
 			}
 
-			console.log('📤 Sending password reset email...');
 			await sendPasswordResetEmail(auth, email);
-			console.log('✅ Password reset email sent successfully');
 		} catch (error: any) {
 			console.error('❌ Error sending password reset email:', error);
 			console.error('❌ Error details:', {
@@ -249,8 +234,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 			// Create user in MongoDB
 			await createUserInMongoDB(firebaseUser, name);
-
-			console.log('Successfully created User in Firebase and MongoDB.');
 		} catch (error: any) {
 			console.error('Signup error:', error);
 

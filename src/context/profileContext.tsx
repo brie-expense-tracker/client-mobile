@@ -146,7 +146,6 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 
 	const fetchProfile = async () => {
 		if (!user || !firebaseUser) {
-			console.log('ProfileProvider: No user or firebaseUser, skipping fetch');
 			setProfile(null);
 			setLoading(false);
 			return;
@@ -173,12 +172,8 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 				response.error.includes('Profile not found')
 			) {
 				// Profile doesn't exist, create a default one
-				console.log(
-					'ProfileProvider: Profile not found, creating default profile'
-				);
 				await createDefaultProfile();
 			} else {
-				console.log('ProfileProvider: API returned error:', response.error);
 				setError(response.error || 'Failed to fetch profile');
 			}
 		} catch (err) {

@@ -19,45 +19,14 @@ const GoalSummaryScreen: React.FC = () => {
 	const { goals, isLoading, hasLoaded } = useGoals();
 	const [goal, setGoal] = useState<Goal | null>(null);
 
-	// Debug logging
-	console.log('GoalSummary - goalId:', goalId);
-	console.log('GoalSummary - goals count:', goals.length);
-	console.log('GoalSummary - isLoading:', isLoading);
-	console.log('GoalSummary - hasLoaded:', hasLoaded);
-	console.log(
-		'GoalSummary - goals:',
-		goals.map((g) => ({ id: g.id, name: g.name }))
-	);
-
 	// Load goal data when component mounts or goals change
 	useEffect(() => {
 		if (goalId && goals.length > 0) {
-			console.log('GoalSummary - Looking for goal with ID:', goalId);
-			console.log(
-				'GoalSummary - Available goal IDs:',
-				goals.map((g) => g.id)
-			);
-			console.log(
-				'GoalSummary - Available goal names:',
-				goals.map((g) => g.name)
-			);
-
 			const foundGoal = goals.find((g) => g.id === goalId);
-			console.log('GoalSummary - Found goal:', foundGoal);
 
 			if (foundGoal) {
 				setGoal(foundGoal);
-			} else {
-				console.warn('GoalSummary - Goal not found with ID:', goalId);
-				console.warn('GoalSummary - This might be an ID format mismatch');
 			}
-		} else if (goalId && goals.length === 0) {
-			console.log(
-				'GoalSummary - Goals array is empty, cannot look for goal:',
-				goalId
-			);
-		} else if (!goalId) {
-			console.log('GoalSummary - No goalId provided in params');
 		}
 	}, [goalId, goals]);
 

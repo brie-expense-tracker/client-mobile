@@ -82,11 +82,9 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 	}, [refetchGoals]);
 
 	const refetch = useCallback(async () => {
-		console.log('[TransactionContext] refetch called');
 		setIsLoading(true);
 		try {
 			const response = await ApiService.get<Transaction[]>('/transactions');
-			console.log('[TransactionContext] API response received:', response);
 
 			if (response.success && response.data) {
 				// Handle double-wrapped response
@@ -133,14 +131,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 						}
 					}
 
-					console.log('[TransactionContext] Transaction target processing:', {
-						transactionId: tx._id ?? tx.id,
-						description: tx.description,
-						originalTarget: tx.target,
-						originalTargetModel: tx.targetModel,
-						extractedTargetId: targetId,
-						extractedTargetModel: targetModel,
-					});
+
 
 					return {
 						id: tx._id ?? tx.id,
@@ -153,15 +144,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 						updatedAt: tx.updatedAt ?? tx.createdAt ?? new Date().toISOString(),
 					};
 				});
-				console.log(
-					'[TransactionContext] Formatted transactions:',
-					formatted.map((t) => ({
-						id: t.id,
-						description: t.description,
-						target: t.target,
-						targetModel: t.targetModel,
-					}))
-				);
+
 				setTransactions(formatted);
 				setHasLoaded(true); // Mark as loaded
 			} else {
@@ -256,10 +239,6 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 
 	const addTransaction = useCallback(
 		async (transactionData: Omit<Transaction, 'id'>) => {
-			console.log(
-				'[TransactionContext] addTransaction called with:',
-				transactionData
-			);
 
 			// Create a temporary ID for optimistic update
 			const tempId = `temp-${Date.now()}-${Math.random()}`;
@@ -272,18 +251,11 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 				updatedAt: new Date().toISOString(), // Add current timestamp for sorting
 			};
 
-			console.log(
-				'[TransactionContext] Optimistic transaction:',
-				newTransaction
-			);
+
 
 			// Optimistically add to UI
 			setTransactions((prev) => {
 				const updated = [newTransaction, ...prev];
-				console.log(
-					'[TransactionContext] Optimistic update - transactions count:',
-					updated.length
-				);
 				return updated;
 			});
 
@@ -293,7 +265,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 					transactionData
 				);
 
-				console.log('[TransactionContext] API response:', response);
+
 
 				if (response.success && response.data) {
 					// Safely convert amount to number with fallback
@@ -337,14 +309,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 						}
 					}
 
-					console.log('[TransactionContext] Target processing result:', {
-						originalTarget: transactionData.target,
-						originalTargetModel: transactionData.targetModel,
-						finalTargetId: targetId,
-						finalTargetModel: targetModel,
-						responseTarget: response.data.target,
-						responseTargetModel: response.data.targetModel,
-					});
+
 
 					// Update with the real ID from the server
 					const serverTransaction: Transaction = {
@@ -362,29 +327,17 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 							new Date().toISOString(),
 					};
 
-					console.log(
-						'[TransactionContext] Server transaction:',
-						serverTransaction
-					);
-					console.log(
-						'[TransactionContext] Original transaction data:',
-						transactionData
-					);
+
 
 					// Replace the temporary transaction with the real one
 					setTransactions((prev) => {
 						const updated = prev.map((t) =>
 							t.id === tempId ? serverTransaction : t
 						);
-						console.log(
-							'[TransactionContext] Server update - transactions count:',
-							updated.length
-						);
 						return updated;
 					});
 
 					// Auto-update budgets and goals based on transaction
-					console.log('[TransactionContext] Updating budgets and goals...');
 					await updateBudgetsAndGoals(serverTransaction);
 
 					return serverTransaction;
@@ -395,10 +348,6 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 				// Remove the optimistic transaction on error
 				setTransactions((prev) => {
 					const updated = prev.filter((t) => t.id !== tempId);
-					console.log(
-						'[TransactionContext] Error cleanup - transactions count:',
-						updated.length
-					);
 					return updated;
 				});
 				throw error;

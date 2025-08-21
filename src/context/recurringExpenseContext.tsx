@@ -75,13 +75,8 @@ export const RecurringExpenseProvider: React.FC<{ children: ReactNode }> = ({
 	const refetch = useCallback(async () => {
 		try {
 			setIsLoading(true);
-			console.log('[RecurringExpenseContext] Loading recurring expenses...');
 
 			const data = await RecurringExpenseService.getRecurringExpenses();
-			console.log('[RecurringExpenseContext] Received data:', data);
-			console.log(
-				'[RecurringExpenseContext] Starting payment status checks...'
-			);
 
 			setExpenses(data);
 
@@ -98,14 +93,8 @@ export const RecurringExpenseProvider: React.FC<{ children: ReactNode }> = ({
 			for (const expense of data) {
 				try {
 					// Check if current period is paid using the correct method
-					console.log(
-						`[RecurringExpenseContext] Checking payment status for ${expense.patternId}`
-					);
 					const { isPaid } = await RecurringExpenseService.isCurrentPeriodPaid(
 						expense.patternId
-					);
-					console.log(
-						`[RecurringExpenseContext] Payment status for ${expense.patternId}: isPaid = ${isPaid}`
 					);
 
 					// Also get transaction info for additional context
