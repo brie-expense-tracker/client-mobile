@@ -185,14 +185,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 	const refetch = useCallback(async () => {
 		setIsLoading(true);
 		try {
-			console.log('[Budgets] Fetching budgets from API...');
 			const response = await ApiService.get<any>('/budgets');
-			console.log('[Budgets] Raw API response:', response);
-			console.log('[Budgets] Response data type:', typeof response.data);
-			console.log(
-				'[Budgets] Response data keys:',
-				Object.keys(response.data || {})
-			);
 
 			// Handle double-wrapped response from ApiService
 			const actualData = response.data?.data || response.data;
@@ -200,11 +193,6 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 				response.data?.success !== undefined
 					? response.data.success
 					: response.success;
-
-			console.log('[Budgets] Processed response:', {
-				actualSuccess,
-				actualData,
-			});
 
 			if (actualSuccess && Array.isArray(actualData)) {
 				const formatted: Budget[] = actualData.map((budget: any) => ({
@@ -226,7 +214,6 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 					shouldAlert: budget.shouldAlert || false,
 					spentPercentage: budget.spentPercentage || 0,
 				}));
-				console.log('[Budgets] Formatted budgets:', formatted);
 				setBudgets(formatted);
 				setHasLoaded(true); // Mark as loaded
 			} else {
@@ -245,11 +232,10 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 
 	const checkBudgetAlerts = useCallback(async () => {
 		try {
-			console.log('[Budgets] Checking budget alerts...');
 			const response = await ApiService.post<any>('/budgets/check-alerts', {});
 
 			if (response.success) {
-				console.log('[Budgets] Budget alerts checked:', response.data);
+				// Budget alerts checked successfully
 			} else {
 				console.warn(
 					'[Budgets] Failed to check budget alerts:',
@@ -262,8 +248,6 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 	}, []);
 
 	const addBudget = useCallback(async (budgetData: CreateBudgetData) => {
-		console.log('addBudget called with:', budgetData);
-
 		// Create a temporary ID for optimistic update
 		const tempId = `temp-${Date.now()}-${Math.random()}`;
 		const newBudget: Budget = {
@@ -273,8 +257,6 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 			categories: budgetData.categories || [],
 			period: budgetData.period || 'monthly',
 		};
-
-		console.log('Optimistic budget created:', newBudget);
 
 		// Optimistically add to UI
 		setBudgets((prev) => {

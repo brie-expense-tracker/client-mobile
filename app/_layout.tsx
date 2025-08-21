@@ -3,7 +3,6 @@ import React, { useEffect, useState } from 'react';
 // @ts-ignore - react-query types will be available after install
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import './global.css';
 import {
 	ActivityIndicator,
 	Text,
@@ -42,11 +41,6 @@ const BACKGROUND_NOTIFICATION_TASK = 'BACKGROUND-NOTIFICATION-TASK';
 TaskManager.defineTask(
 	BACKGROUND_NOTIFICATION_TASK,
 	async ({ data, error, executionInfo }) => {
-		console.log('✅ Received a notification in the background!', {
-			data,
-			error,
-			executionInfo,
-		});
 		// Do something with the notification data
 		return {
 			shouldShowBanner: true,

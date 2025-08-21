@@ -65,27 +65,7 @@ const Dashboard: React.FC = () => {
 	const [isPressed, setIsPressed] = useState(false);
 	const [refreshing, setRefreshing] = useState(false);
 
-	// Debug logging
-	useEffect(() => {
-		console.log('[Dashboard] Current state:', {
-			transactionsCount: transactions.length,
-			transactions: transactions.slice(0, 3).map((tx) => ({
-				id: tx.id,
-				description: tx.description,
-				type: tx.type,
-				amount: tx.amount,
-				target: tx.target,
-				targetModel: tx.targetModel,
-				date: tx.date,
-			})),
-			budgetsCount: budgets.length,
-			goalsCount: goals.length,
-			isLoading,
-		});
-	}, [transactions, budgets, goals, isLoading]);
-
 	const onRefresh = useCallback(async () => {
-		console.log('[Dashboard] onRefresh called');
 		setRefreshing(true);
 		try {
 			await refetch();
@@ -100,11 +80,6 @@ const Dashboard: React.FC = () => {
 	 * ------------------ Derived / memoised values ---------------
 	 */
 	const { totalBalance, dailyChange } = useMemo(() => {
-		console.log(
-			'[Dashboard] Calculating balance from transactions:',
-			transactions.length
-		);
-
 		const balance = transactions.reduce((sum, t) => {
 			const amount =
 				t.type === 'income'
@@ -112,24 +87,17 @@ const Dashboard: React.FC = () => {
 						? 0
 						: t.amount
 					: -(isNaN(t.amount) ? 0 : t.amount);
-			console.log(
-				`[Dashboard] Transaction ${t.id}: ${t.type} ${t.amount} -> contribution: ${amount}`
-			);
 			return sum + amount;
 		}, 0);
 
 		// Use timezone-aware date handling (from ledger)
 		const today = getLocalIsoDate();
-		console.log("[Dashboard] Today's date:", today);
 
 		const change = transactions
 			.filter((t) => {
 				// Compare transaction date with today's date using ISO string format
 				const txDay = t.date.slice(0, 10);
 				const isToday = txDay === today;
-				console.log(
-					`[Dashboard] Transaction ${t.id} date: ${t.date} -> ${txDay}, isToday: ${isToday}`
-				);
 				return isToday;
 			})
 			.reduce((s, t) => {
@@ -139,16 +107,9 @@ const Dashboard: React.FC = () => {
 							? 0
 							: t.amount
 						: -(isNaN(t.amount) ? 0 : t.amount);
-				console.log(
-					`[Dashboard] Today's transaction ${t.id}: ${t.type} ${t.amount} -> contribution: ${amount}`
-				);
 				return s + amount;
 			}, 0);
 
-		console.log('[Dashboard] Calculated values:', {
-			totalBalance: balance,
-			dailyChange: change,
-		});
 		return { totalBalance: balance, dailyChange: change } as const;
 	}, [transactions]);
 

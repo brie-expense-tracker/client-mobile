@@ -74,17 +74,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 			// Set up notification listeners
 			notificationListener.current =
 				Notifications.addNotificationReceivedListener((notification) => {
-					console.log('🔔 Notification Received: ', notification);
 					setNotification(notification);
 					refreshUnreadCount();
 				});
 			responseListener.current =
 				Notifications.addNotificationResponseReceivedListener((response) => {
-					console.log(
-						'🔔 Notification Response: ',
-						JSON.stringify(response, null, 2),
-						JSON.stringify(response.notification.request.content.data, null, 2)
-					);
 					// Handle the notification response here
 				});
 		} catch (err) {

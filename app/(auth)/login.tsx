@@ -64,8 +64,6 @@ export default function Login() {
 
 			// Use the auth context to handle MongoDB user verification
 			await login(firebaseUser);
-
-			console.log('Successfully logged in user');
 		} catch (error: any) {
 			console.error('Login error:', error);
 

@@ -88,11 +88,9 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 	const memoizedGoals = useMemo(() => goals, [goals]);
 
 	const refetch = useCallback(async () => {
-		console.log('[GoalContext] refetch called');
 		setIsLoading(true);
 		try {
 			const response = await ApiService.get<any>('/goals');
-			console.log('[GoalContext] API response received:', response);
 
 			// Handle double-wrapped response from ApiService
 			const actualData = response.data?.data || response.data;
@@ -100,11 +98,6 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 				response.data?.success !== undefined
 					? response.data.success
 					: response.success;
-
-			console.log('[GoalContext] Processed response:', {
-				actualSuccess,
-				dataLength: actualData?.length,
-			});
 
 			if (actualSuccess && Array.isArray(actualData)) {
 				const formatted: Goal[] = actualData.map((goal: any) => ({
@@ -120,15 +113,6 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 					createdAt: goal.createdAt,
 					updatedAt: goal.updatedAt,
 				}));
-				console.log(
-					'[GoalContext] Formatted goals:',
-					formatted.map((g) => ({
-						id: g.id,
-						name: g.name,
-						current: g.current,
-						target: g.target,
-					}))
-				);
 				setGoals(formatted);
 			} else {
 				console.warn('[Goals] Unexpected response:', response);
@@ -139,13 +123,10 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 			setGoals([]);
 		} finally {
 			setIsLoading(false);
-			console.log('[GoalContext] refetch completed');
 		}
 	}, []);
 
 	const addGoal = useCallback(async (goalData: CreateGoalData) => {
-		console.log('addGoal called with:', goalData);
-
 		// Create a temporary ID for optimistic update
 		const tempId = `temp-${Date.now()}-${Math.random()}`;
 		const newGoal: Goal = {
@@ -155,24 +136,18 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 			categories: goalData.categories || [],
 		};
 
-		console.log('Optimistic goal created:', newGoal);
-
 		// Optimistically add to UI
 		setGoals((prev) => {
 			const updated = [newGoal, ...prev];
-			console.log('Updated goals state (optimistic):', updated);
 			return updated;
 		});
 
 		try {
 			const response = await ApiService.post<any>('/goals', goalData);
-			console.log('API response:', response);
 
 			// Handle the response format properly
 			const actualData = response.data?.data || response.data;
 			const actualSuccess = response.success;
-
-			console.log('Processed response:', { actualSuccess, actualData });
 
 			if (actualSuccess && actualData) {
 				// Update with the real ID from the server
@@ -192,12 +167,9 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 					updatedAt: actualData.updatedAt,
 				};
 
-				console.log('Server goal created:', serverGoal);
-
 				// Replace the temporary goal with the real one
 				setGoals((prev) => {
 					const updated = prev.map((g) => (g.id === tempId ? serverGoal : g));
-					console.log('Updated goals state (server):', updated);
 					return updated;
 				});
 
@@ -210,7 +182,6 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 			// Remove the optimistic goal on error
 			setGoals((prev) => {
 				const updated = prev.filter((g) => g.id !== tempId);
-				console.log('Removed optimistic goal on error:', updated);
 				return updated;
 			});
 			console.error('Error adding goal:', error);
