@@ -21,10 +21,11 @@ interface ProfilePreferences {
 		aiSuggestion: boolean;
 		budgetMilestones: boolean;
 		monthlyFinancialCheck: boolean;
+		monthlySavingsTransfer: boolean;
 	};
 	aiInsights: {
 		enabled: boolean;
-		frequency: 'daily' | 'weekly' | 'monthly';
+		frequency: 'daily' | 'weekly' | 'monthly' | 'disabled';
 		pushNotifications: boolean;
 		emailAlerts: boolean;
 		insightTypes: {
@@ -68,6 +69,11 @@ interface ProfilePreferences {
 			undoWindow: number;
 		};
 	};
+	recurringExpenses: {
+		enabled: boolean;
+		notifications: boolean;
+		autoCategorization: boolean;
+	};
 }
 
 interface RiskProfile {
@@ -94,6 +100,7 @@ interface Profile {
 	debt: number;
 	riskProfile: RiskProfile;
 	preferences: ProfilePreferences;
+	phone?: string;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -156,7 +163,9 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 			setLoading(true);
 			setError(null);
 
-			const response = await ApiService.get<{ data: Profile }>('/profiles/me');
+			const response = await ApiService.get<{ data: Profile }>(
+				'/api/profiles/me'
+			);
 			// console.log('ProfileProvider: API response:', response);
 
 			if (response.success && response.data) {
@@ -216,6 +225,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 						aiSuggestion: true,
 						budgetMilestones: false,
 						monthlyFinancialCheck: true,
+						monthlySavingsTransfer: false,
 					},
 					aiInsights: {
 						enabled: true,
@@ -262,6 +272,11 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 							lockEdit: false,
 							undoWindow: 24,
 						},
+					},
+					recurringExpenses: {
+						enabled: false,
+						notifications: false,
+						autoCategorization: false,
 					},
 				},
 			};
@@ -314,7 +329,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 			setError(null);
 
 			const response = await ApiService.put<{ data: Profile }>(
-				'/profiles/me',
+				'/api/profiles/me',
 				updates
 			);
 
@@ -359,7 +374,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 			setError(null);
 
 			const response = await ApiService.put<ProfilePreferences>(
-				'/profiles/preferences',
+				'/api/profiles/preferences',
 				preferences
 			);
 

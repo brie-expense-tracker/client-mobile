@@ -14,7 +14,21 @@ import { useRouter } from 'expo-router';
 import { useProfile } from '../../../../src/context/profileContext';
 
 // Simplified AI configuration presets
-const AI_PRESETS = {
+const AI_PRESETS: Record<
+	'basic' | 'standard' | 'premium',
+	{
+		name: string;
+		description: string;
+		frequency: 'weekly' | 'monthly' | 'daily';
+		insightTypes: {
+			budgetingTips: boolean;
+			expenseReduction: boolean;
+			incomeSuggestions: boolean;
+		};
+		pushNotifications: boolean;
+		emailAlerts: boolean;
+	}
+> = {
 	basic: {
 		name: 'Basic Insights',
 		description: 'Weekly financial summaries and basic tips',
@@ -55,7 +69,7 @@ const AI_PRESETS = {
 
 export default function AIInsightsSettings() {
 	const router = useRouter();
-	const { profile, updateProfile } = useProfile();
+	const { profile, updatePreferences } = useProfile();
 	const [selectedPreset, setSelectedPreset] = useState<
 		'basic' | 'standard' | 'premium'
 	>('standard');
@@ -88,17 +102,13 @@ export default function AIInsightsSettings() {
 		const presetConfig = AI_PRESETS[preset];
 
 		try {
-			await updateProfile({
-				...profile,
-				preferences: {
-					...profile?.preferences,
-					aiInsights: {
-						enabled: aiEnabled,
-						frequency: presetConfig.frequency,
-						pushNotifications: presetConfig.pushNotifications,
-						emailAlerts: presetConfig.emailAlerts,
-						insightTypes: presetConfig.insightTypes,
-					},
+			await updatePreferences({
+				aiInsights: {
+					enabled: aiEnabled,
+					frequency: presetConfig.frequency,
+					pushNotifications: presetConfig.pushNotifications,
+					emailAlerts: presetConfig.emailAlerts,
+					insightTypes: presetConfig.insightTypes,
 				},
 			});
 
@@ -113,13 +123,17 @@ export default function AIInsightsSettings() {
 		setAiEnabled(value);
 
 		try {
-			await updateProfile({
-				...profile,
-				preferences: {
-					...profile?.preferences,
-					aiInsights: {
-						...profile?.preferences?.aiInsights,
-						enabled: value,
+			await updatePreferences({
+				aiInsights: {
+					enabled: value,
+					frequency: profile?.preferences?.aiInsights?.frequency || 'weekly',
+					pushNotifications:
+						profile?.preferences?.aiInsights?.pushNotifications ?? true,
+					emailAlerts: profile?.preferences?.aiInsights?.emailAlerts ?? false,
+					insightTypes: profile?.preferences?.aiInsights?.insightTypes || {
+						budgetingTips: true,
+						expenseReduction: true,
+						incomeSuggestions: false,
 					},
 				},
 			});
@@ -132,18 +146,6 @@ export default function AIInsightsSettings() {
 	return (
 		<SafeAreaView style={styles.container}>
 			<ScrollView style={styles.scrollView}>
-				{/* Header */}
-				<View style={styles.header}>
-					<TouchableOpacity
-						onPress={() => router.back()}
-						style={styles.backButton}
-					>
-						<Ionicons name="arrow-back" size={24} color="#333" />
-					</TouchableOpacity>
-					<Text style={styles.headerTitle}>AI Insights</Text>
-					<View style={styles.placeholder} />
-				</View>
-
 				{/* Main Toggle */}
 				<View style={styles.section}>
 					<View style={styles.settingRow}>

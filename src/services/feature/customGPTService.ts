@@ -46,41 +46,112 @@ export class CustomGPTService {
 	 */
 	async getResponse(message: string): Promise<CustomGPTResponse> {
 		try {
+			console.log('[CustomGPTService] Getting response for:', message);
+			console.log('[CustomGPTService] Session ID:', this.sessionId);
+
 			// Prepare financial context for the AI
 			const financialContext = this.prepareFinancialContext();
+			console.log('[CustomGPTService] Financial context prepared:', {
+				budgetCount: financialContext.budgets.length,
+				goalCount: financialContext.goals.length,
+				transactionCount: financialContext.recentTransactions.length,
+				totalBudget: financialContext.financialSummary.totalBudget,
+				totalSpent: financialContext.financialSummary.totalSpent,
+			});
+
+			const requestPayload = {
+				message: message.trim(),
+				sessionId: this.sessionId,
+				context: financialContext,
+			};
+
+			console.log('[CustomGPTService] Sending request to API:', {
+				endpoint: '/api/custom-gpt/chat',
+				messageLength: message.trim().length,
+				hasContext: !!financialContext,
+			});
 
 			const response = await ApiService.post<CustomGPTResponse>(
-				'/custom-gpt/chat',
-				{
-					message: message.trim(),
-					sessionId: this.sessionId,
-					context: financialContext,
-				}
+				'/api/custom-gpt/chat',
+				requestPayload
 			);
 
+			console.log('[CustomGPTService] API response received:', {
+				success: response.success,
+				hasData: !!response.data,
+				responseLength: response.data?.response?.length || 0,
+				status: response.status,
+				usage: response.usage,
+			});
+
 			if (response.success && response.data) {
-				return {
+				const result = {
 					response: response.data.response,
 					sessionId: response.data.sessionId || this.sessionId,
 					timestamp: response.data.timestamp || new Date(),
 					usage: response.usage,
 				};
+
+				console.log('[CustomGPTService] Returning successful response:', {
+					responsePreview: result.response.substring(0, 100) + '...',
+					sessionId: result.sessionId,
+					timestamp: result.timestamp,
+				});
+
+				return result;
 			}
 
-			throw new Error('Failed to get GPT response');
-		} catch (error: any) {
-			console.error('[CustomGPTService] Error getting response:', error);
+			// If the response is not successful, fall back to fallback response
+			console.log(
+				'[CustomGPTService] API response not successful, using fallback'
+			);
+			const fallbackResponse = this.getFallbackResponse(message);
+			console.log(
+				'[CustomGPTService] Fallback response:',
+				fallbackResponse.substring(0, 100) + '...'
+			);
 
-			// Check if it's a rate limit error
+			return {
+				response: fallbackResponse,
+				sessionId: this.sessionId,
+				timestamp: new Date(),
+				usage: undefined,
+			};
+		} catch (error: any) {
+			// Log the error for debugging but don't throw it
+			console.log(
+				'[CustomGPTService] API call failed, using fallback response:',
+				error.message
+			);
+
+			console.log('[CustomGPTService] Error details:', {
+				message: error.message,
+				status: error.response?.status,
+				statusText: error.response?.statusText,
+				data: error.response?.data,
+				stack: error.stack,
+			});
+
+			// Check if it's a rate limit error - only re-throw these for paywall handling
 			if (error.response?.status === 429) {
+				console.log(
+					'[CustomGPTService] Rate limit error, re-throwing for paywall handling'
+				);
 				throw error; // Re-throw for paywall handling
 			}
 
-			// Return a helpful fallback response
+			// For all other errors (including 401, 500, network errors), use fallback
+			const fallbackResponse = this.getFallbackResponse(message);
+			console.log(
+				'[CustomGPTService] Using fallback due to error:',
+				fallbackResponse.substring(0, 100) + '...'
+			);
+
 			return {
-				response: this.getFallbackResponse(message),
+				response: fallbackResponse,
 				sessionId: this.sessionId,
 				timestamp: new Date(),
+				usage: undefined,
 			};
 		}
 	}
@@ -102,7 +173,7 @@ export class CustomGPTService {
 			amount: t.amount,
 			description: t.description,
 			date: t.date,
-			budget: t.budget,
+			category: t.category,
 		}));
 
 		// Calculate budget utilization
@@ -173,38 +244,199 @@ export class CustomGPTService {
 	public getFallbackResponse(message: string): string {
 		const lowerMessage = message.toLowerCase();
 
-		// Simple keyword-based responses for common questions
-		if (lowerMessage.includes('budget') || lowerMessage.includes('spending')) {
-			return `I can see you have ${
-				this.context.budgets.length
-			} active budgets. Your total budget is $${this.context.budgets
-				.reduce((sum, b) => sum + (b.amount || 0), 0)
-				.toFixed(2)} with $${this.context.budgets
-				.reduce((sum, b) => sum + (b.spent || 0), 0)
-				.toFixed(
+		// Check for specific budget types
+		if (
+			lowerMessage.includes('grocery') ||
+			lowerMessage.includes('food') ||
+			lowerMessage.includes('groceries')
+		) {
+			const groceryBudget = this.context.budgets.find(
+				(b) =>
+					b.name.toLowerCase().includes('grocery') ||
+					b.name.toLowerCase().includes('food') ||
+					b.name.toLowerCase().includes('groceries')
+			);
+
+			if (groceryBudget) {
+				const remaining =
+					(groceryBudget.amount || 0) - (groceryBudget.spent || 0);
+				const utilization = groceryBudget.amount
+					? ((groceryBudget.spent || 0) / groceryBudget.amount) * 100
+					: 0;
+
+				if (utilization > 80) {
+					return `⚠️ Your grocery budget is ${utilization.toFixed(
+						1
+					)}% used! You've spent $${groceryBudget.spent?.toFixed(
+						2
+					)} out of $${groceryBudget.amount?.toFixed(
+						2
+					)}, with only $${remaining.toFixed(
+						2
+					)} remaining. Consider adjusting your spending or budget.`;
+				} else if (utilization > 50) {
+					return `Your grocery budget is ${utilization.toFixed(
+						1
+					)}% used. You've spent $${groceryBudget.spent?.toFixed(
+						2
+					)} out of $${groceryBudget.amount?.toFixed(
+						2
+					)}, with $${remaining.toFixed(2)} remaining. You're on track!`;
+				} else {
+					return `Great job! Your grocery budget is only ${utilization.toFixed(
+						1
+					)}% used. You've spent $${groceryBudget.spent?.toFixed(
+						2
+					)} out of $${groceryBudget.amount?.toFixed(
+						2
+					)}, with $${remaining.toFixed(2)} remaining.`;
+				}
+			}
+		}
+
+		if (
+			lowerMessage.includes('stock') ||
+			lowerMessage.includes('investment') ||
+			lowerMessage.includes('invest')
+		) {
+			const investmentBudget = this.context.budgets.find(
+				(b) =>
+					b.name.toLowerCase().includes('stock') ||
+					b.name.toLowerCase().includes('investment') ||
+					b.name.toLowerCase().includes('invest')
+			);
+
+			if (investmentBudget) {
+				return `You have an investment budget of $${investmentBudget.amount?.toFixed(
 					2
-				)} spent. Would you like me to help you analyze your budget performance or create a new budget?`;
+				)} with $${investmentBudget.spent?.toFixed(
+					2
+				)} spent. Would you like me to help you track your investment spending or adjust this budget?`;
+			} else {
+				return `I can help you set up a budget for stocks and investments! What's your target amount for stock investments this month? I can create a new budget category for you.`;
+			}
+		}
+
+		if (lowerMessage.includes('budget') && lowerMessage.includes('how')) {
+			// More specific budget analysis
+			const totalBudget = this.context.budgets.reduce(
+				(sum, b) => sum + (b.amount || 0),
+				0
+			);
+			const totalSpent = this.context.budgets.reduce(
+				(sum, b) => sum + (b.spent || 0),
+				0
+			);
+			const totalRemaining = totalBudget - totalSpent;
+			const overallUtilization =
+				totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
+
+			if (overallUtilization > 80) {
+				return `⚠️ Your overall budget utilization is ${overallUtilization.toFixed(
+					1
+				)}%! You've spent $${totalSpent.toFixed(
+					2
+				)} out of $${totalBudget.toFixed(
+					2
+				)}, with only $${totalRemaining.toFixed(
+					2
+				)} remaining. Consider reviewing your spending patterns.`;
+			} else if (overallUtilization > 50) {
+				return `Your overall budget utilization is ${overallUtilization.toFixed(
+					1
+				)}%. You've spent $${totalSpent.toFixed(
+					2
+				)} out of $${totalBudget.toFixed(2)}, with $${totalRemaining.toFixed(
+					2
+				)} remaining. You're managing your budget well!`;
+			} else {
+				return `Excellent budget management! Your overall utilization is only ${overallUtilization.toFixed(
+					1
+				)}%. You've spent $${totalSpent.toFixed(
+					2
+				)} out of $${totalBudget.toFixed(2)}, with $${totalRemaining.toFixed(
+					2
+				)} remaining.`;
+			}
 		}
 
 		if (lowerMessage.includes('goal') || lowerMessage.includes('save')) {
-			return `You're tracking ${
-				this.context.goals.length
-			} financial goals with a total target of $${this.context.goals
-				.reduce((sum, g) => sum + (g.target || 0), 0)
-				.toFixed(2)}. You've saved $${this.context.goals
-				.reduce((sum, g) => sum + (g.current || 0), 0)
-				.toFixed(2)} so far. How can I help you reach your savings goals?`;
+			const totalTarget = this.context.goals.reduce(
+				(sum, g) => sum + (g.target || 0),
+				0
+			);
+			const totalSaved = this.context.goals.reduce(
+				(sum, g) => sum + (g.current || 0),
+				0
+			);
+			const overallProgress =
+				totalTarget > 0 ? (totalSaved / totalTarget) * 100 : 0;
+
+			if (overallProgress > 75) {
+				return `🎉 You're ${overallProgress.toFixed(
+					1
+				)}% to your savings goals! You've saved $${totalSaved.toFixed(
+					2
+				)} out of $${totalTarget.toFixed(2)}. You're almost there!`;
+			} else if (overallProgress > 50) {
+				return `Great progress! You're ${overallProgress.toFixed(
+					1
+				)}% to your savings goals. You've saved $${totalSaved.toFixed(
+					2
+				)} out of $${totalTarget.toFixed(2)}. Keep it up!`;
+			} else {
+				return `You're ${overallProgress.toFixed(
+					1
+				)}% to your savings goals. You've saved $${totalSaved.toFixed(
+					2
+				)} out of $${totalTarget.toFixed(
+					2
+				)}. Let's work on strategies to boost your savings!`;
+			}
 		}
 
 		if (lowerMessage.includes('spend') || lowerMessage.includes('expense')) {
+			const recentTransactions = this.context.transactions.slice(-10);
+			const recentTotal = recentTransactions.reduce(
+				(sum, t) => sum + (t.amount || 0),
+				0
+			);
+			const spendingTrend = this.calculateSpendingTrends(
+				this.context.transactions
+			);
+
 			return `I can see ${
 				this.context.transactions.length
-			} recent transactions. Your spending trend is ${
-				this.calculateSpendingTrends(this.context.transactions).trend
+			} recent transactions. Your recent spending is $${recentTotal.toFixed(
+				2
+			)}, and the trend is ${
+				spendingTrend.trend
 			}. Would you like me to analyze your spending patterns or help you track expenses better?`;
 		}
 
-		return `I'm here to help with your finances! I can see you have ${this.context.budgets.length} budgets, ${this.context.goals.length} goals, and ${this.context.transactions.length} transactions. What would you like to know about your financial situation?`;
+		// Default response with more context
+		const totalBudget = this.context.budgets.reduce(
+			(sum, b) => sum + (b.amount || 0),
+			0
+		);
+		const totalSpent = this.context.budgets.reduce(
+			(sum, b) => sum + (b.spent || 0),
+			0
+		);
+		const totalGoals = this.context.goals.reduce(
+			(sum, g) => sum + (g.target || 0),
+			0
+		);
+
+		return `I'm here to help with your finances! I can see you have ${
+			this.context.budgets.length
+		} budgets (${
+			totalBudget > 0 ? `$${totalBudget.toFixed(2)} total` : 'no budgets set'
+		}), ${this.context.goals.length} goals (${
+			totalGoals > 0 ? `$${totalGoals.toFixed(2)} target` : 'no goals set'
+		}), and ${
+			this.context.transactions.length
+		} transactions. What specific aspect would you like to know about?`;
 	}
 
 	/**
@@ -284,7 +516,7 @@ export class CustomGPTService {
 		const categories = new Map<string, number>();
 
 		this.context.transactions.forEach((t) => {
-			const category = t.budget || 'Uncategorized';
+			const category = t.category || 'Uncategorized';
 			categories.set(
 				category,
 				(categories.get(category) || 0) + (t.amount || 0)
@@ -407,7 +639,7 @@ export class CustomGPTService {
 	 */
 	async upgradeSubscription(tier: string) {
 		try {
-			const response = await ApiService.post('/custom-gpt/upgrade', { tier });
+			const response = await ApiService.post('/api/custom-gpt/upgrade', { tier });
 			return response.success;
 		} catch (error) {
 			console.error('[CustomGPTService] Upgrade failed:', error);

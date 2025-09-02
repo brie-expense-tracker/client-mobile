@@ -33,7 +33,6 @@ const RecurringExpensesSummaryWidget: React.FC<
 		expenses,
 		isLoading: loading,
 		summaryStats,
-		lastRefreshed,
 	} = useRecurringExpenses();
 
 	// State for payment status
@@ -60,8 +59,8 @@ const RecurringExpensesSummaryWidget: React.FC<
 				const expensesWithStatus = await Promise.all(
 					transformedExpenses.map(async (expense) => {
 						try {
-							const paymentStatus =
-								await RecurringExpenseService.isCurrentPeriodPaid(
+							const isPaid =
+								await RecurringExpenseService.checkIfCurrentPeriodPaid(
 									expense.patternId
 								);
 
@@ -70,43 +69,15 @@ const RecurringExpensesSummaryWidget: React.FC<
 							let paymentDate: string | undefined;
 							let nextDueDate: string = expense.nextExpectedDate;
 
-							if (paymentStatus.isPaid && paymentStatus.payment) {
-								const dueDate = new Date(expense.nextExpectedDate);
-								const paidDate = new Date(paymentStatus.payment.paidAt);
-
-								// Calculate days between due date and payment date
-								const daysDiff =
-									(paidDate.getTime() - dueDate.getTime()) /
-									(1000 * 60 * 60 * 24);
-
-								// Consider paid if within 2 weeks (14 days) AFTER the due date
-								// This allows for late payments to still be considered "paid" for that period
-								isPaidWithinTwoWeeks = daysDiff >= -14 && daysDiff <= 14;
-
-								console.log(
-									`[RecurringExpensesSummaryWidget] Payment status for ${expense.vendor}:`,
-									{
-										dueDate: dueDate.toLocaleDateString(),
-										paidDate: paidDate.toLocaleDateString(),
-										daysDiff,
-										isPaidWithinTwoWeeks,
-										patternId: expense.patternId,
-									}
+							if (isPaid) {
+								// Since we only get a boolean now, we'll assume it's paid within the period
+								isPaidWithinTwoWeeks = true;
+								paymentDate = new Date().toLocaleDateString();
+								// Calculate next due date based on frequency
+								nextDueDate = calculateNextDueDate(
+									expense.nextExpectedDate,
+									expense.frequency
 								);
-
-								if (isPaidWithinTwoWeeks) {
-									paymentDate = paidDate.toLocaleDateString();
-									// Calculate next due date based on frequency
-									// If paid, calculate from the due date to get the next period
-									// If not paid, use the current expected date
-									nextDueDate = calculateNextDueDate(
-										expense.nextExpectedDate,
-										expense.frequency
-									);
-								} else {
-									// If not paid within 2 weeks, the next due date is the current expected date
-									nextDueDate = expense.nextExpectedDate;
-								}
 							}
 
 							return {
@@ -181,12 +152,9 @@ const RecurringExpensesSummaryWidget: React.FC<
 	};
 
 	// Debug: Log the current status
-	console.log('[RecurringExpensesSummaryWidget] Current status:', {
-		expensesCount: transformedExpenses.length,
-		expensesWithPaymentStatus: expensesWithPaymentStatus.length,
-		summaryStats,
-		lastRefreshed,
-	});
+	console.log(
+		`🔄 Recurring: ${transformedExpenses.length} expenses, ${expensesWithPaymentStatus.length} with status`
+	);
 
 	const handleExpensePress = (expense: TransformedRecurringExpense) => {
 		if (onExpensePress) {

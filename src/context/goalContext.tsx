@@ -90,7 +90,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 	const refetch = useCallback(async () => {
 		setIsLoading(true);
 		try {
-			const response = await ApiService.get<any>('/goals');
+			const response = await ApiService.get<any>('/api/goals');
 
 			// Handle double-wrapped response from ApiService
 			const actualData = response.data?.data || response.data;
@@ -143,7 +143,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 		});
 
 		try {
-			const response = await ApiService.post<any>('/goals', goalData);
+			const response = await ApiService.post<any>('/api/goals', goalData);
 
 			// Handle the response format properly
 			const actualData = response.data?.data || response.data;
@@ -192,7 +192,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 	const updateGoal = useCallback(
 		async (id: string, updates: UpdateGoalData) => {
 			try {
-				const response = await ApiService.put<any>(`/goals/${id}`, updates);
+				const response = await ApiService.put<any>(`/api/goals/${id}`, updates);
 
 				// Handle the response format properly
 				const actualData = response.data?.data || response.data;
@@ -238,7 +238,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 			setGoals((prev) => prev.filter((g) => g.id !== id));
 
 			try {
-				await ApiService.delete(`/goals/${id}`);
+				await ApiService.delete(`/api/goals/${id}`);
 			} catch (err) {
 				console.warn('Delete failed, refetching', err);
 				// Rollback or just refetch
@@ -251,7 +251,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 	const updateGoalCurrent = useCallback(
 		async (goalId: string, amount: number) => {
 			try {
-				const response = await ApiService.post<any>('/goals/update-current', {
+				const response = await ApiService.post<any>('/api/goals/update-current', {
 					goalId,
 					amount,
 				});

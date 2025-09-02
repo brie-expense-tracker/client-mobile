@@ -93,7 +93,7 @@ export const RecurringExpenseProvider: React.FC<{ children: ReactNode }> = ({
 			for (const expense of data) {
 				try {
 					// Check if current period is paid using the correct method
-					const { isPaid } = await RecurringExpenseService.isCurrentPeriodPaid(
+					const isPaid = await RecurringExpenseService.checkIfCurrentPeriodPaid(
 						expense.patternId
 					);
 

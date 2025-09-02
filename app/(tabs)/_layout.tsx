@@ -19,12 +19,12 @@ export default function TabLayout() {
 
 	const navigateToAddTransaction = () => {
 		hideTransactionModal();
-		router.replace('/transaction');
+		router.push('/transaction');
 	};
 
 	const navigateToAddExpense = () => {
 		hideTransactionModal();
-		router.replace('/transaction/expense');
+		router.push('/transaction/expense');
 	};
 
 	return (

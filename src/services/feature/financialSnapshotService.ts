@@ -7,6 +7,9 @@ export interface BudgetHistoryItem {
 	periodStart: Date;
 	periodEnd: Date;
 	createdAt: Date;
+	spentAmount: number;
+	utilizationPercentage: number;
+	periodHealth: 'good' | 'warning' | 'critical';
 }
 
 export class FinancialSnapshotService {

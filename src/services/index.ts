@@ -9,11 +9,17 @@ export {
 	type RecurringExpense,
 } from './feature/recurringExpenseService';
 export { BudgetSuggestionService } from './feature/budgetSuggestionService';
-export { CustomGPTService } from './feature/customGPTService';
-export { InsightsService, type AIInsight } from './feature/insightsService';
+export { TieredAIService } from './feature/tieredAIService';
+export { 
+	InsightsService, 
+	type AIInsight,
+	type InsightsResponse 
+} from './feature/insightsService';
 export {
 	notificationService,
 	type NotificationData,
+	type NotificationResponse,
+	type NotificationConsent,
 } from './feature/notificationService';
 export {
 	WeeklyReflectionService,
@@ -42,6 +48,7 @@ export {
 // ML/AI Services
 export { default as HybridAIService } from './ml/hybridAIService';
 export { default as LocalMLService } from './ml/localMLService';
+export type { AIRequest, AIResponse } from './ml/hybridAIService';
 
 // Utility Services
 export { default as SmartCacheService } from './utility/smartCacheService';

@@ -12,6 +12,7 @@ import {
 	notificationService,
 	NotificationData,
 	NotificationResponse,
+	NotificationConsent,
 } from '../services';
 
 interface NotificationContextType {
@@ -29,6 +30,15 @@ interface NotificationContextType {
 	deleteAllNotifications: () => Promise<void>;
 	sendTestNotification: () => Promise<void>;
 	refreshUnreadCount: () => Promise<void>;
+	// New consent management methods
+	getConsentSettings: () => Promise<NotificationConsent>;
+	updateConsentSettings: (
+		consent: Partial<NotificationConsent>
+	) => Promise<boolean>;
+	isNotificationAllowed: (
+		type: NotificationData['type'],
+		category?: string
+	) => Promise<boolean>;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(
@@ -189,6 +199,42 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 		}
 	}, []);
 
+	// Get consent settings
+	const getConsentSettings = useCallback(async () => {
+		try {
+			return await notificationService.getConsentSettings();
+		} catch (err) {
+			console.error('Error getting consent settings:', err);
+			throw err;
+		}
+	}, []);
+
+	// Update consent settings
+	const updateConsentSettings = useCallback(
+		async (consent: Partial<NotificationConsent>) => {
+			try {
+				return await notificationService.updateConsentSettings(consent);
+			} catch (err) {
+				console.error('Error updating consent settings:', err);
+				throw err;
+			}
+		},
+		[]
+	);
+
+	// Check if notification is allowed
+	const isNotificationAllowed = useCallback(
+		async (type: NotificationData['type'], category?: string) => {
+			try {
+				return await notificationService.isNotificationAllowed(type, category);
+			} catch (err) {
+				console.error('Error checking notification permission:', err);
+				return false;
+			}
+		},
+		[]
+	);
+
 	useEffect(() => {
 		initialize();
 		return () => {
@@ -225,6 +271,10 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 				deleteAllNotifications,
 				sendTestNotification,
 				refreshUnreadCount,
+				// New consent management methods
+				getConsentSettings,
+				updateConsentSettings,
+				isNotificationAllowed,
 			}}
 		>
 			{children}

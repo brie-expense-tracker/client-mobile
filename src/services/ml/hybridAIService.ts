@@ -331,14 +331,14 @@ export class HybridAIService {
 		try {
 			// Use existing AI service
 			if (type === 'categorization') {
-				return await this.apiService.post('/ai/categorize', {
+				return await this.apiService.post('/api/ai/categorize', {
 					transaction: data,
 					userId,
 				});
 			}
 
 			if (type === 'insight' || type === 'advice') {
-				return await this.apiService.post('/ai/query', {
+				return await this.apiService.post('/api/ai/query', {
 					query,
 					context: data,
 					userId,
@@ -346,7 +346,7 @@ export class HybridAIService {
 			}
 
 			if (type === 'forecast') {
-				return await this.apiService.post('/ai/forecast', {
+				return await this.apiService.post('/api/ai/forecast', {
 					transactions: data.transactions,
 					userId,
 				});

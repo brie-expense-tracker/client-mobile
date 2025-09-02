@@ -102,6 +102,7 @@ export interface Profile {
 	preferences: {
 		aiInsights: {
 			enabled: boolean;
+			frequency: 'daily' | 'weekly' | 'monthly' | 'disabled';
 		};
 		riskTolerance: 'conservative' | 'moderate' | 'aggressive';
 		financialFocus: string[];
@@ -109,4 +110,26 @@ export interface Profile {
 	};
 	createdAt: Date;
 	updatedAt: Date;
+}
+
+export interface RecurringExpense {
+	id: string;
+	userId: string;
+	name: string;
+	amount: number;
+	category: string;
+	frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+	nextDue: Date;
+	lastPaid?: Date;
+	isActive: boolean;
+	createdAt: Date;
+	updatedAt: Date;
+	description?: string;
+	icon?: string;
+	color?: string;
+	budgetId?: string;
+	goalId?: string;
+	daysUntilDue?: number;
+	isOverdue?: boolean;
+	isDueSoon?: boolean;
 }

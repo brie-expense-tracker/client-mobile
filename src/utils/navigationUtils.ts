@@ -8,35 +8,35 @@ import { router } from 'expo-router';
  * Navigate to the goals screen and automatically open the goal creation modal
  */
 export const navigateToGoalsWithModal = () => {
-	router.replace('/(tabs)/budgets/goals?openModal=true&tab=goals');
+	router.push('/(tabs)/budgets/goals?openModal=true&tab=goals');
 };
 
 /**
  * Navigate to the goals screen without opening the modal
  */
 export const navigateToGoals = () => {
-	router.replace('/(tabs)/budgets/goals');
+	router.push('/(tabs)/budgets/goals');
 };
 
 /**
  * Navigate to the budgets screen
  */
 export const navigateToBudgets = () => {
-	router.replace('/(tabs)/budgets');
+	router.push('/(tabs)/budgets');
 };
 
 /**
  * Navigate to the budgets screen and automatically open the budget creation modal
  */
 export const navigateToBudgetsWithModal = () => {
-	router.replace('/(tabs)/budgets?openModal=true');
+	router.push('/(tabs)/budgets?openModal=true');
 };
 
 /**
  * Navigate to the transaction screen
  */
 export const navigateToTransaction = () => {
-	router.replace('/(tabs)/transaction');
+	router.push('/(tabs)/transaction');
 };
 
 /**
@@ -55,19 +55,19 @@ export const showTransactionModal = () => {
  * Navigate to the dashboard screen
  */
 export const navigateToDashboard = () => {
-	router.replace('/(tabs)/dashboard');
+	router.push('/(tabs)/dashboard');
 };
 
 /**
  * Navigate to the insights screen
  */
 export const navigateToInsights = () => {
-	router.replace('/(tabs)/insights');
+	router.push('/(tabs)/insights');
 };
 
 /**
  * Navigate to the settings screen
  */
 export const navigateToSettings = () => {
-	router.replace('/(tabs)/settings');
+	router.push('/(tabs)/settings');
 };

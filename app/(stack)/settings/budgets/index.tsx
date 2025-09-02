@@ -369,11 +369,13 @@ const Row = ({
 	subtext,
 	value,
 	onValueChange,
+	loading,
 }: {
 	label: string;
 	subtext?: string;
 	value: boolean;
 	onValueChange: (v: boolean) => void;
+	loading?: boolean;
 }) => (
 	<View style={styles.row}>
 		<View style={styles.rowContent}>
@@ -385,7 +387,9 @@ const Row = ({
 			onValueChange={onValueChange}
 			trackColor={{ false: '#e0e0e0', true: '#00a2ff' }}
 			thumbColor={value ? '#fff' : '#f4f3f4'}
+			disabled={loading}
 		/>
+		{loading && <ActivityIndicator size="small" color="#00a2ff" style={styles.loadingIndicator} />}
 	</View>
 );
 
@@ -395,16 +399,19 @@ const OptionRow = ({
 	selected,
 	onPress,
 	icon,
+	loading,
 }: {
 	label: string;
 	subtext?: string;
 	selected: boolean;
 	onPress: () => void;
 	icon?: keyof typeof Ionicons.glyphMap;
+	loading?: boolean;
 }) => (
 	<TouchableOpacity
 		style={[styles.optionRow, selected && styles.selectedOptionRow]}
 		onPress={onPress}
+		disabled={loading}
 	>
 		<View style={styles.optionContent}>
 			{icon && (
@@ -434,6 +441,7 @@ const OptionRow = ({
 			</View>
 		</View>
 		{selected && <Ionicons name="checkmark" size={24} color="#00a2ff" />}
+		{loading && <ActivityIndicator size="small" color="#00a2ff" />}
 	</TouchableOpacity>
 );
 
@@ -596,5 +604,8 @@ const styles = StyleSheet.create({
 	},
 	picker: {
 		width: '100%',
+	},
+	loadingIndicator: {
+		marginLeft: 10,
 	},
 });

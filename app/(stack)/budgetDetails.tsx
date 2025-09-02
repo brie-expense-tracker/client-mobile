@@ -122,7 +122,7 @@ const BudgetSummaryScreen: React.FC = () => {
 				startDate: new Date(item.periodStart),
 				endDate: new Date(item.periodEnd),
 				utilization: item.utilizationPercentage,
-				health: item.periodHealth,
+				health: typeof item.periodHealth === 'string' ? parseInt(item.periodHealth) : item.periodHealth,
 			};
 		});
 	}, [budgetHistory, budget]);

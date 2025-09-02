@@ -1,0 +1,67 @@
+import { ExpoConfig, ConfigContext } from 'expo/config';
+
+export default ({ config }: ConfigContext): ExpoConfig => ({
+	...config,
+	name: 'brie',
+	slug: 'clientMobile',
+	version: '1.0.0',
+	orientation: 'portrait',
+	scheme: 'brie',
+	userInterfaceStyle: 'automatic',
+	newArchEnabled: true,
+	ios: {
+		supportsTablet: true,
+		bundleIdentifier: 'com.brie.mobile',
+		buildNumber: '1',
+		googleServicesFile: './GoogleService-Info.plist',
+		infoPlist: {
+			ITSAppUsesNonExemptEncryption: false,
+			NSAppTransportSecurity: {
+				NSAllowsLocalNetworking: true,
+			},
+			NSUserNotificationsUsageDescription:
+				'This app uses notifications to keep you informed about your budget goals and financial insights.',
+		},
+	},
+	android: {
+		package: 'com.brie.mobile',
+		versionCode: 1,
+		googleServicesFile: './google-services.json',
+	},
+	web: {
+		bundler: 'metro',
+		output: 'static',
+	},
+	plugins: [
+		'expo-router',
+		[
+			'expo-build-properties',
+			{
+				ios: {
+					useFrameworks: 'static',
+					deploymentTarget: '15.1',
+				},
+				android: {
+					compileSdkVersion: 34,
+					targetSdkVersion: 35,
+					minSdkVersion: 24,
+					buildToolsVersion: '34.0.0',
+				},
+			},
+		],
+		'@react-native-firebase/app',
+		'@react-native-firebase/auth',
+		'@react-native-firebase/crashlytics',
+		'expo-notifications',
+	],
+	experiments: {
+		typedRoutes: true,
+	},
+	assetBundlePatterns: ['./assets/**/*'],
+	extra: {
+		eas: {
+			projectId: '5c37bf2f-48a8-4081-bddb-eb7ed5783845',
+		},
+	},
+	owner: 'xamata',
+});

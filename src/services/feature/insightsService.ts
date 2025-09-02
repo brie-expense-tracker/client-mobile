@@ -75,13 +75,8 @@ export class InsightsService {
 		period: 'daily' | 'weekly' | 'monthly'
 	): Promise<InsightsResponse> {
 		try {
+			console.log(`🧠 Fetching ${period} insights...`);
 			const response = await ApiService.get<any>(`/insights/${period}`);
-
-			// Debug: Log the response to see what we're getting
-			console.log(
-				`InsightsService.getInsights(${period}) - Response:`,
-				JSON.stringify(response, null, 2)
-			);
 
 			// Simplified response processing
 			let insightsArray: AIInsight[] = [];
@@ -111,18 +106,14 @@ export class InsightsService {
 				}
 			}
 
-			console.log(
-				`InsightsService.getInsights(${period}) - Final insightsArray:`,
-				insightsArray
-			);
-
+			console.log(`✅ Found ${insightsArray.length} ${period} insights`);
 			return {
 				success: response.success,
 				data: insightsArray,
 				error: response.error,
 			};
 		} catch (error) {
-			console.error(`InsightsService.getInsights(${period}) - Error:`, error);
+			console.error(`❌ Error fetching ${period} insights:`, error);
 			return {
 				success: false,
 				data: [],
@@ -141,19 +132,11 @@ export class InsightsService {
 		period: 'daily' | 'weekly' | 'monthly'
 	): Promise<InsightsResponse> {
 		try {
-			console.log(
-				`InsightsService.generateInsights(${period}) - Starting generation...`
-			);
+			console.log(`🚀 Generating ${period} insights...`);
 
 			const response = await ApiService.post<any>(
 				`/insights/generate/${period}`,
 				{}
-			);
-
-			// Debug: Log the response to see what we're getting
-			console.log(
-				`InsightsService.generateInsights(${period}) - Response:`,
-				JSON.stringify(response, null, 2)
 			);
 
 			// Handle double-nested response structure that the server actually returns
@@ -188,28 +171,18 @@ export class InsightsService {
 			}
 
 			if (!Array.isArray(insightsArray)) {
-				console.warn(
-					`InsightsService.generateInsights(${period}) - Data is not an array:`,
-					response.data
-				);
+				console.warn(`⚠️ Generated data is not an array for ${period}`);
 				insightsArray = [];
 			}
 
-			console.log(
-				`InsightsService.generateInsights(${period}) - Final processed data:`,
-				insightsArray
-			);
-
+			console.log(`✅ Generated ${insightsArray.length} ${period} insights`);
 			return {
 				success: response.success,
 				data: insightsArray,
 				error: response.error,
 			};
 		} catch (error) {
-			console.error(
-				`InsightsService.generateInsights(${period}) - Error:`,
-				error
-			);
+			console.error(`❌ Error generating ${period} insights:`, error);
 			throw error;
 		}
 	}

@@ -1,12 +1,7 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { router } from 'expo-router';
-import { useProfile } from '@/src/context/profileContext';
+import { View, Text, StyleSheet } from 'react-native';
 
 const AICoachSection = () => {
-	const { profile } = useProfile();
-	const aiInsightsEnabled = profile?.preferences?.aiInsights?.enabled ?? false;
-
 	return (
 		<View style={styles.aiInsightsContainer}>
 			<View style={styles.aiInsightsHeader}>

@@ -176,7 +176,7 @@ export function useRecurringExpenses() {
 	);
 
 	const checkPaymentStatus = useCallback(async (patternId: string) => {
-		return RecurringExpenseService.isCurrentPeriodPaid(patternId);
+		return RecurringExpenseService.checkIfCurrentPeriodPaid(patternId);
 	}, []);
 
 	// ==========================================

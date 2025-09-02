@@ -34,6 +34,32 @@ export default function Layout() {
 				}}
 			/>
 			<Stack.Screen
+				name="upgrade/index"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Upgrade',
+					headerShadowVisible: false,
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerLeft: () => (
+						<BorderlessButton
+							onPress={() => router.back()}
+							onActiveStateChange={setIsPressed}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</BorderlessButton>
+					),
+				}}
+			/>
+			<Stack.Screen
 				name="privacyandsecurity/index"
 				options={{
 					headerShown: true,
@@ -60,27 +86,6 @@ export default function Layout() {
 				}}
 			/>
 
-			<Stack.Screen
-				name="privacyandsecurity/privacyPolicy"
-				options={{
-					headerShown: true,
-					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: 'Privacy Policy',
-					headerShadowVisible: false,
-					headerStyle: {
-						backgroundColor: '#ffffff',
-					},
-					headerLeft: () => (
-						<BorderlessButton
-							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
-							style={{ width: 50 }}
-						>
-							<Ionicons name="chevron-back" size={24} color="#333" />
-						</BorderlessButton>
-					),
-				}}
-			/>
 			<Stack.Screen
 				name="privacyandsecurity/manageData"
 				options={{
@@ -211,33 +216,7 @@ export default function Layout() {
 					),
 				}}
 			/>
-			<Stack.Screen
-				name="profile/editPassword"
-				options={{
-					headerShown: true,
-					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: 'Change Password',
-					headerShadowVisible: false,
-					headerTitleStyle: {
-						fontSize: 20,
-						fontWeight: '600',
-						color: '#333',
-					},
-					headerStyle: {
-						backgroundColor: '#ffffff',
-					},
 
-					headerLeft: () => (
-						<BorderlessButton
-							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
-							style={{ width: 50 }}
-						>
-							<Ionicons name="chevron-back" size={24} color="#333" />
-						</BorderlessButton>
-					),
-				}}
-			/>
 			<Stack.Screen
 				name="profile/editFinancial"
 				options={{
@@ -317,14 +296,6 @@ export default function Layout() {
 							<Ionicons name="chevron-back" size={24} color="#333" />
 						</BorderlessButton>
 					),
-				}}
-			/>
-			<Stack.Screen
-				name="profile/forgotPassword"
-				options={{
-					headerShown: true,
-					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: 'Forgot Password',
 				}}
 			/>
 
@@ -685,60 +656,7 @@ export default function Layout() {
 					),
 				}}
 			/>
-			<Stack.Screen
-				name="data/index"
-				options={{
-					headerShown: true,
-					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: 'Data Handling',
-					headerShadowVisible: false,
-					headerTitleStyle: {
-						fontSize: 20,
-						fontWeight: '600',
-						color: '#333',
-					},
-					headerStyle: {
-						backgroundColor: '#ffffff',
-					},
 
-					headerLeft: () => (
-						<BorderlessButton
-							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
-							style={{ width: 50 }}
-						>
-							<Ionicons name="chevron-back" size={24} color="#333" />
-						</BorderlessButton>
-					),
-				}}
-			/>
-			<Stack.Screen
-				name="data/exportData"
-				options={{
-					headerShown: true,
-					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: 'Export Data',
-					headerShadowVisible: false,
-					headerTitleStyle: {
-						fontSize: 20,
-						fontWeight: '600',
-						color: '#333',
-					},
-					headerStyle: {
-						backgroundColor: '#ffffff',
-					},
-
-					headerLeft: () => (
-						<BorderlessButton
-							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
-							style={{ width: 50 }}
-						>
-							<Ionicons name="chevron-back" size={24} color="#333" />
-						</BorderlessButton>
-					),
-				}}
-			/>
 			<Stack.Screen
 				name="aiInsights/index"
 				options={{

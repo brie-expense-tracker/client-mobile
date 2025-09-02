@@ -8,7 +8,7 @@ import React, {
 	ReactNode,
 } from 'react';
 // Transaction interface defined inline since we removed the mock data file
-interface Transaction {
+export interface Transaction {
 	id: string;
 	description: string;
 	amount: number;
@@ -27,6 +27,7 @@ interface Transaction {
 import { ApiService } from '../services';
 import { useBudget } from './budgetContext';
 import { useGoal } from './goalContext';
+import { setCacheInvalidationFlags } from '../services/utility/cacheInvalidationUtils';
 
 interface TransactionContextType {
 	transactions: Transaction[];
@@ -84,7 +85,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 	const refetch = useCallback(async () => {
 		setIsLoading(true);
 		try {
-			const response = await ApiService.get<Transaction[]>('/transactions');
+			const response = await ApiService.get<Transaction[]>('/api/transactions');
 
 			if (response.success && response.data) {
 				// Handle double-wrapped response
@@ -130,8 +131,6 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 							}
 						}
 					}
-
-
 
 					return {
 						id: tx._id ?? tx.id,
@@ -239,7 +238,6 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 
 	const addTransaction = useCallback(
 		async (transactionData: Omit<Transaction, 'id'>) => {
-
 			// Create a temporary ID for optimistic update
 			const tempId = `temp-${Date.now()}-${Math.random()}`;
 			const newTransaction: Transaction = {
@@ -251,8 +249,6 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 				updatedAt: new Date().toISOString(), // Add current timestamp for sorting
 			};
 
-
-
 			// Optimistically add to UI
 			setTransactions((prev) => {
 				const updated = [newTransaction, ...prev];
@@ -261,11 +257,9 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 
 			try {
 				const response = await ApiService.post<any>(
-					'/transactions',
+					'/api/transactions',
 					transactionData
 				);
-
-
 
 				if (response.success && response.data) {
 					// Safely convert amount to number with fallback
@@ -309,8 +303,6 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 						}
 					}
 
-
-
 					// Update with the real ID from the server
 					const serverTransaction: Transaction = {
 						id: response.data._id ?? response.data.id ?? tempId,
@@ -327,8 +319,6 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 							new Date().toISOString(),
 					};
 
-
-
 					// Replace the temporary transaction with the real one
 					setTransactions((prev) => {
 						const updated = prev.map((t) =>
@@ -339,6 +329,9 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 
 					// Auto-update budgets and goals based on transaction
 					await updateBudgetsAndGoals(serverTransaction);
+
+					// Invalidate relevant cache entries
+					setCacheInvalidationFlags.onNewTransaction();
 
 					return serverTransaction;
 				} else {
@@ -362,7 +355,10 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 			setTransactions((prev) => prev.filter((t) => t.id !== id));
 
 			try {
-				await ApiService.delete(`/transactions/${id}`);
+				await ApiService.delete(`/api/transactions/${id}`);
+
+				// Invalidate relevant cache entries
+				setCacheInvalidationFlags.onNewTransaction();
 			} catch (err) {
 				console.warn('Delete failed, refetching', err);
 				// Rollback or just refetch
@@ -412,7 +408,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 
 			try {
 				const response = await ApiService.put<any>(
-					`/transactions/${id}`,
+					`/api/transactions/${id}`,
 					transactionData
 				);
 
@@ -535,6 +531,9 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 
 					// Auto-update budgets and goals based on updated transaction
 					await updateBudgetsAndGoals(updatedTransaction);
+
+					// Invalidate relevant cache entries
+					setCacheInvalidationFlags.onNewTransaction();
 
 					return updatedTransaction;
 				} else {

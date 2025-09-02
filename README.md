@@ -1,50 +1,126 @@
-# Welcome to your Expo app 👋
+# Brie Mobile App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A React Native mobile application built with Expo for personal finance management with AI-powered insights.
 
-## Get started
+## 🚀 Quick Start
 
-1. Install dependencies
+### Prerequisites
+
+- Node.js (v18 or higher)
+- npm or yarn
+- Expo CLI (`npm install -g @expo/cli`)
+- iOS Simulator (for iOS development)
+- Android Studio (for Android development)
+
+### Installation
+
+1. Install dependencies:
 
    ```bash
    npm install
    ```
 
-2. Start the app
+2. Start the development server:
 
    ```bash
-    npx expo start
+   npm start
    ```
 
-In the output, you'll find options to open the app in a
+3. Run on your preferred platform:
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+   ```bash
+   # iOS
+   npm run ios
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+   # Android
+   npm run android
 
-## Get a fresh project
+   # Web
+   npm run web
+   ```
 
-When you're ready, run:
+## 📱 Features
 
-```bash
-npm run reset-project
+- **AI-Powered Insights**: Intelligent financial analysis and recommendations
+- **Budget Management**: Create and track budgets with visual progress
+- **Goal Setting**: Set financial goals with progress tracking
+- **Transaction Management**: Add and categorize transactions
+- **Offline Support**: Works without internet connection
+- **Accessibility**: Full VoiceOver and TalkBack support
+- **Crash Reporting**: Firebase Crashlytics integration
+
+## 🏗️ Project Structure
+
+```
+client-mobile/
+├── app/                    # Expo Router app directory
+│   ├── (auth)/            # Authentication screens
+│   ├── (onboarding)/      # Onboarding flow
+│   ├── (stack)/           # Main app screens
+│   └── (tabs)/            # Tab navigation screens
+├── src/
+│   ├── components/        # Reusable UI components
+│   ├── services/          # API and business logic
+│   ├── context/           # React Context providers
+│   ├── hooks/             # Custom React hooks
+│   ├── utils/             # Utility functions
+│   └── types/             # TypeScript type definitions
+├── docs/                  # Implementation documentation
+├── ios/                   # iOS native code
+└── android/               # Android native code
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## 🔧 Configuration
 
-## Learn more
+### Environment Setup
 
-To learn more about developing your project with Expo, look at the following resources:
+The app uses Firebase for authentication and crash reporting. Ensure you have:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+- `google-services.json` (Android Firebase config)
+- `GoogleService-Info.plist` (iOS Firebase config)
 
-## Join the community
+### Build Configuration
 
-Join our community of developers creating universal apps.
+- **Development**: `eas build --profile development`
+- **Production**: `eas build --profile production`
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## 📚 Documentation
+
+Comprehensive documentation is available in the [`docs/`](./docs/) folder:
+
+- [Implementation Guides](./docs/README.md#-implementation-guides)
+- [Configuration & Setup](./docs/README.md#-configuration--setup)
+- [Troubleshooting](./docs/README.md#-troubleshooting)
+
+## 🧪 Testing
+
+```bash
+# Run tests
+npm test
+
+# Run linting
+npm run lint
+```
+
+## 🚀 Deployment
+
+The app is configured for deployment via EAS Build:
+
+```bash
+# Build for development
+eas build --profile development
+
+# Build for production
+eas build --profile production
+```
+
+## 🤝 Contributing
+
+1. Follow the existing code style and patterns
+2. Add tests for new features
+3. Update documentation as needed
+4. Ensure accessibility compliance
+
+## 📄 License
+
+This project is part of the Brie financial management platform.

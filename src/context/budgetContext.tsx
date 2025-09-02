@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import { ApiService } from '../services';
 import { useProfile } from './profileContext';
+import { setCacheInvalidationFlags } from '../services/utility/cacheInvalidationUtils';
 
 // ==========================================
 // Types
@@ -185,7 +186,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 	const refetch = useCallback(async () => {
 		setIsLoading(true);
 		try {
-			const response = await ApiService.get<any>('/budgets');
+			const response = await ApiService.get<any>('/api/budgets');
 
 			// Handle double-wrapped response from ApiService
 			const actualData = response.data?.data || response.data;
@@ -232,7 +233,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 
 	const checkBudgetAlerts = useCallback(async () => {
 		try {
-			const response = await ApiService.post<any>('/budgets/check-alerts', {});
+			const response = await ApiService.post<any>('/api/budgets/check-alerts', {});
 
 			if (response.success) {
 				// Budget alerts checked successfully
@@ -266,7 +267,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 		});
 
 		try {
-			const response = await ApiService.post<any>('/budgets', budgetData);
+			const response = await ApiService.post<any>('/api/budgets', budgetData);
 			console.log('API response:', response);
 
 			// Handle the response format properly
@@ -308,6 +309,9 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 					return updated;
 				});
 
+				// Invalidate relevant cache entries
+				setCacheInvalidationFlags.onBudgetChange();
+
 				return serverBudget;
 			} else {
 				// If the response doesn't indicate success, throw an error
@@ -328,7 +332,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 	const updateBudget = useCallback(
 		async (id: string, updates: UpdateBudgetData) => {
 			try {
-				const response = await ApiService.put<any>(`/budgets/${id}`, updates);
+				const response = await ApiService.put<any>(`/api/budgets/${id}`, updates);
 
 				// Handle the response format properly
 				const actualData = response.data?.data || response.data;
@@ -364,6 +368,9 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 					// Note: Transaction refresh is handled by the transaction context itself
 					// when budgets are updated via the API
 
+					// Invalidate relevant cache entries
+					setCacheInvalidationFlags.onBudgetChange();
+
 					return updatedBudget;
 				} else {
 					throw new Error(response.error || 'Failed to update budget');
@@ -382,7 +389,10 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 			setBudgets((prev) => prev.filter((b) => b.id !== id));
 
 			try {
-				await ApiService.delete(`/budgets/${id}`);
+				await ApiService.delete(`/api/budgets/${id}`);
+
+				// Invalidate relevant cache entries
+				setCacheInvalidationFlags.onBudgetChange();
 			} catch (err) {
 				console.warn('Delete failed, refetching', err);
 				// Rollback or just refetch
@@ -398,7 +408,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 			console.log('[Budgets] Current budgets before update:', budgets);
 
 			try {
-				const response = await ApiService.post<any>('/budgets/update-spent', {
+				const response = await ApiService.post<any>('/api/budgets/update-spent', {
 					budgetId,
 					amount,
 				});
@@ -446,6 +456,9 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 						console.log('[Budgets] Budgets state after update:', updated);
 						return updated;
 					});
+
+					// Invalidate relevant cache entries
+					setCacheInvalidationFlags.onBudgetChange();
 
 					return updatedBudget;
 				} else {

@@ -11,13 +11,13 @@ import { ApiService } from '../services';
 // Budget-specific API functions
 // ==========================================
 const fetchBudgets = async (): Promise<Budget[]> => {
-	const response = await ApiService.get<{ data: Budget[] }>('/budgets');
+	const response = await ApiService.get<{ data: Budget[] }>('/api/budgets');
 	return response.data?.data || [];
 };
 
 const createBudget = async (budgetData: CreateBudgetData): Promise<Budget> => {
 	const response = await ApiService.post<{ data: Budget }>(
-		'/budgets',
+		'/api/budgets',
 		budgetData
 	);
 	if (!response.data?.data) {
@@ -31,7 +31,7 @@ const updateBudget = async (
 	updates: UpdateBudgetData
 ): Promise<Budget> => {
 	const response = await ApiService.put<{ data: Budget }>(
-		`/budgets/${id}`,
+		`/api/budgets/${id}`,
 		updates
 	);
 	if (!response.data?.data) {
@@ -41,7 +41,7 @@ const updateBudget = async (
 };
 
 const deleteBudget = async (id: string): Promise<void> => {
-	await ApiService.delete(`/budgets/${id}`);
+	await ApiService.delete(`/api/budgets/${id}`);
 };
 
 // ==========================================

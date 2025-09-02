@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { useProfile } from '../../../../src/context/profileContext';
 import useAuth from '../../../../src/context/AuthContext';
 import Setting from '../components/settingItem';
+import AIProfileInsights from './components/AIProfileInsights';
 
 export default function AccountScreen() {
 	const router = useRouter();
@@ -21,6 +22,29 @@ export default function AccountScreen() {
 	useEffect(() => {
 		fetchProfile();
 	}, []);
+
+	const handleAIAction = (action: string) => {
+		switch (action) {
+			case 'optimize_income':
+				router.push('/(stack)/settings/profile/editFinancial');
+				break;
+			case 'reduce_expenses':
+				router.push('/(stack)/settings/profile/editExpenses');
+				break;
+			case 'set_savings_goal':
+				router.push('/(tabs)/budgets?tab=goals');
+				break;
+			case 'create_budget':
+				router.push('/(tabs)/budgets?tab=budgets');
+				break;
+			case 'debt_strategy':
+				router.push('/(stack)/settings/profile/editFinancial');
+				break;
+			case 'financial_planning':
+				router.push('/(tabs)/assistant');
+				break;
+		}
+	};
 
 	if (loading) {
 		return (
@@ -133,6 +157,14 @@ export default function AccountScreen() {
 				</View>
 			</View>
 
+			{/* AI-Powered Profile Insights */}
+			<View style={styles.section}>
+				<Text style={styles.sectionTitle}>AI Insights & Recommendations</Text>
+				<View style={styles.aiInsightsContainer}>
+					<AIProfileInsights profile={profile} onAction={handleAIAction} />
+				</View>
+			</View>
+
 			{/* Account Management */}
 			<View style={styles.section}>
 				<Text style={styles.sectionTitle}>Account Management</Text>
@@ -226,5 +258,16 @@ const styles = StyleSheet.create({
 		color: '#fff',
 		fontSize: 16,
 		fontWeight: '600',
+	},
+	aiInsightsContainer: {
+		backgroundColor: '#fff',
+		borderRadius: 12,
+		padding: 16,
+		marginTop: 16,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.1,
+		shadowRadius: 4,
+		elevation: 3,
 	},
 });

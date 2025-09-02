@@ -15,7 +15,7 @@ export default function useCoachPrompt() {
 			setLoading(true);
 			try {
 				// Create a new thread with the user's prompt
-				const threadResponse = await ApiService.post('/threads', {
+				const threadResponse = await ApiService.post('/api/threads', {
 					title: prompt.length > 50 ? prompt.substring(0, 50) + '...' : prompt,
 					focusArea: 'financial_coaching',
 					firstMessage: prompt,
@@ -24,7 +24,7 @@ export default function useCoachPrompt() {
 				if (threadResponse.success && threadResponse.data) {
 					// Add AI response to the thread
 					const aiResponse = await ApiService.post(
-						`/threads/${threadResponse.data._id}/messages`,
+						`/api/threads/${threadResponse.data._id}/messages`,
 						{
 							type: 'insight',
 							content: await generateAIResponse(prompt),
@@ -60,7 +60,7 @@ export default function useCoachPrompt() {
 	const generateAIResponse = async (prompt: string): Promise<string> => {
 		try {
 			// Use the existing AI insights service to generate a response
-			const response = await ApiService.post('/ai/financial-insights', {
+			const response = await ApiService.post('/api/ai/financial-insights', {
 				query: prompt,
 				transactions: [], // Will be populated by the backend
 			});

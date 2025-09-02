@@ -26,7 +26,7 @@ export default function useThreads() {
 	const fetchThreads = useCallback(async () => {
 		setLoading(true);
 		try {
-			const response = await ApiService.get('/threads');
+			const response = await ApiService.get('/api/threads');
 
 			if (response.success && response.data && Array.isArray(response.data)) {
 				// Transform the data to match our interface

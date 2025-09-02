@@ -29,8 +29,16 @@ import {
 	TransactionHistory,
 	SettingsBudgetsGoalsWidget,
 	RecurringExpensesSummaryWidget,
-	SpendingForecastCard,
 } from './components';
+import {
+	SkeletonContainer,
+	DashboardWidgetSkeleton,
+} from '../../../src/components/SkeletonLoader';
+import {
+	accessibilityProps,
+	dynamicTextStyle,
+	generateAccessibilityLabel,
+} from '../../../src/utils/accessibility';
 
 /**
  * -----------------------------------------------------------------------------
@@ -121,7 +129,13 @@ const Dashboard: React.FC = () => {
 			<SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
 				<View style={styles.loadingContainer}>
 					<ActivityIndicator size="large" color="#007AFF" />
-					<Text style={styles.loadingText}>Loading your dashboard...</Text>
+					<Text
+						style={[styles.loadingText, dynamicTextStyle]}
+						accessibilityRole="text"
+						accessibilityLabel="Loading your dashboard"
+					>
+						Loading your dashboard...
+					</Text>
 				</View>
 			</SafeAreaView>
 		);
@@ -138,23 +152,46 @@ const Dashboard: React.FC = () => {
 						source={require('../../../src/assets/images/brie-logos.png')}
 						style={styles.logo}
 						resizeMode="contain"
+						accessibilityRole="image"
+						accessibilityLabel="Brie app logo"
 					/>
 
-					<TouchableOpacity
-						onPress={() => router.push('/dashboard/notifications')}
-						style={styles.notificationButton}
-					>
-						<View>
-							<Ionicons name="notifications-outline" color="#333" size={24} />
-							{unreadCount > 0 && (
-								<View style={styles.notificationAlertButton}>
-									<Text style={styles.notificationBadgeText}>
-										{unreadCount > 99 ? '99+' : unreadCount}
-									</Text>
-								</View>
+					<View style={styles.headerButtons}>
+						{/* Development Onboarding Button */}
+						{__DEV__ && (
+							<TouchableOpacity
+								onPress={() => router.push('/(onboarding)/profileSetup')}
+								style={styles.devButton}
+								{...accessibilityProps.button}
+								accessibilityLabel="Open onboarding (development)"
+								accessibilityHint="Double tap to open onboarding screens for testing"
+							>
+								<Ionicons name="settings-outline" color="#4CAF50" size={20} />
+							</TouchableOpacity>
+						)}
+
+						<TouchableOpacity
+							onPress={() => router.push('/dashboard/notifications')}
+							style={styles.notificationButton}
+							{...accessibilityProps.button}
+							accessibilityLabel={generateAccessibilityLabel.button(
+								'Open',
+								'notifications'
 							)}
-						</View>
-					</TouchableOpacity>
+							accessibilityHint="Double tap to view notifications"
+						>
+							<View>
+								<Ionicons name="notifications-outline" color="#333" size={24} />
+								{unreadCount > 0 && (
+									<View style={styles.notificationAlertButton}>
+										<Text style={styles.notificationBadgeText}>
+											{unreadCount > 99 ? '99+' : unreadCount}
+										</Text>
+									</View>
+								)}
+							</View>
+						</TouchableOpacity>
+					</View>
 				</View>
 
 				<ScrollView
@@ -173,53 +210,97 @@ const Dashboard: React.FC = () => {
 					scrollEventThrottle={16}
 					removeClippedSubviews={true}
 					keyboardShouldPersistTaps="handled"
+					accessibilityRole="scroll"
+					accessibilityLabel="Dashboard content"
 				>
 					<View style={[styles.contentContainer]}>
 						{/* -------------------------------------------------- */}
 						{/* Balance card */}
 						{/* -------------------------------------------------- */}
-						<View style={styles.headerCard}>
-							<Text style={styles.balanceLabel}>Your Balance</Text>
-							<View style={styles.rowCenter}>
-								<Text style={styles.balanceAmount}>
-									{currency(totalBalance)}
+						<SkeletonContainer
+							isLoading={isLoading}
+							fallback={<DashboardWidgetSkeleton />}
+						>
+							<View style={styles.headerCard}>
+								<Text
+									style={[styles.balanceLabel, dynamicTextStyle]}
+									accessibilityRole="text"
+									accessibilityLabel="Your balance label"
+								>
+									Your Balance
 								</Text>
-							</View>
-							<Text
-								style={[
-									styles.dailyChange,
-									{ color: dailyChange >= 0 ? '#16a34a' : '#dc2626' },
-								]}
-							>
-								{dailyChange >= 0 ? '+' : ''}
-								{currency(dailyChange)}{' '}
-								{new Date().toLocaleDateString('en-US', {
-									month: 'short',
-									day: 'numeric',
-								})}
-							</Text>
+								<View style={styles.rowCenter}>
+									<Text
+										style={[styles.balanceAmount, dynamicTextStyle]}
+										accessibilityRole="text"
+										accessibilityLabel={`Your balance: ${currency(
+											totalBalance
+										)}`}
+									>
+										{currency(totalBalance)}
+									</Text>
+								</View>
+								<Text
+									style={[
+										styles.dailyChange,
+										{ color: dailyChange >= 0 ? '#16a34a' : '#dc2626' },
+										dynamicTextStyle,
+									]}
+									accessibilityRole="text"
+									accessibilityLabel={`Today's change: ${
+										dailyChange >= 0 ? '+' : ''
+									}${currency(dailyChange)}`}
+								>
+									{dailyChange >= 0 ? '+' : ''}
+									{currency(dailyChange)}{' '}
+									{new Date().toLocaleDateString('en-US', {
+										month: 'short',
+										day: 'numeric',
+									})}
+								</Text>
 
-							<SimpleBalanceWidget transactions={transactions} />
-						</View>
+								<SimpleBalanceWidget transactions={transactions} />
+							</View>
+						</SkeletonContainer>
 
 						{/* Quick Financial Health Summary */}
-						<QuickFinancialSummary transactions={transactions} />
+						<SkeletonContainer
+							isLoading={isLoading}
+							fallback={<DashboardWidgetSkeleton />}
+						>
+							<QuickFinancialSummary transactions={transactions} />
+						</SkeletonContainer>
 
 						{/* Recurring Expenses Summary Widget */}
-						<RecurringExpensesSummaryWidget
-							title="Recurring Expenses"
-							maxVisibleItems={3}
-							showViewAllButton={true}
-						/>
+						<SkeletonContainer
+							isLoading={isLoading}
+							fallback={<DashboardWidgetSkeleton />}
+						>
+							<RecurringExpensesSummaryWidget
+								title="Recurring Expenses"
+								maxVisibleItems={3}
+								showViewAllButton={true}
+							/>
+						</SkeletonContainer>
 
 						{/* Recent Transactions */}
-						<TransactionHistory
-							transactions={transactions}
-							onPress={setIsPressed}
-						/>
+						<SkeletonContainer
+							isLoading={isLoading}
+							fallback={<DashboardWidgetSkeleton />}
+						>
+							<TransactionHistory
+								transactions={transactions}
+								onPress={setIsPressed}
+							/>
+						</SkeletonContainer>
 
 						{/* Settings, Budgets & Goals Widget */}
-						<SettingsBudgetsGoalsWidget compact={true} />
+						<SkeletonContainer
+							isLoading={isLoading}
+							fallback={<DashboardWidgetSkeleton />}
+						>
+							<SettingsBudgetsGoalsWidget compact={true} />
+						</SkeletonContainer>
 					</View>
 				</ScrollView>
 			</GestureHandlerRootView>
@@ -273,6 +354,21 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		marginBottom: 12,
 		flex: 1,
+	},
+	headerButtons: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+	},
+	devButton: {
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#f0f9ff',
+		borderWidth: 1,
+		borderColor: '#4CAF50',
 	},
 	notificationButton: {
 		width: 48,

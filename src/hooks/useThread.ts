@@ -28,7 +28,7 @@ export default function useThread(threadId: string) {
 
 		setLoading(true);
 		try {
-			const response = await ApiService.get(`/threads/${threadId}`);
+			const response = await ApiService.get(`/api/threads/${threadId}`);
 
 			if (response.success && response.data) {
 				const threadData = response.data;
@@ -59,7 +59,7 @@ export default function useThread(threadId: string) {
 			try {
 				// Update the action completion status
 				const response = await ApiService.put(
-					`/threads/${threadId}/actions/${actionId}/complete`,
+					`/api/threads/${threadId}/actions/${actionId}/complete`,
 					{
 						completed: true,
 					}
@@ -94,7 +94,7 @@ export default function useThread(threadId: string) {
 
 			try {
 				const response = await ApiService.post(
-					`/threads/${threadId}/messages`,
+					`/api/threads/${threadId}/messages`,
 					{
 						type,
 						content,

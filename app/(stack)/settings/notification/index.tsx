@@ -6,7 +6,10 @@ import {
 	Switch,
 	ScrollView,
 	Alert,
+	TouchableOpacity,
 } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useProfile } from '../../../../src/context/profileContext';
 
 interface NotificationSettings {
@@ -20,6 +23,7 @@ interface NotificationSettings {
 }
 
 const NotificationSettingsScreen: React.FC = () => {
+	const router = useRouter();
 	const { profile, updateNotificationSettings, loading } = useProfile();
 	const [settings, setSettings] = useState<NotificationSettings>({
 		enableNotifications: true,
@@ -94,7 +98,46 @@ const NotificationSettingsScreen: React.FC = () => {
 
 	return (
 		<View style={styles.mainContainer}>
+			<Stack.Screen
+				options={{
+					title: 'Notifications',
+					headerShown: true,
+				}}
+			/>
+
 			<ScrollView contentContainerStyle={styles.content}>
+				{/* Consent Management Link */}
+				<View style={styles.sectionContainer}>
+					<Text style={styles.sectionTitle}>CONSENT MANAGEMENT</Text>
+					<View style={styles.section}>
+						<TouchableOpacity
+							style={styles.consentLink}
+							onPress={() =>
+								router.push('/(stack)/settings/notification/consentManagement')
+							}
+						>
+							<View style={styles.consentLinkContent}>
+								<Ionicons
+									name="shield-checkmark-outline"
+									size={24}
+									color="#007ACC"
+								/>
+								<View style={styles.consentLinkText}>
+									<Text style={styles.consentLinkTitle}>
+										Notification Consent
+									</Text>
+									<Text style={styles.consentLinkDescription}>
+										Manage detailed notification preferences and marketing
+										consent
+									</Text>
+								</View>
+							</View>
+							<Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+						</TouchableOpacity>
+					</View>
+				</View>
+
+				{/* General Settings */}
 				<View style={styles.sectionContainer}>
 					<Text style={styles.sectionTitle}>GENERAL</Text>
 					<View style={styles.section}>
@@ -111,6 +154,7 @@ const NotificationSettingsScreen: React.FC = () => {
 					</View>
 				</View>
 
+				{/* AI Insights */}
 				<View style={styles.sectionContainer}>
 					<Text style={styles.sectionTitle}>AI INSIGHTS</Text>
 					<View style={styles.section}>
@@ -149,8 +193,9 @@ const NotificationSettingsScreen: React.FC = () => {
 					</View>
 				</View>
 
+				{/* Reminders */}
 				<View style={styles.sectionContainer}>
-					<Text style={styles.sectionTitle}>SUMMARIES</Text>
+					<Text style={styles.sectionTitle}>REMINDERS</Text>
 					<View style={styles.section}>
 						<View style={styles.row}>
 							<Text style={styles.label}>Weekly Summary</Text>
@@ -162,8 +207,9 @@ const NotificationSettingsScreen: React.FC = () => {
 								disabled={saving || loading}
 							/>
 						</View>
+
 						<View style={styles.row}>
-							<Text style={styles.label}>Monthly Financial Health Check</Text>
+							<Text style={styles.label}>Monthly Financial Check</Text>
 							<Switch
 								value={settings.monthlyFinancialCheck}
 								onValueChange={(value) =>
@@ -172,10 +218,7 @@ const NotificationSettingsScreen: React.FC = () => {
 								disabled={saving || loading}
 							/>
 						</View>
-						<Text style={styles.settingDescription}>
-							Get monthly reminders to review your financial progress, adjust
-							budgets, and update goals
-						</Text>
+
 						<View style={styles.row}>
 							<Text style={styles.label}>Monthly Savings Transfer</Text>
 							<Switch
@@ -186,11 +229,20 @@ const NotificationSettingsScreen: React.FC = () => {
 								disabled={saving || loading}
 							/>
 						</View>
-						<Text style={styles.settingDescription}>
-							Receive reminders to transfer your monthly savings to your savings
-							account
-						</Text>
 					</View>
+				</View>
+
+				{/* Information Note */}
+				<View style={styles.infoContainer}>
+					<Ionicons
+						name="information-circle-outline"
+						size={20}
+						color="#6b7280"
+					/>
+					<Text style={styles.infoText}>
+						Core app features work without notifications. Marketing
+						notifications require explicit opt-in.
+					</Text>
 				</View>
 			</ScrollView>
 		</View>
@@ -246,6 +298,53 @@ const styles = StyleSheet.create({
 		color: '#8b8b8b',
 		marginTop: 8,
 		marginLeft: 24,
+	},
+	consentLink: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		paddingVertical: 16,
+		paddingHorizontal: 16,
+		backgroundColor: '#f8fafc',
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#e2e8f0',
+	},
+	consentLinkContent: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		flex: 1,
+	},
+	consentLinkText: {
+		marginLeft: 12,
+		flex: 1,
+	},
+	consentLinkTitle: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#1f2937',
+		marginBottom: 4,
+	},
+	consentLinkDescription: {
+		fontSize: 14,
+		color: '#6b7280',
+		lineHeight: 20,
+	},
+	infoContainer: {
+		flexDirection: 'row',
+		alignItems: 'flex-start',
+		backgroundColor: '#f0f9ff',
+		padding: 16,
+		borderRadius: 8,
+		marginTop: 24,
+		marginHorizontal: 16,
+	},
+	infoText: {
+		flex: 1,
+		fontSize: 14,
+		color: '#0369a1',
+		marginLeft: 8,
+		lineHeight: 20,
 	},
 });
 

@@ -51,7 +51,7 @@ export interface SaveReflectionData {
 export class WeeklyReflectionService {
 	static async getCurrentWeekReflection(): Promise<WeeklyReflection> {
 		try {
-			const response = await ApiService.get('/weekly-reflections/current');
+			const response = await ApiService.get('/api/weekly-reflections/current');
 			return response.data.reflection;
 		} catch (error) {
 			console.error('Error fetching current week reflection:', error);
@@ -63,7 +63,7 @@ export class WeeklyReflectionService {
 		data: SaveReflectionData
 	): Promise<WeeklyReflection> {
 		try {
-			const response = await ApiService.post('/weekly-reflections/save', data);
+			const response = await ApiService.post('/api/weekly-reflections/save', data);
 			return response.data.reflection;
 		} catch (error) {
 			console.error('Error saving weekly reflection:', error);
@@ -76,9 +76,9 @@ export class WeeklyReflectionService {
 		offset: number = 0
 	): Promise<WeeklyReflection[]> {
 		try {
-			const response = await ApiService.get(
-				`/weekly-reflections/history?limit=${limit}&offset=${offset}`
-			);
+					const response = await ApiService.get(
+			`/api/weekly-reflections/history?limit=${limit}&offset=${offset}`
+		);
 			return response.data.reflections;
 		} catch (error) {
 			console.error('Error fetching reflection history:', error);
@@ -88,7 +88,7 @@ export class WeeklyReflectionService {
 
 	static async getReflectionStats(): Promise<ReflectionStats> {
 		try {
-			const response = await ApiService.get('/weekly-reflections/stats');
+			const response = await ApiService.get('/api/weekly-reflections/stats');
 			return response.data.stats;
 		} catch (error) {
 			console.error('Error fetching reflection stats:', error);
