@@ -5,13 +5,17 @@ This directory contains all the service classes that handle business logic, API 
 ## Organization
 
 ### Core Services (`/core`)
+
 Essential services that are used throughout the application:
+
 - **`apiService.ts`** - Central API communication layer
 - **`userService.ts`** - User authentication and profile management
 - **`onboardingService.ts`** - Onboarding flow management
 
 ### Feature Services (`/feature`)
+
 Services that implement specific app features:
+
 - **`recurringExpenseService.ts`** - Recurring expense management
 - **`budgetSuggestionService.ts`** - Budget suggestions and recommendations
 - **`customGPTService.ts`** - AI chat and conversation functionality
@@ -20,12 +24,16 @@ Services that implement specific app features:
 - **`weeklyReflectionService.ts`** - Weekly financial reflection system
 
 ### ML/AI Services (`/ml`)
+
 Machine learning and artificial intelligence services:
+
 - **`hybridAIService.ts`** - Hybrid AI service combining local and cloud AI
 - **`localMLService.ts`** - Local machine learning capabilities
 
 ### Utility Services (`/utility`)
+
 Helper services that provide utility functions:
+
 - **`smartCacheService.ts`** - Intelligent caching layer for performance
 
 ## Usage
@@ -33,12 +41,12 @@ Helper services that provide utility functions:
 All services are exported through the main `index.ts` file. Import them like this:
 
 ```typescript
-import { 
-  ApiService, 
-  UserService, 
-  RecurringExpenseService,
-  HybridAIService,
-  SmartCacheService 
+import {
+	ApiService,
+	UserService,
+	RecurringExpenseService,
+	HybridAIService,
+	SmartCacheService,
 } from '../services';
 ```
 
@@ -53,6 +61,7 @@ import {
 ## Removed Services
 
 The following services were removed as they were not being used in the application:
+
 - AI deployment and orchestration services (`deployAIServices.ts`, `deploymentOrchestrator.ts`, `deploymentService.ts`)
 - Team training services (`teamTrainingService.ts`)
 - Feature store services (`featureStoreService.ts`)

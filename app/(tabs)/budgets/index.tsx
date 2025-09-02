@@ -18,6 +18,17 @@ import MonthlyBudgetSummary from './components/MonthlyBudgetSummary';
 import WeeklyBudgetSummary from './components/WeeklyBudgetSummary';
 import AllBudgetSummary from './components/AllBudgetSummary';
 import BudgetsFeed from './components/BudgetsFeed';
+import { InsightChipsRow } from '../../../src/components/InsightChipsRow';
+import { InsightCard } from '../../../src/components/InsightChip';
+import {
+	SkeletonContainer,
+	BudgetCardSkeleton,
+} from '../../../src/components/SkeletonLoader';
+import {
+	accessibilityProps,
+	dynamicTextStyle,
+	generateAccessibilityLabel,
+} from '../../../src/utils/accessibility';
 
 // ==========================================
 // Main Component
@@ -94,7 +105,13 @@ export default function BudgetScreen() {
 	const LoadingState = () => (
 		<View style={styles.loadingContainer}>
 			<ActivityIndicator size="large" color="#00a2ff" />
-			<Text style={styles.loadingText}>Loading budgets...</Text>
+			<Text
+				style={[styles.loadingText, dynamicTextStyle]}
+				accessibilityRole="text"
+				accessibilityLabel="Loading budgets"
+			>
+				Loading budgets...
+			</Text>
 		</View>
 	);
 
@@ -215,6 +232,63 @@ export default function BudgetScreen() {
 	}, [budgets, activeTab]);
 
 	// ==========================================
+	// Generate Budget Insights
+	// ==========================================
+	const generateBudgetInsights = (budgets: Budget[]): InsightCard[] => {
+		const insights: InsightCard[] = [];
+
+		// 1) Overspend risk insights
+		budgets.forEach((budget) => {
+			const ratio = budget.amount ? (budget.spent || 0) / budget.amount : 0;
+			if (ratio >= 0.8 && (budget.amount || 0) > (budget.spent || 0)) {
+				insights.push({
+					id: `overspend_${budget.id}`,
+					severity: 'warn',
+					headline: `${budget.name} at ${(ratio * 100).toFixed(0)}%`,
+					detail: `You're close to your limit. Consider adjusting spending.`,
+					cta: {
+						label: 'Adjust Budget',
+						action: 'OPEN_BUDGET',
+						payload: { category: budget.name },
+					},
+					evidence: { factIds: [budget.id] },
+				});
+			}
+		});
+
+		// 2) Good progress insights
+		budgets.forEach((budget) => {
+			const ratio = budget.amount ? (budget.spent || 0) / budget.amount : 0;
+			if (ratio <= 0.5 && (budget.spent || 0) > 0) {
+				insights.push({
+					id: `progress_${budget.id}`,
+					severity: 'info',
+					headline: `${budget.name} on track`,
+					detail: `Great job staying within budget!`,
+					evidence: { factIds: [budget.id] },
+				});
+			}
+		});
+
+		// 3) Budget creation suggestion
+		if (budgets.length < 3) {
+			insights.push({
+				id: 'create_more_budgets',
+				severity: 'info',
+				headline: 'Create more budgets',
+				detail: 'Add budgets for dining, entertainment, and other categories.',
+				cta: {
+					label: 'Add Budget',
+					action: 'OPEN_BUDGET',
+				},
+				evidence: { factIds: [] },
+			});
+		}
+
+		return insights.slice(0, 3); // Limit to 3 insights
+	};
+
+	// ==========================================
 	// Main Render
 	// ==========================================
 	// Show loading state while fetching data
@@ -245,16 +319,36 @@ export default function BudgetScreen() {
 						colors={['#00a2ff']}
 					/>
 				}
+				accessibilityLabel="Budgets overview content"
 			>
 				{/* Page Header with Add Button */}
 				<View style={styles.pageHeader}>
 					<View style={styles.pageHeaderContent}>
-						<Text style={styles.pageHeaderTitle}>Budgets Overview</Text>
-						<Text style={styles.pageHeaderSubtitle}>
+						<Text
+							style={[styles.pageHeaderTitle, dynamicTextStyle]}
+							accessibilityRole="header"
+							accessibilityLabel="Budgets overview"
+						>
+							Budgets Overview
+						</Text>
+						<Text
+							style={[styles.pageHeaderSubtitle, dynamicTextStyle]}
+							accessibilityRole="text"
+							accessibilityLabel="Manage your spending across different categories"
+						>
 							Manage your spending across different categories
 						</Text>
 					</View>
-					<TouchableOpacity style={styles.addButton} onPress={showModal}>
+					<TouchableOpacity
+						style={styles.addButton}
+						onPress={showModal}
+						{...accessibilityProps.button}
+						accessibilityLabel={generateAccessibilityLabel.button(
+							'Add',
+							'budget'
+						)}
+						accessibilityHint="Double tap to create a new budget"
+					>
 						<Ionicons name="add" size={20} color="#0f0f0f" />
 						<Text style={styles.addButtonText}>Add Budget</Text>
 					</TouchableOpacity>
@@ -270,6 +364,47 @@ export default function BudgetScreen() {
 						<WeeklyBudgetSummaryComponent />
 					)}
 				</View>
+
+				{/* AI Insight Chips */}
+				{/* Educational Disclaimer */}
+				<View style={styles.disclaimerContainer}>
+					<Ionicons name="information-circle" size={16} color="#ef4444" />
+					<Text style={styles.disclaimerText}>
+						These are educational insights, not financial advice.
+					</Text>
+				</View>
+
+				<InsightChipsRow
+					insights={generateBudgetInsights(budgets)}
+					title="Budget Insights"
+					onInsightPress={(insight) => {
+						console.log('Budget insight pressed:', insight);
+					}}
+					onCTAPress={(action, payload) => {
+						console.log('Budget CTA pressed:', action, payload);
+						// Handle insight actions
+						if (action === 'OPEN_BUDGET') {
+							if (payload?.category) {
+								// Navigate to specific budget category
+								const budget = budgets.find((b) => b.name === payload.category);
+								if (budget) {
+									router.push(`/(stack)/editBudget?id=${budget.id}` as any);
+								}
+							} else {
+								router.push('/(stack)/addBudget' as any);
+							}
+						} else if (action === 'CREATE_RULE') {
+							router.push('/(stack)/addRecurringExpense' as any);
+						} else if (action === 'MARK_PAID') {
+							console.log('Mark as paid:', payload);
+						} else if (action === 'SHIFT_FUNDS') {
+							console.log('Shift funds:', payload);
+						}
+					}}
+					variant="compact"
+					showTitle={true}
+					maxInsights={3}
+				/>
 				<View
 					style={{
 						marginTop: 16,
@@ -439,5 +574,26 @@ const styles = StyleSheet.create({
 		color: '#FFFFFF',
 		fontSize: 16,
 		fontWeight: '600',
+	},
+
+	// Disclaimer styles
+	disclaimerContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#fef2f2',
+		borderRadius: 8,
+		paddingHorizontal: 12,
+		paddingVertical: 8,
+		marginBottom: 16,
+		borderWidth: 1,
+		borderColor: '#fecaca',
+	},
+	disclaimerText: {
+		flex: 1,
+		fontSize: 12,
+		color: '#dc2626',
+		marginLeft: 8,
+		lineHeight: 16,
+		fontWeight: '500',
 	},
 });

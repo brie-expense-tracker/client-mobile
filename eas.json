@@ -9,18 +9,12 @@
 			"distribution": "internal",
 			"env": {
 				"EXPO_PUBLIC_LOCAL_SIM_API_URL": "http://192.168.1.65:3000",
-				"EXPO_PUBLIC_PRODUCTION_API_URL": "https://your-production-api.com/api",
-				"EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyDvklizA_P-Szkr7-69wAs2u2IBO5FQJgE",
-				"EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "brie-24.firebaseapp.com",
-				"EXPO_PUBLIC_FIREBASE_PROJECT_ID": "brie-24",
-				"EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "brie-24.firebasestorage.app",
-				"EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "807336746313",
-				"EXPO_PUBLIC_FIREBASE_APP_ID": "1:807336746313:web:cf2fd752fbf16b13840e98",
-				"EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID": "G-8YCF110ZME"
+				"EXPO_PUBLIC_PRODUCTION_API_URL": "https://your-production-api.com/api"
 			}
 		},
 		"preview": {
-			"distribution": "internal"
+			"distribution": "internal",
+			"autoIncrement": true
 		},
 		"production": {
 			"autoIncrement": true

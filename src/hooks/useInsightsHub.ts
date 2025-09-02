@@ -3,8 +3,7 @@ import { Alert } from 'react-native';
 import { InsightsService, AIInsight, InsightsResponse } from '../services';
 import { useBudget } from '../context/budgetContext';
 import { useGoal } from '../context/goalContext';
-import { TransactionContext } from '../context/transactionContext';
-import { Transaction } from '../data/transactions';
+import { TransactionContext, Transaction } from '../context/transactionContext';
 import { useProfile } from '../context/profileContext';
 
 export type Period = 'week' | 'month' | 'quarter';

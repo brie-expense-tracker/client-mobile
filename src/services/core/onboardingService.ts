@@ -12,18 +12,17 @@ export const OnboardingService = {
 			const response = await ApiService.post<{
 				user: any;
 				onboardingVersion: number;
-			}>('/users/me/onboarding-complete', {});
+			}>('/api/users/me/onboarding-complete', {});
 
 			if (!response.success) {
 				throw new Error(response.error || 'Failed to mark onboarding complete');
 			}
 
 			console.log(
-				'Onboarding marked as complete, version:',
-				response.data?.onboardingVersion
+				`✅ Onboarding complete (v${response.data?.onboardingVersion})`
 			);
 		} catch (error) {
-			console.error('Error marking onboarding complete:', error);
+			console.error('❌ Error marking onboarding complete:', error);
 			throw error;
 		}
 	},
@@ -35,18 +34,10 @@ export const OnboardingService = {
 		try {
 			const response = await ApiService.get<{
 				user: { onboardingVersion: number };
-			}>('/users/me');
-
-			// Debug: Log the full response
-			console.log(
-				'OnboardingService - Full response:',
-				JSON.stringify(response, null, 2)
-			);
+			}>('/api/users/me');
 
 			if (!response.success || !response.data?.user) {
-				console.error('Failed to fetch user data for onboarding check');
-				console.error('Response success:', response.success);
-				console.error('Response data:', response.data);
+				console.error('❌ Failed to fetch user data for onboarding check');
 				return false;
 			}
 
@@ -54,15 +45,15 @@ export const OnboardingService = {
 			const hasSeenCurrentVersion =
 				userOnboardingVersion >= CURRENT_ONBOARDING_VERSION;
 
-			console.log('Onboarding check:', {
-				userVersion: userOnboardingVersion,
-				currentVersion: CURRENT_ONBOARDING_VERSION,
-				hasSeen: hasSeenCurrentVersion,
-			});
+			console.log(
+				`👤 Onboarding: v${userOnboardingVersion}/${CURRENT_ONBOARDING_VERSION} (${
+					hasSeenCurrentVersion ? 'Seen' : 'New'
+				})`
+			);
 
 			return hasSeenCurrentVersion;
 		} catch (error) {
-			console.error('Error checking onboarding status:', error);
+			console.error('❌ Error checking onboarding status:', error);
 			return false;
 		}
 	},

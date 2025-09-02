@@ -24,7 +24,7 @@ export default function useActions() {
 	const fetchActions = useCallback(async () => {
 		setLoading(true);
 		try {
-			const response = await ApiService.get('/intelligent-actions');
+			const response = await ApiService.get('/api/intelligent-actions');
 
 			if (response.success && response.data && Array.isArray(response.data)) {
 				// Transform the data to match our interface
@@ -61,7 +61,7 @@ export default function useActions() {
 	const completeAction = useCallback(async (action: Action) => {
 		try {
 			const response = await ApiService.put(
-				`/intelligent-actions/${action.id}/execute`,
+				`/api/intelligent-actions/${action.id}/execute`,
 				{
 					executed: true,
 					completionDetails: {
@@ -86,7 +86,7 @@ export default function useActions() {
 	const deferAction = useCallback(async (action: Action) => {
 		try {
 			const response = await ApiService.put(
-				`/intelligent-actions/${action.id}/defer`,
+				`/api/intelligent-actions/${action.id}/defer`,
 				{
 					deferUntil: new Date(
 						Date.now() + 7 * 24 * 60 * 60 * 1000
@@ -106,7 +106,7 @@ export default function useActions() {
 	const generateActionsFromInsight = useCallback(async (insight: any) => {
 		try {
 			const response = await ApiService.post(
-				'/intelligent-actions/analyze-insight',
+				'/api/intelligent-actions/analyze-insight',
 				{
 					insight,
 				}

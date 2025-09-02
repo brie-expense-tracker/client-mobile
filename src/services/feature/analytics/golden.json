@@ -1,0 +1,135 @@
+[
+	{
+		"name": "Groceries status straightforward",
+		"intent": "GET_BUDGET_STATUS",
+		"query": "How's my groceries budget?",
+		"factpackFixture": "fp_aug_simple.json",
+		"expected": {
+			"path": "return",
+			"mustInclude": ["Aug", "PDT", "$212.17", "$400.00"],
+			"mustUseFactIds": ["bud_groceries_2025-08"],
+			"forbiddenPhrases": ["guarantee", "risk-free"],
+			"maxResponseTime": 5000,
+			"maxTokens": 200
+		}
+	},
+	{
+		"name": "Ambiguous category needs clarify",
+		"intent": "GET_BUDGET_STATUS",
+		"query": "How's food?",
+		"factpackFixture": "fp_aug_simple.json",
+		"expected": {
+			"path": "clarify",
+			"maxResponseTime": 3000,
+			"maxTokens": 100
+		}
+	},
+	{
+		"name": "Complex optimization needs escalate",
+		"intent": "OPTIMIZE_SPENDING",
+		"query": "How can I optimize my budget to save more?",
+		"factpackFixture": "fp_aug_simple.json",
+		"expected": {
+			"path": "escalate",
+			"maxResponseTime": 8000,
+			"maxTokens": 400
+		}
+	},
+	{
+		"name": "Balance query uses grounded data",
+		"intent": "GET_BALANCE",
+		"query": "What's my current balance?",
+		"factpackFixture": "fp_aug_simple.json",
+		"expected": {
+			"path": "return",
+			"mustInclude": ["$100.00"],
+			"mustUseFactIds": ["bal_checking_2025-08"],
+			"forbiddenPhrases": ["guarantee", "investment advice"],
+			"maxResponseTime": 3000,
+			"maxTokens": 150
+		}
+	},
+	{
+		"name": "Goal progress calculation",
+		"intent": "GET_GOAL_PROGRESS",
+		"query": "How am I doing on my vacation savings?",
+		"factpackFixture": "fp_aug_simple.json",
+		"expected": {
+			"path": "return",
+			"mustInclude": ["$800", "$2000", "40%"],
+			"mustUseFactIds": ["goal_vacation_2025"],
+			"forbiddenPhrases": ["guarantee", "risk-free"],
+			"maxResponseTime": 4000,
+			"maxTokens": 200
+		}
+	},
+	{
+		"name": "Spending forecast with data",
+		"intent": "FORECAST_SPEND",
+		"query": "How much will I spend next month?",
+		"factpackFixture": "fp_aug_simple.json",
+		"expected": {
+			"path": "return",
+			"mustInclude": ["forecast", "based on", "current pace"],
+			"mustUseFactIds": ["spending_patterns"],
+			"forbiddenPhrases": ["guarantee", "exact amount"],
+			"maxResponseTime": 6000,
+			"maxTokens": 300
+		}
+	},
+	{
+		"name": "Subscription tracking",
+		"intent": "LIST_SUBSCRIPTIONS",
+		"query": "What subscriptions do I have?",
+		"factpackFixture": "fp_aug_simple.json",
+		"expected": {
+			"path": "return",
+			"mustInclude": ["Netflix", "$15.99", "monthly"],
+			"mustUseFactIds": ["sub_netflix_monthly"],
+			"forbiddenPhrases": ["guarantee", "risk-free"],
+			"maxResponseTime": 3000,
+			"maxTokens": 200
+		}
+	},
+	{
+		"name": "Recurring expense status",
+		"intent": "GET_RECURRING_STATUS",
+		"query": "When is my rent due?",
+		"factpackFixture": "fp_aug_simple.json",
+		"expected": {
+			"path": "return",
+			"mustInclude": ["rent", "due", "1st"],
+			"mustUseFactIds": ["rec_rent_monthly"],
+			"forbiddenPhrases": ["guarantee", "risk-free"],
+			"maxResponseTime": 3000,
+			"maxTokens": 150
+		}
+	},
+	{
+		"name": "Spending breakdown by category",
+		"intent": "GET_SPENDING_BREAKDOWN",
+		"query": "Break down my spending by category",
+		"factpackFixture": "fp_aug_simple.json",
+		"expected": {
+			"path": "return",
+			"mustInclude": ["groceries", "entertainment", "transportation"],
+			"mustUseFactIds": ["spending_patterns", "budgets"],
+			"forbiddenPhrases": ["guarantee", "risk-free"],
+			"maxResponseTime": 5000,
+			"maxTokens": 250
+		}
+	},
+	{
+		"name": "Budget creation guidance",
+		"intent": "CREATE_BUDGET",
+		"query": "Help me create a budget for dining out",
+		"factpackFixture": "fp_aug_simple.json",
+		"expected": {
+			"path": "return",
+			"mustInclude": ["dining out", "budget", "recommendation"],
+			"forbiddenPhrases": ["guarantee", "risk-free", "exact amount"],
+			"maxResponseTime": 6000,
+			"maxTokens": 300
+		}
+	}
+]

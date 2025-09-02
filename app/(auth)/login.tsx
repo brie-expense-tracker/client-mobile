@@ -6,6 +6,7 @@ import {
 	StyleSheet,
 	Image,
 	SafeAreaView,
+	TouchableOpacity,
 } from 'react-native';
 import React, { useState } from 'react';
 import { router, Stack } from 'expo-router';
@@ -17,11 +18,18 @@ import {
 import useAuth from '../../src/context/AuthContext';
 import { RectButton, BorderlessButton } from 'react-native-gesture-handler';
 
+// Demo credentials for reviewers
+const DEMO_CREDENTIALS = {
+	email: 'demo@brie.app',
+	password: 'demo123',
+};
+
 export default function Login() {
 	const [email, setEmail] = useState('');
 	const [password, setPassword] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
 	const [isPressed, setIsPressed] = useState(false);
+	const [isDemoMode, setIsDemoMode] = useState(false);
 	const { login } = useAuth();
 
 	// Email validator function
@@ -33,6 +41,33 @@ export default function Login() {
 	// Password validator function
 	const isValidPassword = (password: string) => {
 		return password.length >= 6; // Minimum 6 characters for this example
+	};
+
+	const handleDemoLogin = async () => {
+		setIsLoading(true);
+		setIsDemoMode(true);
+
+		try {
+			// Sign in with demo credentials
+			const userCredential = await signInWithEmailAndPassword(
+				getAuth(),
+				DEMO_CREDENTIALS.email,
+				DEMO_CREDENTIALS.password
+			);
+			const firebaseUser = userCredential.user;
+
+			// Use the auth context to handle MongoDB user verification
+			await login(firebaseUser);
+		} catch (error: any) {
+			console.error('Demo login error:', error);
+			Alert.alert(
+				'Demo Error',
+				'Demo mode is currently unavailable. Please contact support.'
+			);
+			setIsDemoMode(false);
+		} finally {
+			setIsLoading(false);
+		}
 	};
 
 	const handleLogin = async () => {
@@ -92,46 +127,39 @@ export default function Login() {
 					style={styles.logo}
 					resizeMode="contain"
 				/>
+
+				{/* Demo Mode Banner */}
+				<View style={styles.demoBanner}>
+					<Text style={styles.demoBannerText}>🎯 Demo Mode Available</Text>
+					<Text style={styles.demoBannerSubtext}>
+						Try the app with sample data (60-90 days of transactions, budgets,
+						and goals)
+					</Text>
+				</View>
+
 				<View style={styles.formContainer}>
 					<Text style={styles.title}>Welcome Back</Text>
-					<Text style={styles.label}>Email</Text>
-					<TextInput
-						style={styles.input}
-						placeholder="Enter your email"
-						value={email}
-						onChangeText={setEmail}
-						keyboardType="email-address"
-						autoCapitalize="none"
-					/>
-					<Text style={styles.label}>Password</Text>
-					<TextInput
-						style={styles.input}
-						placeholder="Enter your password"
-						value={password}
-						onChangeText={setPassword}
-						secureTextEntry
-					/>
-					<View style={styles.forgotPasswordContainer}>
-						<BorderlessButton
-							onActiveStateChange={setIsPressed}
-							onPress={() => {
-								router.replace('/forgotPassword');
-							}}
+
+					{/* Demo Login Button */}
+					<TouchableOpacity
+						style={[styles.demoButton, isDemoMode && styles.demoButtonActive]}
+						onPress={handleDemoLogin}
+						disabled={isLoading}
+					>
+						<Ionicons
+							name="play-circle"
+							size={20}
+							color={isDemoMode ? '#fff' : '#007ACC'}
+						/>
+						<Text
+							style={[
+								styles.demoButtonText,
+								isDemoMode && styles.demoButtonTextActive,
+							]}
 						>
-							<Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-						</BorderlessButton>
-					</View>
-					<View style={styles.buttonContainer}>
-						<RectButton
-							style={[styles.button, isLoading && styles.buttonDisabled]}
-							onPress={handleLogin}
-							enabled={!isLoading}
-						>
-							<Text style={styles.buttonText}>
-								{isLoading ? 'Signing In...' : 'Sign In'}
-							</Text>
-						</RectButton>
-					</View>
+							{isDemoMode ? 'Loading Demo...' : 'Try Demo Mode'}
+						</Text>
+					</TouchableOpacity>
 
 					<View style={styles.dividerContainer}>
 						<View style={styles.divider} />
@@ -139,9 +167,58 @@ export default function Login() {
 						<View style={styles.divider} />
 					</View>
 
+					<Text style={styles.label}>Email</Text>
+					<TextInput
+						style={styles.input}
+						placeholder="Enter your email"
+						placeholderTextColor="#999"
+						value={email}
+						onChangeText={setEmail}
+						keyboardType="email-address"
+						autoCapitalize="none"
+						autoCorrect={false}
+						editable={!isDemoMode}
+					/>
+
+					<Text style={styles.label}>Password</Text>
+					<TextInput
+						style={styles.input}
+						placeholder="Enter your password"
+						placeholderTextColor="#999"
+						value={password}
+						onChangeText={setPassword}
+						secureTextEntry
+						autoCapitalize="none"
+						autoCorrect={false}
+						editable={!isDemoMode}
+					/>
+
+					<RectButton
+						style={[
+							styles.loginButton,
+							(isLoading || isDemoMode) && styles.loginButtonDisabled,
+						]}
+						onPress={handleLogin}
+					>
+						{isLoading ? (
+							<Text style={styles.loginButtonText}>Signing In...</Text>
+						) : (
+							<Text style={styles.loginButtonText}>Sign In</Text>
+						)}
+					</RectButton>
+
+					<View style={styles.dividerContainer}>
+						<View style={styles.divider} />
+						<Text style={styles.dividerText}>or continue with</Text>
+						<View style={styles.divider} />
+					</View>
+
 					<View style={styles.socialButtonsContainer}>
 						<RectButton
-							style={styles.socialButton}
+							style={[
+								styles.socialButton,
+								isDemoMode && styles.socialButtonDisabled,
+							]}
 							onPress={() =>
 								Alert.alert(
 									'Coming Soon',
@@ -154,7 +231,10 @@ export default function Login() {
 						</RectButton>
 
 						<RectButton
-							style={styles.socialButton}
+							style={[
+								styles.socialButton,
+								isDemoMode && styles.socialButtonDisabled,
+							]}
 							onPress={() =>
 								Alert.alert(
 									'Coming Soon',
@@ -176,7 +256,14 @@ export default function Login() {
 							router.replace('/signup');
 						}}
 					>
-						<Text style={styles.signupLink}>Sign Up</Text>
+						<Text
+							style={[
+								styles.signupLink,
+								isDemoMode && styles.signupLinkDisabled,
+							]}
+						>
+							Sign Up
+						</Text>
 					</BorderlessButton>
 				</View>
 			</View>
@@ -339,5 +426,68 @@ const styles = StyleSheet.create({
 		color: '#4A5568',
 		fontSize: 14,
 		fontWeight: '500',
+	},
+	demoBanner: {
+		backgroundColor: '#E6F7FF',
+		padding: 12,
+		borderRadius: 8,
+		marginBottom: 20,
+		alignItems: 'center',
+	},
+	demoBannerText: {
+		fontSize: 16,
+		fontWeight: 'bold',
+		color: '#007ACC',
+	},
+	demoBannerSubtext: {
+		fontSize: 12,
+		color: '#4A5568',
+		marginTop: 4,
+	},
+	demoButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		padding: 12,
+		borderRadius: 12,
+		marginBottom: 10,
+		backgroundColor: '#E6F7FF',
+		gap: 8,
+	},
+	demoButtonActive: {
+		backgroundColor: '#007ACC',
+	},
+	demoButtonText: {
+		fontSize: 16,
+		fontWeight: '500',
+		color: '#007ACC',
+	},
+	demoButtonTextActive: {
+		color: '#fff',
+	},
+	loginButton: {
+		width: '100%',
+		borderRadius: 9999,
+		overflow: 'hidden',
+		alignSelf: 'center',
+		backgroundColor: '#0095FF',
+		marginTop: 10,
+	},
+	loginButtonText: {
+		color: 'white',
+		fontSize: 20,
+		textAlign: 'center',
+		fontWeight: '700',
+		marginVertical: 18,
+	},
+	loginButtonDisabled: {
+		backgroundColor: '#E2E8F0',
+	},
+	socialButtonDisabled: {
+		backgroundColor: '#E2E8F0',
+		opacity: 0.7,
+	},
+	signupLinkDisabled: {
+		opacity: 0.5,
 	},
 });

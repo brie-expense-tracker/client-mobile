@@ -245,7 +245,7 @@ const PaywallModal: React.FC<PaywallModalProps> = ({
 					{/* Premium Features Preview - only show for premium_features reason */}
 					{reason === 'premium_features' && (
 						<View style={styles.premiumPreviewSection}>
-							<Text style={styles.sectionTitle}>What You'll Unlock</Text>
+							<Text style={styles.sectionTitle}>What You&apos;ll Unlock</Text>
 							<View style={styles.premiumFeaturesGrid}>
 								<View style={styles.premiumFeature}>
 									<Ionicons name="infinite" size={20} color="#8b5cf6" />

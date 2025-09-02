@@ -27,18 +27,12 @@ const SimpleBalanceWidget: React.FC<BalanceWidgetProps> = ({
 	transactions,
 }) => {
 	const { totalIncome, totalExpense } = useMemo(() => {
-		console.log(
-			'[SimpleBalanceWidget] Calculating income/expense from transactions:',
-			transactions.length
-		);
+		console.log(`💰 Processing ${transactions.length} transactions`);
 
 		const income = transactions
 			.filter((t) => t.type === 'income')
 			.reduce((s, t) => {
 				const amount = isNaN(t.amount) ? 0 : t.amount;
-				console.log(
-					`[SimpleBalanceWidget] Income transaction ${t.id}: ${t.amount} -> ${amount}`
-				);
 				return s + amount;
 			}, 0);
 
@@ -46,16 +40,10 @@ const SimpleBalanceWidget: React.FC<BalanceWidgetProps> = ({
 			.filter((t) => t.type === 'expense')
 			.reduce((s, t) => {
 				const amount = isNaN(t.amount) ? 0 : t.amount;
-				console.log(
-					`[SimpleBalanceWidget] Expense transaction ${t.id}: ${t.amount} -> ${amount}`
-				);
 				return s + amount;
 			}, 0);
 
-		console.log('[SimpleBalanceWidget] Calculated totals:', {
-			totalIncome: income,
-			totalExpense: expense,
-		});
+		console.log(`✅ Balance: +${income} / -${expense}`);
 		return { totalIncome: income, totalExpense: expense } as const;
 	}, [transactions]);
 

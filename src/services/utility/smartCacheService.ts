@@ -1,15 +1,34 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
+// Enhanced cache categories with specific TTLs
+export type CacheCategory =
+	| 'NARRATION'
+	| 'FAQ'
+	| 'HOWTO'
+	| 'INSIGHT'
+	| 'FORECAST'
+	| 'CATEGORIZATION';
+
+// TTL configuration by category (in milliseconds)
+const TTL_BY_CATEGORY: Record<CacheCategory, number> = {
+	NARRATION: 2 * 60 * 1000, // 2 minutes - very short for dynamic content
+	FAQ: 7 * 24 * 60 * 60 * 1000, // 7 days - longer for static content
+	HOWTO: 30 * 24 * 60 * 60 * 1000, // 30 days - longest for educational content
+	INSIGHT: 24 * 60 * 60 * 1000, // 24 hours - medium for analytical content
+	FORECAST: 6 * 60 * 60 * 1000, // 6 hours - shorter for time-sensitive data
+	CATEGORIZATION: 12 * 60 * 60 * 1000, // 12 hours - medium for classification
+};
+
 export interface CacheEntry {
 	id: string;
 	query: string;
 	response: any;
-	timestamp: number;
+	createdAt: number; // Changed from timestamp for clarity
 	userId: string;
 	usageCount: number;
 	lastUsed: number;
-	category: 'categorization' | 'insight' | 'advice' | 'forecast';
+	category: CacheCategory;
 	confidence: number;
 }
 
@@ -25,15 +44,84 @@ export class SmartCacheService {
 	private static instance: SmartCacheService;
 	private cache = new Map<string, CacheEntry>();
 	private userPatterns = new Map<string, UserPattern>();
-	private readonly CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
 	private readonly MAX_CACHE_SIZE = 1000;
 	private readonly MIN_CONFIDENCE = 0.7;
+
+	// Cache invalidation flags for intelligent cache management
+	private invalidationFlags = new Set<string>();
 
 	static getInstance(): SmartCacheService {
 		if (!SmartCacheService.instance) {
 			SmartCacheService.instance = new SmartCacheService();
 		}
 		return SmartCacheService.instance;
+	}
+
+	/**
+	 * Set invalidation flag to trigger cache invalidation
+	 */
+	setInvalidationFlag(flag: string): void {
+		this.invalidationFlags.add(flag);
+		console.log(`[SmartCacheService] Set invalidation flag: ${flag}`);
+	}
+
+	/**
+	 * Clear invalidation flag
+	 */
+	clearInvalidationFlag(flag: string): void {
+		this.invalidationFlags.delete(flag);
+		console.log(`[SmartCacheService] Cleared invalidation flag: ${flag}`);
+	}
+
+	/**
+	 * Check if cache entry is valid based on category TTL and invalidation flags
+	 */
+	isCacheValid(entry: CacheEntry): boolean {
+		const ttl = TTL_BY_CATEGORY[entry.category] ?? 60_000; // Default 1 minute
+		const fresh = Date.now() - entry.createdAt < ttl;
+
+		// Special invalidation rules by category
+		if (
+			entry.category === 'NARRATION' &&
+			this.invalidationFlags.has('NEW_TX')
+		) {
+			console.log(
+				'[SmartCacheService] Invalidating narration cache due to new transactions'
+			);
+			return false;
+		}
+
+		if (
+			entry.category === 'FORECAST' &&
+			this.invalidationFlags.has('BUDGET_CHANGE')
+		) {
+			console.log(
+				'[SmartCacheService] Invalidating forecast cache due to budget changes'
+			);
+			return false;
+		}
+
+		if (
+			entry.category === 'INSIGHT' &&
+			this.invalidationFlags.has('GOAL_UPDATE')
+		) {
+			console.log(
+				'[SmartCacheService] Invalidating insight cache due to goal updates'
+			);
+			return false;
+		}
+
+		if (
+			entry.category === 'CATEGORIZATION' &&
+			this.invalidationFlags.has('CATEGORY_UPDATE')
+		) {
+			console.log(
+				'[SmartCacheService] Invalidating categorization cache due to category updates'
+			);
+			return false;
+		}
+
+		return fresh;
 	}
 
 	/**
@@ -70,14 +158,14 @@ export class SmartCacheService {
 	async getCachedResponse(
 		query: string,
 		userId: string,
-		category: CacheEntry['category']
+		category: CacheCategory
 	): Promise<any | null> {
 		const cacheKey = this.generateCacheKey(query, userId, category);
 		const entry = this.cache.get(cacheKey);
 
 		if (!entry) return null;
 
-		// Check if cache is still valid
+		// Check if cache is still valid using enhanced validation
 		if (!this.isCacheValid(entry)) {
 			this.cache.delete(cacheKey);
 			return null;
@@ -92,7 +180,10 @@ export class SmartCacheService {
 		this.updateUserPattern(userId, query, category);
 
 		console.log(
-			`[SmartCacheService] Cache hit for: ${query.substring(0, 50)}...`
+			`[SmartCacheService] Cache hit for ${category}: ${query.substring(
+				0,
+				50
+			)}...`
 		);
 		return entry.response;
 	}
@@ -104,7 +195,7 @@ export class SmartCacheService {
 		query: string,
 		response: any,
 		userId: string,
-		category: CacheEntry['category'],
+		category: CacheCategory,
 		confidence: number = 1.0
 	): Promise<void> {
 		if (confidence < this.MIN_CONFIDENCE) {
@@ -119,7 +210,7 @@ export class SmartCacheService {
 			id: cacheKey,
 			query,
 			response,
-			timestamp: Date.now(),
+			createdAt: Date.now(),
 			userId,
 			usageCount: 1,
 			lastUsed: Date.now(),
@@ -138,18 +229,17 @@ export class SmartCacheService {
 		// Persist to storage
 		await this.persistCacheToStorage();
 		console.log(
-			`[SmartCacheService] Cached response for: ${query.substring(0, 50)}...`
+			`[SmartCacheService] Cached ${category} response for: ${query.substring(
+				0,
+				50
+			)}...`
 		);
 	}
 
 	/**
 	 * Check if we should use AI or cached response
 	 */
-	shouldUseAI(
-		query: string,
-		userId: string,
-		category: CacheEntry['category']
-	): boolean {
+	shouldUseAI(query: string, userId: string, category: CacheCategory): boolean {
 		const pattern = this.userPatterns.get(userId);
 		if (!pattern) return true;
 
@@ -162,17 +252,33 @@ export class SmartCacheService {
 	}
 
 	/**
-	 * Get cache statistics
+	 * Get cache statistics with category breakdown
 	 */
 	getCacheStats(): {
 		totalEntries: number;
 		hitRate: number;
 		memoryUsage: number;
 		userPatterns: number;
+		categoryBreakdown: Record<CacheCategory, number>;
 	} {
 		try {
 			const totalEntries = this.cache.size;
 			const userPatterns = this.userPatterns.size;
+
+			// Calculate category breakdown
+			const categoryBreakdown: Record<CacheCategory, number> = {} as Record<
+				CacheCategory,
+				number
+			>;
+			for (const category of Object.keys(TTL_BY_CATEGORY) as CacheCategory[]) {
+				categoryBreakdown[category] = 0;
+			}
+
+			for (const entry of this.cache.values()) {
+				if (categoryBreakdown[entry.category] !== undefined) {
+					categoryBreakdown[entry.category]++;
+				}
+			}
 
 			// Calculate approximate memory usage
 			const memoryUsage = this.estimateMemoryUsage();
@@ -182,6 +288,7 @@ export class SmartCacheService {
 				hitRate: this.calculateHitRate(),
 				memoryUsage,
 				userPatterns,
+				categoryBreakdown,
 			};
 		} catch (error) {
 			console.error('[SmartCacheService] Error getting cache stats:', error);
@@ -191,19 +298,21 @@ export class SmartCacheService {
 				hitRate: 0,
 				memoryUsage: 0,
 				userPatterns: 0,
+				categoryBreakdown: {} as Record<CacheCategory, number>,
 			};
 		}
 	}
 
 	/**
-	 * Clear expired cache entries
+	 * Clear expired cache entries using category-specific TTLs
 	 */
 	async cleanupExpiredCache(): Promise<void> {
 		const now = Date.now();
 		const expiredKeys: string[] = [];
 
 		for (const [key, entry] of this.cache.entries()) {
-			if (now - entry.timestamp > this.CACHE_EXPIRY) {
+			const ttl = TTL_BY_CATEGORY[entry.category] ?? 60_000;
+			if (now - entry.createdAt > ttl) {
 				expiredKeys.push(key);
 			}
 		}
@@ -213,6 +322,50 @@ export class SmartCacheService {
 		if (expiredKeys.length > 0) {
 			console.log(
 				`[SmartCacheService] Cleaned up ${expiredKeys.length} expired entries`
+			);
+			await this.persistCacheToStorage();
+		}
+	}
+
+	/**
+	 * Invalidate cache by category
+	 */
+	async invalidateCacheByCategory(category: CacheCategory): Promise<void> {
+		const keysToDelete: string[] = [];
+
+		for (const [key, entry] of this.cache.entries()) {
+			if (entry.category === category) {
+				keysToDelete.push(key);
+			}
+		}
+
+		keysToDelete.forEach((key) => this.cache.delete(key));
+
+		if (keysToDelete.length > 0) {
+			console.log(
+				`[SmartCacheService] Invalidated ${keysToDelete.length} ${category} cache entries`
+			);
+			await this.persistCacheToStorage();
+		}
+	}
+
+	/**
+	 * Invalidate cache by user
+	 */
+	async invalidateCacheByUser(userId: string): Promise<void> {
+		const keysToDelete: string[] = [];
+
+		for (const [key, entry] of this.cache.entries()) {
+			if (entry.userId === userId) {
+				keysToDelete.push(key);
+			}
+		}
+
+		keysToDelete.forEach((key) => this.cache.delete(key));
+
+		if (keysToDelete.length > 0) {
+			console.log(
+				`[SmartCacheService] Invalidated ${keysToDelete.length} cache entries for user ${userId}`
 			);
 			await this.persistCacheToStorage();
 		}
@@ -239,15 +392,10 @@ export class SmartCacheService {
 		return Math.abs(hash).toString(36);
 	}
 
-	private isCacheValid(entry: CacheEntry): boolean {
-		const now = Date.now();
-		return now - entry.timestamp < this.CACHE_EXPIRY;
-	}
-
 	private hasRecentCache(
 		query: string,
 		userId: string,
-		category: string
+		category: CacheCategory
 	): boolean {
 		const cacheKey = this.generateCacheKey(query, userId, category);
 		const entry = this.cache.get(cacheKey);

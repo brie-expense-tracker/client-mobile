@@ -64,10 +64,10 @@ const SettingsBudgetsGoalsWidget: React.FC<SettingsBudgetsGoalsWidgetProps> = ({
 				<View style={styles.compactRow}>
 					<TouchableOpacity
 						style={styles.compactButton}
-						onPress={() => router.push('/(stack)/settings')}
+						onPress={() => router.push('/(tabs)/budgets?tab=goals')}
 					>
-						<Ionicons name="settings-outline" size={20} color="#666" />
-						<Text style={styles.compactButtonText}>Settings</Text>
+						<Ionicons name="flag-outline" size={20} color="#666" />
+						<Text style={styles.compactButtonText}>Goals</Text>
 					</TouchableOpacity>
 
 					<View style={styles.divider} />
@@ -84,10 +84,10 @@ const SettingsBudgetsGoalsWidget: React.FC<SettingsBudgetsGoalsWidgetProps> = ({
 
 					<TouchableOpacity
 						style={styles.compactButton}
-						onPress={() => router.push('/(tabs)/budgets?tab=goals')}
+						onPress={() => router.push('/(stack)/settings')}
 					>
-						<Ionicons name="flag-outline" size={20} color="#666" />
-						<Text style={styles.compactButtonText}>Goals</Text>
+						<Ionicons name="settings-outline" size={20} color="#666" />
+						<Text style={styles.compactButtonText}>Settings</Text>
 					</TouchableOpacity>
 				</View>
 			</View>

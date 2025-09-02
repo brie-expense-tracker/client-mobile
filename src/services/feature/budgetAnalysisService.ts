@@ -9,6 +9,15 @@ export interface BudgetAnalysis {
 	trend: 'increasing' | 'decreasing' | 'stable';
 	recommendations: string[];
 	lastUpdated: Date;
+	spendingBreakdown: Array<{
+		category: string;
+		amount: number;
+		percentage: number;
+		color?: string;
+	}>;
+	totalSpent: number;
+	transactionCount: number;
+	averageSpent: number;
 }
 
 export class BudgetAnalysisService {
@@ -29,6 +38,10 @@ export class BudgetAnalysisService {
 			trend: 'stable',
 			recommendations: [],
 			lastUpdated: new Date(),
+			spendingBreakdown: [],
+			totalSpent: 0,
+			transactionCount: 0,
+			averageSpent: 0,
 		};
 	}
 }

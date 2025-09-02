@@ -36,7 +36,7 @@ export class RecurringExpenseService {
 	static async detectRecurringPatterns(): Promise<RecurringPattern[]> {
 		try {
 			const response = await ApiService.post<{ patterns: RecurringPattern[] }>(
-				'/recurring-expenses/detect',
+				'/api/recurring-expenses/detect',
 				{}
 			);
 
@@ -59,26 +59,20 @@ export class RecurringExpenseService {
 	 */
 	static async getRecurringExpenses(): Promise<RecurringExpense[]> {
 		try {
-			console.log('[RecurringExpenseService] Fetching recurring expenses...');
+			console.log('🔄 Fetching recurring expenses...');
 			const response = await ApiService.get<{
 				recurringExpenses: RecurringExpense[];
-			}>('/recurring-expenses');
-			console.log('[RecurringExpenseService] API response:', response);
+			}>('/api/recurring-expenses');
 
 			if (response.success && response.data) {
-				console.log(
-					'[RecurringExpenseService] Returning expenses:',
-					response.data.recurringExpenses
-				);
-				return response.data.recurringExpenses || [];
+				const expenses = response.data.recurringExpenses || [];
+				console.log(`✅ Found ${expenses.length} recurring expenses`);
+				return expenses;
 			}
 
 			return [];
 		} catch (error) {
-			console.error(
-				'[RecurringExpenseService] Error getting recurring expenses:',
-				error
-			);
+			console.error('❌ Error getting recurring expenses:', error);
 			return [];
 		}
 	}
@@ -92,7 +86,7 @@ export class RecurringExpenseService {
 		try {
 			const response = await ApiService.get<{
 				alerts: RecurringExpenseAlert[];
-			}>('/recurring-expenses/upcoming');
+			}>('/api/recurring-expenses/upcoming');
 
 			if (response.success && response.data) {
 				return response.data.alerts || [];
@@ -180,7 +174,7 @@ export class RecurringExpenseService {
 		try {
 			const response = await ApiService.post<{
 				recurringExpense: RecurringExpense;
-			}>('/recurring-expenses', data);
+			}>('/api/recurring-expenses', data);
 
 			if (response.success && response.data) {
 				return response.data.recurringExpense;
@@ -208,7 +202,7 @@ export class RecurringExpenseService {
 			const response = await ApiService.post<{
 				message: string;
 				processedCount: number;
-			}>('/recurring-expenses/process', {});
+			}>('/api/recurring-expenses/process', {});
 
 			if (response.success && response.data) {
 				return {
@@ -240,7 +234,7 @@ export class RecurringExpenseService {
 			const response = await ApiService.post<{
 				message: string;
 				removedCount: number;
-			}>('/recurring-expenses/cleanup', {});
+			}>('/api/recurring-expenses/cleanup', {});
 
 			if (response.success && response.data) {
 				return {
@@ -280,7 +274,7 @@ export class RecurringExpenseService {
 			const response = await ApiService.post<{
 				payment: any;
 				message: string;
-			}>('/recurring-expenses/pay', data);
+			}>('/api/recurring-expenses/pay', data);
 
 			if (response.success && response.data) {
 				return {
@@ -312,7 +306,7 @@ export class RecurringExpenseService {
 		try {
 			const response = await ApiService.get<{
 				payments: any[];
-			}>(`/recurring-expenses/${patternId}/payments?limit=${limit}`);
+			}>(`/api/recurring-expenses/${patternId}/payments?limit=${limit}`);
 
 			if (response.success && response.data) {
 				return response.data.payments || [];
@@ -329,40 +323,34 @@ export class RecurringExpenseService {
 	}
 
 	/**
-	 * Check if current period is paid for a recurring expense
+	 * Check if a recurring expense is paid for the current period
 	 */
-	static async isCurrentPeriodPaid(patternId: string): Promise<{
-		isPaid: boolean;
-		payment: any | null;
-	}> {
+	static async checkIfCurrentPeriodPaid(
+		patternId: string
+	): Promise<boolean | null> {
 		try {
-			console.log(
-				`[RecurringExpenseService] Checking if current period is paid for ${patternId}`
-			);
-			const response = await ApiService.get<{
-				isPaid: boolean;
-				payment: any | null;
-			}>(`/recurring-expenses/${patternId}/paid`);
-
-			console.log(
-				`[RecurringExpenseService] Response for ${patternId}:`,
-				response
+			console.log(`🔍 Checking payment status for ${patternId}`);
+			const response = await ApiService.get<{ isPaid: boolean | null }>(
+				`/api/recurring-expenses/${patternId}/paid`
 			);
 
 			if (response.success && response.data) {
-				return {
-					isPaid: response.data.isPaid,
-					payment: response.data.payment,
-				};
+				const isPaid = response.data.isPaid;
+				console.log(
+					`💰 ${patternId}: ${
+						isPaid === null ? 'Unknown' : isPaid ? 'Paid' : 'Unpaid'
+					}`
+				);
+				return isPaid;
 			}
 
-			return { isPaid: false, payment: null };
+			return null;
 		} catch (error) {
 			console.error(
-				'[RecurringExpenseService] Error checking current period paid:',
+				`❌ Error checking payment status for ${patternId}:`,
 				error
 			);
-			return { isPaid: false, payment: null };
+			return null;
 		}
 	}
 
@@ -381,7 +369,7 @@ export class RecurringExpenseService {
 			const response = await ApiService.post<{
 				transactions: any[];
 				message: string;
-			}>('/recurring-expenses/generate-transactions', data);
+			}>('/api/recurring-expenses/generate-transactions', data);
 
 			if (response.success && response.data) {
 				return {
@@ -418,7 +406,7 @@ export class RecurringExpenseService {
 			const response = await ApiService.post<{
 				linkedTransaction: any;
 				message: string;
-			}>('/recurring-expenses/link-transaction', data);
+			}>('/api/recurring-expenses/link-transaction', data);
 
 			if (response.success && response.data) {
 				return {
@@ -447,7 +435,7 @@ export class RecurringExpenseService {
 		try {
 			const response = await ApiService.get<{
 				transactions: any[];
-			}>(`/recurring-expenses/pending-transactions?limit=${limit}`);
+			}>(`/api/recurring-expenses/pending-transactions?limit=${limit}`);
 
 			if (response.success && response.data) {
 				return response.data.transactions || [];
@@ -473,7 +461,7 @@ export class RecurringExpenseService {
 		try {
 			const response = await ApiService.get<{
 				transactions: any[];
-			}>(`/recurring-expenses/${patternId}/transactions?limit=${limit}`);
+			}>(`/api/recurring-expenses/${patternId}/transactions?limit=${limit}`);
 
 			if (response.success && response.data) {
 				return response.data.transactions || [];
@@ -501,7 +489,7 @@ export class RecurringExpenseService {
 			const response = await ApiService.post<{
 				appliedCount: number;
 				message: string;
-			}>('/recurring-expenses/auto-apply', {});
+			}>('/api/recurring-expenses/auto-apply', {});
 
 			if (response.success && response.data) {
 				return {
@@ -518,6 +506,42 @@ export class RecurringExpenseService {
 				error
 			);
 			throw error;
+		}
+	}
+
+	/**
+	 * Check if a recurring expense is paid for the current period
+	 */
+	static async isCurrentPeriodPaid(patternId: string): Promise<{
+		isPaid: boolean;
+		payment?: {
+			paidAt: string;
+			amount: number;
+		};
+	}> {
+		try {
+			const response = await ApiService.get<{
+				isPaid: boolean;
+				payment?: {
+					paidAt: string;
+					amount: number;
+				};
+			}>(`/api/recurring-expenses/${patternId}/paid`);
+
+			if (response.success && response.data) {
+				return {
+					isPaid: response.data.isPaid || false,
+					payment: response.data.payment,
+				};
+			}
+
+			return { isPaid: false };
+		} catch (error) {
+			console.error(
+				'[RecurringExpenseService] Error checking if current period is paid:',
+				error
+			);
+			return { isPaid: false };
 		}
 	}
 }

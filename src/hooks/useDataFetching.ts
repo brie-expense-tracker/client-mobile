@@ -74,7 +74,7 @@ export function useDataFetching<T extends { id: string }>(
 	const refetch = useCallback(async () => {
 		// Prevent concurrent fetches
 		if (isFetching.current) {
-			console.log('[useDataFetching] Fetch already in progress, skipping...');
+			console.log('🔄 Fetch already in progress, skipping...');
 			return;
 		}
 
@@ -83,15 +83,15 @@ export function useDataFetching<T extends { id: string }>(
 			setIsLoading(true);
 			setError(null);
 
-			console.log('[useDataFetching] Fetching data...');
+			console.log('🔄 Fetching data...');
 			const result = await fetchFunction();
 
-			console.log('[useDataFetching] Data received:', result);
+			console.log(`✅ Data received: ${result.length} items`);
 			setData(result);
 			setHasLoaded(true);
 			setLastRefreshed(new Date());
 		} catch (err) {
-			console.error('[useDataFetching] Error fetching data:', err);
+			console.error('❌ Error fetching data:', err);
 			const errorMessage =
 				err instanceof Error ? err.message : 'Failed to fetch data';
 			setError(errorMessage);
@@ -122,9 +122,10 @@ export function useDataFetching<T extends { id: string }>(
 
 				// Optimistic update
 				setData((prev) => [...prev, newItem]);
+				console.log('✅ Item added successfully');
 				return newItem;
 			} catch (err) {
-				console.error('[useDataFetching] Error adding item:', err);
+				console.error('❌ Error adding item:', err);
 				setError(err instanceof Error ? err.message : 'Failed to add item');
 				throw err;
 			}

@@ -4,22 +4,25 @@
 		"slug": "clientMobile",
 		"version": "1.0.0",
 		"orientation": "portrait",
-		"scheme": "myapp",
+		"scheme": "brie",
 		"userInterfaceStyle": "automatic",
 		"newArchEnabled": true,
 		"ios": {
 			"supportsTablet": true,
 			"bundleIdentifier": "com.brie.mobile",
+			"buildNumber": "1",
 			"googleServicesFile": "./GoogleService-Info.plist",
 			"infoPlist": {
 				"ITSAppUsesNonExemptEncryption": false,
 				"NSAppTransportSecurity": {
 					"NSAllowsLocalNetworking": true
-				}
+				},
+				"NSUserNotificationsUsageDescription": "This app uses notifications to keep you informed about your budget goals and financial insights."
 			}
 		},
 		"android": {
 			"package": "com.brie.mobile",
+			"versionCode": 1,
 			"googleServicesFile": "./google-services.json"
 		},
 		"web": {
@@ -42,7 +45,8 @@
 				}
 			],
 			"@react-native-firebase/app",
-			"@react-native-firebase/auth"
+			"@react-native-firebase/auth",
+			"expo-notifications"
 		],
 		"experiments": {
 			"typedRoutes": true

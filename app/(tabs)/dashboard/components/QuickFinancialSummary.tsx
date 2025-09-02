@@ -1,6 +1,9 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useBudget } from '../../../../src/context/budgetContext';
+import { useGoal } from '../../../../src/context/goalContext';
+
 // Transaction interface defined inline since we removed the mock data file
 interface Transaction {
 	id: string;
@@ -18,8 +21,6 @@ interface Transaction {
 		nextExpectedDate: string;
 	};
 }
-import { useBudget } from '../../../../src/context/budgetContext';
-import { useGoal } from '../../../../src/context/goalContext';
 
 interface QuickFinancialSummaryProps {
 	transactions: Transaction[];

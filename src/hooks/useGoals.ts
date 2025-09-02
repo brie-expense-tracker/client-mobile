@@ -7,14 +7,17 @@ import { ApiService } from '../services';
 // Goal-specific API functions
 // ==========================================
 const fetchGoals = async (): Promise<Goal[]> => {
-	const response = await ApiService.get<{ data: Goal[] }>('/goals');
+	const response = await ApiService.get<{ data: Goal[] }>('/api/goals');
 	// Handle the nested response structure from the server
 	const goalsData = response.data?.data || response.data;
 	return Array.isArray(goalsData) ? goalsData : [];
 };
 
 const createGoal = async (goalData: CreateGoalData): Promise<Goal> => {
-	const response = await ApiService.post<{ data: Goal }>('/goals', goalData);
+	const response = await ApiService.post<{ data: Goal }>(
+		'/api/goals',
+		goalData
+	);
 	const responseData = response.data?.data || response.data;
 	if (
 		!responseData ||
@@ -30,7 +33,7 @@ const updateGoal = async (
 	updates: UpdateGoalData
 ): Promise<Goal> => {
 	const response = await ApiService.put<{ data: Goal }>(
-		`/goals/${id}`,
+		`/api/goals/${id}`,
 		updates
 	);
 	const responseData = response.data?.data || response.data;
@@ -44,7 +47,7 @@ const updateGoal = async (
 };
 
 const deleteGoal = async (id: string): Promise<void> => {
-	await ApiService.delete(`/goals/${id}`);
+	await ApiService.delete(`/api/goals/${id}`);
 };
 
 // ==========================================
@@ -108,7 +111,7 @@ export function useGoals() {
 	);
 
 	const deleteGoalDirect = useCallback(async (id: string): Promise<void> => {
-		await ApiService.delete(`/goals/${id}`);
+		await ApiService.delete(`/api/goals/${id}`);
 	}, []);
 
 	// Create a wrapper function that converts Goal to CreateGoalData for the API
@@ -153,13 +156,8 @@ export function useGoals() {
 	// Memoized Data
 	// ==========================================
 	const transformedData = useMemo(() => {
-		console.log('[useGoals] Raw goals data:', goals);
 		const transformed = transformGoalData ? transformGoalData(goals) : goals;
-		console.log('[useGoals] Transformed goals data:', transformed);
-		console.log(
-			'[useGoals] Goal IDs after transformation:',
-			transformed.map((g) => g.id)
-		);
+		console.log(`🎯 Goals: ${transformed.length} active`);
 		return transformed;
 	}, [goals, transformGoalData]);
 
