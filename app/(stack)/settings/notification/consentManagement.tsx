@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
 	View,
 	Text,
@@ -10,14 +10,15 @@ import {
 	Alert,
 	ActivityIndicator,
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Picker } from '@react-native-picker/picker';
+import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useNotification } from '../../../../src/context/notificationContext';
 import { NotificationConsent } from '../../../../src/services';
 
 export default function NotificationConsentScreen() {
-	const router = useRouter();
-	const { updateConsentSettings } = useNotification();
+	const { updateConsentSettings, getConsentSettings, sendTestNotification } =
+		useNotification();
 
 	const [consent, setConsent] = useState<NotificationConsent>({
 		core: {
@@ -49,22 +50,28 @@ export default function NotificationConsentScreen() {
 
 	const [loading, setLoading] = useState(false);
 	const [saving, setSaving] = useState(false);
+	const [quietHours, setQuietHours] = useState({
+		enabled: false,
+		start: '22:00',
+		end: '08:00',
+	});
 
-	useEffect(() => {
-		loadConsentSettings();
-	}, []);
-
-	const loadConsentSettings = async () => {
+	const loadConsentSettings = useCallback(async () => {
 		setLoading(true);
 		try {
-			// This would load from the notification service
-			// For now, using default values
+			const settings = await getConsentSettings();
+			setConsent(settings);
 			setLoading(false);
 		} catch (error) {
 			console.error('Error loading consent settings:', error);
+			Alert.alert('Error', 'Failed to load notification preferences');
 			setLoading(false);
 		}
-	};
+	}, [getConsentSettings]);
+
+	useEffect(() => {
+		loadConsentSettings();
+	}, [loadConsentSettings]);
 
 	const updateConsent = (
 		section: keyof NotificationConsent,
@@ -83,13 +90,27 @@ export default function NotificationConsentScreen() {
 	const handleSave = async () => {
 		setSaving(true);
 		try {
-			await updateConsentSettings(consent);
-			Alert.alert('Success', 'Notification preferences updated successfully');
+			const success = await updateConsentSettings(consent);
+			if (success) {
+				Alert.alert('Success', 'Notification preferences updated successfully');
+			} else {
+				Alert.alert('Error', 'Failed to update notification preferences');
+			}
 		} catch (error) {
 			console.error('Error updating consent settings:', error);
 			Alert.alert('Error', 'Failed to update notification preferences');
 		} finally {
 			setSaving(false);
+		}
+	};
+
+	const handleTestNotification = async () => {
+		try {
+			await sendTestNotification();
+			Alert.alert('Test Sent', 'Test notification sent successfully!');
+		} catch (error) {
+			console.error('Error sending test notification:', error);
+			Alert.alert('Error', 'Failed to send test notification');
 		}
 	};
 
@@ -299,6 +320,37 @@ export default function NotificationConsentScreen() {
 									}
 								/>
 							</View>
+
+							<View style={styles.settingRow}>
+								<View style={styles.settingInfo}>
+									<Text style={styles.settingLabel}>Frequency</Text>
+									<Text style={styles.settingDescription}>
+										How often to receive AI insights
+									</Text>
+								</View>
+								<View style={styles.pickerContainer}>
+									<Picker
+										selectedValue={consent.aiInsights.frequency}
+										onValueChange={(
+											value: 'daily' | 'weekly' | 'monthly' | 'disabled'
+										) =>
+											setConsent((prev) => ({
+												...prev,
+												aiInsights: {
+													...prev.aiInsights,
+													frequency: value,
+												},
+											}))
+										}
+										style={styles.picker}
+									>
+										<Picker.Item label="Daily" value="daily" />
+										<Picker.Item label="Weekly" value="weekly" />
+										<Picker.Item label="Monthly" value="monthly" />
+										<Picker.Item label="Disabled" value="disabled" />
+									</Picker>
+								</View>
+							</View>
 						</>
 					)}
 				</View>
@@ -475,6 +527,93 @@ export default function NotificationConsentScreen() {
 					)}
 				</View>
 
+				{/* Quiet Hours */}
+				<View style={styles.section}>
+					<Text style={styles.sectionTitle}>Quiet Hours</Text>
+					<Text style={styles.sectionDescription}>
+						Set times when you don&apos;t want to receive notifications
+					</Text>
+
+					<View style={styles.settingRow}>
+						<View style={styles.settingInfo}>
+							<Text style={styles.settingLabel}>Enable Quiet Hours</Text>
+							<Text style={styles.settingDescription}>
+								Suppress notifications during specified times
+							</Text>
+						</View>
+						<Switch
+							value={quietHours.enabled}
+							onValueChange={(value) =>
+								setQuietHours((prev) => ({ ...prev, enabled: value }))
+							}
+							trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
+							thumbColor={quietHours.enabled ? '#ffffff' : '#9ca3af'}
+						/>
+					</View>
+
+					{quietHours.enabled && (
+						<>
+							<View style={styles.settingRow}>
+								<View style={styles.settingInfo}>
+									<Text style={styles.settingLabel}>Start Time</Text>
+									<Text style={styles.settingDescription}>
+										When to start suppressing notifications
+									</Text>
+								</View>
+								<View style={styles.pickerContainer}>
+									<Picker
+										selectedValue={quietHours.start}
+										onValueChange={(value: string) =>
+											setQuietHours((prev) => ({ ...prev, start: value }))
+										}
+										style={styles.picker}
+									>
+										{Array.from({ length: 24 }, (_, i) => {
+											const hour = i.toString().padStart(2, '0');
+											return (
+												<Picker.Item
+													key={hour}
+													label={`${hour}:00`}
+													value={`${hour}:00`}
+												/>
+											);
+										})}
+									</Picker>
+								</View>
+							</View>
+
+							<View style={styles.settingRow}>
+								<View style={styles.settingInfo}>
+									<Text style={styles.settingLabel}>End Time</Text>
+									<Text style={styles.settingDescription}>
+										When to resume notifications
+									</Text>
+								</View>
+								<View style={styles.pickerContainer}>
+									<Picker
+										selectedValue={quietHours.end}
+										onValueChange={(value: string) =>
+											setQuietHours((prev) => ({ ...prev, end: value }))
+										}
+										style={styles.picker}
+									>
+										{Array.from({ length: 24 }, (_, i) => {
+											const hour = i.toString().padStart(2, '0');
+											return (
+												<Picker.Item
+													key={hour}
+													label={`${hour}:00`}
+													value={`${hour}:00`}
+												/>
+											);
+										})}
+									</Picker>
+								</View>
+							</View>
+						</>
+					)}
+				</View>
+
 				{/* Important Note */}
 				<View style={styles.noteContainer}>
 					<Ionicons
@@ -490,6 +629,15 @@ export default function NotificationConsentScreen() {
 
 				{/* Action Buttons */}
 				<View style={styles.buttonContainer}>
+					<TouchableOpacity
+						style={[styles.button, styles.testButton]}
+						onPress={handleTestNotification}
+						disabled={saving}
+					>
+						<Ionicons name="notifications-outline" size={20} color="#007ACC" />
+						<Text style={styles.testButtonText}>Send Test Notification</Text>
+					</TouchableOpacity>
+
 					<TouchableOpacity
 						style={[styles.button, styles.resetButton]}
 						onPress={handleResetToDefaults}
@@ -612,6 +760,18 @@ const styles = StyleSheet.create({
 		borderRadius: 12,
 		alignItems: 'center',
 		justifyContent: 'center',
+		flexDirection: 'row',
+		gap: 8,
+	},
+	testButton: {
+		backgroundColor: 'transparent',
+		borderWidth: 1,
+		borderColor: '#007ACC',
+	},
+	testButtonText: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#007ACC',
 	},
 	resetButton: {
 		backgroundColor: 'transparent',
@@ -630,5 +790,14 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		fontWeight: '600',
 		color: '#ffffff',
+	},
+	pickerContainer: {
+		minWidth: 120,
+		height: 40,
+		justifyContent: 'center',
+	},
+	picker: {
+		height: 40,
+		width: 120,
 	},
 });

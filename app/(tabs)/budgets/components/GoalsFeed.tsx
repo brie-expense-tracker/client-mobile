@@ -5,6 +5,8 @@ import {
 	FlatList,
 	TouchableOpacity,
 	StyleSheet,
+	ActivityIndicator,
+	RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useGoals } from '../../../../src/hooks/useGoals';
@@ -13,9 +15,6 @@ import LinearProgressBar from './LinearProgressBar';
 import { router } from 'expo-router';
 
 type GoalStatus = 'ongoing' | 'completed' | 'cancelled';
-
-const currency = (n: number) =>
-	`$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
 const daysLeft = (deadline: string) => {
 	const end = new Date(deadline).setHours(0, 0, 0, 0);
@@ -56,7 +55,6 @@ function GoalRow({
 }) {
 	const status = getGoalStatus(goal);
 	const dl = daysLeft(goal.deadline);
-	const left = Math.max(goal.target - goal.current, 0);
 	const progressPercent =
 		goal.target > 0 ? Math.min((goal.current / goal.target) * 100, 100) : 0;
 
@@ -161,12 +159,18 @@ type TabKey = (typeof TABS)[number]['key'];
 export default function GoalsFeed({
 	scrollEnabled = true,
 	onPressMenu,
+	goals: externalGoals,
 }: {
 	scrollEnabled?: boolean;
 	onPressMenu?: (id: string) => void;
+	goals?: Goal[];
 }) {
 	const [tab, setTab] = useState<TabKey>('all');
-	const { goals, isLoading } = useGoals();
+	const [refreshing, setRefreshing] = useState(false);
+	const { goals: hookGoals, isLoading, refetch } = useGoals();
+
+	// Use external goals if provided, otherwise use hook goals
+	const goals = externalGoals || hookGoals;
 
 	// Filter goals based on selected tab
 	const filtered = useMemo(() => {
@@ -176,6 +180,44 @@ export default function GoalsFeed({
 			(goal) => goal && goal.id && getGoalStatus(goal) === tab
 		);
 	}, [tab, goals]);
+
+	const handleRefresh = async () => {
+		if (!refetch) return;
+		setRefreshing(true);
+		try {
+			await refetch();
+		} catch (error) {
+			console.error('Error refreshing goals:', error);
+		} finally {
+			setRefreshing(false);
+		}
+	};
+
+	const getEmptyStateMessage = () => {
+		switch (tab) {
+			case 'ongoing':
+				return 'No active goals';
+			case 'completed':
+				return 'No completed goals';
+			case 'cancelled':
+				return 'No overdue goals';
+			default:
+				return 'No goals found';
+		}
+	};
+
+	const getEmptyStateSubtitle = () => {
+		switch (tab) {
+			case 'ongoing':
+				return 'Create a new goal to start tracking your progress';
+			case 'completed':
+				return 'Complete some goals to see them here';
+			case 'cancelled':
+				return 'All your goals are on track!';
+			default:
+				return 'Add your first goal to get started';
+		}
+	};
 
 	return (
 		<View style={styles.screen}>
@@ -206,8 +248,9 @@ export default function GoalsFeed({
 			</View>
 
 			{isLoading ? (
-				<View style={styles.emptyState}>
-					<Text style={styles.emptyText}>Loading goals...</Text>
+				<View style={styles.loadingState}>
+					<ActivityIndicator size="large" color="#007ACC" />
+					<Text style={styles.loadingText}>Loading goals...</Text>
 				</View>
 			) : filtered && filtered.length > 0 ? (
 				<FlatList
@@ -222,10 +265,29 @@ export default function GoalsFeed({
 					ItemSeparatorComponent={() => <View style={styles.separator} />}
 					contentContainerStyle={{ paddingBottom: 24 }}
 					scrollEnabled={scrollEnabled}
+					refreshControl={
+						<RefreshControl
+							refreshing={refreshing}
+							onRefresh={handleRefresh}
+							tintColor="#007ACC"
+							colors={['#007ACC']}
+						/>
+					}
 				/>
 			) : (
 				<View style={styles.emptyState}>
-					<Text style={styles.emptyText}>No goals found</Text>
+					<Ionicons name="flag-outline" size={48} color="#d1d5db" />
+					<Text style={styles.emptyTitle}>{getEmptyStateMessage()}</Text>
+					<Text style={styles.emptySubtitle}>{getEmptyStateSubtitle()}</Text>
+					{tab === 'all' && (
+						<TouchableOpacity
+							style={styles.addGoalButton}
+							onPress={() => router.push('/(stack)/addGoal')}
+						>
+							<Ionicons name="add" size={16} color="#007ACC" />
+							<Text style={styles.addGoalButtonText}>Add Goal</Text>
+						</TouchableOpacity>
+					)}
 				</View>
 			)}
 		</View>
@@ -305,15 +367,54 @@ const styles = StyleSheet.create({
 	},
 
 	kebabHit: { paddingLeft: 4, paddingTop: 4, marginLeft: 4 },
-	emptyState: {
+	loadingState: {
 		flex: 1,
 		justifyContent: 'center',
 		alignItems: 'center',
 		paddingVertical: 40,
 	},
-	emptyText: {
+	loadingText: {
 		fontSize: 16,
 		color: '#71717a',
 		textAlign: 'center',
+		marginTop: 12,
+	},
+	emptyState: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		paddingVertical: 40,
+		paddingHorizontal: 32,
+	},
+	emptyTitle: {
+		fontSize: 18,
+		fontWeight: '600',
+		color: '#374151',
+		textAlign: 'center',
+		marginTop: 16,
+	},
+	emptySubtitle: {
+		fontSize: 14,
+		color: '#6b7280',
+		textAlign: 'center',
+		marginTop: 8,
+		lineHeight: 20,
+	},
+	addGoalButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingHorizontal: 16,
+		paddingVertical: 10,
+		borderRadius: 20,
+		backgroundColor: '#f0f8ff',
+		borderWidth: 1,
+		borderColor: '#007ACC',
+		marginTop: 20,
+	},
+	addGoalButtonText: {
+		marginLeft: 6,
+		fontSize: 14,
+		fontWeight: '500',
+		color: '#007ACC',
 	},
 });

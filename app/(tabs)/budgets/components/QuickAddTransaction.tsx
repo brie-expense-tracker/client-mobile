@@ -8,10 +8,12 @@ import {
 	ScrollView,
 	KeyboardAvoidingView,
 	Platform,
+	ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BorderlessButton, RectButton } from 'react-native-gesture-handler';
 import RNModal from 'react-native-modal';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { TransactionContext } from '../../../../src/context/transactionContext';
 // Transaction interface defined inline since we removed the mock data file
 interface Transaction {
@@ -53,8 +55,9 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 		amount: '',
 		date: new Date().toISOString().split('T')[0],
 	});
+	const [isLoading, setIsLoading] = useState(false);
+	const [showDatePicker, setShowDatePicker] = useState(false);
 	const amountInputRef = useRef<TextInput>(null);
-	const [isPressed, setIsPressed] = useState(false);
 	// Reset form when modal opens
 	useEffect(() => {
 		if (isVisible) {
@@ -128,6 +131,7 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 		// For goals, both income and expense transactions are now allowed
 		// Income adds to goal progress, expense subtracts from goal progress
 
+		setIsLoading(true);
 		try {
 			// Validate that we have a goalId for proper linking
 			if (!goalId) {
@@ -169,14 +173,28 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 		} catch (error) {
 			console.error('Error adding transaction:', error);
 			Alert.alert('Error', 'Failed to add transaction. Please try again.');
+		} finally {
+			setIsLoading(false);
 		}
 	};
 
-	const handleTypeToggle = () => {
-		setTransaction((prev) => ({
-			...prev,
-			type: prev.type === 'income' ? 'expense' : 'income',
-		}));
+	const handleDateChange = (event: any, selectedDate?: Date) => {
+		setShowDatePicker(false);
+		if (selectedDate) {
+			setTransaction((prev) => ({
+				...prev,
+				date: selectedDate.toISOString().split('T')[0],
+			}));
+		}
+	};
+
+	const formatDate = (dateString: string) => {
+		const date = new Date(dateString);
+		return date.toLocaleDateString('en-US', {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric',
+		});
 	};
 
 	return (
@@ -197,10 +215,7 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 						<Text style={styles.modalTitle}>
 							{goalName ? `Add to ${goalName}` : 'Quick Add Transaction'}
 						</Text>
-						<BorderlessButton
-							onPress={onClose}
-							onActiveStateChange={setIsPressed}
-						>
+						<BorderlessButton onPress={onClose}>
 							<Ionicons name="close" size={24} color="#757575" />
 						</BorderlessButton>
 					</View>
@@ -222,6 +237,9 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 								onPress={() =>
 									setTransaction((prev) => ({ ...prev, type: 'income' }))
 								}
+								accessibilityLabel="Income transaction type"
+								accessibilityRole="button"
+								accessibilityState={{ selected: transaction.type === 'income' }}
 							>
 								<Ionicons
 									name="arrow-up-circle"
@@ -248,6 +266,11 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 								]}
 								onPress={() => {
 									setTransaction((prev) => ({ ...prev, type: 'expense' }));
+								}}
+								accessibilityLabel="Expense transaction type"
+								accessibilityRole="button"
+								accessibilityState={{
+									selected: transaction.type === 'expense',
 								}}
 							>
 								<Ionicons
@@ -297,8 +320,25 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 									placeholderTextColor="#9E9E9E"
 									autoComplete="off"
 									autoCorrect={false}
+									accessibilityLabel="Transaction amount"
+									accessibilityHint="Enter the amount for this transaction"
 								/>
 							</View>
+						</View>
+
+						{/* Date Input */}
+						<View style={styles.formGroup}>
+							<Text style={styles.label}>Date</Text>
+							<RectButton
+								style={styles.dateButton}
+								onPress={() => setShowDatePicker(true)}
+							>
+								<Ionicons name="calendar-outline" size={20} color="#757575" />
+								<Text style={styles.dateButtonText}>
+									{formatDate(transaction.date)}
+								</Text>
+								<Ionicons name="chevron-down" size={16} color="#757575" />
+							</RectButton>
 						</View>
 
 						{/* Description Input */}
@@ -315,19 +355,40 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 								autoComplete="off"
 								autoCorrect={false}
 								returnKeyType="done"
+								accessibilityLabel="Transaction description"
 							/>
 						</View>
 
 						{/* Submit Button */}
 						<RectButton
-							style={[styles.submitButton, { backgroundColor: goalColor }]}
-							onPress={handleSubmit}
+							style={[
+								styles.submitButton,
+								{ backgroundColor: goalColor },
+								isLoading && styles.submitButtonDisabled,
+							]}
+							onPress={isLoading ? undefined : handleSubmit}
 						>
-							<Text style={styles.submitButtonText}>Add Transaction</Text>
+							{isLoading ? (
+								<ActivityIndicator color="#FFFFFF" size="small" />
+							) : (
+								<Text style={styles.submitButtonText}>Add Transaction</Text>
+							)}
 						</RectButton>
 					</ScrollView>
 				</View>
 			</KeyboardAvoidingView>
+
+			{/* Date Picker Modal */}
+			{showDatePicker && (
+				<DateTimePicker
+					value={new Date(transaction.date)}
+					mode="date"
+					display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+					onChange={handleDateChange}
+					maximumDate={new Date()}
+					accessibilityLabel="Select transaction date"
+				/>
+			)}
 		</RNModal>
 	);
 };
@@ -427,10 +488,27 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		marginTop: 8,
 	},
+	submitButtonDisabled: {
+		opacity: 0.6,
+	},
 	submitButtonText: {
 		color: '#FFFFFF',
 		fontSize: 16,
 		fontWeight: '600',
+	},
+	dateButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#F5F5F5',
+		borderRadius: 12,
+		paddingHorizontal: 16,
+		paddingVertical: 16,
+		gap: 12,
+	},
+	dateButtonText: {
+		flex: 1,
+		fontSize: 16,
+		color: '#212121',
 	},
 
 	helpTextContainer: {

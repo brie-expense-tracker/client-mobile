@@ -9,13 +9,10 @@ import {
 	Alert,
 	ActivityIndicator,
 	SafeAreaView,
-	Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useBudgets } from '../../src/hooks/useBudgets';
-
-const { width } = Dimensions.get('window');
 
 // Popular budget icons
 const budgetIcons: (keyof typeof Ionicons.glyphMap)[] = [
@@ -122,8 +119,41 @@ const AddBudgetScreen: React.FC = () => {
 	const [showIconPicker, setShowIconPicker] = useState(false);
 	const [showColorPicker, setShowColorPicker] = useState(false);
 	const [showCustomAmount, setShowCustomAmount] = useState(false);
-	const [showPeriodPicker, setShowPeriodPicker] = useState(false);
 	const [loading, setLoading] = useState(false);
+	const [rollover, setRollover] = useState(false);
+	const [weekStartDay, setWeekStartDay] = useState<0 | 1>(1);
+	const [monthStartDay, setMonthStartDay] = useState<
+		| 1
+		| 2
+		| 3
+		| 4
+		| 5
+		| 6
+		| 7
+		| 8
+		| 9
+		| 10
+		| 11
+		| 12
+		| 13
+		| 14
+		| 15
+		| 16
+		| 17
+		| 18
+		| 19
+		| 20
+		| 21
+		| 22
+		| 23
+		| 24
+		| 25
+		| 26
+		| 27
+		| 28
+	>(1);
+	const [categories, setCategories] = useState<string[]>([]);
+	const [showCategoriesPicker, setShowCategoriesPicker] = useState(false);
 
 	const { addBudget } = useBudgets();
 
@@ -133,18 +163,24 @@ const AddBudgetScreen: React.FC = () => {
 			return;
 		}
 
+		const amountValue = parseFloat(amount);
+		if (isNaN(amountValue) || amountValue <= 0) {
+			Alert.alert('Error', 'Please enter a valid amount greater than 0');
+			return;
+		}
+
 		setLoading(true);
 		try {
 			await addBudget({
 				name: name.trim(),
-				amount: parseFloat(amount),
+				amount: amountValue,
 				icon,
 				color,
-				categories: [],
+				categories,
 				period,
-				weekStartDay: 1,
-				monthStartDay: 1,
-				rollover: false,
+				weekStartDay,
+				monthStartDay,
+				rollover,
 			});
 
 			Alert.alert('Success', 'Budget added successfully!', [
@@ -475,6 +511,171 @@ const AddBudgetScreen: React.FC = () => {
 							</View>
 						)}
 					</View>
+
+					{/* Rollover Toggle */}
+					<View style={styles.inputGroup}>
+						<Text style={styles.label}>Rollover Unspent Funds</Text>
+						<Text style={styles.subtext}>
+							Carry over unspent money to the next period
+						</Text>
+						<TouchableOpacity
+							style={styles.toggleContainer}
+							onPress={() => setRollover(!rollover)}
+						>
+							<View style={styles.toggleContent}>
+								<Text style={styles.toggleText}>
+									{rollover ? 'Enabled' : 'Disabled'}
+								</Text>
+								<View
+									style={[
+										styles.toggleSwitch,
+										rollover && styles.toggleSwitchActive,
+									]}
+								>
+									<View
+										style={[
+											styles.toggleThumb,
+											rollover && styles.toggleThumbActive,
+										]}
+									/>
+								</View>
+							</View>
+						</TouchableOpacity>
+					</View>
+
+					{/* Week Start Day (for weekly budgets) */}
+					{period === 'weekly' && (
+						<View style={styles.inputGroup}>
+							<Text style={styles.label}>Week Starts On</Text>
+							<Text style={styles.subtext}>
+								Choose which day your week begins
+							</Text>
+							<View style={styles.dayContainer}>
+								<TouchableOpacity
+									style={[
+										styles.dayOption,
+										weekStartDay === 0 && styles.selectedDayOption,
+									]}
+									onPress={() => setWeekStartDay(0)}
+								>
+									<Text
+										style={[
+											styles.dayOptionText,
+											weekStartDay === 0 && styles.selectedDayOptionText,
+										]}
+									>
+										Sunday
+									</Text>
+								</TouchableOpacity>
+								<TouchableOpacity
+									style={[
+										styles.dayOption,
+										weekStartDay === 1 && styles.selectedDayOption,
+									]}
+									onPress={() => setWeekStartDay(1)}
+								>
+									<Text
+										style={[
+											styles.dayOptionText,
+											weekStartDay === 1 && styles.selectedDayOptionText,
+										]}
+									>
+										Monday
+									</Text>
+								</TouchableOpacity>
+							</View>
+						</View>
+					)}
+
+					{/* Month Start Day (for monthly budgets) */}
+					{period === 'monthly' && (
+						<View style={styles.inputGroup}>
+							<Text style={styles.label}>Month Starts On Day</Text>
+							<Text style={styles.subtext}>
+								Choose which day of the month your budget resets
+							</Text>
+							<View style={styles.monthDayContainer}>
+								{Array.from({ length: 28 }, (_, i) => i + 1).map((day) => (
+									<TouchableOpacity
+										key={day}
+										style={[
+											styles.monthDayOption,
+											monthStartDay === day && styles.selectedMonthDayOption,
+										]}
+										onPress={() => setMonthStartDay(day as any)}
+									>
+										<Text
+											style={[
+												styles.monthDayOptionText,
+												monthStartDay === day &&
+													styles.selectedMonthDayOptionText,
+											]}
+										>
+											{day}
+										</Text>
+									</TouchableOpacity>
+								))}
+							</View>
+						</View>
+					)}
+
+					{/* Categories Selection */}
+					<View style={styles.inputGroup}>
+						<Text style={styles.label}>Categories (Optional)</Text>
+						<Text style={styles.subtext}>
+							Add categories to help organize your budget
+						</Text>
+						<TouchableOpacity
+							style={styles.categoriesButton}
+							onPress={() => setShowCategoriesPicker(!showCategoriesPicker)}
+						>
+							<View style={styles.categoriesButtonContent}>
+								<Text style={styles.categoriesButtonText}>
+									{categories.length > 0
+										? `${categories.length} categories selected`
+										: 'Add categories'}
+								</Text>
+								<Ionicons
+									name={showCategoriesPicker ? 'chevron-up' : 'chevron-down'}
+									size={20}
+									color="#757575"
+								/>
+							</View>
+						</TouchableOpacity>
+
+						{showCategoriesPicker && (
+							<View style={styles.categoriesContainer}>
+								<TextInput
+									style={styles.categoryInput}
+									placeholder="Enter category name"
+									placeholderTextColor="#999"
+									onSubmitEditing={(e) => {
+										const category = e.nativeEvent.text.trim();
+										if (category && !categories.includes(category)) {
+											setCategories([...categories, category]);
+											e.nativeEvent.text = '';
+										}
+									}}
+								/>
+								<View style={styles.categoriesList}>
+									{categories.map((category, index) => (
+										<View key={index} style={styles.categoryChip}>
+											<Text style={styles.categoryChipText}>{category}</Text>
+											<TouchableOpacity
+												onPress={() =>
+													setCategories(
+														categories.filter((_, i) => i !== index)
+													)
+												}
+											>
+												<Ionicons name="close" size={16} color="#757575" />
+											</TouchableOpacity>
+										</View>
+									))}
+								</View>
+							</View>
+						)}
+					</View>
 				</View>
 			</ScrollView>
 		</SafeAreaView>
@@ -714,6 +915,155 @@ const styles = StyleSheet.create({
 		borderRadius: 8,
 		justifyContent: 'center',
 		alignItems: 'center',
+	},
+	// Toggle styles
+	toggleContainer: {
+		backgroundColor: '#F5F5F5',
+		borderRadius: 12,
+		padding: 16,
+	},
+	toggleContent: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	toggleText: {
+		fontSize: 16,
+		color: '#212121',
+		fontWeight: '500',
+	},
+	toggleSwitch: {
+		width: 50,
+		height: 30,
+		borderRadius: 15,
+		backgroundColor: '#E0E0E0',
+		justifyContent: 'center',
+		paddingHorizontal: 2,
+	},
+	toggleSwitchActive: {
+		backgroundColor: '#007ACC',
+	},
+	toggleThumb: {
+		width: 26,
+		height: 26,
+		borderRadius: 13,
+		backgroundColor: '#FFFFFF',
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.2,
+		shadowRadius: 2,
+		elevation: 2,
+	},
+	toggleThumbActive: {
+		transform: [{ translateX: 20 }],
+	},
+	// Day selection styles
+	dayContainer: {
+		flexDirection: 'row',
+		gap: 12,
+	},
+	dayOption: {
+		flex: 1,
+		padding: 16,
+		borderRadius: 12,
+		backgroundColor: 'white',
+		borderWidth: 1,
+		borderColor: '#E0E0E0',
+		alignItems: 'center',
+	},
+	selectedDayOption: {
+		borderColor: '#007ACC',
+		backgroundColor: '#007ACC',
+	},
+	dayOptionText: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#212121',
+	},
+	selectedDayOptionText: {
+		color: '#fff',
+		fontWeight: '600',
+	},
+	// Month day selection styles
+	monthDayContainer: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		gap: 8,
+	},
+	monthDayOption: {
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+		backgroundColor: 'white',
+		borderWidth: 1,
+		borderColor: '#E0E0E0',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	selectedMonthDayOption: {
+		borderColor: '#007ACC',
+		backgroundColor: '#007ACC',
+	},
+	monthDayOptionText: {
+		fontSize: 14,
+		fontWeight: '600',
+		color: '#212121',
+	},
+	selectedMonthDayOptionText: {
+		color: '#fff',
+		fontWeight: '600',
+	},
+	// Categories styles
+	categoriesButton: {
+		backgroundColor: '#F5F5F5',
+		borderRadius: 12,
+		padding: 16,
+	},
+	categoriesButtonContent: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	categoriesButtonText: {
+		fontSize: 16,
+		color: '#212121',
+		flex: 1,
+	},
+	categoriesContainer: {
+		marginTop: 8,
+		padding: 12,
+		backgroundColor: '#F9F9F9',
+		borderRadius: 8,
+	},
+	categoryInput: {
+		borderWidth: 1,
+		borderColor: '#E0E0E0',
+		borderRadius: 8,
+		paddingHorizontal: 12,
+		paddingVertical: 10,
+		fontSize: 16,
+		color: '#0a0a0a',
+		backgroundColor: '#ffffff',
+		marginBottom: 12,
+	},
+	categoriesList: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		gap: 8,
+	},
+	categoryChip: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#E3F2FD',
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		borderRadius: 16,
+		gap: 6,
+	},
+	categoryChipText: {
+		fontSize: 14,
+		color: '#1976D2',
+		fontWeight: '500',
 	},
 });
 

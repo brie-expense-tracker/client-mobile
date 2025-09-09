@@ -30,6 +30,13 @@ export interface RecurringExpenseAlert {
 }
 
 export class RecurringExpenseService {
+	// Cache for payment status checks to prevent duplicate API calls
+	private static paymentStatusCache = new Map<
+		string,
+		{ result: boolean | null; timestamp: number }
+	>();
+	private static CACHE_DURATION = 30000; // 30 seconds
+
 	/**
 	 * Detect recurring patterns for the current user
 	 */
@@ -329,6 +336,13 @@ export class RecurringExpenseService {
 		patternId: string
 	): Promise<boolean | null> {
 		try {
+			// Check cache first
+			const cached = this.paymentStatusCache.get(patternId);
+			if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
+				console.log(`🔍 Using cached payment status for ${patternId}`);
+				return cached.result;
+			}
+
 			console.log(`🔍 Checking payment status for ${patternId}`);
 			const response = await ApiService.get<{ isPaid: boolean | null }>(
 				`/api/recurring-expenses/${patternId}/paid`
@@ -341,6 +355,13 @@ export class RecurringExpenseService {
 						isPaid === null ? 'Unknown' : isPaid ? 'Paid' : 'Unpaid'
 					}`
 				);
+
+				// Cache the result
+				this.paymentStatusCache.set(patternId, {
+					result: isPaid,
+					timestamp: Date.now(),
+				});
+
 				return isPaid;
 			}
 
@@ -351,6 +372,77 @@ export class RecurringExpenseService {
 				error
 			);
 			return null;
+		}
+	}
+
+	/**
+	 * Check paid status for multiple recurring expenses in a single request
+	 */
+	static async checkBatchPaidStatus(
+		patternIds: string[]
+	): Promise<Record<string, boolean | null>> {
+		try {
+			if (patternIds.length === 0) return {};
+
+			// Check cache for all IDs first
+			const uncachedIds: string[] = [];
+			const cachedResults: Record<string, boolean | null> = {};
+
+			for (const patternId of patternIds) {
+				const cached = this.paymentStatusCache.get(patternId);
+				if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
+					cachedResults[patternId] = cached.result;
+				} else {
+					uncachedIds.push(patternId);
+				}
+			}
+
+			// If all are cached, return cached results
+			if (uncachedIds.length === 0) {
+				console.log(
+					`🔍 Using cached payment status for all ${patternIds.length} expenses`
+				);
+				return cachedResults;
+			}
+
+			console.log(
+				`🔍 Batch checking payment status for ${uncachedIds.length} expenses`
+			);
+			const response = await ApiService.get<Record<string, boolean | null>>(
+				`/api/recurring-expenses/paid/status?ids=${uncachedIds.join(',')}`
+			);
+
+			if (response.success && response.data) {
+				const batchResults = response.data;
+
+				// Cache the new results
+				Object.entries(batchResults).forEach(([patternId, isPaid]) => {
+					this.paymentStatusCache.set(patternId, {
+						result: isPaid,
+						timestamp: Date.now(),
+					});
+				});
+
+				// Combine cached and new results
+				const allResults = { ...cachedResults, ...batchResults };
+
+				console.log(`💰 Batch payment status:`, allResults);
+				return allResults;
+			}
+
+			// If batch request fails, return cached results only
+			return cachedResults;
+		} catch (error) {
+			console.error('❌ Error checking batch payment status:', error);
+			// Return cached results if available
+			const cachedResults: Record<string, boolean | null> = {};
+			patternIds.forEach((patternId) => {
+				const cached = this.paymentStatusCache.get(patternId);
+				if (cached) {
+					cachedResults[patternId] = cached.result;
+				}
+			});
+			return cachedResults;
 		}
 	}
 

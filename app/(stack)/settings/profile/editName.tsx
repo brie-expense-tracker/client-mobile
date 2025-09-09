@@ -69,14 +69,6 @@ export default function EditNameScreen() {
 		setLastName(validatedText);
 	};
 
-	// Check if form is valid
-	const isFormValid = () => {
-		return (
-			!getValidationError('firstName') &&
-			!getValidationError('lastName') &&
-			hasAnyNameChanges
-		);
-	};
 
 	useEffect(() => {
 		if (profile) {

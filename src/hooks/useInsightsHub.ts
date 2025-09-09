@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useContext } from 'react';
+import { useState, useCallback, useMemo, useContext } from 'react';
 import { Alert } from 'react-native';
 import { InsightsService, AIInsight, InsightsResponse } from '../services';
 import { useBudget } from '../context/budgetContext';
@@ -56,32 +56,40 @@ export interface UseInsightsHubReturn {
 	loadingInsights: boolean;
 	generating: boolean;
 	refreshing: boolean;
+	unreadCount: number;
+	loadingUnreadCount: boolean;
+	error: string | null;
+	isReady: boolean;
 	onRefresh: () => Promise<void>;
 	fetchInsights: () => Promise<void>;
 	generateNewInsights: () => Promise<void>;
+	generateProfileBasedInsights: () => Promise<void>;
 	markInsightAsRead: (insightId: string) => Promise<void>;
+	getInsightDetail: (insightId: string) => Promise<AIInsight | null>;
+	refreshAfterActions: () => Promise<void>;
+	fetchUnreadCount: () => Promise<void>;
+	clearError: () => void;
 }
 
 export function useInsightsHub(period: Period): UseInsightsHubReturn {
 	const { budgets } = useBudget();
 	const { goals } = useGoal();
-	const {
-		transactions,
-		isLoading: transactionsLoading,
-		refetch: refetchTransactions,
-	} = useContext(TransactionContext);
+	const { transactions } = useContext(TransactionContext);
 	const { profile } = useProfile();
 
 	const [insights, setInsights] = useState<AIInsight[] | null>(null);
 	const [loadingInsights, setLoadingInsights] = useState(false); // Changed to false to not auto-load
 	const [generating, setGenerating] = useState(false);
 	const [refreshing, setRefreshing] = useState(false);
+	const [unreadCount, setUnreadCount] = useState(0);
+	const [loadingUnreadCount, setLoadingUnreadCount] = useState(false);
+	const [error, setError] = useState<string | null>(null);
 
 	// Check if AI insights are enabled for this user
 	const aiInsightsEnabled = profile?.preferences?.aiInsights?.enabled ?? true;
 
-	// Calculate summary data for the selected period
-	const summary = useMemo((): SummaryData => {
+	// Memoized period date calculation
+	const periodDates = useMemo(() => {
 		const now = new Date();
 		const start = new Date();
 
@@ -97,11 +105,19 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 				break;
 		}
 
-		const periodTransactions = transactions.filter((tx) => {
-			const txDate = new Date(tx.date);
-			return txDate >= start && txDate <= now;
-		});
+		return { start, end: now };
+	}, [period]);
 
+	// Memoized period transactions
+	const periodTransactions = useMemo(() => {
+		return transactions.filter((tx) => {
+			const txDate = new Date(tx.date);
+			return txDate >= periodDates.start && txDate <= periodDates.end;
+		});
+	}, [transactions, periodDates]);
+
+	// Memoized income and expenses calculation
+	const incomeExpenses = useMemo(() => {
 		const totalIncome = periodTransactions
 			.filter((tx) => tx.type === 'income')
 			.reduce((sum, tx) => sum + tx.amount, 0);
@@ -110,9 +126,15 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 			.filter((tx) => tx.type === 'expense')
 			.reduce((sum, tx) => sum + tx.amount, 0);
 
-		const netSavings = totalIncome - totalExpenses;
+		return {
+			totalIncome,
+			totalExpenses,
+			netSavings: totalIncome - totalExpenses,
+		};
+	}, [periodTransactions]);
 
-		// Calculate budget utilization
+	// Memoized budget calculations
+	const budgetData = useMemo(() => {
 		const totalBudgetAllocated = budgets.reduce(
 			(sum, budget) => sum + budget.amount,
 			0
@@ -126,42 +148,54 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 				? (totalBudgetSpent / totalBudgetAllocated) * 100
 				: 0;
 
-		// Calculate goal progress
+		return {
+			used: totalBudgetSpent,
+			total: totalBudgetAllocated,
+			percentage: budgetUtilization,
+		};
+	}, [budgets]);
+
+	// Memoized goal calculations
+	const goalData = useMemo(() => {
 		const totalGoalTarget = goals.reduce((sum, goal) => sum + goal.target, 0);
 		const totalGoalCurrent = goals.reduce((sum, goal) => sum + goal.current, 0);
 		const goalProgress =
 			totalGoalTarget > 0 ? (totalGoalCurrent / totalGoalTarget) * 100 : 0;
 
+		return {
+			name: goals.length > 0 ? goals[0].name : 'No Goals',
+			current: totalGoalCurrent,
+			target: totalGoalTarget,
+			percentage: goalProgress,
+		};
+	}, [goals]);
+
+	// Calculate summary data for the selected period
+	const summary = useMemo((): SummaryData => {
 		// Calculate financial health score
-		const savingsRate = totalIncome > 0 ? (netSavings / totalIncome) * 100 : 0;
+		const savingsRate =
+			incomeExpenses.totalIncome > 0
+				? (incomeExpenses.netSavings / incomeExpenses.totalIncome) * 100
+				: 0;
 		const budgetAdherence = Math.max(
 			0,
-			100 - Math.abs(budgetUtilization - 100)
+			100 - Math.abs(budgetData.percentage - 100)
 		);
-		const goalProgressScore = goalProgress;
+		const goalProgressScore = goalData.percentage;
 		const financialHealthScore = Math.min(
 			100,
 			savingsRate * 0.4 + budgetAdherence * 0.3 + goalProgressScore * 0.3
 		);
 
 		return {
-			totalIncome,
-			totalExpenses,
-			netSavings,
-			budgetUtilization: {
-				used: totalBudgetSpent,
-				total: totalBudgetAllocated,
-				percentage: budgetUtilization,
-			},
-			goalProgress: {
-				name: goals.length > 0 ? goals[0].name : 'No Goals',
-				current: totalGoalCurrent,
-				target: totalGoalTarget,
-				percentage: goalProgress,
-			},
+			totalIncome: incomeExpenses.totalIncome,
+			totalExpenses: incomeExpenses.totalExpenses,
+			netSavings: incomeExpenses.netSavings,
+			budgetUtilization: budgetData,
+			goalProgress: goalData,
 			financialHealthScore,
 		};
-	}, [period, transactions, budgets, goals]);
+	}, [incomeExpenses, budgetData, goalData]);
 
 	// Calculate report data for export
 	const reportData = useMemo((): ReportData => {
@@ -181,6 +215,7 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 
 		try {
 			setLoadingInsights(true);
+			setError(null); // Clear any previous errors
 
 			// Set a timeout to prevent long loading
 			const timeoutPromise = new Promise((_, reject) => {
@@ -211,6 +246,7 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 				// Check if response had specific errors
 				if (response.error) {
 					console.log('Insights fetch error:', response.error);
+					setError(response.error);
 					setInsights([]);
 				} else {
 					setInsights([]);
@@ -218,7 +254,9 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 			}
 		} catch (error) {
 			console.error('Error fetching insights:', error);
-			// Don't show alert, just set empty insights
+			const errorMessage =
+				error instanceof Error ? error.message : 'Failed to fetch insights';
+			setError(errorMessage);
 			setInsights([]);
 		} finally {
 			setLoadingInsights(false);
@@ -375,6 +413,180 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 		}
 	}, [period, aiInsightsEnabled]); // Remove refetchTransactions from dependencies
 
+	// Fetch unread count
+	const fetchUnreadCount = useCallback(async () => {
+		if (!aiInsightsEnabled) {
+			return;
+		}
+
+		try {
+			setLoadingUnreadCount(true);
+			setError(null);
+			const response = await InsightsService.getUnreadCount();
+
+			if (response.success && response.data) {
+				setUnreadCount(response.data.unreadCount);
+			} else {
+				setError('Failed to fetch unread count');
+			}
+		} catch (error) {
+			console.error('Error fetching unread count:', error);
+			const errorMessage =
+				error instanceof Error ? error.message : 'Failed to fetch unread count';
+			setError(errorMessage);
+		} finally {
+			setLoadingUnreadCount(false);
+		}
+	}, [aiInsightsEnabled]);
+
+	// Get insight detail by ID
+	const getInsightDetail = useCallback(
+		async (insightId: string): Promise<AIInsight | null> => {
+			if (!aiInsightsEnabled) {
+				return null;
+			}
+
+			try {
+				setError(null);
+				const response = await InsightsService.getInsightDetail(insightId);
+				return response.success && response.data ? response.data : null;
+			} catch (error) {
+				console.error('Error fetching insight detail:', error);
+				const errorMessage =
+					error instanceof Error
+						? error.message
+						: 'Failed to fetch insight detail';
+				setError(errorMessage);
+				return null;
+			}
+		},
+		[aiInsightsEnabled]
+	);
+
+	// Generate profile-based weekly insights
+	const generateProfileBasedInsights = useCallback(async () => {
+		if (!aiInsightsEnabled) {
+			console.log(
+				'AI insights are disabled for this user. Skipping profile-based insights generation.'
+			);
+			return;
+		}
+
+		try {
+			console.log(
+				'generateProfileBasedInsights - Starting generation process...'
+			);
+			setGenerating(true);
+
+			const response =
+				await InsightsService.generateProfileBasedWeeklyInsights();
+
+			console.log('Profile-based generation response:', {
+				success: response.success,
+				dataLength: response.data?.length,
+				error: response.error,
+			});
+
+			if (response.success && response.data && Array.isArray(response.data)) {
+				// Sort by most recent and take top 3
+				const sortedInsights = response.data
+					.sort(
+						(a, b) =>
+							new Date(b.generatedAt).getTime() -
+							new Date(a.generatedAt).getTime()
+					)
+					.slice(0, 3);
+
+				console.log(
+					'generateProfileBasedInsights - Setting insights:',
+					sortedInsights.length
+				);
+				setInsights(sortedInsights);
+
+				// If we have insights, show success message
+				if (sortedInsights.length > 0) {
+					console.log(
+						'generateProfileBasedInsights - Success! Generated insights:',
+						sortedInsights.length
+					);
+					Alert.alert(
+						'Success',
+						`Generated ${sortedInsights.length} personalized insights!`,
+						[{ text: 'OK' }]
+					);
+				}
+			} else {
+				console.log('No profile-based insights generated, setting empty array');
+				setInsights([]);
+			}
+		} catch (error) {
+			console.error('Error generating profile-based insights:', error);
+			Alert.alert(
+				'Error',
+				'Failed to generate personalized insights. Please try again.'
+			);
+		} finally {
+			setGenerating(false);
+		}
+	}, [aiInsightsEnabled]);
+
+	// Refresh insights after actions are completed
+	const refreshAfterActions = useCallback(async () => {
+		if (!aiInsightsEnabled) {
+			console.log(
+				'AI insights are disabled for this user. Skipping refresh after actions.'
+			);
+			return;
+		}
+
+		try {
+			setRefreshing(true);
+			console.log(`🔄 Refreshing insights after actions for period: ${period}`);
+
+			const insightsPeriod = convertPeriodToInsightsPeriod(period);
+			const response = await InsightsService.refreshInsightsAfterActions(
+				insightsPeriod
+			);
+
+			if (response.success && response.data && Array.isArray(response.data)) {
+				const sortedInsights = response.data
+					.sort(
+						(a: AIInsight, b: AIInsight) =>
+							new Date(b.generatedAt).getTime() -
+							new Date(a.generatedAt).getTime()
+					)
+					.slice(0, 3);
+
+				console.log(
+					`✅ Refreshed ${sortedInsights.length} insights after actions for ${period}`
+				);
+				setInsights(sortedInsights);
+			} else {
+				setInsights([]);
+			}
+		} catch (error) {
+			console.error('Error refreshing insights after actions:', error);
+			setInsights([]);
+		} finally {
+			setRefreshing(false);
+		}
+	}, [period, aiInsightsEnabled]);
+
+	// Clear error function
+	const clearError = useCallback(() => {
+		setError(null);
+	}, []);
+
+	// Check if hook is ready (has required data and AI insights are enabled)
+	const isReady = useMemo(() => {
+		return (
+			aiInsightsEnabled &&
+			transactions.length >= 0 &&
+			budgets.length >= 0 &&
+			goals.length >= 0
+		);
+	}, [aiInsightsEnabled, transactions.length, budgets.length, goals.length]);
+
 	// Removed automatic fetch - now controlled by useFocusEffect in components
 
 	return {
@@ -384,9 +596,18 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 		loadingInsights,
 		generating,
 		refreshing,
+		unreadCount,
+		loadingUnreadCount,
+		error,
+		isReady,
 		onRefresh,
 		fetchInsights,
 		generateNewInsights,
+		generateProfileBasedInsights,
 		markInsightAsRead,
+		getInsightDetail,
+		refreshAfterActions,
+		fetchUnreadCount,
+		clearError,
 	};
 }

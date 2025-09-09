@@ -6,15 +6,12 @@ import {
 	TouchableOpacity,
 	ScrollView,
 	SafeAreaView,
-	Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRecurringExpenses } from '../../src/hooks/useRecurringExpenses';
 import { RecurringExpense, RecurringExpenseService } from '../../src/services';
 import LinearProgressBar from '../(tabs)/budgets/components/LinearProgressBar';
-
-const { width } = Dimensions.get('window');
 
 interface RecurringTransaction {
 	id: string;

@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { router, Stack } from 'expo-router';
 import { BorderlessButton } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function Layout() {
-	const [isPressed, setIsPressed] = useState(false);
 	return (
 		<Stack>
 			<Stack.Screen
@@ -25,7 +24,6 @@ export default function Layout() {
 					headerLeft: () => (
 						<BorderlessButton
 							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
@@ -51,7 +49,6 @@ export default function Layout() {
 					headerLeft: () => (
 						<BorderlessButton
 							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
@@ -77,7 +74,6 @@ export default function Layout() {
 					headerLeft: () => (
 						<BorderlessButton
 							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
@@ -96,7 +92,6 @@ export default function Layout() {
 					headerLeft: () => (
 						<BorderlessButton
 							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
@@ -126,7 +121,6 @@ export default function Layout() {
 					headerLeft: () => (
 						<BorderlessButton
 							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
@@ -154,7 +148,6 @@ export default function Layout() {
 					headerLeft: () => (
 						<BorderlessButton
 							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
@@ -181,7 +174,6 @@ export default function Layout() {
 					headerLeft: () => (
 						<BorderlessButton
 							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
@@ -208,7 +200,6 @@ export default function Layout() {
 					headerLeft: () => (
 						<BorderlessButton
 							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
@@ -236,7 +227,6 @@ export default function Layout() {
 					headerLeft: () => (
 						<BorderlessButton
 							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
@@ -263,7 +253,6 @@ export default function Layout() {
 					headerLeft: () => (
 						<BorderlessButton
 							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
@@ -290,7 +279,6 @@ export default function Layout() {
 					headerLeft: () => (
 						<BorderlessButton
 							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
@@ -318,7 +306,6 @@ export default function Layout() {
 					headerLeft: () => (
 						<BorderlessButton
 							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
@@ -345,7 +332,6 @@ export default function Layout() {
 					headerLeft: () => (
 						<BorderlessButton
 							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
@@ -373,7 +359,6 @@ export default function Layout() {
 					headerLeft: () => (
 						<BorderlessButton
 							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
@@ -404,7 +389,6 @@ export default function Layout() {
 					headerLeft: () => (
 						<BorderlessButton
 							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
@@ -461,7 +445,6 @@ export default function Layout() {
 					headerLeft: () => (
 						<BorderlessButton
 							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
@@ -487,7 +470,6 @@ export default function Layout() {
 					headerLeft: () => (
 						<BorderlessButton
 							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
@@ -514,7 +496,6 @@ export default function Layout() {
 					headerLeft: () => (
 						<BorderlessButton
 							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
@@ -567,7 +548,6 @@ export default function Layout() {
 					headerLeft: () => (
 						<BorderlessButton
 							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
@@ -594,7 +574,6 @@ export default function Layout() {
 					headerLeft: () => (
 						<BorderlessButton
 							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
@@ -621,7 +600,6 @@ export default function Layout() {
 					headerLeft: () => (
 						<BorderlessButton
 							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
@@ -648,7 +626,6 @@ export default function Layout() {
 					headerLeft: () => (
 						<BorderlessButton
 							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
@@ -676,7 +653,6 @@ export default function Layout() {
 					headerLeft: () => (
 						<BorderlessButton
 							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
@@ -704,7 +680,6 @@ export default function Layout() {
 					headerLeft: () => (
 						<BorderlessButton
 							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
 	Text,
 	View,
@@ -6,6 +6,7 @@ import {
 	Alert,
 	ScrollView,
 	ActivityIndicator,
+	TouchableOpacity,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { RectButton } from 'react-native-gesture-handler';
@@ -23,7 +24,15 @@ export default function GoalsScreen() {
 	// ==========================================
 	// Data Fetching
 	// ==========================================
-	const { goals, deleteGoal, isLoading, hasLoaded, error } = useGoals();
+	const {
+		goals,
+		deleteGoal,
+		isLoading,
+		hasLoaded,
+		error,
+		getGoalsByStatus,
+		sortGoals,
+	} = useGoals();
 
 	// ==========================================
 	// Route Parameters
@@ -37,6 +46,12 @@ export default function GoalsScreen() {
 	const [showQuickAddModal, setShowQuickAddModal] = useState(false);
 	const [selectedGoalForTransaction, setSelectedGoalForTransaction] =
 		useState<Goal | null>(null);
+	const [sortBy, setSortBy] = useState<
+		'name' | 'deadline' | 'progress' | 'target' | 'created'
+	>('deadline');
+	const [filterBy, setFilterBy] = useState<
+		'all' | 'active' | 'completed' | 'overdue'
+	>('all');
 
 	// ==========================================
 	// Memoized Data
@@ -57,6 +72,44 @@ export default function GoalsScreen() {
 			totalCurrent,
 		};
 	}, [goals]);
+
+	// Filter and sort goals
+	const filteredAndSortedGoals = useMemo(() => {
+		let filteredGoals = goals;
+
+		// Apply filter
+		if (filterBy !== 'all') {
+			filteredGoals = getGoalsByStatus(filterBy);
+		}
+
+		// Apply sorting
+		return sortGoals(filteredGoals, sortBy);
+	}, [goals, filterBy, sortBy, getGoalsByStatus, sortGoals]);
+
+	// ==========================================
+	// Modal Handlers
+	// ==========================================
+	const showModal = useCallback(() => {
+		router.push('/(stack)/addGoal');
+	}, [router]);
+
+	const showEditModal = useCallback(
+		(goal: Goal) => {
+			router.push(`/(stack)/editGoal?id=${goal.id}`);
+		},
+		[router]
+	);
+
+	// ==========================================
+	// Goal Management
+	// ==========================================
+	const handleDeleteGoal = async (goalId: string) => {
+		try {
+			await deleteGoal(goalId);
+		} catch (error) {
+			console.error('Error deleting goal:', error);
+		}
+	};
 
 	// ==========================================
 	// Auto-open modal on navigation and refresh data
@@ -82,29 +135,7 @@ export default function GoalsScreen() {
 			}, 100);
 			return () => clearTimeout(timer);
 		}
-	}, [params.openModal]);
-
-	// ==========================================
-	// Goal Management
-	// ==========================================
-	const handleDeleteGoal = async (goalId: string) => {
-		try {
-			await deleteGoal(goalId);
-		} catch (error) {
-			console.error('Error deleting goal:', error);
-		}
-	};
-
-	// ==========================================
-	// Modal Handlers
-	// ==========================================
-	const showModal = () => {
-		router.push('/(stack)/addGoal');
-	};
-
-	const showEditModal = (goal: Goal) => {
-		router.push(`/(stack)/editGoal?id=${goal.id}`);
-	};
+	}, [params.openModal, showModal]);
 
 	const handleCloseQuickAddModal = () => {
 		setShowQuickAddModal(false);
@@ -130,7 +161,7 @@ export default function GoalsScreen() {
 				<Ionicons name="warning-outline" size={64} color="#ff6b6b" />
 				<Text style={styles.errorTitle}>Unable to Load Goals</Text>
 				<Text style={styles.errorSubtext}>
-					{error ||
+					{error?.message ||
 						'There was a problem connecting to the server. Please check your connection and try again.'}
 				</Text>
 				<RectButton
@@ -159,6 +190,67 @@ export default function GoalsScreen() {
 					<Ionicons name="add" size={20} color="#fff" />
 					<Text style={styles.emptyAddButtonText}>Add Goal</Text>
 				</RectButton>
+			</View>
+		</View>
+	);
+
+	// ==========================================
+	// Filter/Sort Header Component
+	// ==========================================
+	const FilterSortHeader = () => (
+		<View style={styles.filterHeader}>
+			<View style={styles.filterRow}>
+				<Text style={styles.filterLabel}>Filter:</Text>
+				<View style={styles.filterButtons}>
+					{['all', 'active', 'completed', 'overdue'].map((filter) => (
+						<TouchableOpacity
+							key={filter}
+							style={[
+								styles.filterButton,
+								filterBy === filter && styles.filterButtonActive,
+							]}
+							onPress={() => setFilterBy(filter as any)}
+						>
+							<Text
+								style={[
+									styles.filterButtonText,
+									filterBy === filter && styles.filterButtonTextActive,
+								]}
+							>
+								{filter.charAt(0).toUpperCase() + filter.slice(1)}
+							</Text>
+						</TouchableOpacity>
+					))}
+				</View>
+			</View>
+			<View style={styles.sortRow}>
+				<Text style={styles.sortLabel}>Sort by:</Text>
+				<View style={styles.sortButtons}>
+					{[
+						{ key: 'deadline', label: 'Deadline' },
+						{ key: 'progress', label: 'Progress' },
+						{ key: 'name', label: 'Name' },
+						{ key: 'target', label: 'Amount' },
+					].map((sort) => (
+						<TouchableOpacity
+							key={sort.key}
+							style={[
+								styles.sortButton,
+								sortBy === sort.key && styles.sortButtonActive,
+							]}
+							onPress={() => setSortBy(sort.key as any)}
+						>
+							<Text
+								style={[
+									styles.sortButtonText,
+									sortBy === sort.key && styles.sortButtonTextActive,
+								]}
+							>
+								{sort.label}
+							</Text>
+						</TouchableOpacity>
+					))}
+				</View>
 			</View>
 		</View>
 	);
@@ -195,8 +287,10 @@ export default function GoalsScreen() {
 					totalCurrent={summaryStats.totalCurrent}
 					onAddGoal={showModal}
 				/>
+				{goals.length > 0 && <FilterSortHeader />}
 				<GoalsFeed
 					scrollEnabled={false}
+					goals={filteredAndSortedGoals}
 					onPressMenu={(id: string) => {
 						const g = goals.find((gg) => gg.id === id);
 						if (g) {
@@ -334,5 +428,86 @@ const styles = StyleSheet.create({
 		color: '#FFFFFF',
 		fontSize: 16,
 		fontWeight: '600',
+	},
+	// Filter/Sort Header Styles
+	filterHeader: {
+		backgroundColor: '#f8f9fa',
+		paddingHorizontal: 16,
+		paddingVertical: 12,
+		borderBottomWidth: 1,
+		borderBottomColor: '#e9ecef',
+	},
+	filterRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginBottom: 8,
+	},
+	filterLabel: {
+		fontSize: 14,
+		fontWeight: '600',
+		color: '#495057',
+		marginRight: 12,
+		minWidth: 50,
+	},
+	filterButtons: {
+		flexDirection: 'row',
+		flex: 1,
+		gap: 6,
+	},
+	filterButton: {
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		borderRadius: 16,
+		backgroundColor: '#fff',
+		borderWidth: 1,
+		borderColor: '#dee2e6',
+	},
+	filterButtonActive: {
+		backgroundColor: '#00a2ff',
+		borderColor: '#00a2ff',
+	},
+	filterButtonText: {
+		fontSize: 12,
+		fontWeight: '500',
+		color: '#6c757d',
+	},
+	filterButtonTextActive: {
+		color: '#fff',
+	},
+	sortRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+	},
+	sortLabel: {
+		fontSize: 14,
+		fontWeight: '600',
+		color: '#495057',
+		marginRight: 12,
+		minWidth: 50,
+	},
+	sortButtons: {
+		flexDirection: 'row',
+		flex: 1,
+		gap: 6,
+	},
+	sortButton: {
+		paddingHorizontal: 10,
+		paddingVertical: 4,
+		borderRadius: 12,
+		backgroundColor: '#fff',
+		borderWidth: 1,
+		borderColor: '#dee2e6',
+	},
+	sortButtonActive: {
+		backgroundColor: '#28a745',
+		borderColor: '#28a745',
+	},
+	sortButtonText: {
+		fontSize: 11,
+		fontWeight: '500',
+		color: '#6c757d',
+	},
+	sortButtonTextActive: {
+		color: '#fff',
 	},
 });

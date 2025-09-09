@@ -32,13 +32,29 @@ export const OnboardingService = {
 	 */
 	hasSeenOnboarding: async (): Promise<boolean> => {
 		try {
+			console.log('🔍 [OnboardingService] Checking onboarding status...');
 			const response = await ApiService.get<{
 				user: { onboardingVersion: number };
 			}>('/api/users/me');
 
+			console.log('🔍 [OnboardingService] API response:', {
+				success: response.success,
+				hasData: !!response.data,
+				hasUser: !!response.data?.user,
+				onboardingVersion: response.data?.user?.onboardingVersion,
+				error: response.error,
+			});
+
 			if (!response.success || !response.data?.user) {
-				console.error('❌ Failed to fetch user data for onboarding check');
-				return false;
+				console.error('❌ Failed to fetch user data for onboarding check:', {
+					success: response.success,
+					error: response.error,
+					hasData: !!response.data,
+					hasUser: !!response.data?.user,
+				});
+				// Return true as fallback to prevent infinite loading
+				// This assumes the user has completed onboarding if we can't determine status
+				return true;
 			}
 
 			const userOnboardingVersion = response.data.user.onboardingVersion;
@@ -54,7 +70,9 @@ export const OnboardingService = {
 			return hasSeenCurrentVersion;
 		} catch (error) {
 			console.error('❌ Error checking onboarding status:', error);
-			return false;
+			// Return true as fallback to prevent infinite loading
+			// This assumes the user has completed onboarding if we can't determine status
+			return true;
 		}
 	},
 

@@ -7,10 +7,17 @@ import {
 	SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useSegments, router } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import BudgetScreen from './index';
 import GoalsScreen from './goals';
 import RecurringExpensesScreen from './recurringExpenses';
+import {
+	accessibilityProps,
+	dynamicTextStyle,
+	generateAccessibilityLabel,
+	voiceOverHints,
+} from '../../../src/utils/accessibility';
 
 export default function BudgetLayout() {
 	const [activeTab, setActiveTab] = useState('budgets');
@@ -27,26 +34,56 @@ export default function BudgetLayout() {
 		}
 	}, [params.tab]);
 
+	// Handle tab selection with haptic feedback
+	const handleTabPress = async (tabName: string) => {
+		if (activeTab !== tabName) {
+			// Add haptic feedback with error handling
+			try {
+				await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+			} catch (error) {
+				// Haptics not available on this device, silently continue
+				console.warn('Haptic feedback not available:', error);
+			}
+			setActiveTab(tabName);
+		}
+	};
+
 	return (
 		<SafeAreaView style={styles.container}>
 			<View style={styles.container}>
 				{/* Custom Header with Tabs */}
 				<View style={styles.header}>
-					<View style={styles.tabContainer}>
+					<View
+						style={styles.tabContainer}
+						accessibilityRole="tablist"
+						accessibilityLabel="Budget management tabs"
+					>
 						<TouchableOpacity
 							style={[styles.tab, activeTab === 'budgets' && styles.activeTab]}
-							onPress={() => setActiveTab('budgets')}
+							onPress={() => handleTabPress('budgets')}
+							{...accessibilityProps.button}
+							accessibilityRole="tab"
+							accessibilityLabel={generateAccessibilityLabel.button(
+								'Budgets',
+								'tab'
+							)}
+							accessibilityHint={voiceOverHints.select}
+							accessibilityState={{ selected: activeTab === 'budgets' }}
 						>
 							<Ionicons
 								name="wallet-outline"
 								size={20}
 								color={activeTab === 'budgets' ? '#222222' : '#757575'}
+								accessibilityRole="image"
+								accessibilityLabel="Budgets icon"
 							/>
 							<Text
 								style={[
 									styles.tabText,
 									activeTab === 'budgets' && styles.activeTabText,
+									dynamicTextStyle,
 								]}
+								accessibilityRole="text"
 							>
 								Budgets
 							</Text>
@@ -54,18 +91,30 @@ export default function BudgetLayout() {
 
 						<TouchableOpacity
 							style={[styles.tab, activeTab === 'goals' && styles.activeTab]}
-							onPress={() => setActiveTab('goals')}
+							onPress={() => handleTabPress('goals')}
+							{...accessibilityProps.button}
+							accessibilityRole="tab"
+							accessibilityLabel={generateAccessibilityLabel.button(
+								'Goals',
+								'tab'
+							)}
+							accessibilityHint={voiceOverHints.select}
+							accessibilityState={{ selected: activeTab === 'goals' }}
 						>
 							<Ionicons
 								name="flag-outline"
 								size={20}
 								color={activeTab === 'goals' ? '#222222' : '#757575'}
+								accessibilityRole="image"
+								accessibilityLabel="Goals icon"
 							/>
 							<Text
 								style={[
 									styles.tabText,
 									activeTab === 'goals' && styles.activeTabText,
+									dynamicTextStyle,
 								]}
+								accessibilityRole="text"
 							>
 								Goals
 							</Text>
@@ -76,18 +125,30 @@ export default function BudgetLayout() {
 								styles.tab,
 								activeTab === 'recurring' && styles.activeTab,
 							]}
-							onPress={() => setActiveTab('recurring')}
+							onPress={() => handleTabPress('recurring')}
+							{...accessibilityProps.button}
+							accessibilityRole="tab"
+							accessibilityLabel={generateAccessibilityLabel.button(
+								'Recurring',
+								'tab'
+							)}
+							accessibilityHint={voiceOverHints.select}
+							accessibilityState={{ selected: activeTab === 'recurring' }}
 						>
 							<Ionicons
 								name="repeat-outline"
 								size={20}
 								color={activeTab === 'recurring' ? '#222222' : '#757575'}
+								accessibilityRole="image"
+								accessibilityLabel="Recurring expenses icon"
 							/>
 							<Text
 								style={[
 									styles.tabText,
 									activeTab === 'recurring' && styles.activeTabText,
+									dynamicTextStyle,
 								]}
+								accessibilityRole="text"
 							>
 								Recurring
 							</Text>
@@ -96,7 +157,10 @@ export default function BudgetLayout() {
 				</View>
 
 				{/* Content Area */}
-				<View style={styles.content}>
+				<View
+					style={styles.content}
+					accessibilityLabel={`${activeTab} content`}
+				>
 					{activeTab === 'budgets' ? (
 						<BudgetScreen />
 					) : activeTab === 'goals' ? (
@@ -142,7 +206,7 @@ const styles = StyleSheet.create({
 		fontWeight: '600',
 		color: '#757575',
 	},
-	
+
 	activeTabText: {
 		color: '#222222',
 	},

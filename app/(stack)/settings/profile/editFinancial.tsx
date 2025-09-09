@@ -29,10 +29,6 @@ export default function EditFinancialScreen() {
 		}
 	}, [profile]);
 
-	const validateNumber = (value: string) => {
-		const num = parseFloat(value);
-		return !isNaN(num) && num >= 0;
-	};
 
 	const formatCurrency = (value: string) => {
 		// Remove any non-digit characters except decimal point

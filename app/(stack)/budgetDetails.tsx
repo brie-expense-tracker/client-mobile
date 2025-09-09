@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
 	View,
 	Text,
@@ -8,9 +8,12 @@ import {
 	SafeAreaView,
 	ActivityIndicator,
 	RefreshControl,
+	Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 import { useBudgets } from '../../src/hooks/useBudgets';
 import { Budget } from '../../src/context/budgetContext';
 import LinearProgressBar from '../(tabs)/budgets/components/LinearProgressBar';
@@ -122,7 +125,10 @@ const BudgetSummaryScreen: React.FC = () => {
 				startDate: new Date(item.periodStart),
 				endDate: new Date(item.periodEnd),
 				utilization: item.utilizationPercentage,
-				health: typeof item.periodHealth === 'string' ? parseInt(item.periodHealth) : item.periodHealth,
+				health:
+					typeof item.periodHealth === 'string'
+						? parseInt(item.periodHealth)
+						: item.periodHealth,
 			};
 		});
 	}, [budgetHistory, budget]);
@@ -158,38 +164,17 @@ const BudgetSummaryScreen: React.FC = () => {
 		}
 	}, [analysis?.spendingBreakdown, analysis?.totalSpent, budget?.amount]);
 
-	// Load budget data and analysis when component mounts
-	useEffect(() => {
-		loadData();
-	}, [budgetId, budgets]);
+	// Calculate budget values for use in callbacks
+	const spent = budget?.spent || 0;
+	const leftRaw = (budget?.amount || 0) - spent;
+	const over = leftRaw < 0;
+	const left = Math.abs(leftRaw);
+	const percent =
+		(budget?.amount || 0) > 0
+			? Math.min((spent / (budget?.amount || 1)) * 100, 100)
+			: 0;
 
-	// Refresh data when budgets change (e.g., after transactions are added)
-	useEffect(() => {
-		if (budget && budgets.length > 0) {
-			const currentBudget = budgets.find((b) => b.id === budgetId);
-			if (currentBudget && currentBudget.spent !== budget.spent) {
-				// Budget spent amount changed, refresh analysis
-				loadData();
-			}
-		}
-	}, [budgets, budget?.spent]);
-
-	// Auto-refresh budget data every 30 seconds to keep it live
-	useEffect(() => {
-		const interval = setInterval(() => {
-			if (budget && !loading && !refreshing) {
-				// Only refresh if we're not already loading or refreshing
-				const currentBudget = budgets.find((b) => b.id === budgetId);
-				if (currentBudget && currentBudget.spent !== budget.spent) {
-					loadData();
-				}
-			}
-		}, 30000); // 30 seconds
-
-		return () => clearInterval(interval);
-	}, [budget, budgets, loading, refreshing]);
-
-	const loadData = async () => {
+	const loadData = useCallback(async () => {
 		if (budgetId && budgets.length > 0) {
 			const foundBudget = budgets.find((b) => b.id === budgetId);
 			if (foundBudget) {
@@ -210,19 +195,229 @@ const BudgetSummaryScreen: React.FC = () => {
 					setLastUpdated(new Date());
 				} catch (err) {
 					console.error('Error loading budget data:', err);
-					setError('Failed to load budget data');
+					const errorMessage =
+						err instanceof Error ? err.message : 'Failed to load budget data';
+					setError(`Unable to load budget analysis: ${errorMessage}`);
 				} finally {
 					setLoading(false);
 				}
 			}
 		}
-	};
+	}, [budgetId, budgets]);
+
+	// Load budget data and analysis when component mounts
+	useEffect(() => {
+		loadData();
+	}, [loadData]);
+
+	// Refresh data when budgets change (e.g., after transactions are added)
+	useEffect(() => {
+		if (budget && budgets.length > 0) {
+			const currentBudget = budgets.find((b) => b.id === budgetId);
+			if (currentBudget && currentBudget.spent !== budget.spent) {
+				// Budget spent amount changed, refresh analysis
+				loadData();
+			}
+		}
+	}, [budgets, budget?.spent, budget, budgetId, loadData]);
+
+	// Auto-refresh budget data every 30 seconds to keep it live
+	useEffect(() => {
+		const interval = setInterval(() => {
+			if (budget && !loading && !refreshing) {
+				// Only refresh if we're not already loading or refreshing
+				const currentBudget = budgets.find((b) => b.id === budgetId);
+				if (currentBudget && currentBudget.spent !== budget.spent) {
+					loadData();
+				}
+			}
+		}, 30000); // 30 seconds
+
+		return () => clearInterval(interval);
+	}, [budget, budgets, loading, refreshing, budgetId, loadData]);
 
 	const onRefresh = async () => {
 		setRefreshing(true);
 		await loadData();
 		setRefreshing(false);
 	};
+
+	const generateBudgetReport = useCallback(() => {
+		if (!budget || !analysis) return '';
+
+		const report = `
+BUDGET REPORT - ${budget.name}
+Generated: ${new Date().toLocaleDateString()}
+
+OVERVIEW
+--------
+Budget Amount: $${budget.amount.toFixed(2)}
+Amount Spent: $${spent.toFixed(2)}
+Remaining: $${left.toFixed(2)}
+Utilization: ${percent.toFixed(1)}%
+
+PERIOD INFORMATION
+------------------
+Period Type: ${budget.period === 'weekly' ? 'Weekly' : 'Monthly'}
+${
+	budgetPeriodInfo ? `Days Until Reset: ${budgetPeriodInfo.daysUntilReset}` : ''
+}
+
+SPENDING BREAKDOWN
+------------------
+${
+	analysis.spendingBreakdown && analysis.spendingBreakdown.length > 0
+		? analysis.spendingBreakdown
+				.map(
+					(item) =>
+						`${item.category}: $${item.amount.toFixed(2)} (${item.percentage}%)`
+				)
+				.join('\n')
+		: 'No spending data available'
+}
+
+ANALYSIS
+--------
+${
+	analysis.transactionCount > 0
+		? `Total Transactions: ${analysis.transactionCount}
+Average per Transaction: $${analysis.averageSpent.toFixed(2)}`
+		: 'No transaction data available'
+}
+
+KEY INSIGHTS
+------------
+${recommendations}
+
+HISTORICAL PERFORMANCE
+---------------------
+${
+	historicalData.length > 0
+		? historicalData
+				.map(
+					(item) =>
+						`${item.period}: $${item.amount.toFixed(
+							2
+						)} (${item.utilization.toFixed(0)}% utilized)`
+				)
+				.join('\n')
+		: 'No historical data available'
+}
+
+---
+Report generated by Brie - Your Personal Finance Assistant
+		`.trim();
+
+		return report;
+	}, [
+		budget,
+		analysis,
+		spent,
+		left,
+		percent,
+		budgetPeriodInfo,
+		recommendations,
+		historicalData,
+	]);
+
+	const handleExportReport = useCallback(async () => {
+		try {
+			const report = generateBudgetReport();
+			if (!report) {
+				Alert.alert('Error', 'Unable to generate report. Please try again.');
+				return;
+			}
+
+			const fileName = `budget-report-${budget?.name
+				?.replace(/\s+/g, '-')
+				.toLowerCase()}-${new Date().toISOString().split('T')[0]}.txt`;
+			const fileUri = FileSystem.documentDirectory + fileName;
+
+			await FileSystem.writeAsStringAsync(fileUri, report, {
+				encoding: FileSystem.EncodingType.UTF8,
+			});
+
+			if (await Sharing.isAvailableAsync()) {
+				await Sharing.shareAsync(fileUri, {
+					mimeType: 'text/plain',
+					dialogTitle: 'Export Budget Report',
+				});
+			} else {
+				Alert.alert(
+					'Sharing not available',
+					'Sharing is not available on this device.'
+				);
+			}
+		} catch (error) {
+			console.error('Error exporting report:', error);
+			Alert.alert(
+				'Export Failed',
+				'Failed to export report. Please try again.'
+			);
+		}
+	}, [generateBudgetReport, budget?.name]);
+
+	const handleShareSummary = useCallback(async () => {
+		try {
+			if (!budget) return;
+
+			const summary = `📊 ${budget.name} Budget Summary
+
+💰 Budget: $${budget.amount.toFixed(2)}
+💸 Spent: $${spent.toFixed(2)}
+${over ? '⚠️ Over by' : '✅ Left'} $${left.toFixed(2)}
+📈 Utilization: ${percent.toFixed(1)}%
+
+${
+	analysis?.spendingBreakdown && analysis.spendingBreakdown.length > 0
+		? `Top spending category: ${analysis.spendingBreakdown[0].category} (${analysis.spendingBreakdown[0].percentage}%)`
+		: 'No spending data yet'
+}
+
+${
+	budgetPeriodInfo
+		? `⏰ ${budget.period === 'weekly' ? 'Week' : 'Month'} resets in ${
+				budgetPeriodInfo.daysUntilReset
+		  } days`
+		: ''
+}
+
+#PersonalFinance #Budgeting #Brie`;
+
+			if (await Sharing.isAvailableAsync()) {
+				// Create a temporary file for sharing
+				const fileName = `budget-summary-${budget.name
+					?.replace(/\s+/g, '-')
+					.toLowerCase()}-${new Date().toISOString().split('T')[0]}.txt`;
+				const fileUri = FileSystem.documentDirectory + fileName;
+
+				await FileSystem.writeAsStringAsync(fileUri, summary, {
+					encoding: FileSystem.EncodingType.UTF8,
+				});
+
+				await Sharing.shareAsync(fileUri, {
+					mimeType: 'text/plain',
+					dialogTitle: 'Share Budget Summary',
+				});
+			} else {
+				Alert.alert(
+					'Sharing not available',
+					'Sharing is not available on this device.'
+				);
+			}
+		} catch (error) {
+			console.error('Error sharing summary:', error);
+			Alert.alert('Share Failed', 'Failed to share summary. Please try again.');
+		}
+	}, [
+		budget,
+		spent,
+		left,
+		over,
+		percent,
+		analysis?.spendingBreakdown,
+		budgetPeriodInfo,
+	]);
 
 	if (!budget) {
 		return (
@@ -243,13 +438,6 @@ const BudgetSummaryScreen: React.FC = () => {
 			</SafeAreaView>
 		);
 	}
-
-	const spent = budget.spent || 0;
-	const leftRaw = budget.amount - spent;
-	const over = leftRaw < 0;
-	const left = Math.abs(leftRaw);
-	const percent =
-		budget.amount > 0 ? Math.min((spent / budget.amount) * 100, 100) : 0;
 
 	// Show loading state for analysis
 	if (loading) {
@@ -292,14 +480,11 @@ const BudgetSummaryScreen: React.FC = () => {
 					<TouchableOpacity
 						style={styles.retryButton}
 						onPress={() => {
-							setLoading(true);
 							setError(null);
-							// Retry loading data
-							BudgetAnalysisService.getBudgetAnalysis(budgetId)
-								.then(setAnalysis)
-								.catch((err) => setError('Failed to load budget analysis'))
-								.finally(() => setLoading(false));
+							loadData();
 						}}
+						accessibilityLabel="Retry loading budget data"
+						accessibilityRole="button"
 					>
 						<Text style={styles.retryButtonText}>Retry</Text>
 					</TouchableOpacity>
@@ -315,6 +500,8 @@ const BudgetSummaryScreen: React.FC = () => {
 				<TouchableOpacity
 					style={styles.backButton}
 					onPress={() => router.back()}
+					accessibilityLabel="Go back"
+					accessibilityRole="button"
 				>
 					<Ionicons name="chevron-back" size={24} color="#222" />
 				</TouchableOpacity>
@@ -323,6 +510,9 @@ const BudgetSummaryScreen: React.FC = () => {
 					style={styles.refreshButton}
 					onPress={onRefresh}
 					disabled={refreshing}
+					accessibilityLabel="Refresh budget data"
+					accessibilityRole="button"
+					accessibilityState={{ disabled: refreshing }}
 				>
 					{refreshing ? (
 						<ActivityIndicator size="small" color="#00a2ff" />
@@ -367,7 +557,15 @@ const BudgetSummaryScreen: React.FC = () => {
 						</View>
 					</View>
 
-					<View style={styles.progressSection}>
+					<View
+						style={styles.progressSection}
+						accessibilityLabel={`Budget progress: ${percent.toFixed(
+							1
+						)}% used, $${spent.toFixed(
+							2
+						)} spent out of $${budget.amount.toFixed(2)}`}
+						accessibilityRole="progressbar"
+					>
 						<LinearProgressBar
 							percent={percent}
 							height={8}
@@ -603,11 +801,21 @@ const BudgetSummaryScreen: React.FC = () => {
 				{/* Action Buttons */}
 				<View style={styles.section}>
 					<View style={styles.actionButtons}>
-						<TouchableOpacity style={styles.actionButton}>
+						<TouchableOpacity
+							style={styles.actionButton}
+							onPress={handleExportReport}
+							accessibilityLabel="Export budget report"
+							accessibilityHint="Export a detailed budget report as a text file"
+						>
 							<Ionicons name="download" size={20} color="#00a2ff" />
 							<Text style={styles.actionButtonText}>Export Report</Text>
 						</TouchableOpacity>
-						<TouchableOpacity style={styles.actionButton}>
+						<TouchableOpacity
+							style={styles.actionButton}
+							onPress={handleShareSummary}
+							accessibilityLabel="Share budget summary"
+							accessibilityHint="Share a summary of your budget performance"
+						>
 							<Ionicons name="share" size={20} color="#00a2ff" />
 							<Text style={styles.actionButtonText}>Share Summary</Text>
 						</TouchableOpacity>

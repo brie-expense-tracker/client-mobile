@@ -6,6 +6,8 @@ import {
 	TouchableOpacity,
 	ActivityIndicator,
 	Alert,
+	RefreshControl,
+	ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -37,9 +39,13 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 		expenses: allExpenses,
 		isLoading: loading,
 		refetch,
+		markAsPaid,
 	} = useRecurringExpenses();
 	const [expenses, setExpenses] = useState<RecurringExpense[]>([]);
 	const [markingAsPaid, setMarkingAsPaid] = useState<string | null>(null);
+	const [paymentStatuses, setPaymentStatuses] = useState<
+		Record<string, boolean | null>
+	>({});
 
 	// Filter expenses based on context data
 	useEffect(() => {
@@ -62,21 +68,118 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 		}
 	}, [allExpenses, showUpcomingOnly]);
 
-	const handleExpensePress = (expense: RecurringExpense) => {
-		if (onExpensePress) {
-			onExpensePress(expense);
-		}
-	};
+	// Check payment status for all expenses
+	useEffect(() => {
+		const checkAllPaymentStatuses = async () => {
+			if (expenses.length === 0) return;
+
+			try {
+				const patternIds = expenses.map((expense) => expense.patternId);
+				const statuses = await RecurringExpenseService.checkBatchPaidStatus(
+					patternIds
+				);
+				setPaymentStatuses(statuses);
+			} catch (error) {
+				console.error('Error checking payment statuses:', error);
+			}
+		};
+
+		checkAllPaymentStatuses();
+	}, [expenses]);
 
 	const handleOptionsPress = (expense: RecurringExpense) => {
-		// Use the onExpensePress handler to show the modal
-		if (onExpensePress) {
-			onExpensePress(expense);
+		// Show options menu with edit and delete options
+		Alert.alert(
+			expense.vendor,
+			`$${expense.amount.toFixed(
+				2
+			)} - ${RecurringExpenseService.formatFrequency(expense.frequency)}`,
+			[
+				{
+					text: 'Edit',
+					onPress: () => {
+						if (onExpensePress) {
+							onExpensePress(expense);
+						}
+					},
+				},
+				{
+					text: 'Mark as Paid',
+					onPress: () => handleMarkAsPaid(expense),
+					style: 'default',
+				},
+				{
+					text: 'Cancel',
+					style: 'cancel',
+				},
+			]
+		);
+	};
+
+	const handleMarkAsPaid = async (expense: RecurringExpense) => {
+		try {
+			setMarkingAsPaid(expense.patternId);
+
+			// Calculate period dates
+			const nextDate = new Date(expense.nextExpectedDate);
+			const periodStart = new Date(nextDate);
+			periodStart.setDate(periodStart.getDate() - 30); // Approximate period start
+			const periodEnd = new Date(nextDate);
+
+			await markAsPaid(
+				expense.patternId,
+				periodStart.toISOString(),
+				periodEnd.toISOString()
+			);
+
+			// Update payment status locally
+			setPaymentStatuses((prev) => ({
+				...prev,
+				[expense.patternId]: true,
+			}));
+
+			// Refresh the data
+			await refetch();
+
+			Alert.alert('Success', `${expense.vendor} has been marked as paid`, [
+				{ text: 'OK' },
+			]);
+		} catch (error) {
+			console.error('Error marking as paid:', error);
+			Alert.alert(
+				'Error',
+				'Failed to mark expense as paid. Please try again.',
+				[{ text: 'OK' }]
+			);
+		} finally {
+			setMarkingAsPaid(null);
 		}
 	};
 
 	const handleAddRecurringExpense = () => {
 		router.push('/(stack)/addRecurringExpense');
+	};
+
+	const handleRefresh = async () => {
+		try {
+			await refetch();
+		} catch (error) {
+			console.error('Error refreshing expenses:', error);
+			Alert.alert('Error', 'Failed to refresh expenses. Please try again.', [
+				{ text: 'OK' },
+			]);
+		}
+	};
+
+	const handleExpenseSelect = (expense: RecurringExpense) => {
+		// Set the selected pattern ID in the filter context
+		if (setSelectedPatternId) {
+			setSelectedPatternId(expense.patternId);
+		}
+		// Also call the original onExpensePress if provided
+		if (onExpensePress) {
+			onExpensePress(expense);
+		}
 	};
 
 	// Group expenses by frequency
@@ -120,8 +223,8 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 			expense.frequency
 		);
 
-		// Simplified status - using days until due to determine if overdue
-		const isPaid = daysUntilDue > 0; // If not overdue, consider it "paid" for display purposes
+		// Use actual payment status from the API
+		const isPaid = paymentStatuses[expense.patternId] === true;
 		const isMarkingAsPaid = markingAsPaid === expense.patternId;
 
 		// Determine icon and color based on vendor
@@ -203,7 +306,7 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 		return (
 			<TouchableOpacity
 				key={expense.patternId}
-				onPress={() => handleExpensePress(expense)}
+				onPress={() => handleExpenseSelect(expense)}
 			>
 				<RecurringExpenseCard
 					vendor={expense.vendor}
@@ -215,7 +318,7 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 					color={color}
 					isPaid={isPaid}
 					isProcessing={isMarkingAsPaid}
-					onPressMarkPaid={() => handleOptionsPress(expense)}
+					onPressMarkPaid={() => handleMarkAsPaid(expense)}
 					onPressEdit={() => handleOptionsPress(expense)}
 				/>
 			</TouchableOpacity>
@@ -255,52 +358,110 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 	const groupedExpenses = groupExpensesByFrequency();
 	const hasExpenses = expenses.length > 0;
 
+	// Calculate summary statistics
+	const totalAmount = expenses.reduce(
+		(sum, expense) => sum + expense.amount,
+		0
+	);
+	const paidCount = expenses.filter(
+		(expense) => paymentStatuses[expense.patternId] === true
+	).length;
+	const unpaidCount = expenses.length - paidCount;
+
 	return (
 		<View style={styles.container}>
 			{title && (
 				<View style={styles.header}>
 					<Text style={styles.title}>{title}</Text>
-					{showAddButton && (
+					<View style={styles.headerButtons}>
 						<TouchableOpacity
-							style={styles.addButton}
-							onPress={handleAddRecurringExpense}
+							style={styles.refreshButton}
+							onPress={handleRefresh}
+							disabled={loading}
 						>
-							<Ionicons name="add" size={20} color="#007ACC" />
-							<Text style={styles.addButtonText}>Add</Text>
+							<Ionicons
+								name="refresh"
+								size={20}
+								color={loading ? '#ccc' : '#007ACC'}
+							/>
 						</TouchableOpacity>
-					)}
+						{showAddButton && (
+							<TouchableOpacity
+								style={styles.addButton}
+								onPress={handleAddRecurringExpense}
+							>
+								<Ionicons name="add" size={20} color="#007ACC" />
+								<Text style={styles.addButtonText}>Add</Text>
+							</TouchableOpacity>
+						)}
+					</View>
 				</View>
 			)}
 
-			{!hasExpenses ? (
-				<View style={styles.emptyContainer}>
-					<Ionicons name="repeat" size={48} color="#ccc" />
-					<Text style={styles.emptyTitle}>No Recurring Expenses</Text>
-					<Text style={styles.emptyText}>
-						{showUpcomingOnly
-							? 'No upcoming recurring expenses in the next 7 days'
-							: 'Add recurring expenses to track your regular payments'}
-					</Text>
+			<ScrollView
+				style={styles.scrollContainer}
+				refreshControl={
+					<RefreshControl
+						refreshing={loading}
+						onRefresh={handleRefresh}
+						tintColor="#007ACC"
+						colors={['#007ACC']}
+					/>
+				}
+				showsVerticalScrollIndicator={false}
+			>
+				{!hasExpenses ? (
+					<View style={styles.emptyContainer}>
+						<Ionicons name="repeat" size={48} color="#ccc" />
+						<Text style={styles.emptyTitle}>No Recurring Expenses</Text>
+						<Text style={styles.emptyText}>
+							{showUpcomingOnly
+								? 'No upcoming recurring expenses in the next 7 days'
+								: 'Add recurring expenses to track your regular payments'}
+						</Text>
 
-					{showAddButton && (
-						<TouchableOpacity
-							style={styles.addRecurringButton}
-							onPress={handleAddRecurringExpense}
-						>
-							<Ionicons name="add" size={16} color="#007ACC" />
-							<Text style={styles.addRecurringButtonText}>
-								Add Recurring Expense
-							</Text>
-						</TouchableOpacity>
-					)}
-				</View>
-			) : (
-				<View style={styles.expensesContainer}>
-					{Object.entries(groupedExpenses).map(([frequency, expenses]) =>
-						renderPeriodSection(frequency, expenses)
-					)}
-				</View>
-			)}
+						{showAddButton && (
+							<TouchableOpacity
+								style={styles.addRecurringButton}
+								onPress={handleAddRecurringExpense}
+							>
+								<Ionicons name="add" size={16} color="#007ACC" />
+								<Text style={styles.addRecurringButtonText}>
+									Add Recurring Expense
+								</Text>
+							</TouchableOpacity>
+						)}
+					</View>
+				) : (
+					<View style={styles.expensesContainer}>
+						{/* Summary Statistics */}
+						<View style={styles.summaryContainer}>
+							<View style={styles.summaryItem}>
+								<Text style={styles.summaryLabel}>Total Amount</Text>
+								<Text style={styles.summaryValue}>
+									${totalAmount.toFixed(2)}
+								</Text>
+							</View>
+							<View style={styles.summaryItem}>
+								<Text style={styles.summaryLabel}>Paid</Text>
+								<Text style={[styles.summaryValue, { color: '#4CAF50' }]}>
+									{paidCount}
+								</Text>
+							</View>
+							<View style={styles.summaryItem}>
+								<Text style={styles.summaryLabel}>Unpaid</Text>
+								<Text style={[styles.summaryValue, { color: '#F44336' }]}>
+									{unpaidCount}
+								</Text>
+							</View>
+						</View>
+
+						{Object.entries(groupedExpenses).map(([frequency, expenses]) =>
+							renderPeriodSection(frequency, expenses)
+						)}
+					</View>
+				)}
+			</ScrollView>
 		</View>
 	);
 };
@@ -308,6 +469,10 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 const styles = StyleSheet.create({
 	container: {
 		backgroundColor: '#fff',
+		flex: 1,
+	},
+	scrollContainer: {
+		flex: 1,
 	},
 	header: {
 		flexDirection: 'row',
@@ -317,10 +482,23 @@ const styles = StyleSheet.create({
 		paddingBottom: 8,
 		paddingHorizontal: 24,
 	},
+	headerButtons: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+	},
 	title: {
 		fontSize: 18,
 		fontWeight: '600',
 		color: '#333',
+	},
+	refreshButton: {
+		width: 32,
+		height: 32,
+		borderRadius: 16,
+		backgroundColor: '#f0f8ff',
+		justifyContent: 'center',
+		alignItems: 'center',
 	},
 	addButton: {
 		flexDirection: 'row',
@@ -385,6 +563,33 @@ const styles = StyleSheet.create({
 	},
 	expensesContainer: {
 		paddingHorizontal: 0,
+	},
+	summaryContainer: {
+		flexDirection: 'row',
+		justifyContent: 'space-around',
+		backgroundColor: '#f8f9fa',
+		marginHorizontal: 24,
+		marginBottom: 16,
+		paddingVertical: 16,
+		paddingHorizontal: 12,
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#e9ecef',
+	},
+	summaryItem: {
+		alignItems: 'center',
+		flex: 1,
+	},
+	summaryLabel: {
+		fontSize: 12,
+		color: '#6c757d',
+		fontWeight: '500',
+		marginBottom: 4,
+	},
+	summaryValue: {
+		fontSize: 16,
+		fontWeight: '700',
+		color: '#212529',
 	},
 	periodSection: {
 		marginBottom: 0,

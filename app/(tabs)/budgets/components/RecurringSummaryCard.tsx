@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
 	View,
 	Text,
@@ -34,6 +34,7 @@ interface Props {
 	activeView: 'monthly' | 'weekly';
 	onViewToggle: () => void;
 	onAddExpense: () => void;
+	onRefresh?: () => void;
 	overdueAmount?: number;
 	dueThisWeekAmount?: number;
 	overdueCount?: number;
@@ -47,6 +48,7 @@ const RecurringSummaryCard: React.FC<Props> = ({
 	activeView,
 	onViewToggle,
 	onAddExpense,
+	onRefresh,
 	overdueAmount = 0,
 	dueThisWeekAmount = 0,
 	overdueCount = 0,
@@ -56,77 +58,51 @@ const RecurringSummaryCard: React.FC<Props> = ({
 		RecurringExpenseWithPaymentStatus[]
 	>([]);
 	const [isLoadingPaymentStatus, setIsLoadingPaymentStatus] = useState(false);
+	const [paymentStatusError, setPaymentStatusError] = useState<string | null>(
+		null
+	);
+	const [isRefreshing, setIsRefreshing] = useState(false);
 
-	// Check payment status for all expenses
+	// Check payment status for all expenses using batch API
 	useEffect(() => {
 		const checkPaymentStatus = async () => {
 			if (expenses.length === 0) return;
 
 			setIsLoadingPaymentStatus(true);
+			setPaymentStatusError(null);
 			try {
-				const expensesWithStatus = await Promise.all(
-					expenses.map(async (expense) => {
-						try {
-							const paymentStatus =
-								await RecurringExpenseService.isCurrentPeriodPaid(
-									expense.patternId
-								);
+				// Use batch API for better performance
+				const patternIds = expenses.map((expense) => expense.patternId);
+				const paymentStatuses =
+					await RecurringExpenseService.checkBatchPaidStatus(patternIds);
 
-							// Check if paid within 2 weeks of the monthly expense
-							let isPaidWithinTwoWeeks = false;
-							let paymentDate: string | undefined;
-							let nextDueDate: string = expense.nextExpectedDate;
+				const expensesWithStatus = expenses.map((expense) => {
+					const isPaid = paymentStatuses[expense.patternId] === true;
+					let paymentDate: string | undefined;
+					let nextDueDate: string = expense.nextExpectedDate;
 
-							if (paymentStatus.isPaid && paymentStatus.payment) {
-								const dueDate = new Date(expense.nextExpectedDate);
-								const paidDate = new Date(paymentStatus.payment.paidAt);
+					if (isPaid) {
+						// Calculate next due date based on frequency
+						nextDueDate = calculateNextDueDate(
+							expense.nextExpectedDate,
+							expense.frequency
+						);
+						// For now, we don't have payment date from batch API
+						// This could be enhanced if the API provides payment dates
+					}
 
-								// Calculate days between due date and payment date
-								const daysDiff =
-									(paidDate.getTime() - dueDate.getTime()) /
-									(1000 * 60 * 60 * 24);
-
-								// Consider paid if within 2 weeks (14 days) AFTER the due date
-								// This allows for late payments to still be considered "paid" for that period
-								isPaidWithinTwoWeeks = daysDiff >= -14 && daysDiff <= 14;
-
-								if (isPaidWithinTwoWeeks) {
-									paymentDate = paidDate.toLocaleDateString();
-									// Calculate next due date based on frequency
-									nextDueDate = calculateNextDueDate(
-										expense.nextExpectedDate,
-										expense.frequency
-									);
-								} else {
-									// If not paid within 2 weeks, the next due date is the current expected date
-									nextDueDate = expense.nextExpectedDate;
-								}
-							}
-
-							return {
-								...expense,
-								isPaid: isPaidWithinTwoWeeks,
-								paymentDate,
-								nextDueDate,
-							};
-						} catch (error) {
-							console.error(
-								`Error checking payment status for ${expense.patternId}:`,
-								error
-							);
-							// Return expense with default unpaid status on error
-							return {
-								...expense,
-								isPaid: false,
-								nextDueDate: expense.nextExpectedDate,
-							};
-						}
-					})
-				);
+					return {
+						...expense,
+						isPaid,
+						paymentDate,
+						nextDueDate,
+					};
+				});
 
 				setExpensesWithPaymentStatus(expensesWithStatus);
 			} catch (error) {
 				console.error('Error checking payment status:', error);
+				setPaymentStatusError('Failed to load payment status');
 				setExpensesWithPaymentStatus(
 					expenses.map((expense) => ({
 						...expense,
@@ -141,6 +117,60 @@ const RecurringSummaryCard: React.FC<Props> = ({
 
 		checkPaymentStatus();
 	}, [expenses]);
+
+	// Refresh payment status - memoized to prevent unnecessary re-renders
+	const handleRefresh = useCallback(async () => {
+		if (isRefreshing) return; // Prevent multiple simultaneous refreshes
+
+		setIsRefreshing(true);
+
+		if (onRefresh) {
+			onRefresh();
+		}
+		// Also refresh payment status locally
+		const checkPaymentStatus = async () => {
+			if (expenses.length === 0) return;
+
+			setIsLoadingPaymentStatus(true);
+			setPaymentStatusError(null);
+			try {
+				const patternIds = expenses.map((expense) => expense.patternId);
+				const paymentStatuses =
+					await RecurringExpenseService.checkBatchPaidStatus(patternIds);
+
+				const expensesWithStatus = expenses.map((expense) => {
+					const isPaid = paymentStatuses[expense.patternId] === true;
+					let nextDueDate: string = expense.nextExpectedDate;
+
+					if (isPaid) {
+						nextDueDate = calculateNextDueDate(
+							expense.nextExpectedDate,
+							expense.frequency
+						);
+					}
+
+					return {
+						...expense,
+						isPaid,
+						nextDueDate,
+					};
+				});
+
+				setExpensesWithPaymentStatus(expensesWithStatus);
+			} catch (error) {
+				console.error('Error refreshing payment status:', error);
+				setPaymentStatusError('Failed to refresh payment status');
+			} finally {
+				setIsLoadingPaymentStatus(false);
+			}
+		};
+
+		try {
+			await checkPaymentStatus();
+		} finally {
+			setIsRefreshing(false);
+		}
+	}, [expenses, onRefresh, isRefreshing]);
 
 	// Helper function to calculate next due date
 	const calculateNextDueDate = (
@@ -168,18 +198,24 @@ const RecurringSummaryCard: React.FC<Props> = ({
 	};
 
 	// Use expenses with payment status if available, otherwise fall back to original expenses
-	const displayExpenses =
-		expensesWithPaymentStatus.length > 0 ? expensesWithPaymentStatus : expenses;
+	// const displayExpenses =
+	// 	expensesWithPaymentStatus.length > 0 ? expensesWithPaymentStatus : expenses;
 
-	// Calculate payment status summary - only when we have payment status data
-	const paidCount =
-		expensesWithPaymentStatus.length > 0
-			? expensesWithPaymentStatus.filter((e) => e.isPaid).length
-			: 0;
-	const unpaidCount =
-		expensesWithPaymentStatus.length > 0
-			? expensesWithPaymentStatus.filter((e) => !e.isPaid).length
-			: 0;
+	// Calculate payment status summary - memoized for performance
+	const paymentStatusSummary = useMemo(() => {
+		if (expensesWithPaymentStatus.length === 0) {
+			return { paidCount: 0, unpaidCount: 0 };
+		}
+
+		const paidCount = expensesWithPaymentStatus.filter((e) => e.isPaid).length;
+		const unpaidCount = expensesWithPaymentStatus.filter(
+			(e) => !e.isPaid
+		).length;
+
+		return { paidCount, unpaidCount };
+	}, [expensesWithPaymentStatus]);
+
+	const { paidCount, unpaidCount } = paymentStatusSummary;
 
 	const getMonthlyEquivalent = (amount: number, frequency: string) => {
 		switch (frequency) {
@@ -214,9 +250,6 @@ const RecurringSummaryCard: React.FC<Props> = ({
 	) => {
 		const now = new Date();
 		const nextDate = new Date(expense.nextDueDate);
-		const daysUntilDue = Math.ceil(
-			(nextDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-		);
 
 		// If overdue or due this period, include the amount
 		if (activeView === 'monthly') {
@@ -306,7 +339,7 @@ const RecurringSummaryCard: React.FC<Props> = ({
 
 	const currentPeriodLabel =
 		activeView === 'monthly' ? 'This Month' : 'This Week';
-	const currentPeriodUnit = activeView === 'monthly' ? '/mo' : '/wk';
+	// const currentPeriodUnit = activeView === 'monthly' ? '/mo' : '/wk';
 
 	return (
 		<View style={styles.container}>
@@ -319,11 +352,38 @@ const RecurringSummaryCard: React.FC<Props> = ({
 					</Text>
 				</View>
 
-				{/* Add Button - Inline with title */}
-				<TouchableOpacity style={styles.addButton} onPress={onAddExpense}>
-					<Ionicons name="add" size={20} color="#0f0f0f" />
-					<Text style={styles.addButtonText}>Add Expense</Text>
-				</TouchableOpacity>
+				{/* Header Controls */}
+				<View style={styles.headerControls}>
+					{/* Refresh Button */}
+					<TouchableOpacity
+						style={styles.refreshButton}
+						onPress={handleRefresh}
+						disabled={isLoadingPaymentStatus || isRefreshing}
+						accessibilityLabel="Refresh payment status"
+						accessibilityHint="Tap to refresh the payment status of recurring expenses"
+						accessibilityRole="button"
+					>
+						<Ionicons
+							name="refresh"
+							size={16}
+							color={
+								isLoadingPaymentStatus || isRefreshing ? '#ccc' : '#007ACC'
+							}
+						/>
+					</TouchableOpacity>
+
+					{/* Add Button */}
+					<TouchableOpacity
+						style={styles.addButton}
+						onPress={onAddExpense}
+						accessibilityLabel="Add new recurring expense"
+						accessibilityHint="Tap to add a new recurring expense"
+						accessibilityRole="button"
+					>
+						<Ionicons name="add" size={20} color="#0f0f0f" />
+						<Text style={styles.addButtonText}>Add Expense</Text>
+					</TouchableOpacity>
+				</View>
 			</View>
 
 			{/* Summary Statistics */}
@@ -341,7 +401,15 @@ const RecurringSummaryCard: React.FC<Props> = ({
 					</View>
 
 					{/* Period Toggle - Inline with primary metric */}
-					<RectButton style={styles.viewToggleButton} onPress={onViewToggle}>
+					<RectButton
+						style={styles.viewToggleButton}
+						onPress={onViewToggle}
+						accessibilityLabel={`Switch to ${
+							activeView === 'monthly' ? 'weekly' : 'monthly'
+						} view`}
+						accessibilityHint="Tap to switch between monthly and weekly view"
+						accessibilityRole="button"
+					>
 						<View style={styles.viewToggleContent}>
 							<Text style={styles.viewToggleText}>
 								{activeView === 'monthly' ? 'Monthly' : 'Weekly'}
@@ -417,6 +485,25 @@ const RecurringSummaryCard: React.FC<Props> = ({
 						<Text style={styles.paymentStatusLoadingText}>
 							Checking payment status...
 						</Text>
+					</View>
+				)}
+
+				{/* Payment Status Error */}
+				{paymentStatusError && (
+					<View style={styles.paymentStatusError}>
+						<Ionicons name="warning-outline" size={16} color="#ef4444" />
+						<Text style={styles.paymentStatusErrorText}>
+							{paymentStatusError}
+						</Text>
+						<TouchableOpacity
+							style={styles.retryButton}
+							onPress={handleRefresh}
+							accessibilityLabel="Retry loading payment status"
+							accessibilityHint="Tap to retry loading payment status"
+							accessibilityRole="button"
+						>
+							<Text style={styles.retryButtonText}>Retry</Text>
+						</TouchableOpacity>
 					</View>
 				)}
 
@@ -510,6 +597,16 @@ const styles = StyleSheet.create({
 		flexDirection: 'column',
 		alignItems: 'flex-end',
 		gap: 8,
+	},
+	refreshButton: {
+		width: 32,
+		height: 32,
+		borderRadius: 16,
+		backgroundColor: '#f0f8ff',
+		justifyContent: 'center',
+		alignItems: 'center',
+		borderWidth: 1,
+		borderColor: '#e0f2fe',
 	},
 	toggleSection: {
 		alignItems: 'flex-end',
@@ -728,6 +825,36 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		fontWeight: '600',
 		color: '#64748b',
+	},
+	paymentStatusError: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		marginTop: 16,
+		paddingVertical: 12,
+		paddingHorizontal: 16,
+		backgroundColor: '#fef2f2',
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#fecaca',
+	},
+	paymentStatusErrorText: {
+		flex: 1,
+		marginLeft: 8,
+		fontSize: 14,
+		fontWeight: '500',
+		color: '#dc2626',
+	},
+	retryButton: {
+		paddingVertical: 6,
+		paddingHorizontal: 12,
+		backgroundColor: '#dc2626',
+		borderRadius: 8,
+	},
+	retryButtonText: {
+		fontSize: 12,
+		fontWeight: '600',
+		color: '#ffffff',
 	},
 });
 

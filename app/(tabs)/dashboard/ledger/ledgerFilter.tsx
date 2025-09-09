@@ -6,9 +6,11 @@ import {
 	StyleSheet,
 	TouchableOpacity,
 	ScrollView,
+	SafeAreaView,
+	TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router, Stack } from 'expo-router';
+import { router } from 'expo-router';
 import { dateFilterModes } from './_layout';
 import { FilterContext } from '../../../../src/context/filterContext';
 import { useBudget } from '../../../../src/context/budgetContext';
@@ -35,6 +37,29 @@ export default function LedgerFilterScreen() {
 		useState<string[]>(selectedBudgets);
 	const [localDateFilterMode, setLocalDateFilterMode] =
 		useState<string>(dateFilterMode);
+
+	// Search and filter state
+	const [goalSearchQuery, setGoalSearchQuery] = useState('');
+	const [budgetSearchQuery, setBudgetSearchQuery] = useState('');
+	const [transactionTypes, setTransactionTypes] = useState<{
+		income: boolean;
+		expense: boolean;
+	}>({ income: true, expense: true });
+
+	// Filter goals and budgets based on search query
+	const filteredGoals = useMemo(() => {
+		if (!goalSearchQuery.trim()) return goals;
+		return goals.filter((goal) =>
+			goal.name.toLowerCase().includes(goalSearchQuery.toLowerCase())
+		);
+	}, [goals, goalSearchQuery]);
+
+	const filteredBudgets = useMemo(() => {
+		if (!budgetSearchQuery.trim()) return budgets;
+		return budgets.filter((budget) =>
+			budget.name.toLowerCase().includes(budgetSearchQuery.toLowerCase())
+		);
+	}, [budgets, budgetSearchQuery]);
 
 	const handleGoalToggle = (goalId: string) => {
 		if (goalId === '') {
@@ -66,9 +91,57 @@ export default function LedgerFilterScreen() {
 		router.back();
 	};
 
+	const handleApply = () => {
+		// Apply changes and go back
+		handleBack();
+	};
+
+	const handleTransactionTypeToggle = (type: 'income' | 'expense') => {
+		setTransactionTypes((prev) => ({
+			...prev,
+			[type]: !prev[type],
+		}));
+	};
+
+	const handleReset = () => {
+		// Reset to default values
+		setLocalSelectedGoals([]);
+		setLocalSelectedBudgets([]);
+		setLocalDateFilterMode('all');
+		setGoalSearchQuery('');
+		setBudgetSearchQuery('');
+		setTransactionTypes({ income: true, expense: true });
+	};
+
 	return (
-		<View style={styles.mainContainer}>
+		<SafeAreaView style={styles.mainContainer}>
+			{/* Header */}
+			<View style={styles.header}>
+				<TouchableOpacity onPress={handleBack} style={styles.backButton}>
+					<Ionicons name="arrow-back" size={24} color="#007AFF" />
+				</TouchableOpacity>
+				<Text style={styles.headerTitle}>Filter Transactions</Text>
+				<View style={styles.headerRight} />
+			</View>
+
 			<ScrollView contentContainerStyle={styles.scrollContent}>
+				{/* Transaction Types */}
+				<Section title="Transaction Types">
+					<SectionSubtext>
+						Select which types of transactions to show
+					</SectionSubtext>
+					<OptionRow
+						label="Income"
+						selected={transactionTypes.income}
+						onPress={() => handleTransactionTypeToggle('income')}
+					/>
+					<OptionRow
+						label="Expenses"
+						selected={transactionTypes.expense}
+						onPress={() => handleTransactionTypeToggle('expense')}
+					/>
+				</Section>
+
 				{/* Date Range */}
 				<Section title="Date Range">
 					<SectionSubtext>Choose how to filter by date</SectionSubtext>
@@ -88,6 +161,23 @@ export default function LedgerFilterScreen() {
 						Select which goals to include (income transactions)
 					</SectionSubtext>
 
+					{/* Search Input */}
+					<View style={styles.searchContainer}>
+						<Ionicons
+							name="search"
+							size={20}
+							color="#666"
+							style={styles.searchIcon}
+						/>
+						<TextInput
+							style={styles.searchInput}
+							placeholder="Search goals..."
+							value={goalSearchQuery}
+							onChangeText={setGoalSearchQuery}
+							placeholderTextColor="#999"
+						/>
+					</View>
+
 					{/* "All" option */}
 					<OptionRow
 						label="All Goals"
@@ -95,8 +185,8 @@ export default function LedgerFilterScreen() {
 						onPress={() => handleGoalToggle('')}
 					/>
 
-					{goals.length ? (
-						goals.map((goal) => (
+					{filteredGoals.length ? (
+						filteredGoals.map((goal) => (
 							<OptionRow
 								key={goal.id}
 								label={goal.name}
@@ -105,7 +195,11 @@ export default function LedgerFilterScreen() {
 							/>
 						))
 					) : (
-						<Text style={styles.noCatsText}>No goals available</Text>
+						<Text style={styles.noCatsText}>
+							{goalSearchQuery
+								? 'No goals found matching your search'
+								: 'No goals available'}
+						</Text>
 					)}
 				</Section>
 
@@ -115,6 +209,23 @@ export default function LedgerFilterScreen() {
 						Select which budgets to include (expense transactions)
 					</SectionSubtext>
 
+					{/* Search Input */}
+					<View style={styles.searchContainer}>
+						<Ionicons
+							name="search"
+							size={20}
+							color="#666"
+							style={styles.searchIcon}
+						/>
+						<TextInput
+							style={styles.searchInput}
+							placeholder="Search budgets..."
+							value={budgetSearchQuery}
+							onChangeText={setBudgetSearchQuery}
+							placeholderTextColor="#999"
+						/>
+					</View>
+
 					{/* "All" option */}
 					<OptionRow
 						label="All Budgets"
@@ -122,8 +233,8 @@ export default function LedgerFilterScreen() {
 						onPress={() => handleBudgetToggle('')}
 					/>
 
-					{budgets.length ? (
-						budgets.map((budget) => (
+					{filteredBudgets.length ? (
+						filteredBudgets.map((budget) => (
 							<OptionRow
 								key={budget.id}
 								label={budget.name}
@@ -132,33 +243,25 @@ export default function LedgerFilterScreen() {
 							/>
 						))
 					) : (
-						<Text style={styles.noCatsText}>No budgets available</Text>
+						<Text style={styles.noCatsText}>
+							{budgetSearchQuery
+								? 'No budgets found matching your search'
+								: 'No budgets available'}
+						</Text>
 					)}
 				</Section>
 			</ScrollView>
-			<Stack.Screen
-				options={{
-					headerShown: true,
-					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: 'Filter',
-					headerShadowVisible: false,
-					headerTitleStyle: {
-						fontSize: 20,
-						fontWeight: '600',
-						color: '#333',
-					},
-					headerStyle: {
-						backgroundColor: '#ffffff',
-					},
 
-					headerLeft: () => (
-						<TouchableOpacity onPress={handleBack} style={{}}>
-							<Ionicons name="chevron-back" size={24} color="#212121" />
-						</TouchableOpacity>
-					),
-				}}
-			/>
-		</View>
+			{/* Action Buttons */}
+			<View style={styles.actionButtons}>
+				<TouchableOpacity onPress={handleReset} style={styles.resetButton}>
+					<Text style={styles.resetButtonText}>Reset</Text>
+				</TouchableOpacity>
+				<TouchableOpacity onPress={handleApply} style={styles.applyButton}>
+					<Text style={styles.applyButtonText}>Apply Filters</Text>
+				</TouchableOpacity>
+			</View>
+		</SafeAreaView>
 	);
 }
 // ——— Shared sub-components ——————————————————————————————————
@@ -204,8 +307,30 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: '#fff',
 	},
+	header: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		paddingHorizontal: 16,
+		paddingVertical: 12,
+		borderBottomWidth: 1,
+		borderBottomColor: '#e2e2e2',
+		backgroundColor: '#fff',
+	},
+	backButton: {
+		padding: 4,
+	},
+	headerTitle: {
+		fontSize: 18,
+		fontWeight: '600',
+		color: '#333',
+	},
+	headerRight: {
+		width: 32, // Same width as back button for centering
+	},
 	scrollContent: {
 		padding: 16,
+		paddingBottom: 100, // Space for action buttons
 	},
 	divider: {
 		height: 1,
@@ -248,5 +373,64 @@ const styles = StyleSheet.create({
 		color: '#666',
 		marginTop: 8,
 		paddingHorizontal: 4,
+	},
+	actionButtons: {
+		flexDirection: 'row',
+		paddingHorizontal: 16,
+		paddingVertical: 12,
+		backgroundColor: '#fff',
+		borderTopWidth: 1,
+		borderTopColor: '#e2e2e2',
+		position: 'absolute',
+		bottom: 0,
+		left: 0,
+		right: 0,
+	},
+	resetButton: {
+		flex: 1,
+		backgroundColor: '#f5f5f5',
+		paddingVertical: 12,
+		paddingHorizontal: 16,
+		borderRadius: 8,
+		marginRight: 8,
+		alignItems: 'center',
+	},
+	resetButtonText: {
+		color: '#666',
+		fontSize: 16,
+		fontWeight: '500',
+	},
+	applyButton: {
+		flex: 1,
+		backgroundColor: '#007AFF',
+		paddingVertical: 12,
+		paddingHorizontal: 16,
+		borderRadius: 8,
+		marginLeft: 8,
+		alignItems: 'center',
+	},
+	applyButtonText: {
+		color: '#fff',
+		fontSize: 16,
+		fontWeight: '600',
+	},
+	searchContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#f5f5f5',
+		borderRadius: 8,
+		paddingHorizontal: 12,
+		marginBottom: 12,
+		borderWidth: 1,
+		borderColor: '#e2e2e2',
+	},
+	searchIcon: {
+		marginRight: 8,
+	},
+	searchInput: {
+		flex: 1,
+		paddingVertical: 10,
+		fontSize: 16,
+		color: '#333',
 	},
 });

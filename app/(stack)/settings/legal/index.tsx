@@ -5,10 +5,10 @@ import {
 	StyleSheet,
 	TouchableOpacity,
 	ScrollView,
-	Linking,
+	SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, Stack } from 'expo-router';
 
 export default function LegalDocumentsScreen() {
 	const router = useRouter();
@@ -62,55 +62,74 @@ export default function LegalDocumentsScreen() {
 		router.push(document.route);
 	};
 
-	const handleOpenExternalLink = (url: string) => {
-		Linking.openURL(url).catch((err) =>
-			console.error('An error occurred', err)
-		);
-	};
-
 	return (
-		<ScrollView
-			style={styles.scrollView}
-			contentContainerStyle={styles.scrollContent}
-			showsVerticalScrollIndicator={false}
-			contentInsetAdjustmentBehavior="automatic"
-		>
-			{/* Legal Documents List */}
-			<View style={styles.settingsContainer}>
-				{legalDocuments.map((document) => (
-					<TouchableOpacity
-						key={document.id}
-						style={styles.settingItem}
-						onPress={() => handleOpenDocument(document)}
-					>
-						<Ionicons
-							name={document.icon as keyof typeof Ionicons.glyphMap}
-							size={24}
-							color="#555"
-						/>
-						<View style={styles.settingContent}>
-							<Text style={styles.settingText}>{document.title}</Text>
-							<Text style={styles.settingDescription}>
-								{document.description}
-							</Text>
-						</View>
-						<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
-					</TouchableOpacity>
-				))}
-			</View>
+		<SafeAreaView style={styles.safeArea}>
+			<Stack.Screen options={{ title: 'Legal Documents' }} />
+			<ScrollView
+				style={styles.scrollView}
+				contentContainerStyle={styles.scrollContent}
+				showsVerticalScrollIndicator={false}
+				contentInsetAdjustmentBehavior="automatic"
+			>
+				{/* Header Section */}
+				<View style={styles.headerSection}>
+					<Text style={styles.headerTitle}>Legal Documents</Text>
+					<Text style={styles.headerDescription}>
+						Review our terms, policies, and legal information to understand how
+						we protect and use your data.
+					</Text>
+				</View>
 
-			{/* Footer */}
-			<View style={styles.footer}>
-				<Text style={styles.footerText}>Last updated: December 2024</Text>
-				<Text style={styles.footerText}>
-					© 2024 Brie Finance Inc. All rights reserved.
-				</Text>
-			</View>
-		</ScrollView>
+				{/* Legal Documents List */}
+				<View style={styles.settingsContainer}>
+					{legalDocuments.map((document) => (
+						<TouchableOpacity
+							key={document.id}
+							style={styles.settingItem}
+							onPress={() => handleOpenDocument(document)}
+							accessibilityRole="button"
+							accessibilityLabel={`${document.title}. ${document.description}`}
+							accessibilityHint="Tap to view this legal document"
+						>
+							<Ionicons
+								name={document.icon as keyof typeof Ionicons.glyphMap}
+								size={24}
+								color="#555"
+								accessibilityHidden={true}
+							/>
+							<View style={styles.settingContent}>
+								<Text style={styles.settingText}>{document.title}</Text>
+								<Text style={styles.settingDescription}>
+									{document.description}
+								</Text>
+							</View>
+							<Ionicons
+								name="chevron-forward"
+								size={18}
+								color="#BEBEBE"
+								accessibilityHidden={true}
+							/>
+						</TouchableOpacity>
+					))}
+				</View>
+
+				{/* Footer */}
+				<View style={styles.footer}>
+					<Text style={styles.footerText}>Last updated: December 2024</Text>
+					<Text style={styles.footerText}>
+						© 2024 Brie Finance Inc. All rights reserved.
+					</Text>
+				</View>
+			</ScrollView>
+		</SafeAreaView>
 	);
 }
 
 const styles = StyleSheet.create({
+	safeArea: {
+		flex: 1,
+		backgroundColor: '#ffffff',
+	},
 	scrollView: {
 		flex: 1,
 		backgroundColor: '#ffffff',
@@ -118,11 +137,36 @@ const styles = StyleSheet.create({
 	scrollContent: {
 		paddingBottom: 40,
 	},
+	headerSection: {
+		paddingHorizontal: 20,
+		paddingTop: 20,
+		paddingBottom: 10,
+	},
+	headerTitle: {
+		fontSize: 28,
+		fontWeight: '700',
+		color: '#333',
+		marginBottom: 8,
+	},
+	headerDescription: {
+		fontSize: 16,
+		color: '#666',
+		lineHeight: 22,
+	},
 	settingsContainer: {
 		backgroundColor: '#fff',
 		marginHorizontal: 20,
+		marginTop: 20,
 		borderRadius: 12,
 		overflow: 'hidden',
+		shadowColor: '#000',
+		shadowOffset: {
+			width: 0,
+			height: 1,
+		},
+		shadowOpacity: 0.05,
+		shadowRadius: 2,
+		elevation: 1,
 	},
 	settingItem: {
 		flexDirection: 'row',
@@ -130,6 +174,7 @@ const styles = StyleSheet.create({
 		padding: 16,
 		borderBottomWidth: 1,
 		borderBottomColor: '#f0f0f0',
+		minHeight: 64,
 	},
 	settingContent: {
 		flex: 1,

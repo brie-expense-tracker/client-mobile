@@ -17,7 +17,8 @@
 				"NSAppTransportSecurity": {
 					"NSAllowsLocalNetworking": true
 				},
-				"NSUserNotificationsUsageDescription": "This app uses notifications to keep you informed about your budget goals and financial insights."
+				"NSUserNotificationsUsageDescription": "This app uses notifications to keep you informed about your budget goals and financial insights.",
+				"UIBackgroundModes": ["remote-notification"]
 			}
 		},
 		"android": {
@@ -46,7 +47,12 @@
 			],
 			"@react-native-firebase/app",
 			"@react-native-firebase/auth",
-			"expo-notifications"
+			[
+				"expo-notifications",
+				{
+					"enableBackgroundRemoteNotifications": true
+				}
+			]
 		],
 		"experiments": {
 			"typedRoutes": true

@@ -12,6 +12,13 @@ import { ApiService } from '../services';
 // ==========================================
 const fetchBudgets = async (): Promise<Budget[]> => {
 	const response = await ApiService.get<{ data: Budget[] }>('/api/budgets');
+
+	// Handle authentication errors gracefully
+	if (!response.success && response.error?.includes('User not authenticated')) {
+		console.log('🔒 [Budgets] User not authenticated, returning empty array');
+		return [];
+	}
+
 	return response.data?.data || [];
 };
 

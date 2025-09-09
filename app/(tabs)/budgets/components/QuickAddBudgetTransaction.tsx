@@ -212,7 +212,11 @@ const QuickAddBudgetTransaction: React.FC<QuickAddBudgetTransactionProps> = ({
 							onPress={onClose}
 							onActiveStateChange={setIsPressed}
 						>
-							<Ionicons name="close" size={24} color="#757575" />
+							<Ionicons
+								name="close"
+								size={24}
+								color={isPressed ? '#333' : '#757575'}
+							/>
 						</BorderlessButton>
 					</View>
 

@@ -343,10 +343,27 @@ class NotificationService {
 				console.log('✅ Push token updated on backend');
 				return true;
 			} else {
+				// Handle authentication errors gracefully
+				if (response.error?.includes('User not authenticated')) {
+					console.log(
+						'🔒 [Notifications] User not authenticated, skipping push token update'
+					);
+					return false;
+				}
 				console.error('❌ Failed to update push token:', response.error);
 				return false;
 			}
 		} catch (error) {
+			// Handle authentication errors gracefully
+			if (
+				error instanceof Error &&
+				error.message.includes('User not authenticated')
+			) {
+				console.log(
+					'🔒 [Notifications] User not authenticated, skipping push token update'
+				);
+				return false;
+			}
 			console.error('❌ Error updating push token:', error);
 			return false;
 		}
@@ -366,16 +383,33 @@ class NotificationService {
 			});
 
 			const response = await ApiService.get<NotificationResponse>(
-				`/notifications?${params}`
+				`/api/notifications?${params}`
 			);
 
 			if (response.success && response.data) {
 				return response.data;
 			} else {
+				// Handle authentication errors gracefully
+				if (response.error?.includes('User not authenticated')) {
+					console.log(
+						'🔒 [Notifications] User not authenticated, returning null'
+					);
+					return null;
+				}
 				console.error('❌ Failed to get notifications:', response.error);
 				return null;
 			}
 		} catch (error) {
+			// Handle authentication errors gracefully
+			if (
+				error instanceof Error &&
+				error.message.includes('User not authenticated')
+			) {
+				console.log(
+					'🔒 [Notifications] User not authenticated, returning null'
+				);
+				return null;
+			}
 			console.error('❌ Error getting notifications:', error);
 			return null;
 		}
@@ -385,16 +419,33 @@ class NotificationService {
 	async getUnreadCount(): Promise<number> {
 		try {
 			const response = await ApiService.get<UnreadCountResponse>(
-				'/notifications/unread-count'
+				'/api/notifications/unread-count'
 			);
 
 			if (response.success && response.data) {
 				return response.data.count;
 			} else {
+				// Handle authentication errors gracefully
+				if (response.error?.includes('User not authenticated')) {
+					console.log(
+						'🔒 [Notifications] User not authenticated, returning 0 unread count'
+					);
+					return 0;
+				}
 				console.error('❌ Failed to get unread count:', response.error);
 				return 0;
 			}
 		} catch (error) {
+			// Handle authentication errors gracefully
+			if (
+				error instanceof Error &&
+				error.message.includes('User not authenticated')
+			) {
+				console.log(
+					'🔒 [Notifications] User not authenticated, returning 0 unread count'
+				);
+				return 0;
+			}
 			console.error('❌ Error getting unread count:', error);
 			return 0;
 		}
@@ -610,13 +661,13 @@ class NotificationService {
 
 		try {
 			const response = await ApiService.get<{ consent: NotificationConsent }>(
-				'/notifications/consent'
+				'/api/notifications/consent'
 			);
 			if (response.success && response.data?.consent) {
 				this.consentSettings = response.data.consent;
 				return this.consentSettings;
 			}
-		} catch (error) {
+		} catch {
 			console.log('❌ Failed to fetch consent settings, using defaults');
 		}
 
@@ -658,7 +709,7 @@ class NotificationService {
 	): Promise<boolean> {
 		try {
 			const response = await ApiService.put<{ success: boolean }>(
-				'/notifications/consent',
+				'/api/notifications/consent',
 				{ consent }
 			);
 			if (response.success) {
@@ -747,6 +798,590 @@ class NotificationService {
 
 		// Send the notification
 		return this.sendNotification(title, message, type, data);
+	}
+
+	// Send a notification (local or push)
+	async sendNotification(
+		title: string,
+		message: string,
+		type: NotificationData['type'] = 'system',
+		data?: any,
+		priority: 'low' | 'medium' | 'high' = 'medium'
+	): Promise<boolean> {
+		try {
+			// Determine the appropriate channel/category based on type
+			let channelId: string | undefined;
+			let categoryIdentifier: string | undefined;
+
+			switch (type) {
+				case 'budget':
+					channelId = 'budget-alerts';
+					categoryIdentifier = 'BUDGET_ALERT';
+					break;
+				case 'goal':
+					channelId = 'goal-updates';
+					categoryIdentifier = 'GOAL_UPDATE';
+					break;
+				case 'transaction':
+					channelId = 'transaction-alerts';
+					categoryIdentifier = 'TRANSACTION_ALERT';
+					break;
+				case 'ai_insight':
+					channelId = 'ai-insights';
+					categoryIdentifier = 'AI_INSIGHT';
+					break;
+				case 'system':
+					channelId = 'system-notifications';
+					categoryIdentifier = 'SYSTEM_NOTIFICATION';
+					break;
+				case 'reminder':
+					channelId = 'reminders';
+					categoryIdentifier = 'REMINDER';
+					break;
+				case 'marketing':
+					channelId = 'marketing';
+					categoryIdentifier = 'MARKETING';
+					break;
+				case 'promotional':
+					channelId = 'promotional';
+					categoryIdentifier = 'PROMOTIONAL';
+					break;
+			}
+
+			// Schedule local notification
+			const identifier = await Notifications.scheduleNotificationAsync({
+				content: {
+					title,
+					body: message,
+					data: {
+						...data,
+						type,
+						timestamp: Date.now(),
+					},
+					categoryIdentifier,
+					...(Platform.OS === 'android' && channelId && { channelId }),
+				},
+				trigger: null, // Send immediately
+			});
+
+			console.log('✅ Notification sent:', identifier);
+			return true;
+		} catch (error) {
+			console.error('❌ Error sending notification:', error);
+			return false;
+		}
+	}
+
+	// Send push notification through backend
+	async sendPushNotification(
+		title: string,
+		message: string,
+		type: NotificationData['type'] = 'system',
+		data?: any,
+		priority: 'low' | 'medium' | 'high' = 'medium',
+		targetUserId?: string
+	): Promise<boolean> {
+		try {
+			const response = await ApiService.post('/api/notifications/send', {
+				title,
+				message,
+				type,
+				data,
+				priority,
+				targetUserId,
+			});
+
+			if (response.success) {
+				console.log('✅ Push notification sent successfully');
+				return true;
+			} else {
+				console.error('❌ Failed to send push notification:', response.error);
+				return false;
+			}
+		} catch (error) {
+			console.error('❌ Error sending push notification:', error);
+			return false;
+		}
+	}
+
+	// Set up notification event listeners
+	setupNotificationListeners(): void {
+		try {
+			// Handle notification received while app is in foreground
+			Notifications.addNotificationReceivedListener((notification) => {
+				console.log('📱 Notification received:', notification);
+				// You can add custom handling here, like updating UI state
+			});
+
+			// Handle notification tap/interaction
+			Notifications.addNotificationResponseReceivedListener((response) => {
+				console.log('👆 Notification tapped:', response);
+				const { actionIdentifier, notification } = response;
+
+				// Handle different action buttons
+				switch (actionIdentifier) {
+					case 'VIEW_BUDGET':
+					case 'VIEW_GOAL':
+					case 'VIEW_TRANSACTION':
+					case 'VIEW_INSIGHT':
+					case 'VIEW_SYSTEM':
+					case 'VIEW_REMINDER':
+					case 'VIEW_UPDATE':
+					case 'VIEW_OFFER':
+						// Navigate to relevant screen based on notification data
+						this.handleNotificationNavigation(notification);
+						break;
+					case 'DISMISS':
+						// Just dismiss, no action needed
+						break;
+				}
+			});
+
+			console.log('✅ Notification listeners set up');
+		} catch (error) {
+			console.error('❌ Error setting up notification listeners:', error);
+		}
+	}
+
+	// Handle notification navigation
+	private handleNotificationNavigation(
+		notification: Notifications.Notification
+	): void {
+		try {
+			const { data } = notification.request.content;
+			const type = data?.type;
+
+			// You can implement navigation logic here based on notification type and data
+			// This would typically involve navigation to specific screens
+			console.log('🧭 Navigating based on notification:', { type, data });
+
+			// Example navigation logic (you'll need to implement actual navigation)
+			switch (type) {
+				case 'budget':
+					// Navigate to budget screen
+					break;
+				case 'goal':
+					// Navigate to goals screen
+					break;
+				case 'transaction':
+					// Navigate to transactions screen
+					break;
+				case 'ai_insight':
+					// Navigate to insights screen
+					break;
+				default:
+					// Navigate to notifications screen
+					break;
+			}
+		} catch (error) {
+			console.error('❌ Error handling notification navigation:', error);
+		}
+	}
+
+	// Clean up notification listeners
+	removeNotificationListeners(): void {
+		try {
+			// Note: Expo Notifications doesn't provide a direct way to remove specific listeners
+			// The listeners are automatically cleaned up when the component unmounts
+			console.log('✅ Notification listeners cleaned up');
+		} catch (error) {
+			console.error('❌ Error removing notification listeners:', error);
+		}
+	}
+
+	// Schedule recurring notifications
+	async scheduleRecurringNotification(
+		title: string,
+		body: string,
+		trigger: {
+			hour: number;
+			minute: number;
+			weekday?: number; // 1-7, where 1 is Sunday
+			day?: number; // 1-31 for monthly
+		},
+		data?: any,
+		type: NotificationData['type'] = 'reminder'
+	): Promise<string | null> {
+		try {
+			// Use the existing scheduleLocalNotification method with proper trigger
+			return await this.scheduleLocalNotification(
+				title,
+				body,
+				{
+					...data,
+					type,
+					recurring: true,
+					timestamp: Date.now(),
+				},
+				{
+					hour: trigger.hour,
+					minute: trigger.minute,
+					...(trigger.weekday && { weekday: trigger.weekday }),
+					...(trigger.day && { day: trigger.day }),
+					repeats: true,
+				} as Notifications.NotificationTriggerInput
+			);
+		} catch (error) {
+			console.error('❌ Error scheduling recurring notification:', error);
+			return null;
+		}
+	}
+
+	// Get scheduled notifications
+	async getScheduledNotifications(): Promise<
+		Notifications.NotificationRequest[]
+	> {
+		try {
+			return await Notifications.getAllScheduledNotificationsAsync();
+		} catch (error) {
+			console.error('❌ Error getting scheduled notifications:', error);
+			return [];
+		}
+	}
+
+	// Send notification with template
+	async sendTemplatedNotification(
+		template:
+			| 'budget_alert'
+			| 'goal_milestone'
+			| 'weekly_summary'
+			| 'monthly_check'
+			| 'spending_insight',
+		data: Record<string, any>
+	): Promise<boolean> {
+		try {
+			const templates = {
+				budget_alert: {
+					title: 'Budget Alert',
+					body: `You've spent ${data.percentage}% of your ${data.category} budget`,
+					type: 'budget' as const,
+					priority: 'high' as const,
+				},
+				goal_milestone: {
+					title: 'Goal Milestone Reached!',
+					body: `Congratulations! You've reached ${data.percentage}% of your ${data.goalName} goal`,
+					type: 'goal' as const,
+					priority: 'medium' as const,
+				},
+				weekly_summary: {
+					title: 'Weekly Summary',
+					body: `This week you spent $${data.totalSpent} across ${data.transactionCount} transactions`,
+					type: 'reminder' as const,
+					priority: 'low' as const,
+				},
+				monthly_check: {
+					title: 'Monthly Check-in',
+					body: `Time for your monthly financial review. You've saved $${data.savings} this month`,
+					type: 'reminder' as const,
+					priority: 'medium' as const,
+				},
+				spending_insight: {
+					title: 'Spending Insight',
+					body: data.insight,
+					type: 'ai_insight' as const,
+					priority: 'low' as const,
+				},
+			};
+
+			const templateData = templates[template];
+			if (!templateData) {
+				console.error('❌ Unknown notification template:', template);
+				return false;
+			}
+
+			return await this.sendNotificationWithConsent(
+				templateData.title,
+				templateData.body,
+				templateData.type,
+				{ ...data, template },
+				template
+			);
+		} catch (error) {
+			console.error('❌ Error sending templated notification:', error);
+			return false;
+		}
+	}
+
+	// Notification analytics and tracking
+	private notificationStats = {
+		sent: 0,
+		delivered: 0,
+		opened: 0,
+		dismissed: 0,
+		byType: {} as Record<string, number>,
+	};
+
+	// Track notification event
+	private trackNotificationEvent(
+		event: 'sent' | 'delivered' | 'opened' | 'dismissed',
+		type?: string
+	): void {
+		this.notificationStats[event]++;
+		if (type) {
+			this.notificationStats.byType[type] =
+				(this.notificationStats.byType[type] || 0) + 1;
+		}
+	}
+
+	// Get notification statistics
+	getNotificationStats(): typeof this.notificationStats {
+		return { ...this.notificationStats };
+	}
+
+	// Reset notification statistics
+	resetNotificationStats(): void {
+		this.notificationStats = {
+			sent: 0,
+			delivered: 0,
+			opened: 0,
+			dismissed: 0,
+			byType: {},
+		};
+	}
+
+	// Notification batching to prevent spam
+	private notificationQueue: {
+		title: string;
+		message: string;
+		type: NotificationData['type'];
+		data?: any;
+		timestamp: number;
+	}[] = [];
+
+	private batchTimeout: ReturnType<typeof setTimeout> | null = null;
+	private readonly BATCH_DELAY = 5000; // 5 seconds
+	private readonly MAX_BATCH_SIZE = 3;
+
+	// Add notification to batch
+	private async addToBatch(
+		title: string,
+		message: string,
+		type: NotificationData['type'],
+		data?: any
+	): Promise<void> {
+		this.notificationQueue.push({
+			title,
+			message,
+			type,
+			data,
+			timestamp: Date.now(),
+		});
+
+		// Clear existing timeout
+		if (this.batchTimeout) {
+			clearTimeout(this.batchTimeout);
+		}
+
+		// If we've reached max batch size, send immediately
+		if (this.notificationQueue.length >= this.MAX_BATCH_SIZE) {
+			await this.processBatch();
+			return;
+		}
+
+		// Set timeout to process batch
+		this.batchTimeout = setTimeout(() => {
+			this.processBatch();
+		}, this.BATCH_DELAY);
+	}
+
+	// Process batched notifications
+	private async processBatch(): Promise<void> {
+		if (this.notificationQueue.length === 0) return;
+
+		const batch = [...this.notificationQueue];
+		this.notificationQueue = [];
+
+		if (this.batchTimeout) {
+			clearTimeout(this.batchTimeout);
+			this.batchTimeout = null;
+		}
+
+		// If only one notification, send it normally
+		if (batch.length === 1) {
+			const notification = batch[0];
+			await this.sendNotificationWithConsent(
+				notification.title,
+				notification.message,
+				notification.type,
+				notification.data
+			);
+			return;
+		}
+
+		// Group notifications by type
+		const grouped = batch.reduce((acc, notification) => {
+			const type = notification.type || 'system';
+			if (!acc[type]) acc[type] = [];
+			acc[type].push(notification);
+			return acc;
+		}, {} as Record<string, typeof batch>);
+
+		// Send grouped notifications
+		for (const [type, notifications] of Object.entries(grouped)) {
+			if (notifications.length === 1) {
+				const notification = notifications[0];
+				await this.sendNotificationWithConsent(
+					notification.title,
+					notification.message,
+					notification.type,
+					notification.data
+				);
+			} else {
+				// Send summary notification
+				const summaryTitle = `${notifications.length} ${type} notifications`;
+				const summaryMessage = `You have ${notifications.length} new ${type} notifications`;
+				await this.sendNotificationWithConsent(
+					summaryTitle,
+					summaryMessage,
+					type as NotificationData['type'],
+					{ batch: true, count: notifications.length, notifications }
+				);
+			}
+		}
+	}
+
+	// Send batched notification
+	async sendBatchedNotification(
+		title: string,
+		message: string,
+		type: NotificationData['type'] = 'system',
+		data?: any
+	): Promise<void> {
+		await this.addToBatch(title, message, type, data);
+	}
+
+	// Initialize notification service with background task registration
+	async initializeWithBackgroundTasks(): Promise<string | null> {
+		try {
+			// Initialize the basic notification service
+			const token = await this.initialize();
+
+			// Set up notification listeners
+			this.setupNotificationListeners();
+
+			// Register background tasks if available
+			try {
+				const { ensureBgPushRegistered } = await import(
+					'../notifications/backgroundTaskService'
+				);
+				await ensureBgPushRegistered();
+			} catch (error) {
+				console.log('⚠️ Background task service not available:', error);
+			}
+
+			return token;
+		} catch (error) {
+			console.error('❌ Error initializing with background tasks:', error);
+			return null;
+		}
+	}
+
+	// Get notification history with filtering
+	async getNotificationHistory(
+		page: number = 1,
+		limit: number = 20,
+		filters?: {
+			type?: NotificationData['type'];
+			unreadOnly?: boolean;
+			dateFrom?: Date;
+			dateTo?: Date;
+		}
+	): Promise<NotificationResponse | null> {
+		try {
+			const params = new URLSearchParams({
+				page: page.toString(),
+				limit: limit.toString(),
+				...(filters?.type && { type: filters.type }),
+				...(filters?.unreadOnly && {
+					unreadOnly: filters.unreadOnly.toString(),
+				}),
+				...(filters?.dateFrom && { dateFrom: filters.dateFrom.toISOString() }),
+				...(filters?.dateTo && { dateTo: filters.dateTo.toISOString() }),
+			});
+
+			const response = await ApiService.get<NotificationResponse>(
+				`/api/notifications/history?${params}`
+			);
+
+			if (response.success && response.data) {
+				return response.data;
+			} else {
+				console.error('❌ Failed to get notification history:', response.error);
+				return null;
+			}
+		} catch (error) {
+			console.error('❌ Error getting notification history:', error);
+			return null;
+		}
+	}
+
+	// Update notification preferences
+	async updateNotificationPreferences(preferences: {
+		enabled: boolean;
+		types: NotificationData['type'][];
+		quietHours?: {
+			start: string; // HH:MM format
+			end: string; // HH:MM format
+		};
+		frequency?: 'immediate' | 'hourly' | 'daily' | 'weekly';
+	}): Promise<boolean> {
+		try {
+			const response = await ApiService.put('/api/notifications/preferences', {
+				preferences,
+			});
+
+			if (response.success) {
+				console.log('✅ Notification preferences updated');
+				return true;
+			} else {
+				console.error(
+					'❌ Failed to update notification preferences:',
+					response.error
+				);
+				return false;
+			}
+		} catch (error) {
+			console.error('❌ Error updating notification preferences:', error);
+			return false;
+		}
+	}
+
+	// Check if notifications are in quiet hours
+	private isInQuietHours(quietHours?: { start: string; end: string }): boolean {
+		if (!quietHours) return false;
+
+		const now = new Date();
+		const currentTime = now.getHours() * 60 + now.getMinutes();
+
+		const [startHour, startMinute] = quietHours.start.split(':').map(Number);
+		const [endHour, endMinute] = quietHours.end.split(':').map(Number);
+
+		const startTime = startHour * 60 + startMinute;
+		const endTime = endHour * 60 + endMinute;
+
+		// Handle quiet hours that span midnight
+		if (startTime <= endTime) {
+			return currentTime >= startTime && currentTime <= endTime;
+		} else {
+			return currentTime >= startTime || currentTime <= endTime;
+		}
+	}
+
+	// Send notification with quiet hours check
+	async sendNotificationWithQuietHours(
+		title: string,
+		message: string,
+		type: NotificationData['type'] = 'system',
+		data?: any,
+		quietHours?: { start: string; end: string }
+	): Promise<boolean> {
+		// Check if we're in quiet hours
+		if (this.isInQuietHours(quietHours)) {
+			console.log('🔇 Notification suppressed during quiet hours');
+			return false;
+		}
+
+		return this.sendNotificationWithConsent(title, message, type, data);
 	}
 }
 

@@ -1,5 +1,8 @@
+// MUST be imported before anything that uses uuid/crypto
+import '../src/polyfills';
+
 import { Stack, useRouter, useSegments } from 'expo-router';
-import React, { Suspense, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 // @ts-ignore - react-query types will be available after install
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -10,7 +13,6 @@ import {
 	StyleSheet,
 	StatusBar,
 	Linking,
-	Platform,
 } from 'react-native';
 import useAuth, { AuthProvider } from '../src/context/AuthContext';
 import {
@@ -24,50 +26,53 @@ import { TransactionModalProvider } from '../src/context/transactionModalContext
 import { DemoDataProvider } from '../src/context/demoDataContext';
 
 import * as Notifications from 'expo-notifications';
-import * as TaskManager from 'expo-task-manager';
 
-// Import telemetry services
-import { featureFlags } from '../src/services/feature/featureFlags';
-import { crashReporting } from '../src/services/feature/crashReporting';
+// Import background task service
+import { ensureBgPushRegistered } from '../src/services/notifications/backgroundTaskService';
 
-// Import utility services
-import { actionQueueService } from '../src/services/utility/actionQueueService';
+// Import app initialization hook
+import { useAppInit } from '../src/hooks/useAppInit';
 
 // Demo mode toggle - set to true to enable demo mode
-const DEMO_MODE = true; // Enable demo mode for testing
+const DEMO_MODE = false; // Disable demo mode to enable authentication
 
 // Development mode toggle - set to true to allow onboarding access after completion
 const DEV_MODE = true; // Enable dev mode for testing onboarding
 
-const BACKGROUND_NOTIFICATION_TASK = 'BACKGROUND-NOTIFICATION-TASK';
+// Background task registration is now handled by backgroundTaskService
 
-// OK to define the task at module scope
-try {
-	TaskManager.defineTask(
-		BACKGROUND_NOTIFICATION_TASK,
-		async ({ data, error, executionInfo }) => {
-			try {
-				// Do something with the notification data
-				return {
-					shouldShowBanner: true,
-					shouldShowList: true,
-					shouldPlaySound: false,
-					shouldSetBadge: false,
-				};
-			} catch (taskError) {
-				console.warn('[TaskManager] Background task failed:', taskError);
-				return {
-					shouldShowBanner: false,
-					shouldShowList: false,
-					shouldPlaySound: false,
-					shouldSetBadge: false,
-				};
-			}
-		}
-	);
-} catch (error) {
-	console.warn('[TaskManager] Failed to define background task:', error);
-}
+const styles = StyleSheet.create({
+	demoIndicator: {
+		position: 'absolute',
+		top: 50,
+		right: 20,
+		backgroundColor: '#FF6B6B',
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		borderRadius: 20,
+		zIndex: 1000,
+	},
+	demoText: {
+		color: 'white',
+		fontSize: 12,
+		fontWeight: 'bold',
+	},
+	devIndicator: {
+		position: 'absolute',
+		top: 90,
+		right: 20,
+		backgroundColor: '#4CAF50',
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		borderRadius: 20,
+		zIndex: 1000,
+	},
+	devText: {
+		color: 'white',
+		fontSize: 12,
+		fontWeight: 'bold',
+	},
+});
 
 const queryClient = new QueryClient({
 	defaultOptions: {
@@ -92,6 +97,27 @@ function RootLayoutContent() {
 	const router = useRouter();
 	const segments = useSegments();
 	const [isMounted, setIsMounted] = useState(false);
+
+	// Add timeout mechanism to prevent infinite loading
+	const [loadingTimeout, setLoadingTimeout] = useState(false);
+
+	// Debug logging helper
+	const logState = (label: string) => {
+		console.log(`🔎 [Layout][${label}]`, {
+			loading,
+			loadingTimeout,
+			firebaseUser: !!firebaseUser,
+			user: !!user,
+			hasSeenOnboarding,
+			segments: segments.join('/'),
+			inAuthGroup: segments[0] === '(auth)',
+			inTabsGroup: segments[0] === '(tabs)',
+			inOnboardingGroup: segments[0] === '(onboarding)',
+			inStackGroup: segments[0] === '(stack)',
+			DEMO_MODE,
+			DEV_MODE,
+		});
+	};
 
 	useEffect(() => {
 		try {
@@ -120,27 +146,8 @@ function RootLayoutContent() {
 			);
 		}
 
-		// Avoid running on web and avoid duplicate registration
-		if (Platform.OS !== 'web') {
-			(async () => {
-				try {
-					const already = await TaskManager.isTaskRegisteredAsync(
-						BACKGROUND_NOTIFICATION_TASK
-					);
-					if (!already) {
-						try {
-							await Notifications.registerTaskAsync(
-								BACKGROUND_NOTIFICATION_TASK
-							);
-						} catch (error) {
-							console.warn('[Notifications] registerTaskAsync failed:', error);
-						}
-					}
-				} catch (e) {
-					console.warn('[Notifications] isTaskRegisteredAsync failed:', e);
-				}
-			})();
-		}
+		// Register background tasks using centralized service
+		ensureBgPushRegistered();
 	}, []);
 
 	// Handle deep links
@@ -190,73 +197,45 @@ function RootLayoutContent() {
 		};
 	}, []);
 
-	// Initialize telemetry services
+	// Initialize telemetry services using the hook
+	useAppInit();
+
+	// Add timeout mechanism to prevent infinite loading
 	useEffect(() => {
-		const initializeTelemetry = async () => {
-			try {
-				console.log('🚀 [Telemetry] Initializing services...');
+		if (loading || (user && hasSeenOnboarding === null)) {
+			// Set a timeout to prevent infinite loading
+			const timeout = setTimeout(() => {
+				console.log('⚠️ [Layout] Loading timeout reached, forcing navigation');
+				console.log('🔍 [Layout] Debug state:', {
+					loading,
+					user: !!user,
+					hasSeenOnboarding,
+					loadingTimeout,
+				});
+				setLoadingTimeout(true);
+			}, 5000); // Reduced to 5 second timeout
 
-				// Initialize feature flags first
-				try {
-					await featureFlags.initialize();
-					console.log('🚩 [FeatureFlags] Initialized');
-				} catch (error) {
-					console.warn('🚩 [FeatureFlags] Failed to initialize:', error);
-				}
-
-				// Initialize crash reporting
-				try {
-					await crashReporting.initialize();
-					console.log('🚨 [CrashReporting] Initialized');
-				} catch (error) {
-					console.warn('🚨 [CrashReporting] Failed to initialize:', error);
-				}
-
-				// Set user consent based on settings (you can integrate with user preferences)
-				try {
-					crashReporting.setUserConsent(true);
-				} catch (error) {
-					console.warn(
-						'🚨 [CrashReporting] Failed to set user consent:',
-						error
-					);
-				}
-
-				// Initialize analytics
-				console.log('📊 [Analytics] Initialized');
-
-				// Test crash reporting in development
-				if (__DEV__) {
-					try {
-						crashReporting.testCrashReporting();
-						crashReporting.testCrashlytics();
-					} catch (error) {
-						console.warn(
-							'🚨 [CrashReporting] Failed to test crash reporting:',
-							error
-						);
-					}
-				}
-
-				console.log('🚀 [Telemetry] All services initialized successfully');
-			} catch (error) {
-				console.warn(
-					'🚀 [Telemetry] Failed to initialize some services:',
-					error
-				);
-			}
-		};
-
-		initializeTelemetry();
-	}, []);
+			return () => clearTimeout(timeout);
+		}
+	}, [loading, user, hasSeenOnboarding, loadingTimeout]);
 
 	useEffect(() => {
 		try {
 			if (!isMounted) return;
+
+			// Debug logging
+			logState('nav-effect:start');
+
 			if (DEMO_MODE) {
 				// In dev mode, allow access to onboarding even in demo mode
 				if (DEV_MODE && segments[0] === '(onboarding)') {
 					// Allow staying on onboarding screens in dev mode
+					return;
+				}
+
+				// Allow access to (stack) group screens (like addGoal, addBudget, etc.)
+				if (segments[0] === '(stack)') {
+					// Allow staying on stack screens in demo mode
 					return;
 				}
 
@@ -274,7 +253,9 @@ function RootLayoutContent() {
 				}
 				return;
 			}
-			if (loading || (user && hasSeenOnboarding === null)) return;
+			// If still loading or onboarding status is unknown and no timeout, wait
+			if (loading || (user && hasSeenOnboarding === null && !loadingTimeout))
+				return;
 			const inAuthGroup = segments[0] === '(auth)';
 			const inTabsGroup = segments[0] === '(tabs)';
 			const inOnboardingGroup = segments[0] === '(onboarding)';
@@ -286,19 +267,26 @@ function RootLayoutContent() {
 					return;
 				}
 
-				if (!hasSeenOnboarding && !inOnboardingGroup) {
+				// If timeout reached, assume user has completed onboarding
+				const shouldShowOnboarding = !hasSeenOnboarding && !loadingTimeout;
+
+				if (shouldShowOnboarding && !inOnboardingGroup) {
 					try {
 						router.replace('/(onboarding)/profileSetup');
 					} catch (error) {
 						console.warn('Failed to navigate to onboarding:', error);
 					}
 				} else if (
-					hasSeenOnboarding &&
+					(hasSeenOnboarding || loadingTimeout) &&
 					!inTabsGroup &&
 					!inStackGroup &&
-					!inOnboardingGroup &&
-					!DEV_MODE // Don't redirect away from onboarding in dev mode
+					!inOnboardingGroup
 				) {
+					// Allow redirect even in DEV_MODE if we're "nowhere" (+not-found)
+					logState('nav-effect:redirecting');
+					console.log(
+						'🧭 [Layout] Redirecting to dashboard because we are not in any group'
+					);
 					try {
 						router.replace('/(tabs)/dashboard');
 					} catch (error) {
@@ -325,7 +313,16 @@ function RootLayoutContent() {
 		} catch (error) {
 			console.warn('Failed to handle navigation logic:', error);
 		}
-	}, [user, firebaseUser, loading, hasSeenOnboarding, segments, isMounted]);
+	}, [
+		user,
+		firebaseUser,
+		loading,
+		hasSeenOnboarding,
+		loadingTimeout,
+		segments,
+		isMounted,
+		router,
+	]);
 
 	if (DEMO_MODE) {
 		try {
@@ -381,32 +378,28 @@ function RootLayoutContent() {
 		}
 	}
 
-	if (loading || (user && hasSeenOnboarding === null)) {
-		try {
-			return (
-				<View
-					style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
-				>
-					<ActivityIndicator size="large" color="#007ACC" />
-					<Text style={{ color: '#007ACC', marginTop: 10 }}>Loading...</Text>
-				</View>
-			);
-		} catch (error) {
-			console.warn('Failed to render loading screen:', error);
-			// Fallback to basic loading screen
-			return (
-				<View
-					style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
-				>
-					<ActivityIndicator size="large" color="#007ACC" />
-					<Text style={{ color: '#007ACC', marginTop: 10 }}>Loading...</Text>
-				</View>
-			);
-		}
+	// Show spinner only while we're still genuinely loading AND we haven't timed out
+	if (
+		(loading && !loadingTimeout) ||
+		(user && hasSeenOnboarding === null && !loadingTimeout)
+	) {
+		console.log('🧩 [Layout] Rendering: loading screen');
+		return (
+			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+				<ActivityIndicator size="large" color="#007ACC" />
+				<Text style={{ color: '#007ACC', marginTop: 10 }}>Loading...</Text>
+				{loadingTimeout && (
+					<Text style={{ color: '#FF6B6B', marginTop: 10, fontSize: 12 }}>
+						Taking longer than expected...
+					</Text>
+				)}
+			</View>
+		);
 	}
 
 	// If user is authenticated, always wrap all screens in ProfileProvider
 	if (firebaseUser && user) {
+		console.log('🧩 [Layout] Rendering: authenticated app');
 		try {
 			return (
 				<ProfileProvider>
@@ -459,27 +452,17 @@ function RootLayoutContent() {
 	}
 
 	// For unauthenticated or auth screens, just show the stack (no user-dependent providers)
-	try {
-		return (
-			<GestureHandlerRootView style={{ flex: 1 }}>
-				<Stack>
-					<Stack.Screen name="(auth)" options={{ headerShown: false }} />
-					<Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
-					<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-					<Stack.Screen name="(stack)" options={{ headerShown: false }} />
-				</Stack>
-			</GestureHandlerRootView>
-		);
-	} catch (error) {
-		console.warn('Failed to render unauthenticated user layout:', error);
-		// Fallback to basic loading screen
-		return (
-			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-				<ActivityIndicator size="large" color="#007ACC" />
-				<Text style={{ color: '#007ACC', marginTop: 10 }}>Loading...</Text>
-			</View>
-		);
-	}
+	console.log('🧩 [Layout] Rendering: unauthenticated stack');
+	return (
+		<GestureHandlerRootView style={{ flex: 1 }}>
+			<Stack>
+				<Stack.Screen name="(auth)" options={{ headerShown: false }} />
+				<Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
+				<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+				<Stack.Screen name="(stack)" options={{ headerShown: false }} />
+			</Stack>
+		</GestureHandlerRootView>
+	);
 }
 
 export default function RootLayout() {
@@ -509,36 +492,3 @@ export default function RootLayout() {
 		);
 	}
 }
-
-const styles = StyleSheet.create({
-	demoIndicator: {
-		position: 'absolute',
-		top: 50,
-		right: 20,
-		backgroundColor: '#FF6B6B',
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		borderRadius: 20,
-		zIndex: 1000,
-	},
-	demoText: {
-		color: 'white',
-		fontSize: 12,
-		fontWeight: 'bold',
-	},
-	devIndicator: {
-		position: 'absolute',
-		top: 90,
-		right: 20,
-		backgroundColor: '#4CAF50',
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		borderRadius: 20,
-		zIndex: 1000,
-	},
-	devText: {
-		color: 'white',
-		fontSize: 12,
-		fontWeight: 'bold',
-	},
-});

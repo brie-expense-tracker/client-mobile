@@ -10,7 +10,7 @@ import {
 	TextInput,
 	Alert,
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useProfile } from '../../../../src/context/profileContext';
 
@@ -29,7 +29,6 @@ interface AIPrivacySettings {
 }
 
 export default function AIPrivacySettingsScreen() {
-	const router = useRouter();
 	const { profile } = useProfile();
 
 	const [settings, setSettings] = useState<AIPrivacySettings>({
@@ -108,7 +107,7 @@ export default function AIPrivacySettingsScreen() {
 		try {
 			// TODO: Save to API
 			Alert.alert('Success', 'Privacy settings saved successfully');
-		} catch (error) {
+		} catch {
 			Alert.alert('Error', 'Failed to save privacy settings');
 		}
 	};

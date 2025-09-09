@@ -7,7 +7,6 @@ import {
 	Text,
 	Switch,
 	StyleSheet,
-	TextInput,
 	TouchableOpacity,
 	Alert,
 	ActivityIndicator,
@@ -21,26 +20,32 @@ export default function BudgetSettingsScreen() {
 	const { profile, loading, updateBudgetSettings } = useProfile();
 
 	/* Local state for form inputs */
-	const [cycleType, setCycleType] = useState<'monthly' | 'weekly'>('monthly');
+	const [cycleType, setCycleType] = useState<'monthly' | 'weekly' | 'biweekly'>(
+		'monthly'
+	);
 	const [cycleStart, setCycleStart] = useState('1'); // 1 = Monday, 0 = Sunday for weekly; 1-28 for monthly
 	const [alertPct, setAlertPct] = useState('80');
 	const [carryOver, setCarryOver] = useState(false);
 	const [autoSync, setAutoSync] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [updatingCycleType, setUpdatingCycleType] = useState(false);
-	const [updatingCycleStart, setUpdatingCycleStart] = useState(false);
-	const [updatingAlertPct, setUpdatingAlertPct] = useState(false);
 	const [updatingCarryOver, setUpdatingCarryOver] = useState(false);
 	const [updatingAutoSync, setUpdatingAutoSync] = useState(false);
+	const [updatingCycleStart, setUpdatingCycleStart] = useState(false);
+	const [updatingAlertPct, setUpdatingAlertPct] = useState(false);
 	// Load settings from profile when available
 	useEffect(() => {
 		if (profile?.preferences?.budgetSettings) {
 			const settings = profile.preferences.budgetSettings;
-			// Ensure cycleType is either 'monthly' or 'weekly'
+			// Ensure cycleType is valid
 			const validCycleType =
-				settings.cycleType === 'weekly' ? 'weekly' : 'monthly';
+				settings.cycleType === 'weekly'
+					? 'weekly'
+					: settings.cycleType === 'biweekly'
+					? 'biweekly'
+					: 'monthly';
 			setCycleType(validCycleType);
-			// For monthly, use the stored value (1-28), for weekly use the stored value (0 or 1)
+			// For monthly, use the stored value (1-28), for weekly/biweekly use the stored value (0 or 1)
 			setCycleStart(settings.cycleStart?.toString() || '1');
 			setAlertPct(settings.alertPct?.toString() || '80');
 			setCarryOver(settings.carryOver || false);
@@ -63,10 +68,13 @@ export default function BudgetSettingsScreen() {
 			const alertPctNum = parseInt(alertPct);
 
 			// Validate cycle start based on type
-			if (cycleType === 'weekly' && (cycleStartNum < 0 || cycleStartNum > 1)) {
+			if (
+				(cycleType === 'weekly' || cycleType === 'biweekly') &&
+				(cycleStartNum < 0 || cycleStartNum > 1)
+			) {
 				Alert.alert(
 					'Invalid Input',
-					'Weekly cycle start must be 0 (Sunday) or 1 (Monday)'
+					'Weekly and biweekly cycle start must be 0 (Sunday) or 1 (Monday)'
 				);
 				return;
 			}
@@ -173,27 +181,55 @@ export default function BudgetSettingsScreen() {
 						icon="calendar-clear-outline"
 						loading={updatingCycleType}
 					/>
+					<OptionRow
+						label="Biweekly"
+						subtext="Reset every two weeks"
+						selected={cycleType === 'biweekly'}
+						onPress={() => {
+							setUpdatingCycleType(true);
+							setCycleType('biweekly');
+							// Simulate API call
+							setTimeout(() => setUpdatingCycleType(false), 500);
+						}}
+						icon="calendar-outline"
+						loading={updatingCycleType}
+					/>
 
-					{cycleType === 'weekly' && (
+					{(cycleType === 'weekly' || cycleType === 'biweekly') && (
 						<>
 							<Label>Reset Day of Week</Label>
 							<LabelSubtext>
 								Which day of the week your budgets reset
+								{cycleType === 'biweekly' ? ' (every two weeks)' : ''}
 							</LabelSubtext>
 
 							<OptionRow
 								label="Monday"
-								subtext="Reset on Monday each week"
+								subtext={`Reset on Monday ${
+									cycleType === 'biweekly' ? 'every two weeks' : 'each week'
+								}`}
 								selected={cycleStart === '1'}
-								onPress={() => setCycleStart('1')}
+								onPress={() => {
+									setUpdatingCycleStart(true);
+									setCycleStart('1');
+									setTimeout(() => setUpdatingCycleStart(false), 500);
+								}}
 								icon="calendar-outline"
+								loading={updatingCycleStart}
 							/>
 							<OptionRow
 								label="Sunday"
-								subtext="Reset on Sunday each week"
+								subtext={`Reset on Sunday ${
+									cycleType === 'biweekly' ? 'every two weeks' : 'each week'
+								}`}
 								selected={cycleStart === '0'}
-								onPress={() => setCycleStart('0')}
+								onPress={() => {
+									setUpdatingCycleStart(true);
+									setCycleStart('0');
+									setTimeout(() => setUpdatingCycleStart(false), 500);
+								}}
 								icon="calendar-clear-outline"
+								loading={updatingCycleStart}
 							/>
 						</>
 					)}
@@ -260,56 +296,83 @@ export default function BudgetSettingsScreen() {
 				{/* —— Spending Alerts —— */}
 				<Section title="Spending Alerts">
 					<SectionSubtext>
-						Get notified when you're approaching your budget limits
+						Get notified when you&apos;re approaching your budget limits
 					</SectionSubtext>
 
 					<Label>Alert Threshold</Label>
 					<LabelSubtext>
-						Get notified when you've spent this percentage of your budget
+						Get notified when you&apos;ve spent this percentage of your budget
 					</LabelSubtext>
 
 					<OptionRow
 						label="50%"
 						subtext="Early warning - get notified at half your budget"
 						selected={alertPct === '50'}
-						onPress={() => setAlertPct('50')}
+						onPress={() => {
+							setUpdatingAlertPct(true);
+							setAlertPct('50');
+							setTimeout(() => setUpdatingAlertPct(false), 500);
+						}}
 						icon="warning-outline"
+						loading={updatingAlertPct}
 					/>
 					<OptionRow
 						label="75%"
 						subtext="Moderate warning - get notified at three-quarters"
 						selected={alertPct === '75'}
-						onPress={() => setAlertPct('75')}
+						onPress={() => {
+							setUpdatingAlertPct(true);
+							setAlertPct('75');
+							setTimeout(() => setUpdatingAlertPct(false), 500);
+						}}
 						icon="alert-circle-outline"
+						loading={updatingAlertPct}
 					/>
 					<OptionRow
 						label="80%"
 						subtext="Standard warning - get notified near limit"
 						selected={alertPct === '80'}
-						onPress={() => setAlertPct('80')}
+						onPress={() => {
+							setUpdatingAlertPct(true);
+							setAlertPct('80');
+							setTimeout(() => setUpdatingAlertPct(false), 500);
+						}}
 						icon="notifications-outline"
+						loading={updatingAlertPct}
 					/>
 					<OptionRow
 						label="90%"
 						subtext="Late warning - get notified close to limit"
 						selected={alertPct === '90'}
-						onPress={() => setAlertPct('90')}
+						onPress={() => {
+							setUpdatingAlertPct(true);
+							setAlertPct('90');
+							setTimeout(() => setUpdatingAlertPct(false), 500);
+						}}
 						icon="alert-outline"
+						loading={updatingAlertPct}
 					/>
 					<OptionRow
 						label="100%"
 						subtext="Critical warning - get notified at limit"
 						selected={alertPct === '100'}
-						onPress={() => setAlertPct('100')}
+						onPress={() => {
+							setUpdatingAlertPct(true);
+							setAlertPct('100');
+							setTimeout(() => setUpdatingAlertPct(false), 500);
+						}}
 						icon="stop-circle-outline"
+						loading={updatingAlertPct}
 					/>
 
 					<View style={styles.alertExamples}>
 						<Text style={styles.alertExampleText}>
-							• At 80%: "You've spent 80% of your Groceries budget"
+							• At 80%: &quot;You&apos;ve spent 80% of your Groceries
+							budget&quot;
 						</Text>
 						<Text style={styles.alertExampleText}>
-							• At 100%: "You've reached your Dining budget limit"
+							• At 100%: &quot;You&apos;ve reached your Dining budget
+							limit&quot;
 						</Text>
 					</View>
 				</Section>
@@ -389,7 +452,13 @@ const Row = ({
 			thumbColor={value ? '#fff' : '#f4f3f4'}
 			disabled={loading}
 		/>
-		{loading && <ActivityIndicator size="small" color="#00a2ff" style={styles.loadingIndicator} />}
+		{loading && (
+			<ActivityIndicator
+				size="small"
+				color="#00a2ff"
+				style={styles.loadingIndicator}
+			/>
+		)}
 	</View>
 );
 
@@ -455,7 +524,7 @@ const LabelSubtext = ({ children }: { children: React.ReactNode }) => (
 
 const styles = StyleSheet.create({
 	safe: { flex: 1, backgroundColor: '#fff' },
-	container: { padding: 24, paddingBottom: 48 },
+	container: { padding: 16, paddingBottom: 32 },
 	sectionHeader: {
 		fontSize: 20,
 		fontWeight: '700',
@@ -465,20 +534,21 @@ const styles = StyleSheet.create({
 	sectionSubtext: {
 		fontSize: 14,
 		color: '#757575',
-		marginBottom: 20,
+		marginBottom: 12,
 		lineHeight: 20,
 	},
 	row: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
-		paddingVertical: 16,
+		paddingVertical: 12,
 		borderBottomWidth: 1,
 		borderBottomColor: '#f0f0f0',
+		backgroundColor: '#fff',
 	},
 	rowContent: {
 		flex: 1,
-		marginRight: 16,
+		marginRight: 12,
 	},
 	rowLabel: {
 		fontSize: 16,
@@ -495,17 +565,17 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
-		paddingVertical: 16,
+		paddingVertical: 12,
 		paddingHorizontal: 12,
-		borderRadius: 12,
+		borderRadius: 8,
 		borderWidth: 1,
 		borderColor: '#e0e0e0',
-		marginBottom: 8,
+		marginBottom: 6,
 		backgroundColor: '#fff',
 	},
 	selectedOptionRow: {
 		borderColor: '#00a2ff',
-		backgroundColor: '#f0f9ff',
+		backgroundColor: '#fff',
 	},
 	optionContent: {
 		flexDirection: 'row',
@@ -513,7 +583,7 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 	optionIcon: {
-		marginRight: 12,
+		marginRight: 8,
 	},
 	optionTextContainer: {
 		flex: 1,
@@ -540,29 +610,31 @@ const styles = StyleSheet.create({
 	label: {
 		fontSize: 16,
 		color: '#212121',
-		marginTop: 16,
-		marginBottom: 8,
+		marginTop: 12,
+		marginBottom: 6,
 		fontWeight: '600',
 	},
 	labelSubtext: {
 		fontSize: 14,
 		color: '#757575',
-		marginBottom: 12,
+		marginBottom: 8,
 		lineHeight: 18,
 	},
 	input: {
 		borderWidth: 1,
 		borderColor: '#e0e0e0',
-		borderRadius: 12,
-		padding: 16,
+		borderRadius: 8,
+		padding: 12,
 		fontSize: 16,
 		backgroundColor: '#fff',
 	},
 	alertExamples: {
-		backgroundColor: '#f8f9fa',
-		borderRadius: 12,
-		padding: 16,
-		marginBottom: 16,
+		backgroundColor: '#fff',
+		borderRadius: 8,
+		padding: 12,
+		marginBottom: 12,
+		borderWidth: 1,
+		borderColor: '#e0e0e0',
 	},
 	alertExampleText: {
 		fontSize: 14,
@@ -582,10 +654,10 @@ const styles = StyleSheet.create({
 	},
 	saveButton: {
 		backgroundColor: '#00a2ff',
-		padding: 16,
-		borderRadius: 12,
+		padding: 12,
+		borderRadius: 8,
 		alignItems: 'center',
-		marginTop: 24,
+		marginTop: 16,
 	},
 	saveButtonDisabled: {
 		backgroundColor: '#ccc',
@@ -598,14 +670,14 @@ const styles = StyleSheet.create({
 	monthDayPicker: {
 		borderWidth: 1,
 		borderColor: '#e0e0e0',
-		borderRadius: 12,
-		padding: 16,
+		borderRadius: 8,
+		padding: 12,
 		backgroundColor: '#fff',
 	},
 	picker: {
 		width: '100%',
 	},
 	loadingIndicator: {
-		marginLeft: 10,
+		marginLeft: 8,
 	},
 });

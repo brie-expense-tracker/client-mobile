@@ -11,9 +11,14 @@ import * as Notifications from 'expo-notifications';
 import {
 	notificationService,
 	NotificationData,
-	NotificationResponse,
 	NotificationConsent,
 } from '../services';
+
+interface NotificationFilter {
+	type?: NotificationData['type'];
+	read?: boolean;
+	priority?: NotificationData['priority'];
+}
 
 interface NotificationContextType {
 	expoPushToken: string | null;
@@ -22,8 +27,15 @@ interface NotificationContextType {
 	notifications: NotificationData[];
 	unreadCount: number;
 	loading: boolean;
+	hasMore: boolean;
+	currentPage: number;
+	filter: NotificationFilter;
 	initialize: () => Promise<void>;
 	getNotifications: (page?: number, limit?: number) => Promise<void>;
+	loadMoreNotifications: () => Promise<void>;
+	refreshNotifications: () => Promise<void>;
+	setFilter: (filter: Partial<NotificationFilter>) => void;
+	clearFilter: () => void;
 	markAsRead: (notificationId: string) => Promise<void>;
 	markAllAsRead: () => Promise<void>;
 	deleteNotification: (notificationId: string) => Promise<void>;
@@ -69,11 +81,24 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 	const [notifications, setNotifications] = useState<NotificationData[]>([]);
 	const [unreadCount, setUnreadCount] = useState<number>(0);
 	const [loading, setLoading] = useState<boolean>(false);
+	const [hasMore, setHasMore] = useState<boolean>(true);
+	const [currentPage, setCurrentPage] = useState<number>(1);
+	const [filter, setFilter] = useState<NotificationFilter>({});
 
 	const notificationListener = useRef<Notifications.EventSubscription | null>(
 		null
 	);
 	const responseListener = useRef<Notifications.EventSubscription | null>(null);
+
+	// Refresh unread count function - defined early to avoid hoisting issues
+	const refreshUnreadCount = useCallback(async () => {
+		try {
+			const count = await notificationService.getUnreadCount();
+			setUnreadCount(count);
+		} catch (err) {
+			console.error('Failed to refresh unread count:', err);
+		}
+	}, []);
 
 	// Initialize notification service
 	const initialize = useCallback(async () => {
@@ -98,7 +123,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 					: new Error('Failed to initialize notifications')
 			);
 		}
-	}, []);
+	}, [refreshUnreadCount]);
 
 	const getNotifications = useCallback(
 		async (page: number = 1, limit: number = 20) => {
@@ -110,6 +135,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 				);
 				if (response) {
 					setNotifications(response.notifications);
+					setCurrentPage(page);
+					setHasMore(response.notifications.length === limit);
 				}
 			} catch (err) {
 				setError(
@@ -122,21 +149,72 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 		[]
 	);
 
-	const markAsRead = useCallback(async (notificationId: string) => {
+	const loadMoreNotifications = useCallback(async () => {
+		if (!hasMore || loading) return;
+
 		try {
-			await notificationService.markAsRead(notificationId);
-			setNotifications((prev) =>
-				prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
-			);
-			refreshUnreadCount();
+			setLoading(true);
+			const nextPage = currentPage + 1;
+			const response = await notificationService.getNotifications(nextPage, 20);
+			if (response) {
+				setNotifications((prev) => [...prev, ...response.notifications]);
+				setCurrentPage(nextPage);
+				setHasMore(response.notifications.length === 20);
+			}
 		} catch (err) {
 			setError(
 				err instanceof Error
 					? err
-					: new Error('Failed to mark notification as read')
+					: new Error('Failed to load more notifications')
 			);
+		} finally {
+			setLoading(false);
 		}
-	}, []);
+	}, [hasMore, loading, currentPage]);
+
+	const refreshNotifications = useCallback(async () => {
+		setCurrentPage(1);
+		setHasMore(true);
+		await getNotifications(1, 20);
+	}, [getNotifications]);
+
+	const setFilterCallback = useCallback(
+		(newFilter: Partial<NotificationFilter>) => {
+			setFilter((prev) => ({ ...prev, ...newFilter }));
+			setCurrentPage(1);
+			setHasMore(true);
+			// Refresh notifications with new filter
+			getNotifications(1, 20);
+		},
+		[getNotifications]
+	);
+
+	const clearFilter = useCallback(() => {
+		setFilter({});
+		setCurrentPage(1);
+		setHasMore(true);
+		// Refresh notifications without filter
+		getNotifications(1, 20);
+	}, [getNotifications]);
+
+	const markAsRead = useCallback(
+		async (notificationId: string) => {
+			try {
+				await notificationService.markAsRead(notificationId);
+				setNotifications((prev) =>
+					prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
+				);
+				refreshUnreadCount();
+			} catch (err) {
+				setError(
+					err instanceof Error
+						? err
+						: new Error('Failed to mark notification as read')
+				);
+			}
+		},
+		[refreshUnreadCount]
+	);
 
 	const markAllAsRead = useCallback(async () => {
 		try {
@@ -152,17 +230,22 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 		}
 	}, []);
 
-	const deleteNotification = useCallback(async (notificationId: string) => {
-		try {
-			await notificationService.deleteNotification(notificationId);
-			setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
-			refreshUnreadCount();
-		} catch (err) {
-			setError(
-				err instanceof Error ? err : new Error('Failed to delete notification')
-			);
-		}
-	}, []);
+	const deleteNotification = useCallback(
+		async (notificationId: string) => {
+			try {
+				await notificationService.deleteNotification(notificationId);
+				setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+				refreshUnreadCount();
+			} catch (err) {
+				setError(
+					err instanceof Error
+						? err
+						: new Error('Failed to delete notification')
+				);
+			}
+		},
+		[refreshUnreadCount]
+	);
 
 	const deleteAllNotifications = useCallback(async () => {
 		try {
@@ -187,15 +270,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 					? err
 					: new Error('Failed to send test notification')
 			);
-		}
-	}, []);
-
-	const refreshUnreadCount = useCallback(async () => {
-		try {
-			const count = await notificationService.getUnreadCount();
-			setUnreadCount(count);
-		} catch (err) {
-			console.error('Failed to refresh unread count:', err);
 		}
 	}, []);
 
@@ -263,8 +337,15 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 				notifications,
 				unreadCount,
 				loading,
+				hasMore,
+				currentPage,
+				filter,
 				initialize,
 				getNotifications,
+				loadMoreNotifications,
+				refreshNotifications,
+				setFilter: setFilterCallback,
+				clearFilter,
 				markAsRead,
 				markAllAsRead,
 				deleteNotification,

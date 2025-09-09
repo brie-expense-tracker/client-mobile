@@ -1,7 +1,7 @@
 // sampleOutputGenerator.ts - Generates sample outputs for testing and demonstration
 // Shows what users actually see in the chat interface
 
-import { ChatResponse } from '../../components/assistant/responseSchema';
+import { ChatResponse } from '../../services/assistant/responseSchema';
 
 export interface SampleQuery {
 	userQuery: string;

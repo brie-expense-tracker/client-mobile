@@ -16,7 +16,6 @@ export default function DeleteAccountScreen() {
 	const router = useRouter();
 	const [confirmText, setConfirmText] = useState('');
 	const [password, setPassword] = useState('');
-	const [isDeleted, setIsDeleted] = useState(false);
 	const { deleteAccount, loading } = useAuth();
 
 	const isDeleteButtonEnabled = () => {

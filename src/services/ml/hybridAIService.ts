@@ -1,7 +1,6 @@
-import SmartCacheService, { CacheEntry } from '../utility/smartCacheService';
-import LocalMLService from './localMLService';
+import { SmartCacheService, CacheEntry } from '../utility/smartCacheService';
+import { LocalMLService } from './localMLService';
 import { ApiService } from '../core/apiService';
-import { useProfile } from '../../context/profileContext';
 
 export interface AIRequest {
 	type: 'categorization' | 'insight' | 'advice' | 'forecast' | 'analysis';
@@ -30,6 +29,26 @@ export interface CostMetrics {
 	averageCostPerRequest: number;
 }
 
+export interface PerformanceMetrics {
+	averageResponseTime: number;
+	successRate: number;
+	errorRate: number;
+	circuitBreakerState: 'closed' | 'open' | 'half-open';
+	lastError?: string;
+	lastErrorTime?: number;
+}
+
+export interface HealthStatus {
+	status: 'healthy' | 'degraded' | 'unhealthy';
+	services: {
+		cache: boolean;
+		localML: boolean;
+		ai: boolean;
+	};
+	lastCheck: number;
+	issues: string[];
+}
+
 export class HybridAIService {
 	private static instance: HybridAIService;
 	private cacheService = SmartCacheService.getInstance();
@@ -42,6 +61,20 @@ export class HybridAIService {
 		cached: 0,
 		ai: 0,
 	};
+	private startTime: number = Date.now();
+
+	// Performance monitoring
+	private responseTimes: number[] = [];
+	private errorCount = 0;
+	private successCount = 0;
+	private readonly MAX_RESPONSE_TIMES = 100; // Keep last 100 response times
+
+	// Circuit breaker for AI service
+	private circuitBreakerState: 'closed' | 'open' | 'half-open' = 'closed';
+	private circuitBreakerFailures = 0;
+	private circuitBreakerLastFailure = 0;
+	private readonly CIRCUIT_BREAKER_THRESHOLD = 5; // Open after 5 failures
+	private readonly CIRCUIT_BREAKER_TIMEOUT = 60000; // 1 minute timeout
 
 	// Cost estimates (in USD)
 	private readonly COST_ESTIMATES = {
@@ -137,13 +170,15 @@ export class HybridAIService {
 
 			if (cachedResponse) {
 				this.trackRequest('cache');
-				return this.createResponse(
+				const response = this.createResponse(
 					cachedResponse,
 					'cache',
 					1.0,
 					Date.now() - startTime,
 					false
 				);
+				this.recordResponseTime(Date.now() - startTime, true);
+				return response;
 			}
 
 			// Determine processing strategy
@@ -163,24 +198,72 @@ export class HybridAIService {
 					break;
 
 				case 'ai':
-					response = await this.processWithAI(request);
-					source = 'ai';
-					confidence = response.confidence || 0.9;
-					learningOpportunity = true;
+					if (this.isCircuitBreakerOpen()) {
+						console.warn(
+							'[HybridAIService] Circuit breaker is open, falling back to local processing'
+						);
+						response = await this.processLocally(request);
+						source = 'local';
+						confidence = response.confidence || 0.6;
+						learningOpportunity = true;
+					} else {
+						try {
+							response = await this.processWithAI(request);
+							source = 'ai';
+							confidence = response.confidence || 0.9;
+							learningOpportunity = true;
+							this.resetCircuitBreaker();
+						} catch (error) {
+							this.recordCircuitBreakerFailure();
+							throw error;
+						}
+					}
 					break;
 
 				case 'hybrid':
-					const [localResult, aiResult] = await Promise.all([
-						this.processLocally(request),
-						this.processWithAI(request),
+					const localPromise = this.processLocally(request);
+					let aiPromise: Promise<any> | null = null;
+
+					if (!this.isCircuitBreakerOpen()) {
+						aiPromise = this.processWithAI(request).catch((error) => {
+							this.recordCircuitBreakerFailure();
+							console.warn(
+								'[HybridAIService] AI processing failed in hybrid mode:',
+								error
+							);
+							return null;
+						});
+					}
+
+					const results = await Promise.allSettled([
+						localPromise,
+						...(aiPromise ? [aiPromise] : []),
 					]);
 
-					response = this.combineResults(localResult, aiResult);
-					source = 'hybrid';
-					confidence = Math.max(
-						localResult.confidence || 0,
-						aiResult.confidence || 0
-					);
+					const localResult =
+						results[0].status === 'fulfilled' ? results[0].value : null;
+					const aiResult =
+						results[1]?.status === 'fulfilled' ? results[1].value : null;
+
+					if (localResult && aiResult) {
+						response = this.combineResults(localResult, aiResult);
+						source = 'hybrid';
+						confidence = Math.max(
+							localResult.confidence || 0,
+							aiResult.confidence || 0
+						);
+					} else if (localResult) {
+						response = localResult;
+						source = 'local';
+						confidence = localResult.confidence || 0.7;
+					} else if (aiResult) {
+						response = aiResult;
+						source = 'ai';
+						confidence = aiResult.confidence || 0.9;
+					} else {
+						throw new Error('Both local and AI processing failed');
+					}
+
 					learningOpportunity = true;
 					break;
 
@@ -201,6 +284,7 @@ export class HybridAIService {
 
 			// Track request metrics
 			this.trackRequest(source);
+			this.recordResponseTime(Date.now() - startTime, true);
 
 			return this.createResponse(
 				response,
@@ -211,11 +295,13 @@ export class HybridAIService {
 			);
 		} catch (error) {
 			console.error('[HybridAIService] Error processing request:', error);
+			this.recordResponseTime(Date.now() - startTime, false);
 
 			// Fallback to local processing
 			try {
 				const fallbackResponse = await this.processLocally(request);
 				this.trackRequest('local');
+				this.recordResponseTime(Date.now() - startTime, true);
 
 				return this.createResponse(
 					fallbackResponse,
@@ -226,6 +312,7 @@ export class HybridAIService {
 				);
 			} catch (fallbackError) {
 				console.error('[HybridAIService] Fallback also failed:', fallbackError);
+				this.recordResponseTime(Date.now() - startTime, false);
 				throw error;
 			}
 		}
@@ -235,7 +322,7 @@ export class HybridAIService {
 	 * Determine the best processing strategy for a request
 	 */
 	private determineStrategy(request: AIRequest): 'local' | 'ai' | 'hybrid' {
-		const { type, priority, context } = request;
+		const { type, priority } = request;
 
 		// High priority requests always use AI for best quality
 		if (priority === 'high') {
@@ -270,13 +357,14 @@ export class HybridAIService {
 	 * Estimate confidence of local processing
 	 */
 	private estimateLocalConfidence(request: AIRequest): number {
-		const { type, query, data } = request;
+		const { type, data } = request;
 
 		if (type === 'categorization' && data?.description) {
 			// Check if we have vendor patterns for this transaction
-			const vendor = this.localMLService['extractVendor'](data.description);
-			// This would need access to vendor patterns, simplified for now
-			return 0.7;
+			const vendor = this.extractVendorFromDescription(data.description);
+			// Check if we have learned patterns for this vendor
+			const hasVendorPattern = this.localMLService.hasVendorPattern(vendor);
+			return hasVendorPattern ? 0.8 : 0.6;
 		}
 
 		if (type === 'forecast') {
@@ -285,6 +373,34 @@ export class HybridAIService {
 		}
 
 		return 0.5; // Default confidence
+	}
+
+	/**
+	 * Extract vendor from transaction description
+	 */
+	private extractVendorFromDescription(description: string): string {
+		// Simple vendor extraction - can be enhanced
+		const words = description.toLowerCase().split(/\s+/);
+		// Look for common vendor indicators
+		const vendorKeywords = [
+			'inc',
+			'llc',
+			'corp',
+			'ltd',
+			'co',
+			'store',
+			'shop',
+			'market',
+		];
+
+		for (let i = 0; i < words.length - 1; i++) {
+			if (vendorKeywords.some((keyword) => words[i + 1]?.includes(keyword))) {
+				return words[i];
+			}
+		}
+
+		// Fallback to first word if no pattern found
+		return words[0] || 'unknown';
 	}
 
 	/**
@@ -535,7 +651,7 @@ export class HybridAIService {
 				cacheStats: this.cacheService.getCacheStats(),
 				mlStats: this.localMLService.getModelMetrics(),
 				costMetrics: this.getCostMetrics(),
-				uptime: Date.now() - (this as any).startTime || 0,
+				uptime: Date.now() - this.startTime,
 			};
 		} catch (error) {
 			console.error('[HybridAIService] Error getting service metrics:', error);
@@ -603,6 +719,141 @@ export class HybridAIService {
 		} catch (error) {
 			console.error('[HybridAIService] Error learning from feedback:', error);
 		}
+	}
+
+	/**
+	 * Record response time and success/failure for performance monitoring
+	 */
+	private recordResponseTime(responseTime: number, success: boolean): void {
+		// Add response time to rolling window
+		this.responseTimes.push(responseTime);
+		if (this.responseTimes.length > this.MAX_RESPONSE_TIMES) {
+			this.responseTimes.shift();
+		}
+
+		// Update success/error counts
+		if (success) {
+			this.successCount++;
+		} else {
+			this.errorCount++;
+		}
+	}
+
+	/**
+	 * Check if circuit breaker is open
+	 */
+	private isCircuitBreakerOpen(): boolean {
+		if (this.circuitBreakerState === 'open') {
+			// Check if timeout has passed
+			if (
+				Date.now() - this.circuitBreakerLastFailure >
+				this.CIRCUIT_BREAKER_TIMEOUT
+			) {
+				this.circuitBreakerState = 'half-open';
+				return false;
+			}
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Record a circuit breaker failure
+	 */
+	private recordCircuitBreakerFailure(): void {
+		this.circuitBreakerFailures++;
+		this.circuitBreakerLastFailure = Date.now();
+
+		if (this.circuitBreakerFailures >= this.CIRCUIT_BREAKER_THRESHOLD) {
+			this.circuitBreakerState = 'open';
+			console.warn('[HybridAIService] Circuit breaker opened due to failures');
+		}
+	}
+
+	/**
+	 * Reset circuit breaker after successful request
+	 */
+	private resetCircuitBreaker(): void {
+		if (this.circuitBreakerState === 'half-open') {
+			this.circuitBreakerState = 'closed';
+			this.circuitBreakerFailures = 0;
+			console.log('[HybridAIService] Circuit breaker reset to closed');
+		}
+	}
+
+	/**
+	 * Get performance metrics
+	 */
+	getPerformanceMetrics(): PerformanceMetrics {
+		const totalRequests = this.successCount + this.errorCount;
+		const averageResponseTime =
+			this.responseTimes.length > 0
+				? this.responseTimes.reduce((sum, time) => sum + time, 0) /
+				  this.responseTimes.length
+				: 0;
+
+		const successRate =
+			totalRequests > 0 ? this.successCount / totalRequests : 0;
+		const errorRate = totalRequests > 0 ? this.errorCount / totalRequests : 0;
+
+		return {
+			averageResponseTime,
+			successRate,
+			errorRate,
+			circuitBreakerState: this.circuitBreakerState,
+			lastError: this.errorCount > 0 ? 'See logs for details' : undefined,
+			lastErrorTime: this.errorCount > 0 ? Date.now() : undefined,
+		};
+	}
+
+	/**
+	 * Get health status of all services
+	 */
+	async getHealthStatus(): Promise<HealthStatus> {
+		const issues: string[] = [];
+		let status: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
+
+		// Check cache service
+		let cacheHealthy = true;
+		try {
+			await this.cacheService.getCacheStats();
+		} catch {
+			cacheHealthy = false;
+			issues.push('Cache service unavailable');
+		}
+
+		// Check local ML service
+		let localMLHealthy = true;
+		try {
+			await this.localMLService.getModelMetrics();
+		} catch {
+			localMLHealthy = false;
+			issues.push('Local ML service unavailable');
+		}
+
+		// Check AI service (circuit breaker state)
+		const aiHealthy = !this.isCircuitBreakerOpen();
+		if (!aiHealthy) {
+			issues.push('AI service circuit breaker is open');
+		}
+
+		// Determine overall status
+		if (!cacheHealthy && !localMLHealthy) {
+			status = 'unhealthy';
+		} else if (!cacheHealthy || !localMLHealthy || !aiHealthy) {
+			status = 'degraded';
+		}
+
+		return {
+			status,
+			services: {
+				cache: cacheHealthy,
+				localML: localMLHealthy,
+				ai: aiHealthy,
+			},
+			lastCheck: Date.now(),
+			issues,
+		};
 	}
 }
 

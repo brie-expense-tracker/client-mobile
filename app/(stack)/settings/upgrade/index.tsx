@@ -110,7 +110,7 @@ export default function UpgradeScreen() {
 					Object.keys(data).find((k) => data[k].popular) ??
 					Object.keys(data)[0];
 				setSelectedTier(defaultKey);
-			} catch (e) {
+			} catch {
 				setError('Unable to load plans. Please try again.');
 			} finally {
 				setFetching(false);
@@ -169,7 +169,7 @@ export default function UpgradeScreen() {
 				`You’re on the ${titleCase(selectedTier)} plan.`,
 				[{ text: 'Continue', onPress: () => router.back() }]
 			);
-		} catch (e) {
+		} catch {
 			Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 			Alert.alert('Upgrade failed', 'Please try again in a moment.');
 		} finally {

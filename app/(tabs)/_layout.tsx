@@ -99,6 +99,16 @@ export default function TabLayout() {
 								tabBarLabel: 'Budgets',
 							}}
 						/>
+						<Tabs.Screen
+							name="reflections"
+							options={{
+								tabBarIcon: ({ color, size }) => (
+									<Ionicons name="journal-outline" color={color} size={size} />
+								),
+								tabBarShowLabel: false,
+								tabBarLabel: 'Reflections',
+							}}
+						/>
 					</Tabs>
 
 					{/* Transaction Choice Modal */}

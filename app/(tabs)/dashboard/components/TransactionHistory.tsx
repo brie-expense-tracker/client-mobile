@@ -1,10 +1,22 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import {
+	View,
+	Text,
+	TouchableOpacity,
+	StyleSheet,
+	ActivityIndicator,
+} from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { BorderlessButton } from 'react-native-gesture-handler';
 import { useBudget } from '../../../../src/context/budgetContext';
 import { useGoal } from '../../../../src/context/goalContext';
+import {
+	accessibilityProps,
+	dynamicTextStyle,
+	generateAccessibilityLabel,
+	voiceOverHints,
+} from '../../../../src/utils/accessibility';
 
 interface Transaction {
 	id: string;
@@ -26,6 +38,7 @@ interface Transaction {
 interface TransactionHistoryProps {
 	transactions: Transaction[];
 	onPress: (isPressed: boolean) => void;
+	isLoading?: boolean;
 }
 
 const currency = new Intl.NumberFormat('en-US', {
@@ -76,7 +89,7 @@ const formatTransactionDate = (dateString: string): string => {
 			month: 'short',
 			day: 'numeric',
 		});
-	} catch (error) {
+	} catch {
 		return 'Invalid Date';
 	}
 };
@@ -84,6 +97,7 @@ const formatTransactionDate = (dateString: string): string => {
 const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 	transactions,
 	onPress,
+	isLoading = false,
 }) => {
 	const { budgets } = useBudget();
 	const { goals } = useGoal();
@@ -172,27 +186,93 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 		}
 	};
 
+	// Show loading state
+	if (isLoading) {
+		return (
+			<View style={styles.transactionsSectionContainer}>
+				<View style={styles.transactionsHeader}>
+					<Text
+						style={[styles.transactionsTitle, dynamicTextStyle]}
+						accessibilityRole="header"
+						accessibilityLabel="Recent Activity section"
+					>
+						Recent Activity
+					</Text>
+				</View>
+				<View style={styles.transactionsListContainer}>
+					<View style={styles.loadingContainer}>
+						<ActivityIndicator size="small" color="#007AFF" />
+						<Text
+							style={[styles.loadingText, dynamicTextStyle]}
+							accessibilityRole="text"
+							accessibilityLabel="Loading transactions"
+						>
+							Loading transactions...
+						</Text>
+					</View>
+				</View>
+			</View>
+		);
+	}
+
 	return (
 		<View style={styles.transactionsSectionContainer}>
 			<View style={styles.transactionsHeader}>
-				<Text style={styles.transactionsTitle}>Recent Activity</Text>
-				<TouchableOpacity onPress={() => router.push('/dashboard/ledger')}>
-					<Text style={styles.viewAllText}>View All</Text>
+				<Text
+					style={[styles.transactionsTitle, dynamicTextStyle]}
+					accessibilityRole="header"
+					accessibilityLabel="Recent Activity section"
+				>
+					Recent Activity
+				</Text>
+				<TouchableOpacity
+					onPress={() => router.push('/dashboard/ledger')}
+					{...accessibilityProps.button}
+					accessibilityLabel={generateAccessibilityLabel.button(
+						'View all',
+						'transactions'
+					)}
+					accessibilityHint={voiceOverHints.navigate}
+				>
+					<Text style={[styles.viewAllText, dynamicTextStyle]}>View All</Text>
 				</TouchableOpacity>
 			</View>
 
-			<View style={styles.transactionsListContainer}>
+			<View
+				style={styles.transactionsListContainer}
+				accessibilityLabel="Recent transactions list"
+			>
 				{recentTransactions.length > 0 ? (
-					recentTransactions.map((t) => {
+					recentTransactions.map((t, index) => {
 						// Get icon and color from transaction's target
 						const iconData = getTransactionContext(t);
+						const amountText = currency(isNaN(t.amount) ? 0 : t.amount);
+						const dateText = formatTransactionDate(t.date);
+						const targetName = getTargetName(t);
 
 						return (
-							<View key={t.id} style={styles.transactionItem}>
+							<View
+								key={t.id}
+								style={styles.transactionItem}
+								accessibilityRole="button"
+								accessibilityLabel={generateAccessibilityLabel.transactionItem(
+									t.description,
+									`${t.type === 'income' ? '+' : '-'}${amountText}`,
+									dateText
+								)}
+								accessibilityHint={`${targetName}. ${voiceOverHints.navigate}`}
+							>
 								<BorderlessButton
 									onPress={() => router.push('/dashboard/ledger')}
 									style={styles.transactionContent}
 									onActiveStateChange={onPress}
+									{...accessibilityProps.button}
+									accessibilityLabel={generateAccessibilityLabel.transactionItem(
+										t.description,
+										`${t.type === 'income' ? '+' : '-'}${amountText}`,
+										dateText
+									)}
+									accessibilityHint={`${targetName}. ${voiceOverHints.navigate}`}
 								>
 									<View style={styles.transactionLeft}>
 										<View
@@ -200,6 +280,8 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 												styles.iconContainer,
 												{ backgroundColor: `${iconData.color}20` },
 											]}
+											accessibilityRole="image"
+											accessibilityLabel={`${targetName} icon`}
 										>
 											<Ionicons
 												name={iconData.icon}
@@ -208,11 +290,20 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 											/>
 										</View>
 										<View style={styles.transactionInfo}>
-											<Text style={styles.transactionDescription}>
+											<Text
+												style={[
+													styles.transactionDescription,
+													dynamicTextStyle,
+												]}
+												accessibilityRole="text"
+											>
 												{t.description}
 											</Text>
-											<Text style={styles.transactionCategory}>
-												{getTargetName(t)}
+											<Text
+												style={[styles.transactionCategory, dynamicTextStyle]}
+												accessibilityRole="text"
+											>
+												{targetName}
 											</Text>
 										</View>
 									</View>
@@ -224,13 +315,17 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 												t.type === 'income'
 													? styles.incomeAmount
 													: styles.expenseAmount,
+												dynamicTextStyle,
 											]}
+											accessibilityRole="text"
 										>
-											{t.type === 'income' ? '+' : '-'}{' '}
-											{currency(isNaN(t.amount) ? 0 : t.amount)}
+											{t.type === 'income' ? '+' : '-'} {amountText}
 										</Text>
-										<Text style={styles.transactionDate}>
-											{formatTransactionDate(t.date)}
+										<Text
+											style={[styles.transactionDate, dynamicTextStyle]}
+											accessibilityRole="text"
+										>
+											{dateText}
 										</Text>
 									</View>
 								</BorderlessButton>
@@ -238,9 +333,24 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 						);
 					})
 				) : (
-					<View style={styles.emptyContainer}>
-						<Ionicons name="document-outline" size={48} color="#ccc" />
-						<Text style={styles.emptyText}>No transactions</Text>
+					<View
+						style={styles.emptyContainer}
+						accessibilityRole="text"
+						accessibilityLabel="No transactions available"
+					>
+						<Ionicons
+							name="document-outline"
+							size={48}
+							color="#ccc"
+							accessibilityRole="image"
+							accessibilityLabel="Empty transactions icon"
+						/>
+						<Text
+							style={[styles.emptyText, dynamicTextStyle]}
+							accessibilityRole="text"
+						>
+							No transactions
+						</Text>
 					</View>
 				)}
 			</View>
@@ -331,6 +441,18 @@ const styles = StyleSheet.create({
 	emptyText: {
 		marginTop: 16,
 		fontSize: 16,
+		color: '#666',
+		fontWeight: '500',
+	},
+	loadingContainer: {
+		justifyContent: 'center',
+		alignItems: 'center',
+		paddingVertical: 40,
+		flexDirection: 'row',
+		gap: 12,
+	},
+	loadingText: {
+		fontSize: 14,
 		color: '#666',
 		fontWeight: '500',
 	},

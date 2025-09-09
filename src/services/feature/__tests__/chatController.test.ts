@@ -8,20 +8,20 @@ import {
 } from '../chatController';
 
 // Mock dependencies
-jest.mock('../../components/assistant/intentMapper', () => ({
+jest.mock('../../services/assistant/intentMapper', () => ({
 	detectIntent: jest.fn(),
 }));
 
-jest.mock('../../components/assistant/routeModel', () => ({
+jest.mock('../../services/assistant/routeModel', () => ({
 	pickModel: jest.fn(),
 	executeHybridCostOptimization: jest.fn(),
 }));
 
-jest.mock('../../components/assistant/responseSchema', () => ({
+jest.mock('../../services/assistant/responseSchema', () => ({
 	composeStructuredResponse: jest.fn(),
 }));
 
-jest.mock('../../components/assistant/helpfulFallbacks', () => ({
+jest.mock('../../services/assistant/helpfulFallbacks', () => ({
 	helpfulFallback: jest.fn(),
 }));
 
@@ -172,9 +172,9 @@ describe('ChatController', () => {
 			jest.spyOn(chatController as any, 'tryGrounded').mockResolvedValue(null);
 
 			// Mock helpful fallback
-			const {
-				helpfulFallback,
-			} = require('../../components/assistant/helpfulFallbacks');
+			const { helpfulFallback } = jest.requireMock(
+				'../../services/assistant/helpfulFallbacks'
+			);
 			helpfulFallback.mockReturnValue({
 				message:
 					'I can help you with your finances. What would you like to know?',
@@ -245,9 +245,9 @@ describe('ChatController', () => {
 				.mockRejectedValue(new Error('Database connection failed'));
 
 			// Mock helpful fallback
-			const {
-				helpfulFallback,
-			} = require('../../components/assistant/helpfulFallbacks');
+			const { helpfulFallback } = jest.requireMock(
+				'../../services/assistant/helpfulFallbacks'
+			);
 			helpfulFallback.mockReturnValue({
 				message:
 					"I'm having trouble accessing your data right now. Please try again.",

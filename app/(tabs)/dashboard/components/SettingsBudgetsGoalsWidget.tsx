@@ -1,14 +1,22 @@
 import React, { useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import {
+	View,
+	Text,
+	TouchableOpacity,
+	StyleSheet,
+	ActivityIndicator,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useBudget } from '../../../../src/context/budgetContext';
 import { useGoal } from '../../../../src/context/goalContext';
 
-const currency = new Intl.NumberFormat('en-US', {
-	style: 'currency',
-	currency: 'USD',
-}).format;
+const formatCurrency = (amount: number): string => {
+	return new Intl.NumberFormat('en-US', {
+		style: 'currency',
+		currency: 'USD',
+	}).format(amount);
+};
 
 interface SettingsBudgetsGoalsWidgetProps {
 	compact?: boolean;
@@ -17,8 +25,8 @@ interface SettingsBudgetsGoalsWidgetProps {
 const SettingsBudgetsGoalsWidget: React.FC<SettingsBudgetsGoalsWidgetProps> = ({
 	compact = false,
 }) => {
-	const { budgets } = useBudget();
-	const { goals } = useGoal();
+	const { budgets, isLoading: budgetsLoading } = useBudget();
+	const { goals, isLoading: goalsLoading } = useGoal();
 
 	const summary = useMemo(() => {
 		// Budget summary
@@ -43,8 +51,14 @@ const SettingsBudgetsGoalsWidget: React.FC<SettingsBudgetsGoalsWidgetProps> = ({
 			goalProgress,
 			budgetsCount: budgets.length,
 			goalsCount: goals.length,
+			totalBudgetAllocated,
+			totalBudgetSpent,
+			totalGoalTarget,
+			totalGoalCurrent,
 		};
 	}, [budgets, goals]);
+
+	const isLoading = budgetsLoading || goalsLoading;
 
 	const getBudgetStatusColor = (utilization: number) => {
 		if (utilization > 90) return '#dc2626';
@@ -65,9 +79,21 @@ const SettingsBudgetsGoalsWidget: React.FC<SettingsBudgetsGoalsWidgetProps> = ({
 					<TouchableOpacity
 						style={styles.compactButton}
 						onPress={() => router.push('/(tabs)/budgets?tab=goals')}
+						disabled={isLoading}
 					>
-						<Ionicons name="flag-outline" size={20} color="#666" />
+						{isLoading ? (
+							<ActivityIndicator size="small" color="#666" />
+						) : (
+							<Ionicons name="flag-outline" size={20} color="#666" />
+						)}
 						<Text style={styles.compactButtonText}>Goals</Text>
+						{summary.goalsCount > 0 && !isLoading && (
+							<View style={styles.compactBadge}>
+								<Text style={styles.compactBadgeText}>
+									{summary.goalsCount}
+								</Text>
+							</View>
+						)}
 					</TouchableOpacity>
 
 					<View style={styles.divider} />
@@ -75,9 +101,21 @@ const SettingsBudgetsGoalsWidget: React.FC<SettingsBudgetsGoalsWidgetProps> = ({
 					<TouchableOpacity
 						style={styles.compactButton}
 						onPress={() => router.push('/(tabs)/budgets?tab=budgets')}
+						disabled={isLoading}
 					>
-						<Ionicons name="wallet-outline" size={20} color="#666" />
+						{isLoading ? (
+							<ActivityIndicator size="small" color="#666" />
+						) : (
+							<Ionicons name="wallet-outline" size={20} color="#666" />
+						)}
 						<Text style={styles.compactButtonText}>Budgets</Text>
+						{summary.budgetsCount > 0 && !isLoading && (
+							<View style={styles.compactBadge}>
+								<Text style={styles.compactBadgeText}>
+									{summary.budgetsCount}
+								</Text>
+							</View>
+						)}
 					</TouchableOpacity>
 
 					<View style={styles.divider} />
@@ -117,32 +155,50 @@ const SettingsBudgetsGoalsWidget: React.FC<SettingsBudgetsGoalsWidgetProps> = ({
 				<TouchableOpacity
 					style={styles.card}
 					onPress={() => router.push('/(tabs)/budgets?tab=budgets')}
+					disabled={isLoading}
 				>
 					<View style={styles.cardHeader}>
 						<View style={styles.iconWrapper}>
-							<Ionicons name="wallet-outline" size={24} color="#00a2ff" />
+							{isLoading ? (
+								<ActivityIndicator size="small" color="#00a2ff" />
+							) : (
+								<Ionicons name="wallet-outline" size={24} color="#00a2ff" />
+							)}
 						</View>
 						<Text style={styles.cardTitle}>Budgets</Text>
+						{summary.budgetsCount > 0 && !isLoading && (
+							<View style={styles.badge}>
+								<Text style={styles.badgeText}>{summary.budgetsCount}</Text>
+							</View>
+						)}
 					</View>
 					<Text style={styles.cardSubtitle}>
-						{summary.budgetsCount > 0
+						{isLoading
+							? 'Loading...'
+							: summary.budgetsCount > 0
 							? `${summary.budgetUtilization.toFixed(0)}% used`
 							: 'No budgets set'}
 					</Text>
-					{summary.budgetsCount > 0 && (
-						<View style={styles.progressBar}>
-							<View
-								style={[
-									styles.progressFill,
-									{
-										width: `${Math.min(summary.budgetUtilization, 100)}%`,
-										backgroundColor: getBudgetStatusColor(
-											summary.budgetUtilization
-										),
-									},
-								]}
-							/>
-						</View>
+					{summary.budgetsCount > 0 && !isLoading && (
+						<>
+							<Text style={styles.amountText}>
+								{formatCurrency(summary.totalBudgetSpent)} of{' '}
+								{formatCurrency(summary.totalBudgetAllocated)}
+							</Text>
+							<View style={styles.progressBar}>
+								<View
+									style={[
+										styles.progressFill,
+										{
+											width: `${Math.min(summary.budgetUtilization, 100)}%`,
+											backgroundColor: getBudgetStatusColor(
+												summary.budgetUtilization
+											),
+										},
+									]}
+								/>
+							</View>
+						</>
 					)}
 				</TouchableOpacity>
 
@@ -150,30 +206,48 @@ const SettingsBudgetsGoalsWidget: React.FC<SettingsBudgetsGoalsWidgetProps> = ({
 				<TouchableOpacity
 					style={styles.card}
 					onPress={() => router.push('/(tabs)/budgets?tab=goals')}
+					disabled={isLoading}
 				>
 					<View style={styles.cardHeader}>
 						<View style={styles.iconWrapper}>
-							<Ionicons name="flag-outline" size={24} color="#9c27b0" />
+							{isLoading ? (
+								<ActivityIndicator size="small" color="#9c27b0" />
+							) : (
+								<Ionicons name="flag-outline" size={24} color="#9c27b0" />
+							)}
 						</View>
 						<Text style={styles.cardTitle}>Goals</Text>
+						{summary.goalsCount > 0 && !isLoading && (
+							<View style={styles.badge}>
+								<Text style={styles.badgeText}>{summary.goalsCount}</Text>
+							</View>
+						)}
 					</View>
 					<Text style={styles.cardSubtitle}>
-						{summary.goalsCount > 0
+						{isLoading
+							? 'Loading...'
+							: summary.goalsCount > 0
 							? `${summary.goalProgress.toFixed(0)}% complete`
 							: 'No goals set'}
 					</Text>
-					{summary.goalsCount > 0 && (
-						<View style={styles.progressBar}>
-							<View
-								style={[
-									styles.progressFill,
-									{
-										width: `${Math.min(summary.goalProgress, 100)}%`,
-										backgroundColor: getGoalStatusColor(summary.goalProgress),
-									},
-								]}
-							/>
-						</View>
+					{summary.goalsCount > 0 && !isLoading && (
+						<>
+							<Text style={styles.amountText}>
+								{formatCurrency(summary.totalGoalCurrent)} of{' '}
+								{formatCurrency(summary.totalGoalTarget)}
+							</Text>
+							<View style={styles.progressBar}>
+								<View
+									style={[
+										styles.progressFill,
+										{
+											width: `${Math.min(summary.goalProgress, 100)}%`,
+											backgroundColor: getGoalStatusColor(summary.goalProgress),
+										},
+									]}
+								/>
+							</View>
+						</>
 					)}
 				</TouchableOpacity>
 			</View>
@@ -242,7 +316,13 @@ const styles = StyleSheet.create({
 	cardSubtitle: {
 		fontSize: 14,
 		color: '#666',
+		marginBottom: 4,
+	},
+	amountText: {
+		fontSize: 12,
+		color: '#888',
 		marginBottom: 8,
+		fontWeight: '500',
 	},
 	badge: {
 		backgroundColor: '#00a2ff',

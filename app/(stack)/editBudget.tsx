@@ -9,14 +9,11 @@ import {
 	Alert,
 	ActivityIndicator,
 	SafeAreaView,
-	Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useBudgets } from '../../src/hooks/useBudgets';
 import { Budget } from '../../src/context/budgetContext';
-
-const { width } = Dimensions.get('window');
 
 // Popular budget icons
 const budgetIcons: (keyof typeof Ionicons.glyphMap)[] = [

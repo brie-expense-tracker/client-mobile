@@ -1,8 +1,7 @@
 // analytics/shadow.ts - Shadow A/B testing for safe AI experimentation
 // Runs current and candidate prompts in parallel without changing UX
 
-import { emit } from './emit';
-import { getSessionId, getMessageId } from './emit';
+import { emit, getSessionId, getMessageId } from './emit';
 
 export interface ShadowConfig {
 	rate: number; // 0.05 = 5% of traffic

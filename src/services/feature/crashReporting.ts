@@ -1,7 +1,7 @@
 // crashReporting.ts - Crash reporting service with Sentry and Firebase Crashlytics
 // Provides production-ready crash reporting with PII protection and user consent
 
-import { TELEMETRY_CONFIG, SAMPLING_CONFIG } from '../../config/telemetry';
+import { TELEMETRY_CONFIG } from '../../config/telemetry';
 import { scrubError, scrubAnalyticsEvent } from '../../utils/piiScrubbing';
 import { featureFlags } from './featureFlags';
 
@@ -336,7 +336,7 @@ export class CrashReportingService {
 	/**
 	 * Set user consent for crash reporting
 	 */
-	setUserConsent(consent: boolean): void {
+	async setUserConsent(consent: boolean): Promise<void> {
 		try {
 			this.options.userConsent = consent;
 
@@ -355,9 +355,9 @@ export class CrashReportingService {
 				try {
 					// Only enable crash collection in production when user consents
 					const shouldEnable = consent && !__DEV__;
-					const {
-						setCrashlyticsCollectionEnabled,
-					} = require('@react-native-firebase/crashlytics');
+					const { setCrashlyticsCollectionEnabled } = await import(
+						'@react-native-firebase/crashlytics'
+					);
 					setCrashlyticsCollectionEnabled(this.crashlytics(), shouldEnable);
 				} catch (error) {
 					console.warn(
@@ -376,7 +376,10 @@ export class CrashReportingService {
 	/**
 	 * Set user context for crash reports
 	 */
-	setUserContext(userId: string, additionalData?: Record<string, any>): void {
+	async setUserContext(
+		userId: string,
+		additionalData?: Record<string, any>
+	): Promise<void> {
 		if (!this.isInitialized || !this.options.userConsent) return;
 
 		try {
@@ -388,10 +391,9 @@ export class CrashReportingService {
 			}
 
 			if (this.crashlytics) {
-				const {
-					setUserId,
-					setAttribute,
-				} = require('@react-native-firebase/crashlytics');
+				const { setUserId, setAttribute } = await import(
+					'@react-native-firebase/crashlytics'
+				);
 				setUserId(this.crashlytics(), userId);
 				if (additionalData) {
 					Object.entries(additionalData).forEach(([key, value]) => {
@@ -407,7 +409,7 @@ export class CrashReportingService {
 	/**
 	 * Set additional context for crash reports
 	 */
-	setContext(key: string, value: any): void {
+	async setContext(key: string, value: any): Promise<void> {
 		if (!this.isInitialized || !this.options.userConsent) return;
 
 		try {
@@ -416,7 +418,9 @@ export class CrashReportingService {
 			}
 
 			if (this.crashlytics) {
-				const { setAttribute } = require('@react-native-firebase/crashlytics');
+				const { setAttribute } = await import(
+					'@react-native-firebase/crashlytics'
+				);
 				setAttribute(this.crashlytics(), key, String(value));
 			}
 		} catch (error) {
@@ -427,7 +431,7 @@ export class CrashReportingService {
 	/**
 	 * Capture and report an error
 	 */
-	captureError(error: Error, context?: CrashContext): void {
+	async captureError(error: Error, context?: CrashContext): Promise<void> {
 		if (!this.isInitialized || !this.options.userConsent) return;
 
 		try {
@@ -450,7 +454,9 @@ export class CrashReportingService {
 			}
 
 			if (this.crashlytics) {
-				const { recordError } = require('@react-native-firebase/crashlytics');
+				const { recordError } = await import(
+					'@react-native-firebase/crashlytics'
+				);
 				recordError(this.crashlytics(), processedError);
 			}
 
@@ -565,14 +571,14 @@ export class CrashReportingService {
 	/**
 	 * Test Crashlytics specifically (development only)
 	 */
-	testCrashlytics(): void {
+	async testCrashlytics(): Promise<void> {
 		if (__DEV__ && this.crashlytics) {
 			try {
 				console.log('🚨 [CrashReporting] Testing Crashlytics...');
 
 				// Test logging
 				try {
-					const { log } = require('@react-native-firebase/crashlytics');
+					const { log } = await import('@react-native-firebase/crashlytics');
 					log(this.crashlytics(), 'Test log from development');
 				} catch (error) {
 					console.warn(
@@ -583,9 +589,9 @@ export class CrashReportingService {
 
 				// Test custom attributes
 				try {
-					const {
-						setAttribute,
-					} = require('@react-native-firebase/crashlytics');
+					const { setAttribute } = await import(
+						'@react-native-firebase/crashlytics'
+					);
 					setAttribute(this.crashlytics(), 'test_attribute', 'test_value');
 				} catch (error) {
 					console.warn(
@@ -596,7 +602,9 @@ export class CrashReportingService {
 
 				// Test non-fatal error (won't crash the app)
 				try {
-					const { recordError } = require('@react-native-firebase/crashlytics');
+					const { recordError } = await import(
+						'@react-native-firebase/crashlytics'
+					);
 					recordError(
 						this.crashlytics(),
 						new Error('Test error from development')
@@ -640,6 +648,328 @@ export class CrashReportingService {
 			userConsent: this.options.userConsent,
 			environment: this.options.environment,
 		};
+	}
+
+	/**
+	 * Start performance monitoring transaction
+	 */
+	startTransaction(name: string, operation: string): any {
+		if (!this.isInitialized || !this.options.userConsent || !this.sentry) {
+			return null;
+		}
+
+		try {
+			return this.sentry.startTransaction({
+				name,
+				op: operation,
+			});
+		} catch (error) {
+			console.warn('🚨 [CrashReporting] Failed to start transaction:', error);
+			return null;
+		}
+	}
+
+	/**
+	 * Finish performance monitoring transaction
+	 */
+	finishTransaction(transaction: any): void {
+		if (!transaction) return;
+
+		try {
+			transaction.finish();
+		} catch (error) {
+			console.warn('🚨 [CrashReporting] Failed to finish transaction:', error);
+		}
+	}
+
+	/**
+	 * Add span to transaction
+	 */
+	addSpan(transaction: any, name: string, operation: string): any {
+		if (!transaction) return null;
+
+		try {
+			return transaction.startChild({
+				op: operation,
+				description: name,
+			});
+		} catch (error) {
+			console.warn('🚨 [CrashReporting] Failed to add span:', error);
+			return null;
+		}
+	}
+
+	/**
+	 * Finish span
+	 */
+	finishSpan(span: any): void {
+		if (!span) return;
+
+		try {
+			span.finish();
+		} catch (error) {
+			console.warn('🚨 [CrashReporting] Failed to finish span:', error);
+		}
+	}
+
+	/**
+	 * Set custom tags for filtering
+	 */
+	async setTag(key: string, value: string): Promise<void> {
+		if (!this.isInitialized || !this.options.userConsent) return;
+
+		try {
+			if (this.sentry) {
+				this.sentry.setTag(key, value);
+			}
+
+			if (this.crashlytics) {
+				const { setAttribute } = await import(
+					'@react-native-firebase/crashlytics'
+				);
+				setAttribute(this.crashlytics(), key, value);
+			}
+		} catch (error) {
+			console.warn('🚨 [CrashReporting] Failed to set tag:', error);
+		}
+	}
+
+	/**
+	 * Set custom tags in bulk
+	 */
+	async setTags(tags: Record<string, string>): Promise<void> {
+		if (!this.isInitialized || !this.options.userConsent) return;
+
+		try {
+			if (this.sentry) {
+				this.sentry.setTags(tags);
+			}
+
+			if (this.crashlytics) {
+				const { setAttribute } = await import(
+					'@react-native-firebase/crashlytics'
+				);
+				Object.entries(tags).forEach(([key, value]) => {
+					setAttribute(this.crashlytics(), key, value);
+				});
+			}
+		} catch (error) {
+			console.warn('🚨 [CrashReporting] Failed to set tags:', error);
+		}
+	}
+
+	/**
+	 * Set user feedback for crash reports
+	 */
+	setUserFeedback(feedback: {
+		eventId: string;
+		name: string;
+		email: string;
+		comments: string;
+	}): void {
+		if (!this.isInitialized || !this.options.userConsent || !this.sentry)
+			return;
+
+		try {
+			this.sentry.captureUserFeedback(feedback);
+		} catch (error) {
+			console.warn('🚨 [CrashReporting] Failed to set user feedback:', error);
+		}
+	}
+
+	/**
+	 * Flush pending events (useful before app termination)
+	 */
+	async flush(timeout: number = 2000): Promise<boolean> {
+		if (!this.isInitialized || !this.sentry) return false;
+
+		try {
+			await this.sentry.flush(timeout);
+			return true;
+		} catch (error) {
+			console.warn('🚨 [CrashReporting] Failed to flush events:', error);
+			return false;
+		}
+	}
+
+	/**
+	 * Clear all context and user data
+	 */
+	async clearContext(): Promise<void> {
+		if (!this.isInitialized) return;
+
+		try {
+			if (this.sentry) {
+				this.sentry.setUser(null);
+				this.sentry.setContext('app', {});
+				this.sentry.setTags({});
+			}
+
+			if (this.crashlytics) {
+				const { setUserId } = await import(
+					'@react-native-firebase/crashlytics'
+				);
+				setUserId(this.crashlytics(), '');
+				// Note: Crashlytics doesn't have a direct way to clear all attributes
+			}
+
+			console.log('🚨 [CrashReporting] Context cleared');
+		} catch (error) {
+			console.warn('🚨 [CrashReporting] Failed to clear context:', error);
+		}
+	}
+
+	/**
+	 * Get current session ID
+	 */
+	getSessionId(): string | null {
+		if (!this.isInitialized || !this.sentry) return null;
+
+		try {
+			return this.sentry.getCurrentScope()?.getSession()?.getId() || null;
+		} catch (error) {
+			console.warn('🚨 [CrashReporting] Failed to get session ID:', error);
+			return null;
+		}
+	}
+
+	/**
+	 * Set release version for better debugging
+	 */
+	setRelease(release: string): void {
+		if (!this.isInitialized || !this.sentry) return;
+
+		try {
+			this.sentry.setRelease(release);
+		} catch (error) {
+			console.warn('🚨 [CrashReporting] Failed to set release:', error);
+		}
+	}
+
+	/**
+	 * Set environment
+	 */
+	setEnvironment(environment: string): void {
+		if (!this.isInitialized || !this.sentry) return;
+
+		try {
+			this.sentry.setEnvironment(environment);
+			this.options.environment = environment;
+		} catch (error) {
+			console.warn('🚨 [CrashReporting] Failed to set environment:', error);
+		}
+	}
+
+	/**
+	 * Capture unhandled promise rejections
+	 */
+	setupUnhandledRejectionCapture(): void {
+		if (!this.isInitialized || !this.sentry) return;
+
+		try {
+			// Capture unhandled promise rejections
+			global.addEventListener?.('unhandledrejection', (event) => {
+				this.captureError(
+					new Error(`Unhandled Promise Rejection: ${event.reason}`),
+					{
+						action: 'unhandled_promise_rejection',
+						additional_data: {
+							reason: event.reason,
+							promise: event.promise,
+						},
+					}
+				);
+			});
+
+			// Capture uncaught exceptions
+			global.addEventListener?.('error', (event) => {
+				this.captureError(new Error(`Uncaught Exception: ${event.error}`), {
+					action: 'uncaught_exception',
+					additional_data: {
+						error: event.error,
+						filename: event.filename,
+						lineno: event.lineno,
+						colno: event.colno,
+					},
+				});
+			});
+
+			console.log('🚨 [CrashReporting] Unhandled rejection capture setup');
+		} catch (error) {
+			console.warn(
+				'🚨 [CrashReporting] Failed to setup unhandled rejection capture:',
+				error
+			);
+		}
+	}
+
+	/**
+	 * Test all crash reporting features
+	 */
+	async testAllFeatures(): Promise<void> {
+		if (!__DEV__) {
+			console.log('🚨 [CrashReporting] Testing only available in development');
+			return;
+		}
+
+		try {
+			console.log(
+				'🚨 [CrashReporting] Testing all crash reporting features...'
+			);
+
+			// Test basic message capture
+			await this.captureMessage(
+				'Test message from crash reporting service',
+				'info',
+				{
+					screen: 'test',
+					action: 'test_all_features',
+				}
+			);
+
+			// Test error capture
+			await this.captureError(
+				new Error('Test error from crash reporting service'),
+				{
+					screen: 'test',
+					action: 'test_error_capture',
+				}
+			);
+
+			// Test breadcrumb
+			this.addBreadcrumb('Test breadcrumb', 'test', {
+				test_data: 'test_value',
+			});
+
+			// Test performance monitoring
+			const transaction = this.startTransaction('test-transaction', 'test');
+			if (transaction) {
+				const span = this.addSpan(transaction, 'test-span', 'test');
+				if (span) {
+					// Simulate some work
+					await new Promise((resolve) => setTimeout(resolve, 100));
+					this.finishSpan(span);
+				}
+				this.finishTransaction(transaction);
+			}
+
+			// Test tags
+			await this.setTag('test_tag', 'test_value');
+			await this.setTags({
+				test_tag_2: 'test_value_2',
+				test_tag_3: 'test_value_3',
+			});
+
+			// Test context
+			await this.setContext('test_context', { test_data: 'test_value' });
+
+			// Test Crashlytics
+			await this.testCrashlytics();
+
+			console.log('🚨 [CrashReporting] All features tested successfully');
+		} catch (error) {
+			console.warn('🚨 [CrashReporting] Failed to test all features:', error);
+		}
 	}
 }
 
