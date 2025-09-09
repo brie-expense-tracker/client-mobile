@@ -12,6 +12,9 @@ import Animated, {
 	Easing,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { useBudget } from '../../../../../src/context/budgetContext';
+import { useGoal } from '../../../../../src/context/goalContext';
+
 // Transaction interface defined inline since we removed the mock data file
 interface Transaction {
 	id: string;
@@ -29,8 +32,6 @@ interface Transaction {
 		nextExpectedDate: string;
 	};
 }
-import { useBudget } from '../../../../../src/context/budgetContext';
-import { useGoal } from '../../../../../src/context/goalContext';
 
 // Helper function to format date without time
 const formatDateWithoutTime = (dateString: string): string => {
@@ -66,7 +67,7 @@ const formatDateWithoutTime = (dateString: string): string => {
 			month: 'short',
 			day: 'numeric',
 		});
-	} catch (error) {
+	} catch {
 		return 'Invalid Date';
 	}
 };
@@ -217,6 +218,8 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 			triggerHaptic,
 			handleDeleteJS,
 			isPanning,
+			TRANSLATE_THRESHOLD,
+			DELETE_WIDTH,
 		]
 	);
 
@@ -276,7 +279,14 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 						/>
 					</View>
 					<View style={styles.textContainer}>
-						<Text style={styles.description}>{item.description}</Text>
+						<View style={styles.descriptionContainer}>
+							<Text style={styles.description}>{item.description}</Text>
+							{item.recurringPattern && (
+								<View style={styles.recurringBadge}>
+									<Ionicons name="repeat" size={12} color="#007ACC" />
+								</View>
+							)}
+						</View>
 						<Text style={styles.category}>
 							{transactionContext.type === 'budget' &&
 								`${
@@ -374,10 +384,24 @@ const styles = StyleSheet.create({
 		marginLeft: 12,
 		flex: 1,
 	},
+	descriptionContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+	},
 	description: {
 		fontSize: 16,
 		fontWeight: '500',
 		color: '#212121',
+		flex: 1,
+	},
+	recurringBadge: {
+		marginLeft: 8,
+		paddingHorizontal: 6,
+		paddingVertical: 2,
+		backgroundColor: '#e3f2fd',
+		borderRadius: 4,
+		borderWidth: 1,
+		borderColor: '#007ACC',
 	},
 	category: {
 		fontSize: 12,

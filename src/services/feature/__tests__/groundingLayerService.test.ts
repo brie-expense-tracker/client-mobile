@@ -1,6 +1,6 @@
 // Test file for GroundingLayerService
 import { GroundingLayerService } from '../groundingLayerService';
-import { FactPackCalculator } from '../../../components/assistant/factPack';
+import { FactPackCalculator } from '../../../services/assistant/factPack';
 
 describe('GroundingLayerService', () => {
 	let service: GroundingLayerService;

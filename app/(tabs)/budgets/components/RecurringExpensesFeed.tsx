@@ -6,16 +6,20 @@ import {
 	TouchableOpacity,
 	StyleSheet,
 	ActivityIndicator,
+	TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
 	RecurringExpense,
 	RecurringExpenseService,
 } from '../../../../src/services';
-import { TransformedRecurringExpense } from '../../../../src/hooks/useRecurringExpenses';
 
-const currency = (n: number) =>
-	`$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+const formatCurrency = (amount: number): string => {
+	return new Intl.NumberFormat('en-US', {
+		style: 'currency',
+		currency: 'USD',
+	}).format(amount);
+};
 
 const formatDate = (dateString: string) => {
 	const date = new Date(dateString);
@@ -343,7 +347,7 @@ function RecurringExpenseRow({
 
 			{/* Right side - Amount and Status */}
 			<View style={styles.rightSection}>
-				<Text style={styles.amountText}>{currency(expense.amount)}</Text>
+				<Text style={styles.amountText}>{formatCurrency(expense.amount)}</Text>
 				<View style={styles.statusContainer}>
 					<Ionicons
 						name={statusIcon.name as any}
@@ -392,6 +396,10 @@ export default function RecurringExpensesFeed({
 	expenses?: RecurringExpense[];
 }) {
 	const [tab, setTab] = useState<TabKey>('all');
+	const [searchQuery, setSearchQuery] = useState('');
+	const [sortBy, setSortBy] = useState<
+		'vendor' | 'amount' | 'dueDate' | 'frequency'
+	>('dueDate');
 	const [expensesWithPaymentStatus, setExpensesWithPaymentStatus] = useState<
 		RecurringExpenseWithPaymentStatus[]
 	>([]);
@@ -400,7 +408,7 @@ export default function RecurringExpensesFeed({
 		null
 	);
 
-	// Check payment status for all expenses
+	// Check payment status for all expenses using batch API
 	useEffect(() => {
 		const checkPaymentStatus = async () => {
 			if (expenses.length === 0) return;
@@ -408,65 +416,42 @@ export default function RecurringExpensesFeed({
 			setIsLoadingPaymentStatus(true);
 			setPaymentStatusError(null);
 			try {
-				const expensesWithStatus = await Promise.all(
-					expenses.map(async (expense) => {
-						try {
-							const paymentStatus =
-								await RecurringExpenseService.isCurrentPeriodPaid(
-									expense.patternId
-								);
+				// Get all pattern IDs
+				const patternIds = expenses.map((expense) => expense.patternId);
 
-							// Check if paid within 2 weeks of the monthly expense
-							let isPaidWithinTwoWeeks = false;
-							let paymentDate: string | undefined;
-							let nextDueDate: string = expense.nextExpectedDate;
+				// Use batch API to check all payment statuses at once
+				const paymentStatuses =
+					await RecurringExpenseService.checkBatchPaidStatus(patternIds);
 
-							if (paymentStatus.isPaid && paymentStatus.payment) {
-								const dueDate = new Date(expense.nextExpectedDate);
-								const paidDate = new Date(paymentStatus.payment.paidAt);
+				const expensesWithStatus = expenses.map((expense) => {
+					const isPaid = paymentStatuses[expense.patternId] || false;
 
-								// Calculate days between due date and payment date
-								const daysDiff =
-									(paidDate.getTime() - dueDate.getTime()) /
-									(1000 * 60 * 60 * 24);
+					// Check if paid within 2 weeks of the monthly expense
+					let isPaidWithinTwoWeeks = false;
+					let paymentDate: string | undefined;
+					let nextDueDate: string = expense.nextExpectedDate;
 
-								// Consider paid if within 2 weeks (14 days) AFTER the due date
-								// This allows for late payments to still be considered "paid" for that period
-								isPaidWithinTwoWeeks = daysDiff >= -14 && daysDiff <= 14;
+					if (isPaid) {
+						// Since we only get a boolean from batch API, we'll assume it's paid within the period
+						isPaidWithinTwoWeeks = true;
+						paymentDate = new Date().toLocaleDateString();
+						// Calculate next due date based on frequency
+						nextDueDate = calculateNextDueDate(
+							expense.nextExpectedDate,
+							expense.frequency
+						);
+					} else {
+						// If not paid, the next due date is the current expected date
+						nextDueDate = expense.nextExpectedDate;
+					}
 
-								if (isPaidWithinTwoWeeks) {
-									paymentDate = paidDate.toLocaleDateString();
-									// Calculate next due date based on frequency
-									nextDueDate = calculateNextDueDate(
-										expense.nextExpectedDate,
-										expense.frequency
-									);
-								} else {
-									// If not paid within 2 weeks, the next due date is the current expected date
-									nextDueDate = expense.nextExpectedDate;
-								}
-							}
-
-							return {
-								...expense,
-								isPaid: isPaidWithinTwoWeeks,
-								paymentDate,
-								nextDueDate,
-							};
-						} catch (error) {
-							console.error(
-								`Error checking payment status for ${expense.patternId}:`,
-								error
-							);
-							// Return expense with default unpaid status on error
-							return {
-								...expense,
-								isPaid: false,
-								nextDueDate: expense.nextExpectedDate,
-							};
-						}
-					})
-				);
+					return {
+						...expense,
+						isPaid: isPaidWithinTwoWeeks,
+						paymentDate,
+						nextDueDate,
+					};
+				});
 
 				setExpensesWithPaymentStatus(expensesWithStatus);
 			} catch (error) {
@@ -488,11 +473,42 @@ export default function RecurringExpensesFeed({
 	}, [expenses]);
 
 	const filtered = useMemo(() => {
-		if (tab === 'all') return expensesWithPaymentStatus;
-		return expensesWithPaymentStatus.filter(
-			(expense) => expense.frequency === tab
-		);
-	}, [tab, expensesWithPaymentStatus]);
+		let filteredExpenses = expensesWithPaymentStatus;
+
+		// Filter by tab
+		if (tab !== 'all') {
+			filteredExpenses = filteredExpenses.filter(
+				(expense) => expense.frequency === tab
+			);
+		}
+
+		// Filter by search query
+		if (searchQuery.trim()) {
+			const query = searchQuery.toLowerCase();
+			filteredExpenses = filteredExpenses.filter((expense) =>
+				expense.vendor.toLowerCase().includes(query)
+			);
+		}
+
+		// Sort expenses
+		return filteredExpenses.sort((a, b) => {
+			switch (sortBy) {
+				case 'vendor':
+					return a.vendor.localeCompare(b.vendor);
+				case 'amount':
+					return b.amount - a.amount;
+				case 'dueDate':
+					return (
+						new Date(a.nextDueDate).getTime() -
+						new Date(b.nextDueDate).getTime()
+					);
+				case 'frequency':
+					return a.frequency.localeCompare(b.frequency);
+				default:
+					return 0;
+			}
+		});
+	}, [tab, searchQuery, sortBy, expensesWithPaymentStatus]);
 
 	// Show loading state while checking payment status
 	if (isLoadingPaymentStatus && expenses.length > 0) {
@@ -524,8 +540,79 @@ export default function RecurringExpensesFeed({
 		);
 	}
 
+	// Empty state component
+	const EmptyState = () => (
+		<View style={styles.emptyContainer}>
+			<Ionicons name="repeat-outline" size={64} color="#e0e0e0" />
+			<Text style={styles.emptyTitle}>No Recurring Expenses</Text>
+			<Text style={styles.emptySubtext}>
+				{searchQuery.trim()
+					? `No expenses found matching "${searchQuery}"`
+					: 'Add your first recurring expense to get started'}
+			</Text>
+		</View>
+	);
+
 	return (
 		<View style={styles.screen}>
+			{/* Search Bar */}
+			<View style={styles.searchContainer}>
+				<View style={styles.searchInputContainer}>
+					<Ionicons
+						name="search"
+						size={20}
+						color="#9ca3af"
+						style={styles.searchIcon}
+					/>
+					<TextInput
+						style={styles.searchInput}
+						placeholder="Search expenses..."
+						value={searchQuery}
+						onChangeText={setSearchQuery}
+						placeholderTextColor="#9ca3af"
+					/>
+					{searchQuery.length > 0 && (
+						<TouchableOpacity
+							onPress={() => setSearchQuery('')}
+							style={styles.clearButton}
+						>
+							<Ionicons name="close-circle" size={20} color="#9ca3af" />
+						</TouchableOpacity>
+					)}
+				</View>
+			</View>
+
+			{/* Sort Controls */}
+			<View style={styles.sortContainer}>
+				<Text style={styles.sortLabel}>Sort by:</Text>
+				<View style={styles.sortButtons}>
+					{[
+						{ key: 'dueDate', label: 'Due Date' },
+						{ key: 'vendor', label: 'Vendor' },
+						{ key: 'amount', label: 'Amount' },
+						{ key: 'frequency', label: 'Frequency' },
+					].map((sort) => (
+						<TouchableOpacity
+							key={sort.key}
+							style={[
+								styles.sortButton,
+								sortBy === sort.key && styles.sortButtonActive,
+							]}
+							onPress={() => setSortBy(sort.key as any)}
+						>
+							<Text
+								style={[
+									styles.sortButtonText,
+									sortBy === sort.key && styles.sortButtonTextActive,
+								]}
+							>
+								{sort.label}
+							</Text>
+						</TouchableOpacity>
+					))}
+				</View>
+			</View>
+
 			{/* Segmented tabs */}
 			<View style={styles.tabsRow}>
 				{TABS.map((t) => {
@@ -552,20 +639,24 @@ export default function RecurringExpensesFeed({
 				})}
 			</View>
 
-			<FlatList
-				data={filtered}
-				keyExtractor={(expense) => expense.patternId}
-				renderItem={({ item }) => (
-					<RecurringExpenseRow
-						expense={item}
-						onPressMenu={onPressMenu ?? ((id) => console.log('menu:', id))}
-						onPressRow={onPressRow}
-					/>
-				)}
-				ItemSeparatorComponent={() => <View style={styles.separator} />}
-				contentContainerStyle={{ paddingBottom: 24 }}
-				scrollEnabled={scrollEnabled}
-			/>
+			{filtered.length === 0 ? (
+				<EmptyState />
+			) : (
+				<FlatList
+					data={filtered}
+					keyExtractor={(expense) => expense.patternId}
+					renderItem={({ item }) => (
+						<RecurringExpenseRow
+							expense={item}
+							onPressMenu={onPressMenu ?? ((id) => console.log('menu:', id))}
+							onPressRow={onPressRow}
+						/>
+					)}
+					ItemSeparatorComponent={() => <View style={styles.separator} />}
+					contentContainerStyle={{ paddingBottom: 24 }}
+					scrollEnabled={scrollEnabled}
+				/>
+			)}
 		</View>
 	);
 }
@@ -682,5 +773,99 @@ const styles = StyleSheet.create({
 		color: '#ffffff',
 		fontSize: 16,
 		fontWeight: '600',
+	},
+	// Search and Sort Styles
+	searchContainer: {
+		paddingHorizontal: 16,
+		paddingVertical: 12,
+		backgroundColor: '#f8f9fa',
+		borderBottomWidth: 1,
+		borderBottomColor: '#e9ecef',
+	},
+	searchInputContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#fff',
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#dee2e6',
+		paddingHorizontal: 12,
+		paddingVertical: 8,
+	},
+	searchIcon: {
+		marginRight: 8,
+	},
+	searchInput: {
+		flex: 1,
+		fontSize: 16,
+		color: '#333',
+		paddingVertical: 4,
+	},
+	clearButton: {
+		marginLeft: 8,
+		padding: 2,
+	},
+	sortContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingHorizontal: 16,
+		paddingVertical: 8,
+		backgroundColor: '#f8f9fa',
+		borderBottomWidth: 1,
+		borderBottomColor: '#e9ecef',
+	},
+	sortLabel: {
+		fontSize: 14,
+		fontWeight: '600',
+		color: '#495057',
+		marginRight: 12,
+		minWidth: 60,
+	},
+	sortButtons: {
+		flexDirection: 'row',
+		flex: 1,
+		gap: 6,
+	},
+	sortButton: {
+		paddingHorizontal: 10,
+		paddingVertical: 4,
+		borderRadius: 12,
+		backgroundColor: '#fff',
+		borderWidth: 1,
+		borderColor: '#dee2e6',
+	},
+	sortButtonActive: {
+		backgroundColor: '#007ACC',
+		borderColor: '#007ACC',
+	},
+	sortButtonText: {
+		fontSize: 11,
+		fontWeight: '500',
+		color: '#6c757d',
+	},
+	sortButtonTextActive: {
+		color: '#fff',
+	},
+	// Empty State Styles
+	emptyContainer: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		paddingHorizontal: 24,
+		paddingVertical: 40,
+	},
+	emptyTitle: {
+		fontSize: 20,
+		fontWeight: '600',
+		color: '#212121',
+		marginTop: 16,
+		marginBottom: 8,
+		textAlign: 'center',
+	},
+	emptySubtext: {
+		fontSize: 16,
+		color: '#757575',
+		textAlign: 'center',
+		lineHeight: 22,
 	},
 });

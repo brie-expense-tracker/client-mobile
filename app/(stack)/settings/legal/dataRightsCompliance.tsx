@@ -21,7 +21,7 @@ export default function DataRightsComplianceScreen() {
 
 					<Bullet number={2}>Right to Delete</Bullet>
 					<Paragraph>
-						You have the right to request deletion of personal data we've
+						You have the right to request deletion of personal data we&apos;ve
 						collected from you, subject to certain exceptions such as completing
 						a transaction or complying with a legal obligation.
 					</Paragraph>
@@ -75,7 +75,7 @@ export default function DataRightsComplianceScreen() {
 					</Paragraph>
 
 					<Bullet number={3}>
-						Right to Erasure / "Right to Be Forgotten" (Art. 17)
+						Right to Erasure / &quot;Right to Be Forgotten&quot; (Art. 17)
 					</Bullet>
 					<Paragraph>
 						Ask for deletion of personal data that is no longer necessary, where

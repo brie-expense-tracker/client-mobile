@@ -6,9 +6,12 @@ import {
 	StyleSheet,
 	Image,
 	SafeAreaView,
+	KeyboardAvoidingView,
+	ScrollView,
+	Platform,
 } from 'react-native';
 import React, { useState } from 'react';
-import { router, Stack } from 'expo-router';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import useAuth from '../../src/context/AuthContext';
 import { RectButton, BorderlessButton } from 'react-native-gesture-handler';
@@ -81,95 +84,118 @@ export default function Signup() {
 
 	return (
 		<SafeAreaView style={styles.safeAreaContainer}>
-			<View style={styles.mainContainer}>
-				<Image
-					source={require('../../src/assets/images/brie-logos.png')}
-					style={styles.logo}
-					resizeMode="contain"
-				/>
-				<View style={styles.formContainer}>
-					<Text style={styles.title}>Create Your Account</Text>
-					<Text style={styles.label}>Email</Text>
-					<TextInput
-						style={styles.input}
-						placeholder="Enter your email"
-						value={email}
-						onChangeText={setEmail}
-						keyboardType="email-address"
-						autoCapitalize="none"
-					/>
-					<Text style={styles.label}>Password</Text>
-					<TextInput
-						style={styles.input}
-						placeholder="Enter your password"
-						value={password}
-						onChangeText={setPassword}
-						secureTextEntry
-					/>
-					<View style={styles.buttonContainer}>
-						<RectButton
-							style={[styles.button, isLoading && styles.buttonDisabled]}
-							onPress={handleSignup}
-							enabled={!isLoading}
-						>
-							<Text style={styles.buttonText}>
-								{isLoading ? 'Creating Account...' : 'Sign Up'}
-							</Text>
-						</RectButton>
-					</View>
+			<KeyboardAvoidingView
+				style={styles.keyboardAvoidingView}
+				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+				keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+			>
+				<ScrollView
+					style={styles.scrollView}
+					contentContainerStyle={styles.scrollContent}
+					showsVerticalScrollIndicator={false}
+					keyboardShouldPersistTaps="handled"
+				>
+					<View style={styles.mainContainer}>
+						<Image
+							source={require('../../src/assets/images/brie-logos.png')}
+							style={styles.logo}
+							resizeMode="contain"
+						/>
+						<View style={styles.formContainer}>
+							<Text style={styles.title}>Create Your Account</Text>
+							<Text style={styles.label}>Email</Text>
+							<TextInput
+								style={styles.input}
+								placeholder="Enter your email"
+								value={email}
+								onChangeText={setEmail}
+								keyboardType="email-address"
+								autoCapitalize="none"
+							/>
+							<Text style={styles.label}>Password</Text>
+							<TextInput
+								style={styles.input}
+								placeholder="Enter your password"
+								value={password}
+								onChangeText={setPassword}
+								secureTextEntry
+							/>
+							<View style={styles.buttonContainer}>
+								<RectButton
+									style={[styles.button, isLoading && styles.buttonDisabled]}
+									onPress={handleSignup}
+									enabled={!isLoading}
+								>
+									<Text style={styles.buttonText}>
+										{isLoading ? 'Creating Account...' : 'Sign Up'}
+									</Text>
+								</RectButton>
+							</View>
 
-					<View style={styles.dividerContainer}>
-						<View style={styles.divider} />
-						<Text style={styles.dividerText}>or sign up with</Text>
-						<View style={styles.divider} />
-					</View>
+							<View style={styles.dividerContainer}>
+								<View style={styles.divider} />
+								<Text style={styles.dividerText}>or sign up with</Text>
+								<View style={styles.divider} />
+							</View>
 
-					<View style={styles.socialButtonsContainer}>
-						<RectButton
-							style={styles.socialButton}
-							onPress={() =>
-								Alert.alert(
-									'Coming Soon',
-									'Google Sign Up will be available soon!'
-								)
-							}
-						>
-							<View style={styles.socialButtonContent}>
-								<Ionicons name="logo-google" size={24} color="#0051ff" />
-								<Text style={styles.socialButtonText}>
-									Continue with Google
+							<View style={styles.socialButtonsContainer}>
+								<RectButton
+									style={styles.socialButton}
+									onPress={() =>
+										Alert.alert(
+											'Coming Soon',
+											'Google Sign Up will be available soon!'
+										)
+									}
+								>
+									<View style={styles.socialButtonContent}>
+										<Ionicons name="logo-google" size={24} color="#0051ff" />
+										<Text style={styles.socialButtonText}>
+											Continue with Google
+										</Text>
+									</View>
+								</RectButton>
+
+								<RectButton
+									style={styles.socialButton}
+									onPress={() =>
+										Alert.alert(
+											'Coming Soon',
+											'Apple Sign Up will be available soon!'
+										)
+									}
+								>
+									<View style={styles.socialButtonContent}>
+										<Ionicons name="logo-apple" size={24} color="#000000" />
+										<Text style={styles.socialButtonText}>
+											Continue with Apple
+										</Text>
+									</View>
+								</RectButton>
+							</View>
+						</View>
+
+						<View style={styles.loginContainer}>
+							<Text style={styles.loginText}>Already have account?</Text>
+							<BorderlessButton
+								onActiveStateChange={setIsPressed}
+								onPress={() => {
+									router.replace('/login');
+								}}
+							>
+								<Text
+									style={[
+										styles.loginLink,
+										isPressed && styles.loginLinkPressed,
+									]}
+								>
+									Log In
 								</Text>
-							</View>
-						</RectButton>
-
-						<RectButton
-							style={styles.socialButton}
-							onPress={() =>
-								Alert.alert(
-									'Coming Soon',
-									'Apple Sign Up will be available soon!'
-								)
-							}
-						>
-							<View style={styles.socialButtonContent}>
-								<Ionicons name="logo-apple" size={24} color="#000000" />
-								<Text style={styles.socialButtonText}>Continue with Apple</Text>
-							</View>
-						</RectButton>
+							</BorderlessButton>
+						</View>
 					</View>
-				</View>
-				<View style={styles.loginContainer}>
-					<Text style={styles.loginText}>Already have account?</Text>
-					<BorderlessButton
-						onActiveStateChange={setIsPressed}
-						onPress={() => {
-							router.replace('/login');
-						}}
-					>
-						<Text style={styles.loginLink}>Log In</Text>
-					</BorderlessButton>
-				</View>
-			</View>
+				</ScrollView>
+			</KeyboardAvoidingView>
 		</SafeAreaView>
 	);
 }
@@ -179,10 +205,20 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: '#fff',
 	},
+	keyboardAvoidingView: {
+		flex: 1,
+	},
+	scrollView: {
+		flex: 1,
+	},
+	scrollContent: {
+		flexGrow: 1,
+	},
 	mainContainer: {
 		flex: 1,
 		alignItems: 'center',
 		paddingHorizontal: 24,
+		minHeight: '100%',
 	},
 	logo: {
 		width: 100,
@@ -192,7 +228,6 @@ const styles = StyleSheet.create({
 	},
 	formContainer: {
 		width: '100%',
-		height: '50%',
 		justifyContent: 'flex-start',
 		alignItems: 'flex-start',
 		backgroundColor: 'white',
@@ -200,6 +235,8 @@ const styles = StyleSheet.create({
 		shadowRadius: 3,
 		elevation: 5,
 		borderRadius: 24,
+		padding: 20,
+		marginBottom: 20,
 	},
 	title: {
 		fontSize: 24,
@@ -261,9 +298,8 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		gap: 4,
 		width: '100%',
-		position: 'absolute',
-		bottom: 0,
 		justifyContent: 'center',
+		paddingVertical: 20,
 	},
 	loginText: {
 		color: '#4A5568',
@@ -272,6 +308,9 @@ const styles = StyleSheet.create({
 		color: '#2C5282',
 		opacity: 0.7,
 		fontWeight: 'bold',
+	},
+	loginLinkPressed: {
+		opacity: 0.6,
 	},
 	dividerContainer: {
 		flexDirection: 'row',

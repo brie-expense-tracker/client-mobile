@@ -7,6 +7,10 @@ import React, {
 	useRef,
 	ReactNode,
 } from 'react';
+import { ApiService } from '../services';
+import { useBudget } from './budgetContext';
+import { useGoal } from './goalContext';
+import { setCacheInvalidationFlags } from '../services/utility/cacheInvalidationUtils';
 // Transaction interface defined inline since we removed the mock data file
 export interface Transaction {
 	id: string;
@@ -24,10 +28,6 @@ export interface Transaction {
 		nextExpectedDate: string;
 	};
 }
-import { ApiService } from '../services';
-import { useBudget } from './budgetContext';
-import { useGoal } from './goalContext';
-import { setCacheInvalidationFlags } from '../services/utility/cacheInvalidationUtils';
 
 interface TransactionContextType {
 	transactions: Transaction[];

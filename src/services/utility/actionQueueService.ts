@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ApiService } from '../core/apiService';
 
 export interface QueuedAction {
 	id: string;
@@ -21,6 +22,7 @@ export interface ActionQueueConfig {
 class ActionQueueService {
 	private queue: QueuedAction[] = [];
 	private isProcessing = false;
+	private isOnline = true;
 	private config: ActionQueueConfig = {
 		maxRetries: 3,
 		retryDelay: 5000, // 5 seconds
@@ -96,9 +98,33 @@ class ActionQueueService {
 		return queuedAction.id;
 	}
 
+	// Check network connectivity
+	private async checkConnectivity(): Promise<boolean> {
+		try {
+			// Try to fetch a small resource to check connectivity
+			await fetch('https://www.google.com/favicon.ico', {
+				method: 'HEAD',
+				mode: 'no-cors',
+				cache: 'no-cache',
+			});
+			this.isOnline = true;
+			return true;
+		} catch {
+			this.isOnline = false;
+			return false;
+		}
+	}
+
 	// Process the entire queue
 	async processQueue(): Promise<void> {
 		if (this.isProcessing || this.queue.length === 0) return;
+
+		// Check connectivity before processing
+		const isOnline = await this.checkConnectivity();
+		if (!isOnline) {
+			console.log('Action queue: Skipping processing - offline');
+			return;
+		}
 
 		this.isProcessing = true;
 
@@ -128,7 +154,16 @@ class ActionQueueService {
 
 					if (action.retryCount >= action.maxRetries) {
 						// Remove permanently failed actions
+						console.error(
+							`Action ${action.id} permanently failed after ${action.maxRetries} retries`
+						);
 						this.queue = this.queue.filter((a) => a.id !== action.id);
+					} else {
+						// Calculate retry delay with exponential backoff
+						const retryDelay = this.calculateRetryDelay(action.retryCount);
+						console.log(
+							`Action ${action.id} will retry in ${retryDelay}ms (attempt ${action.retryCount}/${action.maxRetries})`
+						);
 					}
 				}
 
@@ -168,33 +203,87 @@ class ActionQueueService {
 	}
 
 	private async executeBudgetAction(action: QueuedAction): Promise<void> {
-		// Implement budget API calls
 		console.log('Executing budget action:', action);
-		// Simulate API call
-		await new Promise((resolve) => setTimeout(resolve, 500));
+
+		switch (action.type) {
+			case 'CREATE':
+				await ApiService.post('/api/budgets', action.data);
+				break;
+			case 'UPDATE':
+				await ApiService.put(`/api/budgets/${action.data.id}`, action.data);
+				break;
+			case 'DELETE':
+				await ApiService.delete(`/api/budgets/${action.data.id}`);
+				break;
+			default:
+				throw new Error(`Unknown budget action type: ${action.type}`);
+		}
 	}
 
 	private async executeGoalAction(action: QueuedAction): Promise<void> {
-		// Implement goal API calls
 		console.log('Executing goal action:', action);
-		// Simulate API call
-		await new Promise((resolve) => setTimeout(resolve, 500));
+
+		switch (action.type) {
+			case 'CREATE':
+				await ApiService.post('/api/goals', action.data);
+				break;
+			case 'UPDATE':
+				await ApiService.put(`/api/goals/${action.data.id}`, action.data);
+				break;
+			case 'DELETE':
+				await ApiService.delete(`/api/goals/${action.data.id}`);
+				break;
+			default:
+				throw new Error(`Unknown goal action type: ${action.type}`);
+		}
 	}
 
 	private async executeTransactionAction(action: QueuedAction): Promise<void> {
-		// Implement transaction API calls
 		console.log('Executing transaction action:', action);
-		// Simulate API call
-		await new Promise((resolve) => setTimeout(resolve, 500));
+
+		switch (action.type) {
+			case 'CREATE':
+				await ApiService.post('/api/transactions', action.data);
+				break;
+			case 'UPDATE':
+				await ApiService.put(
+					`/api/transactions/${action.data.id}`,
+					action.data
+				);
+				break;
+			case 'DELETE':
+				await ApiService.delete(`/api/transactions/${action.data.id}`);
+				break;
+			default:
+				throw new Error(`Unknown transaction action type: ${action.type}`);
+		}
 	}
 
 	private async executeRecurringExpenseAction(
 		action: QueuedAction
 	): Promise<void> {
-		// Implement recurring expense API calls
 		console.log('Executing recurring expense action:', action);
-		// Simulate API call
-		await new Promise((resolve) => setTimeout(resolve, 500));
+
+		switch (action.type) {
+			case 'CREATE':
+				await ApiService.post('/api/recurring-expenses', action.data);
+				break;
+			case 'UPDATE':
+				await ApiService.put(
+					`/api/recurring-expenses/${action.data.patternId}`,
+					action.data
+				);
+				break;
+			case 'DELETE':
+				await ApiService.delete(
+					`/api/recurring-expenses/${action.data.patternId}`
+				);
+				break;
+			default:
+				throw new Error(
+					`Unknown recurring expense action type: ${action.type}`
+				);
+		}
 	}
 
 	// Get queue status
@@ -204,6 +293,7 @@ class ActionQueueService {
 			pending: this.queue.filter((a) => a.retryCount < a.maxRetries).length,
 			failed: this.queue.filter((a) => a.retryCount >= a.maxRetries).length,
 			isProcessing: this.isProcessing,
+			isOnline: this.isOnline,
 		};
 	}
 
@@ -250,6 +340,7 @@ class ActionQueueService {
 			await this.saveQueue();
 			return true;
 		} catch (error) {
+			console.error(`Error retrying action ${actionId}:`, error);
 			action.retryCount++;
 			await this.saveQueue();
 			return false;
@@ -274,6 +365,14 @@ class ActionQueueService {
 		}
 	}
 
+	private calculateRetryDelay(retryCount: number): number {
+		// Exponential backoff: base delay * 2^retryCount, with jitter
+		const baseDelay = this.config.retryDelay;
+		const exponentialDelay = baseDelay * Math.pow(2, retryCount - 1);
+		const jitter = Math.random() * 1000; // Add up to 1 second of jitter
+		return Math.min(exponentialDelay + jitter, 30000); // Cap at 30 seconds
+	}
+
 	// Get actions by entity type
 	getActionsByEntity(entity: QueuedAction['entity']): QueuedAction[] {
 		return this.queue.filter((a) => a.entity === entity);
@@ -282,6 +381,18 @@ class ActionQueueService {
 	// Get actions by priority
 	getActionsByPriority(priority: QueuedAction['priority']): QueuedAction[] {
 		return this.queue.filter((a) => a.priority === priority);
+	}
+
+	// Force connectivity check and process queue
+	async forceProcessQueue(): Promise<void> {
+		console.log('Force processing action queue...');
+		await this.checkConnectivity();
+		await this.processQueue();
+	}
+
+	// Get connectivity status
+	getConnectivityStatus(): boolean {
+		return this.isOnline;
 	}
 }
 

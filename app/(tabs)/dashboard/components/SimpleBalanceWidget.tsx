@@ -1,5 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
+import StatWidget from './StatWidget';
+
 // Transaction interface defined inline since we removed the mock data file
 interface Transaction {
 	id: string;
@@ -17,7 +19,6 @@ interface Transaction {
 		nextExpectedDate: string;
 	};
 }
-import StatWidget from './StatWidget';
 
 interface BalanceWidgetProps {
 	transactions: Transaction[];

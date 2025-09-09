@@ -29,15 +29,58 @@ export interface SpendingPattern {
 	dayOfWeekPreference: number[];
 	amountRange: { min: number; max: number };
 	seasonalTrend: 'stable' | 'increasing' | 'decreasing';
+	confidence: number;
+	lastUpdated: number;
+}
+
+export interface ModelMetrics {
+	totalVendorPatterns: number;
+	totalCategoryPatterns: number;
+	averageConfidence: number;
+	learningProgress: number;
+	accuracy: number;
+	lastTrainingTime: number;
+	modelVersion: string;
+}
+
+export interface PredictionResult {
+	category: string;
+	confidence: number;
+	reason: string;
+	budgetMatch?: string;
+	vendorPattern?: string;
+	features: TransactionFeatures;
+	modelVersion: string;
+	timestamp: number;
+}
+
+export interface TrainingData {
+	transactions: any[];
+	userId: string;
+	validationSplit: number;
 }
 
 export class LocalMLService {
 	private static instance: LocalMLService;
-	private vendorPatterns = new Map<string, Map<string, number>>();
+	private vendorPatterns = new Map<
+		string,
+		Map<string, Record<string, number>>
+	>();
 	private categoryPatterns = new Map<string, SpendingPattern>();
 	private userPreferences = new Map<string, any>();
 	private readonly MIN_CONFIDENCE = 0.6;
 	private readonly MIN_SAMPLES = 5;
+	private readonly MODEL_VERSION = '1.0.0';
+
+	// Performance tracking
+	private predictionCount = 0;
+	private correctPredictions = 0;
+	private lastTrainingTime = 0;
+	private modelAccuracy = 0;
+
+	// Feature extraction cache
+	private featureCache = new Map<string, TransactionFeatures>();
+	private readonly CACHE_SIZE_LIMIT = 1000;
 
 	static getInstance(): LocalMLService {
 		if (!LocalMLService.instance) {
@@ -72,7 +115,7 @@ export class LocalMLService {
 	}
 
 	/**
-	 * Categorize transaction using local ML
+	 * Categorize transaction using local ML with enhanced features
 	 */
 	async categorizeTransaction(
 		description: string,
@@ -80,9 +123,15 @@ export class LocalMLService {
 		userId: string,
 		userBudgets: any[]
 	): Promise<CategorizationResult> {
+		const startTime = Date.now();
+		this.predictionCount++;
+
 		try {
-			// Extract features from transaction
-			const features = this.extractFeatures(description, amount);
+			// Validate inputs
+			this.validateTransactionInputs(description, amount, userId);
+
+			// Extract features from transaction (with caching)
+			const features = this.extractFeaturesWithCache(description, amount);
 
 			// Get vendor-based prediction
 			const vendorPrediction = this.predictFromVendor(features.vendor, userId);
@@ -93,11 +142,19 @@ export class LocalMLService {
 			// Get pattern-based prediction
 			const patternPrediction = this.predictFromPatterns(features, userId);
 
-			// Combine predictions using ensemble method
+			// Get keyword-based prediction
+			const keywordPrediction = this.predictFromKeywords(features, userId);
+
+			// Get time-based prediction
+			const timePrediction = this.predictFromTime(features, userId);
+
+			// Combine predictions using enhanced ensemble method
 			const finalPrediction = this.combinePredictions([
 				vendorPrediction,
 				amountPrediction,
 				patternPrediction,
+				keywordPrediction,
+				timePrediction,
 			]);
 
 			// Find best budget match
@@ -106,13 +163,23 @@ export class LocalMLService {
 				userBudgets
 			);
 
-			return {
+			// Calculate processing time
+			const processingTime = Date.now() - startTime;
+
+			const result: CategorizationResult = {
 				category: finalPrediction.category,
 				confidence: finalPrediction.confidence,
 				reason: finalPrediction.reason,
 				budgetMatch: budgetMatch?.name,
 				vendorPattern: vendorPrediction.vendorPattern,
 			};
+
+			// Log performance metrics
+			if (processingTime > 100) {
+				console.warn(`[LocalMLService] Slow prediction: ${processingTime}ms`);
+			}
+
+			return result;
 		} catch (error) {
 			console.error('[LocalMLService] Error categorizing transaction:', error);
 			return {
@@ -133,6 +200,11 @@ export class LocalMLService {
 		userId: string
 	): Promise<void> {
 		try {
+			// Track accuracy
+			if (originalPrediction.category === correctCategory) {
+				this.correctPredictions++;
+			}
+
 			// Update vendor patterns
 			this.updateVendorPattern(
 				userId,
@@ -143,11 +215,18 @@ export class LocalMLService {
 			// Update category patterns
 			this.updateCategoryPattern(userId, correctCategory, originalPrediction);
 
+			// Update model accuracy
+			this.modelAccuracy = this.correctPredictions / this.predictionCount;
+
 			// Persist updated models
 			await this.persistModelsToStorage();
 
 			console.log(
-				`[LocalMLService] Learned from feedback: ${originalPrediction.category} → ${correctCategory}`
+				`[LocalMLService] Learned from feedback: ${
+					originalPrediction.category
+				} → ${correctCategory} (Accuracy: ${(this.modelAccuracy * 100).toFixed(
+					1
+				)}%)`
 			);
 		} catch (error) {
 			console.error('[LocalMLService] Error learning from feedback:', error);
@@ -187,24 +266,40 @@ export class LocalMLService {
 	}
 
 	/**
-	 * Get ML model performance metrics
+	 * Check if we have learned patterns for a specific vendor
 	 */
-	getModelMetrics(): {
-		totalVendorPatterns: number;
-		totalCategoryPatterns: number;
-		averageConfidence: number;
-		learningProgress: number;
-	} {
+	hasVendorPattern(vendor: string): boolean {
+		// Check if any user has patterns for this vendor
+		for (const userPatterns of this.vendorPatterns.values()) {
+			if (userPatterns.has(vendor.toLowerCase())) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Get comprehensive ML model performance metrics
+	 */
+	getModelMetrics(): ModelMetrics {
 		try {
-			const totalVendorPatterns = this.vendorPatterns.size;
+			const totalVendorPatterns = Array.from(
+				this.vendorPatterns.values()
+			).reduce((sum, userPatterns) => sum + userPatterns.size, 0);
 			const totalCategoryPatterns = this.categoryPatterns.size;
 
-			// Calculate average confidence (placeholder for now)
-			const averageConfidence = 0.75;
+			// Calculate accuracy based on feedback
+			const accuracy =
+				this.predictionCount > 0
+					? this.correctPredictions / this.predictionCount
+					: 0;
 
-			// Calculate learning progress based on pattern diversity
+			// Calculate average confidence from recent patterns
+			const averageConfidence = this.calculateAverageConfidence();
+
+			// Calculate learning progress based on pattern diversity and accuracy
 			const learningProgress = Math.min(
-				(totalVendorPatterns + totalCategoryPatterns) / 100,
+				(totalVendorPatterns + totalCategoryPatterns) / 200 + accuracy * 0.5,
 				1.0
 			);
 
@@ -213,6 +308,9 @@ export class LocalMLService {
 				totalCategoryPatterns,
 				averageConfidence,
 				learningProgress,
+				accuracy,
+				lastTrainingTime: this.lastTrainingTime,
+				modelVersion: this.MODEL_VERSION,
 			};
 		} catch (error) {
 			console.error('[LocalMLService] Error getting model metrics:', error);
@@ -222,11 +320,183 @@ export class LocalMLService {
 				totalCategoryPatterns: 0,
 				averageConfidence: 0.5,
 				learningProgress: 0,
+				accuracy: 0,
+				lastTrainingTime: 0,
+				modelVersion: this.MODEL_VERSION,
 			};
 		}
 	}
 
+	/**
+	 * Train model with new data
+	 */
+	async trainModel(trainingData: TrainingData): Promise<void> {
+		try {
+			console.log(
+				`[LocalMLService] Training model with ${trainingData.transactions.length} transactions`
+			);
+
+			const startTime = Date.now();
+
+			// Process training data
+			for (const transaction of trainingData.transactions) {
+				if (
+					transaction.category &&
+					transaction.description &&
+					transaction.amount
+				) {
+					const features = this.extractFeatures(
+						transaction.description,
+						transaction.amount
+					);
+
+					// Update vendor patterns
+					this.updateVendorPattern(
+						trainingData.userId,
+						features.vendor,
+						transaction.category
+					);
+
+					// Update category patterns
+					this.updateCategoryPatternFromTransaction(
+						trainingData.userId,
+						transaction.category,
+						transaction
+					);
+				}
+			}
+
+			// Persist updated models
+			await this.persistModelsToStorage();
+
+			this.lastTrainingTime = Date.now();
+			const trainingTime = this.lastTrainingTime - startTime;
+
+			console.log(
+				`[LocalMLService] Model training completed in ${trainingTime}ms`
+			);
+		} catch (error) {
+			console.error('[LocalMLService] Error training model:', error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Validate model integrity
+	 */
+	async validateModel(): Promise<{ isValid: boolean; issues: string[] }> {
+		const issues: string[] = [];
+
+		try {
+			// Check vendor patterns integrity
+			for (const [userId, userPatterns] of this.vendorPatterns.entries()) {
+				for (const [vendor, categories] of userPatterns.entries()) {
+					if (!categories || typeof categories !== 'object') {
+						issues.push(
+							`Invalid vendor pattern for user ${userId}, vendor ${vendor}`
+						);
+					}
+				}
+			}
+
+			// Check category patterns integrity
+			for (const [category, pattern] of this.categoryPatterns.entries()) {
+				if (!pattern.category || pattern.averageAmount < 0) {
+					issues.push(`Invalid category pattern for ${category}`);
+				}
+			}
+
+			// Check feature cache size
+			if (this.featureCache.size > this.CACHE_SIZE_LIMIT) {
+				issues.push(`Feature cache exceeds limit: ${this.featureCache.size}`);
+			}
+
+			return {
+				isValid: issues.length === 0,
+				issues,
+			};
+		} catch (error) {
+			console.error('[LocalMLService] Error validating model:', error);
+			return {
+				isValid: false,
+				issues: ['Model validation failed: ' + error],
+			};
+		}
+	}
+
+	/**
+	 * Reset model to initial state
+	 */
+	async resetModel(): Promise<void> {
+		try {
+			this.vendorPatterns.clear();
+			this.categoryPatterns.clear();
+			this.userPreferences.clear();
+			this.featureCache.clear();
+			this.predictionCount = 0;
+			this.correctPredictions = 0;
+			this.modelAccuracy = 0;
+			this.lastTrainingTime = 0;
+
+			// Clear storage
+			await Promise.all([
+				AsyncStorage.removeItem('vendor_patterns'),
+				AsyncStorage.removeItem('category_patterns'),
+			]);
+
+			console.log('[LocalMLService] Model reset completed');
+		} catch (error) {
+			console.error('[LocalMLService] Error resetting model:', error);
+			throw error;
+		}
+	}
+
 	// Private helper methods
+
+	private validateTransactionInputs(
+		description: string,
+		amount: number,
+		userId: string
+	): void {
+		if (
+			!description ||
+			typeof description !== 'string' ||
+			description.trim().length === 0
+		) {
+			throw new Error('Valid description is required');
+		}
+		if (typeof amount !== 'number' || amount < 0) {
+			throw new Error('Valid amount is required');
+		}
+		if (!userId || typeof userId !== 'string') {
+			throw new Error('Valid userId is required');
+		}
+	}
+
+	private extractFeaturesWithCache(
+		description: string,
+		amount: number
+	): TransactionFeatures {
+		const cacheKey = `${description}_${amount}`;
+
+		const cached = this.featureCache.get(cacheKey);
+		if (cached) {
+			return cached;
+		}
+
+		const features = this.extractFeatures(description, amount);
+
+		// Cache the features (with size limit)
+		if (this.featureCache.size >= this.CACHE_SIZE_LIMIT) {
+			const firstKey = this.featureCache.keys().next().value;
+			if (firstKey) {
+				this.featureCache.delete(firstKey);
+			}
+		}
+		this.featureCache.set(cacheKey, features);
+
+		return features;
+	}
 
 	private extractFeatures(
 		description: string,
@@ -423,12 +693,173 @@ export class LocalMLService {
 		return { category, confidence, reason };
 	}
 
+	private predictFromKeywords(
+		features: TransactionFeatures,
+		userId: string
+	): {
+		category: string;
+		confidence: number;
+		reason: string;
+	} {
+		const keywords = features.commonKeywords;
+		let category = 'Uncategorized';
+		let confidence = 0.2;
+		let reason = 'No keyword matches found';
+
+		// Enhanced keyword matching with confidence scoring
+		const keywordCategories: Record<
+			string,
+			{ category: string; confidence: number }
+		> = {
+			grocery: { category: 'Food & Dining', confidence: 0.8 },
+			food: { category: 'Food & Dining', confidence: 0.7 },
+			restaurant: { category: 'Food & Dining', confidence: 0.9 },
+			gas: { category: 'Transportation', confidence: 0.8 },
+			fuel: { category: 'Transportation', confidence: 0.8 },
+			uber: { category: 'Transportation', confidence: 0.9 },
+			lyft: { category: 'Transportation', confidence: 0.9 },
+			amazon: { category: 'Shopping', confidence: 0.7 },
+			walmart: { category: 'Shopping', confidence: 0.8 },
+			target: { category: 'Shopping', confidence: 0.8 },
+			coffee: { category: 'Food & Dining', confidence: 0.6 },
+			starbucks: { category: 'Food & Dining', confidence: 0.9 },
+			netflix: { category: 'Entertainment', confidence: 0.9 },
+			spotify: { category: 'Entertainment', confidence: 0.9 },
+			phone: { category: 'Utilities', confidence: 0.7 },
+			internet: { category: 'Utilities', confidence: 0.8 },
+			utility: { category: 'Utilities', confidence: 0.8 },
+			rent: { category: 'Housing', confidence: 0.9 },
+			mortgage: { category: 'Housing', confidence: 0.9 },
+			insurance: { category: 'Insurance', confidence: 0.8 },
+			medical: { category: 'Healthcare', confidence: 0.8 },
+		};
+
+		// Find best keyword match
+		for (const keyword of keywords) {
+			if (keywordCategories[keyword]) {
+				const match = keywordCategories[keyword];
+				if (match.confidence > confidence) {
+					category = match.category;
+					confidence = match.confidence;
+					reason = `Keyword match: ${keyword}`;
+				}
+			}
+		}
+
+		return { category, confidence, reason };
+	}
+
+	private predictFromTime(
+		features: TransactionFeatures,
+		userId: string
+	): {
+		category: string;
+		confidence: number;
+		reason: string;
+	} {
+		let category = 'Uncategorized';
+		let confidence = 0.2;
+		let reason = 'Time-based analysis inconclusive';
+
+		// Time-based patterns
+		const hour = new Date().getHours();
+		const dayOfWeek = features.dayOfWeek;
+
+		// Morning coffee/food patterns
+		if (hour >= 6 && hour <= 10 && features.amount < 15) {
+			category = 'Food & Dining';
+			confidence = 0.6;
+			reason = 'Morning low-amount purchase suggests coffee/food';
+		}
+		// Lunch patterns
+		else if (
+			hour >= 11 &&
+			hour <= 14 &&
+			features.amount >= 10 &&
+			features.amount <= 30
+		) {
+			category = 'Food & Dining';
+			confidence = 0.5;
+			reason = 'Lunch time medium amount suggests food';
+		}
+		// Evening entertainment
+		else if (hour >= 18 && hour <= 23 && features.amount > 50) {
+			category = 'Entertainment';
+			confidence = 0.4;
+			reason = 'Evening high amount suggests entertainment';
+		}
+		// Weekend shopping
+		else if ((dayOfWeek === 0 || dayOfWeek === 6) && features.amount > 100) {
+			category = 'Shopping';
+			confidence = 0.5;
+			reason = 'Weekend high amount suggests shopping';
+		}
+
+		return { category, confidence, reason };
+	}
+
+	private calculateAverageConfidence(): number {
+		// Calculate average confidence from category patterns
+		if (this.categoryPatterns.size === 0) {
+			return 0.5;
+		}
+
+		const confidences = Array.from(this.categoryPatterns.values()).map(
+			(pattern) => pattern.confidence || 0.5
+		);
+
+		return (
+			confidences.reduce((sum, conf) => sum + conf, 0) / confidences.length
+		);
+	}
+
+	private updateCategoryPatternFromTransaction(
+		userId: string,
+		category: string,
+		transaction: any
+	): void {
+		if (!this.categoryPatterns.has(category)) {
+			this.categoryPatterns.set(category, {
+				category,
+				averageAmount: transaction.amount,
+				frequency: 1,
+				dayOfWeekPreference: new Array(7).fill(0),
+				amountRange: { min: transaction.amount, max: transaction.amount },
+				seasonalTrend: 'stable',
+				confidence: 0.5,
+				lastUpdated: Date.now(),
+			});
+		} else {
+			const pattern = this.categoryPatterns.get(category)!;
+			const newFrequency = pattern.frequency + 1;
+			const newAverage =
+				(pattern.averageAmount * pattern.frequency + transaction.amount) /
+				newFrequency;
+
+			pattern.averageAmount = newAverage;
+			pattern.frequency = newFrequency;
+			pattern.amountRange.min = Math.min(
+				pattern.amountRange.min,
+				transaction.amount
+			);
+			pattern.amountRange.max = Math.max(
+				pattern.amountRange.max,
+				transaction.amount
+			);
+			pattern.lastUpdated = Date.now();
+
+			// Update day of week preference
+			const dayOfWeek = new Date(transaction.date).getDay();
+			pattern.dayOfWeekPreference[dayOfWeek]++;
+		}
+	}
+
 	private combinePredictions(
-		predictions: Array<{
+		predictions: {
 			category: string;
 			confidence: number;
 			reason: string;
-		}>
+		}[]
 	): {
 		category: string;
 		confidence: number;
@@ -526,6 +957,8 @@ export class LocalMLService {
 				dayOfWeekPreference: new Array(7).fill(0),
 				amountRange: { min: 0, max: 0 },
 				seasonalTrend: 'stable',
+				confidence: 0.5,
+				lastUpdated: Date.now(),
 			});
 		}
 	}
@@ -553,6 +986,8 @@ export class LocalMLService {
 				dayOfWeekPreference: new Array(7).fill(0),
 				amountRange: { min: 0, max: 0 },
 				seasonalTrend: 'stable',
+				confidence: 0.5,
+				lastUpdated: Date.now(),
 			};
 		}
 
@@ -576,6 +1011,8 @@ export class LocalMLService {
 				max: Math.max(...amounts),
 			},
 			seasonalTrend: 'stable', // Simplified for now
+			confidence: 0.7,
+			lastUpdated: Date.now(),
 		};
 	}
 
@@ -588,7 +1025,10 @@ export class LocalMLService {
 			]);
 
 			if (vendorData) {
-				const parsed = JSON.parse(vendorData);
+				const parsed = JSON.parse(vendorData) as Record<
+					string,
+					Record<string, Record<string, number>>
+				>;
 				// Convert back to nested Maps
 				for (const [userId, userData] of Object.entries(parsed)) {
 					this.vendorPatterns.set(userId, new Map(Object.entries(userData)));

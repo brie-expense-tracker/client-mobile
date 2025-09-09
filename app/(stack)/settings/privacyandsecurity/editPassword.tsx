@@ -5,9 +5,7 @@ import {
 	TextInput,
 	StyleSheet,
 	Alert,
-	ScrollView,
 	SafeAreaView,
-	Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -90,7 +88,7 @@ export default function EditPasswordScreen() {
 					</View>
 					<Text style={styles.title}>Change Your Password</Text>
 					<Text style={styles.subtitle}>
-						Enter your email address and we'll send you a link to change your
+						Enter your email address and we&apos;ll send you a link to change your
 						password.
 					</Text>
 

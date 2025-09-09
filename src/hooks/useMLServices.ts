@@ -1,10 +1,18 @@
 import { useState, useCallback, useEffect, useContext } from 'react';
-import { HybridAIService, AIRequest, AIResponse } from '../services';
+import {
+	HybridAIService,
+	AIRequest,
+	AIResponse,
+	SmartCacheService,
+	InsightsService,
+	BudgetAnalysisService,
+	type AIInsight,
+	type BudgetAnalysis,
+} from '../services';
 import { useBudget } from '../context/budgetContext';
 import { useGoal } from '../context/goalContext';
 import { TransactionContext } from '../context/transactionContext';
 import useAuth from '../context/AuthContext';
-import { SmartCacheService } from '../services';
 
 export interface MLInsight {
 	type:
@@ -29,6 +37,9 @@ export interface MLServiceStatus {
 	localMLConfidence: number;
 	costSavings: number;
 	totalRequests: number;
+	lastError?: string;
+	lastErrorTime?: Date;
+	retryCount: number;
 }
 
 export const useMLServices = () => {
@@ -52,6 +63,7 @@ export const useMLServices = () => {
 		localMLConfidence: 0,
 		costSavings: 0,
 		totalRequests: 0,
+		retryCount: 0,
 	});
 
 	const [isLoading, setIsLoading] = useState(false);
@@ -162,8 +174,51 @@ export const useMLServices = () => {
 	 */
 	const reset = useCallback(() => {
 		setError(null);
-		setStatus((prev) => ({ ...prev, isInitialized: false }));
+		setStatus((prev) => ({
+			...prev,
+			isInitialized: false,
+			retryCount: 0,
+			lastError: undefined,
+			lastErrorTime: undefined,
+		}));
 	}, []);
+
+	/**
+	 * Handle errors with retry logic
+	 */
+	const handleError = useCallback((error: Error, context: string) => {
+		const errorMessage = `${context}: ${error.message}`;
+		console.error(`[useMLServices] ${errorMessage}`, error);
+
+		setError(errorMessage);
+		setStatus((prev) => ({
+			...prev,
+			lastError: errorMessage,
+			lastErrorTime: new Date(),
+			retryCount: prev.retryCount + 1,
+		}));
+	}, []);
+
+	/**
+	 * Retry initialization with exponential backoff
+	 */
+	const retryInitialization = useCallback(async () => {
+		if (status.retryCount >= 3) {
+			console.warn('[useMLServices] Max retry attempts reached');
+			return;
+		}
+
+		const delay = Math.pow(2, status.retryCount) * 1000; // Exponential backoff
+		console.log(
+			`[useMLServices] Retrying initialization in ${delay}ms (attempt ${
+				status.retryCount + 1
+			})`
+		);
+
+		setTimeout(() => {
+			initializeML();
+		}, delay);
+	}, [status.retryCount, initializeML]);
 
 	/**
 	 * Get insights from ML services
@@ -196,11 +251,11 @@ export const useMLServices = () => {
 
 				return convertResponseToInsights(response);
 			} catch (err) {
-				console.error('[useMLServices] Error getting insights:', err);
+				handleError(err as Error, 'Error getting insights');
 				throw err;
 			}
 		},
-		[user?._id, status.isInitialized, transactions, budgets, goals, user]
+		[user?._id, status.isInitialized, transactions, budgets, goals, handleError]
 	);
 
 	/**
@@ -312,7 +367,7 @@ export const useMLServices = () => {
 				throw err;
 			}
 		},
-		[user?._id, status.isInitialized, transactions, budgets, goals, user]
+		[user?._id, status.isInitialized, transactions, budgets, goals]
 	);
 
 	/**
@@ -350,19 +405,6 @@ export const useMLServices = () => {
 	}, [status.isInitialized]);
 
 	/**
-	 * Clear ML cache
-	 */
-	const clearCache = useCallback(async () => {
-		try {
-			await SmartCacheService.getInstance().cleanupExpiredCache();
-			updateStatus();
-			console.log('[useMLServices] Cache cleared successfully');
-		} catch (error) {
-			console.error('[useMLServices] Error clearing cache:', error);
-		}
-	}, []);
-
-	/**
 	 * Update service status
 	 */
 	const updateStatus = useCallback(() => {
@@ -381,6 +423,173 @@ export const useMLServices = () => {
 			console.error('[useMLServices] Error updating status:', err);
 		}
 	}, [status.isInitialized]);
+
+	/**
+	 * Clear ML cache
+	 */
+	const clearCache = useCallback(async () => {
+		try {
+			await SmartCacheService.getInstance().cleanupExpiredCache();
+			updateStatus();
+			console.log('[useMLServices] Cache cleared successfully');
+		} catch (error) {
+			console.error('[useMLServices] Error clearing cache:', error);
+		}
+	}, [updateStatus]);
+
+	/**
+	 * Get budget analysis
+	 */
+	const getBudgetAnalysis = useCallback(
+		async (budgetId: string): Promise<BudgetAnalysis> => {
+			if (!user?._id || !status.isInitialized) {
+				throw new Error('ML services not initialized');
+			}
+
+			try {
+				const analysis = await BudgetAnalysisService.getBudgetAnalysis(
+					budgetId,
+					{
+						includeTransactions: true,
+						timeRange: 'month',
+						includeRecommendations: true,
+						includeTrends: true,
+					}
+				);
+
+				return analysis;
+			} catch (err) {
+				console.error('[useMLServices] Error getting budget analysis:', err);
+				throw new Error('Failed to analyze budget');
+			}
+		},
+		[user?._id, status.isInitialized]
+	);
+
+	/**
+	 * Get AI insights from the insights service
+	 */
+	const getAIInsights = useCallback(async (): Promise<AIInsight[]> => {
+		if (!user?._id || !status.isInitialized) {
+			throw new Error('ML services not initialized');
+		}
+
+		try {
+			const response = await InsightsService.getInsights('monthly');
+
+			if (response.success && response.data) {
+				return response.data;
+			}
+
+			return [];
+		} catch (err) {
+			console.error('[useMLServices] Error getting AI insights:', err);
+			throw new Error('Failed to get AI insights');
+		}
+	}, [user?._id, status.isInitialized]);
+
+	/**
+	 * Mark insight as read
+	 */
+	const markInsightAsRead = useCallback(
+		async (insightId: string): Promise<void> => {
+			if (!user?._id) return;
+
+			try {
+				await InsightsService.markInsightAsRead(insightId);
+			} catch (err) {
+				console.error('[useMLServices] Error marking insight as read:', err);
+			}
+		},
+		[user?._id]
+	);
+
+	/**
+	 * Get unread insights count
+	 */
+	const getUnreadInsightsCount = useCallback(async (): Promise<number> => {
+		if (!user?._id) return 0;
+
+		try {
+			const response = await InsightsService.getUnreadCount();
+			return response.success && response.data ? response.data.unreadCount : 0;
+		} catch (err) {
+			console.error('[useMLServices] Error getting unread count:', err);
+			return 0;
+		}
+	}, [user?._id]);
+
+	/**
+	 * Get spending patterns analysis
+	 */
+	const getSpendingPatterns = useCallback(async (): Promise<any> => {
+		if (!user?._id || !status.isInitialized) {
+			throw new Error('ML services not initialized');
+		}
+
+		try {
+			const request: AIRequest = {
+				type: 'analysis',
+				query: 'Analyze spending patterns and trends',
+				userId: user._id,
+				priority: 'medium',
+				data: {
+					transactions,
+					budgets,
+					goals,
+					userId: user._id,
+				},
+			};
+
+			const response: AIResponse =
+				await HybridAIService.getInstance().processRequest(request);
+
+			return response.response;
+		} catch (err) {
+			console.error('[useMLServices] Error getting spending patterns:', err);
+			throw new Error('Failed to analyze spending patterns');
+		}
+	}, [user?._id, status.isInitialized, transactions, budgets, goals]);
+
+	/**
+	 * Get financial health score
+	 */
+	const getFinancialHealthScore = useCallback(async (): Promise<{
+		score: number;
+		grade: string;
+		recommendations: string[];
+		trends: any;
+	}> => {
+		if (!user?._id || !status.isInitialized) {
+			throw new Error('ML services not initialized');
+		}
+
+		try {
+			const request: AIRequest = {
+				type: 'analysis',
+				query: 'Calculate financial health score and provide recommendations',
+				userId: user._id,
+				priority: 'high',
+				data: {
+					transactions,
+					budgets,
+					goals,
+					userId: user._id,
+				},
+			};
+
+			const response: AIResponse =
+				await HybridAIService.getInstance().processRequest(request);
+
+			return response.response;
+		} catch (err) {
+			console.error(
+				'[useMLServices] Error getting financial health score:',
+				err
+			);
+			throw new Error('Failed to calculate financial health score');
+		}
+	}, [user?._id, status.isInitialized, transactions, budgets, goals]);
 
 	/**
 	 * Convert AI response to insights
@@ -472,7 +681,7 @@ export const useMLServices = () => {
 		isLoading,
 		error,
 
-		// Actions
+		// Core Actions
 		initializeML,
 		getInsights,
 		categorizeTransaction,
@@ -482,6 +691,15 @@ export const useMLServices = () => {
 		getMetrics,
 		clearCache,
 		reset,
+		retryInitialization,
+
+		// Enhanced Features
+		getBudgetAnalysis,
+		getAIInsights,
+		markInsightAsRead,
+		getUnreadInsightsCount,
+		getSpendingPatterns,
+		getFinancialHealthScore,
 
 		// Utilities
 		isReady: status.isInitialized && !isLoading,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
 	View,
 	Text,
@@ -16,10 +16,13 @@ import { router } from 'expo-router';
 import RecurringExpensesFeed from './components/RecurringExpensesFeed';
 import RecurringSummaryCard from './components/RecurringSummaryCard';
 import { useRecurringExpenses } from '../../../src/hooks/useRecurringExpenses';
+import { RecurringExpenseService } from '../../../src/services';
 import {
-	RecurringExpense,
-	RecurringExpenseService,
-} from '../../../src/services';
+	accessibilityProps,
+	dynamicTextStyle,
+	generateAccessibilityLabel,
+	voiceOverHints,
+} from '../../../src/utils/accessibility';
 
 // ==========================================
 // Types
@@ -93,7 +96,7 @@ const RecurringExpensesScreen: React.FC = () => {
 		[dueThisWeekExpenses]
 	);
 
-	const onRefresh = async () => {
+	const onRefresh = useCallback(async () => {
 		setRefreshing(true);
 		try {
 			await refetch();
@@ -102,12 +105,12 @@ const RecurringExpensesScreen: React.FC = () => {
 		} finally {
 			setRefreshing(false);
 		}
-	};
+	}, [refetch]);
 
 	// Refresh when component mounts
 	useEffect(() => {
 		onRefresh();
-	}, []);
+	}, [onRefresh]);
 
 	const handleExpensePress = (expense: RecurringExpenseWithPaymentStatus) => {
 		setSelectedExpense(expense);
@@ -236,9 +239,22 @@ const RecurringExpensesScreen: React.FC = () => {
 	// Loading State Component
 	// ==========================================
 	const LoadingState = () => (
-		<View style={styles.loadingContainer}>
-			<ActivityIndicator size="large" color="#00a2ff" />
-			<Text style={styles.loadingText}>Loading recurring expenses...</Text>
+		<View
+			style={styles.loadingContainer}
+			accessibilityRole="progressbar"
+			accessibilityLabel="Loading recurring expenses"
+		>
+			<ActivityIndicator
+				size="large"
+				color="#00a2ff"
+				accessibilityRole="progressbar"
+			/>
+			<Text
+				style={[styles.loadingText, dynamicTextStyle]}
+				accessibilityRole="text"
+			>
+				Loading recurring expenses...
+			</Text>
 		</View>
 	);
 
@@ -246,20 +262,55 @@ const RecurringExpensesScreen: React.FC = () => {
 	// Error State Component
 	// ==========================================
 	const ErrorState = () => (
-		<View style={styles.errorContainer}>
+		<View
+			style={styles.errorContainer}
+			accessibilityRole="alert"
+			accessibilityLabel="Error loading recurring expenses"
+		>
 			<View style={styles.errorContent}>
-				<Ionicons name="warning-outline" size={64} color="#ff6b6b" />
-				<Text style={styles.errorTitle}>Unable to Load Expenses</Text>
-				<Text style={styles.errorSubtext}>
+				<Ionicons
+					name="warning-outline"
+					size={64}
+					color="#ff6b6b"
+					accessibilityRole="image"
+					accessibilityLabel="Warning icon"
+				/>
+				<Text
+					style={[styles.errorTitle, dynamicTextStyle]}
+					accessibilityRole="text"
+				>
+					Unable to Load Expenses
+				</Text>
+				<Text
+					style={[styles.errorSubtext, dynamicTextStyle]}
+					accessibilityRole="text"
+				>
 					There was a problem connecting to the server. Please check your
 					connection and try again.
 				</Text>
 				<RectButton
 					style={styles.errorButton}
 					onPress={() => router.replace('/(tabs)/budgets/recurringExpenses')}
+					{...accessibilityProps.button}
+					accessibilityLabel={generateAccessibilityLabel.button(
+						'Retry',
+						'loading'
+					)}
+					accessibilityHint={voiceOverHints.retry}
 				>
-					<Ionicons name="refresh" size={20} color="#fff" />
-					<Text style={styles.errorButtonText}>Retry</Text>
+					<Ionicons
+						name="refresh"
+						size={20}
+						color="#fff"
+						accessibilityRole="image"
+						accessibilityLabel="Retry icon"
+					/>
+					<Text
+						style={[styles.errorButtonText, dynamicTextStyle]}
+						accessibilityRole="text"
+					>
+						Retry
+					</Text>
 				</RectButton>
 			</View>
 		</View>
@@ -269,19 +320,54 @@ const RecurringExpensesScreen: React.FC = () => {
 	// Empty State Component
 	// ==========================================
 	const EmptyState = () => (
-		<View style={styles.emptyContainer}>
+		<View
+			style={styles.emptyContainer}
+			accessibilityRole="text"
+			accessibilityLabel="No recurring expenses available"
+		>
 			<View style={styles.emptyContent}>
-				<Ionicons name="repeat-outline" size={64} color="#e0e0e0" />
-				<Text style={styles.emptyTitle}>No Recurring Expenses</Text>
-				<Text style={styles.emptySubtext}>
+				<Ionicons
+					name="repeat-outline"
+					size={64}
+					color="#e0e0e0"
+					accessibilityRole="image"
+					accessibilityLabel="Empty recurring expenses icon"
+				/>
+				<Text
+					style={[styles.emptyTitle, dynamicTextStyle]}
+					accessibilityRole="text"
+				>
+					No Recurring Expenses
+				</Text>
+				<Text
+					style={[styles.emptySubtext, dynamicTextStyle]}
+					accessibilityRole="text"
+				>
 					Add your first recurring expense to start tracking regular payments
 				</Text>
 				<RectButton
 					style={styles.emptyAddButton}
 					onPress={handleAddRecurringExpense}
+					{...accessibilityProps.button}
+					accessibilityLabel={generateAccessibilityLabel.button(
+						'Add',
+						'recurring expense'
+					)}
+					accessibilityHint={voiceOverHints.add}
 				>
-					<Ionicons name="add" size={20} color="#fff" />
-					<Text style={styles.emptyAddButtonText}>Add Expense</Text>
+					<Ionicons
+						name="add"
+						size={20}
+						color="#fff"
+						accessibilityRole="image"
+						accessibilityLabel="Add icon"
+					/>
+					<Text
+						style={[styles.emptyAddButtonText, dynamicTextStyle]}
+						accessibilityRole="text"
+					>
+						Add Expense
+					</Text>
 				</RectButton>
 			</View>
 		</View>
@@ -306,7 +392,10 @@ const RecurringExpensesScreen: React.FC = () => {
 	}
 
 	return (
-		<View style={styles.mainContainer}>
+		<View
+			style={styles.mainContainer}
+			accessibilityLabel="Recurring expenses screen"
+		>
 			<ScrollView
 				style={styles.content}
 				contentContainerStyle={styles.scrollContentContainer}
@@ -316,9 +405,11 @@ const RecurringExpensesScreen: React.FC = () => {
 						onRefresh={onRefresh}
 						tintColor="#00a2ff"
 						colors={['#00a2ff']}
+						accessibilityLabel="Pull to refresh recurring expenses"
 					/>
 				}
 				showsVerticalScrollIndicator={false}
+				accessibilityLabel="Recurring expenses list"
 			>
 				{/* Recurring Summary Card */}
 				<RecurringSummaryCard
@@ -349,39 +440,115 @@ const RecurringExpensesScreen: React.FC = () => {
 				title={selectedExpense?.vendor || 'Expense Options'}
 				icon="ellipsis-horizontal"
 			>
-				<View style={styles.optionsModalContent}>
+				<View
+					style={styles.optionsModalContent}
+					accessibilityLabel="Expense options menu"
+				>
 					<RectButton
 						style={styles.optionButton}
 						onPress={handleViewPaymentHistory}
+						{...accessibilityProps.button}
+						accessibilityLabel={generateAccessibilityLabel.button(
+							'View',
+							'payment history'
+						)}
+						accessibilityHint={voiceOverHints.navigate}
 					>
 						<View style={styles.optionContent}>
-							<Ionicons name="time-outline" size={20} color="#00a2ff" />
-							<Text style={styles.optionText}>View Payment History</Text>
+							<Ionicons
+								name="time-outline"
+								size={20}
+								color="#00a2ff"
+								accessibilityRole="image"
+								accessibilityLabel="Payment history icon"
+							/>
+							<Text
+								style={[styles.optionText, dynamicTextStyle]}
+								accessibilityRole="text"
+							>
+								View Payment History
+							</Text>
 						</View>
 					</RectButton>
 
-					<RectButton style={styles.optionButton} onPress={handleEditExpense}>
+					<RectButton
+						style={styles.optionButton}
+						onPress={handleEditExpense}
+						{...accessibilityProps.button}
+						accessibilityLabel={generateAccessibilityLabel.button(
+							'Edit',
+							'expense'
+						)}
+						accessibilityHint={voiceOverHints.edit}
+					>
 						<View style={styles.optionContent}>
-							<Ionicons name="create-outline" size={20} color="#00a2ff" />
-							<Text style={styles.optionText}>Edit Expense</Text>
+							<Ionicons
+								name="create-outline"
+								size={20}
+								color="#00a2ff"
+								accessibilityRole="image"
+								accessibilityLabel="Edit icon"
+							/>
+							<Text
+								style={[styles.optionText, dynamicTextStyle]}
+								accessibilityRole="text"
+							>
+								Edit Expense
+							</Text>
 						</View>
 					</RectButton>
 
-					<RectButton style={styles.optionButton} onPress={handleMarkAsPaid}>
+					<RectButton
+						style={styles.optionButton}
+						onPress={handleMarkAsPaid}
+						{...accessibilityProps.button}
+						accessibilityLabel={generateAccessibilityLabel.button(
+							'Mark as paid',
+							'expense'
+						)}
+						accessibilityHint={voiceOverHints.save}
+					>
 						<View style={styles.optionContent}>
 							<Ionicons
 								name="checkmark-circle-outline"
 								size={20}
 								color="#00a2ff"
+								accessibilityRole="image"
+								accessibilityLabel="Mark as paid icon"
 							/>
-							<Text style={styles.optionText}>Mark as Paid</Text>
+							<Text
+								style={[styles.optionText, dynamicTextStyle]}
+								accessibilityRole="text"
+							>
+								Mark as Paid
+							</Text>
 						</View>
 					</RectButton>
 
-					<RectButton style={styles.optionButton} onPress={hideOptionsModal}>
+					<RectButton
+						style={styles.optionButton}
+						onPress={hideOptionsModal}
+						{...accessibilityProps.button}
+						accessibilityLabel={generateAccessibilityLabel.button(
+							'Cancel',
+							'options'
+						)}
+						accessibilityHint={voiceOverHints.cancel}
+					>
 						<View style={styles.optionContent}>
-							<Ionicons name="close-outline" size={20} color="#757575" />
-							<Text style={styles.optionText}>Cancel</Text>
+							<Ionicons
+								name="close-outline"
+								size={20}
+								color="#757575"
+								accessibilityRole="image"
+								accessibilityLabel="Cancel icon"
+							/>
+							<Text
+								style={[styles.optionText, dynamicTextStyle]}
+								accessibilityRole="text"
+							>
+								Cancel
+							</Text>
 						</View>
 					</RectButton>
 				</View>

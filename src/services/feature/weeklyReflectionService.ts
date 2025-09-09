@@ -52,6 +52,45 @@ export class WeeklyReflectionService {
 	static async getCurrentWeekReflection(): Promise<WeeklyReflection> {
 		try {
 			const response = await ApiService.get('/api/weekly-reflections/current');
+
+			// Handle case where API returns no data or user not found
+			if (!response.data || !response.data.reflection) {
+				// Return a default reflection structure for new users
+				const now = new Date();
+				const dayOfWeek = now.getDay();
+				const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+				const monday = new Date(
+					now.getTime() - daysToMonday * 24 * 60 * 60 * 1000
+				);
+				const weekStart = new Date(
+					monday.getFullYear(),
+					monday.getMonth(),
+					monday.getDate()
+				);
+				const weekEnd = new Date(
+					monday.getFullYear(),
+					monday.getMonth(),
+					monday.getDate() + 7
+				);
+
+				return {
+					_id: 'temp',
+					userId: 'temp',
+					weekStartDate: weekStart.toISOString(),
+					weekEndDate: weekEnd.toISOString(),
+					financialMetrics: {
+						totalIncome: 0,
+						totalExpenses: 0,
+						netSavings: 0,
+						budgetUtilization: 0,
+						goalProgress: 0,
+					},
+					completed: false,
+					createdAt: new Date().toISOString(),
+					updatedAt: new Date().toISOString(),
+				};
+			}
+
 			return response.data.reflection;
 		} catch (error) {
 			console.error('Error fetching current week reflection:', error);
@@ -63,7 +102,10 @@ export class WeeklyReflectionService {
 		data: SaveReflectionData
 	): Promise<WeeklyReflection> {
 		try {
-			const response = await ApiService.post('/api/weekly-reflections/save', data);
+			const response = await ApiService.post(
+				'/api/weekly-reflections/save',
+				data
+			);
 			return response.data.reflection;
 		} catch (error) {
 			console.error('Error saving weekly reflection:', error);
@@ -76,9 +118,9 @@ export class WeeklyReflectionService {
 		offset: number = 0
 	): Promise<WeeklyReflection[]> {
 		try {
-					const response = await ApiService.get(
-			`/api/weekly-reflections/history?limit=${limit}&offset=${offset}`
-		);
+			const response = await ApiService.get(
+				`/api/weekly-reflections/history?limit=${limit}&offset=${offset}`
+			);
 			return response.data.reflections;
 		} catch (error) {
 			console.error('Error fetching reflection history:', error);
@@ -108,14 +150,26 @@ export class WeeklyReflectionService {
 		budgetUtilization: number;
 		goalProgress: number;
 	} {
+		// Get calendar-aligned week range (Monday to Sunday)
 		const now = new Date();
-		const weekStart = new Date();
-		weekStart.setDate(now.getDate() - 7);
+		const dayOfWeek = now.getDay();
+		const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // If Sunday, go back 6 days
+		const monday = new Date(now.getTime() - daysToMonday * 24 * 60 * 60 * 1000);
+		const weekStart = new Date(
+			monday.getFullYear(),
+			monday.getMonth(),
+			monday.getDate()
+		);
+		const weekEnd = new Date(
+			monday.getFullYear(),
+			monday.getMonth(),
+			monday.getDate() + 7
+		);
 
 		// Filter transactions for the current week
 		const weekTransactions = transactions.filter((tx) => {
 			const txDate = new Date(tx.date);
-			return txDate >= weekStart && txDate <= now;
+			return txDate >= weekStart && txDate < weekEnd;
 		});
 
 		const totalIncome = weekTransactions

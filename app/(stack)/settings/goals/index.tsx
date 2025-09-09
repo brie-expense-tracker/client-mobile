@@ -7,7 +7,6 @@ import {
 	Switch,
 	TextInput,
 	StyleSheet,
-	Platform,
 	TouchableOpacity,
 	Alert,
 	ActivityIndicator,

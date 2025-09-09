@@ -8,6 +8,13 @@ import { ApiService } from '../services';
 // ==========================================
 const fetchGoals = async (): Promise<Goal[]> => {
 	const response = await ApiService.get<{ data: Goal[] }>('/api/goals');
+
+	// Handle authentication errors gracefully
+	if (!response.success && response.error?.includes('User not authenticated')) {
+		console.log('🔒 [Goals] User not authenticated, returning empty array');
+		return [];
+	}
+
 	// Handle the nested response structure from the server
 	const goalsData = response.data?.data || response.data;
 	return Array.isArray(goalsData) ? goalsData : [];
@@ -28,54 +35,38 @@ const createGoal = async (goalData: CreateGoalData): Promise<Goal> => {
 	return responseData as Goal;
 };
 
-const updateGoal = async (
-	id: string,
-	updates: UpdateGoalData
-): Promise<Goal> => {
-	const response = await ApiService.put<{ data: Goal }>(
-		`/api/goals/${id}`,
-		updates
-	);
-	const responseData = response.data?.data || response.data;
-	if (
-		!responseData ||
-		(typeof responseData === 'object' && 'data' in responseData)
-	) {
-		throw new Error('Failed to update goal: No data received');
-	}
-	return responseData as Goal;
-};
-
-const deleteGoal = async (id: string): Promise<void> => {
-	await ApiService.delete(`/api/goals/${id}`);
-};
-
 // ==========================================
 // Goal-specific data transformations
 // ==========================================
 const transformGoalData = (goals: Goal[]) => {
-	return goals.map((goal: any) => {
+	return goals.map((goal: Goal) => {
 		// Transform _id to id if it exists
 		const transformedGoal = {
 			...goal,
-			id: goal._id || goal.id, // Ensure id field exists
+			id: (goal as any)._id || goal.id, // Ensure id field exists
 		};
 
+		// Handle invalid dates gracefully
 		const deadline = new Date(transformedGoal.deadline);
 		const today = new Date();
-		const daysLeft = Math.ceil(
-			(deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-		);
-		const percent = Math.min(
-			(transformedGoal.current / transformedGoal.target) * 100,
-			100
-		);
+
+		// Check if deadline is valid
+		const isValidDeadline = !isNaN(deadline.getTime());
+		const daysLeft = isValidDeadline
+			? Math.ceil(
+					(deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+			  )
+			: 0;
+
+		// Handle division by zero and ensure target is positive
+		const target = Math.max(transformedGoal.target, 0.01); // Prevent division by zero
+		const percent = Math.min((transformedGoal.current / target) * 100, 100);
 
 		return {
 			...transformedGoal,
 			daysLeft,
-			percent,
-			isOverdue: daysLeft < 0,
+			percent: Math.max(0, percent), // Ensure percent is not negative
+			isOverdue: isValidDeadline && daysLeft < 0,
 			isCompleted: percent >= 100,
 		};
 	});
@@ -84,18 +75,16 @@ const transformGoalData = (goals: Goal[]) => {
 // ==========================================
 // Hook
 // ==========================================
-export function useGoals() {
+export function useGoals(options: { refreshOnFocus?: boolean } = {}) {
 	// Memoize the API functions to prevent recreation on every render
 	const memoizedFetchGoals = useCallback(fetchGoals, []);
 	const memoizedCreateGoal = useCallback(createGoal, []);
-	const memoizedUpdateGoal = useCallback(updateGoal, []);
-	const memoizedDeleteGoal = useCallback(deleteGoal, []);
 
 	// Create wrapper functions for the API calls
 	const updateGoalDirect = useCallback(
 		async (id: string, updates: UpdateGoalData): Promise<Goal> => {
 			const response = await ApiService.put<{ data: Goal }>(
-				`/goals/${id}`,
+				`/api/goals/${id}`,
 				updates
 			);
 			const responseData = response.data?.data || response.data;
@@ -148,7 +137,7 @@ export function useGoals() {
 		updateFunction: updateGoalDirect,
 		deleteFunction: deleteGoalDirect,
 		autoRefresh: true,
-		refreshOnFocus: true,
+		refreshOnFocus: options.refreshOnFocus !== false, // Default to true unless explicitly disabled
 		transformData: transformGoalData,
 	});
 
@@ -156,10 +145,10 @@ export function useGoals() {
 	// Memoized Data
 	// ==========================================
 	const transformedData = useMemo(() => {
-		const transformed = transformGoalData ? transformGoalData(goals) : goals;
+		const transformed = transformGoalData(goals);
 		console.log(`🎯 Goals: ${transformed.length} active`);
 		return transformed;
-	}, [goals, transformGoalData]);
+	}, [goals]);
 
 	// ==========================================
 	// Memoized Goal Calculations
@@ -201,6 +190,87 @@ export function useGoals() {
 			overdueGoals,
 			summaryStats,
 		};
+	}, [transformedData]);
+
+	// ==========================================
+	// Goal Filtering and Sorting
+	// ==========================================
+	const getGoalsByCategory = useCallback(
+		(category: string) => {
+			return transformedData.filter((goal) =>
+				goal.categories.includes(category)
+			);
+		},
+		[transformedData]
+	);
+
+	const getGoalsByStatus = useCallback(
+		(status: 'active' | 'completed' | 'overdue') => {
+			switch (status) {
+				case 'active':
+					return transformedData.filter(
+						(goal) => !goal.isCompleted && !goal.isOverdue
+					);
+				case 'completed':
+					return transformedData.filter((goal) => goal.isCompleted);
+				case 'overdue':
+					return transformedData.filter((goal) => goal.isOverdue);
+				default:
+					return [];
+			}
+		},
+		[transformedData]
+	);
+
+	const sortGoals = useCallback(
+		(
+			goals: Goal[],
+			sortBy: 'name' | 'deadline' | 'progress' | 'target' | 'created'
+		) => {
+			return [...goals].sort((a, b) => {
+				switch (sortBy) {
+					case 'name':
+						return a.name.localeCompare(b.name);
+					case 'deadline':
+						return (
+							new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+						);
+					case 'progress':
+						return (b.percent || 0) - (a.percent || 0);
+					case 'target':
+						return b.target - a.target;
+					case 'created':
+						const aCreated = new Date(a.createdAt || 0).getTime();
+						const bCreated = new Date(b.createdAt || 0).getTime();
+						return bCreated - aCreated;
+					default:
+						return 0;
+				}
+			});
+		},
+		[]
+	);
+
+	const searchGoals = useCallback(
+		(query: string) => {
+			const lowercaseQuery = query.toLowerCase();
+			return transformedData.filter(
+				(goal) =>
+					goal.name.toLowerCase().includes(lowercaseQuery) ||
+					goal.categories.some((cat) =>
+						cat.toLowerCase().includes(lowercaseQuery)
+					)
+			);
+		},
+		[transformedData]
+	);
+
+	const getAllCategories = useCallback(() => {
+		const categories = new Set<string>();
+		transformedData.forEach((goal) => {
+			goal.categories.forEach((category) => categories.add(category));
+		});
+		return Array.from(categories).sort();
 	}, [transformedData]);
 
 	// ==========================================
@@ -255,5 +325,12 @@ export function useGoals() {
 		updateGoal: updateGoalWrapper,
 		deleteGoal: deleteGoalWrapper,
 		clearError,
+
+		// Filtering and Sorting
+		getGoalsByCategory,
+		getGoalsByStatus,
+		sortGoals,
+		searchGoals,
+		getAllCategories,
 	};
 }

@@ -12,12 +12,25 @@ export interface IntelligentAction {
 	insightId?: string;
 	period?: string;
 	metadata?: any;
+	// Additional properties used in the component
+	parameters?: Record<string, any>;
+	requiresConfirmation?: boolean;
+	executedAt?: string;
+	error?: string;
+	completionDetails?: {
+		reason: string;
+		message: string;
+		timestamp?: string;
+	};
+	detectionType?: string;
+	detectionCriteria?: Record<string, any>;
 }
 
 export interface ActionExecutionResult {
 	success: boolean;
 	message: string;
 	data?: any;
+	error?: string;
 }
 
 export class IntelligentActionService {

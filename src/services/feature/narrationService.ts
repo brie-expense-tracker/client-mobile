@@ -4,8 +4,10 @@ import {
 	fallbackTemplate,
 	NarrationFacts,
 	UserProfile,
-} from '../../components/assistant/promptBuilder';
-import { ChatResponse } from '../../components/assistant/responseSchema';
+} from '../../services/assistant/promptBuilder';
+import { ChatResponse } from '../../services/assistant/responseSchema';
+import TokenUsageService from './tokenUsageService';
+import { EnhancedTieredAIService } from './enhancedTieredAIService';
 
 export interface NarrationOptions {
 	useMiniModel?: boolean;
@@ -15,10 +17,13 @@ export interface NarrationOptions {
 }
 
 export class NarrationService {
-	private aiService: any; // Replace with your actual AI service
-	private tokenService: any; // Replace with your actual token service
+	private aiService: EnhancedTieredAIService;
+	private tokenService: TokenUsageService;
 
-	constructor(aiService: any, tokenService: any) {
+	constructor(
+		aiService: EnhancedTieredAIService,
+		tokenService: TokenUsageService
+	) {
 		this.aiService = aiService;
 		this.tokenService = tokenService;
 	}
@@ -39,6 +44,12 @@ export class NarrationService {
 			temperature = 0.3,
 		} = options;
 
+		// Track user message for token usage
+		this.tokenService.trackUserMessage(
+			userQuestion,
+			useMiniModel ? 'gpt-3.5-turbo' : 'gpt-4'
+		);
+
 		try {
 			// Determine question type for fallback template
 			const questionType = this.detectQuestionType(userQuestion);
@@ -51,16 +62,42 @@ export class NarrationService {
 				return fallbackTemplate(facts, questionType);
 			}
 
+			// Prepare narration prompt with facts and user profile
+			const prompt = narrationPrompt(facts, userProfile);
+			const fullPrompt = `${prompt}
+
+User Question: ${userQuestion}
+
+Please keep your response concise (max ${maxTokens} tokens) and maintain a professional tone (temperature: ${temperature}).`;
+
 			// Try to get response from the AI service
 			let aiResponse;
 			try {
 				// Use the getResponse method that EnhancedTieredAIService provides
-				aiResponse = await this.aiService.getResponse(userQuestion);
+				aiResponse = await this.aiService.getResponse(fullPrompt);
+
+				// Track successful AI response
+				const responseText =
+					typeof aiResponse.response === 'string'
+						? aiResponse.response
+						: JSON.stringify(aiResponse.response);
+				this.tokenService.trackAIResponse(
+					responseText,
+					useMiniModel ? 'gpt-3.5-turbo' : 'gpt-4',
+					{
+						complexity: useMiniModel ? 'mini' : 'std',
+						confidence: 0.8,
+						responseTime: Date.now(),
+					}
+				);
 			} catch (aiError) {
 				console.warn(
 					'AI service call failed, using fallback template:',
 					aiError
 				);
+
+				// Track failed AI response - no need to track failed responses separately
+
 				return fallbackTemplate(facts, questionType);
 			}
 
@@ -78,7 +115,8 @@ export class NarrationService {
 				// Check if response is already a ChatResponse object
 				if (
 					typeof aiResponse.response === 'object' &&
-					aiResponse.response.message
+					aiResponse.response &&
+					'message' in aiResponse.response
 				) {
 					parsedResponse = aiResponse.response as ChatResponse;
 				} else {
@@ -86,7 +124,10 @@ export class NarrationService {
 					parsedResponse = JSON.parse(aiResponse.response);
 				}
 			} catch (parseError) {
-				console.warn('Failed to parse AI response, using fallback template');
+				console.warn(
+					'Failed to parse AI response, using fallback template:',
+					parseError
+				);
 				return fallbackTemplate(facts, questionType);
 			}
 
@@ -106,11 +147,23 @@ export class NarrationService {
 				}
 			}
 
-			// Add cost estimation
+			// Add cost estimation with token limits
+			const estimatedTokens = this.estimateTokens(parsedResponse);
+			const finalTokens = Math.min(estimatedTokens, maxTokens);
+
 			parsedResponse.cost = {
 				model: useMiniModel ? 'mini' : 'std',
-				estTokens: this.estimateTokens(parsedResponse),
+				estTokens: finalTokens,
 			};
+
+			// Add temperature and token limit info to response
+			if (parsedResponse.details) {
+				parsedResponse.details += ` (Generated with temperature: ${temperature}, token limit: ${maxTokens})`;
+			} else {
+				parsedResponse.details = `Generated with temperature: ${temperature}, token limit: ${maxTokens}`;
+			}
+
+			// Token usage already tracked in the AI response tracking above
 
 			return parsedResponse;
 		} catch (error) {
@@ -166,7 +219,8 @@ export class NarrationService {
 			} catch (parseError) {
 				// If critic fails to parse, assume response is valid
 				console.warn(
-					'Critic response parsing failed, assuming response is valid'
+					'Critic response parsing failed, assuming response is valid:',
+					parseError
 				);
 				return { isValid: true, issues: [], fixes: [], confidence: 0.8 };
 			}
@@ -250,6 +304,30 @@ export class NarrationService {
 	}
 
 	/**
+	 * Estimate tokens from AI service response
+	 */
+	private estimateTokensFromResponse(response: any): number {
+		if (!response || !response.response) {
+			return 0;
+		}
+
+		let tokens = 0;
+		const responseText =
+			typeof response.response === 'string'
+				? response.response
+				: JSON.stringify(response.response);
+
+		tokens += responseText.length / 4;
+
+		// Add tokens for any additional data in the response
+		if (response.usage?.estimatedTokens) {
+			tokens = response.usage.estimatedTokens;
+		}
+
+		return Math.round(tokens);
+	}
+
+	/**
 	 * Prepare facts from app data for narration
 	 */
 	prepareFacts(
@@ -322,5 +400,107 @@ export class NarrationService {
 				  }
 				: undefined,
 		};
+	}
+
+	/**
+	 * Create a more sophisticated narration using the prompt system
+	 */
+	async createNarrationWithPrompt(
+		userQuestion: string,
+		facts: NarrationFacts,
+		userProfile: UserProfile,
+		options: NarrationOptions = {}
+	): Promise<ChatResponse> {
+		const {
+			useMiniModel = true,
+			enableCritic = true,
+			maxTokens = 150,
+			temperature = 0.3,
+		} = options;
+
+		try {
+			// Create a more detailed prompt that includes context
+			const basePrompt = narrationPrompt(facts, userProfile);
+			const enhancedPrompt = `${basePrompt}
+
+CONTEXT:
+- Question: ${userQuestion}
+- Max tokens: ${maxTokens}
+- Temperature: ${temperature}
+- Model: ${useMiniModel ? 'mini' : 'std'}
+
+Please provide a structured response that follows the format exactly.`;
+
+			// Track user message
+			this.tokenService.trackUserMessage(
+				userQuestion,
+				useMiniModel ? 'gpt-3.5-turbo' : 'gpt-4'
+			);
+
+			// Get AI response
+			const aiResponse = await this.aiService.getResponse(enhancedPrompt);
+
+			if (!aiResponse || !aiResponse.response) {
+				return fallbackTemplate(facts, this.detectQuestionType(userQuestion));
+			}
+
+			// Parse and validate response
+			let parsedResponse: ChatResponse;
+			try {
+				if (
+					typeof aiResponse.response === 'object' &&
+					'message' in aiResponse.response
+				) {
+					parsedResponse = aiResponse.response as ChatResponse;
+				} else {
+					parsedResponse = JSON.parse(aiResponse.response);
+				}
+			} catch (parseError) {
+				console.warn('Failed to parse enhanced AI response:', parseError);
+				return fallbackTemplate(facts, this.detectQuestionType(userQuestion));
+			}
+
+			// Validate response structure
+			if (!this.isValidResponse(parsedResponse)) {
+				console.warn('Invalid enhanced response structure');
+				return fallbackTemplate(facts, this.detectQuestionType(userQuestion));
+			}
+
+			// Run critic if enabled
+			if (enableCritic) {
+				const criticResult = await this.runCriticPass(parsedResponse, facts);
+				if (!criticResult.isValid) {
+					console.warn('Critic found issues with enhanced response');
+					return fallbackTemplate(facts, this.detectQuestionType(userQuestion));
+				}
+			}
+
+			// Add cost and metadata
+			const estimatedTokens = this.estimateTokens(parsedResponse);
+			parsedResponse.cost = {
+				model: useMiniModel ? 'mini' : 'std',
+				estTokens: Math.min(estimatedTokens, maxTokens),
+			};
+
+			// Track AI response
+			const responseText =
+				typeof aiResponse.response === 'string'
+					? aiResponse.response
+					: JSON.stringify(aiResponse.response);
+			this.tokenService.trackAIResponse(
+				responseText,
+				useMiniModel ? 'gpt-3.5-turbo' : 'gpt-4',
+				{
+					complexity: useMiniModel ? 'mini' : 'std',
+					confidence: 0.9,
+					responseTime: Date.now(),
+				}
+			);
+
+			return parsedResponse;
+		} catch (error) {
+			console.error('Enhanced narration failed:', error);
+			return fallbackTemplate(facts, this.detectQuestionType(userQuestion));
+		}
 	}
 }

@@ -9,15 +9,12 @@ import {
 	Alert,
 	ActivityIndicator,
 	SafeAreaView,
-	Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useGoals } from '../../src/hooks/useGoals';
 import { Goal } from '../../src/context/goalContext';
-
-const { width } = Dimensions.get('window');
 
 // Popular goal icons
 const goalIcons: (keyof typeof Ionicons.glyphMap)[] = [

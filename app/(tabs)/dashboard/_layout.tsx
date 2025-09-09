@@ -2,9 +2,24 @@ import React, { useState } from 'react';
 import { router, Stack } from 'expo-router';
 import { BorderlessButton } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, {
+	useAnimatedStyle,
+	withSpring,
+} from 'react-native-reanimated';
+import {
+	accessibilityProps,
+	generateAccessibilityLabel,
+	voiceOverHints,
+} from '../../../src/utils/accessibility';
 
 export default function DashboardLayout() {
-	const [sPressed, setIsPressed] = useState(false);
+	const [isPressed, setIsPressed] = useState(false);
+
+	// Animated style for button press feedback
+	const animatedButtonStyle = useAnimatedStyle(() => ({
+		transform: [{ scale: withSpring(isPressed ? 0.95 : 1) }],
+		opacity: withSpring(isPressed ? 0.7 : 1),
+	}));
 
 	return (
 		<Stack>
@@ -14,7 +29,7 @@ export default function DashboardLayout() {
 				options={{
 					headerShown: true,
 					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: 'Notifcations',
+					headerTitle: 'Notifications',
 					headerShadowVisible: false,
 					headerTitleStyle: {
 						fontSize: 20,
@@ -26,13 +41,26 @@ export default function DashboardLayout() {
 					},
 
 					headerLeft: () => (
-						<BorderlessButton
-							onPress={() => router.back()}
-							onActiveStateChange={setIsPressed}
-							style={{ width: 50 }}
-						>
-							<Ionicons name="chevron-back" size={24} color="#333" />
-						</BorderlessButton>
+						<Animated.View style={animatedButtonStyle}>
+							<BorderlessButton
+								onPress={() => router.back()}
+								onActiveStateChange={setIsPressed}
+								style={{ width: 50 }}
+								{...accessibilityProps.button}
+								accessibilityLabel={generateAccessibilityLabel.button(
+									'Go back'
+								)}
+								accessibilityHint={voiceOverHints.navigate}
+							>
+								<Ionicons
+									name="chevron-back"
+									size={24}
+									color="#333"
+									accessibilityRole="image"
+									accessibilityLabel="Back arrow"
+								/>
+							</BorderlessButton>
+						</Animated.View>
 					),
 				}}
 			/>

@@ -5,7 +5,6 @@ import {
 	Text,
 	StyleSheet,
 	TouchableOpacity,
-	Dimensions,
 	Modal,
 	TouchableWithoutFeedback,
 	Alert,
@@ -21,6 +20,12 @@ import {
 	BorderlessButton,
 	GestureHandlerRootView,
 } from 'react-native-gesture-handler';
+import { TransactionContext } from '../../../../src/context/transactionContext';
+import { FilterContext } from '../../../../src/context/filterContext';
+import { useBudget } from '../../../../src/context/budgetContext';
+import { useGoal } from '../../../../src/context/goalContext';
+import { TransactionRow } from './components/transactionRow';
+
 // Transaction interface defined inline since we removed the mock data file
 interface Transaction {
 	id: string;
@@ -38,11 +43,6 @@ interface Transaction {
 		nextExpectedDate: string;
 	};
 }
-import { TransactionContext } from '../../../../src/context/transactionContext';
-import { FilterContext } from '../../../../src/context/filterContext';
-import { useBudget } from '../../../../src/context/budgetContext';
-import { useGoal } from '../../../../src/context/goalContext';
-import { TransactionRow } from './components/transactionRow';
 
 // =============================================
 // Utility Functions
@@ -129,16 +129,17 @@ export default function TransactionScreen() {
 		return getLocalIsoDate();
 	});
 	const [modalVisible, setModalVisible] = useState(false);
-	const [activePicker, setActivePicker] = useState<
-		'calendar' | 'dateMode' | null
-	>(null);
-	const [tempSelection, setTempSelection] = useState<string>('');
 	const [searchQuery, setSearchQuery] = useState('');
 
 	const { transactions, isLoading, refetch, deleteTransaction } =
 		useContext(TransactionContext);
-	const { selectedGoals, selectedBudgets, dateFilterMode, selectedPatternId } =
-		useContext(FilterContext);
+	const {
+		selectedGoals,
+		selectedBudgets,
+		dateFilterMode,
+		selectedPatternId,
+		setSelectedPatternId,
+	} = useContext(FilterContext);
 	const { goals } = useGoal();
 	const { budgets } = useBudget();
 
@@ -405,11 +406,7 @@ export default function TransactionScreen() {
 	};
 
 	const handlePickerPress = (picker: 'calendar' | 'dateMode') => {
-		setActivePicker(picker);
 		if (picker === 'calendar') {
-			setModalVisible(true);
-		} else if (picker === 'dateMode') {
-			setTempSelection(dateFilterMode);
 			setModalVisible(true);
 		}
 	};
@@ -418,7 +415,6 @@ export default function TransactionScreen() {
 		if (selectedDate) {
 			setSelectedDate(selectedDate.toISOString().split('T')[0]);
 			setModalVisible(false);
-			setActivePicker(null);
 		}
 	};
 
@@ -449,6 +445,12 @@ export default function TransactionScreen() {
 							<Ionicons name="chevron-back" size={24} color="#212121" />
 						</BorderlessButton>
 						<View style={styles.headerRight}>
+							<TouchableOpacity
+								style={styles.addButton}
+								onPress={() => router.push('/(tabs)/transaction')}
+							>
+								<Ionicons name="add" size={24} color="#212121" />
+							</TouchableOpacity>
 							<TouchableOpacity
 								style={[
 									styles.filterButton,
@@ -610,7 +612,6 @@ export default function TransactionScreen() {
 // =============================================
 // Styles
 // =============================================
-const { width, height } = Dimensions.get('window');
 const styles = StyleSheet.create({
 	rootContainer: {
 		flex: 1,
@@ -697,7 +698,12 @@ const styles = StyleSheet.create({
 		opacity: 0.5,
 	},
 	addButton: {
-		padding: 8,
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingHorizontal: 8,
+		backgroundColor: '#f0f0f0',
+		borderRadius: 8,
+		marginRight: 8,
 	},
 	modalOverlay: {
 		flex: 1,

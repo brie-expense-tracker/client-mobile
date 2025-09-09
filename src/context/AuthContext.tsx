@@ -1,27 +1,50 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-	getAuth,
-	onAuthStateChanged,
-	sendPasswordResetEmail,
-	confirmPasswordReset,
-	updatePassword,
-	createUserWithEmailAndPassword,
-	signInWithEmailAndPassword,
-	reauthenticateWithCredential,
-	deleteUser,
-	EmailAuthProvider,
-} from '@react-native-firebase/auth';
-import type { FirebaseAuthTypes } from '@react-native-firebase/auth';
+// src/context/AuthContext.tsx
+import React, {
+	createContext,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
+import { AppState, AppStateStatus } from 'react-native';
+import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
+import { getApp } from '@react-native-firebase/app';
+import { getItem, setItem, removeItem } from '../utils/safeStorage';
+import * as Sentry from '@sentry/react-native';
 import { UserService, User, Profile } from '../services';
+import { ApiService } from '../services/core/apiService';
 import { router } from 'expo-router';
 import { SampleDataService } from '../services/feature/sampleDataService';
+import { authService } from '../services/authService';
 
-interface AuthContextType {
+// Error types for better error handling
+export interface AuthError {
+	code: string;
+	message: string;
+	details?: any;
+}
+
+export interface AuthState {
+	isAuthenticated: boolean;
+	isLoading: boolean;
+	user: User | null;
+	profile: Profile | null;
+	firebaseUser: FirebaseAuthTypes.User | null;
+	lastActivity: number;
+	sessionTimeout: number;
+}
+
+export type AuthContextType = {
+	// Core auth state
 	user: User | null;
 	profile: Profile | null;
 	firebaseUser: FirebaseAuthTypes.User | null;
 	loading: boolean;
+	authState: AuthState;
+	error: AuthError | null;
+
+	// Auth methods
 	login: (firebaseUser: FirebaseAuthTypes.User) => Promise<void>;
 	logout: () => Promise<void>;
 	signup: (email: string, password: string, name?: string) => Promise<void>;
@@ -29,37 +52,237 @@ interface AuthContextType {
 		firebaseUser: FirebaseAuthTypes.User,
 		name?: string
 	) => Promise<User>;
+
+	// Password management
 	sendPasswordResetEmail: (email: string) => Promise<void>;
 	confirmPasswordReset: (code: string, newPassword: string) => Promise<void>;
 	updatePassword: (newPassword: string) => Promise<void>;
-	deleteAccount: (password: string) => Promise<void>;
-}
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+	// Account management
+	deleteAccount: (password: string) => Promise<void>;
+	refreshUserData: () => Promise<void>;
+
+	// Security features
+	checkSessionValidity: () => boolean;
+	extendSession: () => void;
+	clearError: () => void;
+
+	// Utility methods
+	isAuthenticated: () => boolean;
+	getUserDisplayName: () => string;
+};
+
+export const AuthContext = createContext<AuthContextType | undefined>(
+	undefined
+);
+
+// Keys for local storage fallbacks
+const UID_KEY = 'firebaseUID';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-	const [user, setUser] = useState<User | null>(null);
-	const [profile, setProfile] = useState<Profile | null>(null);
+	console.log('🚨 [DEBUG] AuthProvider render - component re-rendering');
+
 	const [firebaseUser, setFirebaseUser] =
 		useState<FirebaseAuthTypes.User | null>(null);
+	const [user, setUser] = useState<User | null>(null);
+	const [profile, setProfile] = useState<Profile | null>(null);
 	const [loading, setLoading] = useState(true);
-	const [skipMongoDBCheck, setSkipMongoDBCheck] = useState(false);
-	const [lastProcessedUID, setLastProcessedUID] = useState<string | null>(null);
-	const [processingTimeout, setProcessingTimeout] = useState<number | null>(
-		null
-	);
-	const [isManualLogin, setIsManualLogin] = useState(false);
+	const [error, setError] = useState<AuthError | null>(null);
+	const lastProcessedUIDRef = useRef<string | null>(null);
+	const processingTimeoutRef = useRef<number | null>(null);
+	const isManualLoginRef = useRef(false);
+	const [lastActivity, setLastActivity] = useState<number>(Date.now());
+	const [sessionTimeout] = useState<number>(30 * 60 * 1000); // 30 minutes
 
+	const appState = useRef<AppStateStatus>(AppState.currentState);
+
+	// Enhanced auth state
+	const authState: AuthState = useMemo(() => {
+		console.log('🚨 [DEBUG] authState useMemo recalculating with:', {
+			user: !!user,
+			loading,
+			profile: !!profile,
+			firebaseUser: !!firebaseUser,
+			lastActivity,
+			sessionTimeout,
+		});
+		return {
+			isAuthenticated: !!firebaseUser,
+			isLoading: loading,
+			user,
+			profile,
+			firebaseUser,
+			lastActivity,
+			sessionTimeout,
+		};
+	}, [firebaseUser, loading, user, profile, lastActivity, sessionTimeout]);
+
+	// Subscribe to auth state once
 	useEffect(() => {
-		// Listen for Firebase auth state changes
-		const unsubscribe = onAuthStateChanged(getAuth(), async (firebaseUser) => {
+		console.log('🚨 [DEBUG] Auth useEffect triggered - setting up listeners');
+		console.log('🚨 [DEBUG] Current state values:', {
+			loading,
+			user: !!user,
+			profile: !!profile,
+			firebaseUser: !!firebaseUser,
+			processingTimeoutRef: processingTimeoutRef.current,
+			lastProcessedUIDRef: lastProcessedUIDRef.current,
+			isManualLoginRef: isManualLoginRef.current,
+		});
+		setLoading(true);
+
+		// Define ensureUserExists inside useEffect to avoid dependency issues
+		const ensureUserExistsLocal = async (fbUser: FirebaseAuthTypes.User) => {
+			console.log('🚨 [DEBUG] ensureUserExistsLocal called');
+			try {
+				console.log(
+					'🔍 [DEBUG] Ensuring user exists for Firebase UID:',
+					fbUser.uid.substring(0, 8) + '...'
+				);
+
+				// First, try to get existing user
+				let mongoUser = await UserService.getUserByFirebaseUID(fbUser.uid);
+
+				if (!mongoUser) {
+					// User doesn't exist, create them using the ensure endpoint
+					console.log(
+						'🔍 [DEBUG] User not found in database, creating new user...'
+					);
+
+					try {
+						// Use the ensure endpoint to create the user
+						const response = await ApiService.post<{
+							user: User;
+							profile: Profile;
+						}>('/users/ensure', {
+							firebaseUid: fbUser.uid,
+							email: fbUser.email,
+							displayName: fbUser.displayName,
+						});
+
+						if (response.success && response.data) {
+							mongoUser = response.data.user;
+							if (response.data.profile) {
+								setProfile(response.data.profile);
+							}
+							console.log(
+								'✅ [DEBUG] User and profile created successfully via ensure endpoint'
+							);
+						} else {
+							throw new Error(
+								response.error || 'Failed to create user via ensure endpoint'
+							);
+						}
+					} catch (ensureError) {
+						console.error(
+							'❌ [DEBUG] Ensure endpoint failed, trying createUser:',
+							ensureError
+						);
+
+						// Fallback to createUser method
+						const createResponse = await UserService.createUser({
+							firebaseUID: fbUser.uid,
+							email: fbUser.email!,
+							name: fbUser.displayName || undefined,
+						});
+
+						mongoUser = createResponse.user;
+						setProfile(createResponse.profile);
+						console.log(
+							'✅ [DEBUG] User created successfully via createUser method'
+						);
+					}
+				} else {
+					console.log('✅ [DEBUG] Existing user found in database');
+				}
+
+				// Set the user in state
+				console.log(
+					'🔍 [DEBUG] Setting user state:',
+					mongoUser ? `ID: ${mongoUser._id}` : 'null'
+				);
+				setUser(mongoUser);
+
+				// Always try to fetch profile for existing users (don't depend on profile state)
+				if (mongoUser) {
+					try {
+						console.log('🔍 [DEBUG] Fetching profile for user:', mongoUser._id);
+						const profileResponse = await UserService.getProfileByUserId(
+							mongoUser._id
+						);
+						if (profileResponse) {
+							console.log(
+								'🔍 [DEBUG] Setting profile state:',
+								profileResponse._id
+							);
+							setProfile(profileResponse);
+						} else {
+							console.log('🔍 [DEBUG] No profile found for user');
+						}
+					} catch (profileError) {
+						console.log(
+							'🔍 [DEBUG] Profile fetch failed, continuing without profile:',
+							profileError
+						);
+					}
+				}
+			} catch (e) {
+				console.error('❌ Error ensuring user exists:', e);
+				setError({
+					code: 'USER_CREATION_ERROR',
+					message: 'Failed to create or fetch user from database',
+					details: e,
+				});
+				Sentry.captureException(e);
+			}
+		};
+
+		// Define hydrateFromFirebase inside useEffect to avoid dependency issues
+		const hydrateFromFirebaseLocal = async (
+			fbUser: FirebaseAuthTypes.User | null
+		) => {
+			console.log(
+				'🚨 [DEBUG] hydrateFromFirebaseLocal called with:',
+				fbUser ? `UID: ${fbUser.uid.substring(0, 8)}...` : 'null'
+			);
+			try {
+				if (fbUser) {
+					// Persist UID for other parts of the app that expect it
+					await setItem(UID_KEY, fbUser.uid).catch(() => undefined);
+
+					// Ensure user exists in MongoDB (auto-provision)
+					await ensureUserExistsLocal(fbUser);
+				} else {
+					await removeItem(UID_KEY).catch(() => undefined);
+					setUser(null);
+					setProfile(null);
+				}
+			} catch (err) {
+				console.error('AuthContext - Error fetching user from MongoDB:', err);
+				setUser(null);
+				setProfile(null);
+				setError({
+					code: 'MONGO_FETCH_ERROR',
+					message: 'Failed to fetch user data from database',
+					details: err,
+				});
+				Sentry.captureException(err);
+			}
+		};
+
+		const unsubAuth = auth().onAuthStateChanged(async (fbUser) => {
 			console.log(
 				'🔍 [DEBUG] Firebase auth state changed:',
-				firebaseUser ? `UID: ${firebaseUser.uid.substring(0, 8)}...` : 'null'
+				fbUser ? `UID: ${fbUser.uid.substring(0, 8)}...` : 'null'
 			);
+			console.log('🔍 [DEBUG] Current refs before processing:', {
+				processingTimeoutRef: processingTimeoutRef.current,
+				lastProcessedUIDRef: lastProcessedUIDRef.current,
+				isManualLoginRef: isManualLoginRef.current,
+			});
 
 			// Skip processing if we're handling manual login
-			if (isManualLogin) {
+			if (isManualLoginRef.current) {
 				console.log(
 					'🔍 [DEBUG] Manual login in progress, skipping auth state change processing'
 				);
@@ -67,7 +290,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			}
 
 			// Prevent duplicate processing of the same user
-			if (firebaseUser && lastProcessedUID === firebaseUser.uid) {
+			if (fbUser && lastProcessedUIDRef.current === fbUser.uid) {
 				console.log(
 					'🔍 [DEBUG] Same UID already processed, skipping duplicate MongoDB fetch'
 				);
@@ -75,157 +298,166 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			}
 
 			// Prevent rapid successive calls
-			if (processingTimeout) {
+			if (processingTimeoutRef.current) {
 				console.log(
 					'🔍 [DEBUG] Processing timeout active, skipping rapid call'
 				);
 				return;
 			}
 
-			setFirebaseUser(firebaseUser);
+			console.log(
+				'🔍 [DEBUG] Processing auth state change - calling setFirebaseUser'
+			);
+			setFirebaseUser(fbUser);
 
-			if (firebaseUser) {
-				// User is signed in - always store the Firebase UID
+			console.log('🔍 [DEBUG] Calling hydrateFromFirebaseLocal');
+			await hydrateFromFirebaseLocal(fbUser);
+
+			// Mark this UID as processed
+			if (fbUser) {
 				console.log(
-					'🔍 [DEBUG] Storing Firebase UID in AsyncStorage:',
-					firebaseUser.uid.substring(0, 8) + '...'
+					'🔍 [DEBUG] Setting lastProcessedUIDRef and processing timeout'
 				);
-				await AsyncStorage.setItem('firebaseUID', firebaseUser.uid);
-
-				// Verify storage worked
-				const storedUID = await AsyncStorage.getItem('firebaseUID');
-				console.log(
-					'🔍 [DEBUG] Verified Firebase UID in AsyncStorage:',
-					storedUID ? `${storedUID.substring(0, 8)}...` : 'null'
-				);
-
-				try {
-					// Try to get user from MongoDB
-					const mongoUser = await UserService.getUserByFirebaseUID(
-						firebaseUser.uid
-					);
-					if (mongoUser) {
-						console.log('🔍 [DEBUG] Found MongoDB user:', mongoUser._id);
-						setUser(mongoUser);
-						// Fetch the user's profile
-						const userProfile = await UserService.getProfileByUserId(
-							mongoUser._id
-						);
-						setProfile(userProfile);
-					} else {
-						console.log(
-							'🔍 [DEBUG] No MongoDB user found, will handle during signup'
-						);
-						// User exists in Firebase but not in MongoDB
-						// This will be handled during signup flow
-						setUser(null);
-						setProfile(null);
-					}
-					// Mark this UID as processed
-					setLastProcessedUID(firebaseUser.uid);
-					// Set a timeout to prevent rapid successive calls
-					const timeout = setTimeout(() => setProcessingTimeout(null), 1000);
-					setProcessingTimeout(timeout);
-				} catch (error) {
-					console.error(
-						'AuthContext - Error fetching user from MongoDB:',
-						error
-					);
-					setUser(null);
-					setProfile(null);
-					// Note: Firebase UID is still stored in AsyncStorage above
-					// Still mark as processed to prevent infinite retries
-					setLastProcessedUID(firebaseUser.uid);
-					// Set a timeout to prevent rapid successive calls
-					const timeout = setTimeout(() => setProcessingTimeout(null), 1000);
-					setProcessingTimeout(timeout);
-				}
+				lastProcessedUIDRef.current = fbUser.uid;
+				// Set a timeout to prevent rapid successive calls
+				const timeout = setTimeout(() => {
+					console.log('🔍 [DEBUG] Processing timeout cleared');
+					processingTimeoutRef.current = null;
+				}, 1000);
+				processingTimeoutRef.current = timeout;
 			} else {
-				// User is signed out
-				console.log(
-					'🔍 [DEBUG] User signed out, clearing state and AsyncStorage'
-				);
-				setUser(null);
-				setProfile(null);
-				setLastProcessedUID(null);
-				if (processingTimeout) {
-					clearTimeout(processingTimeout);
-					setProcessingTimeout(null);
+				console.log('🔍 [DEBUG] Clearing refs for logout');
+				lastProcessedUIDRef.current = null;
+				if (processingTimeoutRef.current) {
+					clearTimeout(processingTimeoutRef.current);
+					processingTimeoutRef.current = null;
 				}
-				await AsyncStorage.removeItem('firebaseUID');
+				// Clear auth token cache
+				authService.clearToken();
 			}
 
+			console.log('🔍 [DEBUG] Setting loading to false');
 			setLoading(false);
 		});
 
+		// Keep ID token fresh (useful for your HMAC + server auth flow)
+		const unsubToken = auth().onIdTokenChanged(async (fbUser) => {
+			if (!fbUser) return;
+			try {
+				await fbUser.getIdToken(true); // force refresh
+			} catch (err) {
+				Sentry.captureException(err);
+			}
+		});
+
 		return () => {
-			unsubscribe();
-			if (processingTimeout) {
-				clearTimeout(processingTimeout);
+			console.log('🚨 [DEBUG] Auth useEffect cleanup - removing listeners');
+			unsubAuth();
+			unsubToken();
+			if (processingTimeoutRef.current) {
+				clearTimeout(processingTimeoutRef.current);
 			}
 		};
-	}, [lastProcessedUID, processingTimeout]);
+	}, []); // ✅ Make completely stable - no dependencies
+
+	// Refresh user data function
+	const refreshUserData = useCallback(async (): Promise<void> => {
+		console.log('🚨 [DEBUG] refreshUserData called');
+		const currentFirebaseUser = auth().currentUser;
+		if (!currentFirebaseUser) return;
+
+		try {
+			const mongoUser = await UserService.getUserByFirebaseUID(
+				currentFirebaseUser.uid
+			);
+			if (mongoUser) {
+				console.log('🚨 [DEBUG] refreshUserData setting user and profile');
+				setUser(mongoUser);
+				const userProfile = await UserService.getProfileByUserId(mongoUser._id);
+				setProfile(userProfile);
+			}
+		} catch (error) {
+			console.error('Error refreshing user data:', error);
+			setError({
+				code: 'REFRESH_ERROR',
+				message: 'Failed to refresh user data',
+				details: error,
+			});
+		}
+	}, []); // Remove firebaseUser dependency to prevent infinite loop
+
+	// Foreground refresh via AppState (RN-friendly replacement for any `document` visibility logic)
+	useEffect(() => {
+		console.log(
+			'🚨 [DEBUG] AppState useEffect triggered with refreshUserData dependency'
+		);
+		const onChange = async (nextState: AppStateStatus) => {
+			console.log(
+				'🚨 [DEBUG] AppState changed from',
+				appState.current,
+				'to',
+				nextState
+			);
+			const prev = appState.current;
+			appState.current = nextState;
+			if (prev.match(/inactive|background/) && nextState === 'active') {
+				console.log('🚨 [DEBUG] App became active, refreshing user data');
+				try {
+					const fbUser = auth().currentUser;
+					if (fbUser) {
+						await fbUser.getIdToken(true);
+						await refreshUserData();
+					}
+				} catch (err) {
+					Sentry.captureException(err);
+				}
+			}
+		};
+
+		const sub = AppState.addEventListener('change', onChange);
+		return () => {
+			console.log('🚨 [DEBUG] AppState useEffect cleanup');
+			sub.remove();
+		};
+	}, [refreshUserData]);
 
 	// Cleanup effect for component unmount
 	useEffect(() => {
 		return () => {
-			if (processingTimeout) {
-				clearTimeout(processingTimeout);
+			if (processingTimeoutRef.current) {
+				clearTimeout(processingTimeoutRef.current);
 			}
 		};
-	}, [processingTimeout]);
+	}, []);
 
-	const createUserInMongoDB = async (
-		firebaseUser: FirebaseAuthTypes.User,
-		name?: string
-	): Promise<User> => {
-		try {
-			const userData = {
-				firebaseUID: firebaseUser.uid,
-				email: firebaseUser.email!,
-				name: name || firebaseUser.displayName || undefined,
-			};
+	const createUserInMongoDB = useCallback(
+		async (
+			firebaseUser: FirebaseAuthTypes.User,
+			name?: string
+		): Promise<User> => {
+			try {
+				const userData = {
+					firebaseUID: firebaseUser.uid,
+					email: firebaseUser.email!,
+					name: name || firebaseUser.displayName || undefined,
+				};
 
-			const response = await UserService.createUser(userData);
-			setUser(response.user);
-			setProfile(response.profile);
-			await AsyncStorage.setItem('firebaseUID', firebaseUser.uid);
-			return response.user;
-		} catch (error) {
-			console.error('Error creating user in MongoDB:', error);
-			// Clear any partial state that might have been set
-			setUser(null);
-			setProfile(null);
-			await AsyncStorage.removeItem('firebaseUID');
-			throw error;
-		}
-	};
-
-	// Method to manually sync with MongoDB when user data is actually needed
-	const syncWithMongoDB = async () => {
-		if (!firebaseUser) return null;
-
-		try {
-			const mongoUser = await UserService.getUserByFirebaseUID(
-				firebaseUser.uid
-			);
-			if (mongoUser) {
-				setUser(mongoUser);
-				const userProfile = await UserService.getProfileByUserId(mongoUser._id);
-				setProfile(userProfile);
-				return mongoUser;
+				const response = await UserService.createUser(userData);
+				setUser(response.user);
+				setProfile(response.profile);
+				await setItem(UID_KEY, firebaseUser.uid);
+				return response.user;
+			} catch (error) {
+				console.error('Error creating user in MongoDB:', error);
+				// Clear any partial state that might have been set
+				setUser(null);
+				setProfile(null);
+				await removeItem(UID_KEY);
+				throw error;
 			}
-			return null;
-		} catch (error) {
-			console.error('Error syncing with MongoDB:', error);
-			return null;
-		}
-	};
-
-	// Check if user is authenticated (Firebase only)
-	const isAuthenticated = () => {
-		return !!firebaseUser;
-	};
+		},
+		[]
+	);
 
 	// Sample data seeding for demo mode
 	const seedSampleData = async (userId: string) => {
@@ -249,26 +481,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			);
 
 			// Store sample data in AsyncStorage for demo mode
-			await AsyncStorage.setItem(
+			await setItem(
 				'demo_transactions',
 				JSON.stringify(sampleData.transactions)
 			);
-			await AsyncStorage.setItem(
-				'demo_budgets',
-				JSON.stringify(sampleData.budgets)
-			);
-			await AsyncStorage.setItem(
-				'demo_goals',
-				JSON.stringify(sampleData.goals)
-			);
-			await AsyncStorage.setItem(
+			await setItem('demo_budgets', JSON.stringify(sampleData.budgets));
+			await setItem('demo_goals', JSON.stringify(sampleData.goals));
+			await setItem(
 				'demo_recurring',
 				JSON.stringify(sampleData.recurringExpenses)
 			);
-			await AsyncStorage.setItem(
-				'demo_data_timestamp',
-				new Date().toISOString()
-			);
+			await setItem('demo_data_timestamp', new Date().toISOString());
 
 			console.log('✅ [DEMO] Sample data stored in AsyncStorage');
 		} catch (error) {
@@ -277,9 +500,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		}
 	};
 
-	const refreshDemoData = async (userId: string) => {
+	const refreshDemoData = useCallback(async (userId: string) => {
 		try {
-			const lastRefresh = await AsyncStorage.getItem('demo_data_timestamp');
+			const lastRefresh = await getItem('demo_data_timestamp');
 			if (lastRefresh) {
 				const lastRefreshDate = new Date(lastRefresh);
 				const daysSinceRefresh =
@@ -303,171 +526,228 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			console.error('❌ [DEMO] Error refreshing demo data:', error);
 			throw error;
 		}
-	};
+	}, []);
 
-	const login = async (firebaseUser: FirebaseAuthTypes.User) => {
-		try {
-			// Set manual login flag to prevent auth state change interference
-			setIsManualLogin(true);
+	const login = useCallback(
+		async (firebaseUser: FirebaseAuthTypes.User) => {
+			try {
+				// Set manual login flag to prevent auth state change interference
+				isManualLoginRef.current = true;
 
-			// Check if this is a demo login
-			const isDemoLogin = firebaseUser.email === 'demo@brie.app';
-			console.log(
-				'🔍 [DEBUG] Login attempt:',
-				isDemoLogin ? 'DEMO MODE' : 'Regular user'
-			);
+				// Check if this is a demo login
+				const isDemoLogin = firebaseUser.email === 'demo@brie.app';
+				console.log(
+					'🔍 [DEBUG] Login attempt:',
+					isDemoLogin ? 'DEMO MODE' : 'Regular user'
+				);
 
-			// Store the Firebase UID
-			await AsyncStorage.setItem('firebaseUID', firebaseUser.uid);
+				// Store the Firebase UID
+				await setItem(UID_KEY, firebaseUser.uid);
 
-			// Check if user exists in MongoDB
-			let mongoUser = await UserService.getUserByFirebaseUID(firebaseUser.uid);
+				// Check if user exists in MongoDB
+				let mongoUser = await UserService.getUserByFirebaseUID(
+					firebaseUser.uid
+				);
 
-			if (!mongoUser) {
-				// User doesn't exist in MongoDB, create them
-				console.log('🔍 [DEBUG] Creating new user in MongoDB...');
-				const userData = {
+				if (!mongoUser) {
+					// User doesn't exist in MongoDB, create them
+					console.log('🔍 [DEBUG] Creating new user in MongoDB...');
+					const userData = {
+						firebaseUID: firebaseUser.uid,
+						email: firebaseUser.email!,
+						name: firebaseUser.displayName || undefined,
+					};
+
+					const response = await UserService.createUser(userData);
+					mongoUser = response.user;
+					setUser(mongoUser);
+					setProfile(response.profile);
+					console.log('✅ [DEBUG] New user created in MongoDB');
+
+					// Seed sample data for demo users
+					if (isDemoLogin) {
+						console.log('🎯 [DEMO] Seeding sample data for demo user...');
+						try {
+							await seedSampleData(mongoUser._id);
+							console.log('✅ [DEMO] Sample data seeded successfully');
+						} catch (seedError) {
+							console.error('❌ [DEMO] Error seeding sample data:', seedError);
+						}
+					}
+				} else {
+					// User exists, fetch their profile
+					console.log('🔍 [DEBUG] Existing user found in MongoDB');
+					setUser(mongoUser);
+					const userProfile = await UserService.getProfileByUserId(
+						mongoUser._id
+					);
+					setProfile(userProfile);
+
+					// Check if demo user needs sample data refresh
+					if (isDemoLogin && mongoUser.email === 'demo@brie.app') {
+						console.log('🎯 [DEMO] Checking if sample data needs refresh...');
+						try {
+							await refreshDemoData(mongoUser._id);
+							console.log('✅ [DEMO] Demo data refreshed');
+						} catch (refreshError) {
+							console.error(
+								'❌ [DEMO] Error refreshing demo data:',
+								refreshError
+							);
+						}
+					}
+				}
+
+				// Set loading to false to trigger navigation logic
+				setLoading(false);
+				console.log(
+					'✅ Firebase login successful, UID stored, MongoDB user ready'
+				);
+
+				// Directly navigate to dashboard after successful login
+				// Check if user has seen onboarding first
+				if (mongoUser.onboardingVersion > 0) {
+					console.log(
+						'🔍 [DEBUG] User has seen onboarding, checking current route before navigation'
+					);
+					// Use setTimeout to ensure navigation stack is ready
+					setTimeout(() => {
+						try {
+							// Check if we're already on a valid screen to prevent unwanted navigation
+							const currentPath = router.canGoBack() ? 'unknown' : 'root';
+							console.log('🔍 [DEBUG] Current navigation state:', {
+								currentPath,
+								canGoBack: router.canGoBack(),
+							});
+
+							// Only navigate if we're not already on a valid screen
+							if (!router.canGoBack()) {
+								router.replace('/(tabs)/dashboard');
+								console.log('✅ Navigation to dashboard successful');
+							} else {
+								console.log(
+									'🔍 [DEBUG] Already on a valid screen, skipping navigation'
+								);
+							}
+						} catch (navError) {
+							console.error('❌ Navigation error:', navError);
+							// Only fallback if we're not already on a valid screen
+							if (!router.canGoBack()) {
+								router.replace('/(tabs)/dashboard');
+							}
+						}
+					}, 100);
+				} else {
+					console.log(
+						'🔍 [DEBUG] User needs onboarding, checking current route before navigation'
+					);
+					// Use setTimeout to ensure navigation stack is ready
+					setTimeout(() => {
+						try {
+							// Check if we're already on a valid screen to prevent unwanted navigation
+							const currentPath = router.canGoBack() ? 'unknown' : 'root';
+							console.log('🔍 [DEBUG] Current navigation state:', {
+								currentPath,
+								canGoBack: router.canGoBack(),
+							});
+
+							// Only navigate if we're not already on a valid screen
+							if (!router.canGoBack()) {
+								router.replace('/(onboarding)/profileSetup');
+								console.log('✅ Navigation to onboarding successful');
+							} else {
+								console.log(
+									'🔍 [DEBUG] Already on a valid screen, skipping navigation'
+								);
+							}
+						} catch (navError) {
+							console.error('❌ Navigation error:', navError);
+							// Only fallback if we're not already on a valid screen
+							if (!router.canGoBack()) {
+								router.replace('/(onboarding)/profileSetup');
+							}
+						}
+					}, 100);
+				}
+			} catch (error) {
+				console.error('Error during login:', error);
+				setLoading(false);
+				setError({
+					code: 'LOGIN_ERROR',
+					message: 'Failed to complete login process',
+					details: error,
+				});
+
+				// If MongoDB operations fail, still allow login with Firebase
+				// and let the auth state change listener handle navigation
+				console.log(
+					'⚠️ [DEBUG] MongoDB operations failed, falling back to Firebase-only auth'
+				);
+
+				// Create a minimal user object for navigation
+				const fallbackUser = {
+					_id: 'temp',
 					firebaseUID: firebaseUser.uid,
 					email: firebaseUser.email!,
-					name: firebaseUser.displayName || undefined,
+					onboardingVersion: 0, // Assume they need onboarding
+					createdAt: new Date().toISOString(),
 				};
+				setUser(fallbackUser as User);
 
-				const response = await UserService.createUser(userData);
-				mongoUser = response.user;
-				setUser(mongoUser);
-				setProfile(response.profile);
-				console.log('✅ [DEBUG] New user created in MongoDB');
-
-				// Seed sample data for demo users
-				if (isDemoLogin) {
-					console.log('🎯 [DEMO] Seeding sample data for demo user...');
-					try {
-						await seedSampleData(mongoUser._id);
-						console.log('✅ [DEMO] Sample data seeded successfully');
-					} catch (seedError) {
-						console.error('❌ [DEMO] Error seeding sample data:', seedError);
-					}
+				// Navigate to onboarding as fallback (only if not already on a valid screen)
+				if (!router.canGoBack()) {
+					router.replace('/(onboarding)/profileSetup');
+				} else {
+					console.log(
+						'🔍 [DEBUG] Already on a valid screen, skipping fallback navigation'
+					);
 				}
-			} else {
-				// User exists, fetch their profile
-				console.log('🔍 [DEBUG] Existing user found in MongoDB');
-				setUser(mongoUser);
-				const userProfile = await UserService.getProfileByUserId(mongoUser._id);
-				setProfile(userProfile);
-
-				// Check if demo user needs sample data refresh
-				if (isDemoLogin && mongoUser.email === 'demo@brie.app') {
-					console.log('🎯 [DEMO] Checking if sample data needs refresh...');
-					try {
-						await refreshDemoData(mongoUser._id);
-						console.log('✅ [DEMO] Demo data refreshed');
-					} catch (refreshError) {
-						console.error(
-							'❌ [DEMO] Error refreshing demo data:',
-							refreshError
-						);
-					}
-				}
+			} finally {
+				// Reset manual login flag
+				isManualLoginRef.current = false;
 			}
+		},
+		[refreshDemoData]
+	);
 
-			// Set loading to false to trigger navigation logic
-			setLoading(false);
-			console.log(
-				'✅ Firebase login successful, UID stored, MongoDB user ready'
-			);
-
-			// Directly navigate to dashboard after successful login
-			// Check if user has seen onboarding first
-			if (mongoUser.onboardingVersion > 0) {
-				console.log(
-					'🔍 [DEBUG] User has seen onboarding, navigating to dashboard'
-				);
-				// Use setTimeout to ensure navigation stack is ready
-				setTimeout(() => {
-					try {
-						router.replace('/(tabs)/dashboard');
-						console.log('✅ Navigation to dashboard successful');
-					} catch (navError) {
-						console.error('❌ Navigation error:', navError);
-						// Fallback navigation
-						router.replace('/(tabs)/dashboard');
-					}
-				}, 100);
-			} else {
-				console.log(
-					'🔍 [DEBUG] User needs onboarding, navigating to onboarding'
-				);
-				// Use setTimeout to ensure navigation stack is ready
-				setTimeout(() => {
-					try {
-						router.replace('/(onboarding)/onboardingThree');
-						console.log('✅ Navigation to onboarding successful');
-					} catch (navError) {
-						console.error('❌ Navigation error:', navError);
-						// Fallback navigation
-						router.replace('/(onboarding)/onboardingThree');
-					}
-				}, 100);
-			}
-		} catch (error) {
-			console.error('Error during login:', error);
-			setLoading(false);
-
-			// If MongoDB operations fail, still allow login with Firebase
-			// and let the auth state change listener handle navigation
-			console.log(
-				'⚠️ [DEBUG] MongoDB operations failed, falling back to Firebase-only auth'
-			);
-
-			// Create a minimal user object for navigation
-			const fallbackUser = {
-				_id: 'temp',
-				firebaseUID: firebaseUser.uid,
-				email: firebaseUser.email!,
-				onboardingVersion: 0, // Assume they need onboarding
-				createdAt: new Date().toISOString(),
-			};
-			setUser(fallbackUser as User);
-
-			// Navigate to onboarding as fallback
-			router.replace('/(onboarding)/onboardingThree');
-		} finally {
-			// Reset manual login flag
-			setIsManualLogin(false);
-		}
-	};
-
-	const logout = async () => {
+	const logout = useCallback(async () => {
 		try {
-			await getAuth().signOut();
+			await auth().signOut();
 			setUser(null);
 			setProfile(null);
 			setFirebaseUser(null);
-			setLastProcessedUID(null);
-			if (processingTimeout) {
-				clearTimeout(processingTimeout);
-				setProcessingTimeout(null);
+			lastProcessedUIDRef.current = null;
+			setError(null); // Clear any existing errors
+			if (processingTimeoutRef.current) {
+				clearTimeout(processingTimeoutRef.current);
+				processingTimeoutRef.current = null;
 			}
-			await AsyncStorage.removeItem('firebaseUID');
+			await removeItem(UID_KEY);
 		} catch (error) {
 			console.error('Error during logout:', error);
+			setError({
+				code: 'LOGOUT_ERROR',
+				message: 'Failed to complete logout process',
+				details: error,
+			});
 		}
-	};
+	}, []);
 
-	const sendPasswordResetEmailToUser = async (email: string) => {
+	const sendPasswordResetEmailToUser = useCallback(async (email: string) => {
 		try {
 			console.log('🔍 Starting password reset process...');
 			console.log('📧 Email:', email);
-			console.log('🔥 Firebase Auth instance:', getAuth());
-			console.log('🔥 Firebase Auth current user:', getAuth().currentUser);
+			console.log('🔥 Firebase Auth instance:', auth());
+			console.log('🔥 Firebase Auth current user:', auth().currentUser);
 
 			// Check if Firebase is properly initialized
-			const auth = getAuth();
-			if (!auth) {
+			const authInstance = auth();
+			if (!authInstance) {
 				throw new Error('Firebase Auth is not initialized');
 			}
 
-			await sendPasswordResetEmail(auth, email);
+			await authInstance.sendPasswordResetEmail(email);
+			setError(null); // Clear any existing errors
 		} catch (error: any) {
 			console.error('❌ Error sending password reset email:', error);
 			console.error('❌ Error details:', {
@@ -475,137 +755,290 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				code: error.code,
 				stack: error.stack,
 			});
+			setError({
+				code: 'PASSWORD_RESET_ERROR',
+				message: 'Failed to send password reset email',
+				details: error,
+			});
 			throw error;
 		}
-	};
+	}, []);
 
-	const confirmPasswordResetCode = async (
-		code: string,
-		newPassword: string
-	) => {
-		try {
-			await confirmPasswordReset(getAuth(), code, newPassword);
-		} catch (error) {
-			console.error('Error confirming password reset:', error);
-			throw error;
-		}
-	};
+	const confirmPasswordResetCode = useCallback(
+		async (code: string, newPassword: string) => {
+			try {
+				await auth().confirmPasswordReset(code, newPassword);
+				setError(null); // Clear any existing errors
+			} catch (error) {
+				console.error('Error confirming password reset:', error);
+				setError({
+					code: 'PASSWORD_CONFIRM_ERROR',
+					message: 'Failed to confirm password reset',
+					details: error,
+				});
+				throw error;
+			}
+		},
+		[]
+	);
 
-	const updatePasswordToUser = async (newPassword: string) => {
+	const updatePasswordToUser = useCallback(async (newPassword: string) => {
 		try {
-			const currentUser = getAuth().currentUser;
+			const currentUser = auth().currentUser;
 			if (!currentUser) {
 				throw new Error('No user is currently signed in');
 			}
-			await updatePassword(currentUser, newPassword);
+			await currentUser.updatePassword(newPassword);
+			setError(null); // Clear any existing errors
 		} catch (error) {
 			console.error('Error updating password:', error);
+			setError({
+				code: 'PASSWORD_UPDATE_ERROR',
+				message: 'Failed to update password',
+				details: error,
+			});
 			throw error;
 		}
-	};
+	}, []);
 
-	const signup = async (email: string, password: string, name?: string) => {
-		let firebaseUser: FirebaseAuthTypes.User | null = null;
+	const signup = useCallback(
+		async (email: string, password: string, name?: string) => {
+			let firebaseUser: FirebaseAuthTypes.User | null = null;
 
-		try {
-			// Create user in Firebase first
-			const userCredential = await createUserWithEmailAndPassword(
-				getAuth(),
-				email,
-				password
-			);
-			firebaseUser = userCredential.user;
-
-			// Create user in MongoDB
-			await createUserInMongoDB(firebaseUser, name);
-		} catch (error: any) {
-			console.error('Signup error:', error);
-
-			// Handle specific Firebase errors
-			if (error.code === 'auth/email-already-in-use') {
-				// An account with this email already exists - don't log them in automatically
-				throw new Error(
-					'An account with this email already exists. Please log in instead.'
+			try {
+				// Create user in Firebase first
+				const userCredential = await auth().createUserWithEmailAndPassword(
+					email,
+					password
 				);
-			}
+				firebaseUser = userCredential.user;
 
-			// If Firebase user was created but MongoDB creation failed, delete the Firebase user
-			if (firebaseUser && error.code !== 'auth/email-already-in-use') {
-				try {
-					await firebaseUser.delete();
-					console.log(
-						'Cleaned up Firebase user after MongoDB creation failure'
+				// Create user in MongoDB
+				await createUserInMongoDB(firebaseUser, name);
+			} catch (error: any) {
+				console.error('Signup error:', error);
+
+				// Handle specific Firebase errors
+				if (error.code === 'auth/email-already-in-use') {
+					// An account with this email already exists - don't log them in automatically
+					const signupError = new Error(
+						'An account with this email already exists. Please log in instead.'
 					);
-				} catch (deleteError) {
-					console.error(
-						'Error deleting Firebase user during cleanup:',
-						deleteError
-					);
+					setError({
+						code: 'EMAIL_ALREADY_IN_USE',
+						message: signupError.message,
+						details: error,
+					});
+					throw signupError;
 				}
+
+				// If Firebase user was created but MongoDB creation failed, delete the Firebase user
+				if (firebaseUser && error.code !== 'auth/email-already-in-use') {
+					try {
+						await firebaseUser.delete();
+						console.log(
+							'Cleaned up Firebase user after MongoDB creation failure'
+						);
+					} catch (deleteError) {
+						console.error(
+							'Error deleting Firebase user during cleanup:',
+							deleteError
+						);
+					}
+				}
+
+				setError({
+					code: 'SIGNUP_ERROR',
+					message: 'Failed to create account',
+					details: error,
+				});
+				throw error;
 			}
+		},
+		[createUserInMongoDB]
+	);
 
-			throw error;
-		}
-	};
-
-	const deleteAccount = async (password: string) => {
+	const deleteAccount = useCallback(async (password: string) => {
 		setLoading(true);
 		try {
-			const user = getAuth().currentUser;
+			const user = auth().currentUser;
 			if (!user) throw new Error('No user is currently signed in');
 			if (!user.email) throw new Error('User email is missing');
 
 			// Re-authenticate
-			const credential = EmailAuthProvider.credential(user.email, password);
-			await reauthenticateWithCredential(user, credential);
+			const credential = auth.EmailAuthProvider.credential(
+				user.email,
+				password
+			);
+			await user.reauthenticateWithCredential(credential);
 
 			// Delete backend data
 			await UserService.deleteUserAccount();
 
 			// Delete Firebase user
-			await deleteUser(user);
+			await user.delete();
 
 			// Clear AsyncStorage and context state
-			await AsyncStorage.clear();
+			await removeItem(UID_KEY);
 			setUser(null);
 			setProfile(null);
 			setFirebaseUser(null);
-			setLastProcessedUID(null);
-			if (processingTimeout) {
-				clearTimeout(processingTimeout);
-				setProcessingTimeout(null);
+			lastProcessedUIDRef.current = null;
+			if (processingTimeoutRef.current) {
+				clearTimeout(processingTimeoutRef.current);
+				processingTimeoutRef.current = null;
 			}
 		} catch (error) {
+			setError({
+				code: 'DELETE_ACCOUNT_ERROR',
+				message: 'Failed to delete account',
+				details: error,
+			});
 			throw error;
 		} finally {
 			setLoading(false);
 		}
-	};
+	}, []);
 
-	return (
-		<AuthContext.Provider
-			value={{
-				user,
-				profile,
-				firebaseUser,
-				loading,
-				login,
-				logout,
-				signup,
-				createUserInMongoDB,
-				sendPasswordResetEmail: sendPasswordResetEmailToUser,
-				confirmPasswordReset: confirmPasswordResetCode,
-				updatePassword: updatePasswordToUser,
-				deleteAccount,
-			}}
-		>
-			{children}
-		</AuthContext.Provider>
+	// Enhanced utility methods
+	const isAuthenticated = useCallback((): boolean => {
+		return !!firebaseUser && !!user;
+	}, [firebaseUser, user]);
+
+	const getUserDisplayName = useCallback((): string => {
+		if (profile?.firstName && profile?.lastName) {
+			return `${profile.firstName} ${profile.lastName}`;
+		}
+		if (firebaseUser?.displayName) return firebaseUser.displayName;
+		if (firebaseUser?.email) return firebaseUser.email.split('@')[0];
+		return 'User';
+	}, [profile, firebaseUser]);
+
+	const clearError = useCallback((): void => {
+		setError(null);
+	}, []);
+
+	const checkSessionValidity = useCallback((): boolean => {
+		const currentFirebaseUser = auth().currentUser;
+		if (!currentFirebaseUser) return false;
+		const now = Date.now();
+		return now - lastActivity < sessionTimeout;
+	}, [lastActivity, sessionTimeout]); // Remove firebaseUser dependency
+
+	const extendSession = useCallback((): void => {
+		setLastActivity(Date.now());
+	}, []);
+
+	// Session timeout effect
+	useEffect(() => {
+		console.log(
+			'🚨 [DEBUG] Session timeout useEffect triggered with dependencies:',
+			{
+				firebaseUser: !!firebaseUser,
+				lastActivity,
+				sessionTimeout,
+			}
+		);
+		if (!firebaseUser) return;
+
+		const interval = setInterval(() => {
+			if (!checkSessionValidity()) {
+				console.log('Session expired, logging out...');
+				logout();
+			}
+		}, 60000); // Check every minute
+
+		return () => {
+			console.log('🚨 [DEBUG] Session timeout useEffect cleanup');
+			clearInterval(interval);
+		};
+	}, [
+		firebaseUser,
+		lastActivity,
+		sessionTimeout,
+		checkSessionValidity,
+		logout,
+	]);
+
+	// Activity tracking effect - React Native compatible
+	useEffect(() => {
+		const handleActivity = () => {
+			extendSession();
+		};
+
+		// Track user activity using AppState instead of document events
+		const sub = AppState.addEventListener('change', (nextAppState) => {
+			if (nextAppState === 'active') {
+				handleActivity();
+			}
+		});
+
+		return () => sub.remove();
+	}, [extendSession]);
+
+	const value = useMemo<AuthContextType>(
+		() => ({
+			// Core auth state
+			user,
+			profile,
+			firebaseUser,
+			loading,
+			authState,
+			error,
+
+			// Auth methods
+			login,
+			logout,
+			signup,
+			createUserInMongoDB,
+
+			// Password management
+			sendPasswordResetEmail: sendPasswordResetEmailToUser,
+			confirmPasswordReset: confirmPasswordResetCode,
+			updatePassword: updatePasswordToUser,
+
+			// Account management
+			deleteAccount,
+			refreshUserData,
+
+			// Security features
+			checkSessionValidity,
+			extendSession,
+			clearError,
+
+			// Utility methods
+			isAuthenticated,
+			getUserDisplayName,
+		}),
+		[
+			user,
+			profile,
+			firebaseUser,
+			loading,
+			authState,
+			error,
+			login,
+			logout,
+			signup,
+			createUserInMongoDB,
+			sendPasswordResetEmailToUser,
+			confirmPasswordResetCode,
+			updatePasswordToUser,
+			deleteAccount,
+			refreshUserData,
+			checkSessionValidity,
+			extendSession,
+			clearError,
+			isAuthenticated,
+			getUserDisplayName,
+		]
 	);
+
+	return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export default function useAuth() {
-	const context = useContext(AuthContext);
+	const context = React.useContext(AuthContext);
 	if (context === undefined) {
 		throw new Error('useAuth must be used within an AuthProvider');
 	}

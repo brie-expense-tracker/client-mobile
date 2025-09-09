@@ -4,7 +4,6 @@ import {
 	View,
 	Text,
 	TextInput,
-	TouchableOpacity,
 	StyleSheet,
 	Alert,
 	SafeAreaView,
@@ -94,8 +93,8 @@ export default function ForgotPasswordScreen() {
 					</View>
 					<Text style={styles.title}>Reset Your Password</Text>
 					<Text style={styles.subtitle}>
-						Enter your email address and we'll send you a link to reset your
-						password.
+						Enter your email address and we&apos;ll send you a link to reset
+						your password.
 					</Text>
 
 					<Text style={styles.label}>Email Address</Text>
@@ -138,7 +137,14 @@ export default function ForgotPasswordScreen() {
 					<Text style={styles.backToLoginText}>Remember your password?</Text>
 					<Link replace href="/login" asChild>
 						<BorderlessButton onActiveStateChange={setIsPressed}>
-							<Text style={styles.backToLoginLink}>Back to Login</Text>
+							<Text
+								style={[
+									styles.backToLoginLink,
+									isPressed && styles.backToLoginLinkPressed,
+								]}
+							>
+								Back to Login
+							</Text>
 						</BorderlessButton>
 					</Link>
 				</View>
@@ -282,5 +288,8 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		fontWeight: '600',
 		color: '#4A5568',
+	},
+	backToLoginLinkPressed: {
+		opacity: 0.6,
 	},
 });

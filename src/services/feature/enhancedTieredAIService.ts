@@ -4,16 +4,16 @@ import { GroundingService, detectIntent, Intent } from './groundingService';
 import { ResponseFormatterService } from './responseFormatterService';
 import {
 	executeHybridCostOptimization,
-	pickModel,
 	ModelTier,
 	calculateCostSavings,
-} from '../../components/assistant/routeModel';
+} from '../../services/assistant/routeModel';
 import {
 	answerWithCascade,
 	CascadeResult,
 	FactPack,
 	logCascadeEvent,
-} from '../../components/assistant/ai';
+} from '../../services/assistant/ai';
+import { ToolsOnlyContractService, ToolsOnlyInput } from './toolsOnlyContract';
 
 export interface EnhancedTieredAIResponse {
 	response: string;
@@ -30,6 +30,11 @@ export interface EnhancedTieredAIResponse {
 		remainingRequests: number;
 		cost: number;
 	};
+	toolsOnlyContract?: {
+		isValid: boolean;
+		violations: string[];
+		fallbackUsed: boolean;
+	};
 	hybridOptimization?: {
 		modelTier: ModelTier;
 		totalTokens: number;
@@ -38,13 +43,13 @@ export interface EnhancedTieredAIResponse {
 			savings: number;
 			percentage: number;
 		};
-		steps: Array<{
+		steps: {
 			step: string;
 			description: string;
 			modelUsed: ModelTier;
 			tokenCount: number;
 			cost: number;
-		}>;
+		}[];
 		criticValidation?: {
 			isValid: boolean;
 			ruleValidation: {
@@ -74,6 +79,15 @@ export interface FinancialContext {
 	budgets: Budget[];
 	goals: Goal[];
 	transactions: Transaction[];
+	balances?: {
+		accountId: string;
+		name: string;
+		current: number;
+		total: number;
+		spent: number;
+		type: 'checking' | 'savings' | 'credit' | 'investment';
+	}[];
+	userId?: string;
 	userProfile?: {
 		monthlyIncome?: number;
 		financialGoal?: string;
@@ -92,6 +106,7 @@ export class EnhancedTieredAIService {
 	private sessionId: string;
 	private context: FinancialContext;
 	private conversationHistory: string[] = [];
+	private startTime: number = 0;
 	private modelUsageStats = {
 		low: 0,
 		medium: 0,
@@ -127,6 +142,7 @@ export class EnhancedTieredAIService {
 	 */
 	async getResponse(query: string): Promise<EnhancedTieredAIResponse> {
 		console.log('🔍 [EnhancedTieredAI] Processing query:', query);
+		this.startTime = Date.now();
 
 		// Step 1: Detect intent
 		const intent = detectIntent(query);
@@ -170,6 +186,14 @@ export class EnhancedTieredAIService {
 		console.log('🔍 [EnhancedTieredAI] Trying cascade system');
 		try {
 			const factPack = this.createFactPackFromContext();
+
+			// Log cascade start
+			logCascadeEvent('cascade_start', {
+				intent: intent,
+				user_query: query,
+				fact_pack_size: Object.keys(factPack).length,
+			});
+
 			const cascadeResult = await answerWithCascade({
 				userId: 'user', // You'll need to get this from context
 				intent,
@@ -177,7 +201,22 @@ export class EnhancedTieredAIService {
 				factPack,
 			});
 
-			// Log cascade analytics
+			// Log cascade completion
+			logCascadeEvent('cascade_complete', {
+				intent: intent,
+				final_path: cascadeResult.analytics.decision_path as
+					| 'return'
+					| 'clarify'
+					| 'escalate',
+				total_processing_time_ms: Date.now() - this.startTime,
+				total_tokens:
+					cascadeResult.analytics.writer_tokens +
+					cascadeResult.analytics.critic_tokens +
+					(cascadeResult.analytics.improver_tokens || 0),
+				total_cost: 0, // Calculate based on your token costs
+			});
+
+			// Log user outcome
 			logCascadeEvent('user_outcome', {
 				resolved: cascadeResult.kind === 'answer',
 				path_taken: cascadeResult.analytics.decision_path,
@@ -259,7 +298,7 @@ export class EnhancedTieredAIService {
 	}
 
 	/**
-	 * Get LLM response with appropriate model selection
+	 * Get LLM response with tools-only contract
 	 */
 	private async getLLMResponse(
 		query: string,
@@ -272,24 +311,48 @@ export class EnhancedTieredAIService {
 		const modelUsed = this.selectModel(complexity, intent);
 
 		try {
-			// Prepare context for LLM
-			const llmContext = this.prepareLLMContext(query, intent);
+			// Generate FactPack for grounding
+			const factPack = await this.generateFactPack();
 
-			// Call appropriate LLM endpoint
-			const llmResponse = await this.callLLM(modelUsed, llmContext);
+			// Prepare tools-only input (no raw user data, no PII)
+			const toolsOnlyInput = ToolsOnlyContractService.prepareToolsOnlyInput(
+				query,
+				intent,
+				factPack,
+				this.context
+			);
+
+			// Call LLM with tools-only contract
+			const llmResponse = await this.callLLMWithToolsOnly(
+				modelUsed,
+				toolsOnlyInput
+			);
+
+			// Validate response against toolsOut
+			const validatedResponse = ToolsOnlyContractService.processLLMResponse(
+				llmResponse.response,
+				toolsOnlyInput.toolsOut,
+				intent
+			);
 
 			// Update usage stats
 			this.updateUsageStats(complexity, llmResponse.usage);
 
 			return {
-				response: llmResponse.response,
+				response: validatedResponse.response,
 				sessionId: this.sessionId,
 				timestamp: new Date(),
 				modelUsed,
 				complexity: complexity.complexity,
 				confidence: complexity.confidence,
-				wasGrounded: false,
+				wasGrounded: validatedResponse.isValid,
 				usage: llmResponse.usage,
+				// Add tools-only contract metadata
+				toolsOnlyContract: {
+					isValid: validatedResponse.isValid,
+					violations: validatedResponse.violations,
+					fallbackUsed: validatedResponse.fallbackUsed,
+				},
 			};
 		} catch (error) {
 			console.error('🔍 [EnhancedTieredAI] LLM call failed:', error);
@@ -308,6 +371,11 @@ export class EnhancedTieredAIService {
 					remainingTokens: 10000,
 					remainingRequests: 50,
 					cost: 0,
+				},
+				toolsOnlyContract: {
+					isValid: false,
+					violations: ['LLM call failed'],
+					fallbackUsed: true,
 				},
 			};
 		}
@@ -410,25 +478,256 @@ export class EnhancedTieredAIService {
 	}
 
 	/**
-	 * Call the selected LLM
+	 * Generate FactPack for grounding
 	 */
-	private async callLLM(model: string, context: any) {
-		// This would integrate with your existing AI service
-		// For now, return a mock response
+	private async generateFactPack(): Promise<FactPack> {
+		// This would integrate with your existing FactPack generation
+		// For now, return a mock FactPack
 		return {
-			response: `I understand you're asking about ${context.intent
-				.toLowerCase()
-				.replace(
-					/_/g,
-					' '
-				)}. Let me help you with that using my AI capabilities.`,
-			usage: {
-				estimatedTokens: 50,
-				remainingTokens: 9950,
-				remainingRequests: 49,
-				cost: 0.001,
+			time_window: {
+				start: new Date().toISOString().split('T')[0],
+				end: new Date().toISOString().split('T')[0],
+				tz: 'America/Los_Angeles',
+				period: 'Today',
+			},
+			balances: this.context.balances || [],
+			budgets: this.context.budgets.map((b) => ({
+				id: b.id,
+				name: b.name,
+				period: 'monthly',
+				spent: b.spent || 0,
+				limit: b.amount,
+				remaining: b.amount - (b.spent || 0),
+				utilization: b.spent ? (b.spent / b.amount) * 100 : 0,
+				status:
+					b.spent && b.spent >= b.amount
+						? 'over'
+						: b.spent && b.spent >= b.amount * 0.9
+						? 'at_limit'
+						: 'under',
+				topCategories: [],
+			})),
+			goals: this.context.goals.map((g) => ({
+				id: g.id,
+				name: g.name,
+				targetAmount: g.targetAmount,
+				currentAmount: g.currentAmount,
+				progress: g.progress,
+				remaining: g.targetAmount - g.currentAmount,
+				deadline: g.deadline.toISOString(),
+				status:
+					g.progress >= 80 ? 'ahead' : g.progress >= 50 ? 'on_track' : 'behind',
+			})),
+			recurring: [],
+			recentTransactions: this.context.transactions.slice(-30).map((t) => ({
+				id: t.id,
+				amount: t.amount,
+				category: t.category || 'Uncategorized',
+				date: t.date.toISOString(),
+				type: t.type as 'expense' | 'income' | 'transfer',
+				description: t.description || 'Transaction',
+			})),
+			spendingPatterns: {
+				totalSpent: this.context.transactions.reduce(
+					(sum, t) => sum + t.amount,
+					0
+				),
+				averageDaily: 0,
+				topCategories: [],
+				trend: 'stable' as const,
+				comparison: {
+					previousPeriod: 'Last Month',
+					change: 0,
+					isImprovement: true,
+				},
+			},
+			userProfile: {
+				monthlyIncome: this.context.userProfile?.monthlyIncome || 0,
+				financialGoal: this.context.userProfile?.financialGoal || 'Save money',
+				riskProfile: 'moderate' as const,
+				preferences: {
+					notifications: true,
+					insights: true,
+					autoCategorization: true,
+				},
+			},
+			metadata: {
+				generatedAt: new Date().toISOString(),
+				dataVersion: '1.0',
+				hash: 'mock_hash',
+				source: 'local' as const,
+				freshness: 0,
 			},
 		};
+	}
+
+	/**
+	 * Call LLM with tools-only contract
+	 */
+	private async callLLMWithToolsOnly(
+		model: string,
+		toolsOnlyInput: ToolsOnlyInput
+	) {
+		try {
+			// Create system prompt for tools-only contract
+			const systemPrompt = this.createToolsOnlySystemPrompt(
+				toolsOnlyInput.intent
+			);
+
+			// Create user prompt with only the structured data
+			const userPrompt = this.createToolsOnlyUserPrompt(toolsOnlyInput);
+
+			// Make the actual LLM call
+			const response = await ApiService.post('/api/llm/chat', {
+				systemPrompt,
+				userPrompt,
+				model,
+				maxTokens: 1000,
+				temperature: 0.1,
+			});
+
+			if (response.success && response.data) {
+				const llmResponse = response.data as {
+					response: string;
+					usage?: { total_tokens: number };
+				};
+				return {
+					response: llmResponse.response,
+					usage: {
+						estimatedTokens: llmResponse.usage?.total_tokens || 50,
+						remainingTokens: 10000 - (llmResponse.usage?.total_tokens || 50),
+						remainingRequests: 49,
+						cost: this.calculateCost(
+							llmResponse.usage?.total_tokens || 50,
+							model
+						),
+					},
+				};
+			}
+
+			throw new Error(response.error || 'LLM API call failed');
+		} catch (error) {
+			console.error('🔍 [EnhancedTieredAI] LLM call failed:', error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Create system prompt for tools-only contract
+	 */
+	private createToolsOnlySystemPrompt(intent: string): string {
+		const intentDescriptions = {
+			GET_BALANCE: 'Retrieve current account balances and financial overview',
+			GET_BUDGET_STATUS:
+				'Analyze budget status, spending, and remaining amounts',
+			LIST_SUBSCRIPTIONS: 'List recurring expenses and subscription services',
+			CATEGORIZE_TX: 'Categorize transactions based on description and amount',
+			FORECAST_SPEND: 'Generate spending forecasts and predictions',
+			CREATE_BUDGET: 'Help create new budgets and financial plans',
+			GET_GOAL_PROGRESS: 'Track progress towards financial goals',
+			GET_SPENDING_BREAKDOWN: 'Analyze spending patterns and categories',
+			GENERAL_QA: 'Answer general financial questions and provide advice',
+		};
+
+		return `You are a financial AI assistant. Your task is to ${
+			intentDescriptions[intent as keyof typeof intentDescriptions] ||
+			'help with financial queries'
+		}.
+
+IMPORTANT RULES:
+1. Only use the provided structured data (toolsOut) - do not invent or estimate any numbers
+2. If you need a number that's not in the data, say "I don't have that information in the current data"
+3. Be precise and factual - avoid speculation
+4. Focus on the specific intent: ${intent}
+5. Provide actionable, helpful responses based on the available data
+
+The structured data provided contains verified financial information. Use only this data to answer the user's question.`;
+	}
+
+	/**
+	 * Create user prompt for tools-only contract
+	 */
+	private createToolsOnlyUserPrompt(toolsOnlyInput: ToolsOnlyInput): string {
+		return `Intent: ${toolsOnlyInput.intent}
+
+Structured Data:
+${JSON.stringify(toolsOnlyInput.toolsOut, null, 2)}
+
+Please provide a helpful response based on this data for the intent: ${
+			toolsOnlyInput.intent
+		}`;
+	}
+
+	/**
+	 * Calculate cost based on token usage and model
+	 */
+	private calculateCost(tokens: number, model: string): number {
+		const costPerToken = {
+			'gpt-3.5-turbo': 0.000002,
+			'gpt-4': 0.00003,
+			'gpt-4-turbo': 0.00001,
+		};
+		return (
+			tokens * (costPerToken[model as keyof typeof costPerToken] || 0.000002)
+		);
+	}
+
+	/**
+	 * Call the selected LLM (legacy method - kept for compatibility)
+	 */
+	private async callLLM(model: string, context: any) {
+		try {
+			const systemPrompt = `You are a financial AI assistant. Help the user with their financial questions and tasks.`;
+			const userPrompt = `User is asking about: ${context.intent
+				.toLowerCase()
+				.replace(/_/g, ' ')}. Context: ${JSON.stringify(context, null, 2)}`;
+
+			const response = await ApiService.post('/api/llm/chat', {
+				systemPrompt,
+				userPrompt,
+				model,
+				maxTokens: 1000,
+				temperature: 0.1,
+			});
+
+			if (response.success && response.data) {
+				const llmResponse = response.data as {
+					response: string;
+					usage?: { total_tokens: number };
+				};
+				return {
+					response: llmResponse.response,
+					usage: {
+						estimatedTokens: llmResponse.usage?.total_tokens || 50,
+						remainingTokens: 10000 - (llmResponse.usage?.total_tokens || 50),
+						remainingRequests: 49,
+						cost: this.calculateCost(
+							llmResponse.usage?.total_tokens || 50,
+							model
+						),
+					},
+				};
+			}
+
+			throw new Error(response.error || 'LLM API call failed');
+		} catch (error) {
+			console.error('🔍 [EnhancedTieredAI] Legacy LLM call failed:', error);
+			// Return fallback response
+			return {
+				response: `I understand you're asking about ${context.intent
+					.toLowerCase()
+					.replace(
+						/_/g,
+						' '
+					)}. Let me help you with that using my AI capabilities.`,
+				usage: {
+					estimatedTokens: 50,
+					remainingTokens: 9950,
+					remainingRequests: 49,
+					cost: 0.001,
+				},
+			};
+		}
 	}
 
 	/**

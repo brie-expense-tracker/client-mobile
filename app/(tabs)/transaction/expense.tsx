@@ -15,6 +15,8 @@ import {
 	KeyboardAvoidingView,
 	Platform,
 	ActivityIndicator,
+	Modal,
+	TouchableOpacity,
 } from 'react-native';
 import { RectButton, BorderlessButton } from 'react-native-gesture-handler';
 import { useForm, Controller } from 'react-hook-form';
@@ -39,7 +41,49 @@ interface TransactionFormData {
 	date: string;
 	target?: string;
 	targetModel?: 'Budget' | 'Goal';
+	category?: string;
 }
+
+// Expense categories
+const EXPENSE_CATEGORIES = [
+	{
+		id: 'food',
+		name: 'Food & Dining',
+		icon: 'restaurant-outline',
+		color: '#FF6B6B',
+	},
+	{
+		id: 'transport',
+		name: 'Transportation',
+		icon: 'car-outline',
+		color: '#4ECDC4',
+	},
+	{
+		id: 'entertainment',
+		name: 'Entertainment',
+		icon: 'game-controller-outline',
+		color: '#45B7D1',
+	},
+	{ id: 'shopping', name: 'Shopping', icon: 'bag-outline', color: '#96CEB4' },
+	{
+		id: 'health',
+		name: 'Health & Fitness',
+		icon: 'fitness-outline',
+		color: '#FFEAA7',
+	},
+	{
+		id: 'bills',
+		name: 'Bills & Utilities',
+		icon: 'receipt-outline',
+		color: '#DDA0DD',
+	},
+	{
+		id: 'other',
+		name: 'Other',
+		icon: 'ellipsis-horizontal-outline',
+		color: '#95A5A6',
+	},
+];
 
 // Utility function to get local date in ISO format
 const getLocalIsoDate = (): string => {
@@ -70,25 +114,34 @@ const AddTransactionScreen = () => {
 	const [selectedRecurringExpense, setSelectedRecurringExpense] =
 		useState<RecurringExpense | null>(null);
 	const [showRecurringMatches, setShowRecurringMatches] = useState(false);
+	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [showDatePicker, setShowDatePicker] = useState(false);
 	const [fontsLoaded] = useFonts({
 		...Ionicons.font,
 	});
-	const { transactions, isLoading, addTransaction } =
-		useContext(TransactionContext);
+	const { addTransaction } = useContext(TransactionContext);
 	const { budgets, isLoading: budgetsLoading } = useBudget();
 
-	const { control, handleSubmit, setValue, watch } =
-		useForm<TransactionFormData>({
-			defaultValues: {
-				type: 'expense',
-				description: params.description || '',
-				amount: params.amount || '',
-				budgets: [],
-				date: getLocalIsoDate(),
-				target: undefined,
-				targetModel: undefined,
-			},
-		});
+	const {
+		control,
+		handleSubmit,
+		setValue,
+		watch,
+		formState: { errors },
+		clearErrors,
+	} = useForm<TransactionFormData>({
+		defaultValues: {
+			type: 'expense',
+			description: params.description || '',
+			amount: params.amount || '',
+			budgets: [],
+			date: getLocalIsoDate(),
+			target: undefined,
+			targetModel: undefined,
+			category: undefined,
+		},
+		mode: 'onChange',
+	});
 
 	const amount = watch('amount');
 
@@ -179,7 +232,25 @@ const AddTransactionScreen = () => {
 	}
 
 	const onSubmit = async (data: TransactionFormData) => {
+		console.log('[Expense] onSubmit called with data:', data);
+
+		// Clear any previous errors
+		clearErrors();
+
+		// Validate required fields
+		if (!data.amount || data.amount.trim() === '') {
+			Alert.alert('Error', 'Please enter an amount');
+			return;
+		}
+
+		if (!data.description || data.description.trim() === '') {
+			Alert.alert('Error', 'Please enter a description');
+			return;
+		}
+
 		try {
+			setIsSubmitting(true);
+
 			// Validate amount
 			const amount = parseFloat(data.amount);
 			if (isNaN(amount) || amount <= 0) {
@@ -189,11 +260,16 @@ const AddTransactionScreen = () => {
 
 			// Create transaction data - budget will be auto-matched by backend if not selected
 			const transactionData: any = {
-				description: data.description,
-				amount: amount,
+				description: data.description.trim(),
+				amount: -Math.abs(amount), // Negative for expenses
 				date: data.date,
 				type: 'expense' as const,
 			};
+
+			// Add category if selected
+			if (data.category) {
+				transactionData.category = data.category;
+			}
 
 			// If a budget is selected, use it; otherwise let backend auto-match
 			if (selectedBudgets.length > 0) {
@@ -227,8 +303,33 @@ const AddTransactionScreen = () => {
 						selectedRecurringExpense?.vendor || 'Recurring Expense';
 					Alert.alert(
 						'Success',
-						`Transaction linked to recurring expense: ${expenseName}`,
-						[{ text: 'OK' }]
+						`Expense saved and linked to recurring expense: ${expenseName}`,
+						[
+							{
+								text: 'OK',
+								onPress: () => {
+									// Reset form values
+									setValue('description', '');
+									setValue('amount', '');
+									setValue('budgets', []);
+									setValue('date', getLocalIsoDate());
+									setValue('category', undefined);
+
+									// Reset selected budgets
+									setSelectedBudgets([]);
+
+									// Reset NumberPad
+									setResetNumberPad(true);
+
+									// Navigate back to the previous screen
+									if (router.canGoBack()) {
+										router.back();
+									} else {
+										router.replace('/(tabs)/dashboard');
+									}
+								},
+							},
+						]
 					);
 				} catch (error) {
 					console.error(
@@ -238,32 +339,69 @@ const AddTransactionScreen = () => {
 					// Show user-friendly error message
 					Alert.alert(
 						'Link Error',
-						'Transaction was saved but could not be linked to the recurring expense. You can link it manually later.'
+						'Transaction was saved but could not be linked to the recurring expense. You can link it manually later.',
+						[
+							{
+								text: 'OK',
+								onPress: () => {
+									// Reset form values
+									setValue('description', '');
+									setValue('amount', '');
+									setValue('budgets', []);
+									setValue('date', getLocalIsoDate());
+									setValue('category', undefined);
+
+									// Reset selected budgets
+									setSelectedBudgets([]);
+
+									// Reset NumberPad
+									setResetNumberPad(true);
+
+									// Navigate back to the previous screen
+									if (router.canGoBack()) {
+										router.back();
+									} else {
+										router.replace('/(tabs)/dashboard');
+									}
+								},
+							},
+						]
 					);
 				}
-			}
-
-			// Reset form values
-			setValue('description', '');
-			setValue('amount', ''); // Reset to empty string to show placeholder
-			setValue('budgets', []);
-			setValue('date', getLocalIsoDate());
-
-			// Reset selected budgets
-			setSelectedBudgets([]);
-
-			// Reset NumberPad
-			setResetNumberPad(true);
-
-			// Navigate back to the previous screen
-			if (router.canGoBack()) {
-				router.back();
 			} else {
-				router.replace('/(tabs)/dashboard');
+				// No recurring expense linking needed
+				Alert.alert('Success', 'Expense saved successfully!', [
+					{
+						text: 'OK',
+						onPress: () => {
+							// Reset form values
+							setValue('description', '');
+							setValue('amount', '');
+							setValue('budgets', []);
+							setValue('date', getLocalIsoDate());
+							setValue('category', undefined);
+
+							// Reset selected budgets
+							setSelectedBudgets([]);
+
+							// Reset NumberPad
+							setResetNumberPad(true);
+
+							// Navigate back to the previous screen
+							if (router.canGoBack()) {
+								router.back();
+							} else {
+								router.replace('/(tabs)/dashboard');
+							}
+						},
+					},
+				]);
 			}
 		} catch (error) {
 			console.error('Error saving expense:', error);
-			Alert.alert('Error', 'Failed to save expense');
+			Alert.alert('Error', 'Failed to save expense. Please try again.');
+		} finally {
+			setIsSubmitting(false);
 		}
 	};
 
@@ -360,6 +498,81 @@ const AddTransactionScreen = () => {
 		setShowRecurringMatches(false);
 	};
 
+	const selectedCategory = watch('category');
+	const selectedDate = watch('date');
+
+	// Format date for display
+	const formatDate = (dateString: string) => {
+		const date = new Date(dateString);
+		return date.toLocaleDateString('en-US', {
+			weekday: 'short',
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric',
+		});
+	};
+
+	// Date picker component
+	const DatePickerModal = () => (
+		<Modal
+			visible={showDatePicker}
+			transparent={true}
+			animationType="slide"
+			onRequestClose={() => setShowDatePicker(false)}
+		>
+			<View style={styles.datePickerOverlay}>
+				<View style={styles.datePickerContainer}>
+					<View style={styles.datePickerHeader}>
+						<Text style={styles.datePickerTitle}>Select Date</Text>
+						<TouchableOpacity
+							onPress={() => setShowDatePicker(false)}
+							style={styles.datePickerCloseButton}
+						>
+							<Ionicons name="close" size={24} color="#666" />
+						</TouchableOpacity>
+					</View>
+
+					<ScrollView style={styles.datePickerContent}>
+						{/* Generate date options for the last 30 days and next 7 days */}
+						{Array.from({ length: 37 }, (_, i) => {
+							const date = new Date();
+							date.setDate(date.getDate() - 30 + i);
+							const dateString = date.toISOString().split('T')[0];
+							const isToday = i === 30;
+							const isSelected = selectedDate === dateString;
+
+							return (
+								<TouchableOpacity
+									key={dateString}
+									style={[
+										styles.dateOption,
+										isSelected && styles.dateOptionSelected,
+										isToday && styles.dateOptionToday,
+									]}
+									onPress={() => {
+										setValue('date', dateString);
+										setShowDatePicker(false);
+									}}
+								>
+									<Text
+										style={[
+											styles.dateOptionText,
+											isSelected && styles.dateOptionTextSelected,
+											isToday && styles.dateOptionTextToday,
+										]}
+									>
+										{formatDate(dateString)}
+										{isToday && ' (Today)'}
+									</Text>
+								</TouchableOpacity>
+							);
+						})}
+					</ScrollView>
+				</View>
+			</View>
+		</Modal>
+	);
+
 	//
 	// MAIN COMPONENT===============================================
 	return (
@@ -395,9 +608,63 @@ const AddTransactionScreen = () => {
 							/>
 						</View>
 
+						{/* Category Selector */}
+						<View style={styles.carouselContainer}>
+							<Text style={styles.carouselLabel}>Category</Text>
+							<ScrollView horizontal showsHorizontalScrollIndicator={false}>
+								{EXPENSE_CATEGORIES.map((category) => (
+									<RectButton
+										key={category.id}
+										onPress={() => setValue('category', category.id)}
+										style={[
+											styles.carouselTextWrapper,
+											selectedCategory === category.id && styles.selectedTag,
+										]}
+									>
+										<Ionicons
+											name={category.icon as keyof typeof Ionicons.glyphMap}
+											size={16}
+											color={
+												selectedCategory === category.id
+													? 'white'
+													: category.color
+											}
+											style={styles.carouselIcon}
+										/>
+										<Text
+											style={[
+												styles.carouselText,
+												selectedCategory === category.id &&
+													styles.selectedTagText,
+											]}
+										>
+											{category.name}
+										</Text>
+									</RectButton>
+								))}
+							</ScrollView>
+						</View>
+
+						{/* Date Selector */}
+						<View style={styles.dateSelectorContainer}>
+							<Text style={styles.carouselLabel}>Date</Text>
+							<TouchableOpacity
+								style={styles.dateSelectorButton}
+								onPress={() => setShowDatePicker(true)}
+								accessibilityLabel="Select expense date"
+								accessibilityHint="Double tap to open date picker"
+							>
+								<Ionicons name="calendar-outline" size={20} color="#00a2ff" />
+								<Text style={styles.dateSelectorText}>
+									{formatDate(selectedDate)}
+								</Text>
+								<Ionicons name="chevron-down" size={16} color="#666" />
+							</TouchableOpacity>
+						</View>
+
 						{/* Budgets Carousel */}
 						<View style={styles.carouselContainer}>
-							<Text style={styles.carouselLabel}>Budgets</Text>
+							<Text style={styles.carouselLabel}>Budgets (Optional)</Text>
 							<ScrollView horizontal showsHorizontalScrollIndicator={false}>
 								{budgets.map((budget, index) => (
 									<RectButton
@@ -451,14 +718,24 @@ const AddTransactionScreen = () => {
 									field: { value: string; onChange: (value: string) => void };
 								}) => (
 									<TextInput
-										style={styles.inputDescription}
+										style={[
+											styles.inputDescription,
+											errors.description && styles.inputError,
+										]}
 										placeholder="What did you spend this on?"
 										placeholderTextColor={'#a3a3a3'}
 										value={value}
 										onChangeText={handleDescriptionChange}
+										accessibilityLabel="Expense description"
+										accessibilityHint="Enter a description for this expense"
 									/>
 								)}
 							/>
+							{errors.description && (
+								<Text style={styles.errorText}>
+									{errors.description.message}
+								</Text>
+							)}
 
 							{/* Budget Suggestions */}
 							{showSuggestions && budgetSuggestions.length > 0 && (
@@ -562,13 +839,30 @@ const AddTransactionScreen = () => {
 						<View style={styles.transactionButtonsContainer}>
 							<View style={styles.transactionButtonContainer}>
 								<RectButton
-									style={styles.transactionButton}
+									style={[
+										styles.transactionButton,
+										isSubmitting && styles.transactionButtonDisabled,
+									]}
 									onPress={() => {
+										if (isSubmitting) return;
 										setValue('type', 'expense');
 										handleSubmit(onSubmit)();
 									}}
+									accessibilityLabel="Submit expense transaction"
+									accessibilityHint="Double tap to save the expense"
 								>
-									<Text style={styles.transactionButtonText}>Spent</Text>
+									{isSubmitting ? (
+										<>
+											<ActivityIndicator size="small" color="#fff" />
+											<Text style={styles.transactionButtonText}>
+												Saving...
+											</Text>
+										</>
+									) : (
+										<Text style={styles.transactionButtonText}>
+											Add Expense
+										</Text>
+									)}
 								</RectButton>
 							</View>
 						</View>
@@ -581,6 +875,7 @@ const AddTransactionScreen = () => {
 					</View>
 				</View>
 			</SafeAreaView>
+			<DatePickerModal />
 		</View>
 	);
 };
@@ -995,6 +1290,97 @@ const styles = StyleSheet.create({
 		color: '#FFFFFF',
 		fontSize: 16,
 		fontWeight: '600',
+	},
+	// New styles for date picker and category selector
+	dateSelectorContainer: {
+		marginBottom: 16,
+	},
+	dateSelectorButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingVertical: 12,
+		paddingHorizontal: 16,
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#e0e0e0',
+		backgroundColor: '#fff',
+		gap: 12,
+	},
+	dateSelectorText: {
+		flex: 1,
+		fontSize: 16,
+		color: '#212121',
+		fontWeight: '500',
+	},
+	datePickerOverlay: {
+		flex: 1,
+		backgroundColor: 'rgba(0, 0, 0, 0.5)',
+		justifyContent: 'flex-end',
+	},
+	datePickerContainer: {
+		backgroundColor: '#fff',
+		borderTopLeftRadius: 20,
+		borderTopRightRadius: 20,
+		maxHeight: '70%',
+	},
+	datePickerHeader: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		paddingHorizontal: 20,
+		paddingVertical: 16,
+		borderBottomWidth: 1,
+		borderBottomColor: '#e0e0e0',
+	},
+	datePickerTitle: {
+		fontSize: 18,
+		fontWeight: '600',
+		color: '#212121',
+	},
+	datePickerCloseButton: {
+		padding: 4,
+	},
+	datePickerContent: {
+		maxHeight: 400,
+	},
+	dateOption: {
+		paddingVertical: 16,
+		paddingHorizontal: 20,
+		borderBottomWidth: 1,
+		borderBottomColor: '#f0f0f0',
+	},
+	dateOptionSelected: {
+		backgroundColor: '#f0f8ff',
+	},
+	dateOptionToday: {
+		backgroundColor: '#fff3cd',
+	},
+	dateOptionText: {
+		fontSize: 16,
+		color: '#212121',
+	},
+	dateOptionTextSelected: {
+		color: '#00a2ff',
+		fontWeight: '600',
+	},
+	dateOptionTextToday: {
+		color: '#856404',
+		fontWeight: '600',
+	},
+	// Error handling styles
+	inputError: {
+		borderColor: '#FF6B6B',
+		borderWidth: 2,
+	},
+	errorText: {
+		color: '#FF6B6B',
+		fontSize: 14,
+		marginTop: 4,
+		marginLeft: 4,
+	},
+	transactionButtonDisabled: {
+		backgroundColor: '#CCC',
+		opacity: 0.7,
 	},
 });
 

@@ -1,19 +1,11 @@
 // api.ts - API configuration for the mobile app
+import { resolveApiBaseUrl, getApiUrl, ENV } from './environment';
 
 // Base URL for API endpoints
-export const API_BASE_URL =
-	process.env.EXPO_PUBLIC_LOCAL_SIM_API_URL ||
-	process.env.EXPO_PUBLIC_API_URL ||
-	'http://192.168.1.65:3000';
+export const API_BASE_URL = resolveApiBaseUrl();
 
-// Debug logging to see what's happening
-console.log('🔧 [DEBUG] API Config Loading:');
-console.log(
-	'🔧 [DEBUG] EXPO_PUBLIC_LOCAL_SIM_API_URL:',
-	process.env.EXPO_PUBLIC_LOCAL_SIM_API_URL
-);
-console.log('🔧 [DEBUG] EXPO_PUBLIC_API_URL:', process.env.EXPO_PUBLIC_API_URL);
-console.log('🔧 [DEBUG] Final API_BASE_URL:', API_BASE_URL);
+// Full API URL with base path
+export const API_URL = getApiUrl();
 
 // API endpoints
 export const API_ENDPOINTS = {
@@ -71,7 +63,7 @@ export const API_ENDPOINTS = {
 
 // API configuration
 export const API_CONFIG = {
-	timeout: 30000, // 30 seconds
+	timeout: ENV.API_TIMEOUT_MS,
 	retries: 3,
 	headers: {
 		'Content-Type': 'application/json',
@@ -79,7 +71,5 @@ export const API_CONFIG = {
 	},
 };
 
-// Environment-specific settings
-export const isDevelopment = process.env.NODE_ENV === 'development';
-export const isProduction = process.env.NODE_ENV === 'production';
-export const isTest = process.env.NODE_ENV === 'test';
+// Re-export environment settings for convenience
+export { isDevelopment, isProduction, isTest, isDev } from './environment';

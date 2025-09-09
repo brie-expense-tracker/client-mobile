@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
 	View,
 	Text,
@@ -7,7 +7,6 @@ import {
 	Alert,
 	TouchableOpacity,
 	RefreshControl,
-	ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { RectButton } from 'react-native-gesture-handler';
@@ -20,10 +19,6 @@ import AllBudgetSummary from './components/AllBudgetSummary';
 import BudgetsFeed from './components/BudgetsFeed';
 import { InsightChipsRow } from '../../../src/components/InsightChipsRow';
 import { InsightCard } from '../../../src/components/InsightChip';
-import {
-	SkeletonContainer,
-	BudgetCardSkeleton,
-} from '../../../src/components/SkeletonLoader';
 import {
 	accessibilityProps,
 	dynamicTextStyle,
@@ -64,6 +59,13 @@ export default function BudgetScreen() {
 	const [refreshing, setRefreshing] = useState(false);
 
 	// ==========================================
+	// Modal Handlers
+	// ==========================================
+	const showModal = useCallback(() => {
+		router.push('/(stack)/addBudget');
+	}, [router]);
+
+	// ==========================================
 	// Auto-open modal on navigation and refresh data
 	// ==========================================
 	useEffect(() => {
@@ -83,12 +85,26 @@ export default function BudgetScreen() {
 			}, 100);
 			return () => clearTimeout(timer);
 		}
-	}, [params.openModal]);
+	}, [params.openModal, showModal]);
+
+	// Handle tab parameter from URL
+	useEffect(() => {
+		if (params.tab) {
+			const tabParam = params.tab as string;
+			if (
+				tabParam === 'monthly' ||
+				tabParam === 'weekly' ||
+				tabParam === 'all'
+			) {
+				setActiveTab(tabParam);
+			}
+		}
+	}, [params.tab]);
 
 	// ==========================================
 	// Pull to Refresh Handler
 	// ==========================================
-	const onRefresh = async () => {
+	const onRefresh = useCallback(async () => {
 		setRefreshing(true);
 		try {
 			await refetch();
@@ -97,119 +113,146 @@ export default function BudgetScreen() {
 		} finally {
 			setRefreshing(false);
 		}
-	};
+	}, [refetch]);
 
 	// ==========================================
-	// Loading State Component
+	// Skeleton Loading State Component
 	// ==========================================
-	const LoadingState = () => (
-		<View style={styles.loadingContainer}>
-			<ActivityIndicator size="large" color="#00a2ff" />
-			<Text
-				style={[styles.loadingText, dynamicTextStyle]}
-				accessibilityRole="text"
-				accessibilityLabel="Loading budgets"
+	const SkeletonLoadingState = () => (
+		<View style={styles.mainContainer}>
+			<ScrollView
+				showsVerticalScrollIndicator={false}
+				contentContainerStyle={{ paddingBottom: 24 }}
 			>
-				Loading budgets...
-			</Text>
+				{/* Page Header Skeleton */}
+				<View style={styles.pageHeader}>
+					<View style={styles.pageHeaderContent}>
+						<View style={[styles.skeletonText, { width: 150, height: 20 }]} />
+						<View
+							style={[
+								styles.skeletonText,
+								{ width: 200, height: 14, marginTop: 4 },
+							]}
+						/>
+					</View>
+					<View style={[styles.skeletonButton, { width: 100, height: 40 }]} />
+				</View>
+
+				{/* Summary Card Skeleton */}
+				<View style={[styles.skeletonCard, { height: 180, marginTop: 12 }]} />
+
+				{/* Insights Skeleton */}
+				<View style={styles.skeletonInsights}>
+					<View
+						style={[
+							styles.skeletonText,
+							{ width: 120, height: 16, marginBottom: 12 },
+						]}
+					/>
+					<View style={styles.skeletonChips}>
+						<View style={[styles.skeletonChip, { width: 150 }]} />
+						<View style={[styles.skeletonChip, { width: 180 }]} />
+						<View style={[styles.skeletonChip, { width: 160 }]} />
+					</View>
+				</View>
+
+				{/* Budget List Skeleton */}
+				<View style={styles.skeletonList}>
+					{[1, 2, 3].map((i) => (
+						<View key={i} style={styles.skeletonBudgetItem}>
+							<View style={styles.skeletonIcon} />
+							<View style={styles.skeletonContent}>
+								<View
+									style={[styles.skeletonText, { width: 120, height: 16 }]}
+								/>
+								<View
+									style={[
+										styles.skeletonText,
+										{ width: 80, height: 12, marginTop: 4 },
+									]}
+								/>
+								<View style={[styles.skeletonProgress, { marginTop: 8 }]} />
+								<View
+									style={[
+										styles.skeletonText,
+										{ width: 100, height: 12, marginTop: 6 },
+									]}
+								/>
+							</View>
+						</View>
+					))}
+				</View>
+			</ScrollView>
 		</View>
 	);
 
 	// ==========================================
 	// Error State Component
 	// ==========================================
-	const ErrorState = () => (
-		<View style={styles.errorContainer}>
-			<View style={styles.errorContent}>
-				<Ionicons name="warning-outline" size={64} color="#ff6b6b" />
-				<Text style={styles.errorTitle}>Unable to Load Budgets</Text>
-				<Text style={styles.errorSubtext}>
-					There was a problem connecting to the server. Please check your
-					connection and try again.
-				</Text>
-				<RectButton
-					style={styles.errorButton}
-					onPress={() => router.replace('/(tabs)/budgets')}
-				>
-					<Ionicons name="refresh" size={20} color="#fff" />
-					<Text style={styles.errorButtonText}>Retry</Text>
-				</RectButton>
+	const ErrorState = useCallback(
+		() => (
+			<View style={styles.errorContainer}>
+				<View style={styles.errorContent}>
+					<Ionicons name="warning-outline" size={64} color="#ff6b6b" />
+					<Text style={styles.errorTitle}>Unable to Load Budgets</Text>
+					<Text style={styles.errorSubtext}>
+						{error?.message ||
+							'There was a problem connecting to the server. Please check your connection and try again.'}
+					</Text>
+					<RectButton
+						style={styles.errorButton}
+						onPress={onRefresh}
+						{...accessibilityProps.button}
+						accessibilityLabel={generateAccessibilityLabel.button(
+							'Retry',
+							'loading budgets'
+						)}
+					>
+						<Ionicons name="refresh" size={20} color="#fff" />
+						<Text style={styles.errorButtonText}>Retry</Text>
+					</RectButton>
+				</View>
 			</View>
-		</View>
+		),
+		[error, onRefresh]
 	);
 
 	// ==========================================
 	// Empty State Component
 	// ==========================================
-	const EmptyState = () => (
-		<View style={styles.emptyContainer}>
-			<View style={styles.emptyContent}>
-				<Ionicons name="wallet-outline" size={64} color="#e0e0e0" />
-				<Text style={styles.emptyTitle}>No Budgets Yet</Text>
-				<Text style={styles.emptySubtext}>
-					Create your first budget to start tracking your spending
-				</Text>
-				<RectButton style={styles.emptyAddButton} onPress={showModal}>
-					<Ionicons name="add" size={20} color="#fff" />
-					<Text style={styles.emptyAddButtonText}>Add Budget</Text>
-				</RectButton>
+	const EmptyState = useCallback(
+		() => (
+			<View style={styles.emptyContainer}>
+				<View style={styles.emptyContent}>
+					<Ionicons name="wallet-outline" size={64} color="#e0e0e0" />
+					<Text style={styles.emptyTitle}>No Budgets Yet</Text>
+					<Text style={styles.emptySubtext}>
+						Create your first budget to start tracking your spending and take
+						control of your finances
+					</Text>
+					<RectButton
+						style={styles.emptyAddButton}
+						onPress={showModal}
+						{...accessibilityProps.button}
+						accessibilityLabel={generateAccessibilityLabel.button(
+							'Add',
+							'first budget'
+						)}
+						accessibilityHint="Double tap to create your first budget"
+					>
+						<Ionicons name="add" size={20} color="#fff" />
+						<Text style={styles.emptyAddButtonText}>Add Budget</Text>
+					</RectButton>
+				</View>
 			</View>
-		</View>
+		),
+		[showModal]
 	);
-
-	// ==========================================
-	// Budget Summary Components
-	// ==========================================
-	const AllBudgetsSummaryComponent = () => (
-		<AllBudgetSummary
-			percentage={Math.min(
-				((monthlySummary.totalSpent + weeklySummary.totalSpent) /
-					(monthlySummary.totalAllocated + weeklySummary.totalAllocated)) *
-					100,
-				100
-			)}
-			spent={monthlySummary.totalSpent + weeklySummary.totalSpent}
-			total={monthlySummary.totalAllocated + weeklySummary.totalAllocated}
-			onPeriodToggle={handlePeriodToggle}
-			isActive={activeTab === 'all'}
-		/>
-	);
-
-	const MonthlyBudgetSummaryComponent = () => (
-		<MonthlyBudgetSummary
-			percentage={monthlyPercentage}
-			spent={monthlySummary.totalSpent}
-			total={monthlySummary.totalAllocated}
-			onPeriodToggle={handlePeriodToggle}
-			isActive={activeTab === 'monthly'}
-		/>
-	);
-
-	const WeeklyBudgetSummaryComponent = () => (
-		<WeeklyBudgetSummary
-			percentage={weeklyPercentage}
-			spent={weeklySummary.totalSpent}
-			total={weeklySummary.totalAllocated}
-			onPeriodToggle={handlePeriodToggle}
-			isActive={activeTab === 'weekly'}
-		/>
-	);
-
-	// ==========================================
-	// Modal Handlers
-	// ==========================================
-	const showModal = () => {
-		router.push('/(stack)/addBudget');
-	};
-
-	const showEditModal = (budget: Budget) => {
-		router.push(`/(stack)/editBudget?id=${budget.id}`);
-	};
 
 	// ==========================================
 	// Period Toggle Handler
 	// ==========================================
-	const handlePeriodToggle = () => {
+	const handlePeriodToggle = useCallback(() => {
 		// Cycle through: all -> monthly -> weekly -> all
 		if (activeTab === 'all') {
 			setActiveTab('monthly');
@@ -218,6 +261,60 @@ export default function BudgetScreen() {
 		} else {
 			setActiveTab('all');
 		}
+	}, [activeTab]);
+
+	// ==========================================
+	// Budget Summary Components
+	// ==========================================
+	const AllBudgetsSummaryComponent = useCallback(
+		() => (
+			<AllBudgetSummary
+				percentage={Math.min(
+					((monthlySummary.totalSpent + weeklySummary.totalSpent) /
+						(monthlySummary.totalAllocated + weeklySummary.totalAllocated)) *
+						100,
+					100
+				)}
+				spent={monthlySummary.totalSpent + weeklySummary.totalSpent}
+				total={monthlySummary.totalAllocated + weeklySummary.totalAllocated}
+				onPeriodToggle={handlePeriodToggle}
+				isActive={activeTab === 'all'}
+			/>
+		),
+		[monthlySummary, weeklySummary, handlePeriodToggle, activeTab]
+	);
+
+	const MonthlyBudgetSummaryComponent = useCallback(
+		() => (
+			<MonthlyBudgetSummary
+				percentage={monthlyPercentage}
+				spent={monthlySummary.totalSpent}
+				total={monthlySummary.totalAllocated}
+				onPeriodToggle={handlePeriodToggle}
+				isActive={activeTab === 'monthly'}
+			/>
+		),
+		[monthlyPercentage, monthlySummary, handlePeriodToggle, activeTab]
+	);
+
+	const WeeklyBudgetSummaryComponent = useCallback(
+		() => (
+			<WeeklyBudgetSummary
+				percentage={weeklyPercentage}
+				spent={weeklySummary.totalSpent}
+				total={weeklySummary.totalAllocated}
+				onPeriodToggle={handlePeriodToggle}
+				isActive={activeTab === 'weekly'}
+			/>
+		),
+		[weeklyPercentage, weeklySummary, handlePeriodToggle, activeTab]
+	);
+
+	// ==========================================
+	// Modal Handlers
+	// ==========================================
+	const showEditModal = (budget: Budget) => {
+		router.push(`/(stack)/editBudget?id=${budget.id}`);
 	};
 
 	// Filter budgets based on active tab
@@ -234,66 +331,111 @@ export default function BudgetScreen() {
 	// ==========================================
 	// Generate Budget Insights
 	// ==========================================
-	const generateBudgetInsights = (budgets: Budget[]): InsightCard[] => {
-		const insights: InsightCard[] = [];
+	const generateBudgetInsights = useCallback(
+		(budgets: Budget[]): InsightCard[] => {
+			const insights: InsightCard[] = [];
 
-		// 1) Overspend risk insights
-		budgets.forEach((budget) => {
-			const ratio = budget.amount ? (budget.spent || 0) / budget.amount : 0;
-			if (ratio >= 0.8 && (budget.amount || 0) > (budget.spent || 0)) {
-				insights.push({
-					id: `overspend_${budget.id}`,
-					severity: 'warn',
-					headline: `${budget.name} at ${(ratio * 100).toFixed(0)}%`,
-					detail: `You're close to your limit. Consider adjusting spending.`,
-					cta: {
-						label: 'Adjust Budget',
-						action: 'OPEN_BUDGET',
-						payload: { category: budget.name },
-					},
-					evidence: { factIds: [budget.id] },
-				});
-			}
-		});
-
-		// 2) Good progress insights
-		budgets.forEach((budget) => {
-			const ratio = budget.amount ? (budget.spent || 0) / budget.amount : 0;
-			if (ratio <= 0.5 && (budget.spent || 0) > 0) {
-				insights.push({
-					id: `progress_${budget.id}`,
-					severity: 'info',
-					headline: `${budget.name} on track`,
-					detail: `Great job staying within budget!`,
-					evidence: { factIds: [budget.id] },
-				});
-			}
-		});
-
-		// 3) Budget creation suggestion
-		if (budgets.length < 3) {
-			insights.push({
-				id: 'create_more_budgets',
-				severity: 'info',
-				headline: 'Create more budgets',
-				detail: 'Add budgets for dining, entertainment, and other categories.',
-				cta: {
-					label: 'Add Budget',
-					action: 'OPEN_BUDGET',
-				},
-				evidence: { factIds: [] },
+			// 1) Overspend risk insights
+			budgets.forEach((budget) => {
+				const ratio = budget.amount ? (budget.spent || 0) / budget.amount : 0;
+				if (ratio >= 0.8 && (budget.amount || 0) > (budget.spent || 0)) {
+					insights.push({
+						id: `overspend_${budget.id}`,
+						severity: 'warn',
+						headline: `${budget.name} at ${(ratio * 100).toFixed(0)}%`,
+						detail: `You're close to your limit. Consider adjusting spending.`,
+						cta: {
+							label: 'Adjust Budget',
+							action: 'OPEN_BUDGET',
+							payload: { category: budget.name },
+						},
+						evidence: { factIds: [budget.id] },
+					});
+				}
 			});
-		}
 
-		return insights.slice(0, 3); // Limit to 3 insights
-	};
+			// 2) Critical overspend insights
+			budgets.forEach((budget) => {
+				const ratio = budget.amount ? (budget.spent || 0) / budget.amount : 0;
+				if (ratio >= 1.0) {
+					insights.push({
+						id: `critical_${budget.id}`,
+						severity: 'critical',
+						headline: `${budget.name} over budget`,
+						detail: `You've exceeded your budget by $${(
+							(budget.spent || 0) - budget.amount
+						).toFixed(2)}.`,
+						cta: {
+							label: 'Review Budget',
+							action: 'OPEN_BUDGET',
+							payload: { category: budget.name },
+						},
+						evidence: { factIds: [budget.id] },
+					});
+				}
+			});
+
+			// 3) Good progress insights
+			budgets.forEach((budget) => {
+				const ratio = budget.amount ? (budget.spent || 0) / budget.amount : 0;
+				if (ratio <= 0.5 && (budget.spent || 0) > 0) {
+					insights.push({
+						id: `progress_${budget.id}`,
+						severity: 'info',
+						headline: `${budget.name} on track`,
+						detail: `Great job staying within budget!`,
+						evidence: { factIds: [budget.id] },
+					});
+				}
+			});
+
+			// 4) Budget creation suggestion
+			if (budgets.length < 3) {
+				insights.push({
+					id: 'create_more_budgets',
+					severity: 'info',
+					headline: 'Create more budgets',
+					detail:
+						'Add budgets for dining, entertainment, and other categories.',
+					cta: {
+						label: 'Add Budget',
+						action: 'OPEN_BUDGET',
+					},
+					evidence: { factIds: [] },
+				});
+			}
+
+			// 5) Weekly vs Monthly budget balance insight
+			if (budgets.length > 0) {
+				const weeklyBudgets = budgets.filter((b) => b.period === 'weekly');
+				const monthlyBudgets = budgets.filter((b) => b.period === 'monthly');
+
+				if (weeklyBudgets.length > 0 && monthlyBudgets.length === 0) {
+					insights.push({
+						id: 'add_monthly_budgets',
+						severity: 'info',
+						headline: 'Consider monthly budgets',
+						detail: 'Add monthly budgets for better long-term planning.',
+						cta: {
+							label: 'Add Monthly Budget',
+							action: 'OPEN_BUDGET',
+						},
+						evidence: { factIds: [] },
+					});
+				}
+			}
+
+			return insights.slice(0, 3); // Limit to 3 insights
+		},
+		[]
+	);
 
 	// ==========================================
 	// Main Render
 	// ==========================================
-	// Show loading state while fetching data
+	// Show skeleton loading state while fetching data
 	if (isLoading && !hasLoaded) {
-		return <LoadingState />;
+		return <SkeletonLoadingState />;
 	}
 
 	// Show error state if there's an error
@@ -336,7 +478,11 @@ export default function BudgetScreen() {
 							accessibilityRole="text"
 							accessibilityLabel="Manage your spending across different categories"
 						>
-							Manage your spending across different categories
+							{budgets.length > 0
+								? `${budgets.length} budget${
+										budgets.length === 1 ? '' : 's'
+								  } • ${activeTab} view`
+								: 'Manage your spending across different categories'}
 						</Text>
 					</View>
 					<TouchableOpacity
@@ -595,5 +741,59 @@ const styles = StyleSheet.create({
 		marginLeft: 8,
 		lineHeight: 16,
 		fontWeight: '500',
+	},
+
+	// Skeleton loading styles
+	skeletonText: {
+		backgroundColor: '#f0f0f0',
+		borderRadius: 4,
+	},
+	skeletonButton: {
+		backgroundColor: '#f0f0f0',
+		borderRadius: 12,
+	},
+	skeletonCard: {
+		backgroundColor: '#f0f0f0',
+		borderRadius: 16,
+		marginHorizontal: 24,
+	},
+	skeletonInsights: {
+		paddingHorizontal: 24,
+		marginTop: 16,
+	},
+	skeletonChips: {
+		flexDirection: 'row',
+		gap: 12,
+	},
+	skeletonChip: {
+		height: 60,
+		backgroundColor: '#f0f0f0',
+		borderRadius: 12,
+	},
+	skeletonList: {
+		marginTop: 16,
+		paddingHorizontal: 24,
+	},
+	skeletonBudgetItem: {
+		flexDirection: 'row',
+		alignItems: 'flex-start',
+		paddingVertical: 16,
+		borderBottomWidth: 1,
+		borderBottomColor: '#e5e7eb',
+	},
+	skeletonIcon: {
+		width: 40,
+		height: 40,
+		backgroundColor: '#f0f0f0',
+		borderRadius: 12,
+		marginRight: 12,
+	},
+	skeletonContent: {
+		flex: 1,
+	},
+	skeletonProgress: {
+		height: 4,
+		backgroundColor: '#f0f0f0',
+		borderRadius: 2,
 	},
 });

@@ -7,7 +7,6 @@ import React, {
 	ReactNode,
 } from 'react';
 import { ApiService } from '../services';
-import { useProfile } from './profileContext';
 import { setCacheInvalidationFlags } from '../services/utility/cacheInvalidationUtils';
 
 // ==========================================
@@ -144,6 +143,31 @@ export interface UpdateBudgetData {
 	categories?: string[];
 }
 
+export interface BudgetSummary {
+	totalBudgets: number;
+	totalAllocated: number;
+	totalSpent: number;
+	totalRemaining: number;
+	averageUtilization: number;
+	overBudgetCount: number;
+	underBudgetCount: number;
+	onTrackCount: number;
+	monthlyBudgets: number;
+	weeklyBudgets: number;
+}
+
+export interface BudgetFilter {
+	period?: 'weekly' | 'monthly';
+	categories?: string[];
+	utilizationRange?: {
+		min: number;
+		max: number;
+	};
+	overBudget?: boolean;
+	underBudget?: boolean;
+	searchTerm?: string;
+}
+
 interface BudgetContextType {
 	budgets: Budget[];
 	isLoading: boolean;
@@ -154,6 +178,13 @@ interface BudgetContextType {
 	deleteBudget: (id: string) => Promise<void>;
 	updateBudgetSpent: (budgetId: string, amount: number) => Promise<Budget>;
 	checkBudgetAlerts: () => Promise<void>;
+	getBudgetSummary: () => BudgetSummary;
+	getBudgetUtilization: (budgetId: string) => number;
+	getOverBudgetBudgets: () => Budget[];
+	getUnderBudgetBudgets: () => Budget[];
+	filterBudgets: (filter: BudgetFilter) => Budget[];
+	getAllCategories: () => string[];
+	getBudgetsByCategory: (category: string) => Budget[];
 }
 
 export const BudgetContext = createContext<BudgetContextType>({
@@ -172,13 +203,30 @@ export const BudgetContext = createContext<BudgetContextType>({
 		throw new Error('updateBudgetSpent not implemented');
 	},
 	checkBudgetAlerts: async () => {},
+	getBudgetSummary: () => ({
+		totalBudgets: 0,
+		totalAllocated: 0,
+		totalSpent: 0,
+		totalRemaining: 0,
+		averageUtilization: 0,
+		overBudgetCount: 0,
+		underBudgetCount: 0,
+		onTrackCount: 0,
+		monthlyBudgets: 0,
+		weeklyBudgets: 0,
+	}),
+	getBudgetUtilization: () => 0,
+	getOverBudgetBudgets: () => [],
+	getUnderBudgetBudgets: () => [],
+	filterBudgets: () => [],
+	getAllCategories: () => [],
+	getBudgetsByCategory: () => [],
 });
 
 export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 	const [budgets, setBudgets] = useState<Budget[]>([]);
 	const [isLoading, setIsLoading] = useState<boolean>(false); // Changed from true to false
 	const [hasLoaded, setHasLoaded] = useState<boolean>(false); // Track if data has been loaded
-	const { profile } = useProfile();
 
 	// Note: Transaction refresh is handled by the transaction context itself
 	// when budgets are updated via the API
@@ -233,7 +281,10 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 
 	const checkBudgetAlerts = useCallback(async () => {
 		try {
-			const response = await ApiService.post<any>('/api/budgets/check-alerts', {});
+			const response = await ApiService.post<any>(
+				'/api/budgets/check-alerts',
+				{}
+			);
 
 			if (response.success) {
 				// Budget alerts checked successfully
@@ -332,7 +383,10 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 	const updateBudget = useCallback(
 		async (id: string, updates: UpdateBudgetData) => {
 			try {
-				const response = await ApiService.put<any>(`/api/budgets/${id}`, updates);
+				const response = await ApiService.put<any>(
+					`/api/budgets/${id}`,
+					updates
+				);
 
 				// Handle the response format properly
 				const actualData = response.data?.data || response.data;
@@ -408,10 +462,13 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 			console.log('[Budgets] Current budgets before update:', budgets);
 
 			try {
-				const response = await ApiService.post<any>('/api/budgets/update-spent', {
-					budgetId,
-					amount,
-				});
+				const response = await ApiService.post<any>(
+					'/api/budgets/update-spent',
+					{
+						budgetId,
+						amount,
+					}
+				);
 
 				console.log('[Budgets] updateBudgetSpent API response:', response);
 
@@ -473,6 +530,149 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 		[budgets]
 	);
 
+	// Budget analytics functions
+	const getBudgetSummary = useCallback((): BudgetSummary => {
+		const totalBudgets = budgets.length;
+		const totalAllocated = budgets.reduce(
+			(sum, budget) => sum + budget.amount,
+			0
+		);
+		const totalSpent = budgets.reduce(
+			(sum, budget) => sum + (budget.spent || 0),
+			0
+		);
+		const totalRemaining = totalAllocated - totalSpent;
+		const averageUtilization =
+			totalAllocated > 0 ? (totalSpent / totalAllocated) * 100 : 0;
+
+		const overBudgetCount = budgets.filter(
+			(budget) => (budget.spent || 0) > budget.amount
+		).length;
+		const underBudgetCount = budgets.filter(
+			(budget) => (budget.spent || 0) < budget.amount * 0.8
+		).length;
+		const onTrackCount = budgets.filter((budget) => {
+			const spent = budget.spent || 0;
+			return spent >= budget.amount * 0.8 && spent <= budget.amount;
+		}).length;
+
+		const monthlyBudgets = budgets.filter(
+			(budget) => budget.period === 'monthly'
+		).length;
+		const weeklyBudgets = budgets.filter(
+			(budget) => budget.period === 'weekly'
+		).length;
+
+		return {
+			totalBudgets,
+			totalAllocated,
+			totalSpent,
+			totalRemaining,
+			averageUtilization,
+			overBudgetCount,
+			underBudgetCount,
+			onTrackCount,
+			monthlyBudgets,
+			weeklyBudgets,
+		};
+	}, [budgets]);
+
+	const getBudgetUtilization = useCallback(
+		(budgetId: string): number => {
+			const budget = budgets.find((b) => b.id === budgetId);
+			if (!budget || budget.amount === 0) return 0;
+			return ((budget.spent || 0) / budget.amount) * 100;
+		},
+		[budgets]
+	);
+
+	const getOverBudgetBudgets = useCallback((): Budget[] => {
+		return budgets.filter((budget) => (budget.spent || 0) > budget.amount);
+	}, [budgets]);
+
+	const getUnderBudgetBudgets = useCallback((): Budget[] => {
+		return budgets.filter(
+			(budget) => (budget.spent || 0) < budget.amount * 0.8
+		);
+	}, [budgets]);
+
+	const filterBudgets = useCallback(
+		(filter: BudgetFilter): Budget[] => {
+			return budgets.filter((budget) => {
+				// Filter by period
+				if (filter.period && budget.period !== filter.period) {
+					return false;
+				}
+
+				// Filter by categories
+				if (filter.categories && filter.categories.length > 0) {
+					const budgetCategories = budget.categories || [];
+					const hasMatchingCategory = filter.categories.some((category) =>
+						budgetCategories.includes(category)
+					);
+					if (!hasMatchingCategory) {
+						return false;
+					}
+				}
+
+				// Filter by utilization range
+				if (filter.utilizationRange) {
+					const utilization = getBudgetUtilization(budget.id);
+					if (
+						utilization < filter.utilizationRange.min ||
+						utilization > filter.utilizationRange.max
+					) {
+						return false;
+					}
+				}
+
+				// Filter by over budget
+				if (filter.overBudget && (budget.spent || 0) <= budget.amount) {
+					return false;
+				}
+
+				// Filter by under budget
+				if (filter.underBudget && (budget.spent || 0) >= budget.amount * 0.8) {
+					return false;
+				}
+
+				// Filter by search term
+				if (filter.searchTerm) {
+					const searchLower = filter.searchTerm.toLowerCase();
+					const nameMatch = budget.name.toLowerCase().includes(searchLower);
+					const categoryMatch = (budget.categories || []).some((cat) =>
+						cat.toLowerCase().includes(searchLower)
+					);
+					if (!nameMatch && !categoryMatch) {
+						return false;
+					}
+				}
+
+				return true;
+			});
+		},
+		[budgets, getBudgetUtilization]
+	);
+
+	const getAllCategories = useCallback((): string[] => {
+		const allCategories = new Set<string>();
+		budgets.forEach((budget) => {
+			(budget.categories || []).forEach((category) =>
+				allCategories.add(category)
+			);
+		});
+		return Array.from(allCategories).sort();
+	}, [budgets]);
+
+	const getBudgetsByCategory = useCallback(
+		(category: string): Budget[] => {
+			return budgets.filter((budget) =>
+				(budget.categories || []).includes(category)
+			);
+		},
+		[budgets]
+	);
+
 	// Load budgets when component mounts
 	useEffect(() => {
 		if (!hasLoaded) {
@@ -491,6 +691,13 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 			deleteBudget,
 			updateBudgetSpent,
 			checkBudgetAlerts,
+			getBudgetSummary,
+			getBudgetUtilization,
+			getOverBudgetBudgets,
+			getUnderBudgetBudgets,
+			filterBudgets,
+			getAllCategories,
+			getBudgetsByCategory,
 		}),
 		[
 			budgets,
@@ -502,6 +709,13 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 			deleteBudget,
 			updateBudgetSpent,
 			checkBudgetAlerts,
+			getBudgetSummary,
+			getBudgetUtilization,
+			getOverBudgetBudgets,
+			getUnderBudgetBudgets,
+			filterBudgets,
+			getAllCategories,
+			getBudgetsByCategory,
 		]
 	);
 

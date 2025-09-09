@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 
 // Simple connectivity check using fetch instead of NetInfo
@@ -6,24 +6,24 @@ export const useConnectivity = () => {
 	const [isOnline, setIsOnline] = useState(true);
 	const [isChecking, setIsChecking] = useState(false);
 
-	const checkConnectivity = async () => {
+	const checkConnectivity = useCallback(async () => {
 		if (isChecking) return;
 
 		setIsChecking(true);
 		try {
 			// Try to fetch a small resource to check connectivity
-			const response = await fetch('https://www.google.com/favicon.ico', {
+			await fetch('https://www.google.com/favicon.ico', {
 				method: 'HEAD',
 				mode: 'no-cors',
 				cache: 'no-cache',
 			});
 			setIsOnline(true);
-		} catch (error) {
+		} catch {
 			setIsOnline(false);
 		} finally {
 			setIsChecking(false);
 		}
-	};
+	}, [isChecking]);
 
 	useEffect(() => {
 		// Check initial connectivity
@@ -33,7 +33,7 @@ export const useConnectivity = () => {
 		const interval = setInterval(checkConnectivity, 30000); // Check every 30 seconds
 
 		return () => clearInterval(interval);
-	}, []);
+	}, [checkConnectivity]);
 
 	return {
 		isOnline,
@@ -52,7 +52,7 @@ export const SimpleOfflineBanner = ({
 	queuedActions?: number;
 	onViewQueuedActions?: () => void;
 }) => {
-	const { isOnline, checkConnectivity } = useConnectivity();
+	const { isOnline } = useConnectivity();
 
 	if (isOnline) return null;
 

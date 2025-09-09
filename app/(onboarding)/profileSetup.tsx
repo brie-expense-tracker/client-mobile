@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
 	View,
 	Text,
@@ -15,67 +15,12 @@ import {
 	Platform,
 	Keyboard,
 } from 'react-native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useOnboarding } from '../../src/context/OnboardingContext';
 import { useProfile } from '../../src/context/profileContext';
-import { ApiService } from '../../src/services';
-
-type RootStackParamList = {
-	Home: undefined;
-};
-
-type OnboardingScreenProps = {
-	navigation: NativeStackNavigationProp<RootStackParamList>;
-};
 
 const { width } = Dimensions.get('window');
-
-// Color palette matching budgets screen
-const COLOR_PALETTE = {
-	red: {
-		base: '#E53935',
-		pastel: '#EF5350',
-		dark: '#B71C1C',
-	},
-	orange: {
-		base: '#FB8C00',
-		pastel: '#FFB74D',
-		dark: '#E65100',
-	},
-	yellow: {
-		base: '#FDD835',
-		pastel: '#FFEE58',
-		dark: '#FBC02D',
-	},
-	green: {
-		base: '#43A047',
-		pastel: '#A5D6A7',
-		dark: '#1B5E20',
-	},
-	blue: {
-		base: '#1E88E5',
-		pastel: '#42A5F5',
-		dark: '#0D47A1',
-	},
-	indigo: {
-		base: '#5E35B1',
-		pastel: '#5C6BC0',
-		dark: '#311B92',
-	},
-	violet: {
-		base: '#8E24AA',
-		pastel: '#AB47BC',
-		dark: '#4A0072',
-	},
-	grey: {
-		base: '#424242',
-		pastel: '#757575',
-		dark: '#212121',
-	},
-};
 
 // Currency validation utility functions
 const validateCurrencyInput = (value: string): boolean => {
@@ -124,7 +69,7 @@ const formatCurrencyInput = (value: string): string => {
 	return cleaned;
 };
 
-const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
+const OnboardingScreen = () => {
 	// Basic Info
 	const [firstName, setFirstName] = useState('');
 	const [lastName, setLastName] = useState('');
@@ -137,7 +82,6 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 	const flatListRef = useRef<FlatList>(null);
 	const [currentIndex, setCurrentIndex] = useState(0);
 
-	const { markOnboardingComplete } = useOnboarding();
 	const { updateProfile } = useProfile();
 
 	// Currency input handlers
@@ -253,7 +197,7 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 
 		try {
 			// Update profile using profileContext
-			await updateProfile(profileData);
+			await updateProfile(profileData as any);
 
 			// Navigate to notification permission screen instead of directly to dashboard
 			setTimeout(() => {

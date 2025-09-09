@@ -1,10 +1,4 @@
-import React, {
-	useCallback,
-	useContext,
-	useMemo,
-	useState,
-	useEffect,
-} from 'react';
+import React, { useCallback, useContext, useMemo, useState } from 'react';
 import {
 	View,
 	Text,
@@ -20,8 +14,6 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { TransactionContext } from '../../../src/context/transactionContext';
-import { useBudget } from '../../../src/context/budgetContext';
-import { useGoal } from '../../../src/context/goalContext';
 import { useNotification } from '@/src/context/notificationContext';
 import {
 	SimpleBalanceWidget,
@@ -66,11 +58,7 @@ const getLocalIsoDate = (): string => {
  */
 const Dashboard: React.FC = () => {
 	const { transactions, isLoading, refetch } = useContext(TransactionContext);
-	const { budgets } = useBudget();
-	const { goals } = useGoal();
 	const { unreadCount } = useNotification();
-
-	const [isPressed, setIsPressed] = useState(false);
 	const [refreshing, setRefreshing] = useState(false);
 
 	const onRefresh = useCallback(async () => {
@@ -210,7 +198,6 @@ const Dashboard: React.FC = () => {
 					scrollEventThrottle={16}
 					removeClippedSubviews={true}
 					keyboardShouldPersistTaps="handled"
-					accessibilityRole="scroll"
 					accessibilityLabel="Dashboard content"
 				>
 					<View style={[styles.contentContainer]}>
@@ -290,7 +277,7 @@ const Dashboard: React.FC = () => {
 						>
 							<TransactionHistory
 								transactions={transactions}
-								onPress={setIsPressed}
+								onPress={() => {}}
 							/>
 						</SkeletonContainer>
 
@@ -303,6 +290,17 @@ const Dashboard: React.FC = () => {
 						</SkeletonContainer>
 					</View>
 				</ScrollView>
+
+				{/* Floating Action Button for Quick Add Transaction */}
+				<TouchableOpacity
+					style={styles.fab}
+					onPress={() => router.push('/(tabs)/transaction')}
+					{...accessibilityProps.button}
+					accessibilityLabel="Add new transaction"
+					accessibilityHint="Double tap to add a new income or expense transaction"
+				>
+					<Ionicons name="add" size={24} color="#fff" />
+				</TouchableOpacity>
 			</GestureHandlerRootView>
 		</SafeAreaView>
 	);
@@ -433,6 +431,22 @@ const styles = StyleSheet.create({
 		width: 80,
 		alignSelf: 'center',
 		marginBottom: 12,
+	},
+	fab: {
+		position: 'absolute',
+		bottom: 24,
+		right: 24,
+		width: 56,
+		height: 56,
+		borderRadius: 28,
+		backgroundColor: '#007AFF',
+		justifyContent: 'center',
+		alignItems: 'center',
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.3,
+		shadowRadius: 8,
+		elevation: 8,
 	},
 });
 

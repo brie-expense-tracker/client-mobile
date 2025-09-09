@@ -3,10 +3,12 @@ import React, {
 	useContext,
 	useState,
 	useEffect,
+	useCallback,
 	ReactNode,
 } from 'react';
 import { ApiService } from '../services';
 import useAuth from './AuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface ProfilePreferences {
 	adviceFrequency: string;
@@ -109,6 +111,8 @@ interface ProfileContextType {
 	profile: Profile | null;
 	loading: boolean;
 	error: string | null;
+	isOffline: boolean;
+	lastSyncTime: number | null;
 	fetchProfile: () => Promise<void>;
 	updateProfile: (updates: Partial<Profile>) => Promise<void>;
 	updatePreferences: (
@@ -127,6 +131,8 @@ interface ProfileContextType {
 		settings: Partial<ProfilePreferences['goalSettings']>
 	) => Promise<void>;
 	refreshProfile: () => Promise<void>;
+	clearCache: () => Promise<void>;
+	syncProfile: () => Promise<void>;
 }
 
 const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
@@ -139,6 +145,120 @@ export const useProfile = () => {
 	return context;
 };
 
+// Validation utilities
+const validateProfile = (profile: Partial<Profile>): string[] => {
+	const errors: string[] = [];
+
+	if (profile.firstName && profile.firstName.trim().length < 2) {
+		errors.push('First name must be at least 2 characters long');
+	}
+
+	if (profile.lastName && profile.lastName.trim().length < 2) {
+		errors.push('Last name must be at least 2 characters long');
+	}
+
+	if (profile.monthlyIncome !== undefined && profile.monthlyIncome < 0) {
+		errors.push('Monthly income cannot be negative');
+	}
+
+	if (profile.savings !== undefined && profile.savings < 0) {
+		errors.push('Savings cannot be negative');
+	}
+
+	if (profile.debt !== undefined && profile.debt < 0) {
+		errors.push('Debt cannot be negative');
+	}
+
+	return errors;
+};
+
+const validatePreferences = (
+	preferences: Partial<ProfilePreferences>
+): string[] => {
+	const errors: string[] = [];
+
+	if (
+		preferences.autoSave?.amount !== undefined &&
+		preferences.autoSave.amount < 0
+	) {
+		errors.push('Auto-save amount cannot be negative');
+	}
+
+	if (
+		preferences.budgetSettings?.alertPct !== undefined &&
+		(preferences.budgetSettings.alertPct < 0 ||
+			preferences.budgetSettings.alertPct > 100)
+	) {
+		errors.push('Budget alert percentage must be between 0 and 100');
+	}
+
+	if (
+		preferences.goalSettings?.defaults?.target !== undefined &&
+		preferences.goalSettings.defaults.target < 0
+	) {
+		errors.push('Goal target cannot be negative');
+	}
+
+	if (
+		preferences.goalSettings?.defaults?.dueDays !== undefined &&
+		preferences.goalSettings.defaults.dueDays < 1
+	) {
+		errors.push('Goal due days must be at least 1');
+	}
+
+	return errors;
+};
+
+// Cache utilities
+const CACHE_KEY = 'profile_cache';
+const CACHE_TIMESTAMP_KEY = 'profile_cache_timestamp';
+const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
+
+const saveToCache = async (profile: Profile): Promise<void> => {
+	try {
+		await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(profile));
+		await AsyncStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+	} catch (error) {
+		console.warn('Failed to save profile to cache:', error);
+	}
+};
+
+const loadFromCache = async (): Promise<Profile | null> => {
+	try {
+		const [cachedProfile, timestamp] = await Promise.all([
+			AsyncStorage.getItem(CACHE_KEY),
+			AsyncStorage.getItem(CACHE_TIMESTAMP_KEY),
+		]);
+
+		if (!cachedProfile || !timestamp) {
+			return null;
+		}
+
+		const cacheAge = Date.now() - parseInt(timestamp, 10);
+		if (cacheAge > CACHE_EXPIRY_MS) {
+			// Cache expired, clear it
+			await clearCache();
+			return null;
+		}
+
+		return JSON.parse(cachedProfile);
+	} catch (error) {
+		console.warn('Failed to load profile from cache:', error);
+		return null;
+	}
+};
+
+const clearCache = async (): Promise<void> => {
+	try {
+		await Promise.all([
+			AsyncStorage.removeItem(CACHE_KEY),
+			AsyncStorage.removeItem(CACHE_TIMESTAMP_KEY),
+		]);
+	} catch (error) {
+		console.warn('Failed to clear profile cache:', error);
+	}
+};
+
 interface ProfileProviderProps {
 	children: ReactNode;
 }
@@ -149,9 +269,11 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 	const [profile, setProfile] = useState<Profile | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [isOffline, setIsOffline] = useState(false);
+	const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
 	const { user, firebaseUser } = useAuth();
 
-	const fetchProfile = async () => {
+	const fetchProfile = useCallback(async () => {
 		if (!user || !firebaseUser) {
 			setProfile(null);
 			setLoading(false);
@@ -159,23 +281,29 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 		}
 
 		try {
-			// console.log('ProfileProvider: Fetching profile for user:', user._id);
 			setLoading(true);
 			setError(null);
+			setIsOffline(false);
+
+			// Try to load from cache first
+			const cachedProfile = await loadFromCache();
+			if (cachedProfile) {
+				setProfile(cachedProfile);
+				setLastSyncTime(Date.now());
+			}
 
 			const response = await ApiService.get<{ data: Profile }>(
 				'/api/profiles/me'
 			);
-			// console.log('ProfileProvider: API response:', response);
 
 			if (response.success && response.data) {
-				// Handle nested data structure: response.data.data
 				const profileData = response.data.data || response.data;
-				// console.log(
-				// 	'ProfileProvider: Profile fetched successfully:',
-				// 	profileData
-				// );
 				setProfile(profileData);
+				setLastSyncTime(Date.now());
+				setIsOffline(false);
+
+				// Save to cache
+				await saveToCache(profileData);
 			} else if (
 				response.error &&
 				response.error.includes('Profile not found')
@@ -187,11 +315,20 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 			}
 		} catch (err) {
 			console.error('ProfileProvider: Error fetching profile:', err);
-			setError(err instanceof Error ? err.message : 'Failed to fetch profile');
+
+			// If we have cached data, use it and mark as offline
+			if (profile) {
+				setIsOffline(true);
+				console.log('Using cached profile data due to network error');
+			} else {
+				setError(
+					err instanceof Error ? err.message : 'Failed to fetch profile'
+				);
+			}
 		} finally {
 			setLoading(false);
 		}
-	};
+	}, [user, firebaseUser]);
 
 	const createDefaultProfile = async () => {
 		try {
@@ -307,95 +444,129 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 		}
 	};
 
-	const updateProfile = async (updates: Partial<Profile>) => {
-		if (!user || !firebaseUser) {
-			throw new Error('User not authenticated');
-		}
-
-		// Store the previous state for potential rollback
-		const previousProfile = profile;
-
-		// Optimistically update the profile state immediately
-		setProfile((prev) =>
-			prev
-				? {
-						...prev,
-						...updates,
-				  }
-				: null
-		);
-
-		try {
-			setError(null);
-
-			const response = await ApiService.put<{ data: Profile }>(
-				'/api/profiles/me',
-				updates
-			);
-
-			if (response.success && response.data) {
-				// The optimistic update was correct, no need to update again
-				console.log('Profile updated successfully');
-			} else {
-				// API call failed, revert to previous state
-				setProfile(previousProfile);
-				throw new Error(response.error || 'Failed to update profile');
+	const updateProfile = useCallback(
+		async (updates: Partial<Profile>) => {
+			if (!user || !firebaseUser) {
+				throw new Error('User not authenticated');
 			}
-		} catch (err) {
-			console.error('Error updating profile:', err);
-			// Revert to previous state on error
-			setProfile(previousProfile);
-			setError(err instanceof Error ? err.message : 'Failed to update profile');
-			throw err;
-		}
-	};
 
-	const updatePreferences = async (
-		preferences: Partial<ProfilePreferences>
-	) => {
-		if (!user || !firebaseUser) {
-			throw new Error('User not authenticated');
-		}
-
-		// Store the previous state for potential rollback
-		const previousProfile = profile;
-
-		// Optimistically update the profile state immediately
-		setProfile((prev) =>
-			prev
-				? {
-						...prev,
-						preferences: { ...prev.preferences, ...preferences },
-				  }
-				: null
-		);
-
-		try {
-			setError(null);
-
-			const response = await ApiService.put<ProfilePreferences>(
-				'/api/profiles/preferences',
-				preferences
-			);
-
-			if (response.success && response.data) {
-				// The optimistic update was correct, no need to update again
-				console.log('Preferences updated successfully');
-			} else {
-				// API call failed, revert to previous state
-				setProfile(previousProfile);
-				throw new Error(response.error || 'Failed to update preferences');
+			// Validate input
+			const validationErrors = validateProfile(updates);
+			if (validationErrors.length > 0) {
+				const errorMessage = `Validation failed: ${validationErrors.join(
+					', '
+				)}`;
+				setError(errorMessage);
+				throw new Error(errorMessage);
 			}
-		} catch (err) {
-			console.error('Error updating preferences:', err);
-			// Revert to previous state on error
-			setProfile(previousProfile);
-			setError(
-				err instanceof Error ? err.message : 'Failed to update preferences'
+
+			// Store the previous state for potential rollback
+			const previousProfile = profile;
+
+			// Optimistically update the profile state immediately
+			setProfile((prev) =>
+				prev
+					? {
+							...prev,
+							...updates,
+					  }
+					: null
 			);
-			throw err;
-		}
-	};
+
+			try {
+				setError(null);
+
+				const response = await ApiService.put<{ data: Profile }>(
+					'/api/profiles/me',
+					updates
+				);
+
+				if (response.success && response.data) {
+					// The optimistic update was correct, no need to update again
+					console.log('Profile updated successfully');
+					setLastSyncTime(Date.now());
+					setIsOffline(false);
+
+					// Update cache
+					if (previousProfile) {
+						const updatedProfile = { ...previousProfile, ...updates };
+						await saveToCache(updatedProfile);
+					}
+				} else {
+					// API call failed, revert to previous state
+					setProfile(previousProfile);
+					throw new Error(response.error || 'Failed to update profile');
+				}
+			} catch (err) {
+				console.error('Error updating profile:', err);
+				// Revert to previous state on error
+				setProfile(previousProfile);
+				setError(
+					err instanceof Error ? err.message : 'Failed to update profile'
+				);
+				throw err;
+			}
+		},
+		[user, firebaseUser, profile]
+	);
+
+	const updatePreferences = useCallback(
+		async (preferences: Partial<ProfilePreferences>) => {
+			if (!user || !firebaseUser) {
+				throw new Error('User not authenticated');
+			}
+
+			// Validate input
+			const validationErrors = validatePreferences(preferences);
+			if (validationErrors.length > 0) {
+				const errorMessage = `Validation failed: ${validationErrors.join(
+					', '
+				)}`;
+				setError(errorMessage);
+				throw new Error(errorMessage);
+			}
+
+			// Store the previous state for potential rollback
+			const previousProfile = profile;
+
+			// Optimistically update the profile state immediately
+			setProfile((prev) =>
+				prev
+					? {
+							...prev,
+							preferences: { ...prev.preferences, ...preferences },
+					  }
+					: null
+			);
+
+			try {
+				setError(null);
+
+				const response = await ApiService.put<ProfilePreferences>(
+					'/api/profiles/preferences',
+					preferences
+				);
+
+				if (response.success && response.data) {
+					// The optimistic update was correct, no need to update again
+					console.log('Preferences updated successfully');
+				} else {
+					// API call failed, revert to previous state
+					setProfile(previousProfile);
+					throw new Error(response.error || 'Failed to update preferences');
+				}
+			} catch (err) {
+				console.error('Error updating preferences:', err);
+				// Revert to previous state on error
+				setProfile(previousProfile);
+				setError(
+					err instanceof Error ? err.message : 'Failed to update preferences'
+				);
+				throw err;
+			}
+		},
+		[user, firebaseUser, profile]
+	);
 
 	const updateNotificationSettings = async (
 		settings: Partial<ProfilePreferences['notifications']>
@@ -624,29 +795,47 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 		}
 	};
 
-	const refreshProfile = async () => {
+	const refreshProfile = useCallback(async () => {
 		await fetchProfile();
-	};
+	}, [user, firebaseUser]);
 
-	// Fetch profile when user changes
+	const clearCache = useCallback(async () => {
+		await clearCache();
+		setProfile(null);
+		setLastSyncTime(null);
+	}, []);
+
+	const syncProfile = useCallback(async () => {
+		if (isOffline) {
+			try {
+				await fetchProfile();
+			} catch (error) {
+				console.warn('Failed to sync profile:', error);
+			}
+		}
+	}, [isOffline, user, firebaseUser]);
+
+	// Fetch profile when user changes (only listen to user, not firebaseUser)
 	useEffect(() => {
-		// console.log('ProfileProvider: User or firebaseUser changed:', {
+		// console.log('ProfileProvider: User changed:', {
 		// 	user: !!user,
-		// 	firebaseUser: !!firebaseUser,
+		// 	userId: user?._id,
 		// });
-		if (user && firebaseUser) {
+		if (user) {
 			fetchProfile();
 		} else {
 			setProfile(null);
 			setLoading(false);
 			setError(null);
 		}
-	}, [user, firebaseUser]);
+	}, [user, firebaseUser, fetchProfile]); // Include firebaseUser to ensure we have auth before fetching
 
 	const value: ProfileContextType = {
 		profile,
 		loading,
 		error,
+		isOffline,
+		lastSyncTime,
 		fetchProfile,
 		updateProfile,
 		updatePreferences,
@@ -655,6 +844,8 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 		updateBudgetSettings,
 		updateGoalSettings,
 		refreshProfile,
+		clearCache,
+		syncProfile,
 	};
 
 	return (

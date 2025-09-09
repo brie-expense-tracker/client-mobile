@@ -7,7 +7,7 @@ import {
 	TouchableOpacity,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { BorderlessButton, RectButton } from 'react-native-gesture-handler';
+import { RectButton } from 'react-native-gesture-handler';
 import { Budget } from '../../../../src/context/budgetContext';
 import LinearProgressBar from './LinearProgressBar';
 import { router } from 'expo-router';

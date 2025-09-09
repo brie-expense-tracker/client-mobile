@@ -3,6 +3,13 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import LinearProgressBar from './LinearProgressBar';
 
+const formatCurrency = (amount: number): string => {
+	return new Intl.NumberFormat('en-US', {
+		style: 'currency',
+		currency: 'USD',
+	}).format(amount);
+};
+
 interface Props {
 	totalGoals: number;
 	completedGoals: number;
@@ -46,7 +53,9 @@ const GoalsSummaryCard: React.FC<Props> = ({
 					height={6}
 					color="#18181b"
 					trackColor="#e5e7eb"
-					leftLabel={`$${totalCurrent.toFixed(0)} / $${totalTarget.toFixed(0)}`}
+					leftLabel={`${formatCurrency(totalCurrent)} / ${formatCurrency(
+						totalTarget
+					)}`}
 					rightLabel={`${progressPercentage.toFixed(1)}%`}
 					style={styles.progressBar}
 				/>
@@ -65,12 +74,12 @@ const GoalsSummaryCard: React.FC<Props> = ({
 				</View>
 
 				<View style={styles.statCard}>
-					<Text style={styles.statValue}>${totalCurrent.toFixed(0)}</Text>
+					<Text style={styles.statValue}>{formatCurrency(totalCurrent)}</Text>
 					<Text style={styles.statLabel}>Saved</Text>
 				</View>
 
 				<View style={styles.statCard}>
-					<Text style={styles.statValue}>${totalTarget.toFixed(0)}</Text>
+					<Text style={styles.statValue}>{formatCurrency(totalTarget)}</Text>
 					<Text style={styles.statLabel}>Target</Text>
 				</View>
 			</View>

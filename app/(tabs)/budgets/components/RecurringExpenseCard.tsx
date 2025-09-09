@@ -5,12 +5,8 @@ import {
 	StyleSheet,
 	TouchableOpacity,
 	ActivityIndicator,
-	Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
-const { width } = Dimensions.get('window');
-const LIST_ITEM_WIDTH = width - 48;
 
 type RecurringExpenseCardProps = {
 	vendor: string;
@@ -52,35 +48,70 @@ const RecurringExpenseCard: React.FC<RecurringExpenseCardProps> = ({
 	}
 
 	return (
-		<View style={styles.listItem}>
+		<View style={[styles.listItem, isPaid && styles.paidItem]}>
 			<View style={styles.listItemHeader}>
 				<View style={[styles.iconWrapper, { backgroundColor: color + '20' }]}>
 					<Ionicons name={iconName} size={24} color={color} />
 				</View>
 				<View style={styles.vendorAndAmount}>
-					<Text style={styles.vendor}>{vendor}</Text>
-					<Text style={styles.amount}>${amount.toFixed(2)}</Text>
+					<Text style={[styles.vendor, isPaid && styles.paidText]}>
+						{vendor}
+					</Text>
+					<Text style={[styles.amount, isPaid && styles.paidText]}>
+						${amount.toFixed(2)}
+					</Text>
 				</View>
 				<View style={styles.rightSection}>
-					<View style={[styles.chip, { backgroundColor: chipColor }]}>
-						<Text style={[styles.chipText, { color: chipText }]}>
-							{dueInDays}d
-						</Text>
-					</View>
+					{isPaid ? (
+						<View style={styles.paidChip}>
+							<Ionicons name="checkmark-circle" size={12} color="#4CAF50" />
+							<Text style={styles.paidChipText}>Paid</Text>
+						</View>
+					) : (
+						<>
+							<View style={[styles.chip, { backgroundColor: chipColor }]}>
+								<Text style={[styles.chipText, { color: chipText }]}>
+									{dueInDays}d
+								</Text>
+							</View>
+							{onPressMarkPaid && (
+								<TouchableOpacity
+									style={[
+										styles.quickActionButton,
+										isProcessing && styles.disabledButton,
+									]}
+									onPress={onPressMarkPaid}
+									disabled={isProcessing}
+								>
+									{isProcessing ? (
+										<ActivityIndicator size="small" color="#4CAF50" />
+									) : (
+										<Ionicons name="checkmark" size={16} color="#4CAF50" />
+									)}
+								</TouchableOpacity>
+							)}
+						</>
+					)}
 					<TouchableOpacity
-						style={styles.optionsButton}
+						style={[
+							styles.optionsButton,
+							isProcessing && styles.disabledButton,
+						]}
 						onPress={() => {
-							// Show options menu
-							if (isPaid) {
-								onPressEdit?.();
-							} else {
-								// Show options for unpaid expenses
-								onPressMarkPaid?.();
-							}
+							// Always call onPressEdit for options menu - parent handles the logic
+							onPressEdit?.();
 						}}
 						disabled={isProcessing}
 					>
-						<Ionicons name="ellipsis-horizontal" size={16} color="#757575" />
+						{isProcessing ? (
+							<ActivityIndicator size="small" color="#757575" />
+						) : (
+							<Ionicons
+								name="ellipsis-horizontal"
+								size={16}
+								color={isProcessing ? '#ccc' : '#757575'}
+							/>
+						)}
 					</TouchableOpacity>
 				</View>
 			</View>
@@ -88,9 +119,13 @@ const RecurringExpenseCard: React.FC<RecurringExpenseCardProps> = ({
 			<View style={styles.metaRow}>
 				<View style={styles.dateRow}>
 					<Ionicons name="calendar-outline" size={12} color="#757575" />
-					<Text style={styles.metaText}>{nextDueDate}</Text>
+					<Text style={[styles.metaText, isPaid && styles.paidMetaText]}>
+						{nextDueDate}
+					</Text>
 				</View>
-				<Text style={styles.frequency}>{frequency}</Text>
+				<Text style={[styles.frequency, isPaid && styles.paidMetaText]}>
+					{frequency}
+				</Text>
 			</View>
 			<View style={styles.listItemDivider} />
 		</View>
@@ -179,6 +214,41 @@ const styles = StyleSheet.create({
 		height: 24,
 		justifyContent: 'center',
 		alignItems: 'center',
+	},
+	disabledButton: {
+		opacity: 0.5,
+	},
+	quickActionButton: {
+		width: 24,
+		height: 24,
+		borderRadius: 12,
+		backgroundColor: '#E8F5E9',
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	paidItem: {
+		opacity: 0.7,
+	},
+	paidText: {
+		textDecorationLine: 'line-through',
+		color: '#9E9E9E',
+	},
+	paidChip: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#E8F5E9',
+		borderRadius: 12,
+		paddingVertical: 2,
+		paddingHorizontal: 6,
+		gap: 4,
+	},
+	paidChipText: {
+		fontSize: 10,
+		fontWeight: '600',
+		color: '#4CAF50',
+	},
+	paidMetaText: {
+		color: '#9E9E9E',
 	},
 });
 

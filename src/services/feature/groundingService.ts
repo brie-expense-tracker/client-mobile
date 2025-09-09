@@ -1,4 +1,4 @@
-import { Budget, Goal, Transaction } from '../../types';
+import { Budget, Goal, Transaction, RecurringExpense } from '../../types';
 
 export type Intent =
 	| 'GET_BALANCE'
@@ -22,10 +22,12 @@ export interface FinancialContext {
 	budgets: Budget[];
 	goals: Goal[];
 	transactions: Transaction[];
+	recurringExpenses?: RecurringExpense[];
 	userProfile?: {
 		monthlyIncome?: number;
 		financialGoal?: string;
 		riskProfile?: string;
+		currentBalance?: number;
 	};
 }
 
@@ -92,19 +94,74 @@ export class GroundingService {
 		this.context = context;
 	}
 
+	private validateInput(
+		input: any,
+		requiredFields: string[]
+	): { isValid: boolean; error?: string } {
+		if (!input || typeof input !== 'object') {
+			return { isValid: false, error: 'Input must be an object' };
+		}
+
+		for (const field of requiredFields) {
+			if (
+				!(field in input) ||
+				input[field] === undefined ||
+				input[field] === null
+			) {
+				return { isValid: false, error: `Missing required field: ${field}` };
+			}
+		}
+
+		return { isValid: true };
+	}
+
+	private validateAmount(amount: any): {
+		isValid: boolean;
+		error?: string;
+		value?: number;
+	} {
+		if (typeof amount !== 'number' || isNaN(amount)) {
+			return { isValid: false, error: 'Amount must be a valid number' };
+		}
+
+		if (amount < 0) {
+			return { isValid: false, error: 'Amount cannot be negative' };
+		}
+
+		return { isValid: true, value: amount };
+	}
+
 	async getBalance(): Promise<GroundedResponse> {
 		try {
-			const totalBalance = this.context.userProfile?.monthlyIncome || 0;
-			const totalSpent = this.context.transactions.reduce(
-				(sum, t) => sum + (t.amount || 0),
-				0
-			);
-			const availableBalance = totalBalance - totalSpent;
+			// Use actual balance if available, otherwise calculate from transactions
+			const currentBalance = this.context.userProfile?.currentBalance;
+			let totalIncome = 0;
+			let totalSpent = 0;
+			let availableBalance = 0;
+
+			if (currentBalance !== undefined) {
+				availableBalance = currentBalance;
+				// Calculate income and expenses for context
+				totalIncome = this.context.transactions
+					.filter((t) => t.type === 'income')
+					.reduce((sum, t) => sum + (t.amount || 0), 0);
+				totalSpent = this.context.transactions
+					.filter((t) => t.type === 'expense')
+					.reduce((sum, t) => sum + (t.amount || 0), 0);
+			} else {
+				// Fallback to income-based calculation
+				totalIncome = this.context.userProfile?.monthlyIncome || 0;
+				totalSpent = this.context.transactions
+					.filter((t) => t.type === 'expense')
+					.reduce((sum, t) => sum + (t.amount || 0), 0);
+				availableBalance = totalIncome - totalSpent;
+			}
 
 			return {
 				type: 'data',
 				payload: {
-					totalIncome: totalBalance,
+					currentBalance: availableBalance,
+					totalIncome,
 					totalSpent,
 					availableBalance,
 					currency: 'USD',
@@ -112,6 +169,7 @@ export class GroundingService {
 				confidence: 0.95,
 			};
 		} catch (error) {
+			console.error('Error getting balance:', error);
 			return {
 				type: 'fallback',
 				payload: null,
@@ -161,6 +219,7 @@ export class GroundingService {
 				confidence: 0.9,
 			};
 		} catch (error) {
+			console.error('Error getting budget status:', error);
 			return {
 				type: 'fallback',
 				payload: null,
@@ -171,43 +230,73 @@ export class GroundingService {
 
 	async listSubscriptions(): Promise<GroundedResponse> {
 		try {
-			// Find recurring transactions (simplified heuristic)
-			const recurringTransactions = this.context.transactions
-				.filter((t) => {
-					// Simple heuristic: transactions with same amount and category in recent months
-					const recentTransactions = this.context.transactions.filter(
-						(rt) =>
-							rt.category === t.category &&
-							rt.amount === t.amount &&
-							rt.id !== t.id
-					);
-					return recentTransactions.length > 0;
-				})
-				.map((t) => ({
-					name: t.category || 'Unknown',
-					amount: t.amount,
-					lastDate: t.date,
-					category: t.category,
-				}));
+			let subscriptions: {
+				name: string;
+				amount: number;
+				lastDate: Date;
+				category: string;
+				frequency?: string;
+				isActive?: boolean;
+			}[] = [];
 
-			// Remove duplicates
-			const uniqueSubscriptions = recurringTransactions.filter(
-				(item, index, self) =>
-					index === self.findIndex((t) => t.name === item.name)
-			);
+			// First, use explicit recurring expenses if available
+			if (
+				this.context.recurringExpenses &&
+				this.context.recurringExpenses.length > 0
+			) {
+				subscriptions = this.context.recurringExpenses
+					.filter((re) => re.isActive)
+					.map((re) => ({
+						name: re.name,
+						amount: re.amount,
+						lastDate: re.lastPaid || re.nextDue,
+						category: re.category,
+						frequency: re.frequency,
+						isActive: re.isActive,
+					}));
+			} else {
+				// Fallback: Find recurring transactions using heuristics
+				const recurringTransactions = this.context.transactions
+					.filter((t) => {
+						// Simple heuristic: transactions with same amount and category in recent months
+						const recentTransactions = this.context.transactions.filter(
+							(rt) =>
+								rt.category === t.category &&
+								rt.amount === t.amount &&
+								rt.id !== t.id &&
+								Math.abs(
+									new Date(rt.date).getTime() - new Date(t.date).getTime()
+								) <
+									45 * 24 * 60 * 60 * 1000 // Within 45 days
+						);
+						return recentTransactions.length > 0;
+					})
+					.map((t) => ({
+						name: t.category || 'Unknown',
+						amount: t.amount,
+						lastDate: t.date,
+						category: t.category || 'Unknown',
+						frequency: 'monthly', // Default assumption
+						isActive: true,
+					}));
+
+				// Remove duplicates
+				subscriptions = recurringTransactions.filter(
+					(item, index, self) =>
+						index === self.findIndex((t) => t.name === item.name)
+				);
+			}
 
 			return {
 				type: 'data',
 				payload: {
-					subscriptions: uniqueSubscriptions,
-					totalMonthly: uniqueSubscriptions.reduce(
-						(sum, s) => sum + s.amount,
-						0
-					),
+					subscriptions,
+					totalMonthly: subscriptions.reduce((sum, s) => sum + s.amount, 0),
 				},
-				confidence: 0.8,
+				confidence: this.context.recurringExpenses ? 0.95 : 0.8,
 			};
 		} catch (error) {
+			console.error('Error listing subscriptions:', error);
 			return {
 				type: 'fallback',
 				payload: null,
@@ -248,6 +337,7 @@ export class GroundingService {
 				confidence: 0.85,
 			};
 		} catch (error) {
+			console.error('Error getting goal progress:', error);
 			return {
 				type: 'fallback',
 				payload: null,
@@ -285,6 +375,7 @@ export class GroundingService {
 				confidence: 0.9,
 			};
 		} catch (error) {
+			console.error('Error getting spending breakdown:', error);
 			return {
 				type: 'fallback',
 				payload: null,
@@ -333,6 +424,7 @@ export class GroundingService {
 				confidence: confidence,
 			};
 		} catch (error) {
+			console.error('Error forecasting spend:', error);
 			return {
 				type: 'fallback',
 				payload: null,
@@ -341,11 +433,144 @@ export class GroundingService {
 		}
 	}
 
+	async createBudget(
+		name: string,
+		amount: number,
+		period: 'weekly' | 'monthly' = 'monthly',
+		categories?: string[]
+	): Promise<GroundedResponse> {
+		try {
+			// Validate inputs
+			if (!name || name.trim().length === 0) {
+				return {
+					type: 'fallback',
+					payload: { error: 'Budget name is required' },
+					confidence: 0,
+				};
+			}
+
+			if (amount <= 0) {
+				return {
+					type: 'fallback',
+					payload: { error: 'Budget amount must be greater than 0' },
+					confidence: 0,
+				};
+			}
+
+			// Check if budget with same name already exists
+			const existingBudget = this.context.budgets.find(
+				(b) => b.name.toLowerCase() === name.toLowerCase()
+			);
+
+			if (existingBudget) {
+				return {
+					type: 'fallback',
+					payload: { error: 'Budget with this name already exists' },
+					confidence: 0,
+				};
+			}
+
+			// Create new budget object
+			const newBudget: Budget = {
+				id: `budget_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+				name: name.trim(),
+				amount,
+				spent: 0,
+				period,
+				utilization: 0,
+				createdAt: new Date(),
+				updatedAt: new Date(),
+				categories: categories || [],
+				shouldAlert: true,
+				spentPercentage: 0,
+			};
+
+			// Calculate current spending for this budget's categories
+			if (categories && categories.length > 0) {
+				const currentSpending = this.context.transactions
+					.filter(
+						(t) =>
+							t.type === 'expense' &&
+							t.category &&
+							categories.includes(t.category)
+					)
+					.reduce((sum, t) => sum + (t.amount || 0), 0);
+
+				newBudget.spent = currentSpending;
+				newBudget.utilization = (currentSpending / amount) * 100;
+				newBudget.spentPercentage = newBudget.utilization;
+			}
+
+			return {
+				type: 'data',
+				payload: {
+					budget: newBudget,
+					message: `Budget "${name}" created successfully`,
+					recommendations: this.getBudgetRecommendations(newBudget),
+				},
+				confidence: 0.9,
+			};
+		} catch (error) {
+			console.error('Error creating budget:', error);
+			return {
+				type: 'fallback',
+				payload: { error: 'Failed to create budget' },
+				confidence: 0,
+			};
+		}
+	}
+
+	private getBudgetRecommendations(budget: Budget): string[] {
+		const recommendations: string[] = [];
+
+		if (budget.amount > 1000) {
+			recommendations.push(
+				'Consider breaking this large budget into smaller, more manageable categories'
+			);
+		}
+
+		if (budget.period === 'weekly' && budget.amount > 500) {
+			recommendations.push(
+				'Weekly budget seems high - consider if this should be monthly'
+			);
+		}
+
+		if (budget.categories && budget.categories.length === 0) {
+			recommendations.push('Add specific categories to better track spending');
+		}
+
+		return recommendations;
+	}
+
 	async categorizeTransaction(
 		description: string,
 		amount: number
 	): Promise<GroundedResponse> {
 		try {
+			// Validate inputs
+			if (
+				!description ||
+				typeof description !== 'string' ||
+				description.trim().length === 0
+			) {
+				return {
+					type: 'fallback',
+					payload: {
+						error: 'Description is required and must be a non-empty string',
+					},
+					confidence: 0,
+				};
+			}
+
+			const amountValidation = this.validateAmount(amount);
+			if (!amountValidation.isValid) {
+				return {
+					type: 'fallback',
+					payload: { error: amountValidation.error },
+					confidence: 0,
+				};
+			}
+
 			// Simple rule-based categorization
 			const rules = [
 				{
@@ -399,6 +624,7 @@ export class GroundingService {
 				confidence: bestMatch.confidence,
 			};
 		} catch (error) {
+			console.error('Error categorizing transaction:', error);
 			return {
 				type: 'fallback',
 				payload: null,
@@ -432,24 +658,55 @@ export class GroundingService {
 					return await this.forecastSpend();
 
 				case 'CATEGORIZE_TX':
-					if (input?.description && input?.amount) {
-						return await this.categorizeTransaction(
-							input.description,
-							input.amount
-						);
+					const validation = this.validateInput(input, [
+						'description',
+						'amount',
+					]);
+					if (!validation.isValid) {
+						return {
+							type: 'fallback',
+							payload: { error: validation.error },
+							confidence: 0,
+						};
 					}
-					return null;
+					return await this.categorizeTransaction(
+						input.description,
+						input.amount
+					);
 
 				case 'CREATE_BUDGET':
-					// This requires more complex logic, better to route to LLM
-					return null;
+					const budgetValidation = this.validateInput(input, [
+						'name',
+						'amount',
+					]);
+					if (!budgetValidation.isValid) {
+						return {
+							type: 'fallback',
+							payload: { error: budgetValidation.error },
+							confidence: 0,
+						};
+					}
+					return await this.createBudget(
+						input.name,
+						input.amount,
+						input.period || 'monthly',
+						input.categories
+					);
 
 				default:
-					return null;
+					return {
+						type: 'fallback',
+						payload: null,
+						confidence: 0,
+					};
 			}
 		} catch (error) {
 			console.warn('Grounding service error:', error);
-			return null;
+			return {
+				type: 'fallback',
+				payload: null,
+				confidence: 0,
+			};
 		}
 	}
 }

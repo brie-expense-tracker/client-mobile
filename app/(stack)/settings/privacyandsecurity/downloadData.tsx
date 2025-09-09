@@ -9,13 +9,9 @@ import {
 	ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useProfile } from '../../../../src/context/profileContext';
 import { ApiService } from '../../../../src/services';
 
 export default function DownloadDataScreen() {
-	const router = useRouter();
-	const { profile } = useProfile();
 	const [downloading, setDownloading] = useState(false);
 
 	const handleDownloadData = async () => {
@@ -119,7 +115,7 @@ export default function DownloadDataScreen() {
 			</View>
 
 			<View style={styles.dataTypesSection}>
-				<Text style={styles.sectionTitle}>What's Included</Text>
+				<Text style={styles.sectionTitle}>What&apos;s Included</Text>
 				{dataTypes.map((type, index) => (
 					<View key={index} style={styles.dataTypeItem}>
 						<Ionicons
@@ -155,8 +151,8 @@ export default function DownloadDataScreen() {
 				</TouchableOpacity>
 
 				<Text style={styles.downloadNote}>
-					You'll receive an email with a secure download link once your data is
-					ready.
+					You&apos;ll receive an email with a secure download link once your
+					data is ready.
 				</Text>
 			</View>
 

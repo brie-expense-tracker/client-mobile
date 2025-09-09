@@ -15,6 +15,8 @@ import {
 	KeyboardAvoidingView,
 	Platform,
 	ActivityIndicator,
+	Modal,
+	TouchableOpacity,
 } from 'react-native';
 import { RectButton, BorderlessButton } from 'react-native-gesture-handler';
 import { useForm, Controller } from 'react-hook-form';
@@ -27,13 +29,14 @@ import { useGoal, Goal } from '../../../src/context/goalContext';
 import { navigateToGoalsWithModal } from '../../../src/utils/navigationUtils';
 
 interface TransactionFormData {
-	type: 'income';
+	type: 'income' | 'expense';
 	description: string;
 	amount: string;
 	goals: Goal[];
 	date: string;
 	target?: string;
 	targetModel?: 'Budget' | 'Goal';
+	category?: string;
 }
 
 // Utility function to get local date in ISO format
@@ -47,16 +50,58 @@ const getLocalIsoDate = (): string => {
 
 //
 //  FUNCTIONS START======f=========================================
+// Transaction categories for expenses
+const EXPENSE_CATEGORIES = [
+	{
+		id: 'food',
+		name: 'Food & Dining',
+		icon: 'restaurant-outline',
+		color: '#FF6B6B',
+	},
+	{
+		id: 'transport',
+		name: 'Transportation',
+		icon: 'car-outline',
+		color: '#4ECDC4',
+	},
+	{
+		id: 'entertainment',
+		name: 'Entertainment',
+		icon: 'game-controller-outline',
+		color: '#45B7D1',
+	},
+	{ id: 'shopping', name: 'Shopping', icon: 'bag-outline', color: '#96CEB4' },
+	{
+		id: 'health',
+		name: 'Health & Fitness',
+		icon: 'fitness-outline',
+		color: '#FFEAA7',
+	},
+	{
+		id: 'bills',
+		name: 'Bills & Utilities',
+		icon: 'receipt-outline',
+		color: '#DDA0DD',
+	},
+	{
+		id: 'other',
+		name: 'Other',
+		icon: 'ellipsis-horizontal-outline',
+		color: '#95A5A6',
+	},
+];
+
 const AddTransactionScreen = () => {
 	const router = useRouter();
 	const amountInputRef = useRef<TextInput>(null);
 	const [selectedGoals, setSelectedGoals] = useState<Goal[]>([]);
 	const [resetNumberPad, setResetNumberPad] = useState(false);
+	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [showDatePicker, setShowDatePicker] = useState(false);
 	const [fontsLoaded] = useFonts({
 		...Ionicons.font,
 	});
-	const { transactions, isLoading, addTransaction } =
-		useContext(TransactionContext);
+	const { addTransaction } = useContext(TransactionContext);
 	const { goals, isLoading: goalsLoading } = useGoal();
 
 	const {
@@ -65,6 +110,7 @@ const AddTransactionScreen = () => {
 		setValue,
 		watch,
 		formState: { errors },
+		clearErrors,
 	} = useForm<TransactionFormData>({
 		defaultValues: {
 			type: 'income',
@@ -74,6 +120,7 @@ const AddTransactionScreen = () => {
 			date: getLocalIsoDate(),
 			target: undefined,
 			targetModel: undefined,
+			category: undefined,
 		},
 		mode: 'onChange',
 	});
@@ -158,7 +205,24 @@ const AddTransactionScreen = () => {
 
 	const onSubmit = async (data: TransactionFormData) => {
 		console.log('[Transaction] onSubmit called with data:', data);
+
+		// Clear any previous errors
+		clearErrors();
+
+		// Validate required fields
+		if (!data.amount || data.amount.trim() === '') {
+			Alert.alert('Error', 'Please enter an amount');
+			return;
+		}
+
+		if (!data.description || data.description.trim() === '') {
+			Alert.alert('Error', 'Please enter a description');
+			return;
+		}
+
 		try {
+			setIsSubmitting(true);
+
 			// Validate amount
 			const amount = parseFloat(data.amount);
 			console.log('[Transaction] Parsed amount:', amount);
@@ -170,11 +234,16 @@ const AddTransactionScreen = () => {
 
 			// Create transaction data
 			const transactionData: any = {
-				description: data.description,
-				amount: amount,
+				description: data.description.trim(),
+				amount: data.type === 'expense' ? -Math.abs(amount) : Math.abs(amount), // Negative for expenses
 				date: data.date,
 				type: data.type,
 			};
+
+			// Add category for expenses
+			if (data.type === 'expense' && data.category) {
+				transactionData.category = data.category;
+			}
 
 			// If a goal is selected, associate with that goal
 			if (selectedGoals.length > 0) {
@@ -182,7 +251,6 @@ const AddTransactionScreen = () => {
 				transactionData.targetModel = 'Goal';
 			} else {
 				// No goal selected - this will be categorized as "Other"
-				// Don't set target or targetModel, which means it's an "Other" transaction
 				console.log(
 					'[Transaction] Creating transaction without specific goal target'
 				);
@@ -193,27 +261,45 @@ const AddTransactionScreen = () => {
 
 			console.log('Transaction saved successfully!');
 
-			// Reset form values
-			setValue('description', '');
-			setValue('amount', ''); // Reset to empty string to show placeholder
-			setValue('goals', []);
-			setValue('date', getLocalIsoDate());
+			// Show success feedback
+			Alert.alert(
+				'Success',
+				`${
+					data.type === 'income' ? 'Income' : 'Expense'
+				} transaction saved successfully!`,
+				[
+					{
+						text: 'OK',
+						onPress: () => {
+							// Reset form values
+							setValue('description', '');
+							setValue('amount', '');
+							setValue('goals', []);
+							setValue('date', getLocalIsoDate());
+							setValue('type', 'income');
+							setValue('category', undefined);
 
-			// Reset selected goals
-			setSelectedGoals([]);
+							// Reset selected goals
+							setSelectedGoals([]);
 
-			// Reset NumberPad
-			setResetNumberPad(true);
+							// Reset NumberPad
+							setResetNumberPad(true);
 
-			// Navigate back to the previous screen
-			if (router.canGoBack()) {
-				router.back();
-			} else {
-				router.replace('/(tabs)/dashboard');
-			}
+							// Navigate back to the previous screen
+							if (router.canGoBack()) {
+								router.back();
+							} else {
+								router.replace('/(tabs)/dashboard');
+							}
+						},
+					},
+				]
+			);
 		} catch (error) {
 			console.error('Error saving transaction:', error);
-			Alert.alert('Error', 'Failed to save transaction');
+			Alert.alert('Error', 'Failed to save transaction. Please try again.');
+		} finally {
+			setIsSubmitting(false);
 		}
 	};
 
@@ -226,6 +312,82 @@ const AddTransactionScreen = () => {
 		setValue('goals', newSelectedGoals);
 	};
 
+	const selectedTransactionType = watch('type');
+	const selectedCategory = watch('category');
+	const selectedDate = watch('date');
+
+	// Format date for display
+	const formatDate = (dateString: string) => {
+		const date = new Date(dateString);
+		return date.toLocaleDateString('en-US', {
+			weekday: 'short',
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric',
+		});
+	};
+
+	// Date picker component
+	const DatePickerModal = () => (
+		<Modal
+			visible={showDatePicker}
+			transparent={true}
+			animationType="slide"
+			onRequestClose={() => setShowDatePicker(false)}
+		>
+			<View style={styles.datePickerOverlay}>
+				<View style={styles.datePickerContainer}>
+					<View style={styles.datePickerHeader}>
+						<Text style={styles.datePickerTitle}>Select Date</Text>
+						<TouchableOpacity
+							onPress={() => setShowDatePicker(false)}
+							style={styles.datePickerCloseButton}
+						>
+							<Ionicons name="close" size={24} color="#666" />
+						</TouchableOpacity>
+					</View>
+
+					<ScrollView style={styles.datePickerContent}>
+						{/* Generate date options for the last 30 days and next 7 days */}
+						{Array.from({ length: 37 }, (_, i) => {
+							const date = new Date();
+							date.setDate(date.getDate() - 30 + i);
+							const dateString = date.toISOString().split('T')[0];
+							const isToday = i === 30;
+							const isSelected = selectedDate === dateString;
+
+							return (
+								<TouchableOpacity
+									key={dateString}
+									style={[
+										styles.dateOption,
+										isSelected && styles.dateOptionSelected,
+										isToday && styles.dateOptionToday,
+									]}
+									onPress={() => {
+										setValue('date', dateString);
+										setShowDatePicker(false);
+									}}
+								>
+									<Text
+										style={[
+											styles.dateOptionText,
+											isSelected && styles.dateOptionTextSelected,
+											isToday && styles.dateOptionTextToday,
+										]}
+									>
+										{formatDate(dateString)}
+										{isToday && ' (Today)'}
+									</Text>
+								</TouchableOpacity>
+							);
+						})}
+					</ScrollView>
+				</View>
+			</View>
+		</Modal>
+	);
+
 	//
 	// MAIN COMPONENT===============================================
 	return (
@@ -233,6 +395,66 @@ const AddTransactionScreen = () => {
 			<SafeAreaView style={styles.safeArea} edges={['top']}>
 				<View style={styles.mainContainer}>
 					<View style={styles.topContainer}>
+						{/* Transaction Type Selector */}
+						<View style={styles.transactionTypeContainer}>
+							<Text style={styles.sectionLabel}>Transaction Type</Text>
+							<View style={styles.transactionTypeButtons}>
+								<RectButton
+									style={[
+										styles.transactionTypeButton,
+										selectedTransactionType === 'income' &&
+											styles.transactionTypeButtonActive,
+									]}
+									onPress={() => {
+										setValue('type', 'income');
+										setValue('category', undefined); // Clear category when switching to income
+									}}
+								>
+									<Ionicons
+										name="trending-up-outline"
+										size={20}
+										color={
+											selectedTransactionType === 'income' ? '#fff' : '#00a2ff'
+										}
+									/>
+									<Text
+										style={[
+											styles.transactionTypeButtonText,
+											selectedTransactionType === 'income' &&
+												styles.transactionTypeButtonTextActive,
+										]}
+									>
+										Income
+									</Text>
+								</RectButton>
+								<RectButton
+									style={[
+										styles.transactionTypeButton,
+										selectedTransactionType === 'expense' &&
+											styles.transactionTypeButtonActive,
+									]}
+									onPress={() => setValue('type', 'expense')}
+								>
+									<Ionicons
+										name="trending-down-outline"
+										size={20}
+										color={
+											selectedTransactionType === 'expense' ? '#fff' : '#FF6B6B'
+										}
+									/>
+									<Text
+										style={[
+											styles.transactionTypeButtonText,
+											selectedTransactionType === 'expense' &&
+												styles.transactionTypeButtonTextActive,
+										]}
+									>
+										Expense
+									</Text>
+								</RectButton>
+							</View>
+						</View>
+
 						<View style={styles.inputAmountContainer}>
 							<Ionicons
 								name="logo-usd"
@@ -256,9 +478,67 @@ const AddTransactionScreen = () => {
 										value={value}
 										onChangeText={onChange}
 										showSoftInputOnFocus={false}
+										accessibilityLabel="Amount input"
+										accessibilityHint="Enter the transaction amount"
 									/>
 								)}
 							/>
+						</View>
+
+						{/* Category Selector for Expenses */}
+						{selectedTransactionType === 'expense' && (
+							<View style={styles.carouselContainer}>
+								<Text style={styles.carouselLabel}>Category</Text>
+								<ScrollView horizontal showsHorizontalScrollIndicator={false}>
+									{EXPENSE_CATEGORIES.map((category) => (
+										<RectButton
+											key={category.id}
+											onPress={() => setValue('category', category.id)}
+											style={[
+												styles.carouselTextWrapper,
+												selectedCategory === category.id && styles.selectedTag,
+											]}
+										>
+											<Ionicons
+												name={category.icon as keyof typeof Ionicons.glyphMap}
+												size={16}
+												color={
+													selectedCategory === category.id
+														? 'white'
+														: category.color
+												}
+												style={styles.carouselIcon}
+											/>
+											<Text
+												style={[
+													styles.carouselText,
+													selectedCategory === category.id &&
+														styles.selectedTagText,
+												]}
+											>
+												{category.name}
+											</Text>
+										</RectButton>
+									))}
+								</ScrollView>
+							</View>
+						)}
+
+						{/* Date Selector */}
+						<View style={styles.dateSelectorContainer}>
+							<Text style={styles.sectionLabel}>Date</Text>
+							<TouchableOpacity
+								style={styles.dateSelectorButton}
+								onPress={() => setShowDatePicker(true)}
+								accessibilityLabel="Select transaction date"
+								accessibilityHint="Double tap to open date picker"
+							>
+								<Ionicons name="calendar-outline" size={20} color="#00a2ff" />
+								<Text style={styles.dateSelectorText}>
+									{formatDate(selectedDate)}
+								</Text>
+								<Ionicons name="chevron-down" size={16} color="#666" />
+							</TouchableOpacity>
 						</View>
 
 						{/* Goals Carousel */}
@@ -317,34 +597,63 @@ const AddTransactionScreen = () => {
 									field: { value: string; onChange: (value: string) => void };
 								}) => (
 									<TextInput
-										style={styles.inputDescription}
+										style={[
+											styles.inputDescription,
+											errors.description && styles.inputError,
+										]}
 										placeholder="What's this for?"
 										placeholderTextColor={'#a3a3a3'}
 										value={value}
 										onChangeText={onChange}
+										accessibilityLabel="Transaction description"
+										accessibilityHint="Enter a description for this transaction"
 									/>
 								)}
 							/>
+							{errors.description && (
+								<Text style={styles.errorText}>
+									{errors.description.message}
+								</Text>
+							)}
 						</KeyboardAvoidingView>
 
 						<View style={styles.transactionButtonsContainer}>
 							<View style={styles.transactionButtonContainer}>
 								<RectButton
-									style={styles.transactionButton}
+									style={[
+										styles.transactionButton,
+										isSubmitting && styles.transactionButtonDisabled,
+									]}
 									onPress={() => {
-										console.log('[Transaction] Made button pressed');
+										if (isSubmitting) return;
+										console.log('[Transaction] Submit button pressed');
 										console.log('[Transaction] Current form values:', {
 											amount: watch('amount'),
 											description: watch('description'),
 											type: watch('type'),
 											date: watch('date'),
+											category: watch('category'),
 										});
 										console.log('[Transaction] Form errors:', errors);
-										setValue('type', 'income');
 										handleSubmit(onSubmit)();
 									}}
+									accessibilityLabel={`Submit ${selectedTransactionType} transaction`}
+									accessibilityHint="Double tap to save the transaction"
 								>
-									<Text style={styles.transactionButtonText}>Made</Text>
+									{isSubmitting ? (
+										<>
+											<ActivityIndicator size="small" color="#fff" />
+											<Text style={styles.transactionButtonText}>
+												Saving...
+											</Text>
+										</>
+									) : (
+										<Text style={styles.transactionButtonText}>
+											{selectedTransactionType === 'income'
+												? 'Add Income'
+												: 'Add Expense'}
+										</Text>
+									)}
 								</RectButton>
 							</View>
 						</View>
@@ -358,6 +667,7 @@ const AddTransactionScreen = () => {
 					</View>
 				</View>
 			</SafeAreaView>
+			<DatePickerModal />
 		</View>
 	);
 };
@@ -715,6 +1025,136 @@ const styles = StyleSheet.create({
 	errorButtonText: {
 		color: '#FFFFFF',
 		fontSize: 16,
+		fontWeight: '600',
+	},
+	// New styles for transaction type selector
+	transactionTypeContainer: {
+		marginBottom: 20,
+	},
+	sectionLabel: {
+		fontSize: 16,
+		fontWeight: '600',
+		marginBottom: 12,
+		color: '#212121',
+	},
+	transactionTypeButtons: {
+		flexDirection: 'row',
+		gap: 12,
+	},
+	transactionTypeButton: {
+		flex: 1,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingVertical: 12,
+		paddingHorizontal: 16,
+		borderRadius: 12,
+		borderWidth: 2,
+		borderColor: '#e0e0e0',
+		backgroundColor: '#fff',
+		gap: 8,
+	},
+	transactionTypeButtonActive: {
+		backgroundColor: '#00a2ff',
+		borderColor: '#00a2ff',
+	},
+	transactionTypeButtonText: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#00a2ff',
+	},
+	transactionTypeButtonTextActive: {
+		color: '#fff',
+	},
+	// New styles for error handling
+	inputError: {
+		borderColor: '#FF6B6B',
+		borderWidth: 2,
+	},
+	errorText: {
+		color: '#FF6B6B',
+		fontSize: 14,
+		marginTop: 4,
+		marginLeft: 4,
+	},
+	transactionButtonDisabled: {
+		backgroundColor: '#CCC',
+		opacity: 0.7,
+	},
+	// Date picker styles
+	dateSelectorContainer: {
+		marginBottom: 16,
+	},
+	dateSelectorButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingVertical: 12,
+		paddingHorizontal: 16,
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#e0e0e0',
+		backgroundColor: '#fff',
+		gap: 12,
+	},
+	dateSelectorText: {
+		flex: 1,
+		fontSize: 16,
+		color: '#212121',
+		fontWeight: '500',
+	},
+	datePickerOverlay: {
+		flex: 1,
+		backgroundColor: 'rgba(0, 0, 0, 0.5)',
+		justifyContent: 'flex-end',
+	},
+	datePickerContainer: {
+		backgroundColor: '#fff',
+		borderTopLeftRadius: 20,
+		borderTopRightRadius: 20,
+		maxHeight: '70%',
+	},
+	datePickerHeader: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		paddingHorizontal: 20,
+		paddingVertical: 16,
+		borderBottomWidth: 1,
+		borderBottomColor: '#e0e0e0',
+	},
+	datePickerTitle: {
+		fontSize: 18,
+		fontWeight: '600',
+		color: '#212121',
+	},
+	datePickerCloseButton: {
+		padding: 4,
+	},
+	datePickerContent: {
+		maxHeight: 400,
+	},
+	dateOption: {
+		paddingVertical: 16,
+		paddingHorizontal: 20,
+		borderBottomWidth: 1,
+		borderBottomColor: '#f0f0f0',
+	},
+	dateOptionSelected: {
+		backgroundColor: '#f0f8ff',
+	},
+	dateOptionToday: {
+		backgroundColor: '#fff3cd',
+	},
+	dateOptionText: {
+		fontSize: 16,
+		color: '#212121',
+	},
+	dateOptionTextSelected: {
+		color: '#00a2ff',
+		fontWeight: '600',
+	},
+	dateOptionTextToday: {
+		color: '#856404',
 		fontWeight: '600',
 	},
 });

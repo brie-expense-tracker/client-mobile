@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
 	View,
 	Text,
@@ -9,14 +9,11 @@ import {
 	Alert,
 	ActivityIndicator,
 	SafeAreaView,
-	Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useGoals } from '../../src/hooks/useGoals';
-
-const { width } = Dimensions.get('window');
 
 // Popular goal icons
 const goalIcons: (keyof typeof Ionicons.glyphMap)[] = [
@@ -121,9 +118,12 @@ const COLOR_PALETTE = {
 };
 
 const AddGoalScreen: React.FC = () => {
+	const params = useLocalSearchParams();
 	const [name, setName] = useState('');
 	const [target, setTarget] = useState('');
+	const [current, setCurrent] = useState('');
 	const [deadline, setDeadline] = useState('');
+	const [description, setDescription] = useState('');
 	const [icon, setIcon] =
 		useState<keyof typeof Ionicons.glyphMap>('flag-outline');
 	const [color, setColor] = useState(COLOR_PALETTE.blue.base);
@@ -133,8 +133,23 @@ const AddGoalScreen: React.FC = () => {
 	const [showDatePicker, setShowDatePicker] = useState(false);
 	const [selectedDate, setSelectedDate] = useState(new Date());
 	const [loading, setLoading] = useState(false);
+	const [categories, setCategories] = useState<string[]>([]);
+	const [showCategoriesPicker, setShowCategoriesPicker] = useState(false);
 
-	const { addGoal } = useGoals();
+	const { addGoal } = useGoals({ refreshOnFocus: false });
+
+	// Handle pre-filled parameters from AI assistant
+	useEffect(() => {
+		if (params.prefill === 'emergency_fund') {
+			setName((params.name as string) || 'Emergency Fund');
+			setTarget((params.target as string) || '3000');
+			setDeadline((params.deadline as string) || '');
+			setIcon(
+				(params.icon as keyof typeof Ionicons.glyphMap) || 'shield-checkmark'
+			);
+			setColor((params.color as string) || '#10b981');
+		}
+	}, [params]);
 
 	const validateDate = (dateString: string): boolean => {
 		const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -157,19 +172,45 @@ const AddGoalScreen: React.FC = () => {
 			return;
 		}
 
+		const targetValue = parseFloat(target);
+		if (isNaN(targetValue) || targetValue <= 0) {
+			Alert.alert('Error', 'Please enter a valid target amount greater than 0');
+			return;
+		}
+
+		const currentValue = current.trim() ? parseFloat(current) : 0;
+		if (current.trim() && (isNaN(currentValue) || currentValue < 0)) {
+			Alert.alert(
+				'Error',
+				'Please enter a valid current amount (0 or greater)'
+			);
+			return;
+		}
+
+		if (currentValue > targetValue) {
+			Alert.alert(
+				'Error',
+				'Current amount cannot be greater than target amount'
+			);
+			return;
+		}
+
 		setLoading(true);
 		try {
 			await addGoal({
 				name: name.trim(),
-				target: parseFloat(target),
+				target: targetValue,
 				deadline,
 				icon,
 				color,
-				categories: [],
+				categories,
 			});
 
 			Alert.alert('Success', 'Goal added successfully!', [
-				{ text: 'OK', onPress: () => router.back() },
+				{
+					text: 'OK',
+					onPress: () => router.back(),
+				},
 			]);
 		} catch (error) {
 			console.error('[AddGoalScreen] Error saving:', error);
@@ -466,6 +507,95 @@ const AddGoalScreen: React.FC = () => {
 							</View>
 						)}
 					</View>
+
+					{/* Current Amount */}
+					<View style={styles.inputGroup}>
+						<Text style={styles.label}>Current Amount (Optional)</Text>
+						<Text style={styles.subtext}>
+							How much have you already saved towards this goal?
+						</Text>
+						<TextInput
+							style={styles.textInput}
+							value={current}
+							onChangeText={setCurrent}
+							placeholder="e.g., 500"
+							keyboardType="numeric"
+							placeholderTextColor="#999"
+						/>
+					</View>
+
+					{/* Description */}
+					<View style={styles.inputGroup}>
+						<Text style={styles.label}>Description (Optional)</Text>
+						<Text style={styles.subtext}>Add notes about this goal</Text>
+						<TextInput
+							style={[styles.textInput, styles.textArea]}
+							value={description}
+							onChangeText={setDescription}
+							placeholder="e.g., Save for emergency expenses, vacation fund..."
+							placeholderTextColor="#999"
+							multiline
+							numberOfLines={3}
+						/>
+					</View>
+
+					{/* Categories Selection */}
+					<View style={styles.inputGroup}>
+						<Text style={styles.label}>Categories (Optional)</Text>
+						<Text style={styles.subtext}>
+							Add categories to help organize your goals
+						</Text>
+						<TouchableOpacity
+							style={styles.categoriesButton}
+							onPress={() => setShowCategoriesPicker(!showCategoriesPicker)}
+						>
+							<View style={styles.categoriesButtonContent}>
+								<Text style={styles.categoriesButtonText}>
+									{categories.length > 0
+										? `${categories.length} categories selected`
+										: 'Add categories'}
+								</Text>
+								<Ionicons
+									name={showCategoriesPicker ? 'chevron-up' : 'chevron-down'}
+									size={20}
+									color="#757575"
+								/>
+							</View>
+						</TouchableOpacity>
+
+						{showCategoriesPicker && (
+							<View style={styles.categoriesContainer}>
+								<TextInput
+									style={styles.categoryInput}
+									placeholder="Enter category name"
+									placeholderTextColor="#999"
+									onSubmitEditing={(e) => {
+										const category = e.nativeEvent.text.trim();
+										if (category && !categories.includes(category)) {
+											setCategories([...categories, category]);
+											e.nativeEvent.text = '';
+										}
+									}}
+								/>
+								<View style={styles.categoriesList}>
+									{categories.map((category, index) => (
+										<View key={index} style={styles.categoryChip}>
+											<Text style={styles.categoryChipText}>{category}</Text>
+											<TouchableOpacity
+												onPress={() =>
+													setCategories(
+														categories.filter((_, i) => i !== index)
+													)
+												}
+											>
+												<Ionicons name="close" size={16} color="#757575" />
+											</TouchableOpacity>
+										</View>
+									))}
+								</View>
+							</View>
+						)}
+					</View>
 				</View>
 			</ScrollView>
 		</SafeAreaView>
@@ -707,6 +837,63 @@ const styles = StyleSheet.create({
 		borderRadius: 8,
 		justifyContent: 'center',
 		alignItems: 'center',
+	},
+	// Text area styles
+	textArea: {
+		height: 80,
+		textAlignVertical: 'top',
+	},
+	// Categories styles
+	categoriesButton: {
+		backgroundColor: '#F5F5F5',
+		borderRadius: 12,
+		padding: 16,
+	},
+	categoriesButtonContent: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	categoriesButtonText: {
+		fontSize: 16,
+		color: '#212121',
+		flex: 1,
+	},
+	categoriesContainer: {
+		marginTop: 8,
+		padding: 12,
+		backgroundColor: '#F9F9F9',
+		borderRadius: 8,
+	},
+	categoryInput: {
+		borderWidth: 1,
+		borderColor: '#E0E0E0',
+		borderRadius: 8,
+		paddingHorizontal: 12,
+		paddingVertical: 10,
+		fontSize: 16,
+		color: '#0a0a0a',
+		backgroundColor: '#ffffff',
+		marginBottom: 12,
+	},
+	categoriesList: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		gap: 8,
+	},
+	categoryChip: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#E3F2FD',
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		borderRadius: 16,
+		gap: 6,
+	},
+	categoryChipText: {
+		fontSize: 14,
+		color: '#1976D2',
+		fontWeight: '500',
 	},
 });
 

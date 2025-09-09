@@ -7,6 +7,9 @@ import {
 	Image,
 	SafeAreaView,
 	TouchableOpacity,
+	KeyboardAvoidingView,
+	ScrollView,
+	Platform,
 } from 'react-native';
 import React, { useState } from 'react';
 import { router, Stack } from 'expo-router';
@@ -121,152 +124,174 @@ export default function Login() {
 
 	return (
 		<SafeAreaView style={styles.safeAreaContainer}>
-			<View style={styles.mainContainer}>
-				<Image
-					source={require('../../src/assets/images/brie-logos.png')}
-					style={styles.logo}
-					resizeMode="contain"
-				/>
-
-				{/* Demo Mode Banner */}
-				<View style={styles.demoBanner}>
-					<Text style={styles.demoBannerText}>🎯 Demo Mode Available</Text>
-					<Text style={styles.demoBannerSubtext}>
-						Try the app with sample data (60-90 days of transactions, budgets,
-						and goals)
-					</Text>
-				</View>
-
-				<View style={styles.formContainer}>
-					<Text style={styles.title}>Welcome Back</Text>
-
-					{/* Demo Login Button */}
-					<TouchableOpacity
-						style={[styles.demoButton, isDemoMode && styles.demoButtonActive]}
-						onPress={handleDemoLogin}
-						disabled={isLoading}
-					>
-						<Ionicons
-							name="play-circle"
-							size={20}
-							color={isDemoMode ? '#fff' : '#007ACC'}
+			<KeyboardAvoidingView
+				style={styles.keyboardAvoidingView}
+				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+				keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+			>
+				<ScrollView
+					style={styles.scrollView}
+					contentContainerStyle={styles.scrollContent}
+					showsVerticalScrollIndicator={false}
+					keyboardShouldPersistTaps="handled"
+				>
+					<View style={styles.mainContainer}>
+						<Image
+							source={require('../../src/assets/images/brie-logos.png')}
+							style={styles.logo}
+							resizeMode="contain"
 						/>
-						<Text
-							style={[
-								styles.demoButtonText,
-								isDemoMode && styles.demoButtonTextActive,
-							]}
-						>
-							{isDemoMode ? 'Loading Demo...' : 'Try Demo Mode'}
-						</Text>
-					</TouchableOpacity>
 
-					<View style={styles.dividerContainer}>
-						<View style={styles.divider} />
-						<Text style={styles.dividerText}>or sign in with</Text>
-						<View style={styles.divider} />
+						{/* Demo Mode Banner */}
+						<View style={styles.demoBanner}>
+							<Text style={styles.demoBannerText}>🎯 Demo Mode Available</Text>
+							<Text style={styles.demoBannerSubtext}>
+								Try the app with sample data (60-90 days of transactions,
+								budgets, and goals)
+							</Text>
+						</View>
+
+						<View style={styles.formContainer}>
+							<Text style={styles.title}>Welcome Back</Text>
+
+							{/* Demo Login Button */}
+							<TouchableOpacity
+								style={[
+									styles.demoButton,
+									isDemoMode && styles.demoButtonActive,
+								]}
+								onPress={handleDemoLogin}
+								disabled={isLoading}
+							>
+								<Ionicons
+									name="play-circle"
+									size={20}
+									color={isDemoMode ? '#fff' : '#007ACC'}
+								/>
+								<Text
+									style={[
+										styles.demoButtonText,
+										isDemoMode && styles.demoButtonTextActive,
+									]}
+								>
+									{isDemoMode ? 'Loading Demo...' : 'Try Demo Mode'}
+								</Text>
+							</TouchableOpacity>
+
+							<View style={styles.dividerContainer}>
+								<View style={styles.divider} />
+								<Text style={styles.dividerText}>or sign in with</Text>
+								<View style={styles.divider} />
+							</View>
+
+							<Text style={styles.label}>Email</Text>
+							<TextInput
+								style={styles.input}
+								placeholder="Enter your email"
+								placeholderTextColor="#999"
+								value={email}
+								onChangeText={setEmail}
+								keyboardType="email-address"
+								autoCapitalize="none"
+								autoCorrect={false}
+								editable={!isDemoMode}
+							/>
+
+							<Text style={styles.label}>Password</Text>
+							<TextInput
+								style={styles.input}
+								placeholder="Enter your password"
+								placeholderTextColor="#999"
+								value={password}
+								onChangeText={setPassword}
+								secureTextEntry
+								autoCapitalize="none"
+								autoCorrect={false}
+								editable={!isDemoMode}
+							/>
+
+							<RectButton
+								style={[
+									styles.loginButton,
+									(isLoading || isDemoMode) && styles.loginButtonDisabled,
+								]}
+								onPress={handleLogin}
+							>
+								{isLoading ? (
+									<Text style={styles.loginButtonText}>Signing In...</Text>
+								) : (
+									<Text style={styles.loginButtonText}>Sign In</Text>
+								)}
+							</RectButton>
+
+							<View style={styles.dividerContainer}>
+								<View style={styles.divider} />
+								<Text style={styles.dividerText}>or continue with</Text>
+								<View style={styles.divider} />
+							</View>
+
+							<View style={styles.socialButtonsContainer}>
+								<RectButton
+									style={[
+										styles.socialButton,
+										isDemoMode && styles.socialButtonDisabled,
+									]}
+									onPress={() =>
+										Alert.alert(
+											'Coming Soon',
+											'Google Sign In will be available soon!'
+										)
+									}
+								>
+									<Ionicons name="logo-google" size={24} color="#0051ff" />
+									<Text style={styles.socialButtonText}>
+										Continue with Google
+									</Text>
+								</RectButton>
+
+								<RectButton
+									style={[
+										styles.socialButton,
+										isDemoMode && styles.socialButtonDisabled,
+									]}
+									onPress={() =>
+										Alert.alert(
+											'Coming Soon',
+											'Apple Sign In will be available soon!'
+										)
+									}
+								>
+									<Ionicons name="logo-apple" size={24} color="#000000" />
+									<Text style={styles.socialButtonText}>
+										Continue with Apple
+									</Text>
+								</RectButton>
+							</View>
+						</View>
+
+						<View style={styles.signupContainer}>
+							<Text style={styles.signupText}>Don&apos;t have an account?</Text>
+
+							<BorderlessButton
+								onActiveStateChange={setIsPressed}
+								onPress={() => {
+									router.replace('/signup');
+								}}
+							>
+								<Text
+									style={[
+										styles.signupLink,
+										isDemoMode && styles.signupLinkDisabled,
+										isPressed && styles.signupLinkPressed,
+									]}
+								>
+									Sign Up
+								</Text>
+							</BorderlessButton>
+						</View>
 					</View>
-
-					<Text style={styles.label}>Email</Text>
-					<TextInput
-						style={styles.input}
-						placeholder="Enter your email"
-						placeholderTextColor="#999"
-						value={email}
-						onChangeText={setEmail}
-						keyboardType="email-address"
-						autoCapitalize="none"
-						autoCorrect={false}
-						editable={!isDemoMode}
-					/>
-
-					<Text style={styles.label}>Password</Text>
-					<TextInput
-						style={styles.input}
-						placeholder="Enter your password"
-						placeholderTextColor="#999"
-						value={password}
-						onChangeText={setPassword}
-						secureTextEntry
-						autoCapitalize="none"
-						autoCorrect={false}
-						editable={!isDemoMode}
-					/>
-
-					<RectButton
-						style={[
-							styles.loginButton,
-							(isLoading || isDemoMode) && styles.loginButtonDisabled,
-						]}
-						onPress={handleLogin}
-					>
-						{isLoading ? (
-							<Text style={styles.loginButtonText}>Signing In...</Text>
-						) : (
-							<Text style={styles.loginButtonText}>Sign In</Text>
-						)}
-					</RectButton>
-
-					<View style={styles.dividerContainer}>
-						<View style={styles.divider} />
-						<Text style={styles.dividerText}>or continue with</Text>
-						<View style={styles.divider} />
-					</View>
-
-					<View style={styles.socialButtonsContainer}>
-						<RectButton
-							style={[
-								styles.socialButton,
-								isDemoMode && styles.socialButtonDisabled,
-							]}
-							onPress={() =>
-								Alert.alert(
-									'Coming Soon',
-									'Google Sign In will be available soon!'
-								)
-							}
-						>
-							<Ionicons name="logo-google" size={24} color="#0051ff" />
-							<Text style={styles.socialButtonText}>Continue with Google</Text>
-						</RectButton>
-
-						<RectButton
-							style={[
-								styles.socialButton,
-								isDemoMode && styles.socialButtonDisabled,
-							]}
-							onPress={() =>
-								Alert.alert(
-									'Coming Soon',
-									'Apple Sign In will be available soon!'
-								)
-							}
-						>
-							<Ionicons name="logo-apple" size={24} color="#000000" />
-							<Text style={styles.socialButtonText}>Continue with Apple</Text>
-						</RectButton>
-					</View>
-				</View>
-				<View style={styles.signupContainer}>
-					<Text style={styles.signupText}>Don't have an account?</Text>
-
-					<BorderlessButton
-						onActiveStateChange={setIsPressed}
-						onPress={() => {
-							router.replace('/signup');
-						}}
-					>
-						<Text
-							style={[
-								styles.signupLink,
-								isDemoMode && styles.signupLinkDisabled,
-							]}
-						>
-							Sign Up
-						</Text>
-					</BorderlessButton>
-				</View>
-			</View>
+				</ScrollView>
+			</KeyboardAvoidingView>
 
 			<Stack.Screen options={{ headerShown: false }} />
 		</SafeAreaView>
@@ -278,10 +303,20 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: '#fff',
 	},
+	keyboardAvoidingView: {
+		flex: 1,
+	},
+	scrollView: {
+		flex: 1,
+	},
+	scrollContent: {
+		flexGrow: 1,
+	},
 	mainContainer: {
 		flex: 1,
 		alignItems: 'center',
 		paddingHorizontal: 24,
+		minHeight: '100%',
 	},
 	logo: {
 		width: 100,
@@ -291,12 +326,13 @@ const styles = StyleSheet.create({
 	},
 	formContainer: {
 		width: '100%',
-		height: '50%',
 		justifyContent: 'flex-start',
 		alignItems: 'flex-start',
 		backgroundColor: 'white',
 		alignSelf: 'center',
 		borderRadius: 24,
+		padding: 20,
+		marginBottom: 20,
 	},
 	title: {
 		fontSize: 24,
@@ -358,9 +394,8 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		gap: 4,
 		width: '100%',
-		position: 'absolute',
-		bottom: 0,
 		justifyContent: 'center',
+		paddingVertical: 20,
 	},
 	signupText: {
 		color: '#4A5568',
@@ -489,5 +524,8 @@ const styles = StyleSheet.create({
 	},
 	signupLinkDisabled: {
 		opacity: 0.5,
+	},
+	signupLinkPressed: {
+		opacity: 0.6,
 	},
 });
