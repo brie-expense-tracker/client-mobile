@@ -1,5 +1,5 @@
 import { useRef, useCallback, useEffect, useState, useMemo } from 'react';
-import { Message, MessageAction } from './useMessagesReducer';
+import { Message, MessageAction } from './useMessagesReducerV2';
 import { startStreaming, stopStreaming } from '../services/streaming';
 import { buildSseUrl } from '../networking/endpoints';
 import { authService } from '../services/authService';
@@ -54,7 +54,7 @@ interface UseBulletproofStreamProps {
 	clearStreaming: () => void;
 }
 
-export function useBulletproofStream({
+export function useBulletproofStreamV2({
 	messages,
 	dispatch,
 	streamingRef,
@@ -66,7 +66,6 @@ export function useBulletproofStream({
 }: UseBulletproofStreamProps) {
 	const bufferedText = useRef<string>('');
 	const currentMessageId = useRef<string | null>(null);
-	const connectionRef = useRef<any>(null);
 	const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const healthCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
 		null
@@ -155,7 +154,6 @@ export function useBulletproofStream({
 	// Cleanup on unmount
 	useEffect(() => {
 		return () => {
-			stopStreaming();
 			stopHealthMonitoring();
 			if (retryTimeoutRef.current) {
 				clearTimeout(retryTimeoutRef.current);
@@ -241,235 +239,174 @@ export function useBulletproofStream({
 				// Start health monitoring
 				startHealthMonitoring();
 
-				// Start streaming
-				const connection = startStreaming({
-					url,
-					token: '', // Not needed for UID-based auth
-					onDelta: (text: string) => {
-						// Update activity timestamp
-						setStreamState((prev) => ({
-							...prev,
-							lastActivity: Date.now(),
-							isConnecting: false,
-						}));
-
-						console.log('📝 [Stream] Received delta:', {
-							textLength: text.length,
-							text: text.substring(0, 50) + '...',
-							messageId,
-							timestamp: new Date().toISOString(),
-							bufferedLength: bufferedText.current.length,
-						});
-						bufferedText.current += text;
-						addDelta(messageId, text);
-						onDeltaReceived();
-						callbacks.onDelta?.({ text }, bufferedText.current);
-					},
-					onDone: () => {
-						// Calculate performance metrics
-						const endTime = Date.now();
-						const startTime = streamState.startTime || endTime;
-						const duration = endTime - startTime;
-
-						console.log('✅ [Stream] Completed:', {
-							messageId,
-							duration: `${duration}ms`,
-							chars: bufferedText.current.length,
-							retryCount: streamState.retryCount,
-							timestamp: new Date().toISOString(),
-							finalText: bufferedText.current.substring(0, 100) + '...',
-						});
-
-						setStreamState((prev) => ({
-							...prev,
-							isStreaming: false,
-							isConnecting: false,
-							lastActivity: endTime,
-						}));
-
-						currentMessageId.current = null;
-						streamingRef.current.messageId = null;
-						clearStreaming();
-						stopHealthMonitoring();
-
-						// Finalize the message with performance data
-						finalizeMessage(messageId, bufferedText.current, {
-							totalLatency: duration,
-							timeToFirstToken: duration,
-							cacheHit: false,
-							modelUsed: 'streaming',
-							tokensUsed: bufferedText.current.length,
-						});
-						callbacks.onDone?.();
-					},
-					onError: (error: string) => {
-						// Update state
-						setStreamState((prev) => ({
-							...prev,
-							isStreaming: false,
-							isConnecting: false,
-							lastError: error,
-						}));
-
-						stopHealthMonitoring();
-
-						// Log error with context for debugging
-						ErrorService.logError(
-							{ message: error },
-							{
-								messageId,
-								sessionId: streamingRef.current.sessionId,
-								operation: 'streaming',
-								retryCount: streamState.retryCount,
-							}
-						);
-
-						// Categorize error and get user-friendly message
-						const errorState = ErrorService.categorizeError({ message: error });
-						const userMessage = ErrorService.getUserFriendlyMessage({
-							message: error,
-						});
-
-						console.error('🚨 [Stream] Error:', {
-							error,
-							messageId,
-							retryCount: streamState.retryCount,
-							errorType: errorState.type,
-						});
-
-						// Check if we should retry
-						const shouldRetry =
-							streamState.retryCount < retryConfig.maxRetries &&
-							(error.includes('network') ||
-								error.includes('timeout') ||
-								error.includes('connection'));
-
-						if (shouldRetry) {
-							const nextRetryCount = streamState.retryCount + 1;
-							const delay = calculateRetryDelay(nextRetryCount - 1);
-
-							console.log('🔄 [Stream] Retrying:', {
-								attempt: `${nextRetryCount}/${retryConfig.maxRetries}`,
-								delay: `${delay}ms`,
-								reason: error.includes('network') ? 'network' : 'connection',
-							});
-
-							// Update retry count in state
+				// Start streaming using the new clientMessageId approach
+				const clientMessageId = startChatStream(
+					message.trim(),
+					{
+						onMeta: (data) => {
 							setStreamState((prev) => ({
 								...prev,
-								retryCount: nextRetryCount,
+								lastActivity: Date.now(),
+								isConnecting: false,
+							}));
+							callbacks.onMeta?.(data);
+						},
+						onDelta: (id, text) => {
+							// Update activity timestamp
+							setStreamState((prev) => ({
+								...prev,
+								lastActivity: Date.now(),
+								isConnecting: false,
 							}));
 
-							// Schedule retry with a new attempt
-							retryTimeoutRef.current = setTimeout(async () => {
-								try {
-									// Get fresh auth token
-									const token = await authService.getAuthToken();
-									if (!token) {
-										throw new Error('No authentication token available');
-									}
-
-									// Build URL using the centralized buildSseUrl function
-									const url = buildSseUrl({
-										sessionId,
-										message: message.trim(),
-										uid: token,
-										clientMessageId: messageId,
-									});
-
-									// Start new connection
-									startStreaming({
-										url,
-										token,
-										onDelta: (text: string) => {
-											setStreamState((prev) => ({
-												...prev,
-												lastActivity: Date.now(),
-												isConnecting: false,
-											}));
-											bufferedText.current += text;
-											addDelta(messageId, text);
-											onDeltaReceived();
-											callbacks.onDelta?.({ text }, bufferedText.current);
-										},
-										onDone: () => {
-											setStreamState((prev) => ({
-												...prev,
-												isStreaming: false,
-												isConnecting: false,
-											}));
-											finalizeMessage(messageId, bufferedText.current);
-											callbacks.onDone?.();
-										},
-										onError: (error: string) => {
-											console.error('🚨 [Stream] Retry failed:', {
-												error,
-												attempt: nextRetryCount,
-												messageId,
-											});
-											setStreamState((prev) => ({
-												...prev,
-												isStreaming: false,
-												isConnecting: false,
-												lastError: error,
-											}));
-											clearStreaming();
-											setError(messageId, 'Connection failed after retries');
-											callbacks.onError?.('Connection failed after retries');
-										},
-										onMeta: (data: any) => {
-											callbacks.onMeta?.(data);
-										},
-									});
-								} catch (retryError) {
-									console.error('🚨 [Stream] Retry setup failed:', {
-										error:
-											retryError instanceof Error
-												? retryError.message
-												: String(retryError),
-										messageId,
-										attempt: nextRetryCount,
-									});
-									setStreamState((prev) => ({
-										...prev,
-										isStreaming: false,
-										isConnecting: false,
-									}));
-									clearStreaming();
-									setError(messageId, 'Connection failed');
-									callbacks.onError?.('Connection failed');
-								}
-							}, delay);
-
-							// Notify about retry
-							callbacks.onRetry?.(nextRetryCount, retryConfig.maxRetries);
-						} else {
-							// Final error - no more retries
-							console.error('💥 [Stream] Final failure:', {
+							console.log('📝 [Stream] Received delta:', {
+								textLength: text.length,
+								text: text.substring(0, 50) + '...',
 								messageId,
-								error,
-								retryCount: streamState.retryCount,
-								maxRetries: retryConfig.maxRetries,
-								userMessage,
+								clientMessageId: id,
+								timestamp: new Date().toISOString(),
+								bufferedLength: bufferedText.current.length,
 							});
+							bufferedText.current += text;
+							addDelta(messageId, text);
+							onDeltaReceived();
+							callbacks.onDelta?.({ text }, bufferedText.current);
+						},
+						onDone: (id) => {
+							// Calculate performance metrics
+							const endTime = Date.now();
+							const startTime = streamState.startTime || endTime;
+							const duration = endTime - startTime;
+
+							console.log('✅ [Stream] Completed:', {
+								messageId,
+								clientMessageId: id,
+								duration: `${duration}ms`,
+								chars: bufferedText.current.length,
+								retryCount: streamState.retryCount,
+								timestamp: new Date().toISOString(),
+								finalText: bufferedText.current.substring(0, 100) + '...',
+							});
+
+							setStreamState((prev) => ({
+								...prev,
+								isStreaming: false,
+								isConnecting: false,
+								lastActivity: endTime,
+							}));
 
 							currentMessageId.current = null;
 							streamingRef.current.messageId = null;
 							clearStreaming();
+							stopHealthMonitoring();
 
-							// Set error on the message with user-friendly text
-							setError(messageId, userMessage);
-							callbacks.onError?.(userMessage);
-						}
-					},
-					onMeta: (data: any) => {
-						callbacks.onMeta?.(data);
-					},
-				});
+							// Finalize the message with performance data
+							finalizeMessage(messageId, bufferedText.current, {
+								totalLatency: duration,
+								timeToFirstToken: duration,
+								cacheHit: false,
+								modelUsed: 'streaming',
+								tokensUsed: bufferedText.current.length,
+							});
+							callbacks.onDone?.();
+						},
+						onError: (id, err) => {
+							// Update state
+							setStreamState((prev) => ({
+								...prev,
+								isStreaming: false,
+								isConnecting: false,
+								lastError: err.message,
+							}));
 
-				// Store connection for cleanup
-				connectionRef.current = connection;
-				return connection;
+							stopHealthMonitoring();
+
+							// Log error with context for debugging
+							ErrorService.logError(
+								{ message: err.message },
+								{
+									messageId,
+									sessionId: streamingRef.current.sessionId,
+									operation: 'streaming',
+									retryCount: streamState.retryCount,
+								}
+							);
+
+							// Categorize error and get user-friendly message
+							const errorState = ErrorService.categorizeError({
+								message: err.message,
+							});
+							const userMessage = ErrorService.getUserFriendlyMessage({
+								message: err.message,
+							});
+
+							console.error('🚨 [Stream] Error:', {
+								error: err.message,
+								messageId,
+								clientMessageId: id,
+								retryCount: streamState.retryCount,
+								errorType: errorState.type,
+							});
+
+							// Check if we should retry
+							const shouldRetry =
+								streamState.retryCount < retryConfig.maxRetries &&
+								(err.message.includes('network') ||
+									err.message.includes('timeout') ||
+									err.message.includes('connection'));
+
+							if (shouldRetry) {
+								const nextRetryCount = streamState.retryCount + 1;
+								const delay = calculateRetryDelay(nextRetryCount - 1);
+
+								console.log('🔄 [Stream] Retrying:', {
+									attempt: `${nextRetryCount}/${retryConfig.maxRetries}`,
+									delay: `${delay}ms`,
+									reason: err.message.includes('network')
+										? 'network'
+										: 'connection',
+								});
+
+								// Update retry count in state
+								setStreamState((prev) => ({
+									...prev,
+									retryCount: nextRetryCount,
+								}));
+
+								// Schedule retry with a new attempt
+								retryTimeoutRef.current = setTimeout(async () => {
+									startStream(message, callbacks, {
+										messageId,
+										retryCount: nextRetryCount,
+									});
+								}, delay);
+
+								// Notify about retry
+								callbacks.onRetry?.(nextRetryCount, retryConfig.maxRetries);
+							} else {
+								// Final error - no more retries
+								console.error('💥 [Stream] Final failure:', {
+									messageId,
+									error: err.message,
+									retryCount: streamState.retryCount,
+									maxRetries: retryConfig.maxRetries,
+									userMessage,
+								});
+
+								currentMessageId.current = null;
+								streamingRef.current.messageId = null;
+								clearStreaming();
+
+								// Set error on the message with user-friendly text
+								setError(messageId, userMessage);
+								callbacks.onError?.(userMessage);
+							}
+						},
+					},
+					firebaseUID
+				);
+
+				return { clientMessageId };
 			} catch (error: any) {
 				// Update state
 				setStreamState((prev) => ({
@@ -562,16 +499,12 @@ export function useBulletproofStream({
 		// Stop health monitoring
 		stopHealthMonitoring();
 
-		// Stop the actual stream
-		stopStreaming();
-
 		// Reset state
 		resetStreamState();
 
 		// Clear refs
 		currentMessageId.current = null;
 		streamingRef.current.messageId = null;
-		connectionRef.current = null;
 		clearStreaming();
 	}, [streamingRef, clearStreaming, stopHealthMonitoring, resetStreamState]);
 

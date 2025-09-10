@@ -2,6 +2,7 @@ import { useRef, useCallback, useEffect, useState, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Message, MessageAction } from './useMessagesReducer';
 import { ErrorService } from '../services/errorService';
+import { authService } from '../services/authService';
 
 interface StreamingCallbacks {
 	onMeta?: (data: any) => void;
@@ -507,25 +508,134 @@ export function useAssistantStream({
 							`[AssistantStream] Retrying in ${delay}ms (attempt ${nextRetryCount}/${retryConfig.maxRetries})`
 						);
 
-						// Schedule retry
-						retryTimeoutRef.current = setTimeout(() => {
-							startStream(message, callbacks, {
-								messageId: aiId,
-								retryCount: nextRetryCount,
-							});
+						// Update retry count in state
+						setStreamState((prev) => ({
+							...prev,
+							retryCount: nextRetryCount,
+						}));
+
+						// Schedule retry with a new connection attempt
+						retryTimeoutRef.current = setTimeout(async () => {
+							try {
+								// Get fresh auth token
+								const token = await authService.getAuthToken();
+								if (!token) {
+									throw new Error('No authentication token available');
+								}
+
+								// Build URL
+								const baseUrl =
+									process.env.EXPO_PUBLIC_API_BASE_URL ||
+									(__DEV__
+										? 'http://192.168.1.65:3000'
+										: 'https://your-production-url.com');
+								const apiBaseUrl = baseUrl.endsWith('/api')
+									? baseUrl
+									: `${baseUrl}/api`;
+								const params = new URLSearchParams({
+									sessionId,
+									message: message.trim(),
+									uid: token,
+								});
+								const url = `${apiBaseUrl}/orchestrator/chat/stream?${params.toString()}`;
+
+								// Create new EventSource connection
+								const es = new EventSource(url);
+								currentConnection.current = es;
+
+								es.addEventListener('message', (ev: MessageEvent) => {
+									try {
+										const data = JSON.parse(ev.data);
+										if (data.type === 'delta' && data.content) {
+											setStreamState((prev) => ({
+												...prev,
+												lastActivity: Date.now(),
+												isConnecting: false,
+											}));
+											addDelta(aiId, data.content);
+											onDeltaReceived();
+											callbacks.onDelta?.({ text: data.content }, data.content);
+										}
+									} catch (parseError) {
+										console.warn(
+											'[AssistantStream] Failed to parse message:',
+											parseError
+										);
+									}
+								});
+
+								es.addEventListener('done', () => {
+									setStreamState((prev) => ({
+										...prev,
+										isStreaming: false,
+										isConnecting: false,
+									}));
+									finalizeMessage(aiId, '');
+									callbacks.onDone?.();
+									cleanup();
+								});
+
+								es.addEventListener('error', (e) => {
+									console.error('[AssistantStream] Retry failed:', e);
+									setStreamState((prev) => ({
+										...prev,
+										isStreaming: false,
+										isConnecting: false,
+										lastError: 'Stream connection failed',
+									}));
+									dispatch({
+										type: 'FAIL_STREAM',
+										id: aiId,
+										error: 'Stream connection failed after retries',
+									});
+									cleanup();
+									callbacks.onError?.('Stream connection failed after retries');
+								});
+							} catch (retryError) {
+								console.error(
+									'[AssistantStream] Retry setup failed:',
+									retryError
+								);
+								setStreamState((prev) => ({
+									...prev,
+									isStreaming: false,
+									isConnecting: false,
+								}));
+								dispatch({
+									type: 'FAIL_STREAM',
+									id: aiId,
+									error: 'Connection failed',
+								});
+								callbacks.onError?.('Connection failed');
+							}
 						}, delay);
 
 						// Notify about retry
 						callbacks.onRetry?.(nextRetryCount, retryConfig.maxRetries);
 					} else {
-						// Final error - no more retries
-						dispatch({
-							type: 'FAIL_STREAM',
-							id: aiId,
-							error: 'Stream connection failed after retries',
-						});
+						// Final error - no more retries, provide fallback response
+						const fallbackResponse = `I'm having trouble connecting to my AI services right now. This might be due to a network issue or server maintenance.
+
+Here are some things you can try:
+• Check your internet connection
+• Try asking your question again in a moment
+• Use the refresh button below to retry
+
+I'm still here to help with your financial questions once the connection is restored!`;
+
+						// Add the fallback response as a delta
+						addDelta(aiId, fallbackResponse);
+						finalizeMessage(aiId, fallbackResponse);
+
+						// Update state to show we're done
+						setStreamState((prev) => ({
+							...prev,
+							isStreaming: false,
+							isConnecting: false,
+						}));
+
 						cleanup();
-						callbacks.onError?.('Stream connection failed after retries');
+						callbacks.onDone?.();
 					}
 				});
 

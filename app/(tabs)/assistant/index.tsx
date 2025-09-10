@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
 	View,
 	Text,
@@ -50,11 +50,13 @@ import { TraceEventData } from '../../../src/services/feature/enhancedStreamingS
 import WhyThisTray from './components/WhyThisTray';
 import DevHud from './_components/DevHud';
 import {
-	useMessagesReducer,
+	useMessagesReducerV2,
 	Message,
-} from '../../../src/hooks/useMessagesReducer';
-import { useBulletproofStream } from '../../../src/hooks/useBulletproofStream';
+} from '../../../src/hooks/useMessagesReducerV2';
+import { useBulletproofStreamV3 } from '../../../src/hooks/useBulletproofStreamV3';
 import { modeStateService } from '../../../src/services/assistant/modeStateService';
+import { buildTestSseUrl } from '../../../src/networking/endpoints';
+import { startStreaming } from '../../../src/services/streaming';
 
 export default function AssistantScreen() {
 	const router = useRouter();
@@ -81,7 +83,7 @@ export default function AssistantScreen() {
 		finalizeMessage,
 		setError,
 		clearStreaming,
-	} = useMessagesReducer(initialMessages);
+	} = useMessagesReducerV2(initialMessages);
 
 	const [inputText, setInputText] = useState('');
 	const [orchestratorService, setOrchestratorService] =
@@ -126,7 +128,7 @@ export default function AssistantScreen() {
 	const [modeState, setModeState] = useState(modeStateService.getState());
 
 	// Use the streaming hook
-	const { startStream, stopStream, isStreaming } = useBulletproofStream({
+	const { startStream, stopStream, isStreaming } = useBulletproofStreamV3({
 		messages,
 		dispatch,
 		streamingRef,
@@ -139,6 +141,25 @@ export default function AssistantScreen() {
 
 	// Derived state
 	const streamingMessageId = streamingRef.current.messageId;
+
+	// Keep a ref to the latest messages for verification
+	const messagesRef = useRef(messages);
+	useEffect(() => {
+		messagesRef.current = messages;
+	}, [messages]);
+
+	// Debug: Log messages state changes
+	useEffect(() => {
+		console.log('🔍 [DEBUG] Messages state changed:', {
+			count: messages.length,
+			ids: messages.map((m) => ({
+				id: m.id,
+				isUser: m.isUser,
+				isStreaming: m.isStreaming,
+			})),
+			timestamp: new Date().toISOString(),
+		});
+	}, [messages]);
 
 	// Initialize orchestrator service when profile is available
 	useEffect(() => {
@@ -187,51 +208,19 @@ export default function AssistantScreen() {
 		return unsubscribe;
 	}, []);
 
-	// Debug: Track messages state changes
+	// Track critical state changes only
 	useEffect(() => {
-		console.log('📊 [Assistant] Messages state changed:', {
-			count: messages.length,
-			lastMessage: messages[messages.length - 1]
-				? {
-						id: messages[messages.length - 1].id,
-						isUser: messages[messages.length - 1].isUser,
-						isStreaming: messages[messages.length - 1].isStreaming,
-						textLength: messages[messages.length - 1].text?.length || 0,
-						streamingTextLength:
-							messages[messages.length - 1].streamingText?.length || 0,
-				  }
-				: null,
-			streamingMessageId,
-			isStreaming,
-			allMessageIds: messages.map((m) => m.id),
-		});
-	}, [messages, streamingMessageId, isStreaming]);
-
-	// Enhanced debugging for stream state
-	useEffect(() => {
-		const debugStreamState = () => {
-			const streamingMessages = messages.filter((m) => m.isStreaming);
-			const lastMessage = messages[messages.length - 1];
-
-			console.log('🔍 [STREAM DEBUG] Current state:', {
-				totalMessages: messages.length,
-				streamingCount: streamingMessages.length,
-				streamingMessageIds: streamingMessages.map((m) => m.id),
-				currentStreamingId: streamingMessageId,
-				isStreaming,
-				lastMessageId: lastMessage?.id,
-				lastMessageIsStreaming: lastMessage?.isStreaming,
-				lastMessageText: lastMessage?.text?.substring(0, 50) + '...',
-				lastMessageStreamingText:
-					lastMessage?.streamingText?.substring(0, 50) + '...',
-				sessionId: streamingRef.current.sessionId,
+		const lastMessage = messages[messages.length - 1];
+		if (lastMessage && lastMessage.isStreaming) {
+			console.log('🔄 [Assistant] Stream started for message:', lastMessage.id);
+		} else if (lastMessage && !lastMessage.isStreaming && lastMessage.text) {
+			console.log('✅ [Assistant] Message completed:', {
+				id: lastMessage.id,
+				length: lastMessage.text.length,
+				isUser: lastMessage.isUser,
 			});
-		};
-
-		// Log every 2 seconds when debugging
-		const interval = setInterval(debugStreamState, 2000);
-		return () => clearInterval(interval);
-	}, [messages, streamingMessageId, isStreaming, streamingRef]);
+		}
+	}, [messages]);
 
 	// Load fallback data for offline use
 	const loadFallbackData = async () => {
@@ -474,29 +463,16 @@ export default function AssistantScreen() {
 	};
 
 	const handleSendMessage = async () => {
-		console.log('🚀 [Assistant] ===== STARTING MESSAGE SEND =====');
-		console.log('🚀 [Assistant] Input text:', inputText.trim());
-		console.log('🚀 [Assistant] Input text length:', inputText.trim().length);
-		console.log('🚀 [Assistant] Current loading state:', isStreaming);
-		console.log('🚀 [Assistant] Current messages count:', messages.length);
-		console.log(
-			'🚀 [Assistant] Current streaming message ID:',
-			streamingMessageId
-		);
+		const trimmedInput = inputText.trim();
 
 		// Enhanced validation and recovery
-		if (!inputText.trim()) {
-			console.log('🚀 [Assistant] Early return - empty input');
+		if (!trimmedInput) {
 			return;
 		}
 
 		// Prevent duplicate message processing
-		const trimmedInput = inputText.trim();
 		if (lastProcessedMessage === trimmedInput) {
-			console.warn(
-				'🚨 [Assistant] Duplicate message detected, ignoring:',
-				trimmedInput
-			);
+			console.warn('🚨 [Assistant] Duplicate message detected, ignoring');
 			setDebugInfo('Duplicate message ignored');
 			return;
 		}
@@ -512,15 +488,10 @@ export default function AssistantScreen() {
 					: 0;
 
 				if (timeSinceLastUpdate > 10000) {
-					// 10 seconds
-					console.warn(
-						'🚨 [Assistant] Detected stuck streaming state, recovering...'
-					);
-					console.warn('🚨 [Assistant] Streaming message:', {
-						id: streamingMessage.id,
-						text: streamingMessage.text?.substring(0, 100),
-						streamingText: streamingMessage.streamingText?.substring(0, 100),
-						timeSinceLastUpdate,
+					console.warn('🚨 [Assistant] Stuck stream detected, recovering...', {
+						messageId: streamingMessage.id,
+						timeSinceLastUpdate: `${Math.round(timeSinceLastUpdate / 1000)}s`,
+						hasContent: !!(streamingMessage.buffered || streamingMessage.text),
 					});
 
 					// Force clear streaming state
@@ -532,7 +503,6 @@ export default function AssistantScreen() {
 		}
 
 		if (isStreaming) {
-			console.log('🚀 [Assistant] Early return - already streaming');
 			return;
 		}
 
@@ -541,7 +511,7 @@ export default function AssistantScreen() {
 
 		// Add user message using reducer
 		const userMessageId = addUserMessage(trimmedInput);
-		console.log('🚀 [Assistant] Created user message with ID:', userMessageId);
+		console.log('🔍 [DEBUG] User message added with ID:', userMessageId);
 
 		// Track this message to prevent duplicates
 		setLastProcessedMessage(trimmedInput);
@@ -551,8 +521,6 @@ export default function AssistantScreen() {
 		setShowFallback(false);
 		setTraceData(null);
 		setPerformanceData(null);
-
-		console.log('🚀 [Assistant] Cleared input, starting stream');
 
 		// Check intent sufficiency before sending to AI
 		const context: IntentContext = {
@@ -596,53 +564,103 @@ export default function AssistantScreen() {
 			return;
 		}
 
-		// Create streaming AI message using reducer
-		const aiMessageId = (Date.now() + 1).toString();
-		console.log(
-			'🤖 [Assistant] About to create AI message with ID:',
-			aiMessageId
-		);
-		console.log(
-			'🤖 [Assistant] Current messages before adding AI placeholder:',
-			messages.length
-		);
+		// Create streaming AI message using reducer with proper synchronization
+		let aiMessageId = (Date.now() + 1).toString();
+		console.log('🔍 [DEBUG] Creating AI placeholder with ID:', aiMessageId);
 
+		// Add the AI placeholder message
 		addAIPlaceholder(aiMessageId);
+
+		// Wait for state update and verify message was added with multiple attempts
+		let verifyMessage = null;
+		let attempts = 0;
+		const maxAttempts = 10;
+
+		// Add a small initial delay to ensure state has been updated
+		await new Promise((resolve) => setTimeout(resolve, 100));
+
+		while (!verifyMessage && attempts < maxAttempts) {
+			await new Promise((resolve) => setTimeout(resolve, 50));
+			// Use the ref to get the latest messages state
+			verifyMessage = messagesRef.current.find((m) => m.id === aiMessageId);
+			attempts++;
+
+			if (!verifyMessage && attempts < maxAttempts) {
+				console.log(
+					`🔍 [DEBUG] Verification attempt ${attempts}/${maxAttempts} for message:`,
+					aiMessageId,
+					'Available IDs:',
+					messagesRef.current.map((m) => m.id)
+				);
+			}
+		}
+
+		if (!verifyMessage) {
+			console.error(
+				'🚨 [Assistant] Message not found after adding placeholder:',
+				{
+					aiMessageId,
+					availableIds: messagesRef.current.map((m) => m.id),
+					attempts,
+				}
+			);
+
+			// Try one more time with a new ID
+			const newAiMessageId = (Date.now() + 2).toString();
+			console.log(
+				'🔄 [Assistant] Creating new message with ID:',
+				newAiMessageId
+			);
+
+			addAIPlaceholder(newAiMessageId);
+
+			// Wait and verify the new message
+			attempts = 0;
+			while (!verifyMessage && attempts < maxAttempts) {
+				await new Promise((resolve) => setTimeout(resolve, 50));
+				verifyMessage = messagesRef.current.find(
+					(m) => m.id === newAiMessageId
+				);
+				attempts++;
+			}
+
+			if (!verifyMessage) {
+				console.error('🚨 [Assistant] Message creation failed, aborting');
+				return;
+			}
+
+			// Update the aiMessageId to use the new one
+			aiMessageId = newAiMessageId;
+		}
+
+		console.log(
+			'✅ [DEBUG] Message verified after adding placeholder:',
+			verifyMessage.id
+		);
 
 		// Transition to processing mode
 		modeStateService.transitionTo('processing', 'AI processing started');
 
-		console.log('🤖 [Assistant] Created AI message with ID:', aiMessageId);
-		console.log(
-			'🤖 [Assistant] Current messages after adding AI placeholder:',
-			messages.length
-		);
-
 		// Set up UI timeout to detect stuck states with better recovery
 		const timeout = setTimeout(() => {
-			console.warn('🚨 [Assistant] UI timeout - stream may be stuck');
-			console.warn('🚨 [Assistant] Current streaming state:', isStreaming);
-			console.warn(
-				'🚨 [Assistant] Current streaming message ID:',
-				streamingMessageId
-			);
-			console.warn('🚨 [Assistant] Messages count:', messages.length);
-
-			// Check if we have a streaming message that's been stuck
 			const streamingMessage = messages.find(
 				(m) => m.id === streamingMessageId
 			);
-			if (streamingMessage && streamingMessage.isStreaming) {
-				console.warn('🚨 [Assistant] Forcing completion of stuck message:', {
-					id: streamingMessage.id,
-					text: streamingMessage.text?.substring(0, 100),
-					streamingText: streamingMessage.streamingText?.substring(0, 100),
-				});
 
+			console.warn('🚨 [Assistant] Stream timeout after 30s', {
+				messageId: streamingMessageId,
+				hasStreamingMessage: !!streamingMessage,
+				hasContent: streamingMessage
+					? !!(streamingMessage.buffered || streamingMessage.text)
+					: false,
+				streamingState: isStreaming,
+			});
+
+			if (streamingMessage && streamingMessage.isStreaming) {
 				// Force finalize the message with whatever content we have
 				finalizeMessage(
 					streamingMessage.id,
-					streamingMessage.streamingText ||
+					streamingMessage.buffered ||
 						streamingMessage.text ||
 						'Response incomplete due to timeout',
 					streamingMessage.performance
@@ -652,40 +670,55 @@ export default function AssistantScreen() {
 			setDebugInfo('UI timeout - stream completed with timeout');
 			stopStream();
 			clearStreaming();
-		}, 30000); // 30 second timeout (reduced from 45)
+		}, 30000); // 30 second timeout
 		setUiTimeout(timeout as any);
 
-		console.log('🌊 [Assistant] Starting streaming with new hook');
-		console.log('🌊 [Assistant] Current input:', currentInput);
-		console.log('🌊 [Assistant] Target AI message ID:', aiMessageId);
+		console.log('🚀 [Assistant] Starting stream for message:', aiMessageId);
 
-		// Wait a moment to ensure the message is properly added to the state
-		await new Promise((resolve) => setTimeout(resolve, 100));
-
-		// Verify the message was added by checking the current state
-		// We need to use a different approach since messages might be stale in closure
-		console.log('🔍 [Assistant] Message verification after delay:', {
-			aiMessageId,
-			totalMessages: messages.length,
-			messageIds: messages.map((m) => m.id),
-		});
-
-		// Instead of checking if message exists, we'll let the streaming hook handle it
-		// and provide better error handling there
+		// Ensure the streaming ref is set to the correct message ID and sessionId
+		streamingRef.current.messageId = aiMessageId;
+		if (!streamingRef.current.sessionId) {
+			streamingRef.current.sessionId = `session_${Date.now()}`;
+		}
+		console.log('🔍 [DEBUG] Set streamingRef.messageId to:', aiMessageId);
+		console.log(
+			'🔍 [DEBUG] Set streamingRef.sessionId to:',
+			streamingRef.current.sessionId
+		);
+		console.log(
+			'🔍 [DEBUG] Current messages before streaming:',
+			messages.map((m) => ({
+				id: m.id,
+				isUser: m.isUser,
+				isStreaming: m.isStreaming,
+			}))
+		);
 
 		try {
+			console.log('🔍 [DEBUG] About to call startStream with:', {
+				message: currentInput,
+				messageId: aiMessageId,
+				messageLength: currentInput.length,
+				sessionId: streamingRef.current.sessionId,
+				currentMessages: messagesRef.current.map((m) => ({
+					id: m.id,
+					isUser: m.isUser,
+					isStreaming: m.isStreaming,
+				})),
+			});
+
+			console.log('🚀 [Assistant] Calling startStream function...');
 			await startStream(
 				currentInput,
 				{
 					onMeta: (data) => {
-						console.log('[Assistant] Meta event received:', data);
-						setDebugInfo(`Meta: ${JSON.stringify(data).substring(0, 100)}...`);
 						if (data.timeToFirstToken) {
 							console.log(
-								'[Assistant] Time to first token:',
+								'⚡ [Assistant] First token received:',
 								data.timeToFirstToken + 'ms'
 							);
 						}
+						setDebugInfo(`Meta: ${JSON.stringify(data).substring(0, 100)}...`);
 					},
 					onDelta: (data, bufferedText) => {
 						// Transition to streaming mode on first delta
@@ -696,98 +729,139 @@ export default function AssistantScreen() {
 							);
 						}
 
-						console.log('🔥 [Assistant] Delta received:', {
-							textLength: data.text?.length || 0,
-							bufferedLength: bufferedText.length,
+						console.log('[CALLBACK onDelta] len=', data.text?.length || 0);
+						console.log('📝 [Assistant] Stream delta received:', {
+							chars: bufferedText.length,
 							messageId: aiMessageId,
+							deltaText: data.text?.substring(0, 50) + '...',
+							fullBufferedText: bufferedText.substring(0, 100) + '...',
 						});
+
+						// Ensure we're updating the correct message using the ref
+						const targetMessage = messagesRef.current.find(
+							(m) => m.id === aiMessageId
+						);
+						if (!targetMessage) {
+							console.error(
+								'🚨 [Assistant] Target message not found during delta:',
+								{
+									aiMessageId,
+									availableIds: messagesRef.current.map((m) => m.id),
+								}
+							);
+
+							// Try to create the message if it doesn't exist
+							console.log('🔄 [Assistant] Creating missing message for delta');
+							addAIPlaceholder(aiMessageId);
+							// Add a small delay to ensure the message is created
+							setTimeout(() => {
+								addDelta(aiMessageId, data.text || '');
+							}, 10);
+							return;
+						}
+
+						// Add delta to the message
+						addDelta(aiMessageId, data.text || '');
+
 						setDebugInfo(
-							`Delta: ${bufferedText.length} chars - "${bufferedText.substring(
-								0,
-								50
-							)}..."`
+							`Streaming: ${
+								bufferedText.length
+							} chars - "${bufferedText.substring(0, 50)}..."`
 						);
 					},
 					onFinal: (data) => {
-						console.log('🏁 [Assistant] Final received:', {
+						console.log('✅ [Assistant] Stream completed:', {
 							responseLength: data.response?.length || 0,
 							messageId: aiMessageId,
 						});
 						setPerformanceData(data.performance);
 					},
 					onTrace: (data) => {
-						console.log('[Assistant] Trace event:', data);
 						setTraceData(data);
 					},
 					onDone: () => {
 						// Transition to idle mode on completion
 						modeStateService.transitionTo('idle', 'stream completed');
 
-						console.log('✅ [Assistant] Stream completed');
-						console.log('✅ [Assistant] Finalizing message:', aiMessageId);
-						console.log(
-							'✅ [Assistant] Current streaming message ID:',
-							streamingMessageId
-						);
+						// Debug: Log current state before finalization
+						console.log('🔍 [DEBUG] Finalization state:', {
+							streamingMessageId,
+							aiMessageId,
+							availableMessages: messagesRef.current.map((m) => ({
+								id: m.id,
+								isUser: m.isUser,
+								isStreaming: m.isStreaming,
+								hasBufferedText: !!(m.buffered && m.buffered.length > 0),
+							})),
+						});
 
-						// Find the correct message to finalize - use the streaming message ID if available
-						const messageIdToFinalize = streamingMessageId || aiMessageId;
-						const currentMessage = messages.find(
+						// Find the correct message to finalize - prioritize the AI message ID
+						const messageIdToFinalize = aiMessageId; // Use the AI message ID we created
+						let currentMessage = messagesRef.current.find(
 							(m) => m.id === messageIdToFinalize
 						);
 
-						console.log(
-							'✅ [Assistant] Looking for message:',
-							messageIdToFinalize
-						);
-						console.log(
-							'✅ [Assistant] Found message:',
-							currentMessage ? 'Yes' : 'No'
-						);
-
-						if (currentMessage) {
-							console.log(
-								'✅ [Assistant] Finalizing streaming message with content:',
+						if (!currentMessage) {
+							console.error(
+								'🚨 [Assistant] Message not found for finalization:',
 								{
-									id: currentMessage.id,
-									text: currentMessage.text?.substring(0, 100),
-									streamingText: currentMessage.streamingText?.substring(
-										0,
-										100
-									),
-									isStreaming: currentMessage.isStreaming,
+									messageIdToFinalize,
+									streamingMessageId,
+									availableIds: messagesRef.current.map((m) => m.id),
 								}
 							);
 
-							// Use the streaming text if available, otherwise use the text
-							const finalText =
-								currentMessage.streamingText &&
-								currentMessage.streamingText.length > 0
-									? currentMessage.streamingText
-									: currentMessage.text ||
-									  'Response received but content not found';
-
-							console.log(
-								'✅ [Assistant] Final text to use:',
-								finalText.substring(0, 100)
+							// Recovery: Try to find any streaming message
+							const streamingMessage = messagesRef.current.find(
+								(m) => m.isStreaming
 							);
-							finalizeMessage(
-								messageIdToFinalize,
-								finalText,
-								currentMessage.performance
-							);
-						} else {
-							console.error(
-								'🚨 [Assistant] Could not find message to finalize:',
-								messageIdToFinalize
-							);
-							console.error(
-								'🚨 [Assistant] Available message IDs:',
-								messages.map((m) => m.id)
-							);
+							if (streamingMessage) {
+								console.log(
+									'🔄 [Assistant] Recovery: Found streaming message:',
+									streamingMessage.id
+								);
+								currentMessage = streamingMessage;
+							} else {
+								// Last resort: create a new message with the buffered text
+								console.log('🔄 [Assistant] Creating recovery message');
+								addAIPlaceholder(messageIdToFinalize);
+								// Wait a moment for the message to be created
+								setTimeout(() => {
+									finalizeMessage(
+										messageIdToFinalize,
+										'Response received but content not found',
+										undefined
+									);
+								}, 50);
+								return;
+							}
 						}
 
+						// Use the buffered text if available, otherwise use the text
+						const finalText =
+							currentMessage.buffered && currentMessage.buffered.length > 0
+								? currentMessage.buffered
+								: currentMessage.text ||
+								  'Response received but content not found';
+
+						console.log('✅ [Assistant] Finalizing message:', {
+							id: messageIdToFinalize,
+							length: finalText.length,
+							hasContent: finalText.length > 0,
+							bufferedLength: currentMessage.buffered?.length || 0,
+							textLength: currentMessage.text?.length || 0,
+						});
+
+						finalizeMessage(
+							messageIdToFinalize,
+							finalText,
+							currentMessage.performance
+						);
+
 						setDebugInfo('Stream completed');
+
+						// Clear streaming state with safety check
+						console.log('🔍 [DEBUG] Clearing streaming state');
 						clearStreaming();
 
 						// Reset duplicate prevention after successful completion
@@ -804,12 +878,26 @@ export default function AssistantScreen() {
 						// Transition to error mode
 						modeStateService.transitionTo('error', `stream error: ${error}`);
 
-						console.error('[Assistant] Stream error:', error);
+						console.error('🚨 [Assistant] Stream failed:', {
+							error,
+							messageId: aiMessageId,
+							streamingState: isStreaming,
+							timeout: !!uiTimeout,
+						});
+
+						console.log('🔍 [DEBUG] Error state:', {
+							aiMessageId,
+							availableMessages: messagesRef.current.map((m) => ({
+								id: m.id,
+								isUser: m.isUser,
+								isStreaming: m.isStreaming,
+								hasBufferedText: !!(m.buffered && m.buffered.length > 0),
+							})),
+						});
+
 						setError(aiMessageId, error);
 						setShowFallback(true);
 						loadFallbackData();
-						// Don't clear streaming state - let the message show the error
-						// clearStreaming();
 
 						// Reset duplicate prevention after error
 						setTimeout(() => {
@@ -824,8 +912,15 @@ export default function AssistantScreen() {
 				},
 				{ messageId: aiMessageId }
 			);
+
+			console.log('✅ [Assistant] Stream call completed successfully');
 		} catch (error) {
-			console.error('💥 [Assistant] Error starting stream:', error);
+			console.error('💥 [Assistant] Failed to start stream:', {
+				error: error instanceof Error ? error.message : String(error),
+				messageId: aiMessageId,
+				inputLength: currentInput.length,
+			});
+
 			setError(aiMessageId, 'Failed to start stream');
 			setShowFallback(true);
 			await loadFallbackData();
@@ -836,8 +931,6 @@ export default function AssistantScreen() {
 				setUiTimeout(null);
 			}
 		}
-
-		console.log('🏁 [Assistant] ===== MESSAGE SEND COMPLETED =====');
 	};
 
 	// Handle retry of AI services
@@ -850,7 +943,7 @@ export default function AssistantScreen() {
 			// Try to send the last message again
 			const lastUserMessage = messages.find((msg) => msg.isUser);
 			if (lastUserMessage) {
-				setInputText(lastUserMessage.text);
+				setInputText(lastUserMessage.text || '');
 				await handleSendMessage();
 			}
 		} catch (error) {
@@ -869,6 +962,46 @@ export default function AssistantScreen() {
 	const handleShowWork = () => {
 		console.log('Show work button pressed');
 		// TODO: Implement show work functionality
+	};
+
+	// Test streaming function
+	const testStreaming = async () => {
+		console.log('🧪 [Test] Starting streaming test');
+		const testUrl = buildTestSseUrl();
+
+		try {
+			startStreaming({
+				url: testUrl,
+				token: 'test-token',
+				onDelta: (text: string) => {
+					console.log('🧪 [Test] Received delta:', text);
+					// Add test message to chat
+					const testMessageId = (Date.now() + 1).toString();
+					addAIPlaceholder(testMessageId);
+					addDelta(testMessageId, text);
+				},
+				onDone: () => {
+					console.log('🧪 [Test] Stream completed');
+					// Finalize the test message
+					const lastMessage = messages[messages.length - 1];
+					if (lastMessage && lastMessage.isStreaming) {
+						finalizeMessage(
+							lastMessage.id,
+							lastMessage.buffered || lastMessage.text || 'Test completed'
+						);
+					}
+				},
+				onError: (error: string) => {
+					console.error('🧪 [Test] Stream error:', error);
+					setError('test', error);
+				},
+				onMeta: (data: any) => {
+					console.log('🧪 [Test] Meta data:', data);
+				},
+			});
+		} catch (error) {
+			console.error('🧪 [Test] Failed to start test stream:', error);
+		}
 	};
 
 	return (
@@ -892,18 +1025,6 @@ export default function AssistantScreen() {
 					data={messages}
 					keyExtractor={(item) => item.id}
 					renderItem={({ item }) => {
-						// Debug logging for message rendering
-						if (!item.isUser) {
-							console.log(`🎨 [Assistant] Rendering AI message ${item.id}:`, {
-								isStreaming: item.isStreaming,
-								text: item.text,
-								streamingText: item.streamingText,
-								displayText: item.isStreaming ? item.streamingText : item.text,
-								textLength: item.text?.length || 0,
-								streamingTextLength: item.streamingText?.length || 0,
-							});
-						}
-
 						return (
 							<View
 								style={[
@@ -917,11 +1038,18 @@ export default function AssistantScreen() {
 										item.isUser ? styles.userMessageText : styles.aiMessageText,
 									]}
 								>
-									{item.isStreaming ? item.streamingText : item.text}
+									{item.isStreaming ? item.buffered : item.text}
 									{item.isStreaming && (
 										<Text style={styles.streamingCursor}>|</Text>
 									)}
 								</Text>
+								{__DEV__ && !item.isUser && (
+									<Text style={styles.debugText}>
+										Debug: {item.isStreaming ? 'streaming' : 'final'} | Text:{' '}
+										{item.text?.length || 0} chars | Buffered:{' '}
+										{item.buffered?.length || 0} chars
+									</Text>
+								)}
 								{!item.isUser && item.performance && (
 									<View style={styles.performanceInfo}>
 										<Text style={styles.performanceText}>
@@ -1041,16 +1169,19 @@ export default function AssistantScreen() {
 											? '✅ Recovered'
 											: 'Normal'}
 									</Text>
-									{messages[messages.length - 1]?.streamingText && (
+									{messages[messages.length - 1]?.buffered && (
 										<Text style={styles.debugText}>
-											Streaming text:{' '}
-											{messages[messages.length - 1].streamingText?.substring(
-												0,
-												60
-											)}
+											Buffered text:{' '}
+											{messages[messages.length - 1].buffered?.substring(0, 60)}
 											...
 										</Text>
 									)}
+									<TouchableOpacity
+										style={styles.testButton}
+										onPress={testStreaming}
+									>
+										<Text style={styles.testButtonText}>🧪 Test Streaming</Text>
+									</TouchableOpacity>
 								</View>
 							)}
 							{missingInfoState.isCollecting &&
@@ -1335,5 +1466,17 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		color: '#92400e',
 		fontFamily: 'monospace',
+	},
+	testButton: {
+		backgroundColor: '#3b82f6',
+		borderRadius: 8,
+		padding: 8,
+		marginTop: 8,
+		alignItems: 'center',
+	},
+	testButtonText: {
+		color: '#ffffff',
+		fontSize: 14,
+		fontWeight: '600',
 	},
 });

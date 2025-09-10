@@ -1,6 +1,7 @@
 import { useRef, useCallback, useEffect, useState, useMemo } from 'react';
-import { Message, MessageAction } from './useMessagesReducer';
+import { Message, MessageAction } from './useMessagesReducerV2';
 import { startStreaming, stopStreaming } from '../services/streaming';
+import { cancelSSE } from '../services/streamManager';
 import { buildSseUrl } from '../networking/endpoints';
 import { authService } from '../services/authService';
 import { ErrorService } from '../services/errorService';
@@ -54,7 +55,7 @@ interface UseBulletproofStreamProps {
 	clearStreaming: () => void;
 }
 
-export function useBulletproofStream({
+export function useBulletproofStreamV3({
 	messages,
 	dispatch,
 	streamingRef,
@@ -163,6 +164,14 @@ export function useBulletproofStream({
 		};
 	}, [stopHealthMonitoring]);
 
+	// Additional cleanup on route change/unmount
+	useEffect(() => {
+		return () => {
+			// Cancel any active SSE connection
+			cancelSSE();
+		};
+	}, []);
+
 	const startStream = useCallback(
 		async (
 			message: string,
@@ -204,6 +213,7 @@ export function useBulletproofStream({
 					retryCount > 0
 						? `${retryCount}/${retryConfig.maxRetries}`
 						: 'initial',
+				message: message.substring(0, 100) + '...',
 			});
 
 			// Notify about retry if applicable
@@ -234,6 +244,7 @@ export function useBulletproofStream({
 				console.log('🔧 [Stream] Built URL with UID:', {
 					url: url.substring(0, 100) + '...',
 					hasUID: !!firebaseUID,
+					fullUrl: url,
 				});
 
 				console.log('🔗 [Stream] Connecting to server');
@@ -241,10 +252,12 @@ export function useBulletproofStream({
 				// Start health monitoring
 				startHealthMonitoring();
 
-				// Start streaming
+				// Start streaming with stream key for deduplication
 				const connection = startStreaming({
 					url,
 					token: '', // Not needed for UID-based auth
+					streamKey: `${firebaseUID}:${messageId}`, // Use stable stream key
+					clientMessageId: messageId, // Pass message ID for filtering
 					onDelta: (text: string) => {
 						// Update activity timestamp
 						setStreamState((prev) => ({
@@ -263,7 +276,8 @@ export function useBulletproofStream({
 						bufferedText.current += text;
 						addDelta(messageId, text);
 						onDeltaReceived();
-						callbacks.onDelta?.({ text }, bufferedText.current);
+						// NOTE: onDelta callbacks are telemetry only; do not mutate message text here.
+						callbacks.onMeta?.({ type: 'delta', len: text.length });
 					},
 					onDone: () => {
 						// Calculate performance metrics
@@ -381,6 +395,7 @@ export function useBulletproofStream({
 									startStreaming({
 										url,
 										token,
+										clientMessageId: messageId, // Pass message ID for filtering
 										onDelta: (text: string) => {
 											setStreamState((prev) => ({
 												...prev,
@@ -390,7 +405,8 @@ export function useBulletproofStream({
 											bufferedText.current += text;
 											addDelta(messageId, text);
 											onDeltaReceived();
-											callbacks.onDelta?.({ text }, bufferedText.current);
+											// NOTE: onDelta callbacks are telemetry only; do not mutate message text here.
+											callbacks.onMeta?.({ type: 'delta', len: text.length });
 										},
 										onDone: () => {
 											setStreamState((prev) => ({

@@ -226,7 +226,11 @@ export class StreamingOrchestratorService {
 	constructor(context: FinancialContext, sessionId?: string) {
 		this.context = context;
 		this.sessionId = sessionId || this.generateSessionId();
-		this.baseUrl = 'http://localhost:3000'; // TODO: Get from environment config
+		this.baseUrl =
+			process.env.EXPO_PUBLIC_API_BASE_URL ||
+			(__DEV__
+				? 'http://192.168.1.65:3000'
+				: 'https://your-production-url.com');
 	}
 
 	/**
@@ -245,6 +249,9 @@ export class StreamingOrchestratorService {
 	): Promise<StreamingChunk[]> {
 		const startTime = Date.now();
 		let timeToFirstToken: number | null = null;
+		const messageId = `msg_${Date.now()}_${Math.random()
+			.toString(36)
+			.substr(2, 9)}`;
 
 		// Single-flight guard to prevent duplicate connections
 		if (
@@ -363,6 +370,7 @@ export class StreamingOrchestratorService {
 				sessionId: this.sessionId,
 				message: message.trim(),
 				uid: firebaseUid,
+				clientMessageId: messageId,
 			});
 			const eventSource = new EventSource(url);
 			this.currentConnection = eventSource;
@@ -489,6 +497,9 @@ export class StreamingOrchestratorService {
 	): Promise<void> {
 		const startTime = Date.now();
 		let timeToFirstToken: number | null = null;
+		const messageId = `msg_${Date.now()}_${Math.random()
+			.toString(36)
+			.substr(2, 9)}`;
 
 		// Single-flight guard to prevent duplicate connections
 		if (
@@ -539,6 +550,7 @@ export class StreamingOrchestratorService {
 				sessionId: this.sessionId,
 				message: message.trim(),
 				uid: firebaseUid,
+				clientMessageId: messageId,
 			});
 			const eventSource = new EventSource(url);
 			this.currentConnection = eventSource;

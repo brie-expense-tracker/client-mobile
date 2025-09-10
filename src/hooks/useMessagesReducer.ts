@@ -67,6 +67,7 @@ export function messagesReducer(
 		ids: state.map((m) => m.id),
 		action: action.type,
 		actionId: 'id' in action ? action.id : undefined,
+		timestamp: new Date().toISOString(),
 	});
 
 	switch (action.type) {
@@ -86,7 +87,16 @@ export function messagesReducer(
 				streamingText: '',
 			};
 			console.log('[REDUCER] Adding AI placeholder:', aiMsg.id);
-			return [...state, aiMsg];
+			console.log(
+				'[REDUCER] Current state before adding:',
+				state.map((m) => ({ id: m.id, isUser: m.isUser }))
+			);
+			const newState = [...state, aiMsg];
+			console.log(
+				'[REDUCER] New state after adding:',
+				newState.map((m) => ({ id: m.id, isUser: m.isUser }))
+			);
+			return newState;
 
 		case 'START_STREAM':
 			console.log('[REDUCER] Starting stream for message:', action.id);
@@ -212,6 +222,14 @@ export function messagesReducer(
 
 		case 'CLEAR_STREAMING':
 			console.log('[REDUCER] Clearing streaming state');
+			console.log(
+				'[REDUCER] Current messages before clear:',
+				state.map((m) => ({
+					id: m.id,
+					isStreaming: m.isStreaming,
+					hasStreamingText: !!(m.streamingText && m.streamingText.length > 0),
+				}))
+			);
 			return state.map((m) => ({
 				...m,
 				isStreaming: false,
