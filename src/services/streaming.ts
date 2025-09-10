@@ -3,6 +3,8 @@
  * Implements strict SSE contract with proper error handling
  */
 
+import { startSSE as startSSEManager, cancelSSE } from './streamManager';
+
 export interface StreamingCallbacks {
 	onDelta: (text: string) => void;
 	onDone: () => void;
@@ -17,6 +19,8 @@ export interface StartOptions {
 	onDone: () => void;
 	onError: (error: string) => void;
 	onMeta?: (data: any) => void;
+	streamKey?: string; // Add stream key for deduplication
+	clientMessageId?: string; // Add client message ID for filtering
 }
 
 /**
@@ -29,20 +33,35 @@ export function startSSE({
 	onDone,
 	onError,
 	onMeta,
+	streamKey,
+	clientMessageId,
 }: StartOptions) {
 	let lastTick = Date.now();
 	let closed = false;
 	let eventSource: EventSource | null = null;
+	let lastSeq = -1; // Track sequence numbers for deduplication
 
 	// Watchdog to detect stalled connections
 	const watchdog = setInterval(() => {
-		if (Date.now() - lastTick > 30000) {
+		const timeSinceLastTick = Date.now() - lastTick;
+		if (timeSinceLastTick > 30000) {
 			// 30s of silence
-			console.warn('[SSE] Stream stalled, closing connection');
+			console.warn('🚨 [SSE] Stream stalled after 30s, closing connection', {
+				timeSinceLastTick,
+				readyState: eventSource ? (eventSource as any).readyState : 'no source',
+				url: url.substring(0, 100) + '...',
+				timestamp: new Date().toISOString(),
+			});
 			onError('Stream stalled - connection lost');
 			cleanup();
+		} else if (timeSinceLastTick > 15000) {
+			// 15s warning
+			console.warn('⚠️ [SSE] Stream slow - no data for 15s', {
+				timeSinceLastTick,
+				readyState: eventSource ? (eventSource as any).readyState : 'no source',
+			});
 		}
-	}, 10000);
+	}, 5000); // Check every 5 seconds
 
 	const cleanup = () => {
 		if (!closed) {
@@ -56,74 +75,167 @@ export function startSSE({
 	};
 
 	try {
-		// Create EventSource with proper headers
-		eventSource = new EventSource(url, {
-			headers: {
-				Authorization: `Bearer ${token}`,
-				'Content-Type': 'application/json',
-			},
-		} as any); // RN polyfill usually allows headers
+		// Use stream manager for hard-lock to single stream
+		if (streamKey) {
+			const managerResult = startSSEManager(url, streamKey, {
+				onDelta: (data: { text: string; seq?: number }) => {
+					// Handle sequence number deduplication
+					if (typeof data.seq === 'number') {
+						if (data.seq <= lastSeq) {
+							console.warn('🚫 [SSE] Dropping duplicate/out-of-order delta:', {
+								seq: data.seq,
+								lastSeq,
+								text: data.text?.substring(0, 50) + '...',
+							});
+							return; // Drop duplicate/out-of-order
+						}
+						lastSeq = data.seq;
+					}
 
-		// Handle connection open
-		eventSource.addEventListener('open', () => {
-			console.log('[SSE] Connection opened');
-			lastTick = Date.now();
-		});
+					lastTick = Date.now();
+					if (data.text) {
+						onDelta(data.text);
+					}
+				},
+				onDone: (full?: string) => {
+					console.log('✅ [SSE] Stream completed via stream manager', {
+						timestamp: new Date().toISOString(),
+						hasFull: !!full,
+					});
+					lastTick = Date.now();
+					cleanup();
+					onDone();
+				},
+				onError: (e: any) => {
+					console.error('🚨 [SSE] Stream error via stream manager:', e);
+					lastTick = Date.now();
+					cleanup();
+					onError('Stream error');
+				},
+			});
+			eventSource = managerResult || null;
+		} else {
+			// Fallback to direct EventSource creation
+			eventSource = new EventSource(url);
 
-		// Handle meta events
-		eventSource.addEventListener('meta', (ev: MessageEvent) => {
-			lastTick = Date.now();
-			try {
-				const data = JSON.parse(ev.data);
-				onMeta?.(data);
-			} catch (error) {
-				console.warn('[SSE] Failed to parse meta event:', error);
-			}
-		});
+			// Handle connection open
+			eventSource.addEventListener('open', () => {
+				console.log('🔗 [SSE] Connection established', {
+					url: url.substring(0, 100) + '...',
+					readyState: (eventSource as any).readyState,
+					timestamp: new Date().toISOString(),
+				});
+				lastTick = Date.now();
+			});
 
-		// Handle delta events (text chunks)
-		eventSource.addEventListener('delta', (ev: MessageEvent) => {
-			lastTick = Date.now();
-			try {
-				const data = JSON.parse(ev.data);
-				if (data.text) {
-					onDelta(data.text);
+			// Handle meta events
+			eventSource.addEventListener('meta', (ev: MessageEvent) => {
+				lastTick = Date.now();
+				try {
+					const data = JSON.parse(ev.data);
+					console.log('📦 [SSE] Meta event received:', data);
+					onMeta?.(data);
+				} catch (error) {
+					console.warn('⚠️ [SSE] Failed to parse meta event:', error);
 				}
-			} catch (error) {
-				console.warn('[SSE] Failed to parse delta event:', error);
-			}
-		});
+			});
 
-		// Handle done event
-		eventSource.addEventListener('done', (ev: MessageEvent) => {
-			console.log('[SSE] Stream completed');
-			lastTick = Date.now();
-			cleanup();
-			onDone();
-		});
+			// Handle delta events (text chunks) with sequence number support
+			eventSource.addEventListener('delta', (ev: MessageEvent) => {
+				lastTick = Date.now();
+				try {
+					const data = JSON.parse(ev.data);
 
-		// Handle error event
-		eventSource.addEventListener('error', (ev: MessageEvent) => {
-			console.error('[SSE] Stream error event:', ev);
-			lastTick = Date.now();
-			cleanup();
-			onError('Stream error');
-		});
+					// Gate on clientMessageId to prevent processing events from wrong messages
+					if (clientMessageId && data.clientMessageId !== clientMessageId) {
+						console.warn('🚫 [SSE] Dropping delta for different message:', {
+							expected: clientMessageId,
+							received: data.clientMessageId,
+							text: data.text?.substring(0, 50) + '...',
+						});
+						return; // Drop events for different messages
+					}
 
-		// Handle connection errors
-		eventSource.onerror = (error) => {
-			console.error('[SSE] EventSource error:', error);
-			cleanup();
-			onError('Connection error');
-		};
+					// Handle sequence number deduplication
+					if (typeof data.seq === 'number') {
+						if (data.seq <= lastSeq) {
+							console.warn('🚫 [SSE] Dropping duplicate/out-of-order delta:', {
+								seq: data.seq,
+								lastSeq,
+								text: data.text?.substring(0, 50) + '...',
+							});
+							return; // Drop duplicate/out-of-order
+						}
+						lastSeq = data.seq;
+					}
 
-		// Handle ping events (heartbeat)
-		eventSource.addEventListener('ping', () => {
-			lastTick = Date.now();
-			// No-op, just update last tick
-		});
+					console.log('📝 [SSE] Delta event received:', {
+						textLength: data.text?.length || 0,
+						text: data.text?.substring(0, 50) + '...',
+						seq: data.seq,
+						clientMessageId: data.clientMessageId,
+						timestamp: new Date().toISOString(),
+					});
+					if (data.text) {
+						onDelta(data.text);
+					}
+				} catch (error) {
+					console.warn('⚠️ [SSE] Failed to parse delta event:', error, {
+						rawData: ev.data,
+						timestamp: new Date().toISOString(),
+					});
+				}
+			});
+
+			// Handle done event
+			eventSource.addEventListener('done', (ev: MessageEvent) => {
+				console.log('✅ [SSE] Stream completed', {
+					timestamp: new Date().toISOString(),
+					readyState: (eventSource as any).readyState,
+					rawData: ev.data,
+				});
+				lastTick = Date.now();
+				cleanup();
+				onDone();
+			});
+
+			// Handle error event
+			eventSource.addEventListener('error', (ev: MessageEvent) => {
+				console.error('🚨 [SSE] Stream error event:', {
+					event: ev,
+					timestamp: new Date().toISOString(),
+					readyState: (eventSource as any).readyState,
+					url: url.substring(0, 100) + '...',
+				});
+				lastTick = Date.now();
+				cleanup();
+				onError('Stream error');
+			});
+
+			// Handle connection errors
+			eventSource.onerror = (error) => {
+				console.error('🚨 [SSE] EventSource error:', {
+					error,
+					timestamp: new Date().toISOString(),
+					readyState: (eventSource as any).readyState,
+					url: url.substring(0, 100) + '...',
+				});
+				cleanup();
+				onError('Connection error');
+			};
+
+			// Handle ping events (heartbeat)
+			eventSource.addEventListener('ping', () => {
+				lastTick = Date.now();
+				// No-op, just update last tick
+			});
+
+			// Remove generic message handler to avoid double processing of named events
+			// If any proxy strips event: lines, the browser will deliver as generic message
+			// but we already handle delta, meta, done, error events specifically above
+		}
 	} catch (error) {
-		console.error('[SSE] Failed to create EventSource:', error);
+		console.error('💥 [SSE] Failed to create EventSource:', error);
 		cleanup();
 		onError('Failed to create connection');
 	}
@@ -151,7 +263,7 @@ class ConnectionManager {
 			(this.currentConnection?.eventSource &&
 				(this.currentConnection.eventSource as any).readyState === 1)
 		) {
-			console.warn('[SSE] Connection already active, skipping duplicate');
+			console.warn('⚠️ [SSE] Connection already active, skipping duplicate');
 			return { cancel: () => {} };
 		}
 
@@ -206,6 +318,7 @@ export function startStreaming(options: StartOptions) {
  * Close current streaming connection
  */
 export function stopStreaming() {
+	cancelSSE(); // Use stream manager to cancel active stream
 	connectionManager.closeConnection();
 }
 

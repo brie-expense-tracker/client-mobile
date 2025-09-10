@@ -196,6 +196,9 @@ export async function startSSE({
 		const sessionIdToSend =
 			body?.sessionId ||
 			`session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+		const messageId = `msg_${Date.now()}_${Math.random()
+			.toString(36)
+			.substr(2, 9)}`;
 
 		console.log('[EnhancedStreamingService] URL building debug:');
 		console.log('[EnhancedStreamingService] body:', body);
@@ -207,6 +210,7 @@ export async function startSSE({
 			sessionId: sessionIdToSend,
 			message: messageToSend,
 			uid: firebaseUid,
+			clientMessageId: messageId,
 		});
 
 		console.log('[EnhancedStreamingService] Final URL:', urlWithUid);
@@ -649,9 +653,13 @@ export function startStream(args: {
 		return () => {};
 	}
 
+	const messageId = `msg_${Date.now()}_${Math.random()
+		.toString(36)
+		.substr(2, 9)}`;
 	const url = buildSseUrl({
 		sessionId: args.sessionId,
 		message: args.message,
+		clientMessageId: messageId,
 	});
 	connecting = true;
 
@@ -865,6 +873,10 @@ export class EnhancedStreamingService {
 			return;
 		}
 
+		const messageId = `msg_${Date.now()}_${Math.random()
+			.toString(36)
+			.substr(2, 9)}`;
+
 		// Single-flight guard - close existing connection first
 		if (currentConnection) {
 			console.log('[SSE] Closing existing connection before starting new one');
@@ -904,6 +916,7 @@ export class EnhancedStreamingService {
 				sessionId: this.sessionId,
 				message: message.trim(),
 				uid: firebaseUid,
+				clientMessageId: messageId,
 			});
 			console.log('[EnhancedStreamingService] SSE URL:', url);
 			console.log('[EnhancedStreamingService] Callbacks provided:', {
