@@ -120,6 +120,13 @@ export const messagesReducerV2 = (state = initial, action: any): State => {
 		}
 		case 'FINALIZE': {
 			const id = action.id as string;
+
+			// Guard: check if message already finalized (idempotent)
+			if (state.byId[id] && !state.byId[id].isStreaming) {
+				console.log('[Reducer] FINALIZE already completed for id:', id);
+				return state;
+			}
+
 			if (!state.byId[id]) {
 				console.error('❌ FINALIZE missing message', { id });
 				// Try to find any streaming message to finalize
@@ -153,6 +160,11 @@ export const messagesReducerV2 = (state = initial, action: any): State => {
 			return { ...state, streamingId: null };
 		}
 		case 'CLEAR_STREAMING': {
+			const id = action.id;
+			if (!id) {
+				console.warn('[Reducer] CLEAR_STREAMING without id — ignored');
+				return state;
+			}
 			if (state.streamingId && state.byId[state.streamingId]) {
 				state.byId[state.streamingId].isStreaming = false;
 			}
@@ -238,10 +250,13 @@ export function useMessagesReducerV2(initialMessages: Message[]) {
 		dispatch({ type: 'SET_ERROR', id: messageId, error: errorMessage });
 	}, []);
 
-	const clearStreaming = useCallback(() => {
-		streamingRef.current = { messageId: null, sessionId: null };
-		dispatch({ type: 'CLEAR_STREAMING' });
-	}, []);
+	const clearStreaming = useCallback(
+		(messageId?: string) => {
+			streamingRef.current = { messageId: null, sessionId: null };
+			dispatch({ type: 'CLEAR_STREAMING', id: messageId || state.streamingId });
+		},
+		[state.streamingId]
+	);
 
 	const onDeltaReceived = useCallback(() => {
 		// No-op for compatibility

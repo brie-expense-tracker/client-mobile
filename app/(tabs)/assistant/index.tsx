@@ -641,20 +641,23 @@ export default function AssistantScreen() {
 		// Transition to processing mode
 		modeStateService.transitionTo('processing', 'AI processing started');
 
-		// Set up UI timeout to detect stuck states with better recovery
+		// Set up UI timeout as a fallback (stream layer now handles real timeouts with inactivity timer)
 		const timeout = setTimeout(() => {
 			const streamingMessage = messages.find(
 				(m) => m.id === streamingMessageId
 			);
 
-			console.warn('🚨 [Assistant] Stream timeout after 30s', {
-				messageId: streamingMessageId,
-				hasStreamingMessage: !!streamingMessage,
-				hasContent: streamingMessage
-					? !!(streamingMessage.buffered || streamingMessage.text)
-					: false,
-				streamingState: isStreaming,
-			});
+			console.warn(
+				'🚨 [Assistant] UI fallback timeout after 3m (stream layer should have handled this)',
+				{
+					messageId: streamingMessageId,
+					hasStreamingMessage: !!streamingMessage,
+					hasContent: streamingMessage
+						? !!(streamingMessage.buffered || streamingMessage.text)
+						: false,
+					streamingState: isStreaming,
+				}
+			);
 
 			if (streamingMessage && streamingMessage.isStreaming) {
 				// Force finalize the message with whatever content we have
@@ -662,15 +665,15 @@ export default function AssistantScreen() {
 					streamingMessage.id,
 					streamingMessage.buffered ||
 						streamingMessage.text ||
-						'Response incomplete due to timeout',
+						'Response incomplete due to UI timeout',
 					streamingMessage.performance
 				);
 			}
 
-			setDebugInfo('UI timeout - stream completed with timeout');
+			setDebugInfo('UI fallback timeout - stream should have completed');
 			stopStream();
 			clearStreaming();
-		}, 30000); // 30 second timeout
+		}, 180000); // 3 minute fallback timeout (stream layer handles real timeouts)
 		setUiTimeout(timeout as any);
 
 		console.log('🚀 [Assistant] Starting stream for message:', aiMessageId);

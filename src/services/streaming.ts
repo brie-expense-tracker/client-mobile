@@ -40,13 +40,28 @@ export function startSSE({
 	let closed = false;
 	let eventSource: EventSource | null = null;
 	let lastSeq = -1; // Track sequence numbers for deduplication
+	let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
 
-	// Watchdog to detect stalled connections
+	// Inactivity timer - 2 minutes for mobile
+	const INACTIVITY_MS = 120000;
+
+	function resetInactivityTimer(reason: string) {
+		if (inactivityTimer) {
+			clearTimeout(inactivityTimer);
+		}
+		inactivityTimer = setTimeout(() => {
+			console.warn('🚨 [SSE] Stream timeout (inactivity):', reason);
+			onError('Stream timeout - inactivity');
+			cleanup();
+		}, INACTIVITY_MS);
+	}
+
+	// Legacy watchdog for backward compatibility (reduced timeout since we have inactivity timer)
 	const watchdog = setInterval(() => {
 		const timeSinceLastTick = Date.now() - lastTick;
-		if (timeSinceLastTick > 30000) {
-			// 30s of silence
-			console.warn('🚨 [SSE] Stream stalled after 30s, closing connection', {
+		if (timeSinceLastTick > 150000) {
+			// 2.5 minutes of silence (fallback to inactivity timer)
+			console.warn('🚨 [SSE] Stream stalled after 2.5m, closing connection', {
 				timeSinceLastTick,
 				readyState: eventSource ? (eventSource as any).readyState : 'no source',
 				url: url.substring(0, 100) + '...',
@@ -54,19 +69,23 @@ export function startSSE({
 			});
 			onError('Stream stalled - connection lost');
 			cleanup();
-		} else if (timeSinceLastTick > 15000) {
-			// 15s warning
-			console.warn('⚠️ [SSE] Stream slow - no data for 15s', {
+		} else if (timeSinceLastTick > 30000) {
+			// 30s warning
+			console.warn('⚠️ [SSE] Stream slow - no data for 30s', {
 				timeSinceLastTick,
 				readyState: eventSource ? (eventSource as any).readyState : 'no source',
 			});
 		}
-	}, 5000); // Check every 5 seconds
+	}, 10000); // Check every 10 seconds
 
 	const cleanup = () => {
 		if (!closed) {
 			closed = true;
 			clearInterval(watchdog);
+			if (inactivityTimer) {
+				clearTimeout(inactivityTimer);
+				inactivityTimer = null;
+			}
 			if (eventSource) {
 				eventSource.close();
 				eventSource = null;
@@ -126,11 +145,13 @@ export function startSSE({
 					timestamp: new Date().toISOString(),
 				});
 				lastTick = Date.now();
+				resetInactivityTimer('open');
 			});
 
 			// Handle meta events
 			eventSource.addEventListener('meta', (ev: MessageEvent) => {
 				lastTick = Date.now();
+				resetInactivityTimer('meta');
 				try {
 					const data = JSON.parse(ev.data);
 					console.log('📦 [SSE] Meta event received:', data);
@@ -140,9 +161,16 @@ export function startSSE({
 				}
 			});
 
+			// Handle limit events
+			eventSource.addEventListener('limit', (ev: MessageEvent) => {
+				lastTick = Date.now();
+				resetInactivityTimer('limit');
+			});
+
 			// Handle delta events (text chunks) with sequence number support
 			eventSource.addEventListener('delta', (ev: MessageEvent) => {
 				lastTick = Date.now();
+				resetInactivityTimer('delta');
 				try {
 					const data = JSON.parse(ev.data);
 
@@ -195,6 +223,11 @@ export function startSSE({
 					rawData: ev.data,
 				});
 				lastTick = Date.now();
+				// Clear inactivity timer on done
+				if (inactivityTimer) {
+					clearTimeout(inactivityTimer);
+					inactivityTimer = null;
+				}
 				cleanup();
 				onDone();
 			});
@@ -208,6 +241,11 @@ export function startSSE({
 					url: url.substring(0, 100) + '...',
 				});
 				lastTick = Date.now();
+				// Clear inactivity timer on error
+				if (inactivityTimer) {
+					clearTimeout(inactivityTimer);
+					inactivityTimer = null;
+				}
 				cleanup();
 				onError('Stream error');
 			});
@@ -220,6 +258,11 @@ export function startSSE({
 					readyState: (eventSource as any).readyState,
 					url: url.substring(0, 100) + '...',
 				});
+				// Clear inactivity timer on error
+				if (inactivityTimer) {
+					clearTimeout(inactivityTimer);
+					inactivityTimer = null;
+				}
 				cleanup();
 				onError('Connection error');
 			};
@@ -227,6 +270,7 @@ export function startSSE({
 			// Handle ping events (heartbeat)
 			eventSource.addEventListener('ping', () => {
 				lastTick = Date.now();
+				resetInactivityTimer('ping');
 				// No-op, just update last tick
 			});
 
