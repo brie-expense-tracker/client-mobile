@@ -5,7 +5,11 @@ import { logChat } from '../services/feature/analyticsService';
 
 interface FallbackActionCardProps {
 	message: string;
-	fallbackType: 'grounding_failed' | 'critic_failed' | 'model_error' | 'network_error';
+	fallbackType:
+		| 'grounding_failed'
+		| 'critic_failed'
+		| 'model_error'
+		| 'network_error';
 	onRetry?: () => void;
 	onUseFallback?: () => void;
 	onContactSupport?: () => void;
@@ -32,6 +36,9 @@ export default function FallbackActionCard({
 			hadCard: false,
 			fallback: true,
 			userSatisfaction: undefined,
+			responseTimeMs: 0,
+			messageLength: 0,
+			hasFinancialData: false,
 			factPackId: factPackId || 'unknown',
 		});
 
@@ -52,6 +59,9 @@ export default function FallbackActionCard({
 			hadCard: false,
 			fallback: true,
 			userSatisfaction: undefined,
+			responseTimeMs: 0,
+			messageLength: 0,
+			hasFinancialData: false,
 			factPackId: factPackId || 'unknown',
 		});
 
@@ -72,6 +82,9 @@ export default function FallbackActionCard({
 			hadCard: false,
 			fallback: true,
 			userSatisfaction: 'thumbs_down',
+			responseTimeMs: 0,
+			messageLength: 0,
+			hasFinancialData: false,
 			factPackId: factPackId || 'unknown',
 			dissatisfactionReason: 'fallback_unsatisfactory',
 		});
@@ -81,7 +94,7 @@ export default function FallbackActionCard({
 		} else {
 			Alert.alert(
 				'Contact Support',
-				'Please email support@brie.ai with your issue and we\'ll get back to you within 24 hours.',
+				"Please email support@brie.ai with your issue and we'll get back to you within 24 hours.",
 				[{ text: 'Got it', style: 'default' }]
 			);
 		}
@@ -120,13 +133,13 @@ export default function FallbackActionCard({
 	const getFallbackDescription = () => {
 		switch (fallbackType) {
 			case 'grounding_failed':
-				return 'We couldn\'t access your financial data for instant answers.';
+				return "We couldn't access your financial data for instant answers.";
 			case 'critic_failed':
-				return 'Our fact-checking system couldn\'t validate the response.';
+				return "Our fact-checking system couldn't validate the response.";
 			case 'model_error':
 				return 'The AI service is temporarily unavailable.';
 			case 'network_error':
-				return 'We\'re having trouble connecting to our services.';
+				return "We're having trouble connecting to our services.";
 			default:
 				return 'Something went wrong with our service.';
 		}
@@ -138,9 +151,9 @@ export default function FallbackActionCard({
 				<Ionicons name={getFallbackIcon()} size={20} color="#ef4444" />
 				<Text style={styles.title}>{getFallbackTitle()}</Text>
 			</View>
-			
+
 			<Text style={styles.description}>{getFallbackDescription()}</Text>
-			
+
 			{message && (
 				<View style={styles.messageContainer}>
 					<Text style={styles.messageText}>{message}</Text>
@@ -154,15 +167,21 @@ export default function FallbackActionCard({
 						<Text style={styles.primaryButtonText}>Try Again</Text>
 					</TouchableOpacity>
 				)}
-				
+
 				{onUseFallback && (
-					<TouchableOpacity style={styles.secondaryButton} onPress={handleUseFallback}>
+					<TouchableOpacity
+						style={styles.secondaryButton}
+						onPress={handleUseFallback}
+					>
 						<Ionicons name="information-circle" size={16} color="#3b82f6" />
 						<Text style={styles.secondaryButtonText}>Use Fallback</Text>
 					</TouchableOpacity>
 				)}
-				
-				<TouchableOpacity style={styles.supportButton} onPress={handleContactSupport}>
+
+				<TouchableOpacity
+					style={styles.supportButton}
+					onPress={handleContactSupport}
+				>
 					<Ionicons name="help-circle" size={16} color="#6b7280" />
 					<Text style={styles.supportButtonText}>Contact Support</Text>
 				</TouchableOpacity>

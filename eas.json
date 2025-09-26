@@ -8,19 +8,51 @@
 			"developmentClient": true,
 			"distribution": "internal",
 			"env": {
-				"EXPO_PUBLIC_LOCAL_SIM_API_URL": "http://192.168.1.65:3000",
-				"EXPO_PUBLIC_PRODUCTION_API_URL": "https://your-production-api.com/api"
+				"EXPO_PUBLIC_API_URL": "https://brie-staging-api.onrender.com",
+				"EXPO_PUBLIC_ENV": "development"
 			}
 		},
 		"preview": {
+			"channel": "preview",
 			"distribution": "internal",
-			"autoIncrement": true
+			"autoIncrement": true,
+			"env": {
+				"EXPO_PUBLIC_API_URL": "https://brie-staging-api.onrender.com",
+				"EXPO_PUBLIC_ENV": "staging"
+			}
+		},
+		"testflight": {
+			"channel": "testflight",
+			"distribution": "store",
+			"autoIncrement": true,
+			"env": {
+				"EXPO_PUBLIC_API_URL": "https://brie-staging-api.onrender.com",
+				"EXPO_PUBLIC_ENV": "testflight"
+			},
+			"ios": {
+				"image": "latest"
+			}
 		},
 		"production": {
-			"autoIncrement": true
+			"channel": "production",
+			"distribution": "store",
+			"autoIncrement": true,
+			"env": {
+				"EXPO_PUBLIC_API_URL": "https://brie-staging-api.onrender.com",
+				"EXPO_PUBLIC_ENV": "production"
+			}
 		}
 	},
 	"submit": {
-		"production": {}
+		"testflight": {
+			"ios": {
+				"ascAppId": "YOUR_APP_ID_FROM_ASC"
+			}
+		},
+		"production": {
+			"ios": {
+				"ascAppId": "YOUR_APP_ID_FROM_ASC"
+			}
+		}
 	}
 }

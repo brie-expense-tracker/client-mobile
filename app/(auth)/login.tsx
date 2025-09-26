@@ -21,19 +21,13 @@ import {
 import useAuth from '../../src/context/AuthContext';
 import { RectButton, BorderlessButton } from 'react-native-gesture-handler';
 
-// Demo credentials for reviewers
-const DEMO_CREDENTIALS = {
-	email: 'demo@brie.app',
-	password: 'demo123',
-};
-
 export default function Login() {
 	const [email, setEmail] = useState('');
 	const [password, setPassword] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
 	const [isPressed, setIsPressed] = useState(false);
-	const [isDemoMode, setIsDemoMode] = useState(false);
-	const { login } = useAuth();
+	const [showPassword, setShowPassword] = useState(false);
+	const { login, signInWithGoogle } = useAuth();
 
 	// Email validator function
 	const isValidEmail = (email: string) => {
@@ -44,33 +38,6 @@ export default function Login() {
 	// Password validator function
 	const isValidPassword = (password: string) => {
 		return password.length >= 6; // Minimum 6 characters for this example
-	};
-
-	const handleDemoLogin = async () => {
-		setIsLoading(true);
-		setIsDemoMode(true);
-
-		try {
-			// Sign in with demo credentials
-			const userCredential = await signInWithEmailAndPassword(
-				getAuth(),
-				DEMO_CREDENTIALS.email,
-				DEMO_CREDENTIALS.password
-			);
-			const firebaseUser = userCredential.user;
-
-			// Use the auth context to handle MongoDB user verification
-			await login(firebaseUser);
-		} catch (error: any) {
-			console.error('Demo login error:', error);
-			Alert.alert(
-				'Demo Error',
-				'Demo mode is currently unavailable. Please contact support.'
-			);
-			setIsDemoMode(false);
-		} finally {
-			setIsLoading(false);
-		}
 	};
 
 	const handleLogin = async () => {
@@ -122,6 +89,40 @@ export default function Login() {
 		}
 	};
 
+	const handleGoogleSignIn = async () => {
+		try {
+			await signInWithGoogle();
+		} catch (error: any) {
+			console.error('Google Sign-In error:', error);
+
+			// Don't show error alert for user cancellation
+			if (
+				error.code === 'auth/internal-error' &&
+				error.message?.includes('cancelled')
+			) {
+				return; // Exit silently
+			}
+
+			let errorMessage = 'Failed to sign in with Google.';
+
+			if (error.code === 'GOOGLE_SIGNIN_ERROR') {
+				errorMessage = error.message || 'Failed to sign in with Google.';
+			} else if (
+				error.code === 'auth/account-exists-with-different-credential'
+			) {
+				errorMessage =
+					'An account already exists with this email address. Please sign in with your password instead.';
+			} else if (error.code === 'auth/invalid-credential') {
+				errorMessage = 'Invalid Google credentials. Please try again.';
+			} else if (error.code === 'auth/network-request-failed') {
+				errorMessage =
+					'Network error. Please check your connection and try again.';
+			}
+
+			Alert.alert('Error', errorMessage);
+		}
+	};
+
 	return (
 		<SafeAreaView style={styles.safeAreaContainer}>
 			<KeyboardAvoidingView
@@ -142,47 +143,8 @@ export default function Login() {
 							resizeMode="contain"
 						/>
 
-						{/* Demo Mode Banner */}
-						<View style={styles.demoBanner}>
-							<Text style={styles.demoBannerText}>🎯 Demo Mode Available</Text>
-							<Text style={styles.demoBannerSubtext}>
-								Try the app with sample data (60-90 days of transactions,
-								budgets, and goals)
-							</Text>
-						</View>
-
 						<View style={styles.formContainer}>
 							<Text style={styles.title}>Welcome Back</Text>
-
-							{/* Demo Login Button */}
-							<TouchableOpacity
-								style={[
-									styles.demoButton,
-									isDemoMode && styles.demoButtonActive,
-								]}
-								onPress={handleDemoLogin}
-								disabled={isLoading}
-							>
-								<Ionicons
-									name="play-circle"
-									size={20}
-									color={isDemoMode ? '#fff' : '#007ACC'}
-								/>
-								<Text
-									style={[
-										styles.demoButtonText,
-										isDemoMode && styles.demoButtonTextActive,
-									]}
-								>
-									{isDemoMode ? 'Loading Demo...' : 'Try Demo Mode'}
-								</Text>
-							</TouchableOpacity>
-
-							<View style={styles.dividerContainer}>
-								<View style={styles.divider} />
-								<Text style={styles.dividerText}>or sign in with</Text>
-								<View style={styles.divider} />
-							</View>
 
 							<Text style={styles.label}>Email</Text>
 							<TextInput
@@ -194,26 +156,36 @@ export default function Login() {
 								keyboardType="email-address"
 								autoCapitalize="none"
 								autoCorrect={false}
-								editable={!isDemoMode}
 							/>
 
 							<Text style={styles.label}>Password</Text>
-							<TextInput
-								style={styles.input}
-								placeholder="Enter your password"
-								placeholderTextColor="#999"
-								value={password}
-								onChangeText={setPassword}
-								secureTextEntry
-								autoCapitalize="none"
-								autoCorrect={false}
-								editable={!isDemoMode}
-							/>
+							<View style={styles.passwordInputContainer}>
+								<TextInput
+									style={styles.passwordInput}
+									placeholder="Enter your password"
+									placeholderTextColor="#999"
+									value={password}
+									onChangeText={setPassword}
+									secureTextEntry={!showPassword}
+									autoCapitalize="none"
+									autoCorrect={false}
+								/>
+								<TouchableOpacity
+									style={styles.passwordToggle}
+									onPress={() => setShowPassword(!showPassword)}
+								>
+									<Ionicons
+										name={showPassword ? 'eye-off' : 'eye'}
+										size={20}
+										color="#999"
+									/>
+								</TouchableOpacity>
+							</View>
 
 							<RectButton
 								style={[
 									styles.loginButton,
-									(isLoading || isDemoMode) && styles.loginButtonDisabled,
+									isLoading && styles.loginButtonDisabled,
 								]}
 								onPress={handleLogin}
 							>
@@ -234,26 +206,19 @@ export default function Login() {
 								<RectButton
 									style={[
 										styles.socialButton,
-										isDemoMode && styles.socialButtonDisabled,
+										isLoading && styles.socialButtonDisabled,
 									]}
-									onPress={() =>
-										Alert.alert(
-											'Coming Soon',
-											'Google Sign In will be available soon!'
-										)
-									}
+									onPress={handleGoogleSignIn}
+									enabled={!isLoading}
 								>
 									<Ionicons name="logo-google" size={24} color="#0051ff" />
 									<Text style={styles.socialButtonText}>
-										Continue with Google
+										{isLoading ? 'Signing In...' : 'Continue with Google'}
 									</Text>
 								</RectButton>
 
 								<RectButton
-									style={[
-										styles.socialButton,
-										isDemoMode && styles.socialButtonDisabled,
-									]}
+									style={styles.socialButton}
 									onPress={() =>
 										Alert.alert(
 											'Coming Soon',
@@ -281,7 +246,6 @@ export default function Login() {
 								<Text
 									style={[
 										styles.signupLink,
-										isDemoMode && styles.signupLinkDisabled,
 										isPressed && styles.signupLinkPressed,
 									]}
 								>
@@ -362,6 +326,35 @@ const styles = StyleSheet.create({
 		shadowOpacity: 0.3,
 		shadowRadius: 4,
 		elevation: 5,
+	},
+	passwordInputContainer: {
+		position: 'relative',
+		width: '100%',
+		marginBottom: 16,
+	},
+	passwordInput: {
+		width: '100%',
+		padding: 16,
+		paddingRight: 50,
+		borderRadius: 8,
+		backgroundColor: '#fff',
+		shadowColor: '#b9b9b9',
+		shadowOffset: {
+			width: 0,
+			height: 2,
+		},
+		shadowOpacity: 0.3,
+		shadowRadius: 4,
+		elevation: 5,
+	},
+	passwordToggle: {
+		position: 'absolute',
+		right: 16,
+		top: 0,
+		bottom: 0,
+		justifyContent: 'center',
+		alignItems: 'center',
+		width: 40,
 	},
 	buttonContainer: {
 		width: '100%',
@@ -462,44 +455,6 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		fontWeight: '500',
 	},
-	demoBanner: {
-		backgroundColor: '#E6F7FF',
-		padding: 12,
-		borderRadius: 8,
-		marginBottom: 20,
-		alignItems: 'center',
-	},
-	demoBannerText: {
-		fontSize: 16,
-		fontWeight: 'bold',
-		color: '#007ACC',
-	},
-	demoBannerSubtext: {
-		fontSize: 12,
-		color: '#4A5568',
-		marginTop: 4,
-	},
-	demoButton: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
-		padding: 12,
-		borderRadius: 12,
-		marginBottom: 10,
-		backgroundColor: '#E6F7FF',
-		gap: 8,
-	},
-	demoButtonActive: {
-		backgroundColor: '#007ACC',
-	},
-	demoButtonText: {
-		fontSize: 16,
-		fontWeight: '500',
-		color: '#007ACC',
-	},
-	demoButtonTextActive: {
-		color: '#fff',
-	},
 	loginButton: {
 		width: '100%',
 		borderRadius: 9999,
@@ -518,14 +473,10 @@ const styles = StyleSheet.create({
 	loginButtonDisabled: {
 		backgroundColor: '#E2E8F0',
 	},
-	socialButtonDisabled: {
-		backgroundColor: '#E2E8F0',
-		opacity: 0.7,
-	},
-	signupLinkDisabled: {
-		opacity: 0.5,
-	},
 	signupLinkPressed: {
+		opacity: 0.6,
+	},
+	socialButtonDisabled: {
 		opacity: 0.6,
 	},
 });

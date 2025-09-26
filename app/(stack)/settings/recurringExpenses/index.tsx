@@ -27,9 +27,9 @@ export default function RecurringExpensesSettingsScreen() {
 	useEffect(() => {
 		if (profile?.preferences?.recurringExpenses) {
 			const settings = profile.preferences.recurringExpenses;
-			setAutoSync(settings.autoSync ?? true);
-			setReminderNotifications(settings.reminderNotifications ?? true);
-			setExpenseTracking(settings.expenseTracking ?? true);
+			setAutoSync(settings.enabled ?? true);
+			setReminderNotifications(settings.notifications ?? true);
+			setExpenseTracking(settings.autoCategorization ?? true);
 		}
 	}, [profile?.preferences?.recurringExpenses]);
 

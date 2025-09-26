@@ -1,4 +1,5 @@
 import { nanoid } from 'nanoid/non-secure';
+import { getApiBaseUrl } from '../config/environment';
 
 type StreamHandlers = {
 	onMeta?: (m: any) => void;
@@ -20,7 +21,7 @@ export function startChatStream(
 	const clientMessageId = nanoid();
 	current = { id: clientMessageId, connecting: true };
 
-	const url = new URL('http://192.168.1.65:3000/api/stream/chat');
+	const url = new URL(`${getApiBaseUrl()}/api/stream/chat`);
 	url.searchParams.set('sessionId', 'default');
 	if (uid) {
 		url.searchParams.set('uid', uid);

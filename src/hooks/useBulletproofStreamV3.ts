@@ -239,6 +239,7 @@ export function useBulletproofStreamV3({
 					message: message.trim(),
 					uid: firebaseUID,
 					clientMessageId: messageId,
+					expand: options?.expand || false,
 				});
 
 				console.log('🔧 [Stream] Built URL with UID:', {

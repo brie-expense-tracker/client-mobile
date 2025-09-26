@@ -3,9 +3,10 @@ import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import SmartSuggestions from './SmartSuggestions';
+import { InterfaceMode } from '../../../../src/services/assistant/types';
 
 interface InterfacePanelProps {
-	type: 'insights' | 'actions';
+	type: InterfaceMode;
 	onClose: () => void;
 	onPickPrompt: (text: string) => void;
 }
@@ -19,14 +20,14 @@ export default function InterfacePanel({
 
 	const getPanelConfig = () => {
 		switch (type) {
-			case 'insights':
+			case 'INSIGHTS':
 				return {
 					icon: 'analytics',
 					title: 'AI Insights',
 					color: '#8b5cf6',
 					iconColor: '#3b82f6',
 				};
-			case 'actions':
+			case 'ACTIONS':
 				return {
 					icon: 'flash',
 					title: 'Quick Actions',
@@ -46,7 +47,7 @@ export default function InterfacePanel({
 	const config = getPanelConfig();
 
 	const renderActionsGrid = () => {
-		if (type === 'actions') {
+		if (type === 'ACTIONS') {
 			return (
 				<View style={styles.actionsGrid}>
 					<TouchableOpacity

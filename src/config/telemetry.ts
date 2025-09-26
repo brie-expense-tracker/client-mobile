@@ -59,7 +59,9 @@ export const TELEMETRY_CONFIG = {
 
 	// API Configuration
 	API: {
-		BASE_URL: process.env.API_BASE_URL || 'http://localhost:3000',
+		BASE_URL:
+			process.env.EXPO_PUBLIC_API_URL ||
+			'https://brie-staging-api.onrender.com',
 		TIMEOUT: parseInt(process.env.API_TIMEOUT || '10000'),
 	},
 } as const;

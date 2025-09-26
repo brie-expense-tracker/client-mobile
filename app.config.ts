@@ -7,7 +7,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 
 	return {
 		...config,
-		name: 'brie',
+		name: 'Brie - AI Financial Assistant',
 		slug: 'clientMobile',
 		version: '1.0.0',
 		orientation: 'portrait',
@@ -22,10 +22,21 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 			infoPlist: {
 				ITSAppUsesNonExemptEncryption: false,
 				NSAppTransportSecurity: {
-					NSAllowsLocalNetworking: true,
+					NSExceptionDomains: {
+						'brie-staging-api.onrender.com': {
+							NSExceptionAllowsInsecureHTTPLoads: false,
+							NSExceptionMinimumTLSVersion: '1.2',
+						},
+						'api.brie.app': {
+							NSExceptionAllowsInsecureHTTPLoads: false,
+							NSExceptionMinimumTLSVersion: '1.2',
+						},
+					},
 				},
 				NSUserNotificationsUsageDescription:
 					'This app uses notifications to keep you informed about your budget goals and financial insights.',
+				NSLocationWhenInUseUsageDescription:
+					'Location is used to provide location-based financial insights and merchant information.',
 				// Only enable background modes in production
 				...(isProduction && { UIBackgroundModes: ['remote-notification'] }),
 			},
@@ -59,6 +70,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 			'@react-native-firebase/app',
 			'@react-native-firebase/auth',
 			'@react-native-firebase/crashlytics',
+			'@react-native-google-signin/google-signin',
 			[
 				'expo-notifications',
 				{

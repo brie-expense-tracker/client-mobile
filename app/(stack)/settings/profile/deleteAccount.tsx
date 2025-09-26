@@ -51,7 +51,6 @@ export default function DeleteAccountScreen() {
 					onPress: async () => {
 						try {
 							await deleteAccount(password);
-							setIsDeleted(true);
 							Alert.alert(
 								'Account Deleted',
 								'Your account has been permanently deleted.',

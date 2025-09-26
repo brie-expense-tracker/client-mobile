@@ -17,6 +17,9 @@ import { ApiService } from '../services/core/apiService';
 import { router } from 'expo-router';
 import { SampleDataService } from '../services/feature/sampleDataService';
 import { authService } from '../services/authService';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { GoogleAuthProvider } from '@react-native-firebase/auth';
+import { configureGoogleSignIn } from '../config/googleSignIn';
 
 // Error types for better error handling
 export interface AuthError {
@@ -52,6 +55,10 @@ export type AuthContextType = {
 		firebaseUser: FirebaseAuthTypes.User,
 		name?: string
 	) => Promise<User>;
+
+	// Google Sign-In methods
+	signInWithGoogle: () => Promise<void>;
+	signUpWithGoogle: () => Promise<void>;
 
 	// Password management
 	sendPasswordResetEmail: (email: string) => Promise<void>;
@@ -130,6 +137,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			isManualLoginRef: isManualLoginRef.current,
 		});
 		setLoading(true);
+
+		// Configure Google Sign-In
+		configureGoogleSignIn();
 
 		// Define ensureUserExists inside useEffect to avoid dependency issues
 		const ensureUserExistsLocal = async (fbUser: FirebaseAuthTypes.User) => {
@@ -858,6 +868,101 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		[createUserInMongoDB]
 	);
 
+	// Google Sign-In methods
+	const signInWithGoogle = useCallback(async () => {
+		try {
+			setLoading(true);
+			setError(null);
+
+			// Check if your device supports Google Play
+			await GoogleSignin.hasPlayServices({
+				showPlayServicesUpdateDialog: true,
+			});
+
+			// Get the users ID token
+			const { idToken } = await GoogleSignin.signIn();
+
+			// Create a Google credential with the token
+			const googleCredential = GoogleAuthProvider.credential(idToken);
+
+			// Sign-in the user with the credential
+			const userCredential = await auth().signInWithCredential(
+				googleCredential
+			);
+			const firebaseUser = userCredential.user;
+
+			// Use the existing login method to handle MongoDB user creation
+			await login(firebaseUser);
+		} catch (error: any) {
+			console.error('Google Sign-In error:', error);
+
+			// Handle user cancellation gracefully
+			if (
+				error.code === 'auth/internal-error' &&
+				error.message?.includes('cancelled')
+			) {
+				console.log('Google Sign-In cancelled by user');
+				return; // Exit silently without showing error
+			}
+
+			setError({
+				code: 'GOOGLE_SIGNIN_ERROR',
+				message: 'Failed to sign in with Google',
+				details: error,
+			});
+			throw error;
+		} finally {
+			setLoading(false);
+		}
+	}, [login]);
+
+	const signUpWithGoogle = useCallback(async () => {
+		try {
+			setLoading(true);
+			setError(null);
+
+			// Check if your device supports Google Play
+			await GoogleSignin.hasPlayServices({
+				showPlayServicesUpdateDialog: true,
+			});
+
+			// Get the users ID token
+			const { idToken } = await GoogleSignin.signIn();
+
+			// Create a Google credential with the token
+			const googleCredential = GoogleAuthProvider.credential(idToken);
+
+			// Sign-in the user with the credential
+			const userCredential = await auth().signInWithCredential(
+				googleCredential
+			);
+			const firebaseUser = userCredential.user;
+
+			// Use the existing login method to handle MongoDB user creation
+			await login(firebaseUser);
+		} catch (error: any) {
+			console.error('Google Sign-Up error:', error);
+
+			// Handle user cancellation gracefully
+			if (
+				error.code === 'auth/internal-error' &&
+				error.message?.includes('cancelled')
+			) {
+				console.log('Google Sign-Up cancelled by user');
+				return; // Exit silently without showing error
+			}
+
+			setError({
+				code: 'GOOGLE_SIGNUP_ERROR',
+				message: 'Failed to sign up with Google',
+				details: error,
+			});
+			throw error;
+		} finally {
+			setLoading(false);
+		}
+	}, [login]);
+
 	const deleteAccount = useCallback(async (password: string) => {
 		setLoading(true);
 		try {
@@ -992,6 +1097,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			signup,
 			createUserInMongoDB,
 
+			// Google Sign-In methods
+			signInWithGoogle,
+			signUpWithGoogle,
+
 			// Password management
 			sendPasswordResetEmail: sendPasswordResetEmailToUser,
 			confirmPasswordReset: confirmPasswordResetCode,
@@ -1021,6 +1130,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			logout,
 			signup,
 			createUserInMongoDB,
+			signInWithGoogle,
+			signUpWithGoogle,
 			sendPasswordResetEmailToUser,
 			confirmPasswordResetCode,
 			updatePasswordToUser,
