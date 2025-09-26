@@ -227,10 +227,8 @@ export class StreamingOrchestratorService {
 		this.context = context;
 		this.sessionId = sessionId || this.generateSessionId();
 		this.baseUrl =
-			process.env.EXPO_PUBLIC_API_BASE_URL ||
-			(__DEV__
-				? 'http://192.168.1.65:3000'
-				: 'https://your-production-url.com');
+			process.env.EXPO_PUBLIC_API_URL ||
+			'https://brie-staging-api.onrender.com';
 	}
 
 	/**

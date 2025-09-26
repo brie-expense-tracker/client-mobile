@@ -199,10 +199,7 @@ export function useAssistantStream({
 		(sessionId: string, message: string, uid: string) => {
 			// Get the actual API base URL from environment
 			const baseUrl =
-				process.env.EXPO_PUBLIC_API_BASE_URL ||
-				(__DEV__
-					? 'http://192.168.1.65:3000'
-					: 'https://your-production-url.com');
+				process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 
 			// Ensure baseUrl ends with /api
 			const apiBaseUrl = baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
@@ -525,10 +522,8 @@ export function useAssistantStream({
 
 								// Build URL
 								const baseUrl =
-									process.env.EXPO_PUBLIC_API_BASE_URL ||
-									(__DEV__
-										? 'http://192.168.1.65:3000'
-										: 'https://your-production-url.com');
+									process.env.EXPO_PUBLIC_API_URL ||
+									'https://brie-staging-api.onrender.com';
 								const apiBaseUrl = baseUrl.endsWith('/api')
 									? baseUrl
 									: `${baseUrl}/api`;

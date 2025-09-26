@@ -123,6 +123,14 @@ export default function AssistantScreen() {
 	} | null>(null);
 	const [dataInitialized, setDataInitialized] = useState(false);
 	const [lastProcessedMessage, setLastProcessedMessage] = useState<string>('');
+	const [budgetStatus, setBudgetStatus] = useState<{
+		spent: number;
+		limit: number;
+		remaining: number;
+		percentage: number;
+		canExpand: boolean;
+	} | null>(null);
+	const [showExpandButton, setShowExpandButton] = useState(false);
 
 	// Mode state management
 	const [modeState, setModeState] = useState(modeStateService.getState());
@@ -721,6 +729,10 @@ export default function AssistantScreen() {
 								data.timeToFirstToken + 'ms'
 							);
 						}
+						// Update budget status from meta data
+						if (data.budget) {
+							setBudgetStatus(data.budget);
+						}
 						setDebugInfo(`Meta: ${JSON.stringify(data).substring(0, 100)}...`);
 					},
 					onDelta: (data, bufferedText) => {
@@ -778,6 +790,12 @@ export default function AssistantScreen() {
 							messageId: aiMessageId,
 						});
 						setPerformanceData(data.performance);
+
+						// Show expand button for short responses if user has budget
+						const responseLength = data.response?.length || 0;
+						if (responseLength < 300 && budgetStatus?.canExpand) {
+							setShowExpandButton(true);
+						}
 					},
 					onTrace: (data) => {
 						setTraceData(data);
@@ -867,6 +885,9 @@ export default function AssistantScreen() {
 						console.log('🔍 [DEBUG] Clearing streaming state');
 						clearStreaming();
 
+						// Reset expand button state
+						setShowExpandButton(false);
+
 						// Reset duplicate prevention after successful completion
 						setTimeout(() => {
 							setLastProcessedMessage('');
@@ -913,7 +934,10 @@ export default function AssistantScreen() {
 						}
 					},
 				},
-				{ messageId: aiMessageId }
+				{
+					messageId: aiMessageId,
+					expand: showExpandButton, // Pass expand flag if showing expand button
+				}
 			);
 
 			console.log('✅ [Assistant] Stream call completed successfully');
@@ -967,6 +991,27 @@ export default function AssistantScreen() {
 		// TODO: Implement show work functionality
 	};
 
+	// Handle expand button
+	const handleExpand = async () => {
+		const lastMessage = messages[messages.length - 1];
+		if (lastMessage && !lastMessage.isUser) {
+			// Re-send the last user message with expand flag
+			const userMessages = messages.filter((m) => m.isUser);
+			const lastUserMessage = userMessages[userMessages.length - 1];
+
+			if (lastUserMessage) {
+				// Set the input text and trigger expand
+				setInputText(lastUserMessage.text || '');
+				setShowExpandButton(true); // Keep expand button visible to pass the flag
+
+				// Trigger the message send with expand flag
+				setTimeout(() => {
+					handleSendMessage();
+				}, 100);
+			}
+		}
+	};
+
 	// Test streaming function
 	const testStreaming = async () => {
 		console.log('🧪 [Test] Starting streaming test');
@@ -1016,7 +1061,15 @@ export default function AssistantScreen() {
 				>
 					<Ionicons name="settings-outline" size={24} color="#374151" />
 				</TouchableOpacity>
-				<Text style={styles.headerTitle}>AI Assistant</Text>
+				<View style={styles.headerCenter}>
+					<Text style={styles.headerTitle}>AI Assistant</Text>
+					{budgetStatus && (
+						<Text style={styles.budgetIndicator}>
+							💰 {budgetStatus.percentage}% used (
+							{budgetStatus.remaining.toFixed(2)} left)
+						</Text>
+					)}
+				</View>
 				<View style={{ width: 24 }} />
 			</View>
 
@@ -1115,6 +1168,17 @@ export default function AssistantScreen() {
 										traceData={traceData || undefined}
 										performance={performanceData || undefined}
 									/>
+								)}
+								{/* Expand button for short responses */}
+								{!item.isUser && !item.isStreaming && showExpandButton && (
+									<TouchableOpacity
+										style={styles.expandButton}
+										onPress={handleExpand}
+									>
+										<Text style={styles.expandButtonText}>
+											📈 Expand with more detail
+										</Text>
+									</TouchableOpacity>
 								)}
 							</View>
 						);
@@ -1302,10 +1366,19 @@ const styles = StyleSheet.create({
 		borderBottomWidth: 1,
 		borderBottomColor: '#e5e7eb',
 	},
+	headerCenter: {
+		flex: 1,
+		alignItems: 'center',
+	},
 	headerTitle: {
 		fontSize: 18,
 		fontWeight: '600',
 		color: '#111827',
+	},
+	budgetIndicator: {
+		fontSize: 12,
+		color: '#6b7280',
+		marginTop: 2,
 	},
 	container: {
 		flex: 1,
@@ -1454,6 +1527,20 @@ const styles = StyleSheet.create({
 	},
 	showWorkButtonText: {
 		color: '#374151',
+		fontSize: 14,
+		fontWeight: '500',
+	},
+	expandButton: {
+		backgroundColor: '#f0f9ff',
+		borderRadius: 8,
+		padding: 8,
+		marginTop: 8,
+		alignItems: 'center',
+		borderWidth: 1,
+		borderColor: '#0ea5e9',
+	},
+	expandButtonText: {
+		color: '#0369a1',
 		fontSize: 14,
 		fontWeight: '500',
 	},

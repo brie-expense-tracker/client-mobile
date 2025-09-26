@@ -8,6 +8,7 @@ export function buildSseUrl(input: {
 	message: string;
 	uid?: string;
 	clientMessageId?: string;
+	expand?: boolean;
 }) {
 	const u = new URL(SSE_CHAT_URL);
 	u.searchParams.set('sessionId', input.sessionId);
@@ -17,6 +18,9 @@ export function buildSseUrl(input: {
 	}
 	if (input.clientMessageId) {
 		u.searchParams.set('clientMessageId', input.clientMessageId);
+	}
+	if (input.expand) {
+		u.searchParams.set('expand', 'true');
 	}
 	console.log('🔧 [SSE] Built URL:', u.toString());
 	return u.toString();

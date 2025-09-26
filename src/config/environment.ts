@@ -17,13 +17,9 @@ export const ENV = {
 	// Security
 	HMAC_SECRET_KEY: process.env.EXPO_PUBLIC_HMAC_SECRET_KEY,
 
-	// URLs
-	LOCAL_SIM_API_URL:
-		process.env.EXPO_PUBLIC_LOCAL_SIM_API_URL || 'http://localhost:3000',
-	LOCAL_DEVICE_API_URL:
-		process.env.EXPO_PUBLIC_LOCAL_DEVICE_API_URL || 'http://192.168.1.65:3000',
-	PRODUCTION_API_URL:
-		process.env.EXPO_PUBLIC_API_URL || 'https://api.briefinance.com',
+	// Primary API URL - use EXPO_PUBLIC_API_URL everywhere
+	API_URL:
+		process.env.EXPO_PUBLIC_API_URL || 'https://brie-staging-api.onrender.com',
 };
 
 // Helper function to detect if running on simulator
@@ -32,37 +28,10 @@ function isSimulator(): boolean {
 	return !Device.isDevice;
 }
 
-// URL resolution logic
+// URL resolution logic - now uses single EXPO_PUBLIC_API_URL
 export function resolveApiBaseUrl(): string {
-	const env = ENV.EXPO_PUBLIC_ENV;
-
-	console.log('🔧 [Environment] Resolving API URL for environment:', env);
-	console.log(
-		'🔧 [Environment] LOCAL_DEVICE_API_URL:',
-		ENV.LOCAL_DEVICE_API_URL
-	);
-	console.log('🔧 [Environment] LOCAL_SIM_API_URL:', ENV.LOCAL_SIM_API_URL);
-
-	if (env === 'dev' || env === 'dev_sim' || env === 'development') {
-		// Use simulator URL for simulators, device URL for physical devices
-		const base = isSimulator()
-			? ENV.LOCAL_SIM_API_URL
-			: ENV.LOCAL_DEVICE_API_URL;
-		console.log(
-			'🔧 [Environment] Using',
-			isSimulator() ? 'simulator' : 'device',
-			'API URL:',
-			base
-		);
-		return base;
-	}
-
-	// Production
-	console.log(
-		'🔧 [Environment] Using production API URL:',
-		ENV.PRODUCTION_API_URL
-	);
-	return ENV.PRODUCTION_API_URL;
+	console.log('🔧 [Environment] Using API URL:', ENV.API_URL);
+	return ENV.API_URL;
 }
 
 // Get full API URL with base path
@@ -89,13 +58,6 @@ console.log('🔧 [Environment] EXPO_PUBLIC_ENV:', ENV.EXPO_PUBLIC_ENV);
 console.log('🔧 [Environment] Platform:', Platform.OS);
 console.log('🔧 [Environment] Is Device:', Device.isDevice);
 console.log('🔧 [Environment] Is Simulator:', isSimulator());
-console.log(
-	'🔧 [Environment] LOCAL_SIM_API_URL from env:',
-	ENV.LOCAL_SIM_API_URL
-);
-console.log(
-	'🔧 [Environment] LOCAL_DEVICE_API_URL from env:',
-	ENV.LOCAL_DEVICE_API_URL
-);
+console.log('🔧 [Environment] API URL:', ENV.API_URL);
 console.log('🔧 [Environment] API Base URL:', resolveApiBaseUrl());
 console.log('🔧 [Environment] Full API URL:', getApiUrl());

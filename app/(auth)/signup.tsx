@@ -6,6 +6,7 @@ import {
 	StyleSheet,
 	Image,
 	SafeAreaView,
+	TouchableOpacity,
 	KeyboardAvoidingView,
 	ScrollView,
 	Platform,
@@ -20,8 +21,9 @@ export default function Signup() {
 	const [email, setEmail] = useState('');
 	const [password, setPassword] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
-	const { signup } = useAuth();
+	const { signup, signUpWithGoogle } = useAuth();
 	const [isPressed, setIsPressed] = useState(false);
+	const [showPassword, setShowPassword] = useState(false);
 
 	// Email validator function
 	const isValidEmail = (email: string) => {
@@ -82,6 +84,40 @@ export default function Signup() {
 		}
 	};
 
+	const handleGoogleSignUp = async () => {
+		try {
+			await signUpWithGoogle();
+		} catch (error: any) {
+			console.error('Google Sign-Up error:', error);
+
+			// Don't show error alert for user cancellation
+			if (
+				error.code === 'auth/internal-error' &&
+				error.message?.includes('cancelled')
+			) {
+				return; // Exit silently
+			}
+
+			let errorMessage = 'Failed to sign up with Google.';
+
+			if (error.code === 'GOOGLE_SIGNUP_ERROR') {
+				errorMessage = error.message || 'Failed to sign up with Google.';
+			} else if (
+				error.code === 'auth/account-exists-with-different-credential'
+			) {
+				errorMessage =
+					'An account already exists with this email address. Please sign in instead.';
+			} else if (error.code === 'auth/invalid-credential') {
+				errorMessage = 'Invalid Google credentials. Please try again.';
+			} else if (error.code === 'auth/network-request-failed') {
+				errorMessage =
+					'Network error. Please check your connection and try again.';
+			}
+
+			Alert.alert('Error', errorMessage);
+		}
+	};
+
 	return (
 		<SafeAreaView style={styles.safeAreaContainer}>
 			<KeyboardAvoidingView
@@ -107,19 +143,36 @@ export default function Signup() {
 							<TextInput
 								style={styles.input}
 								placeholder="Enter your email"
+								placeholderTextColor="#999"
 								value={email}
 								onChangeText={setEmail}
 								keyboardType="email-address"
 								autoCapitalize="none"
+								autoCorrect={false}
 							/>
 							<Text style={styles.label}>Password</Text>
-							<TextInput
-								style={styles.input}
-								placeholder="Enter your password"
-								value={password}
-								onChangeText={setPassword}
-								secureTextEntry
-							/>
+							<View style={styles.passwordInputContainer}>
+								<TextInput
+									style={styles.passwordInput}
+									placeholder="Enter your password"
+									placeholderTextColor="#999"
+									value={password}
+									onChangeText={setPassword}
+									secureTextEntry={!showPassword}
+									autoCapitalize="none"
+									autoCorrect={false}
+								/>
+								<TouchableOpacity
+									style={styles.passwordToggle}
+									onPress={() => setShowPassword(!showPassword)}
+								>
+									<Ionicons
+										name={showPassword ? 'eye-off' : 'eye'}
+										size={20}
+										color="#999"
+									/>
+								</TouchableOpacity>
+							</View>
 							<View style={styles.buttonContainer}>
 								<RectButton
 									style={[styles.button, isLoading && styles.buttonDisabled]}
@@ -140,18 +193,19 @@ export default function Signup() {
 
 							<View style={styles.socialButtonsContainer}>
 								<RectButton
-									style={styles.socialButton}
-									onPress={() =>
-										Alert.alert(
-											'Coming Soon',
-											'Google Sign Up will be available soon!'
-										)
-									}
+									style={[
+										styles.socialButton,
+										isLoading && styles.socialButtonDisabled,
+									]}
+									onPress={handleGoogleSignUp}
+									enabled={!isLoading}
 								>
 									<View style={styles.socialButtonContent}>
 										<Ionicons name="logo-google" size={24} color="#0051ff" />
 										<Text style={styles.socialButtonText}>
-											Continue with Google
+											{isLoading
+												? 'Creating Account...'
+												: 'Continue with Google'}
 										</Text>
 									</View>
 								</RectButton>
@@ -267,6 +321,35 @@ const styles = StyleSheet.create({
 		shadowRadius: 4,
 		elevation: 5,
 	},
+	passwordInputContainer: {
+		position: 'relative',
+		width: '100%',
+		marginBottom: 16,
+	},
+	passwordInput: {
+		width: '100%',
+		padding: 16,
+		paddingRight: 50,
+		borderRadius: 8,
+		backgroundColor: '#fff',
+		shadowColor: '#b9b9b9',
+		shadowOffset: {
+			width: 0,
+			height: 2,
+		},
+		shadowOpacity: 0.3,
+		shadowRadius: 4,
+		elevation: 5,
+	},
+	passwordToggle: {
+		position: 'absolute',
+		right: 16,
+		top: 0,
+		bottom: 0,
+		justifyContent: 'center',
+		alignItems: 'center',
+		width: 40,
+	},
 	buttonContainer: {
 		width: '100%',
 		alignSelf: 'center',
@@ -380,5 +463,8 @@ const styles = StyleSheet.create({
 	errorText: {
 		fontSize: 12,
 		fontWeight: 'bold',
+	},
+	socialButtonDisabled: {
+		opacity: 0.6,
 	},
 });

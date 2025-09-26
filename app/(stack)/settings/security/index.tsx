@@ -24,7 +24,7 @@ export default function SecurityScreen() {
 						<TouchableOpacity
 							style={styles.optionItem}
 							onPress={() =>
-								router.push('/(stack)/settings/security/editPassword')
+								router.push('/(stack)/settings/privacyandsecurity/editPassword')
 							}
 						>
 							<View style={styles.optionLeft}>
@@ -41,9 +41,7 @@ export default function SecurityScreen() {
 
 						<TouchableOpacity
 							style={styles.optionItem}
-							onPress={() =>
-								router.push('/(stack)/settings/security/forgotPassword')
-							}
+							onPress={() => router.push('/(auth)/forgotPassword')}
 						>
 							<View style={styles.optionLeft}>
 								<Ionicons name="mail-outline" size={24} color="#555" />

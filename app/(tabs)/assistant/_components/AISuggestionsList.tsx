@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PendingAction } from '../../../../src/types/assistant';
 import {
 	View,
 	Text,
@@ -152,7 +153,7 @@ const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
 		setSelectedSuggestion(null);
 	};
 
-	const handleActionExecuted = (action: IntelligentAction, result: any) => {
+	const handleActionExecuted = (action: PendingAction, result: any) => {
 		console.log('Smart action executed:', action, result);
 
 		// Don't show success message here - let parent components handle it

@@ -75,7 +75,7 @@ export default function ConnectivityTest() {
 			// Test 4: Test API endpoints
 			addResult('Testing API endpoints...');
 			try {
-				const response = await ApiService.get('/api/health');
+				const response = await ApiService.get('/health');
 				if (response.success) {
 					addResult('✅ Health endpoint: SUCCESS');
 				} else {

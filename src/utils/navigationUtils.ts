@@ -62,12 +62,12 @@ export const navigateToDashboard = () => {
  * Navigate to the insights screen
  */
 export const navigateToInsights = () => {
-	router.push('/(tabs)/insights');
+	router.push('/(tabs)/reflections');
 };
 
 /**
  * Navigate to the settings screen
  */
 export const navigateToSettings = () => {
-	router.push('/(tabs)/settings');
+	router.push('/(stack)/settings');
 };
