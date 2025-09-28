@@ -1,9 +1,10 @@
 import React, {
-	useState,
-	useRef,
 	useEffect,
-	useCallback,
+	useMemo,
+	useRef,
+	useState,
 	useContext,
+	useCallback,
 } from 'react';
 import {
 	View,
@@ -18,320 +19,332 @@ import {
 	Modal,
 	TouchableOpacity,
 } from 'react-native';
-import { RectButton, BorderlessButton } from 'react-native-gesture-handler';
+import { RectButton } from 'react-native-gesture-handler';
 import { useForm, Controller } from 'react-hook-form';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFonts } from 'expo-font';
 import { TransactionContext } from '../../../src/context/transactionContext';
 import { useGoal, Goal } from '../../../src/context/goalContext';
+import { useBudget, Budget } from '../../../src/context/budgetContext';
 import { navigateToGoalsWithModal } from '../../../src/utils/navigationUtils';
 
+/**
+ * TransactionScreen (Pro)
+ * ---------------------------------------------------
+ * Polished, production‑minded entry screen for Income/Expense:
+ * • Robust validation with two‑decimal currency control
+ * • Clear mode separation (income vs expense)
+ * • Goal chips for income, Budget chips for expense
+ * • Accessible, test‑friendly, double‑tap safe primary CTA
+ * • Consistent empty states + helpful copy
+ */
+
 interface TransactionFormData {
-	type: 'income' | 'expense';
+	type?: 'income' | 'expense';
 	description: string;
-	amount: string;
-	goals: Goal[];
-	date: string;
+	amount: string; // string for input friendliness
+	goals?: Goal[];
+	budgets?: Budget[];
+	date: string; // yyyy-mm-dd
 	target?: string;
 	targetModel?: 'Budget' | 'Goal';
-	category?: string;
 }
 
-// Utility function to get local date in ISO format
+// ---------- Utils
 const getLocalIsoDate = (): string => {
 	const today = new Date();
-	// Adjust for timezone offset to ensure we get the correct local date
 	const offset = today.getTimezoneOffset();
-	const localDate = new Date(today.getTime() - offset * 60 * 1000);
-	return localDate.toISOString().split('T')[0];
+	const local = new Date(today.getTime() - offset * 60 * 1000);
+	return local.toISOString().split('T')[0];
 };
 
-//
-//  FUNCTIONS START======f=========================================
-// Transaction categories for expenses
-const EXPENSE_CATEGORIES = [
-	{
-		id: 'food',
-		name: 'Food & Dining',
-		icon: 'restaurant-outline',
-		color: '#FF6B6B',
-	},
-	{
-		id: 'transport',
-		name: 'Transportation',
-		icon: 'car-outline',
-		color: '#4ECDC4',
-	},
-	{
-		id: 'entertainment',
-		name: 'Entertainment',
-		icon: 'game-controller-outline',
-		color: '#45B7D1',
-	},
-	{ id: 'shopping', name: 'Shopping', icon: 'bag-outline', color: '#96CEB4' },
-	{
-		id: 'health',
-		name: 'Health & Fitness',
-		icon: 'fitness-outline',
-		color: '#FFEAA7',
-	},
-	{
-		id: 'bills',
-		name: 'Bills & Utilities',
-		icon: 'receipt-outline',
-		color: '#DDA0DD',
-	},
-	{
-		id: 'other',
-		name: 'Other',
-		icon: 'ellipsis-horizontal-outline',
-		color: '#95A5A6',
-	},
-];
+// Allow only digits + one dot, clamp to two decimals
+const sanitizeCurrency = (value: string): string => {
+	const cleaned = value.replace(/[^0-9.]/g, '');
+	if (!cleaned) return '';
+	const [int, ...rest] = cleaned.split('.');
+	const decimals = rest.join('');
+	const two = decimals.slice(0, 2);
+	return rest.length > 0 ? `${int}.${two}` : int;
+};
 
-const AddTransactionScreen = () => {
+const prettyCurrency = (value: string): string => {
+	const num = Number(value);
+	if (!isFinite(num) || num <= 0) return '$0.00';
+	return new Intl.NumberFormat('en-US', {
+		style: 'currency',
+		currency: 'USD',
+	}).format(num);
+};
+
+const isIOS = Platform.OS === 'ios';
+
+const TransactionScreen = () => {
 	const router = useRouter();
-	const amountInputRef = useRef<TextInput>(null);
+	const params = useLocalSearchParams<{ mode?: 'income' | 'expense' }>();
+	const amountRef = useRef<TextInput>(null);
+
+	const [mode, setMode] = useState<'income' | 'expense'>(
+		params.mode === 'expense' ? 'expense' : 'income'
+	);
 	const [selectedGoals, setSelectedGoals] = useState<Goal[]>([]);
-	const [resetNumberPad, setResetNumberPad] = useState(false);
+	const [selectedBudgets, setSelectedBudgets] = useState<Budget[]>([]);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [showDatePicker, setShowDatePicker] = useState(false);
-	const [fontsLoaded] = useFonts({
-		...Ionicons.font,
-	});
+
 	const { addTransaction } = useContext(TransactionContext);
 	const { goals, isLoading: goalsLoading } = useGoal();
+	const { budgets, isLoading: budgetsLoading } = useBudget();
+
+	const ready = mode === 'income' ? !goalsLoading : !budgetsLoading;
+
+	// Keep URL in sync without navigation transition
+	useEffect(() => {
+		if ((params.mode ?? 'income') !== mode) {
+			router.setParams({ mode });
+		}
+	}, [mode, params.mode, router]);
 
 	const {
 		control,
 		handleSubmit,
 		setValue,
 		watch,
-		formState: { errors },
+		trigger,
+		formState: { errors, isValid },
 		clearErrors,
+		reset,
 	} = useForm<TransactionFormData>({
 		defaultValues: {
-			type: 'income',
 			description: '',
 			amount: '',
 			goals: [],
+			budgets: [],
 			date: getLocalIsoDate(),
 			target: undefined,
 			targetModel: undefined,
-			category: undefined,
 		},
 		mode: 'onChange',
 	});
 
 	const amount = watch('amount');
+	const description = watch('description');
+	const selectedDate = watch('date');
 
-	// Memoize the setValue function to prevent infinite re-renders
-	const handleAmountChange = useCallback(
-		(value: string) => {
-			console.log('[Transaction] handleAmountChange called with:', value);
-			setValue('amount', value);
+	// Focus amount on mount for speed entry
+	useEffect(() => {
+		const t = setTimeout(() => amountRef.current?.focus(), 350);
+		return () => clearTimeout(t);
+	}, []);
+
+	// Keep caret at end for manual edits
+	useEffect(() => {
+		if (amountRef.current) {
+			const len = amount?.length ?? 0;
+			amountRef.current.setNativeProps({ selection: { start: len, end: len } });
+		}
+	}, [amount]);
+
+	const amountNumber = useMemo(() => Number(amount), [amount]);
+	const canSubmit =
+		isValid && !isSubmitting && amountNumber > 0 && !!description?.trim();
+
+	// ---------- Handlers
+	const onToggleGoal = useCallback(
+		(goal: Goal) => {
+			const exists = selectedGoals.some((g) => g.id === goal.id);
+			const next = exists
+				? selectedGoals.filter((g) => g.id !== goal.id)
+				: [...selectedGoals, goal];
+			setSelectedGoals(next);
+			setValue('goals', next, { shouldValidate: false });
+		},
+		[selectedGoals, setValue]
+	);
+
+	const onToggleBudget = useCallback(
+		(budget: Budget) => {
+			const exists = selectedBudgets.some((b) => b.id === budget.id);
+			const next = exists
+				? selectedBudgets.filter((b) => b.id !== budget.id)
+				: [...selectedBudgets, budget];
+			setSelectedBudgets(next);
+			setValue('budgets', next, { shouldValidate: false });
+		},
+		[selectedBudgets, setValue]
+	);
+
+	const onChangeAmount = useCallback(
+		(text: string) => {
+			const sanitized = sanitizeCurrency(text);
+			setValue('amount', sanitized, { shouldValidate: true });
 		},
 		[setValue]
 	);
 
-	// Reset the resetNumberPad state after it's been used
-	useEffect(() => {
-		if (resetNumberPad) {
-			const timer = setTimeout(() => {
-				setResetNumberPad(false);
-			}, 100);
-			return () => clearTimeout(timer);
-		}
-	}, [resetNumberPad]);
-
-	useEffect(() => {
-		if (amountInputRef.current) {
-			amountInputRef.current.setNativeProps({
-				selection: {
-					start: amount.length,
-					end: amount.length,
-				},
-			});
-		}
-	}, [amount]);
-
-	// ==========================================
-	// Loading State Component
-	// ==========================================
-	const LoadingState = () => (
-		<View style={styles.loadingContainer}>
-			<ActivityIndicator size="large" color="#00a2ff" />
-			<Text style={styles.loadingText}>Loading...</Text>
-		</View>
-	);
-
-	// ==========================================
-	// Error State Component
-	// ==========================================
-	const ErrorState = () => (
-		<View style={styles.errorContainer}>
-			<View style={styles.errorContent}>
-				<Ionicons name="warning-outline" size={64} color="#ff6b6b" />
-				<Text style={styles.errorTitle}>Unable to Load</Text>
-				<Text style={styles.errorSubtext}>
-					There was a problem loading the transaction form. Please try again.
-				</Text>
-				<RectButton
-					style={styles.errorButton}
-					onPress={() => router.replace('/(tabs)/transaction')}
-				>
-					<Ionicons name="refresh" size={20} color="#fff" />
-					<Text style={styles.errorButtonText}>Retry</Text>
-				</RectButton>
-			</View>
-		</View>
-	);
-
-	// ==========================================
-	// Main Render
-	// ==========================================
-	// Show loading state while fonts or goals are loading
-	if (!fontsLoaded || goalsLoading) {
-		return <LoadingState />;
-	}
-
-	// Show error state if there's a critical error
-	if (false) {
-		// Add actual error condition here if needed
-		return <ErrorState />;
-	}
+	const onBlurAmount = useCallback(() => {
+		const n = Number(amount);
+		if (isFinite(n) && n > 0)
+			setValue('amount', n.toFixed(2), { shouldValidate: true });
+		trigger('amount');
+	}, [amount, setValue, trigger]);
 
 	const onSubmit = async (data: TransactionFormData) => {
-		console.log('[Transaction] onSubmit called with data:', data);
-
-		// Clear any previous errors
 		clearErrors();
 
-		// Validate required fields
-		if (!data.amount || data.amount.trim() === '') {
-			Alert.alert('Error', 'Please enter an amount');
-			return;
-		}
-
-		if (!data.description || data.description.trim() === '') {
-			Alert.alert('Error', 'Please enter a description');
-			return;
-		}
+		if (!data.amount?.trim())
+			return Alert.alert('Missing amount', 'Please enter an amount.');
+		if (!data.description?.trim())
+			return Alert.alert(
+				'Missing description',
+				'Please add a short description.'
+			);
 
 		try {
 			setIsSubmitting(true);
 
-			// Validate amount
-			const amount = parseFloat(data.amount);
-			console.log('[Transaction] Parsed amount:', amount);
-			if (isNaN(amount) || amount <= 0) {
-				console.log('[Transaction] Amount validation failed');
-				Alert.alert('Error', 'Please enter a valid amount greater than 0');
-				return;
+			const amt = Number(data.amount);
+			if (!isFinite(amt) || amt <= 0) {
+				return Alert.alert('Invalid amount', 'Enter an amount greater than 0.');
 			}
 
-			// Create transaction data
-			const transactionData: any = {
+			const isIncome = mode === 'income';
+			const payload: any = {
 				description: data.description.trim(),
-				amount: data.type === 'expense' ? -Math.abs(amount) : Math.abs(amount), // Negative for expenses
+				amount: isIncome ? Math.abs(amt) : -Math.abs(amt),
 				date: data.date,
-				type: data.type,
+				type: isIncome ? 'income' : 'expense',
 			};
 
-			// Add category for expenses
-			if (data.type === 'expense' && data.category) {
-				transactionData.category = data.category;
-			}
-
-			// If a goal is selected, associate with that goal
-			if (selectedGoals.length > 0) {
-				transactionData.target = selectedGoals[0].id;
-				transactionData.targetModel = 'Goal';
+			if (isIncome) {
+				if (selectedGoals.length > 0) {
+					payload.target = selectedGoals[0].id;
+					payload.targetModel = 'Goal';
+				}
 			} else {
-				// No goal selected - this will be categorized as "Other"
-				console.log(
-					'[Transaction] Creating transaction without specific goal target'
-				);
+				if (selectedBudgets.length > 0) {
+					payload.target = selectedBudgets[0].id;
+					payload.targetModel = 'Budget';
+				}
 			}
 
-			// Use the context's addTransaction method
-			await addTransaction(transactionData);
+			await addTransaction(payload);
 
-			console.log('Transaction saved successfully!');
-
-			// Show success feedback
 			Alert.alert(
 				'Success',
-				`${
-					data.type === 'income' ? 'Income' : 'Expense'
-				} transaction saved successfully!`,
+				`${isIncome ? 'Income' : 'Expense'} saved successfully!`,
 				[
 					{
 						text: 'OK',
 						onPress: () => {
-							// Reset form values
-							setValue('description', '');
-							setValue('amount', '');
-							setValue('goals', []);
-							setValue('date', getLocalIsoDate());
-							setValue('type', 'income');
-							setValue('category', undefined);
-
-							// Reset selected goals
+							reset({
+								description: '',
+								amount: '',
+								goals: [],
+								budgets: [],
+								date: getLocalIsoDate(),
+								target: undefined,
+								targetModel: undefined,
+							});
 							setSelectedGoals([]);
-
-							// Reset NumberPad
-							setResetNumberPad(true);
-
-							// Navigate back to the previous screen
-							if (router.canGoBack()) {
-								router.back();
-							} else {
-								router.replace('/(tabs)/dashboard');
-							}
+							setSelectedBudgets([]);
+							if (router.canGoBack()) router.back();
+							else router.replace('/(tabs)/dashboard');
 						},
 					},
 				]
 			);
-		} catch (error) {
-			console.error('Error saving transaction:', error);
-			Alert.alert('Error', 'Failed to save transaction. Please try again.');
+		} catch (e) {
+			console.log('Save transaction error', e);
+			Alert.alert('Error', 'Failed to save. Please try again.');
 		} finally {
 			setIsSubmitting(false);
 		}
 	};
 
-	const toggleGoalSelection = (goal: Goal) => {
-		const newSelectedGoals = selectedGoals.some((g) => g.id === goal.id)
-			? selectedGoals.filter((g) => g.id !== goal.id)
-			: [...selectedGoals, goal];
+	// ---------- UI bits
+	const Header = () => (
+		<View style={styles.header}>
+			<View style={styles.headerRow}>
+				<Text style={styles.title}>
+					{mode === 'income' ? 'Add Income' : 'Add Expense'}
+				</Text>
+				<View style={styles.badges}>
+					{mode === 'income' ? (
+						<>
+							<View style={styles.badge}>
+								<Ionicons name="trophy-outline" size={14} color="#007AFF" />
+								<Text style={styles.badgeText}>Goal Deposit</Text>
+							</View>
+							<View style={styles.badge}>
+								<Ionicons name="sparkles-outline" size={14} color="#007AFF" />
+								<Text style={styles.badgeText}>Auto‑Allocate</Text>
+							</View>
+						</>
+					) : (
+						<>
+							<View style={styles.badge}>
+								<Ionicons name="wallet-outline" size={14} color="#FF6B6B" />
+								<Text style={styles.badgeText}>Budget Tracking</Text>
+							</View>
+							<View style={styles.badge}>
+								<Ionicons name="repeat-outline" size={14} color="#FF6B6B" />
+								<Text style={styles.badgeText}>Auto‑Suggest</Text>
+							</View>
+						</>
+					)}
+				</View>
+			</View>
+			<Text style={styles.subtitle}>
+				{mode === 'income'
+					? 'Enter amount and details. Tag a goal, or leave unassigned to allocate later.'
+					: 'Enter amount and details. Tag a budget, or leave uncategorized to file later.'}
+			</Text>
+		</View>
+	);
 
-		setSelectedGoals(newSelectedGoals);
-		setValue('goals', newSelectedGoals);
+	const PreviewSummary = () => {
+		const amountText = prettyCurrency(amount || '');
+		const targetText =
+			mode === 'income'
+				? selectedGoals.length > 0
+					? ` • Goal: ${selectedGoals[0].name}`
+					: ' • No goal selected'
+				: selectedBudgets.length > 0
+				? ` • Budget: ${selectedBudgets[0].name}`
+				: ' • No budget selected';
+
+		return (
+			<View style={styles.previewCard} accessibilityRole="summary">
+				<View style={styles.previewRow}>
+					<Ionicons
+						name={
+							mode === 'income' ? 'file-tray-full-outline' : 'file-tray-outline'
+						}
+						size={18}
+						color="#111"
+					/>
+					<Text style={styles.previewTitle}>This will create</Text>
+				</View>
+				<Text style={styles.previewLine}>
+					<Text style={styles.previewEmph}>{amountText}</Text>{' '}
+					{mode === 'income' ? 'income' : 'expense'} on{' '}
+					{new Date(selectedDate).toLocaleDateString()} {targetText}
+				</Text>
+				<Text style={styles.previewHint}>
+					{mode === 'income'
+						? "If you don't pick a goal, the deposit is saved without a target — you can allocate later."
+						: "If you don't pick a budget, the expense is saved without a target — you can categorize later."}
+				</Text>
+			</View>
+		);
 	};
 
-	const selectedTransactionType = watch('type');
-	const selectedCategory = watch('category');
-	const selectedDate = watch('date');
-
-	// Format date for display
-	const formatDate = (dateString: string) => {
-		const date = new Date(dateString);
-		return date.toLocaleDateString('en-US', {
-			weekday: 'short',
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric',
-		});
-	};
-
-	// Date picker component
 	const DatePickerModal = () => (
 		<Modal
 			visible={showDatePicker}
-			transparent={true}
+			transparent
 			animationType="slide"
 			onRequestClose={() => setShowDatePicker(false)}
 		>
@@ -346,28 +359,26 @@ const AddTransactionScreen = () => {
 							<Ionicons name="close" size={24} color="#666" />
 						</TouchableOpacity>
 					</View>
-
 					<ScrollView style={styles.datePickerContent}>
-						{/* Generate date options for the last 30 days and next 7 days */}
 						{Array.from({ length: 37 }, (_, i) => {
-							const date = new Date();
-							date.setDate(date.getDate() - 30 + i);
-							const dateString = date.toISOString().split('T')[0];
+							const d = new Date();
+							d.setDate(d.getDate() - 30 + i);
+							const iso = d.toISOString().split('T')[0];
 							const isToday = i === 30;
-							const isSelected = selectedDate === dateString;
-
+							const isSelected = selectedDate === iso;
 							return (
 								<TouchableOpacity
-									key={dateString}
+									key={iso}
 									style={[
 										styles.dateOption,
 										isSelected && styles.dateOptionSelected,
 										isToday && styles.dateOptionToday,
 									]}
 									onPress={() => {
-										setValue('date', dateString);
+										setValue('date', iso);
 										setShowDatePicker(false);
 									}}
+									hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
 								>
 									<Text
 										style={[
@@ -376,8 +387,13 @@ const AddTransactionScreen = () => {
 											isToday && styles.dateOptionTextToday,
 										]}
 									>
-										{formatDate(dateString)}
-										{isToday && ' (Today)'}
+										{d.toLocaleDateString('en-US', {
+											weekday: 'short',
+											year: 'numeric',
+											month: 'short',
+											day: 'numeric',
+										})}
+										{isToday ? ' (Today)' : ''}
 									</Text>
 								</TouchableOpacity>
 							);
@@ -388,576 +404,442 @@ const AddTransactionScreen = () => {
 		</Modal>
 	);
 
-	//
-	// MAIN COMPONENT===============================================
 	return (
-		<View style={styles.container}>
-			<SafeAreaView style={styles.safeArea} edges={['top']}>
-				<View style={styles.mainContainer}>
-					<View style={styles.topContainer}>
-						{/* Transaction Type Selector */}
-						<View style={styles.transactionTypeContainer}>
-							<Text style={styles.sectionLabel}>Transaction Type</Text>
-							<View style={styles.transactionTypeButtons}>
-								<RectButton
+		<SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+			<View
+				style={[
+					styles.screen,
+					{ opacity: ready ? 1 : 0, transform: [{ scale: ready ? 1 : 0.98 }] },
+				]}
+			>
+				{/* Mode Switcher */}
+				<View style={styles.modeSwitcher}>
+					<TouchableOpacity
+						style={[
+							styles.modeButton,
+							mode === 'income' && styles.modeButtonActive,
+						]}
+						onPress={() => setMode('income')}
+						accessibilityRole="button"
+						accessibilityState={{ selected: mode === 'income' }}
+						testID="mode-income"
+					>
+						<Ionicons
+							name="add-circle-outline"
+							size={20}
+							color={mode === 'income' ? '#fff' : '#007ACC'}
+						/>
+						<Text
+							style={[
+								styles.modeButtonText,
+								mode === 'income' && styles.modeButtonTextActive,
+							]}
+						>
+							Income
+						</Text>
+					</TouchableOpacity>
+					<TouchableOpacity
+						style={[
+							styles.modeButton,
+							mode === 'expense' && styles.modeButtonActive,
+						]}
+						onPress={() => setMode('expense')}
+						accessibilityRole="button"
+						accessibilityState={{ selected: mode === 'expense' }}
+						testID="mode-expense"
+					>
+						<Ionicons
+							name="remove-circle-outline"
+							size={20}
+							color={mode === 'expense' ? '#fff' : '#FF6B6B'}
+						/>
+						<Text
+							style={[
+								styles.modeButtonText,
+								mode === 'expense' && styles.modeButtonTextActive,
+							]}
+						>
+							Expense
+						</Text>
+					</TouchableOpacity>
+				</View>
+
+				<ScrollView
+					style={styles.scrollView}
+					contentContainerStyle={styles.scrollContent}
+					keyboardShouldPersistTaps="handled"
+					showsVerticalScrollIndicator={false}
+				>
+					<Header />
+
+					{/* Amount */}
+					<View style={styles.amountWrap}>
+						<Ionicons
+							name="logo-usd"
+							size={22}
+							color="#111"
+							style={{ marginRight: 6 }}
+						/>
+						<Controller
+							control={control}
+							name="amount"
+							rules={{
+								required: 'Amount is required',
+								validate: (v) =>
+									Number(v) > 0 || 'Enter an amount greater than 0',
+							}}
+							render={({ field: { value, onBlur } }) => (
+								<TextInput
+									ref={amountRef}
 									style={[
-										styles.transactionTypeButton,
-										selectedTransactionType === 'income' &&
-											styles.transactionTypeButtonActive,
+										styles.amountInput,
+										errors.amount && styles.inputError,
 									]}
-									onPress={() => {
-										setValue('type', 'income');
-										setValue('category', undefined); // Clear category when switching to income
+									placeholder="0.00"
+									placeholderTextColor="#9e9e9e"
+									keyboardType="decimal-pad"
+									value={value}
+									onChangeText={onChangeAmount}
+									onBlur={() => {
+										onBlur();
+										onBlurAmount();
 									}}
-								>
-									<Ionicons
-										name="trending-up-outline"
-										size={20}
-										color={
-											selectedTransactionType === 'income' ? '#fff' : '#00a2ff'
-										}
-									/>
-									<Text
-										style={[
-											styles.transactionTypeButtonText,
-											selectedTransactionType === 'income' &&
-												styles.transactionTypeButtonTextActive,
-										]}
-									>
-										Income
-									</Text>
-								</RectButton>
-								<RectButton
-									style={[
-										styles.transactionTypeButton,
-										selectedTransactionType === 'expense' &&
-											styles.transactionTypeButtonActive,
-									]}
-									onPress={() => setValue('type', 'expense')}
-								>
-									<Ionicons
-										name="trending-down-outline"
-										size={20}
-										color={
-											selectedTransactionType === 'expense' ? '#fff' : '#FF6B6B'
-										}
-									/>
-									<Text
-										style={[
-											styles.transactionTypeButtonText,
-											selectedTransactionType === 'expense' &&
-												styles.transactionTypeButtonTextActive,
-										]}
-									>
-										Expense
-									</Text>
-								</RectButton>
-							</View>
-						</View>
+									accessibilityLabel={`${mode} amount`}
+									accessibilityHint="Enter dollars and cents"
+									returnKeyType="next"
+								/>
+							)}
+						/>
+					</View>
+					{errors.amount && (
+						<Text style={styles.errorText}>
+							{String(errors.amount.message)}
+						</Text>
+					)}
 
-						<View style={styles.inputAmountContainer}>
-							<Ionicons
-								name="logo-usd"
-								size={24}
-								color="black"
-								style={styles.dollarIcon}
-							/>
-							<Controller
-								control={control}
-								name="amount"
-								render={({
-									field: { value, onChange },
-								}: {
-									field: { value: string; onChange: (value: string) => void };
-								}) => (
-									<TextInput
-										ref={amountInputRef}
-										style={styles.inputAmount}
-										placeholder="0"
-										placeholderTextColor={'#000000'}
-										value={value}
-										onChangeText={onChange}
-										showSoftInputOnFocus={false}
-										accessibilityLabel="Amount input"
-										accessibilityHint="Enter the transaction amount"
-									/>
-								)}
-							/>
-						</View>
+					{/* Date */}
+					<View style={styles.section}>
+						<Text style={styles.sectionTitle}>Date</Text>
+						<TouchableOpacity
+							style={styles.dateSelector}
+							onPress={() => setShowDatePicker(true)}
+							accessibilityLabel="Select date"
+							accessibilityHint="Opens date picker"
+							testID="select-date"
+						>
+							<Ionicons name="calendar-outline" size={18} color="#007AFF" />
+							<Text style={styles.dateText}>
+								{new Date(selectedDate).toLocaleDateString()}
+							</Text>
+							<Ionicons name="chevron-down" size={16} color="#666" />
+						</TouchableOpacity>
+					</View>
 
-						{/* Category Selector for Expenses */}
-						{selectedTransactionType === 'expense' && (
-							<View style={styles.carouselContainer}>
-								<Text style={styles.carouselLabel}>Category</Text>
-								<ScrollView horizontal showsHorizontalScrollIndicator={false}>
-									{EXPENSE_CATEGORIES.map((category) => (
-										<RectButton
-											key={category.id}
-											onPress={() => setValue('category', category.id)}
-											style={[
-												styles.carouselTextWrapper,
-												selectedCategory === category.id && styles.selectedTag,
-											]}
-										>
-											<Ionicons
-												name={category.icon as keyof typeof Ionicons.glyphMap}
-												size={16}
-												color={
-													selectedCategory === category.id
-														? 'white'
-														: category.color
-												}
-												style={styles.carouselIcon}
-											/>
-											<Text
-												style={[
-													styles.carouselText,
-													selectedCategory === category.id &&
-														styles.selectedTagText,
-												]}
-											>
-												{category.name}
-											</Text>
-										</RectButton>
-									))}
-								</ScrollView>
-							</View>
-						)}
-
-						{/* Date Selector */}
-						<View style={styles.dateSelectorContainer}>
-							<Text style={styles.sectionLabel}>Date</Text>
-							<TouchableOpacity
-								style={styles.dateSelectorButton}
-								onPress={() => setShowDatePicker(true)}
-								accessibilityLabel="Select transaction date"
-								accessibilityHint="Double tap to open date picker"
-							>
-								<Ionicons name="calendar-outline" size={20} color="#00a2ff" />
-								<Text style={styles.dateSelectorText}>
-									{formatDate(selectedDate)}
-								</Text>
-								<Ionicons name="chevron-down" size={16} color="#666" />
-							</TouchableOpacity>
-						</View>
-
-						{/* Goals Carousel */}
-						<View style={styles.carouselContainer}>
-							<Text style={styles.carouselLabel}>Goals (Optional)</Text>
+					{/* Goals (Income) / Budgets (Expense) */}
+					{mode === 'income' ? (
+						<View style={styles.section}>
+							<Text style={styles.sectionTitle}>Goals (Optional)</Text>
 							<ScrollView horizontal showsHorizontalScrollIndicator={false}>
-								{goals.map((goal, index) => (
-									<RectButton
-										key={index}
-										onPress={() => toggleGoalSelection(goal)}
-										style={[
-											styles.carouselTextWrapper,
-											selectedGoals.some((g) => g.id === goal.id) &&
-												styles.selectedTag,
-										]}
-									>
-										<Ionicons
-											name={goal.icon as keyof typeof Ionicons.glyphMap}
-											size={16}
-											color={
-												selectedGoals.some((g) => g.id === goal.id)
-													? 'white'
-													: goal.color
-											}
-											style={styles.carouselIcon}
-										/>
-										<Text
-											style={[
-												styles.carouselText,
-												selectedGoals.some((g) => g.id === goal.id) &&
-													styles.selectedTagText,
-											]}
-										>
-											{goal.name}
-										</Text>
-									</RectButton>
-								))}
+								{goals.length === 0 ? (
+									<View style={styles.emptyChip}>
+										<Text style={styles.emptyChipText}>No goals yet</Text>
+									</View>
+								) : (
+									goals.map((g) => {
+										const active = selectedGoals.some((x) => x.id === g.id);
+										return (
+											<RectButton
+												key={g.id}
+												onPress={() => onToggleGoal(g)}
+												style={[styles.tag, active && styles.tagActive]}
+												testID={`goal-${g.id}`}
+											>
+												<Ionicons
+													name={(g.icon as any) ?? 'flag-outline'}
+													size={16}
+													color={active ? '#fff' : g.color || '#007AFF'}
+													style={{ marginRight: 6 }}
+												/>
+												<Text
+													style={[
+														styles.tagText,
+														active && styles.tagTextActive,
+													]}
+												>
+													{g.name}
+												</Text>
+											</RectButton>
+										);
+									})
+								)}
 								<RectButton
 									onPress={navigateToGoalsWithModal}
 									style={styles.addButton}
+									testID="add-goal"
 								>
-									<Ionicons name="add-outline" size={24} color="#757575" />
+									<Ionicons name="add-outline" size={22} color="#757575" />
 								</RectButton>
 							</ScrollView>
+							<Text style={styles.helperText}>
+								Pick a goal to deposit into, or leave blank to keep funds
+								unassigned.
+							</Text>
 						</View>
+					) : (
+						<View style={styles.section}>
+							<Text style={styles.sectionTitle}>Budgets (Optional)</Text>
+							<ScrollView horizontal showsHorizontalScrollIndicator={false}>
+								{budgets.length === 0 ? (
+									<View style={styles.emptyChip}>
+										<Text style={styles.emptyChipText}>No budgets yet</Text>
+									</View>
+								) : (
+									budgets.map((b) => {
+										const active = selectedBudgets.some((x) => x.id === b.id);
+										return (
+											<RectButton
+												key={b.id}
+												onPress={() => onToggleBudget(b)}
+												style={[styles.tag, active && styles.tagActive]}
+												testID={`budget-${b.id}`}
+											>
+												<Ionicons
+													name={(b.icon as any) ?? 'wallet-outline'}
+													size={16}
+													color={active ? '#fff' : b.color || '#FF6B6B'}
+													style={{ marginRight: 6 }}
+												/>
+												<Text
+													style={[
+														styles.tagText,
+														active && styles.tagTextActive,
+													]}
+												>
+													{b.name}
+												</Text>
+											</RectButton>
+										);
+									})
+								)}
+							</ScrollView>
+							<Text style={styles.helperText}>
+								Pick a budget to charge, or leave blank to categorize later.
+							</Text>
+						</View>
+					)}
 
-						<KeyboardAvoidingView
-							behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-						>
+					{/* Description */}
+					<KeyboardAvoidingView behavior={isIOS ? 'padding' : undefined}>
+						<View style={styles.section}>
+							<Text style={styles.sectionTitle}>What is this {mode}?</Text>
 							<Controller
 								control={control}
 								name="description"
-								render={({
-									field: { value, onChange },
-								}: {
-									field: { value: string; onChange: (value: string) => void };
-								}) => (
+								rules={{ required: 'Please enter a short description' }}
+								render={({ field: { value, onChange, onBlur } }) => (
 									<TextInput
 										style={[
-											styles.inputDescription,
+											styles.input,
 											errors.description && styles.inputError,
 										]}
-										placeholder="What's this for?"
-										placeholderTextColor={'#a3a3a3'}
+										placeholder={
+											mode === 'income'
+												? 'e.g., Paycheck, freelance invoice, refund…'
+												: 'e.g., Groceries, gas, subscription…'
+										}
+										placeholderTextColor="#a3a3a3"
 										value={value}
-										onChangeText={onChange}
-										accessibilityLabel="Transaction description"
-										accessibilityHint="Enter a description for this transaction"
+										onChangeText={(t) => {
+											onChange(t);
+										}}
+										onBlur={() => {
+											onBlur();
+											trigger('description');
+										}}
+										accessibilityLabel={`${mode} description`}
+										maxLength={120}
 									/>
 								)}
 							/>
+							<View style={styles.fieldMetaRow}>
+								<Text style={styles.fieldMetaText}>
+									{description?.length ?? 0}/120
+								</Text>
+							</View>
 							{errors.description && (
 								<Text style={styles.errorText}>
-									{errors.description.message}
+									{String(errors.description.message)}
 								</Text>
 							)}
-						</KeyboardAvoidingView>
-
-						<View style={styles.transactionButtonsContainer}>
-							<View style={styles.transactionButtonContainer}>
-								<RectButton
-									style={[
-										styles.transactionButton,
-										isSubmitting && styles.transactionButtonDisabled,
-									]}
-									onPress={() => {
-										if (isSubmitting) return;
-										console.log('[Transaction] Submit button pressed');
-										console.log('[Transaction] Current form values:', {
-											amount: watch('amount'),
-											description: watch('description'),
-											type: watch('type'),
-											date: watch('date'),
-											category: watch('category'),
-										});
-										console.log('[Transaction] Form errors:', errors);
-										handleSubmit(onSubmit)();
-									}}
-									accessibilityLabel={`Submit ${selectedTransactionType} transaction`}
-									accessibilityHint="Double tap to save the transaction"
-								>
-									{isSubmitting ? (
-										<>
-											<ActivityIndicator size="small" color="#fff" />
-											<Text style={styles.transactionButtonText}>
-												Saving...
-											</Text>
-										</>
-									) : (
-										<Text style={styles.transactionButtonText}>
-											{selectedTransactionType === 'income'
-												? 'Add Income'
-												: 'Add Expense'}
-										</Text>
-									)}
-								</RectButton>
-							</View>
 						</View>
-					</View>
-					<View style={styles.topNumPadContainer}>
-						<NumberPad
-							onValueChange={handleAmountChange}
-							reset={resetNumberPad}
-							value={watch('amount')}
-						/>
-					</View>
+					</KeyboardAvoidingView>
+
+					{/* Preview */}
+					<PreviewSummary />
+
+					{/* CTAs */}
+					<View style={{ height: 12 }} />
+					<RectButton
+						style={[styles.primaryBtn, !canSubmit && styles.primaryBtnDisabled]}
+						enabled={canSubmit}
+						onPress={() => {
+							if (isSubmitting) return; // double‑tap safe
+							handleSubmit(onSubmit)();
+						}}
+						accessibilityLabel={`Save ${mode}`}
+						testID="save-transaction"
+					>
+						{isSubmitting ? (
+							<>
+								<ActivityIndicator size="small" color="#fff" />
+								<Text style={styles.primaryBtnText}>Saving…</Text>
+							</>
+						) : (
+							<Text style={styles.primaryBtnText}>
+								{mode === 'income' ? 'Save Income' : 'Save Expense'}
+							</Text>
+						)}
+					</RectButton>
+					<TouchableOpacity
+						style={styles.secondaryBtn}
+						onPress={() => {
+							reset({
+								description: '',
+								amount: '',
+								goals: [],
+								budgets: [],
+								date: getLocalIsoDate(),
+								target: undefined,
+								targetModel: undefined,
+							});
+							setSelectedGoals([]);
+							setSelectedBudgets([]);
+						}}
+						accessibilityRole="button"
+						testID="reset-form"
+					>
+						<Text style={styles.secondaryBtnText}>Reset</Text>
+					</TouchableOpacity>
+
+					<View style={{ height: 24 }} />
+				</ScrollView>
+			</View>
+
+			{!ready && (
+				<View style={styles.loadingOverlay}>
+					<ActivityIndicator size="large" color="#007AFF" />
+					<Text style={styles.loadingText}>
+						{mode === 'income' ? 'Loading goals…' : 'Loading budgets…'}
+					</Text>
 				</View>
-			</SafeAreaView>
+			)}
 			<DatePickerModal />
-		</View>
+		</SafeAreaView>
 	);
 };
 
-//
-// NUMBER PAD COMPONENT===============================================
-const NumberPad: React.FC<{
-	onValueChange: (value: string) => void;
-	reset?: boolean;
-	value?: string;
-}> = ({ onValueChange, reset = false, value: externalValue = '' }) => {
-	const [internalValue, setInternalValue] = useState(externalValue);
-	const [pressed, setPressed] = useState(false);
-
-	// Sync with external value
-	useEffect(() => {
-		setInternalValue(externalValue);
-	}, [externalValue]);
-
-	// Reset the value when reset prop changes to true
-	useEffect(() => {
-		if (reset) {
-			setInternalValue('');
-			onValueChange('');
-		}
-	}, [reset, onValueChange]);
-
-	// Use useEffect to call onValueChange when internal value changes
-	useEffect(() => {
-		if (internalValue !== externalValue) {
-			console.log('[NumberPad] Updating form value:', internalValue);
-			onValueChange(internalValue);
-		}
-	}, [internalValue, externalValue, onValueChange]);
-
-	const validateAmount = (newValue: string): boolean => {
-		// Check if empty
-		if (!newValue) return true;
-
-		// Convert to number for validation
-		const numValue = parseFloat(newValue);
-
-		// Check if greater than 0
-		if (numValue <= 0) return false;
-
-		// Check if less than 1 million
-		if (numValue > 1000000) return false;
-
-		// Check decimal places
-		if (newValue.includes('.')) {
-			const decimalPlaces = newValue.split('.')[1].length;
-			if (decimalPlaces > 2) return false;
-		}
-
-		return true;
-	};
-
-	const handlePress = (num: string) => {
-		setInternalValue((prev) => {
-			let newValue = prev + num;
-
-			// If trying to add decimal point
-			if (num === '.') {
-				// If already has decimal point, don't add another
-				if (prev.includes('.')) return prev;
-				// If empty, add '0.' instead of just '.'
-				if (!prev) newValue = '0.';
-			}
-
-			// Validate the new value
-			if (!validateAmount(newValue)) return prev;
-
-			// Limit to 9 characters total
-			newValue = newValue.slice(-9);
-			return newValue;
-		});
-	};
-
-	const handleBackspace = () => {
-		setInternalValue((prev) => {
-			const newValue = prev.slice(0, -1);
-			return newValue;
-		});
-	};
-
-	return (
-		<View style={styles.numPadContainer}>
-			<View style={styles.numPadRow}>
-				{[1, 2, 3].map((num) => (
-					<BorderlessButton
-						key={num}
-						style={styles.buttonNumLight}
-						onPress={() => handlePress(num.toString())}
-						onActiveStateChange={(active) => setPressed(!pressed)}
-					>
-						<Text style={styles.buttonText}>{num}</Text>
-					</BorderlessButton>
-				))}
-			</View>
-			<View style={styles.numPadRow}>
-				{[4, 5, 6].map((num) => (
-					<BorderlessButton
-						key={num}
-						style={styles.buttonNumLight}
-						onPress={() => handlePress(num.toString())}
-						onActiveStateChange={(active) => setPressed(!pressed)}
-					>
-						<Text style={styles.buttonText}>{num}</Text>
-					</BorderlessButton>
-				))}
-			</View>
-			<View style={styles.numPadRow}>
-				{[7, 8, 9].map((num) => (
-					<BorderlessButton
-						key={num}
-						style={styles.buttonNumLight}
-						onPress={() => handlePress(num.toString())}
-						onActiveStateChange={(active) => setPressed(!pressed)}
-					>
-						<Text style={styles.buttonText}>{num}</Text>
-					</BorderlessButton>
-				))}
-			</View>
-			<View style={styles.numPadRow}>
-				<BorderlessButton
-					style={styles.buttonNumDark}
-					onPress={() => handlePress('.')}
-					onActiveStateChange={(active) => setPressed(!pressed)}
-				>
-					<Text style={styles.buttonText}>.</Text>
-				</BorderlessButton>
-				<BorderlessButton
-					style={styles.buttonNumLight}
-					onPress={() => handlePress('0')}
-					onActiveStateChange={(active) => setPressed(!pressed)}
-				>
-					<Text style={styles.buttonText}>0</Text>
-				</BorderlessButton>
-				<BorderlessButton
-					style={styles.buttonNumDark}
-					onPress={handleBackspace}
-					onActiveStateChange={(active) => setPressed(!pressed)}
-				>
-					<Text style={styles.buttonText}>⌫</Text>
-				</BorderlessButton>
-			</View>
-		</View>
-	);
-};
-
+// ---------------- Styles ----------------
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: '#fff',
-	},
-	safeArea: {
-		flex: 1,
-		backgroundColor: '#ffffff',
-	},
-	mainContainer: {
-		flex: 1,
-		justifyContent: 'space-between',
-		backgroundColor: '#ffffff',
-	},
-	topContainer: {
-		flex: 1,
-		justifyContent: 'flex-end',
-		padding: 16,
-		paddingBottom: 16,
-	},
-	inputAmountContainer: {
+	container: { flex: 1, backgroundColor: '#fff' },
+	screen: { flex: 1 },
+	scrollView: { flex: 1 },
+	scrollContent: { padding: 16 },
+
+	// Mode Switcher
+	modeSwitcher: {
 		flexDirection: 'row',
-		justifyContent: 'center',
+		margin: 16,
+		marginBottom: 8,
+		backgroundColor: '#f2f2f2',
+		borderRadius: 12,
+		padding: 4,
+	},
+	modeButton: {
+		flex: 1,
+		flexDirection: 'row',
 		alignItems: 'center',
-		minHeight: 180,
-		maxHeight: 240,
+		justifyContent: 'center',
+		paddingVertical: 12,
+		paddingHorizontal: 16,
+		borderRadius: 8,
+		gap: 6,
 	},
-	dollarIcon: {
-		height: 40,
+	modeButtonActive: {
+		backgroundColor: '#111',
 	},
-	inputAmount: {
-		fontSize: 48,
-		fontWeight: '600',
-		textAlign: 'left',
-		marginRight: 10,
-		color: '#212121',
-	},
-	inputDescription: {
-		height: 50,
+	modeButtonText: {
 		fontSize: 16,
-		color: '#212121',
-		borderColor: '#e0e0e0',
+		fontWeight: '600',
+		color: '#6b7280',
+	},
+	modeButtonTextActive: {
+		color: '#fff',
+		fontWeight: '700',
+	},
+
+	header: { marginBottom: 8 },
+	headerRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+	},
+	title: { fontSize: 24, fontWeight: '700', color: '#111' },
+	subtitle: { color: '#616161', marginTop: 8, lineHeight: 20 },
+	badges: { flexDirection: 'row', gap: 6 },
+	badge: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+		paddingHorizontal: 10,
+		paddingVertical: 6,
+		borderRadius: 14,
+		backgroundColor: '#E8F0FE',
+	},
+	badgeText: { color: '#0A66FF', fontSize: 12, fontWeight: '600' },
+
+	amountWrap: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginTop: 18,
+		marginBottom: 6,
+	},
+	amountInput: { fontSize: 44, fontWeight: '700', color: '#111', flex: 1 },
+
+	section: { marginTop: 18 },
+	sectionTitle: {
+		fontSize: 16,
+		fontWeight: '700',
+		color: '#111',
+		marginBottom: 10,
+	},
+
+	dateSelector: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 10,
+		paddingVertical: 12,
+		paddingHorizontal: 16,
 		borderRadius: 12,
 		borderWidth: 1,
-		marginBottom: 16,
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		backgroundColor: '#fff',
-	},
-	success: {
-		color: 'green',
-		marginTop: 10,
-	},
-	transactionButtonsContainer: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		gap: 12,
-	},
-	transactionButtonContainer: {
-		flex: 1,
-	},
-	transactionButton: {
-		width: '100%',
-		alignItems: 'center',
-		justifyContent: 'center',
-		borderRadius: 12,
-		backgroundColor: '#00a2ff',
-		paddingVertical: 16,
-		paddingHorizontal: 24,
-	},
-	transactionButtonText: {
-		color: 'white',
-		fontWeight: '600',
-		fontSize: 16,
-	},
-	topNumPadContainer: {
-		padding: 8,
-		borderTopWidth: 1,
 		borderColor: '#e0e0e0',
-		backgroundColor: '#f8f9fa',
-	},
-	numPadContainer: {
-		justifyContent: 'center',
-	},
-	buttonNumLight: {
-		flex: 1,
-		paddingVertical: 8,
-		justifyContent: 'center',
-		alignItems: 'center',
-		margin: 4,
-		borderRadius: 8,
 		backgroundColor: '#fff',
 	},
-	buttonNumDark: {
-		flex: 1,
-		paddingVertical: 12,
-		justifyContent: 'center',
-		alignItems: 'center',
-		margin: 4,
-		borderRadius: 8,
-		backgroundColor: '#f0f0f0',
-	},
-	buttonText: {
-		fontSize: 24,
-		color: '#212121',
-		fontWeight: '500',
-	},
-	numPadRow: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-	},
-	carouselContainer: {
-		marginBottom: 16,
-	},
-	carouselLabel: {
-		fontSize: 16,
-		fontWeight: '600',
-		marginBottom: 12,
-		color: '#212121',
-	},
-	carouselTextWrapper: {
+	dateText: { flex: 1, fontSize: 16, color: '#111', fontWeight: '500' },
+
+	tag: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		paddingVertical: 8,
 		paddingHorizontal: 12,
-		justifyContent: 'center',
-		borderRadius: 8,
-		marginRight: 8,
+		borderRadius: 10,
 		backgroundColor: '#f8f9fa',
 		borderWidth: 1,
 		borderColor: '#e0e0e0',
+		marginRight: 8,
 	},
-	selectedTag: {
-		backgroundColor: '#00a2ff',
-		borderColor: '#00a2ff',
-	},
-	selectedTagText: {
-		color: 'white',
-		fontWeight: '600',
-	},
+	tagActive: { backgroundColor: '#00a2ff', borderColor: '#00a2ff' },
+	tagText: { color: '#111', fontWeight: '500' },
+	tagTextActive: { color: '#fff', fontWeight: '700' },
 	addButton: {
 		padding: 8,
 		justifyContent: 'center',
@@ -967,141 +849,79 @@ const styles = StyleSheet.create({
 		borderWidth: 1,
 		borderColor: '#e0e0e0',
 	},
-	loadingContainer: {
-		flex: 1,
-		justifyContent: 'center',
-		alignItems: 'center',
-		backgroundColor: '#fff',
-	},
-	loadingText: {
-		fontSize: 16,
-		fontWeight: '600',
-		marginTop: 16,
-		color: '#757575',
-	},
-	carouselIcon: {
-		marginRight: 8,
-	},
-	carouselText: {
-		fontSize: 14,
-		fontWeight: '500',
-		color: '#212121',
-	},
-	errorContainer: {
-		flex: 1,
-		justifyContent: 'center',
-		alignItems: 'center',
-		paddingHorizontal: 24,
-		backgroundColor: '#fff',
-	},
-	errorContent: {
-		alignItems: 'center',
-		maxWidth: 280,
-	},
-	errorTitle: {
-		fontSize: 24,
-		fontWeight: '600',
-		color: '#212121',
-		marginTop: 16,
-		marginBottom: 8,
-		textAlign: 'center',
-	},
-	errorSubtext: {
-		fontSize: 16,
-		color: '#757575',
-		textAlign: 'center',
-		marginBottom: 32,
-		lineHeight: 22,
-	},
-	errorButton: {
-		backgroundColor: '#00a2ff',
-		borderRadius: 12,
-		paddingVertical: 16,
-		paddingHorizontal: 24,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-	},
-	errorButtonText: {
-		color: '#FFFFFF',
-		fontSize: 16,
-		fontWeight: '600',
-	},
-	// New styles for transaction type selector
-	transactionTypeContainer: {
-		marginBottom: 20,
-	},
-	sectionLabel: {
-		fontSize: 16,
-		fontWeight: '600',
-		marginBottom: 12,
-		color: '#212121',
-	},
-	transactionTypeButtons: {
-		flexDirection: 'row',
-		gap: 12,
-	},
-	transactionTypeButton: {
-		flex: 1,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
-		paddingVertical: 12,
-		paddingHorizontal: 16,
-		borderRadius: 12,
-		borderWidth: 2,
-		borderColor: '#e0e0e0',
-		backgroundColor: '#fff',
-		gap: 8,
-	},
-	transactionTypeButtonActive: {
-		backgroundColor: '#00a2ff',
-		borderColor: '#00a2ff',
-	},
-	transactionTypeButtonText: {
-		fontSize: 16,
-		fontWeight: '600',
-		color: '#00a2ff',
-	},
-	transactionTypeButtonTextActive: {
-		color: '#fff',
-	},
-	// New styles for error handling
-	inputError: {
-		borderColor: '#FF6B6B',
-		borderWidth: 2,
-	},
-	errorText: {
-		color: '#FF6B6B',
-		fontSize: 14,
-		marginTop: 4,
-		marginLeft: 4,
-	},
-	transactionButtonDisabled: {
-		backgroundColor: '#CCC',
-		opacity: 0.7,
-	},
-	// Date picker styles
-	dateSelectorContainer: {
-		marginBottom: 16,
-	},
-	dateSelectorButton: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingVertical: 12,
-		paddingHorizontal: 16,
-		borderRadius: 12,
+	emptyChip: {
+		paddingVertical: 8,
+		paddingHorizontal: 12,
+		borderRadius: 10,
+		backgroundColor: '#f8f9fa',
 		borderWidth: 1,
 		borderColor: '#e0e0e0',
-		backgroundColor: '#fff',
-		gap: 12,
+		marginRight: 8,
 	},
-	dateSelectorText: {
-		flex: 1,
+	emptyChipText: { color: '#6b7280' },
+	helperText: { marginTop: 6, color: '#6b7280' },
+
+	input: {
+		height: 50,
 		fontSize: 16,
-		color: '#212121',
-		fontWeight: '500',
+		color: '#111',
+		borderColor: '#e0e0e0',
+		borderRadius: 12,
+		borderWidth: 1,
+		paddingHorizontal: 16,
+		paddingVertical: 12,
+		backgroundColor: '#fff',
 	},
+	inputError: { borderColor: '#FF6B6B', borderWidth: 2 },
+	errorText: { color: '#FF6B6B', fontSize: 13, marginTop: 6 },
+	fieldMetaRow: {
+		marginTop: 6,
+		flexDirection: 'row',
+		justifyContent: 'flex-end',
+	},
+	fieldMetaText: { color: '#9e9e9e', fontSize: 12 },
+
+	previewCard: {
+		marginTop: 16,
+		padding: 14,
+		backgroundColor: '#FAFAFA',
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#eee',
+	},
+	previewRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		marginBottom: 6,
+	},
+	previewTitle: { fontWeight: '700', color: '#111' },
+	previewLine: { color: '#333', marginTop: 2 },
+	previewEmph: { fontWeight: '800' },
+	previewHint: { color: '#6b7280', marginTop: 6, fontSize: 12 },
+
+	primaryBtn: {
+		marginTop: 14,
+		width: '100%',
+		alignItems: 'center',
+		justifyContent: 'center',
+		borderRadius: 12,
+		backgroundColor: '#00a2ff',
+		paddingVertical: 16,
+		flexDirection: 'row',
+		gap: 8,
+	},
+	primaryBtnDisabled: { backgroundColor: '#b0dffc' },
+	primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+	secondaryBtn: {
+		marginTop: 10,
+		alignSelf: 'center',
+		paddingVertical: 8,
+		paddingHorizontal: 12,
+	},
+	secondaryBtnText: { color: '#6b7280', fontWeight: '600' },
+
+	// Date picker styles
 	datePickerOverlay: {
 		flex: 1,
 		backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1122,41 +942,33 @@ const styles = StyleSheet.create({
 		borderBottomWidth: 1,
 		borderBottomColor: '#e0e0e0',
 	},
-	datePickerTitle: {
-		fontSize: 18,
-		fontWeight: '600',
-		color: '#212121',
-	},
-	datePickerCloseButton: {
-		padding: 4,
-	},
-	datePickerContent: {
-		maxHeight: 400,
-	},
+	datePickerTitle: { fontSize: 18, fontWeight: '700', color: '#111' },
+	datePickerCloseButton: { padding: 4 },
+	datePickerContent: { maxHeight: 400 },
 	dateOption: {
 		paddingVertical: 16,
 		paddingHorizontal: 20,
 		borderBottomWidth: 1,
 		borderBottomColor: '#f0f0f0',
 	},
-	dateOptionSelected: {
-		backgroundColor: '#f0f8ff',
+	dateOptionSelected: { backgroundColor: '#f0f8ff' },
+	dateOptionToday: { backgroundColor: '#fff3cd' },
+	dateOptionText: { fontSize: 16, color: '#111' },
+	dateOptionTextSelected: { color: '#00a2ff', fontWeight: '700' },
+	dateOptionTextToday: { color: '#856404', fontWeight: '700' },
+
+	loadingOverlay: {
+		...StyleSheet.absoluteFillObject,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#fff',
 	},
-	dateOptionToday: {
-		backgroundColor: '#fff3cd',
-	},
-	dateOptionText: {
+	loadingText: {
+		marginTop: 16,
+		color: '#616161',
 		fontSize: 16,
-		color: '#212121',
-	},
-	dateOptionTextSelected: {
-		color: '#00a2ff',
-		fontWeight: '600',
-	},
-	dateOptionTextToday: {
-		color: '#856404',
-		fontWeight: '600',
+		fontWeight: '500',
 	},
 });
 
-export default AddTransactionScreen;
+export default TransactionScreen;

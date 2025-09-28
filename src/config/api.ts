@@ -41,6 +41,12 @@ export const API_ENDPOINTS = {
 		me: `${API_BASE_URL}/api/profiles/me`,
 		user: (userId: string) => `${API_BASE_URL}/api/profiles/user/${userId}`,
 	},
+	weeklyReflections: {
+		current: `${API_BASE_URL}/api/weekly-reflections/current`,
+		save: `${API_BASE_URL}/api/weekly-reflections/save`,
+		history: `${API_BASE_URL}/api/weekly-reflections/history`,
+		stats: `${API_BASE_URL}/api/weekly-reflections/stats`,
+	},
 	// AI endpoints
 	ai: {
 		customGPT: {
