@@ -2,7 +2,10 @@
 import '../src/polyfills';
 
 import { Stack, useRouter, useSegments } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import * as SplashScreen from 'expo-splash-screen';
+import * as Font from 'expo-font';
+import { Ionicons } from '@expo/vector-icons';
 // @ts-ignore - react-query types will be available after install
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -14,6 +17,10 @@ import {
 	StatusBar,
 	Linking,
 } from 'react-native';
+import {
+	SafeAreaProvider,
+	initialWindowMetrics,
+} from 'react-native-safe-area-context';
 import useAuth, { AuthProvider } from '../src/context/AuthContext';
 import {
 	OnboardingProvider,
@@ -38,6 +45,9 @@ const DEMO_MODE = false; // Disable demo mode to enable authentication
 
 // Development mode toggle - set to true to allow onboarding access after completion
 const DEV_MODE = true; // Enable dev mode for testing onboarding
+
+// Prevent splash screen from auto-hiding
+SplashScreen.preventAutoHideAsync();
 
 // Background task registration is now handled by backgroundTaskService
 
@@ -102,22 +112,25 @@ function RootLayoutContent() {
 	const [loadingTimeout, setLoadingTimeout] = useState(false);
 
 	// Debug logging helper
-	const logState = (label: string) => {
-		console.log(`🔎 [Layout][${label}]`, {
-			loading,
-			loadingTimeout,
-			firebaseUser: !!firebaseUser,
-			user: !!user,
-			hasSeenOnboarding,
-			segments: segments.join('/'),
-			inAuthGroup: segments[0] === '(auth)',
-			inTabsGroup: segments[0] === '(tabs)',
-			inOnboardingGroup: segments[0] === '(onboarding)',
-			inStackGroup: segments[0] === '(stack)',
-			DEMO_MODE,
-			DEV_MODE,
-		});
-	};
+	const logState = useCallback(
+		(label: string) => {
+			console.log(`🔎 [Layout][${label}]`, {
+				loading,
+				loadingTimeout,
+				firebaseUser: !!firebaseUser,
+				user: !!user,
+				hasSeenOnboarding,
+				segments: segments.join('/'),
+				inAuthGroup: segments[0] === '(auth)',
+				inTabsGroup: segments[0] === '(tabs)',
+				inOnboardingGroup: segments[0] === '(onboarding)',
+				inStackGroup: segments[0] === '(stack)',
+				DEMO_MODE,
+				DEV_MODE,
+			});
+		},
+		[loading, loadingTimeout, firebaseUser, user, hasSeenOnboarding, segments]
+	);
 
 	useEffect(() => {
 		try {
@@ -322,6 +335,7 @@ function RootLayoutContent() {
 		segments,
 		isMounted,
 		router,
+		logState,
 	]);
 
 	if (DEMO_MODE) {
@@ -340,7 +354,12 @@ function RootLayoutContent() {
 						<TransactionProvider>
 							<TransactionModalProvider>
 								<DemoDataProvider>
-									<Stack>
+									<Stack
+										screenOptions={{
+											contentStyle: { backgroundColor: '#fff' },
+											animation: 'fade',
+										}}
+									>
 										<Stack.Screen
 											name="(auth)"
 											options={{ headerShown: false }}
@@ -413,22 +432,32 @@ function RootLayoutContent() {
 						<TransactionModalProvider>
 							<DemoDataProvider>
 								<GestureHandlerRootView style={{ flex: 1 }}>
-									<Stack>
+									<Stack
+										screenOptions={{
+											headerShown: false,
+											animation: 'none',
+											contentStyle: { backgroundColor: '#fff' },
+										}}
+									>
 										<Stack.Screen
 											name="(auth)"
-											options={{ headerShown: false }}
+											options={{ headerShown: false, animation: 'none' }}
 										/>
 										<Stack.Screen
 											name="(onboarding)"
-											options={{ headerShown: false }}
+											options={{ headerShown: false, animation: 'none' }}
 										/>
 										<Stack.Screen
 											name="(tabs)"
-											options={{ headerShown: false }}
+											options={{ headerShown: false, animation: 'none' }}
 										/>
 										<Stack.Screen
 											name="(stack)"
-											options={{ headerShown: false }}
+											options={{ headerShown: false, animation: 'none' }}
+										/>
+										<Stack.Screen
+											name="transaction/index"
+											options={{ headerShown: false, animation: 'none' }}
 										/>
 									</Stack>
 								</GestureHandlerRootView>
@@ -455,30 +484,99 @@ function RootLayoutContent() {
 	console.log('🧩 [Layout] Rendering: unauthenticated stack');
 	return (
 		<GestureHandlerRootView style={{ flex: 1 }}>
-			<Stack>
-				<Stack.Screen name="(auth)" options={{ headerShown: false }} />
-				<Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
-				<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-				<Stack.Screen name="(stack)" options={{ headerShown: false }} />
+			<Stack
+				screenOptions={{
+					headerShown: false,
+					animation: 'none',
+					contentStyle: { backgroundColor: '#fff' },
+				}}
+			>
+				<Stack.Screen
+					name="(auth)"
+					options={{ headerShown: false, animation: 'none' }}
+				/>
+				<Stack.Screen
+					name="(onboarding)"
+					options={{ headerShown: false, animation: 'none' }}
+				/>
+				<Stack.Screen
+					name="(tabs)"
+					options={{ headerShown: false, animation: 'none' }}
+				/>
+				<Stack.Screen
+					name="(stack)"
+					options={{ headerShown: false, animation: 'none' }}
+				/>
+				<Stack.Screen
+					name="transaction/index"
+					options={{ headerShown: false, animation: 'none' }}
+				/>
 			</Stack>
 		</GestureHandlerRootView>
 	);
 }
 
 export default function RootLayout() {
+	const [fontsLoaded, setFontsLoaded] = useState(false);
+	const [isBootDataReady, setIsBootDataReady] = useState(false);
+
+	useEffect(() => {
+		(async () => {
+			try {
+				// Load fonts and icons
+				await Font.loadAsync({
+					...Ionicons.font, // Preload vector icons
+					// Add custom fonts here if needed
+				});
+				setFontsLoaded(true);
+			} catch (error) {
+				console.warn('Failed to load fonts:', error);
+				setFontsLoaded(true);
+			}
+		})();
+	}, []);
+
+	// Track when boot data is ready (auth + initial data)
+	useEffect(() => {
+		// Set a timeout to ensure boot data is ready
+		const timer = setTimeout(() => {
+			setIsBootDataReady(true);
+		}, 1000); // Give 1 second for initial data to load
+
+		return () => clearTimeout(timer);
+	}, []);
+
+	useEffect(() => {
+		if (fontsLoaded && isBootDataReady) {
+			// Hide splash screen after fonts and boot data are ready
+			SplashScreen.hideAsync();
+		}
+	}, [fontsLoaded, isBootDataReady]);
+
+	// Don't render anything until fonts and boot data are loaded
+	if (!fontsLoaded || !isBootDataReady) {
+		return null; // Splash screen is visible
+	}
+
 	try {
 		return (
-			<QueryClientProvider client={queryClient}>
-				{/* Default status bar configuration for the entire app */}
-				<StatusBar barStyle="dark-content" backgroundColor="transparent" />
-				<NotificationProvider>
-					<AuthProvider>
-						<OnboardingProvider>
-							<RootLayoutContent />
-						</OnboardingProvider>
-					</AuthProvider>
-				</NotificationProvider>
-			</QueryClientProvider>
+			<SafeAreaProvider initialMetrics={initialWindowMetrics}>
+				<QueryClientProvider client={queryClient}>
+					{/* Default status bar configuration for the entire app */}
+					<StatusBar
+						barStyle="dark-content"
+						backgroundColor="#fff"
+						translucent={false}
+					/>
+					<NotificationProvider>
+						<AuthProvider>
+							<OnboardingProvider>
+								<RootLayoutContent />
+							</OnboardingProvider>
+						</AuthProvider>
+					</NotificationProvider>
+				</QueryClientProvider>
+			</SafeAreaProvider>
 		);
 	} catch (error) {
 		console.warn('Failed to render root layout:', error);

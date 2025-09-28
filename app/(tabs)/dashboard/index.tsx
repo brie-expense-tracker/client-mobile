@@ -290,17 +290,6 @@ const Dashboard: React.FC = () => {
 						</SkeletonContainer>
 					</View>
 				</ScrollView>
-
-				{/* Floating Action Button for Quick Add Transaction */}
-				<TouchableOpacity
-					style={styles.fab}
-					onPress={() => router.push('/(tabs)/transaction')}
-					{...accessibilityProps.button}
-					accessibilityLabel="Add new transaction"
-					accessibilityHint="Double tap to add a new income or expense transaction"
-				>
-					<Ionicons name="add" size={24} color="#fff" />
-				</TouchableOpacity>
 			</GestureHandlerRootView>
 		</SafeAreaView>
 	);
@@ -431,22 +420,6 @@ const styles = StyleSheet.create({
 		width: 80,
 		alignSelf: 'center',
 		marginBottom: 12,
-	},
-	fab: {
-		position: 'absolute',
-		bottom: 24,
-		right: 24,
-		width: 56,
-		height: 56,
-		borderRadius: 28,
-		backgroundColor: '#007AFF',
-		justifyContent: 'center',
-		alignItems: 'center',
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.3,
-		shadowRadius: 8,
-		elevation: 8,
 	},
 });
 

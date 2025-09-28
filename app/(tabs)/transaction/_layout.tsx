@@ -1,11 +1,19 @@
-import React from 'react';
 import { Stack } from 'expo-router';
+import React from 'react';
 
-export default function _layout() {
+export default function TransactionLayout() {
 	return (
-		<Stack screenOptions={{ animation: 'none', headerShown: false }}>
-			<Stack.Screen name="index" />
-			<Stack.Screen name="expense" />
+		<Stack
+			screenOptions={{
+				headerShown: false,
+			}}
+		>
+			<Stack.Screen
+				name="index"
+				options={{
+					title: 'Transaction',
+				}}
+			/>
 		</Stack>
 	);
 }

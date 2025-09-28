@@ -936,7 +936,6 @@ export default function AssistantScreen() {
 				},
 				{
 					messageId: aiMessageId,
-					expand: showExpandButton, // Pass expand flag if showing expand button
 				}
 			);
 
@@ -1311,10 +1310,12 @@ export default function AssistantScreen() {
 									onShowWork={handleShowWork}
 								/>
 							)}
-							<ServiceStatusIndicator
-								onRetry={handleRetry}
-								isRetrying={isRetrying}
-							/>
+							{__DEV__ && (
+								<ServiceStatusIndicator
+									onRetry={handleRetry}
+									isRetrying={isRetrying}
+								/>
+							)}
 						</View>
 					}
 				/>

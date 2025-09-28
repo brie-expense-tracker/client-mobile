@@ -54,7 +54,7 @@ export class WeeklyReflectionService {
 			const response = await ApiService.get('/api/weekly-reflections/current');
 
 			// Handle case where API returns no data or user not found
-			if (!response.data || !response.data.reflection) {
+			if (!response.data || !(response.data as any).reflection) {
 				// Return a default reflection structure for new users
 				const now = new Date();
 				const dayOfWeek = now.getDay();
@@ -91,7 +91,7 @@ export class WeeklyReflectionService {
 				};
 			}
 
-			return response.data.reflection;
+			return (response.data as any).reflection;
 		} catch (error) {
 			console.error('Error fetching current week reflection:', error);
 			throw error;
@@ -106,7 +106,7 @@ export class WeeklyReflectionService {
 				'/api/weekly-reflections/save',
 				data
 			);
-			return response.data.reflection;
+			return (response.data as any).reflection;
 		} catch (error) {
 			console.error('Error saving weekly reflection:', error);
 			throw error;
@@ -121,7 +121,7 @@ export class WeeklyReflectionService {
 			const response = await ApiService.get(
 				`/api/weekly-reflections/history?limit=${limit}&offset=${offset}`
 			);
-			return response.data.reflections;
+			return (response.data as any).reflections;
 		} catch (error) {
 			console.error('Error fetching reflection history:', error);
 			throw error;
@@ -131,7 +131,7 @@ export class WeeklyReflectionService {
 	static async getReflectionStats(): Promise<ReflectionStats> {
 		try {
 			const response = await ApiService.get('/api/weekly-reflections/stats');
-			return response.data.stats;
+			return (response.data as any).stats;
 		} catch (error) {
 			console.error('Error fetching reflection stats:', error);
 			throw error;

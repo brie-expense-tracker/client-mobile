@@ -16,6 +16,7 @@ export interface UseWeeklyReflectionReturn {
 	saveReflection: (data: SaveReflectionData) => Promise<void>;
 	updateMoodRating: (rating: number) => Promise<void>;
 	updateWinOfTheWeek: (win: string) => Promise<void>;
+	updateReflectionNotes: (notes: string) => Promise<void>;
 	refreshReflection: () => Promise<void>;
 }
 
@@ -105,6 +106,20 @@ export function useWeeklyReflection(): UseWeeklyReflectionReturn {
 		[currentReflection, saveReflection]
 	);
 
+	// Update reflection notes
+	const updateReflectionNotes = useCallback(
+		async (notes: string) => {
+			if (!currentReflection) return;
+
+			await saveReflection({
+				moodRating: currentReflection.moodRating,
+				winOfTheWeek: currentReflection.winOfTheWeek,
+				reflectionNotes: notes,
+			});
+		},
+		[currentReflection, saveReflection]
+	);
+
 	// Refresh reflection data
 	const refreshReflection = useCallback(async () => {
 		await fetchCurrentReflection();
@@ -123,6 +138,7 @@ export function useWeeklyReflection(): UseWeeklyReflectionReturn {
 		saveReflection,
 		updateMoodRating,
 		updateWinOfTheWeek,
+		updateReflectionNotes,
 		refreshReflection,
 	};
 }
