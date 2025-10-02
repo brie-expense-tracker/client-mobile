@@ -921,27 +921,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			setLoading(true);
 			setError(null);
 
+			console.log('🔐 Starting Google Sign-Up process...');
+
+			// Ensure Google Sign-In is configured
+			console.log('🔧 Ensuring Google Sign-In is configured...');
+			configureGoogleSignIn();
+
 			// Check if your device supports Google Play
+			console.log('🔍 Checking Google Play Services...');
 			await GoogleSignin.hasPlayServices({
 				showPlayServicesUpdateDialog: true,
 			});
+			console.log('✅ Google Play Services available');
+
+			// Sign out from any previous Google session to ensure clean state
+			console.log('🔄 Signing out from any previous Google session...');
+			try {
+				await GoogleSignin.signOut();
+			} catch (signOutError) {
+				console.log('ℹ️ No previous Google session to sign out from');
+			}
 
 			// Get the users ID token
-			const { idToken } = await GoogleSignin.signIn();
+			console.log('🔑 Requesting Google Sign-In...');
+			const { idToken, user } = await GoogleSignin.signIn();
+			console.log('✅ Google Sign-In successful, user:', user?.email);
+
+			if (!idToken) {
+				throw new Error('No ID token received from Google Sign-In');
+			}
 
 			// Create a Google credential with the token
+			console.log('🔐 Creating Firebase credential...');
 			const googleCredential = GoogleAuthProvider.credential(idToken);
 
 			// Sign-in the user with the credential
+			console.log('🔥 Signing in with Firebase...');
 			const userCredential = await auth().signInWithCredential(
 				googleCredential
 			);
 			const firebaseUser = userCredential.user;
+			console.log('✅ Firebase authentication successful:', firebaseUser.uid);
 
 			// Use the existing login method to handle MongoDB user creation
+			console.log('👤 Creating user profile...');
 			await login(firebaseUser);
+			console.log('✅ Google Sign-Up completed successfully');
 		} catch (error: any) {
-			console.error('Google Sign-Up error:', error);
+			console.error('❌ Google Sign-Up error:', error);
+			console.error('Error code:', error.code);
+			console.error('Error message:', error.message);
 
 			// Handle user cancellation gracefully
 			if (
@@ -952,9 +981,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				return; // Exit silently without showing error
 			}
 
+			// Handle specific error cases
+			let errorMessage = 'Failed to sign up with Google';
+			if (error.code === 'auth/network-request-failed') {
+				errorMessage = 'Network error. Please check your internet connection.';
+			} else if (error.code === 'auth/too-many-requests') {
+				errorMessage = 'Too many attempts. Please try again later.';
+			} else if (error.code === 'auth/invalid-credential') {
+				errorMessage = 'Invalid Google credentials. Please try again.';
+			}
+
 			setError({
 				code: 'GOOGLE_SIGNUP_ERROR',
-				message: 'Failed to sign up with Google',
+				message: errorMessage,
 				details: error,
 			});
 			throw error;
