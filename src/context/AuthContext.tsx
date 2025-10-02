@@ -944,10 +944,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 			// Get the users ID token
 			console.log('🔑 Requesting Google Sign-In...');
-			const { idToken, user } = await GoogleSignin.signIn();
+			const signInResult = await GoogleSignin.signIn();
+			console.log('📋 Google Sign-In result:', signInResult);
+			
+			const { idToken, user, serverAuthCode } = signInResult;
 			console.log('✅ Google Sign-In successful, user:', user?.email);
+			console.log('🔑 ID Token received:', idToken ? 'Yes' : 'No');
+			console.log('🔑 Server Auth Code received:', serverAuthCode ? 'Yes' : 'No');
 
 			if (!idToken) {
+				console.error('❌ No ID token in sign-in result:', signInResult);
+				console.error('Available properties:', Object.keys(signInResult));
+				
+				// Try to get the token separately
+				console.log('🔄 Attempting to get ID token separately...');
+				try {
+					const tokens = await GoogleSignin.getTokens();
+					console.log('🔑 Tokens from getTokens:', tokens);
+					if (tokens.idToken) {
+						console.log('✅ Got ID token from getTokens');
+						// Use the token from getTokens
+						const googleCredential = GoogleAuthProvider.credential(tokens.idToken);
+						const userCredential = await auth().signInWithCredential(googleCredential);
+						const firebaseUser = userCredential.user;
+						console.log('✅ Firebase authentication successful:', firebaseUser.uid);
+						await login(firebaseUser);
+						console.log('✅ Google Sign-Up completed successfully');
+						return;
+					}
+				} catch (tokenError) {
+					console.error('❌ Failed to get tokens separately:', tokenError);
+				}
+				
 				throw new Error('No ID token received from Google Sign-In');
 			}
 
