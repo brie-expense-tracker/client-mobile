@@ -15,108 +15,15 @@ import { router, useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useGoals } from '../../src/hooks/useGoals';
 import { Goal } from '../../src/context/goalContext';
-
-// Popular goal icons
-const goalIcons: (keyof typeof Ionicons.glyphMap)[] = [
-	'flag-outline',
-	'trophy-outline',
-	'star-outline',
-	'diamond-outline',
-	'ribbon-outline',
-	'medal-outline',
-	'checkmark-circle-outline',
-	'home-outline',
-	'business-outline',
-	'construct-outline',
-	'hammer-outline',
-	'key-outline',
-	'lock-open-outline',
-	'car-outline',
-	'airplane-outline',
-	'train-outline',
-	'bus-outline',
-	'bicycle-outline',
-	'boat-outline',
-	'compass-outline',
-	'map-outline',
-	'location-outline',
-	'camera-outline',
-	'bed-outline',
-	'umbrella-outline',
-	'globe-outline',
-	'book-outline',
-	'school-outline',
-	'library-outline',
-	'briefcase-outline',
-	'laptop-outline',
-	'desktop-outline',
-	'fitness-outline',
-	'medical-outline',
-	'heart-outline',
-	'medkit-outline',
-	'bandage-outline',
-	'body-outline',
-	'game-controller-outline',
-	'musical-notes-outline',
-	'film-outline',
-	'color-palette-outline',
-	'bag-outline',
-	'cart-outline',
-	'card-outline',
-	'wallet-outline',
-	'storefront-outline',
-	'cut-outline',
-	'phone-portrait-outline',
-	'tablet-portrait-outline',
-	'watch-outline',
-	'headset-outline',
-	'wifi-outline',
-	'cloud-outline',
-	'people-outline',
-	'person-outline',
-	'gift-outline',
-	'rose-outline',
-	'football-outline',
-	'basketball-outline',
-	'baseball-outline',
-	'golf-outline',
-	'tennisball-outline',
-	'snow-outline',
-	'calculator-outline',
-	'pie-chart-outline',
-	'trending-up-outline',
-	'shield-checkmark-outline',
-	'balloon-outline',
-	'cafe-outline',
-	'restaurant-outline',
-	'fast-food-outline',
-	'wine-outline',
-	'pizza-outline',
-	'paw-outline',
-	'fish-outline',
-	'leaf-outline',
-	'rocket-outline',
-	'flash-outline',
-	'bulb-outline',
-	'calendar-outline',
-	'time-outline',
-	'notifications-outline',
-	'settings-outline',
-];
-
-// Quick target presets
-const targetPresets = [500, 1000, 2500, 5000, 10000];
-
-const COLOR_PALETTE = {
-	red: { base: '#E53935', pastel: '#EF5350', dark: '#B71C1C' },
-	orange: { base: '#FB8C00', pastel: '#FFB74D', dark: '#E65100' },
-	yellow: { base: '#FDD835', pastel: '#FFEE58', dark: '#FBC02D' },
-	green: { base: '#43A047', pastel: '#A5D6A7', dark: '#1B5E20' },
-	blue: { base: '#1E88E5', pastel: '#42A5F5', dark: '#0D47A1' },
-	indigo: { base: '#5E35B1', pastel: '#5C6BC0', dark: '#311B92' },
-	violet: { base: '#8E24AA', pastel: '#AB47BC', dark: '#4A0072' },
-	grey: { base: '#424242', pastel: '#757575', dark: '#212121' },
-};
+import {
+	COLOR_PALETTE,
+	GOAL_ICONS,
+	GOAL_TARGET_PRESETS,
+	DEFAULT_GOAL_ICON,
+	DEFAULT_COLOR,
+	isValidIoniconsName,
+	normalizeIconName,
+} from '../../src/constants/uiConstants';
 
 const EditGoalScreen: React.FC = () => {
 	const params = useLocalSearchParams();
@@ -126,8 +33,8 @@ const EditGoalScreen: React.FC = () => {
 	const [target, setTarget] = useState('');
 	const [deadline, setDeadline] = useState('');
 	const [icon, setIcon] =
-		useState<keyof typeof Ionicons.glyphMap>('flag-outline');
-	const [color, setColor] = useState(COLOR_PALETTE.blue.base);
+		useState<keyof typeof Ionicons.glyphMap>(DEFAULT_GOAL_ICON);
+	const [color, setColor] = useState<string>(DEFAULT_COLOR);
 	const [showIconPicker, setShowIconPicker] = useState(false);
 	const [showColorPicker, setShowColorPicker] = useState(false);
 	const [showCustomTarget, setShowCustomTarget] = useState(false);
@@ -141,15 +48,29 @@ const EditGoalScreen: React.FC = () => {
 	// Load goal data when component mounts
 	useEffect(() => {
 		if (goalId && goals.length > 0) {
+			console.log('[EditGoalScreen] Looking for goal with ID:', goalId);
+			console.log(
+				'[EditGoalScreen] Available goals:',
+				goals.map((g) => ({ id: g.id, name: g.name }))
+			);
 			const foundGoal = goals.find((g) => g.id === goalId);
 			if (foundGoal) {
+				console.log('[EditGoalScreen] Found goal:', foundGoal);
 				setGoal(foundGoal);
 				setName(foundGoal.name || '');
 				setTarget(foundGoal.target?.toString() || '');
 				setDeadline(foundGoal.deadline.split('T')[0] || '');
-				setIcon(foundGoal.icon as keyof typeof Ionicons.glyphMap);
-				setColor(foundGoal.color || COLOR_PALETTE.blue.base);
+				// Handle icon - normalize to valid Ionicons name
+				const goalIcon = foundGoal.icon;
+				if (goalIcon) {
+					setIcon(normalizeIconName(goalIcon));
+				} else {
+					setIcon(DEFAULT_GOAL_ICON);
+				}
+				setColor(foundGoal.color || DEFAULT_COLOR);
 				setSelectedDate(new Date(foundGoal.deadline));
+			} else {
+				console.log('[EditGoalScreen] Goal not found with ID:', goalId);
 			}
 		}
 	}, [goalId, goals]);
@@ -179,11 +100,31 @@ const EditGoalScreen: React.FC = () => {
 
 		setLoading(true);
 		try {
-			await updateGoal(goal.id, {
+			// Use normalized icon
+			const selectedIcon = isValidIoniconsName(icon) ? icon : DEFAULT_GOAL_ICON;
+
+			// Use _id if available, otherwise use id
+			const goalIdToUse = (goal as any)._id || goal.id;
+
+			console.log('[EditGoalScreen] Updating goal:', {
+				goalId: goalIdToUse,
+				originalGoalId: goal.id,
+				goal_id: (goal as any)._id,
+				updates: {
+					name: name.trim(),
+					target: parseFloat(target),
+					deadline,
+					icon: selectedIcon,
+					color,
+					categories: goal.categories || [],
+				},
+			});
+
+			await updateGoal(goalIdToUse, {
 				name: name.trim(),
 				target: parseFloat(target),
 				deadline,
-				icon,
+				icon: selectedIcon,
 				color,
 				categories: goal.categories || [],
 			});
@@ -301,7 +242,7 @@ const EditGoalScreen: React.FC = () => {
 
 						{/* Quick Target Presets */}
 						<View style={styles.presetsContainer}>
-							{targetPresets.map((amount) => (
+							{GOAL_TARGET_PRESETS.map((amount) => (
 								<TouchableOpacity
 									key={amount}
 									style={[
@@ -419,26 +360,29 @@ const EditGoalScreen: React.FC = () => {
 						</TouchableOpacity>
 
 						{showIconPicker && (
-							<View style={styles.iconGrid}>
-								{goalIcons.map((iconName) => (
-									<TouchableOpacity
-										key={iconName}
-										style={[
-											styles.iconOption,
-											icon === iconName && { backgroundColor: color },
-										]}
-										onPress={() => {
-											setIcon(iconName);
-											setShowIconPicker(false);
-										}}
-									>
-										<Ionicons
-											name={iconName}
-											size={24}
-											color={icon === iconName ? 'white' : color}
-										/>
-									</TouchableOpacity>
-								))}
+							<View style={styles.iconPickerContainer}>
+								{/* Icon Grid */}
+								<View style={styles.iconGrid}>
+									{GOAL_ICONS.map((iconName) => (
+										<TouchableOpacity
+											key={iconName}
+											style={[
+												styles.iconOption,
+												icon === iconName && { backgroundColor: color },
+											]}
+											onPress={() => {
+												setIcon(iconName);
+												setShowIconPicker(false);
+											}}
+										>
+											<Ionicons
+												name={iconName}
+												size={24}
+												color={icon === iconName ? 'white' : color}
+											/>
+										</TouchableOpacity>
+									))}
+								</View>
 							</View>
 						)}
 					</View>
@@ -712,11 +656,44 @@ const styles = StyleSheet.create({
 		flex: 1,
 		marginLeft: 12,
 	},
+	iconPickerContainer: {
+		marginTop: 8,
+	},
+	iconTypeToggle: {
+		flexDirection: 'row',
+		backgroundColor: '#f5f5f5',
+		borderRadius: 8,
+		padding: 4,
+		marginBottom: 12,
+	},
+	iconTypeButton: {
+		flex: 1,
+		paddingVertical: 8,
+		paddingHorizontal: 12,
+		borderRadius: 6,
+		alignItems: 'center',
+	},
+	iconTypeButtonActive: {
+		backgroundColor: 'white',
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.1,
+		shadowRadius: 2,
+		elevation: 2,
+	},
+	iconTypeButtonText: {
+		fontSize: 14,
+		color: '#666',
+		fontWeight: '500',
+	},
+	iconTypeButtonTextActive: {
+		color: '#333',
+		fontWeight: '600',
+	},
 	iconGrid: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',
 		gap: 8,
-		marginTop: 2,
 	},
 	iconOption: {
 		width: 40,

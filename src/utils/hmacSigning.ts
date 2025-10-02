@@ -49,10 +49,19 @@ export class HMACSigningService {
 		// Create the payload to sign: timestamp + nonce + method + path + body
 		const payload = `${timestamp}.${nonce}.${method.toUpperCase()}.${path}.${body}`;
 
+		console.log('🔐 [HMAC] Debug - Payload to sign:', payload);
+		console.log(
+			'🔐 [HMAC] Debug - Secret key (first 8 chars):',
+			this.secretKey.substring(0, 8) + '...'
+		);
+
 		// Create HMAC signature using CryptoJS
 		const hmac = hmacSHA256(payload, this.secretKey);
+		const signature = hmac.toString(encHex);
 
-		return hmac.toString(encHex);
+		console.log('🔐 [HMAC] Debug - Generated signature:', signature);
+
+		return signature;
 	}
 
 	/**
@@ -110,12 +119,9 @@ let hmacService: HMACSigningService | null = null;
 
 export function getHMACService(): HMACSigningService {
 	if (!hmacService) {
-		const secretKey = process.env.EXPO_PUBLIC_HMAC_SECRET_KEY;
-		if (!secretKey) {
-			throw new Error(
-				'EXPO_PUBLIC_HMAC_SECRET_KEY environment variable is required'
-			);
-		}
+		const secretKey =
+			process.env.EXPO_PUBLIC_HMAC_SECRET_KEY ||
+			'dev-hmac-secret-key-32-chars-minimum-required-for-development';
 
 		hmacService = new HMACSigningService({
 			secretKey,

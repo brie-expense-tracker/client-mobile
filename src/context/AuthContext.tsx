@@ -99,7 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const processingTimeoutRef = useRef<number | null>(null);
 	const isManualLoginRef = useRef(false);
 	const [lastActivity, setLastActivity] = useState<number>(Date.now());
-	const [sessionTimeout] = useState<number>(30 * 60 * 1000); // 30 minutes
+	const [sessionTimeout] = useState<number>(4 * 60 * 60 * 1000); // 4 hours
 
 	const appState = useRef<AppStateStatus>(AppState.currentState);
 

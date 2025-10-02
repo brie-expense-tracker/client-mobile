@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { RectButton } from 'react-native-gesture-handler';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import CustomSlidingModal from './CustomSlidingModal';
+import { normalizeIconName } from '../../../../src/constants/uiConstants';
 
 type ColorOption = {
 	base: string;
@@ -175,7 +176,7 @@ const GoalFormModal: React.FC<GoalFormModalProps> = ({
 						]}
 					>
 						<Ionicons
-							name={formData.icon as any}
+							name={normalizeIconName(formData.icon || 'flag-outline')}
 							size={20}
 							color={formData.color}
 						/>
@@ -206,7 +207,7 @@ const GoalFormModal: React.FC<GoalFormModalProps> = ({
 							}}
 						>
 							<Ionicons
-								name={icon as any}
+								name={icon}
 								size={24}
 								color={formData.icon === icon ? 'white' : formData.color}
 							/>

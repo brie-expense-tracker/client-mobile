@@ -6,6 +6,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Font from 'expo-font';
 import { Ionicons } from '@expo/vector-icons';
+import { getApp, initializeApp } from '@react-native-firebase/app';
 // @ts-ignore - react-query types will be available after install
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -507,10 +508,6 @@ function RootLayoutContent() {
 					name="(stack)"
 					options={{ headerShown: false, animation: 'none' }}
 				/>
-				<Stack.Screen
-					name="transaction/index"
-					options={{ headerShown: false, animation: 'none' }}
-				/>
 			</Stack>
 		</GestureHandlerRootView>
 	);
@@ -529,6 +526,15 @@ export default function RootLayout() {
 					// Add custom fonts here if needed
 				});
 				setFontsLoaded(true);
+
+				// Verify Firebase configuration
+				try {
+					const app = getApp();
+					console.log('✅ Firebase initialized successfully:', app.name);
+					console.log('Firebase project ID:', app.options.projectId);
+				} catch (firebaseError) {
+					console.error('❌ Firebase initialization failed:', firebaseError);
+				}
 			} catch (error) {
 				console.warn('Failed to load fonts:', error);
 				setFontsLoaded(true);

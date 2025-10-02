@@ -120,6 +120,8 @@ export function useDataFetching<T extends { id: string }>(
 	const isFetching = useRef(false); // Prevent concurrent fetches
 	const offlineQueue = useRef<(() => Promise<any>)[]>([]); // Queue for offline operations
 	const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const lastFetchTime = useRef<number>(0); // Track last fetch time for debouncing
+	const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
 	// ==========================================
 	// Helper Functions
@@ -370,6 +372,34 @@ export function useDataFetching<T extends { id: string }>(
 		]
 	);
 
+	// Debounced refetch to prevent rapid successive calls
+	const debouncedRefetch = useCallback(
+		(forceRefresh = false) => {
+			const now = Date.now();
+			const timeSinceLastFetch = now - lastFetchTime.current;
+			const minInterval = 2000; // Minimum 2 seconds between fetches
+
+			// Clear any existing debounce timeout
+			if (debounceTimeoutRef.current) {
+				clearTimeout(debounceTimeoutRef.current);
+			}
+
+			// If enough time has passed, fetch immediately
+			if (timeSinceLastFetch >= minInterval || forceRefresh) {
+				lastFetchTime.current = now;
+				refetch(forceRefresh);
+			} else {
+				// Otherwise, debounce the request
+				const remainingTime = minInterval - timeSinceLastFetch;
+				debounceTimeoutRef.current = setTimeout(() => {
+					lastFetchTime.current = Date.now();
+					refetch(forceRefresh);
+				}, remainingTime);
+			}
+		},
+		[refetch]
+	);
+
 	// ==========================================
 	// CRUD Operations
 	// ==========================================
@@ -432,15 +462,27 @@ export function useDataFetching<T extends { id: string }>(
 			}
 
 			// Find the original item for optimistic update
-			const originalItem = data.find((item) => item.id === id);
+			// Check both id and _id fields to handle MongoDB _id fields
+			const originalItem = data.find(
+				(item) => item.id === id || (item as any)._id === id
+			);
 			if (!originalItem) {
+				console.error('[useDataFetching] Item not found for update:', {
+					searchingForId: id,
+					availableIds: data.map((item) => ({
+						id: item.id,
+						_id: (item as any)._id,
+					})),
+				});
 				throw new Error('Item not found');
 			}
 
 			// Optimistic update
 			const optimisticItem = { ...originalItem, ...updates };
 			setData((prev) =>
-				prev.map((item) => (item.id === id ? optimisticItem : item))
+				prev.map((item) =>
+					item.id === id || (item as any)._id === id ? optimisticItem : item
+				)
 			);
 
 			const performUpdate = async () => {
@@ -450,7 +492,9 @@ export function useDataFetching<T extends { id: string }>(
 
 					// Replace optimistic update with real data
 					setData((prev) =>
-						prev.map((item) => (item.id === id ? updatedItem : item))
+						prev.map((item) =>
+							item.id === id || (item as any)._id === id ? updatedItem : item
+						)
 					);
 					console.log('✅ Item updated successfully');
 					return updatedItem;
@@ -459,7 +503,9 @@ export function useDataFetching<T extends { id: string }>(
 
 					// Revert optimistic update on error
 					setData((prev) =>
-						prev.map((item) => (item.id === id ? originalItem : item))
+						prev.map((item) =>
+							item.id === id || (item as any)._id === id ? originalItem : item
+						)
 					);
 
 					const categorizedError = categorizeError(err);
@@ -489,13 +535,25 @@ export function useDataFetching<T extends { id: string }>(
 			}
 
 			// Find the original item for potential rollback
-			const originalItem = data.find((item) => item.id === id);
+			// Check both id and _id fields to handle MongoDB _id fields
+			const originalItem = data.find(
+				(item) => item.id === id || (item as any)._id === id
+			);
 			if (!originalItem) {
+				console.error('[useDataFetching] Item not found for deletion:', {
+					searchingForId: id,
+					availableIds: data.map((item) => ({
+						id: item.id,
+						_id: (item as any)._id,
+					})),
+				});
 				throw new Error('Item not found');
 			}
 
 			// Optimistic update
-			setData((prev) => prev.filter((item) => item.id !== id));
+			setData((prev) =>
+				prev.filter((item) => item.id !== id && (item as any)._id !== id)
+			);
 
 			const performDelete = async () => {
 				try {
@@ -614,13 +672,31 @@ export function useDataFetching<T extends { id: string }>(
 	useFocusEffect(
 		useCallback(() => {
 			if (refreshOnFocus && hasLoaded && !isInitialMount.current) {
-				console.log('[useDataFetching] Component focused, refreshing data...');
-				refetch();
+				// Only refresh if cache is expired or data is stale
+				if (
+					!isCacheValid() ||
+					!lastRefreshed ||
+					Date.now() - lastRefreshed.getTime() > cacheTTL
+				) {
+					console.log(
+						'[useDataFetching] Component focused, refreshing data...'
+					);
+					debouncedRefetch();
+				} else {
+					console.log('📦 Using cached data');
+				}
 			}
 			if (isInitialMount.current) {
 				isInitialMount.current = false;
 			}
-		}, [refreshOnFocus, hasLoaded, refetch])
+		}, [
+			refreshOnFocus,
+			hasLoaded,
+			debouncedRefetch,
+			isCacheValid,
+			lastRefreshed,
+			cacheTTL,
+		])
 	);
 
 	// ==========================================
@@ -630,6 +706,9 @@ export function useDataFetching<T extends { id: string }>(
 		return () => {
 			if (retryTimeoutRef.current) {
 				clearTimeout(retryTimeoutRef.current);
+			}
+			if (debounceTimeoutRef.current) {
+				clearTimeout(debounceTimeoutRef.current);
 			}
 		};
 	}, []);
@@ -654,6 +733,7 @@ export function useDataFetching<T extends { id: string }>(
 		totalItems,
 		// Actions
 		refetch,
+		debouncedRefetch,
 		addItem,
 		updateItem,
 		deleteItem,

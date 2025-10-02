@@ -1,4 +1,12 @@
-import React, { useCallback, useContext, useMemo, useState } from 'react';
+import React, {
+	useCallback,
+	useContext,
+	useMemo,
+	useState,
+	useEffect,
+	useRef,
+} from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
 	View,
 	Text,
@@ -8,55 +16,41 @@ import {
 	RefreshControl,
 	ActivityIndicator,
 	Image,
+	Animated,
+	Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import Svg, {
+	Path,
+	Defs,
+	LinearGradient as SvgGrad,
+	Stop,
+} from 'react-native-svg';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { TransactionContext } from '../../../src/context/transactionContext';
 import { useNotification } from '@/src/context/notificationContext';
-import {
-	SimpleBalanceWidget,
-	QuickFinancialSummary,
-	TransactionHistory,
-	SettingsBudgetsGoalsWidget,
-	RecurringExpensesSummaryWidget,
-} from './components';
-import {
-	SkeletonContainer,
-	DashboardWidgetSkeleton,
-} from '../../../src/components/SkeletonLoader';
+import { TransactionHistory } from './components';
 import {
 	accessibilityProps,
 	dynamicTextStyle,
 	generateAccessibilityLabel,
 } from '../../../src/utils/accessibility';
 
-/**
- * -----------------------------------------------------------------------------
- * Constants & Helpers
- * -----------------------------------------------------------------------------
- */
-
 const currency = new Intl.NumberFormat('en-US', {
 	style: 'currency',
 	currency: 'USD',
 }).format;
-
-const getLocalIsoDate = (): string => {
+const getLocalIsoDate = () => {
 	const today = new Date();
-	// Adjust for timezone offset to ensure we get the correct local date
 	const offset = today.getTimezoneOffset();
 	const localDate = new Date(today.getTime() - offset * 60 * 1000);
 	return localDate.toISOString().split('T')[0];
 };
 
-/**
- * -----------------------------------------------------------------------------
- * Dashboard – main screen
- * -----------------------------------------------------------------------------
- */
-const Dashboard: React.FC = () => {
+export default function DashboardPro() {
 	const { transactions, isLoading, refetch } = useContext(TransactionContext);
 	const { unreadCount } = useNotification();
 	const [refreshing, setRefreshing] = useState(false);
@@ -65,64 +59,57 @@ const Dashboard: React.FC = () => {
 		setRefreshing(true);
 		try {
 			await refetch();
-		} catch (error) {
-			console.error('Error refreshing dashboard:', error);
 		} finally {
 			setRefreshing(false);
 		}
 	}, [refetch]);
 
-	/**
-	 * ------------------ Derived / memoised values ---------------
-	 */
-	const { totalBalance, dailyChange } = useMemo(() => {
-		const balance = transactions.reduce((sum, t) => {
-			const amount =
-				t.type === 'income'
-					? isNaN(t.amount)
-						? 0
-						: t.amount
-					: -(isNaN(t.amount) ? 0 : t.amount);
-			return sum + amount;
-		}, 0);
+	// Refresh transactions when dashboard comes into focus
+	useFocusEffect(
+		useCallback(() => {
+			refetch();
+		}, [refetch])
+	);
 
-		// Use timezone-aware date handling (from ledger)
+	const { totalBalance, dailyChange, last7 } = useMemo(() => {
 		const today = getLocalIsoDate();
+		let balance = 0;
+		let change = 0;
+		const byDay: Record<string, number> = {};
 
-		const change = transactions
-			.filter((t) => {
-				// Compare transaction date with today's date using ISO string format
-				const txDay = t.date.slice(0, 10);
-				const isToday = txDay === today;
-				return isToday;
-			})
-			.reduce((s, t) => {
-				const amount =
-					t.type === 'income'
-						? isNaN(t.amount)
-							? 0
-							: t.amount
-						: -(isNaN(t.amount) ? 0 : t.amount);
-				return s + amount;
-			}, 0);
+		for (const t of transactions) {
+			const amt = isNaN(t.amount) ? 0 : t.amount;
+			// Amount is already signed (positive for income, negative for expenses)
+			balance += amt;
 
-		return { totalBalance: balance, dailyChange: change } as const;
+			const d = (t.date || '').slice(0, 10);
+			byDay[d] = (byDay[d] || 0) + amt;
+
+			if (d === today) change += amt;
+		}
+
+		// make last 7 days sparkline data (oldest -> newest)
+		const days: string[] = [];
+		for (let i = 6; i >= 0; i--) {
+			const dt = new Date();
+			dt.setDate(dt.getDate() - i);
+			const iso = new Date(dt.getTime() - dt.getTimezoneOffset() * 60000)
+				.toISOString()
+				.slice(0, 10);
+			days.push(iso);
+		}
+		const last7 = days.map((d) => byDay[d] || 0);
+
+		return { totalBalance: balance, dailyChange: change, last7 };
 	}, [transactions]);
 
-	/**
-	 * --------------------------- UI -----------------------------
-	 */
 	if (isLoading) {
 		return (
 			<SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
 				<View style={styles.loadingContainer}>
 					<ActivityIndicator size="large" color="#007AFF" />
-					<Text
-						style={[styles.loadingText, dynamicTextStyle]}
-						accessibilityRole="text"
-						accessibilityLabel="Loading your dashboard"
-					>
-						Loading your dashboard...
+					<Text style={[styles.loadingText, dynamicTextStyle]}>
+						Loading your dashboard…
 					</Text>
 				</View>
 			</SafeAreaView>
@@ -132,46 +119,48 @@ const Dashboard: React.FC = () => {
 	return (
 		<SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
 			<GestureHandlerRootView style={{ flex: 1 }}>
-				{/* -------------------------------------------------- */}
-				{/* Sticky Header */}
-				{/* -------------------------------------------------- */}
+				{/* ---------- Sticky Header ---------- */}
 				<View style={styles.stickyHeader}>
-					<Image
-						source={require('../../../src/assets/images/brie-logos.png')}
-						style={styles.logo}
-						resizeMode="contain"
-						accessibilityRole="image"
-						accessibilityLabel="Brie app logo"
-					/>
+					<View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+						<Image
+							source={require('../../../src/assets/logos/brie-logo.png')}
+							style={styles.logo}
+							resizeMode="contain"
+							accessibilityRole="image"
+							accessibilityLabel="Brie app logo"
+						/>
+					</View>
 
 					<View style={styles.headerButtons}>
-						{/* Development Onboarding Button */}
-						{__DEV__ && (
-							<TouchableOpacity
-								onPress={() => router.push('/(onboarding)/profileSetup')}
-								style={styles.devButton}
-								{...accessibilityProps.button}
-								accessibilityLabel="Open onboarding (development)"
-								accessibilityHint="Double tap to open onboarding screens for testing"
-							>
-								<Ionicons name="settings-outline" color="#4CAF50" size={20} />
-							</TouchableOpacity>
-						)}
+						<TouchableOpacity
+							onPress={() => router.push('/(stack)/settings')}
+							style={styles.headerButton}
+							{...accessibilityProps.button}
+							accessibilityLabel={generateAccessibilityLabel.button(
+								'Open',
+								'settings'
+							)}
+						>
+							<Ionicons name="settings-outline" color="#111827" size={24} />
+						</TouchableOpacity>
 
 						<TouchableOpacity
 							onPress={() => router.push('/dashboard/notifications')}
-							style={styles.notificationButton}
+							style={styles.headerButton}
 							{...accessibilityProps.button}
 							accessibilityLabel={generateAccessibilityLabel.button(
 								'Open',
 								'notifications'
 							)}
-							accessibilityHint="Double tap to view notifications"
 						>
 							<View>
-								<Ionicons name="notifications-outline" color="#333" size={24} />
+								<Ionicons
+									name="notifications-outline"
+									color="#111827"
+									size={24}
+								/>
 								{unreadCount > 0 && (
-									<View style={styles.notificationAlertButton}>
+									<View style={styles.notificationBadge}>
 										<Text style={styles.notificationBadgeText}>
 											{unreadCount > 99 ? '99+' : unreadCount}
 										</Text>
@@ -184,7 +173,7 @@ const Dashboard: React.FC = () => {
 
 				<ScrollView
 					style={styles.scrollView}
-					contentContainerStyle={styles.scrollContentContainer}
+					contentContainerStyle={{ padding: 24, paddingTop: 8 }}
 					showsVerticalScrollIndicator={false}
 					refreshControl={
 						<RefreshControl
@@ -195,183 +184,392 @@ const Dashboard: React.FC = () => {
 							progressBackgroundColor="#ffffff"
 						/>
 					}
-					scrollEventThrottle={16}
-					removeClippedSubviews={true}
 					keyboardShouldPersistTaps="handled"
-					accessibilityLabel="Dashboard content"
 				>
-					<View style={[styles.contentContainer]}>
-						{/* -------------------------------------------------- */}
-						{/* Balance card */}
-						{/* -------------------------------------------------- */}
-						<SkeletonContainer
-							isLoading={isLoading}
-							fallback={<DashboardWidgetSkeleton />}
-						>
-							<View style={styles.headerCard}>
-								<Text
-									style={[styles.balanceLabel, dynamicTextStyle]}
-									accessibilityRole="text"
-									accessibilityLabel="Your balance label"
-								>
-									Your Balance
-								</Text>
-								<View style={styles.rowCenter}>
-									<Text
-										style={[styles.balanceAmount, dynamicTextStyle]}
-										accessibilityRole="text"
-										accessibilityLabel={`Your balance: ${currency(
-											totalBalance
-										)}`}
-									>
-										{currency(totalBalance)}
-									</Text>
-								</View>
-								<Text
-									style={[
-										styles.dailyChange,
-										{ color: dailyChange >= 0 ? '#16a34a' : '#dc2626' },
-										dynamicTextStyle,
-									]}
-									accessibilityRole="text"
-									accessibilityLabel={`Today's change: ${
-										dailyChange >= 0 ? '+' : ''
-									}${currency(dailyChange)}`}
-								>
-									{dailyChange >= 0 ? '+' : ''}
-									{currency(dailyChange)}{' '}
-									{new Date().toLocaleDateString('en-US', {
-										month: 'short',
-										day: 'numeric',
-									})}
-								</Text>
+					{/* ---------- Hero Pro Balance Card ---------- */}
+					<HeroPro
+						total={totalBalance}
+						dailyChange={dailyChange}
+						last7={last7}
+					/>
 
-								<SimpleBalanceWidget transactions={transactions} />
-							</View>
-						</SkeletonContainer>
+					{/* ---------- Inline Quick Actions (replaces FAB) ---------- */}
+					<QuickActionsRow
+						onAddIncome={() => router.push('/(tabs)/transaction?mode=income')}
+						onAddExpense={() => router.push('/(tabs)/transaction?mode=expense')}
+						onSetGoal={() => router.push('/(tabs)/budgets?tab=goals')}
+					/>
 
-						{/* Quick Financial Health Summary */}
-						<SkeletonContainer
-							isLoading={isLoading}
-							fallback={<DashboardWidgetSkeleton />}
-						>
-							<QuickFinancialSummary transactions={transactions} />
-						</SkeletonContainer>
+					{/* ---------- Quick Financial Summary ---------- */}
+					<QuickSummary
+						items={[
+							{
+								label: 'Budget used',
+								value: 0.62,
+								hint: 'Under target this month',
+							},
+							{ label: 'Savings pace', value: 0.45, hint: 'On track for goal' },
+							{
+								label: 'Debt payoff',
+								value: 0.18,
+								hint: 'Consider rounding up payments',
+							},
+						]}
+					/>
 
-						{/* Recurring Expenses Summary Widget */}
-						<SkeletonContainer
-							isLoading={isLoading}
-							fallback={<DashboardWidgetSkeleton />}
-						>
-							<RecurringExpensesSummaryWidget
-								title="Recurring Expenses"
-								maxVisibleItems={3}
-								showViewAllButton={true}
-							/>
-						</SkeletonContainer>
+					{/* ---------- Recurring Expenses preview ---------- */}
+					<RecurringPreview
+						rowsLimit={3}
+						onViewAll={() => router.push('/(tabs)/budgets?tab=recurring')}
+					/>
 
-						{/* Recent Transactions */}
-						<SkeletonContainer
-							isLoading={isLoading}
-							fallback={<DashboardWidgetSkeleton />}
-						>
-							<TransactionHistory
-								transactions={transactions}
-								onPress={() => {}}
-							/>
-						</SkeletonContainer>
-
-						{/* Settings, Budgets & Goals Widget */}
-						<SkeletonContainer
-							isLoading={isLoading}
-							fallback={<DashboardWidgetSkeleton />}
-						>
-							<SettingsBudgetsGoalsWidget compact={true} />
-						</SkeletonContainer>
-					</View>
+					{/* ---------- Transaction History ---------- */}
+					<TransactionHistory
+						transactions={transactions}
+						onPress={() => {}}
+						isLoading={isLoading}
+					/>
 				</ScrollView>
 			</GestureHandlerRootView>
 		</SafeAreaView>
 	);
-};
+}
 
-/**
- * -----------------------------------------------------------------------------
- * Styles
- * -----------------------------------------------------------------------------
- */
+/** ----------------- Subcomponents ----------------- */
+
+function HeroPro({
+	total,
+	dailyChange,
+	last7,
+}: {
+	total: number;
+	dailyChange: number;
+	last7: number[];
+}) {
+	// ------- animated count-up for balance -------
+	const anim = useRef(new Animated.Value(0)).current;
+	const [display, setDisplay] = useState(0);
+
+	useEffect(() => {
+		anim.stopAnimation();
+		anim.setValue(0);
+		Animated.timing(anim, {
+			toValue: 1,
+			duration: 700,
+			easing: Easing.out(Easing.cubic),
+			useNativeDriver: false,
+		}).start();
+	}, [total, anim]);
+
+	useEffect(() => {
+		const startVal = display;
+		const endVal = total;
+		const sub = anim.addListener(({ value }) => {
+			const v = startVal + (endVal - startVal) * value;
+			setDisplay(v);
+		});
+		return () => anim.removeListener(sub);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [total]);
+
+	// ------- sparkline path (with area) -------
+	const w = 300;
+	const h = 72;
+	const pad = 6;
+	const step = (w - pad * 2) / Math.max(last7.length - 1, 1);
+	const max = Math.max(...last7, 1);
+	const min = Math.min(...last7, 0);
+	const span = Math.max(max - min, 1);
+
+	const points = last7.map((v, i) => {
+		const x = pad + i * step;
+		const y = h - pad - ((v - min) / span) * (h - pad * 2);
+		return { x, y };
+	});
+
+	const lineD =
+		points.length > 0
+			? points.map((p, i) => `${i ? 'L' : 'M'}${p.x},${p.y}`).join(' ')
+			: `M${pad},${h - pad} L${w - pad},${h - pad}`;
+
+	const areaD =
+		points.length > 0
+			? `M${points[0].x},${h - pad} ` +
+			  points.map((p) => `L${p.x},${p.y}`).join(' ') +
+			  ` L${points[points.length - 1].x},${h - pad} Z`
+			: `M${pad},${h - pad} L${w - pad},${h - pad} L${w - pad},${h - pad} Z`;
+
+	const isPositive = total >= 0;
+	const mainLine = isPositive ? '#2563EB' : '#DC2626';
+	const pillBg = isPositive ? '#ECFDF5' : '#FEF2F2';
+	const pillBorder = isPositive ? '#10B981' : '#EF4444';
+	const pillText = isPositive ? '#065F46' : '#991B1B';
+	const arrow = isPositive ? 'arrow-up' : 'arrow-down';
+
+	return (
+		<LinearGradient
+			colors={isPositive ? ['#F0F7FF', '#EEF2FF'] : ['#FFF1F2', '#FDF2F8']}
+			start={{ x: 0, y: 0 }}
+			end={{ x: 1, y: 1 }}
+			style={heroStyles.card}
+		>
+			<View style={heroStyles.topRow}>
+				<View>
+					<Text style={heroStyles.label}>Your Balance</Text>
+					<Text
+						style={[
+							heroStyles.amount,
+							{ color: isPositive ? '#0B1324' : '#0B1324' },
+						]}
+						accessibilityRole="header"
+					>
+						{currency(display)}
+					</Text>
+				</View>
+
+				<View
+					accessible
+					accessibilityLabel={`Day change ${
+						dailyChange >= 0 ? 'up' : 'down'
+					} ${currency(Math.abs(dailyChange))}`}
+					style={[
+						heroStyles.pill,
+						{ backgroundColor: pillBg, borderColor: pillBorder },
+					]}
+				>
+					<Ionicons name={arrow} size={14} color={pillText} />
+					<Text style={[heroStyles.pillText, { color: pillText }]}>
+						{dailyChange >= 0 ? '+' : '-'}
+						{currency(Math.abs(dailyChange))} today
+					</Text>
+				</View>
+			</View>
+
+			<View style={{ height: h, marginTop: 14 }}>
+				<Svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`}>
+					<Defs>
+						<SvgGrad id="areaFill" x1="0" y1="0" x2="0" y2="1">
+							<Stop offset="0" stopColor={mainLine} stopOpacity="0.25" />
+							<Stop offset="1" stopColor={mainLine} stopOpacity="0.02" />
+						</SvgGrad>
+					</Defs>
+
+					{/* area */}
+					<Path d={areaD} fill="url(#areaFill)" />
+
+					{/* line */}
+					<Path
+						d={lineD}
+						fill="none"
+						stroke={mainLine}
+						strokeWidth={2}
+						strokeLinejoin="round"
+						strokeLinecap="round"
+					/>
+
+					{/* end dot */}
+					{points.length > 0 ? (
+						<Path
+							d={`M${points.at(-1)!.x},${
+								points.at(-1)!.y
+							} m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0`}
+							fill={mainLine}
+						/>
+					) : null}
+				</Svg>
+			</View>
+
+			<View style={heroStyles.captionRow}>
+				<Text style={heroStyles.caption}>Last 7 days</Text>
+			</View>
+		</LinearGradient>
+	);
+}
+
+function QuickActionsRow({
+	onAddIncome,
+	onAddExpense,
+	onSetGoal,
+}: {
+	onAddIncome: () => void;
+	onAddExpense: () => void;
+	onSetGoal: () => void;
+}) {
+	return (
+		<View style={styles.qaRow}>
+			<ActionChip
+				label="Add Income"
+				icon="arrow-down-circle-outline"
+				onPress={onAddIncome}
+			/>
+			<ActionChip
+				label="Add Expense"
+				icon="arrow-up-circle-outline"
+				onPress={onAddExpense}
+			/>
+			<ActionChip label="Set Goal" icon="flag-outline" onPress={onSetGoal} />
+		</View>
+	);
+}
+
+function ActionChip({
+	label,
+	icon,
+	onPress,
+}: {
+	label: string;
+	icon: any;
+	onPress: () => void;
+}) {
+	return (
+		<TouchableOpacity
+			onPress={onPress}
+			style={styles.actionChip}
+			{...accessibilityProps.button}
+		>
+			<Ionicons name={icon} size={16} color="#374151" />
+			<Text style={[styles.actionChipText, dynamicTextStyle]}>{label}</Text>
+		</TouchableOpacity>
+	);
+}
+
+function QuickSummary({
+	items,
+}: {
+	items: { label: string; value: number; hint?: string }[];
+}) {
+	return (
+		<View style={styles.card}>
+			<View style={styles.cardHeaderRow}>
+				<Text style={[styles.cardTitle, dynamicTextStyle]}>
+					Quick Financial Summary
+				</Text>
+			</View>
+			{items.map((it, idx) => (
+				<View key={idx} style={{ marginTop: idx === 0 ? 4 : 14 }}>
+					<View style={styles.summaryRow}>
+						<Text style={[styles.summaryLabel, dynamicTextStyle]}>
+							{it.label}
+						</Text>
+						<Text style={[styles.summaryValue, dynamicTextStyle]}>
+							{Math.round(it.value * 100)}%
+						</Text>
+					</View>
+					<View style={styles.progressTrack}>
+						<View
+							style={[
+								styles.progressFill,
+								{ width: `${Math.min(100, Math.max(0, it.value * 100))}%` },
+							]}
+						/>
+					</View>
+					{it.hint ? (
+						<Text style={[styles.hint, dynamicTextStyle]}>{it.hint}</Text>
+					) : null}
+				</View>
+			))}
+		</View>
+	);
+}
+
+function RecurringPreview({
+	rowsLimit = 3,
+	onViewAll,
+}: {
+	rowsLimit?: number;
+	onViewAll: () => void;
+}) {
+	// Placeholder skeleton you can wire to your recurring context:
+	const rows = [
+		{ name: 'Rent', due: 'Oct 1', amount: 1665, status: 'upcoming' },
+		{ name: 'Spotify', due: 'Sep 29', amount: 10.99, status: 'due-soon' },
+		{ name: 'Internet', due: 'Oct 3', amount: 70, status: 'upcoming' },
+	].slice(0, rowsLimit);
+
+	return (
+		<View style={styles.card}>
+			<View style={styles.cardHeaderRow}>
+				<Text style={[styles.cardTitle, dynamicTextStyle]}>
+					Recurring Expenses
+				</Text>
+				<TouchableOpacity onPress={onViewAll} {...accessibilityProps.button}>
+					<Text style={styles.viewAll}>View all</Text>
+				</TouchableOpacity>
+			</View>
+			{rows.map((r, i) => (
+				<View key={i} style={styles.recurringRow}>
+					<View
+						style={[
+							styles.dot,
+							{
+								backgroundColor:
+									r.status === 'due-soon' ? '#F59E0B' : '#60A5FA',
+							},
+						]}
+					/>
+					<View style={{ flex: 1 }}>
+						<Text style={[styles.recurringName, dynamicTextStyle]}>
+							{r.name}
+						</Text>
+						<Text style={[styles.recurringMeta, dynamicTextStyle]}>
+							Due {r.due}
+						</Text>
+					</View>
+					<Text style={[styles.recurringAmount, dynamicTextStyle]}>
+						{currency(r.amount)}
+					</Text>
+				</View>
+			))}
+		</View>
+	);
+}
+
+/** ----------------- Styles ----------------- */
+
 const styles = StyleSheet.create({
-	safeArea: {
-		flex: 1,
-		backgroundColor: '#fff',
-	},
-	loadingContainer: {
-		flex: 1,
-		justifyContent: 'center',
-		alignItems: 'center',
-	},
+	safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
+	loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 	loadingText: {
 		marginTop: 16,
 		fontSize: 16,
-		color: '#666',
+		color: '#6B7280',
 		fontWeight: '500',
 	},
-	scrollView: {
-		flex: 1,
-		backgroundColor: '#fff',
-	},
-	scrollContentContainer: {
-		flexGrow: 1,
-	},
-	contentContainer: {
-		paddingHorizontal: 24,
-		paddingTop: 8,
-	},
-	/** Header **/
+
+	scrollView: { flex: 1, backgroundColor: '#FFFFFF' },
+
 	stickyHeader: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
 		paddingHorizontal: 24,
-		zIndex: 1000,
+		paddingTop: 8,
+		paddingBottom: 6,
+		backgroundColor: '#FFFFFF',
 	},
-	headerContainer: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		marginBottom: 12,
-		flex: 1,
-	},
+	logo: { height: 40, width: 90 },
+	headerTitle: { fontSize: 20, fontWeight: '700', color: '#111827' },
+
 	headerButtons: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 8,
 	},
-	devButton: {
-		width: 40,
-		height: 40,
-		borderRadius: 20,
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: '#f0f9ff',
-		borderWidth: 1,
-		borderColor: '#4CAF50',
-	},
-	notificationButton: {
-		width: 48,
-		height: 48,
-		borderRadius: 24,
+	headerButton: {
+		width: 44,
+		height: 44,
+		borderRadius: 22,
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
-	notificationAlertButton: {
+	notificationBadge: {
 		position: 'absolute',
-		top: -4,
-		right: -4,
+		top: -2,
+		right: -2,
 		minWidth: 16,
 		height: 16,
 		borderRadius: 8,
-		backgroundColor: '#dc2626',
+		backgroundColor: '#EF4444',
 		borderWidth: 2,
 		borderColor: 'white',
 		justifyContent: 'center',
@@ -384,43 +582,112 @@ const styles = StyleSheet.create({
 		fontWeight: 'bold',
 		textAlign: 'center',
 	},
-	/** Balance card **/
-	headerCard: {
-		backgroundColor: '#fff',
-		borderRadius: 12,
-		padding: 20,
-		marginBottom: 24,
-		borderWidth: 1,
-		borderColor: '#efefef',
+
+	qaRow: { flexDirection: 'row', gap: 6, marginTop: 14, marginBottom: 8 },
+	actionChip: {
+		flex: 1,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		gap: 2,
+		backgroundColor: '#FFFFFF',
+		paddingVertical: 12,
+		paddingHorizontal: 8,
+		borderRadius: 14,
+		borderWidth: 1.5,
+		borderColor: '#E5E7EB',
 		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.05,
-		shadowRadius: 8,
-		elevation: 2,
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.04,
+		shadowRadius: 3,
+		elevation: 1,
 	},
-	balanceLabel: {
-		color: '#666',
-		fontSize: 14,
-		fontWeight: '500',
-		marginBottom: 8,
+	actionChipText: { color: '#374151', fontSize: 13, fontWeight: '600' },
+
+	card: {
+		backgroundColor: '#FFFFFF',
+		borderRadius: 16,
+		padding: 16,
+		marginTop: 16,
+		borderWidth: 1,
+		borderColor: '#E5E7EB',
+		shadowColor: '#000',
+		shadowOpacity: 0.03,
+		shadowRadius: 6,
+		elevation: 1,
 	},
-	balanceAmount: {
-		color: '#333',
-		fontSize: 32,
-		fontWeight: '600',
+	cardHeaderRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		marginBottom: 4,
 	},
-	dailyChange: {
-		fontSize: 16,
-		fontWeight: '500',
+	cardTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
+	viewAll: { fontSize: 14, color: '#3B82F6', fontWeight: '600' },
+
+	summaryRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+	},
+	summaryLabel: { fontSize: 14, color: '#374151', fontWeight: '600' },
+	summaryValue: { fontSize: 14, color: '#111827', fontWeight: '700' },
+	progressTrack: {
+		height: 8,
+		backgroundColor: '#F3F4F6',
+		borderRadius: 999,
 		marginTop: 8,
+		overflow: 'hidden',
 	},
-	rowCenter: { flexDirection: 'row', alignItems: 'center' },
-	logo: {
-		height: 30,
-		width: 80,
-		alignSelf: 'center',
-		marginBottom: 12,
+	progressFill: { height: 8, backgroundColor: '#60A5FA' },
+	hint: { marginTop: 6, fontSize: 12, color: '#6B7280' },
+
+	recurringRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingVertical: 10,
+		gap: 10,
 	},
+	dot: { width: 8, height: 8, borderRadius: 4 },
+	recurringName: { fontSize: 14, fontWeight: '600', color: '#111827' },
+	recurringMeta: { fontSize: 12, color: '#6B7280', marginTop: 2 },
+	recurringAmount: { fontSize: 14, fontWeight: '700', color: '#111827' },
 });
 
-export default Dashboard;
+const heroStyles = StyleSheet.create({
+	card: {
+		borderRadius: 18,
+		padding: 20,
+		borderWidth: 1,
+		borderColor: '#E5E7EB',
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 3 },
+		shadowOpacity: 0.06,
+		shadowRadius: 10,
+		elevation: 2,
+	},
+	topRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	label: { color: '#6B7280', fontSize: 13, fontWeight: '600' },
+	amount: {
+		marginTop: 4,
+		fontSize: 30,
+		fontWeight: '800',
+		letterSpacing: -0.3,
+	},
+	pill: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+		paddingVertical: 6,
+		paddingHorizontal: 10,
+		borderRadius: 999,
+		borderWidth: 1,
+	},
+	pillText: { fontSize: 12, fontWeight: '700' },
+	captionRow: { marginTop: 10 },
+	caption: { fontSize: 12, color: '#6B7280', fontWeight: '500' },
+});

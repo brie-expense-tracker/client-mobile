@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import {
 	View,
 	Text,
@@ -10,15 +10,24 @@ import {
 	FlatList,
 	Dimensions,
 	ScrollView,
-	Alert,
 	KeyboardAvoidingView,
 	Platform,
 	Keyboard,
+	ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useProfile } from '../../src/context/profileContext';
+
+type FieldErrors = {
+	firstName?: string;
+	lastName?: string;
+	monthlyIncome?: string;
+	financialGoal?: string;
+	housingExpense?: string;
+};
 
 const { width } = Dimensions.get('window');
 
@@ -79,164 +88,243 @@ const OnboardingScreen = () => {
 	const [financialGoal, setFinancialGoal] = useState('');
 	const [housingExpense, setHousingExpense] = useState('');
 
+	// UI State
+	const [touched, setTouched] = useState<{
+		firstName: boolean;
+		lastName: boolean;
+		monthlyIncome: boolean;
+		financialGoal: boolean;
+		housingExpense: boolean;
+	}>({
+		firstName: false,
+		lastName: false,
+		monthlyIncome: false,
+		financialGoal: false,
+		housingExpense: false,
+	});
+	const [submitting, setSubmitting] = useState(false);
+
 	const flatListRef = useRef<FlatList>(null);
 	const [currentIndex, setCurrentIndex] = useState(0);
 
 	const { updateProfile } = useProfile();
 
+	const palette = useMemo(
+		() => ({
+			bg: '#FFFFFF',
+			text: '#0F172A',
+			subtext: '#475569',
+			brand: '#0A84FF',
+			brandDark: '#0060D1',
+			border: '#E2E8F0',
+			error: '#DC2626',
+			inputBg: '#FFFFFF',
+			shadow: '#0F172A',
+			divider: '#E2E8F0',
+		}),
+		[]
+	);
+
+	// Validation logic
+	const isValidName = (val: string) => val.trim().length >= 1;
+	const isValidCurrency = (val: string) => !val || validateCurrencyInput(val);
+	const isValidGoal = (val: string) => val.length > 0;
+
+	const errors: FieldErrors = {};
+	if (touched.firstName && !isValidName(firstName)) {
+		errors.firstName = 'First name is required.';
+	}
+	if (touched.lastName && !isValidName(lastName)) {
+		errors.lastName = 'Last name is required.';
+	}
+	if (touched.monthlyIncome && !isValidCurrency(monthlyIncome)) {
+		errors.monthlyIncome = 'Please enter a valid amount (e.g., 2450.50).';
+	}
+	if (touched.financialGoal && !isValidGoal(financialGoal)) {
+		errors.financialGoal = 'Please select a financial goal.';
+	}
+	if (touched.housingExpense && !isValidCurrency(housingExpense)) {
+		errors.housingExpense = 'Please enter a valid amount.';
+	}
+
+	const stepValid = useMemo(() => {
+		if (currentIndex === 0) return true; // welcome screen
+		if (currentIndex === 1) {
+			return (
+				isValidName(firstName) &&
+				isValidName(lastName) &&
+				isValidCurrency(monthlyIncome)
+			);
+		}
+		if (currentIndex === 2) {
+			return isValidGoal(financialGoal) && isValidCurrency(housingExpense);
+		}
+		return false;
+	}, [
+		currentIndex,
+		firstName,
+		lastName,
+		monthlyIncome,
+		financialGoal,
+		housingExpense,
+	]);
+
 	// Currency input handlers
-	const handleCurrencyInput = (
-		value: string,
-		setter: (value: string) => void
-	) => {
-		const formatted = formatCurrencyInput(value);
-		if (validateCurrencyInput(formatted)) {
-			setter(formatted);
-		}
-	};
-
-	const handleSubmit = async () => {
-		// Validate all currency inputs before submission
-		const currencyFields = [
-			{ value: monthlyIncome, name: 'Monthly Income' },
-			{ value: housingExpense, name: 'Housing Expense' },
-		];
-
-		// Check if any currency field has invalid data
-		for (const field of currencyFields) {
-			if (field.value && !validateCurrencyInput(field.value)) {
-				Alert.alert(
-					'Invalid Input',
-					`Please enter a valid amount for ${field.name}.`,
-					[{ text: 'OK' }]
-				);
-				return;
+	const handleCurrencyInput = useCallback(
+		(value: string, setter: (value: string) => void) => {
+			const formatted = formatCurrencyInput(value);
+			if (validateCurrencyInput(formatted)) {
+				setter(formatted);
 			}
+		},
+		[]
+	);
+
+	const onBlurField = useCallback((field: keyof typeof touched) => {
+		setTouched((prev) => ({ ...prev, [field]: true }));
+	}, []);
+
+	const handleSubmit = useCallback(async () => {
+		if (submitting) return;
+
+		// Mark all fields as touched to reveal errors
+		setTouched({
+			firstName: true,
+			lastName: true,
+			monthlyIncome: true,
+			financialGoal: true,
+			housingExpense: true,
+		});
+
+		// Check if form is valid
+		if (!stepValid) {
+			await Haptics.selectionAsync();
+			return;
 		}
 
-		const profileData = {
-			firstName,
-			lastName,
-			ageRange: '25-34', // Default age range
-			monthlyIncome: monthlyIncome ? parseFloat(monthlyIncome) : 0,
-			financialGoal,
-			expenses: {
-				housing: housingExpense ? parseFloat(housingExpense) : 0,
-				loans: 0,
-				subscriptions: 0,
-			},
-			savings: 0,
-			debt: 0,
-			riskProfile: {
-				tolerance: '3',
-				experience: '3',
-			},
-			preferences: {
-				adviceFrequency: 'Weekly summary',
-				autoSave: {
-					enabled: false,
-					amount: 0,
+		setSubmitting(true);
+		try {
+			const profileData = {
+				firstName: firstName.trim(),
+				lastName: lastName.trim(),
+				ageRange: '25-34', // Default age range
+				monthlyIncome: monthlyIncome ? parseFloat(monthlyIncome) : 0,
+				financialGoal,
+				expenses: {
+					housing: housingExpense ? parseFloat(housingExpense) : 0,
+					loans: 0,
+					subscriptions: 0,
 				},
-				notifications: {
-					enableNotifications: true,
-					weeklySummary: true,
-					overspendingAlert: true,
-					aiSuggestion: true,
-					budgetMilestones: true,
-					monthlyFinancialCheck: true,
-					monthlySavingsTransfer: false,
+				savings: 0,
+				debt: 0,
+				riskProfile: {
+					tolerance: '3',
+					experience: '3',
 				},
-				aiInsights: {
-					enabled: true,
-					frequency: 'weekly' as const,
-					pushNotifications: true,
-					emailAlerts: false,
-					insightTypes: {
-						budgetingTips: true,
-						expenseReduction: true,
-						incomeSuggestions: true,
-					},
-				},
-				budgetSettings: {
-					cycleType: 'monthly' as const,
-					cycleStart: 1,
-					alertPct: 80,
-					carryOver: false,
-					autoSync: true,
-				},
-				goalSettings: {
-					defaults: {
-						target: 1000,
-						dueDays: 90,
-						sortBy: 'percent',
-						currency: 'USD',
-					},
-					ai: {
-						enabled: true,
-						tone: 'friendly',
-						frequency: 'medium',
-						whatIf: true,
+				preferences: {
+					adviceFrequency: 'Weekly summary',
+					autoSave: {
+						enabled: false,
+						amount: 0,
 					},
 					notifications: {
-						milestoneAlerts: true,
-						weeklySummary: false,
-						offTrackAlert: true,
+						enableNotifications: true,
+						weeklySummary: true,
+						overspendingAlert: true,
+						aiSuggestion: true,
+						budgetMilestones: true,
+						monthlyFinancialCheck: true,
+						monthlySavingsTransfer: false,
 					},
-					display: {
-						showCompleted: true,
-						autoArchive: true,
-						rounding: '1',
+					aiInsights: {
+						enabled: true,
+						frequency: 'weekly' as const,
+						pushNotifications: true,
+						emailAlerts: false,
+						insightTypes: {
+							budgetingTips: true,
+							expenseReduction: true,
+							incomeSuggestions: true,
+						},
 					},
-					security: {
-						lockEdit: false,
-						undoWindow: 24,
+					budgetSettings: {
+						cycleType: 'monthly' as const,
+						cycleStart: 1,
+						alertPct: 80,
+						carryOver: false,
+						autoSync: true,
+					},
+					goalSettings: {
+						defaults: {
+							target: 1000,
+							dueDays: 90,
+							sortBy: 'percent',
+							currency: 'USD',
+						},
+						ai: {
+							enabled: true,
+							tone: 'friendly',
+							frequency: 'medium',
+							whatIf: true,
+						},
+						notifications: {
+							milestoneAlerts: true,
+							weeklySummary: false,
+							offTrackAlert: true,
+						},
+						display: {
+							showCompleted: true,
+							autoArchive: true,
+							rounding: '1',
+						},
+						security: {
+							lockEdit: false,
+							undoWindow: 24,
+						},
 					},
 				},
-			},
-		};
+			};
 
-		try {
 			// Update profile using profileContext
 			await updateProfile(profileData as any);
-
-			// Navigate to notification permission screen instead of directly to dashboard
-			setTimeout(() => {
-				router.push('/(onboarding)/notificationSetup');
-			}, 100);
+			await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+			router.push('/(onboarding)/notificationSetup');
 		} catch (error) {
 			console.error('Error submitting profile:', error);
+			await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 			// Even if profile submission fails, try to continue to notification setup
 			try {
-				setTimeout(() => {
-					router.push('/(onboarding)/notificationSetup');
-				}, 100);
+				router.push('/(onboarding)/notificationSetup');
 			} catch (onboardingError) {
 				console.error(
 					'Error navigating to notification setup:',
 					onboardingError
 				);
 				// Fallback to dashboard if navigation fails
-				setTimeout(() => {
-					router.replace('/(tabs)/dashboard');
-				}, 100);
+				router.replace('/(tabs)/dashboard');
 			}
+		} finally {
+			setSubmitting(false);
 		}
-	};
+	}, [
+		submitting,
+		stepValid,
+		firstName,
+		lastName,
+		monthlyIncome,
+		financialGoal,
+		housingExpense,
+		updateProfile,
+	]);
 
-	const handleSkip = async () => {
+	const handleSkip = useCallback(async () => {
 		try {
-			// Navigate to notification permission screen instead of directly to dashboard
-			setTimeout(() => {
-				router.push('/(onboarding)/notificationSetup');
-			}, 100);
+			router.push('/(onboarding)/notificationSetup');
 		} catch (error) {
 			console.error('Error navigating to notification setup:', error);
-			// Even if there's an error, try to navigate to dashboard
-			setTimeout(() => {
-				router.replace('/(tabs)/dashboard');
-			}, 100);
+			router.replace('/(tabs)/dashboard');
 		}
-	};
+	}, []);
 
 	const renderItem = ({ item, index }: { item: any; index: number }) => {
 		switch (index) {
@@ -251,15 +339,28 @@ const OnboardingScreen = () => {
 						>
 							<View style={styles.welcomeCard}>
 								<View style={styles.welcomeIllustration}>
-									<Ionicons name="wallet-outline" size={80} color="#0095FF" />
+									<Ionicons
+										name="wallet-outline"
+										size={80}
+										color={palette.brand}
+									/>
 								</View>
-								<Text style={styles.welcomeTitle}>Welcome to Brie!</Text>
-								<Text style={styles.welcomeSubtitle}>
-									Set up your budgets and goals to track your progress
+								<Text style={[styles.welcomeTitle, { color: palette.text }]}>
+									Welcome to Brie
 								</Text>
-								<Text style={styles.welcomeDescription}>
-									Let&apos;s create your first budget and financial goal to get
-									you started on your financial journey.
+								<Text
+									style={[styles.welcomeSubtitle, { color: palette.brand }]}
+								>
+									Setup that respects your time
+								</Text>
+								<Text
+									style={[
+										styles.welcomeDescription,
+										{ color: palette.subtext },
+									]}
+								>
+									We&apos;ll personalize budgets and goals with just a few
+									details. You can change everything later in Settings.
 								</Text>
 							</View>
 						</ScrollView>
@@ -274,53 +375,97 @@ const OnboardingScreen = () => {
 							keyboardShouldPersistTaps="handled"
 							keyboardDismissMode="interactive"
 						>
-							<Text style={styles.title}>Let&apos;s get to know you</Text>
+							<Text style={[styles.title, { color: palette.text }]}>
+								Let&apos;s get to know you
+							</Text>
 							<View style={styles.inputContainer}>
-								<Text style={styles.label}>First Name</Text>
-								<Text style={styles.subtext}>
-									This helps us personalize your experience
+								<Text style={[styles.label, { color: palette.subtext }]}>
+									First name
+								</Text>
+								<Text style={[styles.subtext, { color: palette.subtext }]}>
+									We&apos;ll use this to personalize your experience
 								</Text>
 								<TextInput
 									value={firstName}
 									onChangeText={setFirstName}
-									style={styles.input}
-									placeholderTextColor="#6b7280"
+									onBlur={() => onBlurField('firstName')}
+									style={[styles.input, inputShadow]}
+									placeholderTextColor="#94A3B8"
 									placeholder="Enter your first name"
+									accessibilityLabel="First name"
+									returnKeyType="next"
+									autoCapitalize="words"
 								/>
+								{!!errors.firstName && (
+									<Text
+										style={styles.errorText}
+										accessibilityLiveRegion="polite"
+									>
+										{errors.firstName}
+									</Text>
+								)}
 							</View>
 							<View style={styles.inputContainer}>
-								<Text style={styles.label}>Last Name</Text>
-								<Text style={styles.subtext}>
-									Your full name helps with account security
+								<Text style={[styles.label, { color: palette.subtext }]}>
+									Last name
+								</Text>
+								<Text style={[styles.subtext, { color: palette.subtext }]}>
+									Helps with account security and support
 								</Text>
 								<TextInput
 									value={lastName}
 									onChangeText={setLastName}
-									style={styles.input}
-									placeholderTextColor="#6b7280"
+									onBlur={() => onBlurField('lastName')}
+									style={[styles.input, inputShadow]}
+									placeholderTextColor="#94A3B8"
 									placeholder="Enter your last name"
+									accessibilityLabel="Last name"
+									returnKeyType="next"
+									autoCapitalize="words"
 								/>
+								{!!errors.lastName && (
+									<Text
+										style={styles.errorText}
+										accessibilityLiveRegion="polite"
+									>
+										{errors.lastName}
+									</Text>
+								)}
 							</View>
 							<View style={styles.inputContainer}>
-								<Text style={styles.label}>Monthly Take-Home Income</Text>
-								<Text style={styles.subtext}>
-									Your after-tax income helps us calculate realistic budgets
+								<Text style={[styles.label, { color: palette.subtext }]}>
+									Monthly take-home income
 								</Text>
-								<View style={styles.inputWithIcon}>
+								<Text style={[styles.subtext, { color: palette.subtext }]}>
+									After taxes; this improves budget suggestions
+								</Text>
+								<View style={[styles.inputWithIcon, inputShadow]}>
 									<View style={styles.inputIcon}>
-										<Ionicons name="logo-usd" size={20} color="#6b7280" />
+										<Ionicons name="logo-usd" size={18} color="#6b7280" />
 									</View>
 									<TextInput
 										value={monthlyIncome}
 										onChangeText={(text) =>
 											handleCurrencyInput(text, setMonthlyIncome)
 										}
-										keyboardType="numeric"
+										onBlur={() => onBlurField('monthlyIncome')}
+										keyboardType={
+											Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'
+										}
 										style={styles.inputWithIconText}
-										placeholderTextColor="#6b7280"
+										placeholderTextColor="#94A3B8"
 										placeholder="0.00"
+										accessibilityLabel="Monthly income"
 									/>
 								</View>
+								{!!errors.monthlyIncome && (
+									<Text
+										style={styles.errorText}
+										accessibilityLiveRegion="polite"
+									>
+										{errors.monthlyIncome}
+									</Text>
+								)}
 							</View>
 						</ScrollView>
 					</View>
@@ -334,11 +479,15 @@ const OnboardingScreen = () => {
 							keyboardShouldPersistTaps="handled"
 							keyboardDismissMode="interactive"
 						>
-							<Text style={styles.title}>Your Financial Goals</Text>
+							<Text style={[styles.title, { color: palette.text }]}>
+								Your primary goal
+							</Text>
 							<View style={styles.inputContainer}>
-								<Text style={styles.label}>Primary Financial Goal</Text>
-								<Text style={styles.subtext}>
-									Choose your most important financial priority right now
+								<Text style={[styles.label, { color: palette.subtext }]}>
+									Choose one
+								</Text>
+								<Text style={[styles.subtext, { color: palette.subtext }]}>
+									You can add more later
 								</Text>
 								<View style={styles.goalContainer}>
 									{[
@@ -350,11 +499,18 @@ const OnboardingScreen = () => {
 									].map((goal) => (
 										<Pressable
 											key={goal}
-											onPress={() => setFinancialGoal(goal)}
+											onPress={() => {
+												setFinancialGoal(goal);
+												onBlurField('financialGoal');
+											}}
 											style={[
 												styles.goalButton,
 												financialGoal === goal && styles.selectedGoal,
+												cardShadow,
 											]}
+											accessibilityRole="button"
+											accessibilityState={{ selected: financialGoal === goal }}
+											accessibilityLabel={goal}
 										>
 											<Text
 												style={[
@@ -367,35 +523,74 @@ const OnboardingScreen = () => {
 										</Pressable>
 									))}
 								</View>
+								{!!errors.financialGoal && (
+									<Text
+										style={styles.errorText}
+										accessibilityLiveRegion="polite"
+									>
+										{errors.financialGoal}
+									</Text>
+								)}
 							</View>
 							<View style={styles.inputContainer}>
-								<Text style={styles.label}>Monthly Housing Expense</Text>
-								<Text style={styles.subtext}>
-									Track your biggest monthly expense to create better budgets
+								<Text style={[styles.label, { color: palette.subtext }]}>
+									Monthly housing expense
 								</Text>
-								<View style={styles.inputWithIcon}>
+								<Text style={[styles.subtext, { color: palette.subtext }]}>
+									Track your biggest fixed cost
+								</Text>
+								<View style={[styles.inputWithIcon, inputShadow]}>
 									<View style={styles.inputIcon}>
-										<Ionicons name="logo-usd" size={20} color="#6b7280" />
+										<Ionicons name="home-outline" size={18} color="#6b7280" />
 									</View>
 									<TextInput
 										value={housingExpense}
 										onChangeText={(text) =>
 											handleCurrencyInput(text, setHousingExpense)
 										}
-										keyboardType="numeric"
+										onBlur={() => onBlurField('housingExpense')}
+										keyboardType={
+											Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'
+										}
 										style={styles.inputWithIconText}
-										placeholderTextColor="#6b7280"
+										placeholderTextColor="#94A3B8"
 										placeholder="0.00"
+										accessibilityLabel="Monthly housing expense"
 									/>
 								</View>
+								{!!errors.housingExpense && (
+									<Text
+										style={styles.errorText}
+										accessibilityLiveRegion="polite"
+									>
+										{errors.housingExpense}
+									</Text>
+								)}
 							</View>
 
-							<Pressable onPress={handleSubmit} style={styles.submitButton}>
+							<Pressable
+								onPress={handleSubmit}
+								style={[
+									styles.submitButton,
+									{ opacity: stepValid && !submitting ? 1 : 0.6 },
+								]}
+								disabled={!stepValid || submitting}
+								accessibilityRole="button"
+								accessibilityLabel="Complete setup"
+							>
 								<LinearGradient
-									colors={['#0095FF', '#008cff']}
+									colors={[palette.brand, palette.brandDark]}
 									style={styles.gradient}
 								>
-									<Text style={styles.submitButtonText}>Complete Setup</Text>
+									{submitting ? (
+										<ActivityIndicator
+											size="small"
+											color="#FFFFFF"
+											style={{ paddingVertical: 16 }}
+										/>
+									) : (
+										<Text style={styles.submitButtonText}>Complete Setup</Text>
+									)}
 								</LinearGradient>
 							</Pressable>
 						</ScrollView>
@@ -406,9 +601,13 @@ const OnboardingScreen = () => {
 		}
 	};
 
-	const handleNext = () => {
-		// Dismiss keyboard when continuing to next slide
+	const handleNext = useCallback(async () => {
 		Keyboard.dismiss();
+
+		if (!stepValid) {
+			await Haptics.selectionAsync();
+			return;
+		}
 
 		if (currentIndex < 2) {
 			flatListRef.current?.scrollToIndex({
@@ -416,10 +615,13 @@ const OnboardingScreen = () => {
 				animated: true,
 			});
 			setCurrentIndex(currentIndex + 1);
+			await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+		} else {
+			await handleSubmit();
 		}
-	};
+	}, [currentIndex, stepValid, handleSubmit]);
 
-	const handleBack = () => {
+	const handleBack = useCallback(() => {
 		if (currentIndex > 0) {
 			flatListRef.current?.scrollToIndex({
 				index: currentIndex - 1,
@@ -427,7 +629,7 @@ const OnboardingScreen = () => {
 			});
 			setCurrentIndex(currentIndex - 1);
 		}
-	};
+	}, [currentIndex]);
 
 	return (
 		<SafeAreaView style={styles.container}>
@@ -477,25 +679,55 @@ const OnboardingScreen = () => {
 				</View>
 				<View style={styles.navigationButtons}>
 					{currentIndex > 0 ? (
-						<Pressable onPress={handleBack} style={styles.navButton}>
+						<Pressable
+							onPress={handleBack}
+							style={[styles.navButton, cardShadow]}
+						>
 							<Text style={styles.navButtonBackText}>← Back</Text>
 						</Pressable>
 					) : (
 						<View style={styles.navButton} />
 					)}
-					{currentIndex < 2 && (
-						<Pressable
-							onPress={handleNext}
-							style={[styles.navButton, styles.nextButton]}
-						>
-							<Text style={styles.navButtonText}>Continue</Text>
-						</Pressable>
-					)}
+					<Pressable
+						onPress={handleNext}
+						style={[
+							styles.navButton,
+							styles.nextButton,
+							cardShadow,
+							{ opacity: stepValid ? 1 : 0.6 },
+						]}
+						disabled={!stepValid}
+					>
+						<Text style={styles.navButtonText}>
+							{currentIndex < 2 ? 'Continue' : 'Complete Setup'}
+						</Text>
+					</Pressable>
 				</View>
 			</KeyboardAvoidingView>
 		</SafeAreaView>
 	);
 };
+
+/* ---------- Shadow Constants ---------- */
+const inputShadow = Platform.select({
+	ios: {
+		shadowColor: '#0F172A',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.06,
+		shadowRadius: 6,
+	},
+	android: { elevation: 1.5 },
+});
+
+const cardShadow = Platform.select({
+	ios: {
+		shadowColor: '#0F172A',
+		shadowOffset: { width: 0, height: 8 },
+		shadowOpacity: 0.08,
+		shadowRadius: 16,
+	},
+	android: { elevation: 3 },
+});
 
 const styles = StyleSheet.create({
 	container: {
@@ -575,22 +807,28 @@ const styles = StyleSheet.create({
 		color: '#374151',
 	},
 	input: {
-		backgroundColor: 'white',
+		backgroundColor: '#FFFFFF',
 		borderRadius: 12,
-		padding: 16,
+		paddingHorizontal: 14,
+		paddingVertical: 14,
 		fontSize: 16,
-		borderWidth: 1,
-		borderColor: '#e5e7eb',
-		marginBottom: 12,
+		borderWidth: StyleSheet.hairlineWidth,
+		borderColor: '#E2E8F0',
+		marginBottom: 6,
 	},
 	inputWithIcon: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		backgroundColor: 'white',
+		backgroundColor: '#FFFFFF',
 		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: '#e5e7eb',
-		marginBottom: 12,
+		borderWidth: StyleSheet.hairlineWidth,
+		borderColor: '#E2E8F0',
+		marginBottom: 6,
+	},
+	errorText: {
+		color: '#DC2626',
+		fontSize: 12,
+		marginTop: 6,
 	},
 	inputWithIconText: {
 		flex: 1,
@@ -635,12 +873,12 @@ const styles = StyleSheet.create({
 	goalButton: {
 		padding: 16,
 		borderRadius: 12,
-		backgroundColor: 'white',
-		borderWidth: 1,
-		borderColor: '#e5e7eb',
+		backgroundColor: '#FFFFFF',
+		borderWidth: StyleSheet.hairlineWidth,
+		borderColor: '#E2E8F0',
 	},
 	selectedGoal: {
-		borderColor: '#0095FF',
+		borderColor: '#0A84FF',
 		backgroundColor: '#f0f9ff',
 	},
 	goalText: {
@@ -648,7 +886,7 @@ const styles = StyleSheet.create({
 		color: '#374151',
 	},
 	selectedGoalText: {
-		color: '#0095FF',
+		color: '#0A84FF',
 		fontWeight: '600',
 	},
 	ratingContainer: {
@@ -700,10 +938,10 @@ const styles = StyleSheet.create({
 
 	submitButton: {
 		width: '100%',
-		borderRadius: 9999,
+		borderRadius: 999,
 		overflow: 'hidden',
 		marginTop: 16,
-		shadowColor: '#0095FF',
+		shadowColor: '#0A84FF',
 		shadowOffset: { width: 0, height: 8 },
 		shadowOpacity: 0.6,
 		shadowRadius: 15,
@@ -733,7 +971,7 @@ const styles = StyleSheet.create({
 		marginHorizontal: 2,
 	},
 	paginationDotActive: {
-		backgroundColor: '#0095FF',
+		backgroundColor: '#0A84FF',
 		height: 7,
 		borderRadius: 8,
 	},
@@ -746,12 +984,12 @@ const styles = StyleSheet.create({
 	navButton: {
 		padding: 12,
 		borderRadius: 20,
-		backgroundColor: '#fff',
-		width: 100,
+		backgroundColor: '#FFFFFF',
+		width: 120,
 		alignItems: 'center',
 	},
 	nextButton: {
-		backgroundColor: '#fff',
+		backgroundColor: '#FFFFFF',
 	},
 	navButtonBackText: {
 		color: '#444444',
@@ -759,8 +997,8 @@ const styles = StyleSheet.create({
 		fontSize: 18,
 	},
 	navButtonText: {
-		color: '#0095FF',
-		fontWeight: '600',
+		color: '#0A84FF',
+		fontWeight: '700',
 		fontSize: 18,
 	},
 	sectionTitle: {

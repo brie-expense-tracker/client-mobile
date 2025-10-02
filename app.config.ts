@@ -11,6 +11,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 		slug: 'clientMobile',
 		version: '1.0.0',
 		orientation: 'portrait',
+		icon: './src/assets/icons/adaptive-icon.png',
 		scheme: 'brie',
 		userInterfaceStyle: 'automatic',
 		newArchEnabled: true,
@@ -18,7 +19,13 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 			supportsTablet: true,
 			bundleIdentifier: 'com.brie.mobile',
 			buildNumber: '1',
-			googleServicesFile: './GoogleService-Info.plist',
+			googleServicesFile:
+				process.env.GOOGLE_SERVICE_INFO_PLIST || './GoogleService-Info.plist',
+			icon: {
+				light: './src/assets/icons/ios-light.png',
+				dark: './src/assets/icons/ios-dark.png',
+				tinted: './src/assets/icons/ios-tinted.png',
+			},
 			infoPlist: {
 				ITSAppUsesNonExemptEncryption: false,
 				NSAppTransportSecurity: {
@@ -44,7 +51,13 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 		android: {
 			package: 'com.brie.mobile',
 			versionCode: 1,
-			googleServicesFile: './google-services.json',
+			googleServicesFile:
+				process.env.GOOGLE_SERVICES_JSON || './google-services.json',
+			adaptiveIcon: {
+				foregroundImage: './src/assets/icons/adaptive-icon.png',
+				monochromeImage: './src/assets/icons/adaptive-icon.png',
+				backgroundColor: '#ffffff',
+			},
 		},
 		web: {
 			bundler: 'metro',
@@ -78,11 +91,26 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 					enableBackgroundRemoteNotifications: isProduction,
 				},
 			],
+			[
+				'expo-splash-screen',
+				{
+					image: './src/assets/icons/splash-icon-dark.png',
+					resizeMode: 'contain',
+					imageWidth: 200,
+					backgroundColor: '#ffffff',
+					dark: {
+						image: './src/assets/icons/splash-icon-light.png',
+						resizeMode: 'contain',
+						imageWidth: 200,
+						backgroundColor: '#000000',
+					},
+				},
+			],
 		],
 		experiments: {
 			typedRoutes: true,
 		},
-		assetBundlePatterns: ['./assets/**/*'],
+		assetBundlePatterns: ['./src/assets/**/*'],
 		extra: {
 			eas: {
 				projectId: '5c37bf2f-48a8-4081-bddb-eb7ed5783845',

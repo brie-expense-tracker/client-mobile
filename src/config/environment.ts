@@ -15,7 +15,9 @@ export const ENV = {
 	),
 
 	// Security
-	HMAC_SECRET_KEY: process.env.EXPO_PUBLIC_HMAC_SECRET_KEY,
+	HMAC_SECRET_KEY:
+		process.env.EXPO_PUBLIC_HMAC_SECRET_KEY ||
+		'dev-hmac-secret-key-32-chars-minimum-required-for-development',
 
 	// Primary API URL - use EXPO_PUBLIC_API_URL everywhere
 	API_URL:
