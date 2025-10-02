@@ -946,16 +946,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			console.log('🔑 Requesting Google Sign-In...');
 			const signInResult = await GoogleSignin.signIn();
 			console.log('📋 Google Sign-In result:', signInResult);
+
+			// Handle the actual data structure returned by Google Sign-In
+			let idToken, user, serverAuthCode;
 			
-			const { idToken, user, serverAuthCode } = signInResult;
+			if (signInResult.type === 'success' && signInResult.data) {
+				// Success case - data is in signInResult.data
+				({ idToken, user, serverAuthCode } = signInResult.data);
+			} else if (signInResult.type === 'cancelled') {
+				// User cancelled - exit silently
+				console.log('ℹ️ Google Sign-In cancelled by user');
+				return;
+			} else {
+				// Direct access for other cases
+				({ idToken, user, serverAuthCode } = signInResult);
+			}
 			console.log('✅ Google Sign-In successful, user:', user?.email);
 			console.log('🔑 ID Token received:', idToken ? 'Yes' : 'No');
-			console.log('🔑 Server Auth Code received:', serverAuthCode ? 'Yes' : 'No');
+			console.log(
+				'🔑 Server Auth Code received:',
+				serverAuthCode ? 'Yes' : 'No'
+			);
 
 			if (!idToken) {
 				console.error('❌ No ID token in sign-in result:', signInResult);
 				console.error('Available properties:', Object.keys(signInResult));
-				
+
 				// Try to get the token separately
 				console.log('🔄 Attempting to get ID token separately...');
 				try {
@@ -964,10 +980,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 					if (tokens.idToken) {
 						console.log('✅ Got ID token from getTokens');
 						// Use the token from getTokens
-						const googleCredential = GoogleAuthProvider.credential(tokens.idToken);
-						const userCredential = await auth().signInWithCredential(googleCredential);
+						const googleCredential = GoogleAuthProvider.credential(
+							tokens.idToken
+						);
+						const userCredential = await auth().signInWithCredential(
+							googleCredential
+						);
 						const firebaseUser = userCredential.user;
-						console.log('✅ Firebase authentication successful:', firebaseUser.uid);
+						console.log(
+							'✅ Firebase authentication successful:',
+							firebaseUser.uid
+						);
 						await login(firebaseUser);
 						console.log('✅ Google Sign-Up completed successfully');
 						return;
@@ -975,7 +998,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				} catch (tokenError) {
 					console.error('❌ Failed to get tokens separately:', tokenError);
 				}
-				
+
 				throw new Error('No ID token received from Google Sign-In');
 			}
 

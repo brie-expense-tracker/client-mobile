@@ -15,7 +15,10 @@ export const configureGoogleSignIn = () => {
 				'807336746313-khft9ts8r9li4cvme5bpjnhr1tdou3je.apps.googleusercontent.com', // [iOS] if you want to specify the client ID of type iOS (otherwise, it is taken from GoogleService-Info.plist)
 			googleServicePlistPath: '', // [iOS] if you renamed your GoogleService-Info.plist file, add the new name here
 			profileImageSize: 120, // [iOS] The desired height (and width) of the profile image. Defaults to 120px
-			scopes: ['https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile'], // Add required scopes
+			scopes: [
+				'https://www.googleapis.com/auth/userinfo.email',
+				'https://www.googleapis.com/auth/userinfo.profile',
+			], // Add required scopes
 		});
 		console.log('✅ Google Sign-In configured successfully');
 	} catch (error) {
