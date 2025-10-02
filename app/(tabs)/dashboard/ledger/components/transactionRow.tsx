@@ -14,6 +14,8 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 import { useBudget } from '../../../../../src/context/budgetContext';
 import { useGoal } from '../../../../../src/context/goalContext';
+import { useRecurringExpenses } from '../../../../../src/hooks/useRecurringExpenses';
+import { normalizeIconName } from '../../../../../src/constants/uiConstants';
 
 // Transaction interface defined inline since we removed the mock data file
 interface Transaction {
@@ -72,6 +74,169 @@ const formatDateWithoutTime = (dateString: string): string => {
 	}
 };
 
+// Smart fallback function to infer icon and color from transaction description
+const getSmartFallback = (description: string, type: 'income' | 'expense') => {
+	const desc = description.toLowerCase();
+
+	// Income categories
+	if (type === 'income') {
+		if (
+			desc.includes('salary') ||
+			desc.includes('payroll') ||
+			desc.includes('wage')
+		) {
+			return {
+				icon: 'briefcase-outline' as keyof typeof Ionicons.glyphMap,
+				color: '#43A047',
+			};
+		}
+		if (
+			desc.includes('freelance') ||
+			desc.includes('contract') ||
+			desc.includes('gig')
+		) {
+			return {
+				icon: 'laptop-outline' as keyof typeof Ionicons.glyphMap,
+				color: '#1E88E5',
+			};
+		}
+		if (
+			desc.includes('investment') ||
+			desc.includes('dividend') ||
+			desc.includes('stock')
+		) {
+			return {
+				icon: 'trending-up-outline' as keyof typeof Ionicons.glyphMap,
+				color: '#8E24AA',
+			};
+		}
+		if (desc.includes('refund') || desc.includes('rebate')) {
+			return {
+				icon: 'arrow-back-outline' as keyof typeof Ionicons.glyphMap,
+				color: '#43A047',
+			};
+		}
+		if (desc.includes('gift') || desc.includes('bonus')) {
+			return {
+				icon: 'gift-outline' as keyof typeof Ionicons.glyphMap,
+				color: '#FB8C00',
+			};
+		}
+		// Default income
+		return {
+			icon: 'trending-up-outline' as keyof typeof Ionicons.glyphMap,
+			color: '#43A047',
+		};
+	}
+
+	// Expense categories
+	if (
+		desc.includes('food') ||
+		desc.includes('restaurant') ||
+		desc.includes('grocery') ||
+		desc.includes('dining')
+	) {
+		return {
+			icon: 'restaurant-outline' as keyof typeof Ionicons.glyphMap,
+			color: '#FB8C00',
+		};
+	}
+	if (
+		desc.includes('gas') ||
+		desc.includes('fuel') ||
+		desc.includes('transport') ||
+		desc.includes('uber') ||
+		desc.includes('lyft')
+	) {
+		return {
+			icon: 'car-outline' as keyof typeof Ionicons.glyphMap,
+			color: '#1E88E5',
+		};
+	}
+	if (
+		desc.includes('rent') ||
+		desc.includes('mortgage') ||
+		desc.includes('housing') ||
+		desc.includes('utilities')
+	) {
+		return {
+			icon: 'home-outline' as keyof typeof Ionicons.glyphMap,
+			color: '#8E24AA',
+		};
+	}
+	if (
+		desc.includes('shopping') ||
+		desc.includes('store') ||
+		desc.includes('amazon') ||
+		desc.includes('retail')
+	) {
+		return {
+			icon: 'bag-outline' as keyof typeof Ionicons.glyphMap,
+			color: '#E53935',
+		};
+	}
+	if (
+		desc.includes('entertainment') ||
+		desc.includes('movie') ||
+		desc.includes('game') ||
+		desc.includes('streaming')
+	) {
+		return {
+			icon: 'game-controller-outline' as keyof typeof Ionicons.glyphMap,
+			color: '#5E35B1',
+		};
+	}
+	if (
+		desc.includes('health') ||
+		desc.includes('medical') ||
+		desc.includes('doctor') ||
+		desc.includes('pharmacy')
+	) {
+		return {
+			icon: 'medical-outline' as keyof typeof Ionicons.glyphMap,
+			color: '#E53935',
+		};
+	}
+	if (
+		desc.includes('education') ||
+		desc.includes('school') ||
+		desc.includes('course') ||
+		desc.includes('book')
+	) {
+		return {
+			icon: 'school-outline' as keyof typeof Ionicons.glyphMap,
+			color: '#1E88E5',
+		};
+	}
+	if (
+		desc.includes('subscription') ||
+		desc.includes('netflix') ||
+		desc.includes('spotify') ||
+		desc.includes('premium')
+	) {
+		return {
+			icon: 'card-outline' as keyof typeof Ionicons.glyphMap,
+			color: '#8E24AA',
+		};
+	}
+	if (
+		desc.includes('insurance') ||
+		desc.includes('tax') ||
+		desc.includes('fee')
+	) {
+		return {
+			icon: 'shield-outline' as keyof typeof Ionicons.glyphMap,
+			color: '#424242',
+		};
+	}
+
+	// Default expense
+	return {
+		icon: 'trending-down-outline' as keyof typeof Ionicons.glyphMap,
+		color: '#E53935',
+	};
+};
+
 interface TransactionRowProps {
 	item: Transaction;
 	onDelete: (id: string, resetAnimation: () => void) => void;
@@ -89,9 +254,10 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 	const TRANSLATE_THRESHOLD = -70;
 	const DELETE_WIDTH = 60;
 
-	// Get budget and goal contexts
+	// Get budget, goal, and recurring expense contexts
 	const { budgets } = useBudget();
 	const { goals } = useGoal();
+	const { expenses: recurringExpenses } = useRecurringExpenses();
 
 	// Memoize the transaction context calculation to prevent unnecessary recalculations
 	const transactionContext = useMemo(() => {
@@ -108,11 +274,19 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 					const transactionContribution =
 						(item.amount / (matchingBudget.amount || 1)) * 100;
 
+					// Use budget icon/color if available, otherwise fall back to smart inference
+					const budgetIcon =
+						matchingBudget.icon ||
+						getSmartFallback(item.description, 'expense').icon;
+					const budgetColor =
+						matchingBudget.color ||
+						getSmartFallback(item.description, 'expense').color;
+
 					return {
 						type: 'budget' as const,
 						name: matchingBudget.name,
-						icon: matchingBudget.icon as keyof typeof Ionicons.glyphMap,
-						color: matchingBudget.color,
+						icon: normalizeIconName(budgetIcon),
+						color: budgetColor,
 						progress: transactionContribution,
 						spent: matchingBudget.spent || 0,
 						allocated: matchingBudget.amount || 0,
@@ -128,11 +302,19 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 					const transactionContribution =
 						(item.amount / matchingGoal.target) * 100;
 
+					// Use goal icon/color if available, otherwise fall back to smart inference
+					const goalIcon =
+						matchingGoal.icon ||
+						getSmartFallback(item.description, 'income').icon;
+					const goalColor =
+						matchingGoal.color ||
+						getSmartFallback(item.description, 'income').color;
+
 					return {
 						type: 'goal' as const,
 						name: matchingGoal.name,
-						icon: matchingGoal.icon as keyof typeof Ionicons.glyphMap,
-						color: matchingGoal.color,
+						icon: normalizeIconName(goalIcon),
+						color: goalColor,
 						progress: transactionContribution,
 						current: matchingGoal.current,
 						target: matchingGoal.target,
@@ -142,20 +324,38 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 			}
 		}
 
-		// Fallback for transactions without matching budget/goal or no target
+		// Smart fallback: try to infer icon and color from transaction description
+		const smartFallback = getSmartFallback(item.description, item.type);
+
 		return {
 			type: 'general' as const,
 			name: item.type === 'income' ? 'Income' : 'Expense',
-			icon:
-				item.type === 'income'
-					? 'trending-up-outline'
-					: ('trending-down-outline' as keyof typeof Ionicons.glyphMap),
-			color: item.type === 'income' ? '#4CAF50' : '#F44336',
+			icon: smartFallback.icon,
+			color: smartFallback.color,
 			progress: 0,
 			spent: 0,
 			allocated: 0,
 		};
-	}, [item.target, item.targetModel, item.type, item.amount, budgets, goals]);
+	}, [
+		item.target,
+		item.targetModel,
+		item.type,
+		item.amount,
+		item.description,
+		budgets,
+		goals,
+	]);
+
+	// Get recurring expense information if linked
+	const recurringExpenseInfo = useMemo(() => {
+		if (item.recurringPattern?.patternId) {
+			const recurringExpense = recurringExpenses.find(
+				(exp) => exp.patternId === item.recurringPattern?.patternId
+			);
+			return recurringExpense;
+		}
+		return null;
+	}, [item.recurringPattern?.patternId, recurringExpenses]);
 
 	const triggerHaptic = useCallback(() => {
 		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -287,17 +487,87 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 								</View>
 							)}
 						</View>
-						<Text style={styles.category}>
-							{transactionContext.type === 'budget' &&
-								`${
-									transactionContext.name
-								} • +${transactionContext.progress.toFixed(1)}% to budget`}
-							{transactionContext.type === 'goal' &&
-								`${
-									transactionContext.name
-								} • +${transactionContext.progress.toFixed(1)}% to goal`}
-							{transactionContext.type === 'general' && transactionContext.name}
-						</Text>
+
+						{/* Enhanced linked data display */}
+						<View style={styles.linkedDataContainer}>
+							{/* Budget/Goal information */}
+							{transactionContext.type === 'budget' && (
+								<View style={styles.linkedItem}>
+									<View
+										style={[
+											styles.linkedIcon,
+											{ backgroundColor: `${transactionContext.color}20` },
+										]}
+									>
+										<Ionicons
+											name="wallet-outline"
+											size={12}
+											color={transactionContext.color}
+										/>
+									</View>
+									<Text style={styles.linkedText}>
+										<Text style={styles.linkedName}>
+											{transactionContext.name}
+										</Text>
+										<Text style={styles.linkedDetails}>
+											{' '}
+											• +{transactionContext.progress.toFixed(1)}% to budget
+										</Text>
+									</Text>
+								</View>
+							)}
+
+							{transactionContext.type === 'goal' && (
+								<View style={styles.linkedItem}>
+									<View
+										style={[
+											styles.linkedIcon,
+											{ backgroundColor: `${transactionContext.color}20` },
+										]}
+									>
+										<Ionicons
+											name="flag-outline"
+											size={12}
+											color={transactionContext.color}
+										/>
+									</View>
+									<Text style={styles.linkedText}>
+										<Text style={styles.linkedName}>
+											{transactionContext.name}
+										</Text>
+										<Text style={styles.linkedDetails}>
+											{' '}
+											• +{transactionContext.progress.toFixed(1)}% to goal
+										</Text>
+									</Text>
+								</View>
+							)}
+
+							{/* Recurring expense information */}
+							{recurringExpenseInfo && (
+								<View style={styles.linkedItem}>
+									<View
+										style={[styles.linkedIcon, { backgroundColor: '#e0f2fe' }]}
+									>
+										<Ionicons name="repeat" size={12} color="#0ea5e9" />
+									</View>
+									<Text style={styles.linkedText}>
+										<Text style={styles.linkedName}>
+											{recurringExpenseInfo.vendor || 'Recurring'}
+										</Text>
+										<Text style={styles.linkedDetails}>
+											{' '}
+											• {recurringExpenseInfo.frequency || 'monthly'}
+										</Text>
+									</Text>
+								</View>
+							)}
+
+							{/* Fallback for general transactions */}
+							{transactionContext.type === 'general' && (
+								<Text style={styles.category}>{transactionContext.name}</Text>
+							)}
+						</View>
 					</View>
 					<View style={styles.amountDate}>
 						<Text
@@ -329,7 +599,9 @@ export const TransactionRow = React.memo(
 			prevProps.item.date === nextProps.item.date &&
 			prevProps.item.type === nextProps.item.type &&
 			prevProps.item.target === nextProps.item.target &&
-			prevProps.item.targetModel === nextProps.item.targetModel;
+			prevProps.item.targetModel === nextProps.item.targetModel &&
+			prevProps.item.recurringPattern?.patternId ===
+				nextProps.item.recurringPattern?.patternId;
 
 		// Debug logging for transaction updates
 		if (!shouldUpdate) {
@@ -343,6 +615,8 @@ export const TransactionRow = React.memo(
 				nextTarget: nextProps.item.target,
 				prevTargetModel: prevProps.item.targetModel,
 				nextTargetModel: nextProps.item.targetModel,
+				prevRecurringPattern: prevProps.item.recurringPattern?.patternId,
+				nextRecurringPattern: nextProps.item.recurringPattern?.patternId,
 			});
 		}
 
@@ -402,6 +676,36 @@ const styles = StyleSheet.create({
 		borderRadius: 4,
 		borderWidth: 1,
 		borderColor: '#007ACC',
+	},
+	linkedDataContainer: {
+		marginTop: 4,
+		gap: 4,
+	},
+	linkedItem: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+	},
+	linkedIcon: {
+		width: 20,
+		height: 20,
+		borderRadius: 4,
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	linkedText: {
+		fontSize: 12,
+		color: '#6b7280',
+		fontWeight: '500',
+		flex: 1,
+	},
+	linkedName: {
+		fontWeight: '600',
+		color: '#374151',
+	},
+	linkedDetails: {
+		fontWeight: '400',
+		color: '#6b7280',
 	},
 	category: {
 		fontSize: 12,

@@ -13,6 +13,7 @@ import { useGoals } from '../../../../src/hooks/useGoals';
 import { Goal } from '../../../../src/context/goalContext';
 import LinearProgressBar from './LinearProgressBar';
 import { router } from 'expo-router';
+import { normalizeIconName } from '../../../../src/constants/uiConstants';
 
 type GoalStatus = 'ongoing' | 'completed' | 'cancelled';
 
@@ -93,7 +94,7 @@ function GoalRow({
 				style={[styles.iconWrapper, { backgroundColor: `${goal.color}20` }]}
 			>
 				<Ionicons
-					name={goal.icon as keyof typeof Ionicons.glyphMap}
+					name={normalizeIconName(goal.icon || 'flag-outline')}
 					size={24}
 					color={goal.color}
 				/>

@@ -12,6 +12,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useGoals } from '../../src/hooks/useGoals';
 import { Goal } from '../../src/context/goalContext';
 import LinearProgressBar from '../(tabs)/budgets/components/LinearProgressBar';
+import { normalizeIconName } from '../../src/constants/uiConstants';
 
 const GoalSummaryScreen: React.FC = () => {
 	const params = useLocalSearchParams();
@@ -159,11 +160,23 @@ const GoalSummaryScreen: React.FC = () => {
 								{ backgroundColor: (goal.color ?? '#18181b') + '12' },
 							]}
 						>
-							<Ionicons
-								name={goal.icon as keyof typeof Ionicons.glyphMap}
-								size={24}
-								color={goal.color ?? '#18181b'}
-							/>
+							{goal.icon &&
+							goal.icon.length > 0 &&
+							!goal.icon.match(
+								/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u
+							) ? (
+								<Ionicons
+									name={goal.icon as keyof typeof Ionicons.glyphMap}
+									size={24}
+									color={goal.color ?? '#18181b'}
+								/>
+							) : (
+								<Ionicons
+									name={normalizeIconName(goal.icon || 'flag-outline')}
+									size={20}
+									color={goal.color || '#007AFF'}
+								/>
+							)}
 						</View>
 						<View style={styles.goalInfo}>
 							<Text style={styles.goalName}>{goal.name}</Text>

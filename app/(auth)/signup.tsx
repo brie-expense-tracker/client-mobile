@@ -1,250 +1,317 @@
+import React, { useMemo, useState, useCallback } from 'react';
 import {
 	View,
 	Text,
 	TextInput,
-	Alert,
 	StyleSheet,
 	Image,
 	SafeAreaView,
-	TouchableOpacity,
 	KeyboardAvoidingView,
 	ScrollView,
 	Platform,
+	ActivityIndicator,
+	Pressable,
 } from 'react-native';
-import React, { useState } from 'react';
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import auth from '@react-native-firebase/auth';
+import * as Haptics from 'expo-haptics';
 import useAuth from '../../src/context/AuthContext';
 import { RectButton, BorderlessButton } from 'react-native-gesture-handler';
+
+type FieldErrors = {
+	email?: string;
+	password?: string;
+	form?: string;
+};
 
 export default function Signup() {
 	const [email, setEmail] = useState('');
 	const [password, setPassword] = useState('');
+	const [touched, setTouched] = useState<{ email: boolean; password: boolean }>(
+		{
+			email: false,
+			password: false,
+		}
+	);
 	const [isLoading, setIsLoading] = useState(false);
-	const { signup, signUpWithGoogle } = useAuth();
-	const [isPressed, setIsPressed] = useState(false);
 	const [showPassword, setShowPassword] = useState(false);
+	const { signup, signUpWithGoogle } = useAuth();
 
-	// Email validator function
-	const isValidEmail = (email: string) => {
-		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-		return emailRegex.test(email);
-	};
+	const palette = useMemo(
+		() => ({
+			bg: '#FFFFFF',
+			text: '#0F172A',
+			subtext: '#475569',
+			brand: '#0A84FF',
+			brandDark: '#0060D1',
+			border: '#E2E8F0',
+			error: '#DC2626',
+			inputBg: '#FFFFFF',
+			shadow: '#0F172A',
+			divider: '#E2E8F0',
+		}),
+		[]
+	);
 
-	// Password validator function
-	const isValidPassword = (password: string) => {
-		return password.length >= 6; // Minimum 6 characters for this example
-	};
+	const isValidEmail = (val: string) =>
+		/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim().toLowerCase());
 
-	const handleSignup = async () => {
-		if (!email || !password) {
-			Alert.alert('Error', 'Please fill in all fields.');
-			return;
-		}
+	const isValidPassword = (val: string) => val.trim().length >= 6;
 
-		if (!isValidEmail(email)) {
-			Alert.alert('Error', 'Please enter a valid email address.');
-			return;
-		}
+	const errors: FieldErrors = {};
+	if (touched.email && !isValidEmail(email)) {
+		errors.email = 'Enter a valid email address.';
+	}
+	if (touched.password && !isValidPassword(password)) {
+		errors.password = 'Password must be at least 6 characters.';
+	}
 
-		if (!isValidPassword(password)) {
-			Alert.alert('Error', 'Password must be at least 6 characters long.');
-			return;
-		}
+	const canSubmit =
+		isValidEmail(email) && isValidPassword(password) && !isLoading;
+
+	const handleSignup = useCallback(async () => {
+		// mark both fields as touched to reveal errors if present
+		setTouched({ email: true, password: true });
+
+		if (!isValidEmail(email) || !isValidPassword(password) || isLoading) return;
 
 		setIsLoading(true);
-
 		try {
-			await signup(email, password);
-			Alert.alert('Success', `Account created for ${email}`);
-		} catch (error: any) {
-			console.error('Signup error:', error);
+			// Use the auth context signup method
+			await signup(email.trim().toLowerCase(), password.trim());
+
+			await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+		} catch (e: any) {
+			await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 
 			let errorMessage = 'An error occurred during signup.';
 			if (
-				error.code === 'auth/email-already-in-use' ||
-				error.message?.includes('already exists')
+				e?.code === 'auth/email-already-in-use' ||
+				e?.message?.includes('already exists')
 			) {
 				errorMessage =
 					'An account with this email already exists. Please log in instead.';
-			} else if (error.code === 'auth/weak-password') {
+			} else if (e?.code === 'auth/weak-password') {
 				errorMessage = 'Password is too weak.';
-			} else if (error.code === 'auth/invalid-email') {
+			} else if (e?.code === 'auth/invalid-email') {
 				errorMessage = 'Invalid email address.';
-			} else if (error.code === 'auth/network-request-failed') {
+			} else if (e?.code === 'auth/network-request-failed') {
 				errorMessage =
 					'Network error. Please check your connection and try again.';
-			} else if (error.message?.includes('Failed to create user')) {
+			} else if (e?.message?.includes('Failed to create user')) {
 				errorMessage = 'Failed to create account. Please try again.';
 			}
 
-			Alert.alert('Error', errorMessage);
+			// Show a compact inline error message at the top of the form
+			console.warn('Signup error:', e, errorMessage);
+			// Optionally, set a banner state if you want a persistent bar.
 		} finally {
 			setIsLoading(false);
 		}
-	};
+	}, [email, password, isLoading, signup]);
 
-	const handleGoogleSignUp = async () => {
+	const handleGoogleSignUp = useCallback(async () => {
+		if (isLoading) return;
+		setIsLoading(true);
 		try {
 			await signUpWithGoogle();
+			await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 		} catch (error: any) {
-			console.error('Google Sign-Up error:', error);
-
-			// Don't show error alert for user cancellation
-			if (
-				error.code === 'auth/internal-error' &&
-				error.message?.includes('cancelled')
-			) {
-				return; // Exit silently
+			// Silently ignore user cancellation
+			const cancelled =
+				(error?.code === 'auth/internal-error' &&
+					error?.message?.includes('cancelled')) ||
+				error?.code === 'GOOGLE_SIGNUP_CANCELED';
+			if (!cancelled) {
+				console.warn('Google Sign-Up error:', error);
+				await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 			}
-
-			let errorMessage = 'Failed to sign up with Google.';
-
-			if (error.code === 'GOOGLE_SIGNUP_ERROR') {
-				errorMessage = error.message || 'Failed to sign up with Google.';
-			} else if (
-				error.code === 'auth/account-exists-with-different-credential'
-			) {
-				errorMessage =
-					'An account already exists with this email address. Please sign in instead.';
-			} else if (error.code === 'auth/invalid-credential') {
-				errorMessage = 'Invalid Google credentials. Please try again.';
-			} else if (error.code === 'auth/network-request-failed') {
-				errorMessage =
-					'Network error. Please check your connection and try again.';
-			}
-
-			Alert.alert('Error', errorMessage);
+		} finally {
+			setIsLoading(false);
 		}
-	};
+	}, [isLoading, signUpWithGoogle]);
+
+	const onBlurEmail = () => setTouched((t) => ({ ...t, email: true }));
+	const onBlurPassword = () => setTouched((t) => ({ ...t, password: true }));
 
 	return (
-		<SafeAreaView style={styles.safeAreaContainer}>
+		<SafeAreaView
+			style={[styles.safeAreaContainer, { backgroundColor: palette.bg }]}
+		>
+			<Stack.Screen options={{ headerShown: false }} />
 			<KeyboardAvoidingView
 				style={styles.keyboardAvoidingView}
-				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+				behavior={Platform.OS === 'ios' ? 'padding' : undefined}
 				keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
 			>
 				<ScrollView
 					style={styles.scrollView}
 					contentContainerStyle={styles.scrollContent}
-					showsVerticalScrollIndicator={false}
 					keyboardShouldPersistTaps="handled"
+					showsVerticalScrollIndicator={false}
 				>
 					<View style={styles.mainContainer}>
+						{/* Brand / Logo */}
 						<Image
-							source={require('../../src/assets/images/brie-logos.png')}
+							source={require('../../src/assets/logos/brie-logo.png')}
 							style={styles.logo}
 							resizeMode="contain"
+							accessible
+							accessibilityLabel="Brie logo"
 						/>
-						<View style={styles.formContainer}>
-							<Text style={styles.title}>Create Your Account</Text>
-							<Text style={styles.label}>Email</Text>
+
+						{/* Headline & subtitle */}
+						<View style={styles.headingWrap}>
+							<Text style={[styles.title, { color: palette.text }]}>
+								Create your account
+							</Text>
+							<Text style={[styles.subtitle, { color: palette.subtext }]}>
+								Join Brie and start your financial journey today.
+							</Text>
+						</View>
+
+						{/* Form Card */}
+						<View style={[styles.card, cardShadow]}>
+							{/* Email */}
+							<Text style={[styles.label, { color: palette.subtext }]}>
+								Email
+							</Text>
 							<TextInput
-								style={styles.input}
-								placeholder="Enter your email"
-								placeholderTextColor="#999"
+								style={[styles.input, inputShadow]}
+								placeholder="you@example.com"
+								placeholderTextColor="#94A3B8"
 								value={email}
-								onChangeText={setEmail}
+								onChangeText={(t) => setEmail(t)}
+								onBlur={onBlurEmail}
 								keyboardType="email-address"
 								autoCapitalize="none"
 								autoCorrect={false}
+								textContentType="username"
+								accessibilityLabel="Email address input"
+								returnKeyType="next"
+								onSubmitEditing={() => {
+									// focus password? Kept simple to avoid ref noise
+								}}
 							/>
-							<Text style={styles.label}>Password</Text>
-							<View style={styles.passwordInputContainer}>
+							{!!errors.email && (
+								<Text style={styles.errorText} accessibilityLiveRegion="polite">
+									{errors.email}
+								</Text>
+							)}
+
+							{/* Password */}
+							<Text
+								style={[
+									styles.label,
+									{ color: palette.subtext, marginTop: 16 },
+								]}
+							>
+								Password
+							</Text>
+							<View style={[styles.passwordInputContainer, inputShadow]}>
 								<TextInput
 									style={styles.passwordInput}
 									placeholder="Enter your password"
-									placeholderTextColor="#999"
+									placeholderTextColor="#94A3B8"
 									value={password}
-									onChangeText={setPassword}
+									onChangeText={(t) => setPassword(t)}
+									onBlur={onBlurPassword}
 									secureTextEntry={!showPassword}
 									autoCapitalize="none"
 									autoCorrect={false}
+									textContentType="password"
+									accessibilityLabel="Password input"
+									returnKeyType="done"
+									onSubmitEditing={handleSignup}
 								/>
-								<TouchableOpacity
+								<Pressable
+									accessibilityRole="button"
+									accessibilityLabel={
+										showPassword ? 'Hide password' : 'Show password'
+									}
+									hitSlop={12}
+									onPress={() => setShowPassword((s) => !s)}
 									style={styles.passwordToggle}
-									onPress={() => setShowPassword(!showPassword)}
 								>
 									<Ionicons
 										name={showPassword ? 'eye-off' : 'eye'}
-										size={20}
-										color="#999"
+										size={22}
+										color="#64748B"
 									/>
-								</TouchableOpacity>
+								</Pressable>
 							</View>
-							<View style={styles.buttonContainer}>
-								<RectButton
-									style={[styles.button, isLoading && styles.buttonDisabled]}
-									onPress={handleSignup}
-									enabled={!isLoading}
-								>
-									<Text style={styles.buttonText}>
-										{isLoading ? 'Creating Account...' : 'Sign Up'}
-									</Text>
-								</RectButton>
-							</View>
+							{!!errors.password && (
+								<Text style={styles.errorText} accessibilityLiveRegion="polite">
+									{errors.password}
+								</Text>
+							)}
 
+							{/* Submit */}
+							<RectButton
+								enabled={canSubmit}
+								onPress={handleSignup}
+								style={[
+									styles.cta,
+									{ backgroundColor: canSubmit ? palette.brand : '#CBD5E1' },
+								]}
+							>
+								{isLoading ? (
+									<ActivityIndicator size="small" color="#FFFFFF" />
+								) : (
+									<Text style={styles.ctaText}>Sign Up</Text>
+								)}
+							</RectButton>
+
+							{/* Divider */}
 							<View style={styles.dividerContainer}>
-								<View style={styles.divider} />
-								<Text style={styles.dividerText}>or sign up with</Text>
-								<View style={styles.divider} />
+								<View
+									style={[styles.divider, { backgroundColor: palette.divider }]}
+								/>
+								<Text style={[styles.dividerText, { color: palette.subtext }]}>
+									or continue with
+								</Text>
+								<View
+									style={[styles.divider, { backgroundColor: palette.divider }]}
+								/>
 							</View>
 
-							<View style={styles.socialButtonsContainer}>
-								<RectButton
-									style={[
-										styles.socialButton,
-										isLoading && styles.socialButtonDisabled,
-									]}
-									onPress={handleGoogleSignUp}
-									enabled={!isLoading}
-								>
-									<View style={styles.socialButtonContent}>
-										<Ionicons name="logo-google" size={24} color="#0051ff" />
-										<Text style={styles.socialButtonText}>
-											{isLoading
-												? 'Creating Account...'
-												: 'Continue with Google'}
-										</Text>
-									</View>
-								</RectButton>
+							{/* Socials */}
+							<RectButton
+								onPress={handleGoogleSignUp}
+								enabled={!isLoading}
+								style={[
+									styles.socialButton,
+									socialShadow,
+									{ opacity: isLoading ? 0.6 : 1 },
+								]}
+							>
+								<Ionicons name="logo-google" size={22} color="#1D4ED8" />
+								<Text style={styles.socialButtonText}>
+									{isLoading ? 'Creating account…' : 'Google'}
+								</Text>
+							</RectButton>
 
-								<RectButton
-									style={styles.socialButton}
-									onPress={() =>
-										Alert.alert(
-											'Coming Soon',
-											'Apple Sign Up will be available soon!'
-										)
-									}
-								>
-									<View style={styles.socialButtonContent}>
-										<Ionicons name="logo-apple" size={24} color="#000000" />
-										<Text style={styles.socialButtonText}>
-											Continue with Apple
-										</Text>
-									</View>
-								</RectButton>
-							</View>
+							<RectButton
+								enabled={!isLoading}
+								onPress={() => {}}
+								style={[styles.socialButton, socialShadow, { opacity: 0.6 }]}
+							>
+								<Ionicons name="logo-apple" size={22} color="#0F172A" />
+								<Text style={styles.socialButtonText}>Apple (soon)</Text>
+							</RectButton>
 						</View>
 
-						<View style={styles.loginContainer}>
-							<Text style={styles.loginText}>Already have account?</Text>
+						{/* Login prompt */}
+						<View style={styles.loginRow}>
+							<Text style={[styles.loginText, { color: palette.subtext }]}>
+								Already have an account?
+							</Text>
 							<BorderlessButton
-								onActiveStateChange={setIsPressed}
-								onPress={() => {
-									router.replace('/login');
-								}}
+								onPress={() => router.replace('/login')}
+								rippleColor="rgba(0,0,0,0.08)"
 							>
-								<Text
-									style={[
-										styles.loginLink,
-										isPressed && styles.loginLinkPressed,
-									]}
-								>
-									Log In
-								</Text>
+								<Text style={styles.loginLink}>Sign In</Text>
 							</BorderlessButton>
 						</View>
 					</View>
@@ -254,217 +321,158 @@ export default function Signup() {
 	);
 }
 
+/* ---------- Styles ---------- */
+
+const inputShadow = Platform.select({
+	ios: {
+		shadowColor: '#0F172A',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.06,
+		shadowRadius: 6,
+	},
+	android: { elevation: 1.5 },
+});
+
+const socialShadow = Platform.select({
+	ios: {
+		shadowColor: '#0F172A',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.08,
+		shadowRadius: 8,
+	},
+	android: { elevation: 2 },
+});
+
+const cardShadow = Platform.select({
+	ios: {
+		shadowColor: '#0F172A',
+		shadowOffset: { width: 0, height: 10 },
+		shadowOpacity: 0.08,
+		shadowRadius: 20,
+	},
+	android: { elevation: 3 },
+});
+
 const styles = StyleSheet.create({
 	safeAreaContainer: {
 		flex: 1,
-		backgroundColor: '#fff',
 	},
-	keyboardAvoidingView: {
-		flex: 1,
-	},
-	scrollView: {
-		flex: 1,
-	},
-	scrollContent: {
-		flexGrow: 1,
-	},
+	keyboardAvoidingView: { flex: 1 },
+	scrollView: { flex: 1 },
+	scrollContent: { flexGrow: 1 },
 	mainContainer: {
 		flex: 1,
-		alignItems: 'center',
-		paddingHorizontal: 24,
 		minHeight: '100%',
+		paddingHorizontal: 20,
+		paddingTop: 24,
+		paddingBottom: 16,
+		alignItems: 'stretch',
 	},
 	logo: {
-		width: 100,
-		height: 40,
-		marginVertical: 40,
-		resizeMode: 'contain',
-	},
-	formContainer: {
-		width: '100%',
-		justifyContent: 'flex-start',
-		alignItems: 'flex-start',
-		backgroundColor: 'white',
+		width: 120,
+		height: 56,
 		alignSelf: 'center',
-		shadowRadius: 3,
-		elevation: 5,
-		borderRadius: 24,
-		padding: 20,
-		marginBottom: 20,
+		marginTop: 12,
+		marginBottom: 16,
 	},
-	title: {
-		fontSize: 24,
-		color: '#000000',
-		fontWeight: '500',
-		marginVertical: 10,
+	headingWrap: { alignItems: 'center', marginBottom: 8 },
+	title: { fontSize: 24, fontWeight: '700', letterSpacing: 0.2 },
+	subtitle: { fontSize: 14, marginTop: 6 },
+	card: {
+		width: '100%',
+		backgroundColor: '#FFFFFF',
+		borderRadius: 20,
+		padding: 18,
+		marginTop: 16,
 	},
 	label: {
-		fontWeight: '500',
-		fontSize: 14,
-		color: '#4A5568',
-		textAlign: 'left',
-		width: '100%',
+		fontSize: 13,
+		fontWeight: '600',
 		marginBottom: 8,
 	},
 	input: {
 		width: '100%',
-		padding: 16,
-		marginBottom: 16,
-		borderRadius: 8,
-		backgroundColor: '#fff',
-		shadowColor: '#b9b9b9',
-		shadowOffset: {
-			width: 0,
-			height: 2,
-		},
-		shadowOpacity: 0.3,
-		shadowRadius: 4,
-		elevation: 5,
+		paddingHorizontal: 14,
+		paddingVertical: 14,
+		borderRadius: 12,
+		backgroundColor: '#FFFFFF',
+		borderWidth: StyleSheet.hairlineWidth,
+		borderColor: '#E2E8F0',
+	},
+	errorText: {
+		color: '#DC2626',
+		fontSize: 12,
+		marginTop: 6,
 	},
 	passwordInputContainer: {
 		position: 'relative',
 		width: '100%',
-		marginBottom: 16,
+		borderRadius: 12,
+		backgroundColor: '#FFFFFF',
+		borderWidth: StyleSheet.hairlineWidth,
+		borderColor: '#E2E8F0',
 	},
 	passwordInput: {
 		width: '100%',
-		padding: 16,
-		paddingRight: 50,
-		borderRadius: 8,
-		backgroundColor: '#fff',
-		shadowColor: '#b9b9b9',
-		shadowOffset: {
-			width: 0,
-			height: 2,
-		},
-		shadowOpacity: 0.3,
-		shadowRadius: 4,
-		elevation: 5,
+		paddingHorizontal: 14,
+		paddingVertical: 14,
+		borderRadius: 12,
 	},
 	passwordToggle: {
 		position: 'absolute',
-		right: 16,
+		right: 10,
 		top: 0,
 		bottom: 0,
 		justifyContent: 'center',
+		paddingHorizontal: 6,
+	},
+	cta: {
+		width: '100%',
+		borderRadius: 999,
 		alignItems: 'center',
-		width: 40,
-	},
-	buttonContainer: {
-		width: '100%',
-		alignSelf: 'center',
-		shadowColor: '#000000',
-		shadowOffset: {
-			width: 0,
-			height: 4,
-		},
-		shadowOpacity: 0.2,
-		shadowRadius: 6,
-		elevation: 5,
-		marginTop: 10,
-	},
-	button: {
-		width: '100%',
-		borderRadius: 9999,
-		overflow: 'hidden',
-		alignSelf: 'center',
-		backgroundColor: '#0095FF',
-	},
-	buttonText: {
-		color: 'white',
-		fontSize: 20,
-		textAlign: 'center',
-		fontWeight: '700',
-		marginVertical: 18,
-	},
-	loginContainer: {
-		flexDirection: 'row',
-		gap: 4,
-		width: '100%',
 		justifyContent: 'center',
-		paddingVertical: 20,
+		paddingVertical: 14,
+		marginTop: 12,
 	},
-	loginText: {
-		color: '#4A5568',
-	},
-	loginLink: {
-		color: '#2C5282',
-		opacity: 0.7,
-		fontWeight: 'bold',
-	},
-	loginLinkPressed: {
-		opacity: 0.6,
+	ctaText: {
+		color: '#FFFFFF',
+		fontSize: 17,
+		fontWeight: '700',
 	},
 	dividerContainer: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		width: '100%',
-		marginVertical: 40,
+		marginVertical: 18,
 	},
-	divider: {
-		flex: 1,
-		height: 1,
-		backgroundColor: '#E2E8F0',
-	},
-	dividerText: {
-		marginHorizontal: 10,
-		color: '#4A5568',
-		fontSize: 14,
-	},
-	socialButtonsContainer: {
-		width: '100%',
-		gap: 12,
-	},
+	divider: { flex: 1, height: StyleSheet.hairlineWidth },
+	dividerText: { marginHorizontal: 10, fontSize: 13 },
 	socialButton: {
 		flexDirection: 'row',
 		alignItems: 'center',
+		gap: 10,
 		justifyContent: 'center',
-		padding: 16,
+		paddingVertical: 14,
 		borderRadius: 12,
-		marginBottom: 10,
+		backgroundColor: '#FFFFFF',
+		borderWidth: StyleSheet.hairlineWidth,
 		borderColor: '#E2E8F0',
-		backgroundColor: 'white',
-		gap: 12,
-		shadowColor: '#afafaf',
-		shadowOffset: {
-			width: 0,
-			height: 2,
-		},
-		shadowOpacity: 0.3,
-		shadowRadius: 6,
-		elevation: 5,
-	},
-	socialButtonContent: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
-		gap: 12,
+		marginBottom: 10,
 	},
 	socialButtonText: {
-		fontSize: 16,
-		color: '#4A5568',
-		fontWeight: '500',
+		fontSize: 15,
+		fontWeight: '600',
+		color: '#334155',
 	},
-	buttonDisabled: {
-		backgroundColor: '#E2E8F0',
+	loginRow: {
+		flexDirection: 'row',
+		justifyContent: 'center',
+		gap: 6,
+		marginTop: 14,
 	},
-	tokenContainer: {
-		padding: 16,
-		backgroundColor: '#f3f4f6',
-		borderTopWidth: 1,
-		borderTopColor: '#e5e7eb',
-	},
-	tokenText: {
-		fontSize: 12,
-		fontFamily: 'monospace',
-		marginBottom: 8,
-		color: '#000000',
-	},
-	errorText: {
-		fontSize: 12,
-		fontWeight: 'bold',
-	},
-	socialButtonDisabled: {
-		opacity: 0.6,
+	loginText: { fontSize: 14 },
+	loginLink: {
+		fontSize: 14,
+		color: '#0A84FF',
+		fontWeight: '800',
 	},
 });

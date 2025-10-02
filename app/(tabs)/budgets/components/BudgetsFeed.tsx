@@ -11,6 +11,7 @@ import { RectButton } from 'react-native-gesture-handler';
 import { Budget } from '../../../../src/context/budgetContext';
 import LinearProgressBar from './LinearProgressBar';
 import { router } from 'expo-router';
+import { normalizeIconName } from '../../../../src/constants/uiConstants';
 
 const currency = (n: number) =>
 	`$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
@@ -67,7 +68,7 @@ function BudgetRow({
 				]}
 			>
 				<Ionicons
-					name={(budget.icon as any) ?? 'wallet-outline'}
+					name={normalizeIconName(budget.icon || 'wallet-outline')}
 					size={20}
 					color={budget.color ?? '#18181b'}
 				/>

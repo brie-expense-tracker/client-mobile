@@ -132,7 +132,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 						}
 					}
 
-					return {
+					const transaction = {
 						id: tx._id ?? tx.id,
 						description: tx.description ?? '',
 						amount: amount,
@@ -142,6 +142,8 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 						targetModel: targetModel,
 						updatedAt: tx.updatedAt ?? tx.createdAt ?? new Date().toISOString(),
 					};
+
+					return transaction;
 				});
 
 				setTransactions(formatted);

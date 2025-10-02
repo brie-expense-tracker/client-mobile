@@ -1,5 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL, API_CONFIG } from '../../config/api';
+import { getHMACService } from '../../utils/hmacSigning';
 
 // Demo logging: Keep essential info but reduce noise
 console.log(`🌐 API: ${__DEV__ ? 'DEV' : 'PROD'} | Base: ${API_BASE_URL}`);
@@ -10,6 +10,27 @@ const inflight = new Map<string, Promise<any>>();
 // Request cancellation support
 const abortControllers = new Map<string, AbortController>();
 
+// Request throttling and caching
+const requestCache = new Map<
+	string,
+	{ data: any; timestamp: number; ttl: number }
+>();
+const requestThrottle = new Map<string, number>();
+const rateLimitBackoff = new Map<string, number>();
+
+// Configuration
+const CACHE_TTL = {
+	'/api/notifications/unread-count': 30000, // 30 seconds
+	'/api/notifications': 60000, // 1 minute
+	'/api/transactions': 30000, // 30 seconds
+	'/api/budgets': 60000, // 1 minute
+	'/api/goals': 60000, // 1 minute
+	default: 10000, // 10 seconds
+};
+
+const THROTTLE_DELAY = __DEV__ ? 100 : 1000; // Much shorter delay in development
+const RATE_LIMIT_BACKOFF_BASE = __DEV__ ? 1000 : 5000; // 1 second in dev, 5 seconds in prod
+
 // Request/Response interceptors
 type RequestInterceptor = (
 	url: string,
@@ -19,6 +40,96 @@ type ResponseInterceptor = (response: Response) => Promise<Response>;
 
 const requestInterceptors: RequestInterceptor[] = [];
 const responseInterceptors: ResponseInterceptor[] = [];
+
+// Check if request is cached and still valid
+function getCachedRequest<T>(endpoint: string): T | null {
+	const cacheKey = endpoint;
+	const cached = requestCache.get(cacheKey);
+
+	if (cached) {
+		const now = Date.now();
+		const isExpired = now - cached.timestamp > cached.ttl;
+
+		if (!isExpired) {
+			console.log(`💾 [ApiService] Cache hit for: ${endpoint}`);
+			return cached.data as T;
+		} else {
+			requestCache.delete(cacheKey);
+		}
+	}
+
+	return null;
+}
+
+// Cache successful request response
+function cacheRequest(endpoint: string, data: any): void {
+	const cacheKey = endpoint;
+	const ttl =
+		CACHE_TTL[endpoint as keyof typeof CACHE_TTL] || CACHE_TTL.default;
+
+	requestCache.set(cacheKey, {
+		data,
+		timestamp: Date.now(),
+		ttl,
+	});
+
+	console.log(
+		`💾 [ApiService] Cached response for: ${endpoint} (TTL: ${ttl}ms)`
+	);
+}
+
+// Check if request should be throttled
+function shouldThrottleRequest(endpoint: string): boolean {
+	const now = Date.now();
+	const lastRequest = requestThrottle.get(endpoint);
+
+	if (lastRequest && now - lastRequest < THROTTLE_DELAY) {
+		console.log(`⏳ [ApiService] Throttling request: ${endpoint}`);
+		return true;
+	}
+
+	requestThrottle.set(endpoint, now);
+	return false;
+}
+
+// Check if endpoint is in rate limit backoff
+function isRateLimited(endpoint: string): boolean {
+	// Disable rate limiting in development mode
+	if (__DEV__) {
+		return false;
+	}
+
+	const backoffUntil = rateLimitBackoff.get(endpoint);
+	if (backoffUntil && Date.now() < backoffUntil) {
+		console.log(
+			`🚫 [ApiService] Rate limited for: ${endpoint} (backoff until: ${new Date(
+				backoffUntil
+			).toISOString()})`
+		);
+		return true;
+	}
+	return false;
+}
+
+// Set rate limit backoff
+function setRateLimitBackoff(
+	endpoint: string,
+	backoffMs: number = RATE_LIMIT_BACKOFF_BASE
+): void {
+	// Skip rate limiting in development mode
+	if (__DEV__) {
+		console.log(
+			`🚫 [ApiService] Rate limiting disabled in development for: ${endpoint}`
+		);
+		return;
+	}
+
+	const backoffUntil = Date.now() + backoffMs;
+	rateLimitBackoff.set(endpoint, backoffUntil);
+	console.log(
+		`🚫 [ApiService] Rate limit backoff set for: ${endpoint} (${backoffMs}ms)`
+	);
+}
 
 // Single-flight pattern to prevent duplicate requests
 async function singleflight<T>(key: string, fn: () => Promise<T>): Promise<T> {
@@ -38,7 +149,8 @@ async function singleflight<T>(key: string, fn: () => Promise<T>): Promise<T> {
 // Retry with exponential backoff for non-429 errors
 async function retryWithBackoff<T>(
 	fn: () => Promise<T>,
-	maxRetries: number = 2
+	maxRetries: number = 2,
+	endpoint?: string
 ): Promise<T> {
 	let lastError: Error | null = null;
 
@@ -48,8 +160,13 @@ async function retryWithBackoff<T>(
 		} catch (error: any) {
 			lastError = error;
 
-			// Don't retry on 429 rate limit errors - let the caller handle it
+			// Handle 429 rate limit errors with backoff
 			if (error?.response?.status === 429 || error?.status === 429) {
+				if (endpoint) {
+					// Set exponential backoff for this endpoint
+					const backoffMs = RATE_LIMIT_BACKOFF_BASE * Math.pow(2, attempt);
+					setRateLimitBackoff(endpoint, backoffMs);
+				}
 				throw error;
 			}
 
@@ -118,6 +235,49 @@ export class ApiService {
 		}
 		// Default to true for React Native
 		return true;
+	}
+
+	// Check if endpoint requires HMAC signing
+	private static requiresHMACSigning(endpoint: string): boolean {
+		const hmacEndpoints = ['/api/budgets', '/api/budgets/'];
+
+		return hmacEndpoints.some((hmacEndpoint) =>
+			endpoint.startsWith(hmacEndpoint)
+		);
+	}
+
+	// Add HMAC signature to headers if required
+	private static async addHMACSignatureIfRequired(
+		endpoint: string,
+		method: string,
+		body: any,
+		headers: Record<string, string>
+	): Promise<Record<string, string>> {
+		if (!this.requiresHMACSigning(endpoint)) {
+			return headers;
+		}
+
+		try {
+			const hmacService = getHMACService();
+			const bodyString = JSON.stringify(body);
+			console.log('🔐 [ApiService] HMAC Debug - Body string:', bodyString);
+			console.log('🔐 [ApiService] HMAC Debug - Method:', method);
+			console.log('🔐 [ApiService] HMAC Debug - Endpoint:', endpoint);
+
+			const signedHeaders = hmacService.signRequestHeaders(
+				body,
+				method,
+				endpoint,
+				headers
+			);
+
+			console.log('🔐 [ApiService] Added HMAC signature for:', endpoint);
+			return signedHeaders;
+		} catch (error) {
+			console.error('❌ [ApiService] Failed to add HMAC signature:', error);
+			// Continue without HMAC signature - let the server handle the error
+			return headers;
+		}
 	}
 
 	private static createAbortController(key: string): AbortController {
@@ -260,177 +420,208 @@ export class ApiService {
 
 	static async get<T>(
 		endpoint: string,
-		retries: number = 2
+		retries: number = 2,
+		useCache: boolean = true
 	): Promise<ApiResponse<T>> {
 		// Check if offline
 		if (!this.isOnline()) {
 			throw new ApiError('No internet connection', ApiErrorType.OFFLINE_ERROR);
 		}
 
+		// Check cache first
+		if (useCache) {
+			const cached = getCachedRequest<ApiResponse<T>>(endpoint);
+			if (cached) {
+				return cached;
+			}
+		}
+
+		// Check if endpoint is rate limited
+		if (isRateLimited(endpoint)) {
+			throw new ApiError('Rate limited', ApiErrorType.RATE_LIMIT_ERROR, 429);
+		}
+
+		// Check if request should be throttled
+		if (shouldThrottleRequest(endpoint)) {
+			await new Promise((resolve) => setTimeout(resolve, THROTTLE_DELAY));
+		}
+
 		// Create a unique key for deduplication
 		const requestKey = `GET:${endpoint}`;
 
 		return singleflight(requestKey, async () => {
-			return retryWithBackoff(async () => {
-				let headers: Record<string, string>;
-				try {
-					headers = await this.getAuthHeaders();
-				} catch (authError: any) {
-					// Handle authentication errors gracefully
-					if (authError.isAuthError) {
-						console.log('🔒 [API] User not authenticated, skipping request');
-						return {
-							success: false,
-							error: 'User not authenticated',
-							data: [] as T, // Return empty array for data fetching hooks
-						};
-					}
-					throw authError;
-				}
-
-				const url = `${API_BASE_URL}${endpoint}`;
-
-				// Debug logging for URL construction
-				console.log('🔧 [DEBUG] URL Construction:');
-				console.log('🔧 [DEBUG] API_BASE_URL:', API_BASE_URL);
-				console.log('🔧 [DEBUG] endpoint:', endpoint);
-				console.log('🔧 [DEBUG] final URL:', url);
-
-				// Demo logging: Keep essential request info
-				console.log(`📡 GET: ${endpoint}`);
-
-				// Create abort controller for this request
-				const controller = this.createAbortController(requestKey);
-				const timeoutId = setTimeout(
-					() => controller.abort(),
-					API_CONFIG.timeout
-				);
-
-				try {
-					// Apply request interceptors
-					const { url: finalUrl, options: finalOptions } =
-						await this.applyRequestInterceptors(url, {
-							method: 'GET',
-							headers,
-							signal: controller.signal,
-						});
-
-					const response = await fetch(finalUrl, finalOptions);
-
-					clearTimeout(timeoutId);
-					this.cleanupAbortController(requestKey);
-
-					// Apply response interceptors
-					const processedResponse = await this.applyResponseInterceptors(
-						response
-					);
-
-					// Check if response is JSON before parsing
-					const contentType = processedResponse.headers.get('content-type');
-					let data: any;
-
-					if (contentType && contentType.includes('application/json')) {
-						try {
-							data = await processedResponse.json();
-						} catch (parseError) {
-							console.error('❌ API: JSON parse error:', parseError);
+			return retryWithBackoff(
+				async () => {
+					let headers: Record<string, string>;
+					try {
+						headers = await this.getAuthHeaders();
+					} catch (authError: any) {
+						// Handle authentication errors gracefully
+						if (authError.isAuthError) {
+							console.log('🔒 [API] User not authenticated, skipping request');
 							return {
 								success: false,
-								error: 'Invalid JSON response from server',
+								error: 'User not authenticated',
+								data: [] as T, // Return empty array for data fetching hooks
 							};
 						}
-					} else {
-						// Handle non-JSON responses (like HTML 404 pages)
-						const textResponse = await processedResponse.text();
-						console.log(
-							'⚠️ API: Non-JSON response:',
-							textResponse.substring(0, 100)
+						throw authError;
+					}
+
+					const url = `${API_BASE_URL}${endpoint}`;
+
+					// Debug logging for URL construction
+					console.log('🔧 [DEBUG] URL Construction:');
+					console.log('🔧 [DEBUG] API_BASE_URL:', API_BASE_URL);
+					console.log('🔧 [DEBUG] endpoint:', endpoint);
+					console.log('🔧 [DEBUG] final URL:', url);
+
+					// Demo logging: Keep essential request info
+					console.log(`📡 GET: ${endpoint}`);
+
+					// Create abort controller for this request
+					const controller = this.createAbortController(requestKey);
+					const timeoutId = setTimeout(
+						() => controller.abort(),
+						API_CONFIG.timeout
+					);
+
+					try {
+						// Apply request interceptors
+						const { url: finalUrl, options: finalOptions } =
+							await this.applyRequestInterceptors(url, {
+								method: 'GET',
+								headers,
+								signal: controller.signal,
+							});
+
+						const response = await fetch(finalUrl, finalOptions);
+
+						clearTimeout(timeoutId);
+						this.cleanupAbortController(requestKey);
+
+						// Apply response interceptors
+						const processedResponse = await this.applyResponseInterceptors(
+							response
 						);
 
-						if (!processedResponse.ok) {
+						// Check if response is JSON before parsing
+						const contentType = processedResponse.headers.get('content-type');
+						let data: any;
+
+						if (contentType && contentType.includes('application/json')) {
+							try {
+								data = await processedResponse.json();
+							} catch (parseError) {
+								console.error('❌ API: JSON parse error:', parseError);
+								return {
+									success: false,
+									error: 'Invalid JSON response from server',
+								};
+							}
+						} else {
+							// Handle non-JSON responses (like HTML 404 pages)
+							const textResponse = await processedResponse.text();
+							console.log(
+								'⚠️ API: Non-JSON response:',
+								textResponse.substring(0, 100)
+							);
+
+							if (!processedResponse.ok) {
+								return {
+									success: false,
+									error: `HTTP error! status: ${processedResponse.status}`,
+								};
+							}
+
 							return {
 								success: false,
-								error: `HTTP error! status: ${processedResponse.status}`,
+								error: 'Server returned non-JSON response',
 							};
 						}
 
-						return {
-							success: false,
-							error: 'Server returned non-JSON response',
-						};
-					}
+						if (!processedResponse.ok) {
+							// Handle 429 rate limiting specifically
+							if (processedResponse.status === 429) {
+								throw new ApiError(
+									'Rate limit exceeded',
+									ApiErrorType.RATE_LIMIT_ERROR,
+									429
+								);
+							}
 
-					if (!processedResponse.ok) {
-						// Handle 429 rate limiting specifically
-						if (processedResponse.status === 429) {
-							throw new ApiError(
-								'Rate limit exceeded',
-								ApiErrorType.RATE_LIMIT_ERROR,
-								429
-							);
+							// Handle authentication errors
+							if (processedResponse.status === 401) {
+								throw new ApiError(
+									'Authentication failed',
+									ApiErrorType.AUTHENTICATION_ERROR,
+									401
+								);
+							}
+
+							// Handle validation errors
+							if (processedResponse.status === 400) {
+								throw new ApiError(
+									data.error || 'Validation error',
+									ApiErrorType.VALIDATION_ERROR,
+									400
+								);
+							}
+
+							// Handle server errors
+							if (processedResponse.status >= 500) {
+								throw new ApiError(
+									data.error || 'Server error',
+									ApiErrorType.SERVER_ERROR,
+									processedResponse.status
+								);
+							}
+
+							return {
+								success: false,
+								error:
+									data.error ||
+									`HTTP error! status: ${processedResponse.status}`,
+							};
 						}
 
-						// Handle authentication errors
-						if (processedResponse.status === 401) {
-							throw new ApiError(
-								'Authentication failed',
-								ApiErrorType.AUTHENTICATION_ERROR,
-								401
-							);
+						// Demo logging: Success response
+						console.log(`✅ GET: ${endpoint} (${processedResponse.status})`);
+						const result = { success: true, data };
+
+						// Cache successful response
+						if (useCache) {
+							cacheRequest(endpoint, result);
 						}
 
-						// Handle validation errors
-						if (processedResponse.status === 400) {
-							throw new ApiError(
-								data.error || 'Validation error',
-								ApiErrorType.VALIDATION_ERROR,
-								400
-							);
+						return result;
+					} catch (error: unknown) {
+						clearTimeout(timeoutId);
+						this.cleanupAbortController(requestKey);
+
+						if (error instanceof ApiError) {
+							throw error;
 						}
 
-						// Handle server errors
-						if (processedResponse.status >= 500) {
-							throw new ApiError(
-								data.error || 'Server error',
-								ApiErrorType.SERVER_ERROR,
-								processedResponse.status
-							);
+						// Handle network errors
+						if (error instanceof TypeError && error.message.includes('fetch')) {
+							throw new ApiError('Network error', ApiErrorType.NETWORK_ERROR);
 						}
 
-						return {
-							success: false,
-							error:
-								data.error || `HTTP error! status: ${processedResponse.status}`,
-						};
+						// Handle timeout errors
+						if (error instanceof Error && error.name === 'AbortError') {
+							throw new ApiError('Request timeout', ApiErrorType.TIMEOUT_ERROR);
+						}
+
+						throw new ApiError(
+							error instanceof Error ? error.message : 'Unknown error',
+							ApiErrorType.UNKNOWN_ERROR
+						);
 					}
-
-					// Demo logging: Success response
-					console.log(`✅ GET: ${endpoint} (${processedResponse.status})`);
-					return { success: true, data };
-				} catch (error: unknown) {
-					clearTimeout(timeoutId);
-					this.cleanupAbortController(requestKey);
-
-					if (error instanceof ApiError) {
-						throw error;
-					}
-
-					// Handle network errors
-					if (error instanceof TypeError && error.message.includes('fetch')) {
-						throw new ApiError('Network error', ApiErrorType.NETWORK_ERROR);
-					}
-
-					// Handle timeout errors
-					if (error instanceof Error && error.name === 'AbortError') {
-						throw new ApiError('Request timeout', ApiErrorType.TIMEOUT_ERROR);
-					}
-
-					throw new ApiError(
-						error instanceof Error ? error.message : 'Unknown error',
-						ApiErrorType.UNKNOWN_ERROR
-					);
-				}
-			}, retries);
+				},
+				retries,
+				endpoint
+			);
 		});
 	}
 
@@ -470,6 +661,14 @@ export class ApiService {
 					}
 					throw authError;
 				}
+
+				// Add HMAC signature if required
+				headers = await this.addHMACSignatureIfRequired(
+					endpoint,
+					'POST',
+					body,
+					headers
+				);
 
 				const url = `${API_BASE_URL}${endpoint}`;
 
@@ -602,6 +801,14 @@ export class ApiService {
 				}
 				throw authError;
 			}
+
+			// Add HMAC signature if required
+			headers = await this.addHMACSignatureIfRequired(
+				endpoint,
+				'PUT',
+				body,
+				headers
+			);
 
 			const url = `${API_BASE_URL}${endpoint}`;
 
@@ -957,5 +1164,60 @@ export class ApiService {
 			pending: inflight.size,
 			inflight: abortControllers.size,
 		};
+	}
+
+	/**
+	 * Clear cache for a specific endpoint or all endpoints
+	 */
+	static clearCache(endpoint?: string): void {
+		if (endpoint) {
+			requestCache.delete(endpoint);
+			console.log(`🗑️ [ApiService] Cache cleared for: ${endpoint}`);
+		} else {
+			requestCache.clear();
+			console.log(`🗑️ [ApiService] All cache cleared`);
+		}
+	}
+
+	/**
+	 * Clear rate limit backoff for a specific endpoint or all endpoints
+	 */
+	static clearRateLimit(endpoint?: string): void {
+		if (endpoint) {
+			rateLimitBackoff.delete(endpoint);
+			console.log(`🚫 [ApiService] Rate limit cleared for: ${endpoint}`);
+		} else {
+			rateLimitBackoff.clear();
+			console.log(`🚫 [ApiService] All rate limits cleared`);
+		}
+	}
+
+	/**
+	 * Clear all rate limits - useful for development
+	 */
+	static resetRateLimits(): void {
+		rateLimitBackoff.clear();
+		requestThrottle.clear();
+		console.log(`🚫 [ApiService] All rate limits and throttles reset`);
+	}
+
+	/**
+	 * Get cache statistics
+	 */
+	static getCacheStats(): { size: number; entries: string[] } {
+		return {
+			size: requestCache.size,
+			entries: Array.from(requestCache.keys()),
+		};
+	}
+
+	/**
+	 * Force refresh data by bypassing cache
+	 */
+	static async getFresh<T>(
+		endpoint: string,
+		retries: number = 2
+	): Promise<ApiResponse<T>> {
+		return this.get<T>(endpoint, retries, false);
 	}
 }

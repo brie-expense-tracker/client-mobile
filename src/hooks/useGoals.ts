@@ -83,10 +83,12 @@ export function useGoals(options: { refreshOnFocus?: boolean } = {}) {
 	// Create wrapper functions for the API calls
 	const updateGoalDirect = useCallback(
 		async (id: string, updates: UpdateGoalData): Promise<Goal> => {
+			console.log('[useGoals] updateGoalDirect called with:', { id, updates });
 			const response = await ApiService.put<{ data: Goal }>(
 				`/api/goals/${id}`,
 				updates
 			);
+			console.log('[useGoals] updateGoalDirect response:', response);
 			const responseData = response.data?.data || response.data;
 			if (
 				!responseData ||
@@ -137,7 +139,7 @@ export function useGoals(options: { refreshOnFocus?: boolean } = {}) {
 		updateFunction: updateGoalDirect,
 		deleteFunction: deleteGoalDirect,
 		autoRefresh: true,
-		refreshOnFocus: options.refreshOnFocus !== false, // Default to true unless explicitly disabled
+		refreshOnFocus: options.refreshOnFocus === true, // Only refresh on focus if explicitly enabled
 		transformData: transformGoalData,
 	});
 

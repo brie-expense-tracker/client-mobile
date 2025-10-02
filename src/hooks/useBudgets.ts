@@ -27,10 +27,35 @@ const createBudget = async (budgetData: CreateBudgetData): Promise<Budget> => {
 		'/api/budgets',
 		budgetData
 	);
-	if (!response.data?.data) {
-		throw new Error('Failed to create budget: No data received');
+
+	// Debug: Log the actual response structure
+	console.log(
+		'🔍 [createBudget] Full response:',
+		JSON.stringify(response, null, 2)
+	);
+
+	// Handle error responses first
+	if (response.success === false && response.error) {
+		throw new Error(`Failed to create budget: ${response.error}`);
 	}
-	return response.data.data;
+
+	// Handle different response structures for successful responses
+	if (response.data?.data) {
+		// Expected structure: { data: { data: Budget } }
+		return response.data.data as Budget;
+	} else if (
+		response.data &&
+		typeof response.data === 'object' &&
+		'id' in response.data
+	) {
+		// Direct structure: { data: Budget }
+		return response.data as unknown as Budget;
+	} else if (response.success && response.data) {
+		// Fallback: assume response.data is the budget
+		return response.data as unknown as Budget;
+	}
+
+	throw new Error('Failed to create budget: No data received');
 };
 
 const updateBudget = async (
@@ -41,10 +66,35 @@ const updateBudget = async (
 		`/api/budgets/${id}`,
 		updates
 	);
-	if (!response.data?.data) {
-		throw new Error('Failed to update budget: No data received');
+
+	// Debug: Log the actual response structure
+	console.log(
+		'🔍 [updateBudget] Full response:',
+		JSON.stringify(response, null, 2)
+	);
+
+	// Handle error responses first
+	if (response.success === false && response.error) {
+		throw new Error(`Failed to update budget: ${response.error}`);
 	}
-	return response.data.data;
+
+	// Handle different response structures for successful responses
+	if (response.data?.data) {
+		// Expected structure: { data: { data: Budget } }
+		return response.data.data as Budget;
+	} else if (
+		response.data &&
+		typeof response.data === 'object' &&
+		'id' in response.data
+	) {
+		// Direct structure: { data: Budget }
+		return response.data as unknown as Budget;
+	} else if (response.success && response.data) {
+		// Fallback: assume response.data is the budget
+		return response.data as unknown as Budget;
+	}
+
+	throw new Error('Failed to update budget: No data received');
 };
 
 const deleteBudget = async (id: string): Promise<void> => {
@@ -109,7 +159,7 @@ export function useBudgets() {
 		updateFunction: updateBudget,
 		deleteFunction: deleteBudget,
 		autoRefresh: true,
-		refreshOnFocus: true,
+		refreshOnFocus: false, // Disable automatic refresh on focus to reduce requests
 		transformData: transformBudgetData,
 	});
 

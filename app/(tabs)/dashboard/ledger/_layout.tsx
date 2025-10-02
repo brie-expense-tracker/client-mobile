@@ -58,7 +58,7 @@ export default function TransactionStack() {
 							backgroundColor: '#ffffff',
 						},
 						headerTitleStyle: {
-							fontSize: 20,
+							fontSize: 18,
 							fontWeight: '600',
 							color: '#333',
 						},

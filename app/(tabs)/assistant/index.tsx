@@ -57,6 +57,7 @@ import { useBulletproofStreamV3 } from '../../../src/hooks/useBulletproofStreamV
 import { modeStateService } from '../../../src/services/assistant/modeStateService';
 import { buildTestSseUrl } from '../../../src/networking/endpoints';
 import { startStreaming } from '../../../src/services/streaming';
+import { Image } from 'expo-image';
 
 export default function AssistantScreen() {
 	const router = useRouter();
@@ -1061,7 +1062,14 @@ export default function AssistantScreen() {
 					<Ionicons name="settings-outline" size={24} color="#374151" />
 				</TouchableOpacity>
 				<View style={styles.headerCenter}>
-					<Text style={styles.headerTitle}>AI Assistant</Text>
+					<Image
+						source={require('../../../src/assets/logos/brieai-logo.png')}
+						style={styles.logo}
+						resizeMode="contain"
+						accessibilityRole="image"
+						accessibilityLabel="Brie app logo"
+					/>
+					{/* <Text style={styles.headerTitle}>AI Assistant</Text> */}
 					{budgetStatus && (
 						<Text style={styles.budgetIndicator}>
 							💰 {budgetStatus.percentage}% used (
@@ -1363,10 +1371,11 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'space-between',
 		paddingHorizontal: 20,
-		paddingVertical: 16,
+		paddingVertical: 8,
 		borderBottomWidth: 1,
 		borderBottomColor: '#e5e7eb',
 	},
+	logo: { height: 30, width: 80 },
 	headerCenter: {
 		flex: 1,
 		alignItems: 'center',

@@ -8,7 +8,6 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { BorderlessButton } from 'react-native-gesture-handler';
 import { useBudget } from '../../../../src/context/budgetContext';
 import { useGoal } from '../../../../src/context/goalContext';
 import {
@@ -17,6 +16,7 @@ import {
 	generateAccessibilityLabel,
 	voiceOverHints,
 } from '../../../../src/utils/accessibility';
+import { normalizeIconName } from '../../../../src/constants/uiConstants';
 
 interface Transaction {
 	id: string;
@@ -46,52 +46,167 @@ const currency = new Intl.NumberFormat('en-US', {
 	currency: 'USD',
 }).format;
 
-const formatTransactionDate = (dateString: string): string => {
-	try {
-		// Handle empty, null, or undefined date strings
+// Smart fallback function to infer icon and color from transaction description
+const getSmartFallback = (description: string, type: 'income' | 'expense') => {
+	const desc = description.toLowerCase();
+
+	// Income categories
+	if (type === 'income') {
 		if (
-			!dateString ||
-			typeof dateString !== 'string' ||
-			dateString.trim() === ''
+			desc.includes('salary') ||
+			desc.includes('payroll') ||
+			desc.includes('wage')
 		) {
-			return 'Invalid Date';
+			return {
+				icon: 'briefcase-outline' as keyof typeof Ionicons.glyphMap,
+				color: '#43A047',
+			};
 		}
-
-		// Extract just the date part (YYYY-MM-DD) if it's a longer string
-		const datePart = dateString.slice(0, 10);
-
-		// Check if it's a valid YYYY-MM-DD format
-		if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
-			return 'Invalid Date';
+		if (
+			desc.includes('freelance') ||
+			desc.includes('contract') ||
+			desc.includes('gig')
+		) {
+			return {
+				icon: 'laptop-outline' as keyof typeof Ionicons.glyphMap,
+				color: '#1E88E5',
+			};
 		}
-
-		// Parse the date in local timezone by creating a date object
-		// and adjusting for timezone offset
-		const [year, month, day] = datePart.split('-').map(Number);
-		const date = new Date(year, month - 1, day); // month is 0-indexed
-
-		// Check if the date is valid
-		if (isNaN(date.getTime())) {
-			return 'Invalid Date';
+		if (
+			desc.includes('investment') ||
+			desc.includes('dividend') ||
+			desc.includes('stock')
+		) {
+			return {
+				icon: 'trending-up-outline' as keyof typeof Ionicons.glyphMap,
+				color: '#8E24AA',
+			};
 		}
-
-		// Check if the date is today
-		const today = new Date();
-		if (date.toDateString() === today.toDateString()) {
-			return today.toLocaleDateString('en-US', {
-				month: 'short',
-				day: 'numeric',
-			});
+		if (desc.includes('refund') || desc.includes('rebate')) {
+			return {
+				icon: 'arrow-back-outline' as keyof typeof Ionicons.glyphMap,
+				color: '#43A047',
+			};
 		}
-
-		// Format as "Jun 27" for PST timezone
-		return date.toLocaleDateString('en-US', {
-			month: 'short',
-			day: 'numeric',
-		});
-	} catch {
-		return 'Invalid Date';
+		if (desc.includes('gift') || desc.includes('bonus')) {
+			return {
+				icon: 'gift-outline' as keyof typeof Ionicons.glyphMap,
+				color: '#FB8C00',
+			};
+		}
+		// Default income
+		return {
+			icon: 'trending-up-outline' as keyof typeof Ionicons.glyphMap,
+			color: '#43A047',
+		};
 	}
+
+	// Expense categories
+	if (
+		desc.includes('food') ||
+		desc.includes('restaurant') ||
+		desc.includes('grocery') ||
+		desc.includes('dining')
+	) {
+		return {
+			icon: 'restaurant-outline' as keyof typeof Ionicons.glyphMap,
+			color: '#FB8C00',
+		};
+	}
+	if (
+		desc.includes('gas') ||
+		desc.includes('fuel') ||
+		desc.includes('transport') ||
+		desc.includes('uber') ||
+		desc.includes('lyft')
+	) {
+		return {
+			icon: 'car-outline' as keyof typeof Ionicons.glyphMap,
+			color: '#1E88E5',
+		};
+	}
+	if (
+		desc.includes('rent') ||
+		desc.includes('mortgage') ||
+		desc.includes('housing') ||
+		desc.includes('utilities')
+	) {
+		return {
+			icon: 'home-outline' as keyof typeof Ionicons.glyphMap,
+			color: '#8E24AA',
+		};
+	}
+	if (
+		desc.includes('shopping') ||
+		desc.includes('store') ||
+		desc.includes('amazon') ||
+		desc.includes('retail')
+	) {
+		return {
+			icon: 'bag-outline' as keyof typeof Ionicons.glyphMap,
+			color: '#E53935',
+		};
+	}
+	if (
+		desc.includes('entertainment') ||
+		desc.includes('movie') ||
+		desc.includes('game') ||
+		desc.includes('streaming')
+	) {
+		return {
+			icon: 'game-controller-outline' as keyof typeof Ionicons.glyphMap,
+			color: '#5E35B1',
+		};
+	}
+	if (
+		desc.includes('health') ||
+		desc.includes('medical') ||
+		desc.includes('doctor') ||
+		desc.includes('pharmacy')
+	) {
+		return {
+			icon: 'medical-outline' as keyof typeof Ionicons.glyphMap,
+			color: '#E53935',
+		};
+	}
+	if (
+		desc.includes('education') ||
+		desc.includes('school') ||
+		desc.includes('course') ||
+		desc.includes('book')
+	) {
+		return {
+			icon: 'school-outline' as keyof typeof Ionicons.glyphMap,
+			color: '#1E88E5',
+		};
+	}
+	if (
+		desc.includes('subscription') ||
+		desc.includes('netflix') ||
+		desc.includes('spotify') ||
+		desc.includes('premium')
+	) {
+		return {
+			icon: 'card-outline' as keyof typeof Ionicons.glyphMap,
+			color: '#8E24AA',
+		};
+	}
+	if (
+		desc.includes('insurance') ||
+		desc.includes('tax') ||
+		desc.includes('fee')
+	) {
+		return {
+			icon: 'shield-outline' as keyof typeof Ionicons.glyphMap,
+			color: '#424242',
+		};
+	}
+
+	// Default expense
+	return {
+		icon: 'trending-down-outline' as keyof typeof Ionicons.glyphMap,
+		color: '#E53935',
+	};
 };
 
 const TransactionHistory: React.FC<TransactionHistoryProps> = ({
@@ -102,9 +217,41 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 	const { budgets } = useBudget();
 	const { goals } = useGoal();
 
+	// Helper function to get today's date in local timezone
+	const getTodayDate = (): Date => {
+		const today = new Date();
+		// Adjust for timezone offset to ensure we get the correct local date
+		const offset = today.getTimezoneOffset();
+		const localDate = new Date(today.getTime() - offset * 60 * 1000);
+		// Set time to start of day for accurate comparison
+		localDate.setHours(0, 0, 0, 0);
+		return localDate;
+	};
+
 	const recentTransactions = transactions
+		.filter((transaction) => {
+			// Filter out future transactions (transactions with dates after today)
+			const transactionDate = new Date(transaction.date);
+			const today = getTodayDate();
+
+			// Set transaction date to start of day for accurate comparison
+			transactionDate.setHours(0, 0, 0, 0);
+
+			return transactionDate <= today;
+		})
 		.sort((a, b) => {
-			// First, compare by date (newest first)
+			// First, prioritize actual transactions over recurring placeholders
+			const aIsRecurringPlaceholder =
+				a.description.includes('Recurring Expense');
+			const bIsRecurringPlaceholder =
+				b.description.includes('Recurring Expense');
+
+			if (aIsRecurringPlaceholder !== bIsRecurringPlaceholder) {
+				// Actual transactions come first
+				return aIsRecurringPlaceholder ? 1 : -1;
+			}
+
+			// Then, compare by date (newest first)
 			const dateA = new Date(a.date);
 			const dateB = new Date(b.date);
 
@@ -122,6 +269,11 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 
 	// Helper function to get target name and percentage
 	const getTargetName = (transaction: Transaction): string => {
+		// Special handling for recurring expense placeholders
+		if (transaction.description.includes('Recurring Expense')) {
+			return 'Recurring Expense';
+		}
+
 		if (transaction.target && transaction.targetModel) {
 			if (transaction.targetModel === 'Budget') {
 				const budget = budgets.find((b) => b.id === transaction.target);
@@ -151,79 +303,104 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 
 	// Helper function to get transaction context (icon and color from target)
 	const getTransactionContext = (transaction: Transaction) => {
+		// Special handling for recurring expense placeholders
+		if (transaction.description.includes('Recurring Expense')) {
+			return {
+				icon: 'refresh-outline' as keyof typeof Ionicons.glyphMap,
+				color: '#f59e0b', // Amber for recurring
+			};
+		}
+
+		// Check if transaction has a target and targetModel
 		if (transaction.target && transaction.targetModel) {
-			if (transaction.targetModel === 'Budget') {
-				const budget = budgets.find((b) => b.id === transaction.target);
-				if (budget) {
+			if (
+				transaction.targetModel === 'Budget' &&
+				transaction.type === 'expense'
+			) {
+				// For expenses, find the matching budget by ID
+				const matchingBudget = budgets.find(
+					(budget) => budget.id === transaction.target
+				);
+
+				if (matchingBudget) {
+					// Use budget icon/color if available, otherwise fall back to smart inference
+					const budgetIcon =
+						matchingBudget.icon ||
+						getSmartFallback(transaction.description, 'expense').icon;
+					const budgetColor =
+						matchingBudget.color ||
+						getSmartFallback(transaction.description, 'expense').color;
+
 					return {
-						icon: budget.icon as keyof typeof Ionicons.glyphMap,
-						color: budget.color,
+						icon: normalizeIconName(budgetIcon),
+						color: budgetColor,
 					};
 				}
-			} else if (transaction.targetModel === 'Goal') {
-				const goal = goals.find((g) => g.id === transaction.target);
-				if (goal) {
+			} else if (
+				transaction.targetModel === 'Goal' &&
+				transaction.type === 'income'
+			) {
+				// For income, find the matching goal by ID
+				const matchingGoal = goals.find(
+					(goal) => goal.id === transaction.target
+				);
+
+				if (matchingGoal) {
+					// Use goal icon/color if available, otherwise fall back to smart inference
+					const goalIcon =
+						matchingGoal.icon ||
+						getSmartFallback(transaction.description, 'income').icon;
+					const goalColor =
+						matchingGoal.color ||
+						getSmartFallback(transaction.description, 'income').color;
+
 					return {
-						icon: goal.icon as keyof typeof Ionicons.glyphMap,
-						color: goal.color,
+						icon: normalizeIconName(goalIcon),
+						color: goalColor,
 					};
 				}
 			}
 		}
 
-		// Fallback for transactions without target or when target not found
-		// Use more descriptive icons based on transaction type
-		if (transaction.type === 'income') {
-			return {
-				icon: 'trending-up-outline' as keyof typeof Ionicons.glyphMap,
-				color: '#16a34a', // Green for income
-			};
-		} else {
-			return {
-				icon: 'trending-down-outline' as keyof typeof Ionicons.glyphMap,
-				color: '#dc2626', // Red for expense
-			};
-		}
+		// Smart fallback: try to infer icon and color from transaction description
+		const smartFallback = getSmartFallback(
+			transaction.description,
+			transaction.type
+		);
+
+		return {
+			icon: smartFallback.icon,
+			color: smartFallback.color,
+		};
 	};
 
 	// Show loading state
 	if (isLoading) {
 		return (
-			<View style={styles.transactionsSectionContainer}>
-				<View style={styles.transactionsHeader}>
-					<Text
-						style={[styles.transactionsTitle, dynamicTextStyle]}
-						accessibilityRole="header"
-						accessibilityLabel="Recent Activity section"
-					>
-						Recent Activity
-					</Text>
-				</View>
-				<View style={styles.transactionsListContainer}>
-					<View style={styles.loadingContainer}>
-						<ActivityIndicator size="small" color="#007AFF" />
-						<Text
-							style={[styles.loadingText, dynamicTextStyle]}
-							accessibilityRole="text"
-							accessibilityLabel="Loading transactions"
-						>
-							Loading transactions...
-						</Text>
-					</View>
+			<View style={styles.card}>
+				<Text
+					style={[styles.cardTitle, dynamicTextStyle]}
+					accessibilityRole="header"
+					accessibilityLabel="Recent Transactions section"
+				>
+					Recent Transactions
+				</Text>
+				<View style={{ paddingVertical: 16 }}>
+					<ActivityIndicator size="small" color="#007AFF" />
 				</View>
 			</View>
 		);
 	}
 
 	return (
-		<View style={styles.transactionsSectionContainer}>
-			<View style={styles.transactionsHeader}>
+		<View style={styles.card}>
+			<View style={styles.cardHeaderRow}>
 				<Text
-					style={[styles.transactionsTitle, dynamicTextStyle]}
+					style={[styles.cardTitle, dynamicTextStyle]}
 					accessibilityRole="header"
-					accessibilityLabel="Recent Activity section"
+					accessibilityLabel="Recent Transactions section"
 				>
-					Recent Activity
+					Recent Transactions
 				</Text>
 				<TouchableOpacity
 					onPress={() => router.push('/dashboard/ledger')}
@@ -234,122 +411,71 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 					)}
 					accessibilityHint={voiceOverHints.navigate}
 				>
-					<Text style={[styles.viewAllText, dynamicTextStyle]}>View All</Text>
+					<Text style={styles.viewAll}>View All</Text>
 				</TouchableOpacity>
 			</View>
 
-			<View
-				style={styles.transactionsListContainer}
-				accessibilityLabel="Recent transactions list"
-			>
+			<View accessibilityLabel="Recent transactions list">
 				{recentTransactions.length > 0 ? (
 					recentTransactions.map((t, index) => {
-						// Get icon and color from transaction's target
-						const iconData = getTransactionContext(t);
-						const amountText = currency(isNaN(t.amount) ? 0 : t.amount);
-						const dateText = formatTransactionDate(t.date);
+						const amt = isNaN(t.amount) ? 0 : t.amount;
+						const signed = t.type === 'income' ? amt : -amt;
+						const amountColor = signed >= 0 ? '#10B981' : '#EF4444';
+						const date = (t.date || '').slice(0, 10);
 						const targetName = getTargetName(t);
+						const iconData = getTransactionContext(t);
 
 						return (
-							<View
+							<TouchableOpacity
 								key={t.id}
-								style={styles.transactionItem}
-								accessibilityRole="button"
+								onPress={() => router.push('/dashboard/ledger')}
+								style={styles.txRow}
+								{...accessibilityProps.button}
 								accessibilityLabel={generateAccessibilityLabel.transactionItem(
 									t.description,
-									`${t.type === 'income' ? '+' : '-'}${amountText}`,
-									dateText
+									`${t.type === 'income' ? '+' : '-'}${currency(amt)}`,
+									date
 								)}
 								accessibilityHint={`${targetName}. ${voiceOverHints.navigate}`}
 							>
-								<BorderlessButton
-									onPress={() => router.push('/dashboard/ledger')}
-									style={styles.transactionContent}
-									onActiveStateChange={onPress}
-									{...accessibilityProps.button}
-									accessibilityLabel={generateAccessibilityLabel.transactionItem(
-										t.description,
-										`${t.type === 'income' ? '+' : '-'}${amountText}`,
-										dateText
-									)}
-									accessibilityHint={`${targetName}. ${voiceOverHints.navigate}`}
+								<View
+									style={[
+										styles.categoryChip,
+										{ backgroundColor: `${iconData.color}20` },
+									]}
 								>
-									<View style={styles.transactionLeft}>
-										<View
-											style={[
-												styles.iconContainer,
-												{ backgroundColor: `${iconData.color}20` },
-											]}
-											accessibilityRole="image"
-											accessibilityLabel={`${targetName} icon`}
-										>
-											<Ionicons
-												name={iconData.icon}
-												size={20}
-												color={iconData.color}
-											/>
-										</View>
-										<View style={styles.transactionInfo}>
-											<Text
-												style={[
-													styles.transactionDescription,
-													dynamicTextStyle,
-												]}
-												accessibilityRole="text"
-											>
-												{t.description}
-											</Text>
-											<Text
-												style={[styles.transactionCategory, dynamicTextStyle]}
-												accessibilityRole="text"
-											>
-												{targetName}
-											</Text>
-										</View>
-									</View>
-
-									<View style={styles.transactionRight}>
-										<Text
-											style={[
-												styles.transactionAmount,
-												t.type === 'income'
-													? styles.incomeAmount
-													: styles.expenseAmount,
-												dynamicTextStyle,
-											]}
-											accessibilityRole="text"
-										>
-											{t.type === 'income' ? '+' : '-'} {amountText}
-										</Text>
-										<Text
-											style={[styles.transactionDate, dynamicTextStyle]}
-											accessibilityRole="text"
-										>
-											{dateText}
-										</Text>
-									</View>
-								</BorderlessButton>
-							</View>
+									<Ionicons
+										name={iconData.icon}
+										size={16}
+										color={iconData.color}
+									/>
+								</View>
+								<View style={{ flex: 1 }}>
+									<Text
+										style={[styles.txTitle, dynamicTextStyle]}
+										numberOfLines={1}
+									>
+										{t.description}
+									</Text>
+									<Text style={[styles.txMeta, dynamicTextStyle]}>{date}</Text>
+								</View>
+								<Text
+									style={[
+										styles.txAmount,
+										{ color: amountColor },
+										dynamicTextStyle,
+									]}
+								>
+									{signed >= 0 ? '+' : ''}
+									{currency(Math.abs(signed))}
+								</Text>
+							</TouchableOpacity>
 						);
 					})
 				) : (
-					<View
-						style={styles.emptyContainer}
-						accessibilityRole="text"
-						accessibilityLabel="No transactions available"
-					>
-						<Ionicons
-							name="document-outline"
-							size={48}
-							color="#ccc"
-							accessibilityRole="image"
-							accessibilityLabel="Empty transactions icon"
-						/>
-						<Text
-							style={[styles.emptyText, dynamicTextStyle]}
-							accessibilityRole="text"
-						>
-							No transactions
+					<View style={{ paddingVertical: 16 }}>
+						<Text style={[styles.emptyText, dynamicTextStyle]}>
+							No transactions yet. Add your first expense to get started.
 						</Text>
 					</View>
 				)}
@@ -359,102 +485,64 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 };
 
 const styles = StyleSheet.create({
-	transactionsSectionContainer: {
-		marginTop: 8,
-	},
-	transactionsHeader: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		marginBottom: 16,
-	},
-	transactionsTitle: {
-		fontWeight: '600',
-		fontSize: 18,
-		color: '#333',
-	},
-	viewAllText: {
-		color: '#889195',
-		fontSize: 14,
-		fontWeight: '500',
-	},
-	transactionsListContainer: {
-		backgroundColor: '#fff',
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: '#efefef',
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.05,
-		shadowRadius: 8,
-		elevation: 2,
-	},
-	transactionItem: {
-		borderRadius: 12,
+	card: {
+		backgroundColor: '#FFFFFF',
+		borderRadius: 16,
 		padding: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: '#efefef',
+		marginTop: 16,
+		borderWidth: 1,
+		borderColor: '#E5E7EB',
+		shadowColor: '#000',
+		shadowOpacity: 0.03,
+		shadowRadius: 6,
+		elevation: 1,
 	},
-	transactionContent: {
+	cardHeaderRow: {
 		flexDirection: 'row',
+		alignItems: 'center',
 		justifyContent: 'space-between',
-		alignItems: 'center',
-		flex: 1,
+		marginBottom: 4,
 	},
-	transactionLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-	iconContainer: {
-		width: 40,
-		height: 40,
-		borderRadius: 20,
-		justifyContent: 'center',
-		alignItems: 'center',
-		marginRight: 12,
-	},
-	transactionInfo: { flex: 1 },
-	transactionDescription: {
-		fontWeight: '500',
-		color: '#333',
-		fontSize: 14,
-	},
-	transactionCategory: {
-		fontSize: 12,
-		color: '#666',
-		marginTop: 4,
-	},
-	transactionRight: { alignItems: 'flex-end' },
-	transactionAmount: {
+	cardTitle: {
 		fontSize: 16,
+		fontWeight: '700',
+		color: '#111827',
+	},
+	viewAll: {
+		fontSize: 14,
+		color: '#3B82F6',
 		fontWeight: '600',
 	},
-	transactionDate: {
-		fontSize: 12,
-		color: '#666',
-		marginTop: 4,
-	},
-	incomeAmount: { color: '#16a34a' },
-	expenseAmount: { color: '#dc2626' },
-	emptyContainer: {
-		justifyContent: 'center',
+	txRow: {
+		flexDirection: 'row',
 		alignItems: 'center',
-		paddingVertical: 40,
+		gap: 12,
+		paddingVertical: 12,
+	},
+	categoryChip: {
+		width: 32,
+		height: 32,
+		borderRadius: 8,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	txTitle: {
+		fontSize: 14,
+		fontWeight: '600',
+		color: '#111827',
+	},
+	txMeta: {
+		fontSize: 12,
+		color: '#6B7280',
+		marginTop: 2,
+	},
+	txAmount: {
+		fontSize: 14,
+		fontWeight: '800',
 	},
 	emptyText: {
-		marginTop: 16,
-		fontSize: 16,
-		color: '#666',
-		fontWeight: '500',
-	},
-	loadingContainer: {
-		justifyContent: 'center',
-		alignItems: 'center',
-		paddingVertical: 40,
-		flexDirection: 'row',
-		gap: 12,
-	},
-	loadingText: {
 		fontSize: 14,
-		color: '#666',
-		fontWeight: '500',
+		color: '#6B7280',
 	},
 });
 

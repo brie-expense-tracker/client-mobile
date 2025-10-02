@@ -90,13 +90,48 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 	);
 	const responseListener = useRef<Notifications.EventSubscription | null>(null);
 
-	// Refresh unread count function - defined early to avoid hoisting issues
-	const refreshUnreadCount = useCallback(async () => {
+	// Throttling for unread count refresh
+	const lastUnreadCountRefresh = useRef<number>(0);
+	const UNREAD_COUNT_THROTTLE_MS = 30000; // 30 seconds
+	const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+	// Refresh unread count function with throttling
+	const refreshUnreadCount = useCallback(async (force: boolean = false) => {
+		const now = Date.now();
+		if (
+			!force &&
+			now - lastUnreadCountRefresh.current < UNREAD_COUNT_THROTTLE_MS
+		) {
+			console.log('⏳ [NotificationContext] Throttling unread count refresh');
+			return;
+		}
+
+		lastUnreadCountRefresh.current = now;
 		try {
 			const count = await notificationService.getUnreadCount();
 			setUnreadCount(count);
 		} catch (err) {
 			console.error('Failed to refresh unread count:', err);
+		}
+	}, []);
+
+	// Set up periodic refresh with intelligent intervals
+	const startPeriodicRefresh = useCallback(() => {
+		if (refreshIntervalRef.current) {
+			clearInterval(refreshIntervalRef.current);
+		}
+
+		// Refresh every 2 minutes when app is active
+		refreshIntervalRef.current = setInterval(() => {
+			refreshUnreadCount();
+		}, 120000); // 2 minutes
+	}, [refreshUnreadCount]);
+
+	// Stop periodic refresh
+	const stopPeriodicRefresh = useCallback(() => {
+		if (refreshIntervalRef.current) {
+			clearInterval(refreshIntervalRef.current);
+			refreshIntervalRef.current = null;
 		}
 	}, []);
 
@@ -110,12 +145,15 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 			notificationListener.current =
 				Notifications.addNotificationReceivedListener((notification) => {
 					setNotification(notification);
-					refreshUnreadCount();
+					refreshUnreadCount(true); // Force refresh when new notification arrives
 				});
 			responseListener.current =
 				Notifications.addNotificationResponseReceivedListener((response) => {
 					// Handle the notification response here
 				});
+
+			// Start periodic refresh
+			startPeriodicRefresh();
 		} catch (err) {
 			setError(
 				err instanceof Error
@@ -123,7 +161,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 					: new Error('Failed to initialize notifications')
 			);
 		}
-	}, [refreshUnreadCount]);
+	}, [refreshUnreadCount, startPeriodicRefresh]);
 
 	const getNotifications = useCallback(
 		async (page: number = 1, limit: number = 20) => {
@@ -318,13 +356,15 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 			if (responseListener.current) {
 				responseListener.current.remove();
 			}
+			// Clean up periodic refresh
+			stopPeriodicRefresh();
 		};
-	}, [initialize]);
+	}, [initialize, stopPeriodicRefresh]);
 
 	useEffect(() => {
 		if (expoPushToken) {
 			getNotifications();
-			refreshUnreadCount();
+			refreshUnreadCount(true); // Force initial refresh
 		}
 	}, [expoPushToken, getNotifications, refreshUnreadCount]);
 

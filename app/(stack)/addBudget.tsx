@@ -13,108 +13,21 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useBudgets } from '../../src/hooks/useBudgets';
-
-// Popular budget icons
-const budgetIcons: (keyof typeof Ionicons.glyphMap)[] = [
-	'restaurant-outline',
-	'fast-food-outline',
-	'wine-outline',
-	'cafe-outline',
-	'pizza-outline',
-	'cart-outline',
-	'bag-outline',
-	'card-outline',
-	'wallet-outline',
-	'storefront-outline',
-	'car-outline',
-	'airplane-outline',
-	'train-outline',
-	'bus-outline',
-	'bicycle-outline',
-	'boat-outline',
-	'home-outline',
-	'flash-outline',
-	'water-outline',
-	'thermometer-outline',
-	'construct-outline',
-	'hammer-outline',
-	'game-controller-outline',
-	'musical-notes-outline',
-	'film-outline',
-	'ticket-outline',
-	'bowling-ball-outline',
-	'golf-outline',
-	'tennisball-outline',
-	'fitness-outline',
-	'medical-outline',
-	'heart-outline',
-	'medkit-outline',
-	'bandage-outline',
-	'school-outline',
-	'book-outline',
-	'library-outline',
-	'briefcase-outline',
-	'laptop-outline',
-	'desktop-outline',
-	'cut-outline',
-	'color-palette-outline',
-	'body-outline',
-	'eyedrop-outline',
-	'rose-outline',
-	'call-outline',
-	'phone-portrait-outline',
-	'wifi-outline',
-	'cellular-outline',
-	'cloud-outline',
-	'globe-outline',
-	'gift-outline',
-	'star-outline',
-	'balloon-outline',
-	'paw-outline',
-	'fish-outline',
-	'leaf-outline',
-	'football-outline',
-	'basketball-outline',
-	'baseball-outline',
-	'snow-outline',
-	'compass-outline',
-	'map-outline',
-	'location-outline',
-	'camera-outline',
-	'bed-outline',
-	'umbrella-outline',
-	'calculator-outline',
-	'pie-chart-outline',
-	'trending-up-outline',
-	'shield-checkmark-outline',
-	'key-outline',
-	'lock-open-outline',
-	'calendar-outline',
-	'time-outline',
-	'notifications-outline',
-	'settings-outline',
-];
-
-// Quick amount presets
-const amountPresets = [200, 500, 1000, 2000, 5000];
-
-const COLOR_PALETTE = {
-	red: { base: '#E53935', pastel: '#EF5350', dark: '#B71C1C' },
-	orange: { base: '#FB8C00', pastel: '#FFB74D', dark: '#E65100' },
-	yellow: { base: '#FDD835', pastel: '#FFEE58', dark: '#FBC02D' },
-	green: { base: '#43A047', pastel: '#A5D6A7', dark: '#1B5E20' },
-	blue: { base: '#1E88E5', pastel: '#42A5F5', dark: '#0D47A1' },
-	indigo: { base: '#5E35B1', pastel: '#5C6BC0', dark: '#311B92' },
-	violet: { base: '#8E24AA', pastel: '#AB47BC', dark: '#4A0072' },
-	grey: { base: '#424242', pastel: '#757575', dark: '#212121' },
-};
+import { Budget } from '../../src/context/budgetContext';
+import {
+	COLOR_PALETTE,
+	BUDGET_ICONS,
+	BUDGET_AMOUNT_PRESETS,
+	DEFAULT_BUDGET_ICON,
+	DEFAULT_COLOR,
+} from '../../src/constants/uiConstants';
 
 const AddBudgetScreen: React.FC = () => {
 	const [name, setName] = useState('');
 	const [amount, setAmount] = useState('');
 	const [icon, setIcon] =
-		useState<keyof typeof Ionicons.glyphMap>('cart-outline');
-	const [color, setColor] = useState(COLOR_PALETTE.blue.base);
+		useState<keyof typeof Ionicons.glyphMap>(DEFAULT_BUDGET_ICON);
+	const [color, setColor] = useState<string>(DEFAULT_COLOR);
 	const [period, setPeriod] = useState<'weekly' | 'monthly'>('monthly');
 	const [showIconPicker, setShowIconPicker] = useState(false);
 	const [showColorPicker, setShowColorPicker] = useState(false);
@@ -254,7 +167,7 @@ const AddBudgetScreen: React.FC = () => {
 
 						{/* Quick Amount Presets */}
 						<View style={styles.presetsContainer}>
-							{amountPresets.map((amountValue) => (
+							{BUDGET_AMOUNT_PRESETS.map((amountValue) => (
 								<TouchableOpacity
 									key={amountValue}
 									style={[
@@ -399,7 +312,7 @@ const AddBudgetScreen: React.FC = () => {
 
 						{showIconPicker && (
 							<View style={styles.iconGrid}>
-								{budgetIcons.map((iconName) => (
+								{BUDGET_ICONS.map((iconName) => (
 									<TouchableOpacity
 										key={iconName}
 										style={[
