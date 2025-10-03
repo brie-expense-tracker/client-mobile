@@ -9,6 +9,11 @@ interface FilterContextType {
 	setDateFilterMode: (mode: string) => void;
 	selectedPatternId: string | null;
 	setSelectedPatternId: (patternId: string | null) => void;
+	transactionTypes: {
+		income: boolean;
+		expense: boolean;
+	};
+	setTransactionTypes: (types: { income: boolean; expense: boolean }) => void;
 }
 
 export const FilterContext = createContext<FilterContextType>({
@@ -20,6 +25,8 @@ export const FilterContext = createContext<FilterContextType>({
 	setDateFilterMode: () => {},
 	selectedPatternId: null,
 	setSelectedPatternId: () => {},
+	transactionTypes: { income: true, expense: true },
+	setTransactionTypes: () => {},
 });
 
 export const FilterProvider = ({ children }: { children: ReactNode }) => {
@@ -29,6 +36,10 @@ export const FilterProvider = ({ children }: { children: ReactNode }) => {
 	const [selectedPatternId, setSelectedPatternId] = useState<string | null>(
 		null
 	);
+	const [transactionTypes, setTransactionTypes] = useState<{
+		income: boolean;
+		expense: boolean;
+	}>({ income: true, expense: true });
 
 	const value = useMemo(
 		() => ({
@@ -40,8 +51,16 @@ export const FilterProvider = ({ children }: { children: ReactNode }) => {
 			setDateFilterMode,
 			selectedPatternId,
 			setSelectedPatternId,
+			transactionTypes,
+			setTransactionTypes,
 		}),
-		[selectedGoals, selectedBudgets, dateFilterMode, selectedPatternId]
+		[
+			selectedGoals,
+			selectedBudgets,
+			dateFilterMode,
+			selectedPatternId,
+			transactionTypes,
+		]
 	);
 
 	return (

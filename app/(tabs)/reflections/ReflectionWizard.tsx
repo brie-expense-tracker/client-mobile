@@ -255,12 +255,16 @@ export default function ReflectionWizard() {
 		);
 	}
 
-	// Show success screen after saving
-	if (showSuccess && savedReflection) {
-		console.log('Showing success screen with reflection:', savedReflection);
+	// Show success screen after saving OR if reflection is already completed for this week
+	if (
+		(showSuccess && savedReflection) ||
+		(currentReflection?.completed && !showSuccess)
+	) {
+		const reflectionToShow = savedReflection || currentReflection;
+		console.log('Showing success screen with reflection:', reflectionToShow);
 		return (
 			<ReflectionSuccessScreen
-				reflection={savedReflection}
+				reflection={reflectionToShow!}
 				onBack={handleBackToWizard}
 				onEdit={handleEditReflection}
 			/>

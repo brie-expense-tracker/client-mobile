@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, {
+	useState,
+	useEffect,
+	useRef,
+	useContext,
+	useCallback,
+} from 'react';
 import {
 	View,
 	Text,
@@ -18,6 +24,9 @@ import {
 	OrchestratorAIResponse,
 } from '../../../src/services/feature/orchestratorAIService';
 import { useProfile } from '../../../src/context/profileContext';
+import { useBudgets } from '../../../src/hooks/useBudgets';
+import { useGoals } from '../../../src/hooks/useGoals';
+import { TransactionContext } from '../../../src/context/transactionContext';
 import MissingInfoCard, {
 	MissingInfoChip,
 } from '../../../src/components/assistant/cards/MissingInfoCard';
@@ -58,10 +67,20 @@ import { modeStateService } from '../../../src/services/assistant/modeStateServi
 import { buildTestSseUrl } from '../../../src/networking/endpoints';
 import { startStreaming } from '../../../src/services/streaming';
 import { Image } from 'expo-image';
+import {
+	InsightsContextService,
+	Insight,
+} from '../../../src/services/insights/insightsContextService';
+import ContextualInsightsPanel from '../../../src/components/assistant/panels/ContextualInsightsPanel';
 
 export default function AssistantScreen() {
 	const router = useRouter();
 	const { profile } = useProfile();
+	const { budgets } = useBudgets() as { budgets: any[] };
+	const { goals } = useGoals() as { goals: any[] };
+	const { transactions } = useContext(TransactionContext) as {
+		transactions: any[];
+	};
 
 	// Initialize messages with reducer
 	const initialMessages: Message[] = [
@@ -132,6 +151,11 @@ export default function AssistantScreen() {
 		canExpand: boolean;
 	} | null>(null);
 	const [showExpandButton, setShowExpandButton] = useState(false);
+	const [currentConversationContext, setCurrentConversationContext] =
+		useState('');
+	const [insightsService] = useState(() =>
+		InsightsContextService.getInstance()
+	);
 
 	// Mode state management
 	const [modeState, setModeState] = useState(modeStateService.getState());
@@ -170,6 +194,21 @@ export default function AssistantScreen() {
 		});
 	}, [messages]);
 
+	// Load insights context from profile insights
+	const loadInsightsContext = useCallback(async () => {
+		try {
+			// Load context from AsyncStorage (set by profile insights)
+			await insightsService.loadContext();
+
+			// Load insights with current data
+			await insightsService.loadInsights(profile, budgets, goals, transactions);
+
+			console.log('[Assistant] Loaded insights context and data');
+		} catch (error) {
+			console.error('[Assistant] Failed to load insights context:', error);
+		}
+	}, [insightsService, profile, budgets, goals, transactions]);
+
 	// Initialize orchestrator service when profile is available
 	useEffect(() => {
 		if (profile) {
@@ -196,8 +235,11 @@ export default function AssistantScreen() {
 
 			// Load fallback data
 			loadFallbackData();
+
+			// Load insights context
+			loadInsightsContext();
 		}
-	}, [profile]);
+	}, [profile, budgets, goals, transactions, loadInsightsContext]);
 
 	// Track when data is initialized
 	useEffect(() => {
@@ -531,6 +573,30 @@ export default function AssistantScreen() {
 		setTraceData(null);
 		setPerformanceData(null);
 
+		// Update conversation context for insights
+		setCurrentConversationContext(currentInput);
+
+		// Get insights context for conversation
+		const insightsContext = insightsService.getContextForConversation();
+		const relevantInsights = insightsService.getRelevantInsights(
+			currentInput,
+			2
+		);
+
+		// Enhance user input with insights context if available
+		let enhancedInput = currentInput;
+		if (insightsContext) {
+			enhancedInput = `${currentInput}\n\nContext: ${insightsContext}`;
+		}
+
+		// Add relevant insights to context
+		if (relevantInsights.length > 0) {
+			const insightsText = relevantInsights
+				.map((insight) => `- ${insight.title}: ${insight.message}`)
+				.join('\n');
+			enhancedInput += `\n\nRelevant insights:\n${insightsText}`;
+		}
+
 		// Check intent sufficiency before sending to AI
 		const context: IntentContext = {
 			profile: {
@@ -708,9 +774,9 @@ export default function AssistantScreen() {
 
 		try {
 			console.log('🔍 [DEBUG] About to call startStream with:', {
-				message: currentInput,
+				message: enhancedInput,
 				messageId: aiMessageId,
-				messageLength: currentInput.length,
+				messageLength: enhancedInput.length,
 				sessionId: streamingRef.current.sessionId,
 				currentMessages: messagesRef.current.map((m) => ({
 					id: m.id,
@@ -721,7 +787,7 @@ export default function AssistantScreen() {
 
 			console.log('🚀 [Assistant] Calling startStream function...');
 			await startStream(
-				currentInput,
+				enhancedInput,
 				{
 					onMeta: (data) => {
 						if (data.timeToFirstToken) {
@@ -894,6 +960,9 @@ export default function AssistantScreen() {
 							setLastProcessedMessage('');
 						}, 1000);
 
+						// Clear insights context after successful conversation
+						insightsService.clearContext();
+
 						if (uiTimeout) {
 							clearTimeout(uiTimeout);
 							setUiTimeout(null);
@@ -989,6 +1058,49 @@ export default function AssistantScreen() {
 	const handleShowWork = () => {
 		console.log('Show work button pressed');
 		// TODO: Implement show work functionality
+	};
+
+	// Handle insight press
+	const handleInsightPress = (insight: Insight) => {
+		console.log('Insight pressed:', insight.title);
+
+		// Route to appropriate screen based on action
+		if (insight.action) {
+			if (insight.action === 'create_budget') {
+				router.push('/(tabs)/budgets?tab=budgets');
+			} else if (insight.action === 'set_savings_goal') {
+				router.push('/(tabs)/budgets?tab=goals');
+			} else if (
+				insight.action === 'debt_strategy' ||
+				insight.action === 'optimize_income'
+			) {
+				router.push('/(stack)/settings/profile/editFinancial');
+			} else if (insight.action === 'reduce_expenses') {
+				router.push('/(stack)/settings/profile/editExpenses');
+			} else {
+				// Default: start a conversation about this insight
+				handleAskAboutInsight(insight);
+			}
+		}
+	};
+
+	// Handle asking about insight
+	const handleAskAboutInsight = (insight: Insight) => {
+		console.log('Ask about insight:', insight.title);
+
+		// Create a contextual question about the insight
+		const question = `Can you help me understand this insight: "${insight.title}" - ${insight.message}`;
+
+		// Set the input text and send the message
+		setInputText(question);
+
+		// Update conversation context
+		setCurrentConversationContext(`${insight.title} ${insight.message}`);
+
+		// Auto-send after a short delay
+		setTimeout(() => {
+			handleSendMessage();
+		}, 100);
 	};
 
 	// Handle expand button
@@ -1193,6 +1305,15 @@ export default function AssistantScreen() {
 					contentContainerStyle={styles.messagesContainer}
 					ListFooterComponent={
 						<View>
+							{/* Contextual Insights Panel */}
+							{!isStreaming && dataInitialized && (
+								<ContextualInsightsPanel
+									conversationContext={currentConversationContext}
+									onInsightPress={handleInsightPress}
+									onAskAboutInsight={handleAskAboutInsight}
+									maxInsights={3}
+								/>
+							)}
 							{isStreaming && !streamingMessageId && (
 								<View style={styles.loadingContainer}>
 									<ActivityIndicator size="small" color="#3b82f6" />

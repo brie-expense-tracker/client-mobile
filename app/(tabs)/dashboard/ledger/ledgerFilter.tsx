@@ -24,6 +24,8 @@ export default function LedgerFilterScreen() {
 		setSelectedBudgets,
 		dateFilterMode,
 		setDateFilterMode,
+		transactionTypes,
+		setTransactionTypes,
 	} = useContext(FilterContext);
 
 	// Get goals and budgets from context
@@ -41,10 +43,6 @@ export default function LedgerFilterScreen() {
 	// Search and filter state
 	const [goalSearchQuery, setGoalSearchQuery] = useState('');
 	const [budgetSearchQuery, setBudgetSearchQuery] = useState('');
-	const [transactionTypes, setTransactionTypes] = useState<{
-		income: boolean;
-		expense: boolean;
-	}>({ income: true, expense: true });
 
 	// Filter goals and budgets based on search query
 	const filteredGoals = useMemo(() => {
@@ -97,17 +95,25 @@ export default function LedgerFilterScreen() {
 	};
 
 	const handleTransactionTypeToggle = (type: 'income' | 'expense') => {
-		setTransactionTypes((prev) => ({
-			...prev,
-			[type]: !prev[type],
-		}));
+		const newTypes = {
+			...transactionTypes,
+			[type]: !transactionTypes[type],
+		};
+
+		// Prevent deselecting both types - at least one must be selected
+		if (!newTypes.income && !newTypes.expense) {
+			// If both would be false, don't update the state
+			return;
+		}
+
+		setTransactionTypes(newTypes);
 	};
 
 	const handleReset = () => {
 		// Reset to default values
 		setLocalSelectedGoals([]);
 		setLocalSelectedBudgets([]);
-		setLocalDateFilterMode('all');
+		setLocalDateFilterMode('month');
 		setGoalSearchQuery('');
 		setBudgetSearchQuery('');
 		setTransactionTypes({ income: true, expense: true });
@@ -115,15 +121,6 @@ export default function LedgerFilterScreen() {
 
 	return (
 		<SafeAreaView style={styles.mainContainer}>
-			{/* Header */}
-			<View style={styles.header}>
-				<TouchableOpacity onPress={handleBack} style={styles.backButton}>
-					<Ionicons name="arrow-back" size={24} color="#007AFF" />
-				</TouchableOpacity>
-				<Text style={styles.headerTitle}>Filter Transactions</Text>
-				<View style={styles.headerRight} />
-			</View>
-
 			<ScrollView contentContainerStyle={styles.scrollContent}>
 				{/* Transaction Types */}
 				<Section title="Transaction Types">
@@ -307,27 +304,11 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: '#fff',
 	},
-	header: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		borderBottomWidth: 1,
-		borderBottomColor: '#e2e2e2',
-		backgroundColor: '#fff',
-	},
+
 	backButton: {
 		padding: 4,
 	},
-	headerTitle: {
-		fontSize: 18,
-		fontWeight: '600',
-		color: '#333',
-	},
-	headerRight: {
-		width: 32, // Same width as back button for centering
-	},
+
 	scrollContent: {
 		padding: 16,
 		paddingBottom: 100, // Space for action buttons

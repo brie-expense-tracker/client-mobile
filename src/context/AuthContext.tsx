@@ -352,11 +352,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		});
 
 		// Keep ID token fresh (useful for your HMAC + server auth flow)
+		// Note: This is separate from onAuthStateChanged to avoid duplicate processing
 		const unsubToken = auth().onIdTokenChanged(async (fbUser) => {
 			if (!fbUser) return;
 			try {
+				// Only refresh token, don't trigger user processing
 				await fbUser.getIdToken(true); // force refresh
+				console.log('🔑 [DEBUG] ID token refreshed');
 			} catch (err) {
+				console.error('🔑 [DEBUG] Failed to refresh ID token:', err);
 				Sentry.captureException(err);
 			}
 		});

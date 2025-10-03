@@ -621,7 +621,10 @@ export default function AccountScreen() {
 				colors={colors}
 				right={
 					<TouchableOpacity
-						onPress={() => router.push('/(tabs)/assistant')}
+						onPress={() => {
+							// Navigate to assistant with insights context
+							router.push('/(tabs)/assistant');
+						}}
 						style={{
 							flexDirection: 'row',
 							alignItems: 'center',
@@ -631,9 +634,9 @@ export default function AccountScreen() {
 						}}
 					>
 						<Text style={{ color: colors.tint, fontWeight: '700' }}>
-							View all
+							Chat about insights
 						</Text>
-						<Ionicons name="chevron-forward" size={16} color={colors.tint} />
+						<Ionicons name="chatbubble-outline" size={16} color={colors.tint} />
 					</TouchableOpacity>
 				}
 			>

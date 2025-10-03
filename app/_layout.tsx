@@ -572,13 +572,13 @@ export default function RootLayout() {
 							backgroundColor="#fff"
 							translucent={false}
 						/>
-						<NotificationProvider>
-							<AuthProvider>
+						<AuthProvider>
+							<NotificationProvider>
 								<OnboardingProvider>
 									<RootLayoutContent />
 								</OnboardingProvider>
-							</AuthProvider>
-						</NotificationProvider>
+							</NotificationProvider>
+						</AuthProvider>
 					</ThemeProvider>
 				</QueryClientProvider>
 			</SafeAreaProvider>

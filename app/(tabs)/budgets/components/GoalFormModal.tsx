@@ -10,9 +10,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { RectButton } from 'react-native-gesture-handler';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import CustomSlidingModal from './CustomSlidingModal';
 import { normalizeIconName } from '../../../../src/constants/uiConstants';
+import { DateField } from '../../../../src/components/DateField';
 
 type ColorOption = {
 	base: string;
@@ -45,10 +45,7 @@ type GoalFormModalProps = {
 	onToggleColorPicker: () => void;
 	showIconPicker: boolean;
 	onToggleIconPicker: () => void;
-	showDatePicker: boolean;
-	onToggleDatePicker: () => void;
-	selectedDate: Date;
-	onDateChange: (date: Date) => void;
+	onDateChange: (date: string) => void;
 	goalIcons: (keyof typeof Ionicons.glyphMap)[];
 	colorPalette: Record<string, ColorOption>;
 	secondaryActionButton?: {
@@ -74,9 +71,6 @@ const GoalFormModal: React.FC<GoalFormModalProps> = ({
 	onToggleColorPicker,
 	showIconPicker,
 	onToggleIconPicker,
-	showDatePicker,
-	onToggleDatePicker,
-	selectedDate,
 	onDateChange,
 	goalIcons,
 	colorPalette,
@@ -220,44 +214,16 @@ const GoalFormModal: React.FC<GoalFormModalProps> = ({
 
 	const DatePicker = () => (
 		<View style={styles.datePickerContainer}>
-			<Text style={styles.label}>Target Date</Text>
-			<RectButton style={styles.dateButton} onPress={onToggleDatePicker}>
-				<View style={styles.dateButtonContent}>
-					<View
-						style={[
-							styles.dateIcon,
-							{ backgroundColor: formData.color + '20' },
-						]}
-					>
-						<Ionicons
-							name="calendar-outline"
-							size={16}
-							color={formData.color}
-						/>
-					</View>
-					<Text style={styles.dateButtonText}>
-						{formData.deadline || 'Select date'}
-					</Text>
-					<Ionicons name="chevron-down" size={20} color="#757575" />
-				</View>
-			</RectButton>
-
-			{showDatePicker && (
-				<DateTimePicker
-					mode="date"
-					display="inline"
-					onChange={(event, date) => {
-						onToggleDatePicker();
-						if (date) {
-							onDateChange(date);
-							const formattedDate = date.toISOString().split('T')[0];
-							onFormDataChange({ ...formData, deadline: formattedDate });
-						}
-					}}
-					minimumDate={new Date()}
-					value={selectedDate}
-				/>
-			)}
+			<DateField
+				value={formData.deadline}
+				onChange={(isoDate) => {
+					onDateChange(isoDate);
+					onFormDataChange({ ...formData, deadline: isoDate });
+				}}
+				title="Target Date"
+				placeholder="Select date"
+				minDate={new Date().toISOString().split('T')[0]} // Today or later
+			/>
 		</View>
 	);
 
@@ -465,29 +431,6 @@ const styles = StyleSheet.create({
 	},
 	datePickerContainer: {
 		marginBottom: 20,
-	},
-	dateButton: {
-		backgroundColor: '#F5F5F5',
-		borderRadius: 12,
-		padding: 16,
-	},
-	dateButtonContent: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-	dateIcon: {
-		width: 24,
-		height: 24,
-		borderRadius: 6,
-		justifyContent: 'center',
-		alignItems: 'center',
-	},
-	dateButtonText: {
-		fontSize: 16,
-		color: '#212121',
-		flex: 1,
-		marginLeft: 12,
 	},
 	colorPickerContainer: {
 		marginBottom: 10,

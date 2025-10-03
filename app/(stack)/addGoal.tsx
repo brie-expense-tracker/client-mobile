@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useGoals } from '../../src/hooks/useGoals';
 import { Goal } from '../../src/context/goalContext';
 import {
@@ -24,6 +23,7 @@ import {
 	isValidIoniconsName,
 	normalizeIconName,
 } from '../../src/constants/uiConstants';
+import { DateField } from '../../src/components/DateField';
 
 const AddGoalScreen: React.FC = () => {
 	const params = useLocalSearchParams();
@@ -38,8 +38,6 @@ const AddGoalScreen: React.FC = () => {
 	const [showIconPicker, setShowIconPicker] = useState(false);
 	const [showColorPicker, setShowColorPicker] = useState(false);
 	const [showCustomTarget, setShowCustomTarget] = useState(false);
-	const [showDatePicker, setShowDatePicker] = useState(false);
-	const [selectedDate, setSelectedDate] = useState(new Date());
 	const [loading, setLoading] = useState(false);
 	const [categories, setCategories] = useState<string[]>([]);
 	const [showCategoriesPicker, setShowCategoriesPicker] = useState(false);
@@ -128,13 +126,8 @@ const AddGoalScreen: React.FC = () => {
 		}
 	};
 
-	const handleDateChange = (event: any, selectedDate?: Date) => {
-		setShowDatePicker(false);
-		if (selectedDate) {
-			setSelectedDate(selectedDate);
-			const formattedDate = selectedDate.toISOString().split('T')[0];
-			setDeadline(formattedDate);
-		}
+	const handleDateChange = (isoDate: string) => {
+		setDeadline(isoDate);
 	};
 
 	return (
@@ -245,35 +238,13 @@ const AddGoalScreen: React.FC = () => {
 
 					{/* Target Date */}
 					<View style={styles.inputGroup}>
-						<Text style={styles.label}>Target Date</Text>
-						<TouchableOpacity
-							style={styles.dateButton}
-							onPress={() => setShowDatePicker(!showDatePicker)}
-						>
-							<View style={styles.dateButtonContent}>
-								<View
-									style={[styles.dateIcon, { backgroundColor: color + '20' }]}
-								>
-									<Ionicons name="calendar-outline" size={16} color={color} />
-								</View>
-								<Text style={styles.dateButtonText}>
-									{deadline || 'Select date'}
-								</Text>
-								<Ionicons name="chevron-down" size={20} color="#757575" />
-							</View>
-						</TouchableOpacity>
-
-						{showDatePicker && (
-							<View style={styles.datePickerWrapper}>
-								<DateTimePicker
-									value={selectedDate}
-									mode="date"
-									display="inline"
-									onChange={handleDateChange}
-									minimumDate={new Date()}
-								/>
-							</View>
-						)}
+						<DateField
+							value={deadline}
+							onChange={handleDateChange}
+							title="Target Date"
+							placeholder="Select date"
+							minDate={new Date().toISOString().split('T')[0]} // Today or later
+						/>
 					</View>
 
 					{/* Icon Selection */}
@@ -616,39 +587,6 @@ const styles = StyleSheet.create({
 		fontWeight: '500',
 		color: '#757575',
 		marginBottom: 8,
-	},
-	dateButton: {
-		backgroundColor: '#ffffff',
-		borderRadius: 8,
-		padding: 16,
-		borderWidth: 1,
-		borderColor: '#e5e7eb',
-	},
-	dateButtonContent: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-	dateIcon: {
-		width: 24,
-		height: 24,
-		borderRadius: 6,
-		justifyContent: 'center',
-		alignItems: 'center',
-	},
-	dateButtonText: {
-		flex: 1,
-		marginLeft: 12,
-		fontSize: 16,
-		color: '#0a0a0a',
-	},
-	datePickerWrapper: {
-		backgroundColor: '#ffffff',
-		borderRadius: 8,
-		padding: 8,
-		marginTop: 8,
-		borderWidth: 1,
-		borderColor: '#e5e7eb',
 	},
 	iconButton: {
 		backgroundColor: '#F5F5F5',
