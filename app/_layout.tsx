@@ -32,6 +32,7 @@ import { NotificationProvider } from '../src/context/notificationContext';
 import { TransactionProvider } from '../src/context/transactionContext';
 import { TransactionModalProvider } from '../src/context/transactionModalContext';
 import { DemoDataProvider } from '../src/context/demoDataContext';
+import { ThemeProvider } from '../src/context/ThemeContext';
 
 import * as Notifications from 'expo-notifications';
 
@@ -564,19 +565,21 @@ export default function RootLayout() {
 		return (
 			<SafeAreaProvider initialMetrics={initialWindowMetrics}>
 				<QueryClientProvider client={queryClient}>
-					{/* Default status bar configuration for the entire app */}
-					<StatusBar
-						barStyle="dark-content"
-						backgroundColor="#fff"
-						translucent={false}
-					/>
-					<NotificationProvider>
-						<AuthProvider>
-							<OnboardingProvider>
-								<RootLayoutContent />
-							</OnboardingProvider>
-						</AuthProvider>
-					</NotificationProvider>
+					<ThemeProvider>
+						{/* Default status bar configuration for the entire app */}
+						<StatusBar
+							barStyle="dark-content"
+							backgroundColor="#fff"
+							translucent={false}
+						/>
+						<NotificationProvider>
+							<AuthProvider>
+								<OnboardingProvider>
+									<RootLayoutContent />
+								</OnboardingProvider>
+							</AuthProvider>
+						</NotificationProvider>
+					</ThemeProvider>
 				</QueryClientProvider>
 			</SafeAreaProvider>
 		);

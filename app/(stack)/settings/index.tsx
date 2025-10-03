@@ -9,7 +9,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import useAuth from '../../../src/context/AuthContext';
+import { useTheme } from '../../../src/context/ThemeContext';
 import ConnectivityTest from '../../../src/components/ConnectivityTest';
+import ThemeToggle from '../../../src/components/ThemeToggle';
 
 /* --------------------------------- UI --------------------------------- */
 
@@ -20,11 +22,24 @@ type Item = {
 	onPress?: () => void;
 };
 
-function Section({ title, items }: { title: string; items: Item[] }) {
+function Section({
+	title,
+	items,
+	colors,
+}: {
+	title: string;
+	items: Item[];
+	colors: any;
+}) {
 	return (
-		<View style={styles.section}>
-			<Text style={styles.sectionTitle}>{title}</Text>
-			<View style={styles.card}>
+		<View style={[styles.section, { backgroundColor: colors.bg }]}>
+			<Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
+			<View
+				style={[
+					styles.card,
+					{ backgroundColor: colors.card, borderColor: colors.line },
+				]}
+			>
 				{items.map((item, index) => {
 					const isLast = index === items.length - 1;
 					return (
@@ -33,9 +48,15 @@ function Section({ title, items }: { title: string; items: Item[] }) {
 							style={[styles.row, isLast && styles.rowLast]}
 							onPress={item.onPress}
 						>
-							<Ionicons name={item.icon} size={24} color="#007AFF" />
-							<Text style={styles.rowText}>{item.label}</Text>
-							<Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
+							<Ionicons name={item.icon} size={24} color={colors.tint} />
+							<Text style={[styles.rowText, { color: colors.text }]}>
+								{item.label}
+							</Text>
+							<Ionicons
+								name="chevron-forward"
+								size={20}
+								color={colors.subtle}
+							/>
 						</TouchableOpacity>
 					);
 				})}
@@ -49,6 +70,7 @@ function Section({ title, items }: { title: string; items: Item[] }) {
 export default function SettingsScreen() {
 	const router = useRouter();
 	const { logout } = useAuth();
+	const { colors } = useTheme();
 
 	const handleLogout = async () => {
 		try {
@@ -72,14 +94,6 @@ export default function SettingsScreen() {
 		},
 	];
 
-	const appItems: Item[] = [
-		{
-			label: 'Notifications',
-			icon: 'notifications-outline',
-			onPress: () => router.push('/(stack)/settings/notification'),
-		},
-	];
-
 	const supportItems: Item[] = [
 		{
 			label: 'About',
@@ -98,30 +112,64 @@ export default function SettingsScreen() {
 
 	return (
 		<ScrollView
-			style={styles.container}
+			style={[styles.container, { backgroundColor: colors.bg }]}
 			contentContainerStyle={styles.scrollContent}
 			showsVerticalScrollIndicator={false}
 		>
-			{/* Header */}
-			<View style={styles.header}>
-				<Text style={styles.title}>Settings</Text>
-			</View>
-
 			{/* Debug / Testing (kept simple and white) - Only show in development */}
 			{__DEV__ && (
-				<View style={styles.section}>
-					<Text style={styles.sectionTitle}>Debug & Testing</Text>
-					<View style={styles.cardNoRows}>
+				<View style={[styles.section, { backgroundColor: colors.bg }]}>
+					<Text style={[styles.sectionTitle, { color: colors.text }]}>
+						Debug & Testing
+					</Text>
+					<View
+						style={[
+							styles.cardNoRows,
+							{ backgroundColor: colors.card, borderColor: colors.line },
+						]}
+					>
 						<ConnectivityTest />
 					</View>
 				</View>
 			)}
 
 			{/* Sections */}
-			<Section title="Account" items={accountItems} />
-			<Section title="App" items={appItems} />
-			<Section title="Support" items={supportItems} />
-			<Section title="Legal" items={legalItems} />
+			<Section title="Account" items={accountItems} colors={colors} />
+
+			{/* App Settings with Theme Toggle */}
+			<View style={[styles.section, { backgroundColor: colors.bg }]}>
+				<Text style={[styles.sectionTitle, { color: colors.text }]}>App</Text>
+				<View
+					style={[
+						styles.card,
+						{ backgroundColor: colors.card, borderColor: colors.line },
+					]}
+				>
+					<ThemeToggle />
+					<View style={[styles.row, styles.rowLast]}>
+						<Ionicons
+							name="notifications-outline"
+							size={24}
+							color={colors.tint}
+						/>
+						<Text style={[styles.rowText, { color: colors.text }]}>
+							Notifications
+						</Text>
+						<TouchableOpacity
+							onPress={() => router.push('/(stack)/settings/notification')}
+						>
+							<Ionicons
+								name="chevron-forward"
+								size={20}
+								color={colors.subtle}
+							/>
+						</TouchableOpacity>
+					</View>
+				</View>
+			</View>
+
+			<Section title="Support" items={supportItems} colors={colors} />
+			<Section title="Legal" items={legalItems} colors={colors} />
 
 			{/* Logout */}
 			<View style={styles.logoutContainer}>
@@ -143,17 +191,6 @@ const styles = StyleSheet.create({
 	},
 	scrollContent: {
 		paddingBottom: 32,
-	},
-	header: {
-		paddingTop: 50,
-		paddingBottom: 16,
-		paddingHorizontal: 20,
-		backgroundColor: '#fff',
-	},
-	title: {
-		fontSize: 28,
-		fontWeight: 'bold',
-		color: '#333',
 	},
 
 	/* Sections */
