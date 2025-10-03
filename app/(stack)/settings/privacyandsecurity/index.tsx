@@ -32,7 +32,7 @@ export default function PrivacySecurityScreen() {
 			rows: [
 				{
 					label: 'Change Password',
-					route: '/(stack)/settings/privacyandsecurity/changePassword',
+					route: '/(stack)/settings/privacyandsecurity/editPassword',
 				},
 			],
 		},

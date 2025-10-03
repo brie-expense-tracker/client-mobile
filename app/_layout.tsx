@@ -456,10 +456,6 @@ function RootLayoutContent() {
 											name="(stack)"
 											options={{ headerShown: false, animation: 'none' }}
 										/>
-										<Stack.Screen
-											name="transaction/index"
-											options={{ headerShown: false, animation: 'none' }}
-										/>
 									</Stack>
 								</GestureHandlerRootView>
 							</DemoDataProvider>

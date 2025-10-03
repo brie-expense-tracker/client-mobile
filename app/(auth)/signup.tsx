@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import auth from '@react-native-firebase/auth';
 import * as Haptics from 'expo-haptics';
 import useAuth from '../../src/context/AuthContext';
 import { RectButton, BorderlessButton } from 'react-native-gesture-handler';
