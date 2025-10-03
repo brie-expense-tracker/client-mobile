@@ -31,7 +31,7 @@ import Svg, {
 } from 'react-native-svg';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { TransactionContext } from '../../../src/context/transactionContext';
-import { useNotification } from '@/src/context/notificationContext';
+import { useNotification } from '../../../src/context/notificationContext';
 import { TransactionHistory } from './components';
 import {
 	accessibilityProps,

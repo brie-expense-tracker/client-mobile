@@ -11,7 +11,6 @@ import { useRouter } from 'expo-router';
 import useAuth from '../../../src/context/AuthContext';
 import { useTheme } from '../../../src/context/ThemeContext';
 import ConnectivityTest from '../../../src/components/ConnectivityTest';
-import ThemeToggle from '../../../src/components/ThemeToggle';
 
 /* --------------------------------- UI --------------------------------- */
 
@@ -94,6 +93,14 @@ export default function SettingsScreen() {
 		},
 	];
 
+	const notificationItems: Item[] = [
+		{
+			label: 'Notification Settings',
+			icon: 'notifications-outline',
+			onPress: () => router.push('/(stack)/settings/notification'),
+		},
+	];
+
 	const supportItems: Item[] = [
 		{
 			label: 'About',
@@ -135,38 +142,11 @@ export default function SettingsScreen() {
 
 			{/* Sections */}
 			<Section title="Account" items={accountItems} colors={colors} />
-
-			{/* App Settings with Theme Toggle */}
-			<View style={[styles.section, { backgroundColor: colors.bg }]}>
-				<Text style={[styles.sectionTitle, { color: colors.text }]}>App</Text>
-				<View
-					style={[
-						styles.card,
-						{ backgroundColor: colors.card, borderColor: colors.line },
-					]}
-				>
-					<ThemeToggle />
-					<View style={[styles.row, styles.rowLast]}>
-						<Ionicons
-							name="notifications-outline"
-							size={24}
-							color={colors.tint}
-						/>
-						<Text style={[styles.rowText, { color: colors.text }]}>
-							Notifications
-						</Text>
-						<TouchableOpacity
-							onPress={() => router.push('/(stack)/settings/notification')}
-						>
-							<Ionicons
-								name="chevron-forward"
-								size={20}
-								color={colors.subtle}
-							/>
-						</TouchableOpacity>
-					</View>
-				</View>
-			</View>
+			<Section
+				title="Notifications"
+				items={notificationItems}
+				colors={colors}
+			/>
 
 			<Section title="Support" items={supportItems} colors={colors} />
 			<Section title="Legal" items={legalItems} colors={colors} />

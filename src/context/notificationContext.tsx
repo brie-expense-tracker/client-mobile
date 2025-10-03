@@ -13,6 +13,7 @@ import {
 	NotificationData,
 	NotificationConsent,
 } from '../services';
+import useAuth from './AuthContext';
 
 interface NotificationFilter {
 	type?: NotificationData['type'];
@@ -74,6 +75,11 @@ interface NotificationProviderProps {
 export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 	children,
 }) => {
+	// Safety check for children prop - don't inspect it, just render it
+	if (!children) {
+		console.error('NotificationProvider: children prop is undefined');
+		return null;
+	}
 	const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
 	const [notification, setNotification] =
 		useState<Notifications.Notification | null>(null);
@@ -141,7 +147,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 			setError(null);
 			const token = await notificationService.initialize();
 			setExpoPushToken(token);
-			// Set up notification listeners
+
+			// Set up notification service listeners (includes navigation logic)
+			notificationService.setupNotificationListeners();
+
+			// Set up notification listeners for context state management
 			notificationListener.current =
 				Notifications.addNotificationReceivedListener((notification) => {
 					setNotification(notification);
@@ -149,7 +159,13 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 				});
 			responseListener.current =
 				Notifications.addNotificationResponseReceivedListener((response) => {
-					// Handle the notification response here
+					console.log('📱 Notification response received:', response);
+					// The notification service will handle the navigation logic
+					// We just need to ensure the notification is marked as read if needed
+					if (response.notification.request.content.data?.id) {
+						// Mark as read if the notification has an ID
+						markAsRead(response.notification.request.content.data.id);
+					}
 				});
 
 			// Start periodic refresh
@@ -165,18 +181,31 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 
 	const getNotifications = useCallback(
 		async (page: number = 1, limit: number = 20) => {
+			// Prevent multiple simultaneous requests
+			if (loading) {
+				console.log('🔄 [Notifications] Request already in progress, skipping');
+				return;
+			}
+
 			try {
 				setLoading(true);
+				setError(null);
 				const response = await notificationService.getNotifications(
 					page,
 					limit
 				);
 				if (response) {
-					setNotifications(response.notifications);
+					// Use safe array length to prevent crashes
+					const notificationCount = response.notifications?.length || 0;
+					setNotifications(response.notifications || []);
 					setCurrentPage(page);
-					setHasMore(response.notifications.length === limit);
+					setHasMore(notificationCount === limit);
+					console.log(
+						`✅ [Notifications] Loaded ${notificationCount} notifications for page ${page}`
+					);
 				}
 			} catch (err) {
+				console.error('❌ [Notifications] Error getting notifications:', err);
 				setError(
 					err instanceof Error ? err : new Error('Failed to get notifications')
 				);
@@ -184,22 +213,43 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 				setLoading(false);
 			}
 		},
-		[]
+		[loading]
 	);
 
 	const loadMoreNotifications = useCallback(async () => {
-		if (!hasMore || loading) return;
+		if (!hasMore || loading) {
+			console.log(
+				'🔄 [Notifications] Load more blocked - hasMore:',
+				hasMore,
+				'loading:',
+				loading
+			);
+			return;
+		}
 
 		try {
 			setLoading(true);
+			setError(null);
 			const nextPage = currentPage + 1;
+			console.log(`📄 [Notifications] Loading page ${nextPage}`);
 			const response = await notificationService.getNotifications(nextPage, 20);
 			if (response) {
-				setNotifications((prev) => [...prev, ...response.notifications]);
+				// Use safe array operations to prevent crashes
+				const newNotifications = response.notifications || [];
+				const newNotificationCount = newNotifications.length;
+
+				setNotifications((prev) => [...prev, ...newNotifications]);
 				setCurrentPage(nextPage);
-				setHasMore(response.notifications.length === 20);
+				setHasMore(newNotificationCount === 20);
+				console.log(
+					`✅ [Notifications] Loaded ${newNotificationCount} more notifications`
+				);
 			}
 		} catch (err) {
+			console.error(
+				'❌ [Notifications] Error loading more notifications:',
+				err
+			);
 			setError(
 				err instanceof Error
 					? err
@@ -211,10 +261,17 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 	}, [hasMore, loading, currentPage]);
 
 	const refreshNotifications = useCallback(async () => {
+		// Prevent refresh if already loading
+		if (loading) {
+			console.log('🔄 [Notifications] Refresh blocked - already loading');
+			return;
+		}
+
+		console.log('🔄 [Notifications] Refreshing notifications');
 		setCurrentPage(1);
 		setHasMore(true);
 		await getNotifications(1, 20);
-	}, [getNotifications]);
+	}, [getNotifications, loading]);
 
 	const setFilterCallback = useCallback(
 		(newFilter: Partial<NotificationFilter>) => {
@@ -347,8 +404,18 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 		[]
 	);
 
+	// Defer notification initialization until user is authenticated
+	const { user, isAuthenticated } = useAuth();
+
 	useEffect(() => {
-		initialize();
+		// Only initialize notifications when user is authenticated
+		if (isAuthenticated && user) {
+			console.log(
+				'🔔 [Notifications] User authenticated, initializing notifications'
+			);
+			initialize();
+		}
+
 		return () => {
 			if (notificationListener.current) {
 				notificationListener.current.remove();
@@ -359,7 +426,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 			// Clean up periodic refresh
 			stopPeriodicRefresh();
 		};
-	}, [initialize, stopPeriodicRefresh]);
+	}, [initialize, stopPeriodicRefresh, isAuthenticated, user]);
 
 	useEffect(() => {
 		if (expoPushToken) {

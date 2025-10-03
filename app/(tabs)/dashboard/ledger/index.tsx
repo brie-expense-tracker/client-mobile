@@ -5,17 +5,13 @@ import {
 	Text,
 	StyleSheet,
 	TouchableOpacity,
-	Modal,
-	TouchableWithoutFeedback,
 	Alert,
 	TextInput,
 	SectionList,
-	Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import {
 	BorderlessButton,
 	GestureHandlerRootView,
@@ -25,6 +21,8 @@ import { FilterContext } from '../../../../src/context/filterContext';
 import { useBudget } from '../../../../src/context/budgetContext';
 import { useGoal } from '../../../../src/context/goalContext';
 import { TransactionRow } from './components/transactionRow';
+import CalendarSheet from './components/CalendarSheet';
+import CalendarTrigger from './components/CalendarTrigger';
 
 // Transaction interface defined inline since we removed the mock data file
 interface Transaction {
@@ -128,8 +126,8 @@ export default function TransactionScreen() {
 	const [selectedDate, setSelectedDate] = useState<string>(() => {
 		return getLocalIsoDate();
 	});
-	const [modalVisible, setModalVisible] = useState(false);
 	const [searchQuery, setSearchQuery] = useState('');
+	const [calendarOpen, setCalendarOpen] = useState(false);
 
 	const { transactions, isLoading, refetch, deleteTransaction } =
 		useContext(TransactionContext);
@@ -139,6 +137,7 @@ export default function TransactionScreen() {
 		dateFilterMode,
 		selectedPatternId,
 		setSelectedPatternId,
+		transactionTypes,
 	} = useContext(FilterContext);
 	const { goals } = useGoal();
 	const { budgets } = useBudget();
@@ -188,10 +187,23 @@ export default function TransactionScreen() {
 			selectedDate,
 			searchQuery,
 			selectedPatternId,
+			transactionTypes,
 		});
 
 		return transactions
 			.filter((tx) => {
+				// transaction type match
+				const typeMatch = transactionTypes[tx.type];
+				if (!typeMatch) {
+					console.log(
+						'[Ledger] Transaction filtered out by type filter:',
+						tx.description,
+						'type:',
+						tx.type
+					);
+					return false;
+				}
+
 				// pattern match
 				const patternMatch = (() => {
 					if (!selectedPatternId) {
@@ -362,6 +374,7 @@ export default function TransactionScreen() {
 		dateFilterMode,
 		selectedDate,
 		searchQuery,
+		transactionTypes,
 	]);
 
 	// Group into sections
@@ -405,19 +418,6 @@ export default function TransactionScreen() {
 		]);
 	};
 
-	const handlePickerPress = (picker: 'calendar' | 'dateMode') => {
-		if (picker === 'calendar') {
-			setModalVisible(true);
-		}
-	};
-
-	const handleDateChange = (event: any, selectedDate?: Date) => {
-		if (selectedDate) {
-			setSelectedDate(selectedDate.toISOString().split('T')[0]);
-			setModalVisible(false);
-		}
-	};
-
 	// Edit modal handlers
 	const showEditModal = (transaction: Transaction) => {
 		router.push({
@@ -451,23 +451,31 @@ export default function TransactionScreen() {
 							>
 								<Ionicons name="add" size={24} color="#212121" />
 							</TouchableOpacity>
-							<TouchableOpacity
-								style={[
-									styles.filterButton,
-									dateFilterMode === 'month' && styles.filterButtonDisabled,
-								]}
-								onPress={() => {
-									if (dateFilterMode !== 'month') {
-										handlePickerPress('calendar');
-									}
-								}}
-							>
-								<Ionicons
-									name="calendar"
-									size={24}
-									color={dateFilterMode === 'month' ? '#616161' : '#212121'}
-								/>
-							</TouchableOpacity>
+							{dateFilterMode === 'day' ? (
+								<View style={{ flex: 1, marginRight: 8 }}>
+									<CalendarTrigger
+										dateISO={selectedDate}
+										onPress={() => setCalendarOpen(true)}
+									/>
+								</View>
+							) : (
+								<TouchableOpacity
+									style={[
+										styles.filterButton,
+										dateFilterMode === 'month' && styles.filterButtonDisabled,
+									]}
+									onPress={() => {
+										// This could trigger a mode change to day mode
+										// For now, we'll keep it as a placeholder
+									}}
+								>
+									<Ionicons
+										name="calendar"
+										size={24}
+										color={dateFilterMode === 'month' ? '#616161' : '#212121'}
+									/>
+								</TouchableOpacity>
+							)}
 							<TouchableOpacity
 								style={styles.filterButton}
 								onPress={handleFilterPress}
@@ -565,46 +573,17 @@ export default function TransactionScreen() {
 			</View>
 
 			{/* Calendar Modal */}
-			<Modal
-				visible={modalVisible}
-				transparent
-				animationType="none"
-				onRequestClose={() => setModalVisible(false)}
-				statusBarTranslucent
-			>
-				<TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
-					<View style={styles.modalOverlay}>
-						<TouchableWithoutFeedback>
-							<View style={styles.modalContent}>
-								<View style={styles.modalHeader}>
-									<Text style={styles.modalTitle}>Select Date</Text>
-									<TouchableOpacity
-										onPress={() => setModalVisible(false)}
-										style={styles.closeButton}
-									>
-										<Ionicons name="close" size={24} color="#9ca3af" />
-									</TouchableOpacity>
-								</View>
-								{Platform.OS === 'ios' ? (
-									<DateTimePicker
-										value={new Date(selectedDate)}
-										onChange={handleDateChange}
-										mode="date"
-										display="inline"
-									/>
-								) : (
-									<DateTimePicker
-										value={new Date(selectedDate)}
-										onChange={handleDateChange}
-										mode="date"
-										display="default"
-									/>
-								)}
-							</View>
-						</TouchableWithoutFeedback>
-					</View>
-				</TouchableWithoutFeedback>
-			</Modal>
+			<CalendarSheet
+				visible={calendarOpen}
+				value={selectedDate}
+				onClose={() => setCalendarOpen(false)}
+				onChange={(iso) => {
+					if (iso) {
+						setSelectedDate(iso);
+					}
+					setCalendarOpen(false);
+				}}
+			/>
 		</GestureHandlerRootView>
 	);
 }
@@ -704,39 +683,6 @@ const styles = StyleSheet.create({
 		backgroundColor: '#f0f0f0',
 		borderRadius: 8,
 		marginRight: 8,
-	},
-	modalOverlay: {
-		flex: 1,
-		backgroundColor: 'rgba(0, 0, 0, 0.5)',
-		justifyContent: 'center',
-		alignItems: 'center',
-		position: 'absolute',
-		top: 0,
-		left: 0,
-		right: 0,
-		bottom: 0,
-		zIndex: 2000,
-	},
-	modalContent: {
-		backgroundColor: 'white',
-		borderRadius: 24,
-		padding: 16,
-	},
-	modalHeader: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		padding: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: '#e5e7eb',
-	},
-	modalTitle: {
-		fontSize: 18,
-		fontWeight: '600',
-		color: '#212121',
-	},
-	closeButton: {
-		padding: 4,
 	},
 	pickerContent: {
 		width: '100%',

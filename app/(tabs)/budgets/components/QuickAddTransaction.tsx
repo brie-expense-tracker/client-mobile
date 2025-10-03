@@ -13,8 +13,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { BorderlessButton, RectButton } from 'react-native-gesture-handler';
 import RNModal from 'react-native-modal';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { TransactionContext } from '../../../../src/context/transactionContext';
+import { DateField } from '../../../../src/components/DateField';
 // Transaction interface defined inline since we removed the mock data file
 interface Transaction {
 	id: string;
@@ -56,7 +56,6 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 		date: new Date().toISOString().split('T')[0],
 	});
 	const [isLoading, setIsLoading] = useState(false);
-	const [showDatePicker, setShowDatePicker] = useState(false);
 	const amountInputRef = useRef<TextInput>(null);
 	// Reset form when modal opens
 	useEffect(() => {
@@ -178,14 +177,11 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 		}
 	};
 
-	const handleDateChange = (event: any, selectedDate?: Date) => {
-		setShowDatePicker(false);
-		if (selectedDate) {
-			setTransaction((prev) => ({
-				...prev,
-				date: selectedDate.toISOString().split('T')[0],
-			}));
-		}
+	const handleDateChange = (isoDate: string) => {
+		setTransaction((prev) => ({
+			...prev,
+			date: isoDate,
+		}));
 	};
 
 	const formatDate = (dateString: string) => {
@@ -328,17 +324,13 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 
 						{/* Date Input */}
 						<View style={styles.formGroup}>
-							<Text style={styles.label}>Date</Text>
-							<RectButton
-								style={styles.dateButton}
-								onPress={() => setShowDatePicker(true)}
-							>
-								<Ionicons name="calendar-outline" size={20} color="#757575" />
-								<Text style={styles.dateButtonText}>
-									{formatDate(transaction.date)}
-								</Text>
-								<Ionicons name="chevron-down" size={16} color="#757575" />
-							</RectButton>
+							<DateField
+								value={transaction.date}
+								onChange={handleDateChange}
+								title="Date"
+								placeholder="Select date"
+								maxDate={new Date().toISOString().split('T')[0]} // Today or earlier
+							/>
 						</View>
 
 						{/* Description Input */}
@@ -377,18 +369,6 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 					</ScrollView>
 				</View>
 			</KeyboardAvoidingView>
-
-			{/* Date Picker Modal */}
-			{showDatePicker && (
-				<DateTimePicker
-					value={new Date(transaction.date)}
-					mode="date"
-					display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-					onChange={handleDateChange}
-					maximumDate={new Date()}
-					accessibilityLabel="Select transaction date"
-				/>
-			)}
 		</RNModal>
 	);
 };
@@ -495,20 +475,6 @@ const styles = StyleSheet.create({
 		color: '#FFFFFF',
 		fontSize: 16,
 		fontWeight: '600',
-	},
-	dateButton: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#F5F5F5',
-		borderRadius: 12,
-		paddingHorizontal: 16,
-		paddingVertical: 16,
-		gap: 12,
-	},
-	dateButtonText: {
-		flex: 1,
-		fontSize: 16,
-		color: '#212121',
 	},
 
 	helpTextContainer: {

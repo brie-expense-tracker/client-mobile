@@ -16,7 +16,6 @@ import {
 	KeyboardAvoidingView,
 	Platform,
 	ActivityIndicator,
-	Modal,
 	TouchableOpacity,
 } from 'react-native';
 import { RectButton } from 'react-native-gesture-handler';
@@ -28,6 +27,7 @@ import { TransactionContext } from '../../../src/context/transactionContext';
 import { useGoal, Goal } from '../../../src/context/goalContext';
 import { useBudget, Budget } from '../../../src/context/budgetContext';
 import { navigateToGoalsWithModal } from '../../../src/utils/navigationUtils';
+import { DateField } from '../../../src/components/DateField';
 
 /**
  * TransactionScreen (Pro)
@@ -91,7 +91,6 @@ const TransactionScreen = () => {
 	const [selectedGoals, setSelectedGoals] = useState<Goal[]>([]);
 	const [selectedBudgets, setSelectedBudgets] = useState<Budget[]>([]);
 	const [isSubmitting, setIsSubmitting] = useState(false);
-	const [showDatePicker, setShowDatePicker] = useState(false);
 
 	const { addTransaction } = useContext(TransactionContext);
 	const { goals, isLoading: goalsLoading } = useGoal();
@@ -341,69 +340,6 @@ const TransactionScreen = () => {
 		);
 	};
 
-	const DatePickerModal = () => (
-		<Modal
-			visible={showDatePicker}
-			transparent
-			animationType="slide"
-			onRequestClose={() => setShowDatePicker(false)}
-		>
-			<View style={styles.datePickerOverlay}>
-				<View style={styles.datePickerContainer}>
-					<View style={styles.datePickerHeader}>
-						<Text style={styles.datePickerTitle}>Select Date</Text>
-						<TouchableOpacity
-							onPress={() => setShowDatePicker(false)}
-							style={styles.datePickerCloseButton}
-						>
-							<Ionicons name="close" size={24} color="#666" />
-						</TouchableOpacity>
-					</View>
-					<ScrollView style={styles.datePickerContent}>
-						{Array.from({ length: 37 }, (_, i) => {
-							const d = new Date();
-							d.setDate(d.getDate() - 30 + i);
-							const iso = d.toISOString().split('T')[0];
-							const isToday = i === 30;
-							const isSelected = selectedDate === iso;
-							return (
-								<TouchableOpacity
-									key={iso}
-									style={[
-										styles.dateOption,
-										isSelected && styles.dateOptionSelected,
-										isToday && styles.dateOptionToday,
-									]}
-									onPress={() => {
-										setValue('date', iso);
-										setShowDatePicker(false);
-									}}
-									hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-								>
-									<Text
-										style={[
-											styles.dateOptionText,
-											isSelected && styles.dateOptionTextSelected,
-											isToday && styles.dateOptionTextToday,
-										]}
-									>
-										{d.toLocaleDateString('en-US', {
-											weekday: 'short',
-											year: 'numeric',
-											month: 'short',
-											day: 'numeric',
-										})}
-										{isToday ? ' (Today)' : ''}
-									</Text>
-								</TouchableOpacity>
-							);
-						})}
-					</ScrollView>
-				</View>
-			</View>
-		</Modal>
-	);
-
 	return (
 		<SafeAreaView style={styles.container} edges={['top', 'bottom']}>
 			<View
@@ -518,22 +454,13 @@ const TransactionScreen = () => {
 					)}
 
 					{/* Date */}
-					<View style={styles.section}>
-						<Text style={styles.sectionTitle}>Date</Text>
-						<TouchableOpacity
-							style={styles.dateSelector}
-							onPress={() => setShowDatePicker(true)}
-							accessibilityLabel="Select date"
-							accessibilityHint="Opens date picker"
-							testID="select-date"
-						>
-							<Ionicons name="calendar-outline" size={18} color="#007AFF" />
-							<Text style={styles.dateText}>
-								{new Date(selectedDate).toLocaleDateString()}
-							</Text>
-							<Ionicons name="chevron-down" size={16} color="#666" />
-						</TouchableOpacity>
-					</View>
+					<DateField
+						value={selectedDate}
+						onChange={(iso) => setValue('date', iso, { shouldValidate: true })}
+						title="Date"
+						testID="date-inline"
+						containerStyle={{ marginTop: 18 }}
+					/>
 
 					{/* Goals (Income) / Budgets (Expense) */}
 					{mode === 'income' ? (
@@ -733,7 +660,6 @@ const TransactionScreen = () => {
 					</Text>
 				</View>
 			)}
-			<DatePickerModal />
 		</SafeAreaView>
 	);
 };
@@ -920,42 +846,6 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 12,
 	},
 	secondaryBtnText: { color: '#6b7280', fontWeight: '600' },
-
-	// Date picker styles
-	datePickerOverlay: {
-		flex: 1,
-		backgroundColor: 'rgba(0, 0, 0, 0.5)',
-		justifyContent: 'flex-end',
-	},
-	datePickerContainer: {
-		backgroundColor: '#fff',
-		borderTopLeftRadius: 20,
-		borderTopRightRadius: 20,
-		maxHeight: '70%',
-	},
-	datePickerHeader: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		paddingHorizontal: 20,
-		paddingVertical: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: '#e0e0e0',
-	},
-	datePickerTitle: { fontSize: 18, fontWeight: '700', color: '#111' },
-	datePickerCloseButton: { padding: 4 },
-	datePickerContent: { maxHeight: 400 },
-	dateOption: {
-		paddingVertical: 16,
-		paddingHorizontal: 20,
-		borderBottomWidth: 1,
-		borderBottomColor: '#f0f0f0',
-	},
-	dateOptionSelected: { backgroundColor: '#f0f8ff' },
-	dateOptionToday: { backgroundColor: '#fff3cd' },
-	dateOptionText: { fontSize: 16, color: '#111' },
-	dateOptionTextSelected: { color: '#00a2ff', fontWeight: '700' },
-	dateOptionTextToday: { color: '#856404', fontWeight: '700' },
 
 	loadingOverlay: {
 		...StyleSheet.absoluteFillObject,

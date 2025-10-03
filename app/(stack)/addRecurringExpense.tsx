@@ -12,8 +12,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { RecurringExpenseService } from '../../src/services';
+import { DateField } from '../../src/components/DateField';
 
 const AddRecurringExpenseScreen: React.FC = () => {
 	const [vendor, setVendor] = useState('');
@@ -21,8 +21,9 @@ const AddRecurringExpenseScreen: React.FC = () => {
 	const [frequency, setFrequency] = useState<
 		'weekly' | 'monthly' | 'quarterly' | 'yearly'
 	>('monthly');
-	const [nextDueDate, setNextDueDate] = useState(new Date());
-	const [showDatePicker, setShowDatePicker] = useState(false);
+	const [nextDueDate, setNextDueDate] = useState(
+		new Date().toISOString().split('T')[0]
+	);
 	const [loading, setLoading] = useState(false);
 
 	const frequencies = [
@@ -48,7 +49,7 @@ const AddRecurringExpenseScreen: React.FC = () => {
 				vendor: vendor.trim(),
 				amount: parseFloat(amount),
 				frequency,
-				nextExpectedDate: nextDueDate.toISOString(),
+				nextExpectedDate: new Date(nextDueDate).toISOString(),
 			});
 
 			Alert.alert('Success', 'Recurring expense added successfully!', [
@@ -68,11 +69,8 @@ const AddRecurringExpenseScreen: React.FC = () => {
 		}
 	};
 
-	const handleDateChange = (event: any, selectedDate?: Date) => {
-		setShowDatePicker(false);
-		if (selectedDate) {
-			setNextDueDate(selectedDate);
-		}
+	const handleDateChange = (isoDate: string) => {
+		setNextDueDate(isoDate);
 	};
 
 	return (
@@ -158,37 +156,13 @@ const AddRecurringExpenseScreen: React.FC = () => {
 
 					{/* Next Due Date */}
 					<View style={styles.inputGroup}>
-						<Text style={styles.label}>Next Due Date</Text>
-						<TouchableOpacity
-							style={styles.dateButton}
-							onPress={() => setShowDatePicker(!showDatePicker)}
-						>
-							<View style={styles.dateButtonContent}>
-								<View style={styles.dateIcon}>
-									<Ionicons name="calendar-outline" size={16} color="#007ACC" />
-								</View>
-								<Text style={styles.dateButtonText}>
-									{nextDueDate.toLocaleDateString()}
-								</Text>
-								<Ionicons
-									name={showDatePicker ? 'chevron-up' : 'chevron-down'}
-									size={20}
-									color="#757575"
-								/>
-							</View>
-						</TouchableOpacity>
-
-						{showDatePicker && (
-							<View style={styles.datePickerWrapper}>
-								<DateTimePicker
-									value={nextDueDate}
-									mode="date"
-									display="inline"
-									onChange={handleDateChange}
-									minimumDate={new Date()}
-								/>
-							</View>
-						)}
+						<DateField
+							value={nextDueDate}
+							onChange={handleDateChange}
+							title="Next Due Date"
+							placeholder="Select date"
+							minDate={new Date().toISOString().split('T')[0]} // Today or later
+						/>
 					</View>
 
 					{/* Info Card */}
@@ -326,40 +300,6 @@ const styles = StyleSheet.create({
 	frequencyButtonTextActive: {
 		color: '#ffffff',
 		fontWeight: '600',
-	},
-	dateButton: {
-		backgroundColor: '#ffffff',
-		borderRadius: 8,
-		padding: 16,
-		borderWidth: 1,
-		borderColor: '#e5e7eb',
-	},
-	dateButtonContent: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-	dateIcon: {
-		width: 24,
-		height: 24,
-		borderRadius: 6,
-		backgroundColor: '#1E88E520',
-		justifyContent: 'center',
-		alignItems: 'center',
-	},
-	dateButtonText: {
-		flex: 1,
-		marginLeft: 12,
-		fontSize: 16,
-		color: '#0a0a0a',
-	},
-	datePickerWrapper: {
-		backgroundColor: '#ffffff',
-		borderRadius: 8,
-		padding: 8,
-		marginTop: 8,
-		borderWidth: 1,
-		borderColor: '#e5e7eb',
 	},
 	infoCard: {
 		flexDirection: 'row',

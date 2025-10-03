@@ -1,5 +1,6 @@
 import { API_BASE_URL, API_CONFIG } from '../../config/api';
 import { getHMACService } from '../../utils/hmacSigning';
+import { RequestManager } from './requestManager';
 
 // Demo logging: Keep essential info but reduce noise
 console.log(`🌐 API: ${__DEV__ ? 'DEV' : 'PROD'} | Base: ${API_BASE_URL}`);
@@ -28,8 +29,8 @@ const CACHE_TTL = {
 	default: 10000, // 10 seconds
 };
 
-const THROTTLE_DELAY = __DEV__ ? 100 : 1000; // Much shorter delay in development
-const RATE_LIMIT_BACKOFF_BASE = __DEV__ ? 1000 : 5000; // 1 second in dev, 5 seconds in prod
+const THROTTLE_DELAY = __DEV__ ? 1000 : 1000; // 1 second delay in development to avoid rate limiting
+const RATE_LIMIT_BACKOFF_BASE = __DEV__ ? 2000 : 5000; // 2 seconds in dev, 5 seconds in prod
 
 // Request/Response interceptors
 type RequestInterceptor = (
@@ -94,11 +95,6 @@ function shouldThrottleRequest(endpoint: string): boolean {
 
 // Check if endpoint is in rate limit backoff
 function isRateLimited(endpoint: string): boolean {
-	// Disable rate limiting in development mode
-	if (__DEV__) {
-		return false;
-	}
-
 	const backoffUntil = rateLimitBackoff.get(endpoint);
 	if (backoffUntil && Date.now() < backoffUntil) {
 		console.log(
@@ -116,14 +112,6 @@ function setRateLimitBackoff(
 	endpoint: string,
 	backoffMs: number = RATE_LIMIT_BACKOFF_BASE
 ): void {
-	// Skip rate limiting in development mode
-	if (__DEV__) {
-		console.log(
-			`🚫 [ApiService] Rate limiting disabled in development for: ${endpoint}`
-		);
-		return;
-	}
-
 	const backoffUntil = Date.now() + backoffMs;
 	rateLimitBackoff.set(endpoint, backoffUntil);
 	console.log(
@@ -436,193 +424,64 @@ export class ApiService {
 			}
 		}
 
-		// Check if endpoint is rate limited
-		if (isRateLimited(endpoint)) {
-			throw new ApiError('Rate limited', ApiErrorType.RATE_LIMIT_ERROR, 429);
-		}
+		try {
+			let headers: Record<string, string>;
+			try {
+				headers = await this.getAuthHeaders();
+			} catch (authError: any) {
+				// Handle authentication errors gracefully
+				if (authError.isAuthError) {
+					console.log('🔒 [API] User not authenticated, skipping request');
+					return {
+						success: false,
+						error: 'User not authenticated',
+						data: [] as T, // Return empty array for data fetching hooks
+					};
+				}
+				throw authError;
+			}
 
-		// Check if request should be throttled
-		if (shouldThrottleRequest(endpoint)) {
-			await new Promise((resolve) => setTimeout(resolve, THROTTLE_DELAY));
-		}
+			const url = `${API_BASE_URL}${endpoint}`;
 
-		// Create a unique key for deduplication
-		const requestKey = `GET:${endpoint}`;
+			// Debug logging for URL construction
+			console.log('🔧 [DEBUG] URL Construction:');
+			console.log('🔧 [DEBUG] API_BASE_URL:', API_BASE_URL);
+			console.log('🔧 [DEBUG] endpoint:', endpoint);
+			console.log('🔧 [DEBUG] final URL:', url);
 
-		return singleflight(requestKey, async () => {
-			return retryWithBackoff(
-				async () => {
-					let headers: Record<string, string>;
-					try {
-						headers = await this.getAuthHeaders();
-					} catch (authError: any) {
-						// Handle authentication errors gracefully
-						if (authError.isAuthError) {
-							console.log('🔒 [API] User not authenticated, skipping request');
-							return {
-								success: false,
-								error: 'User not authenticated',
-								data: [] as T, // Return empty array for data fetching hooks
-							};
-						}
-						throw authError;
-					}
+			// Demo logging: Keep essential request info
+			console.log(`📡 GET: ${endpoint}`);
 
-					const url = `${API_BASE_URL}${endpoint}`;
+			// Use RequestManager for intelligent request handling
+			const data = await RequestManager.request<T>('GET', url, {
+				headers,
+			});
 
-					// Debug logging for URL construction
-					console.log('🔧 [DEBUG] URL Construction:');
-					console.log('🔧 [DEBUG] API_BASE_URL:', API_BASE_URL);
-					console.log('🔧 [DEBUG] endpoint:', endpoint);
-					console.log('🔧 [DEBUG] final URL:', url);
+			const result: ApiResponse<T> = {
+				success: true,
+				data,
+			};
 
-					// Demo logging: Keep essential request info
-					console.log(`📡 GET: ${endpoint}`);
+			// Cache successful response
+			if (useCache) {
+				cacheRequest(endpoint, result);
+			}
 
-					// Create abort controller for this request
-					const controller = this.createAbortController(requestKey);
-					const timeoutId = setTimeout(
-						() => controller.abort(),
-						API_CONFIG.timeout
-					);
+			// Demo logging: Keep essential success info
+			console.log(`✅ GET: ${endpoint} (200)`);
 
-					try {
-						// Apply request interceptors
-						const { url: finalUrl, options: finalOptions } =
-							await this.applyRequestInterceptors(url, {
-								method: 'GET',
-								headers,
-								signal: controller.signal,
-							});
+			return result;
+		} catch (error: any) {
+			// Handle errors from RequestManager
+			if (error instanceof ApiError) {
+				throw error;
+			}
 
-						const response = await fetch(finalUrl, finalOptions);
-
-						clearTimeout(timeoutId);
-						this.cleanupAbortController(requestKey);
-
-						// Apply response interceptors
-						const processedResponse = await this.applyResponseInterceptors(
-							response
-						);
-
-						// Check if response is JSON before parsing
-						const contentType = processedResponse.headers.get('content-type');
-						let data: any;
-
-						if (contentType && contentType.includes('application/json')) {
-							try {
-								data = await processedResponse.json();
-							} catch (parseError) {
-								console.error('❌ API: JSON parse error:', parseError);
-								return {
-									success: false,
-									error: 'Invalid JSON response from server',
-								};
-							}
-						} else {
-							// Handle non-JSON responses (like HTML 404 pages)
-							const textResponse = await processedResponse.text();
-							console.log(
-								'⚠️ API: Non-JSON response:',
-								textResponse.substring(0, 100)
-							);
-
-							if (!processedResponse.ok) {
-								return {
-									success: false,
-									error: `HTTP error! status: ${processedResponse.status}`,
-								};
-							}
-
-							return {
-								success: false,
-								error: 'Server returned non-JSON response',
-							};
-						}
-
-						if (!processedResponse.ok) {
-							// Handle 429 rate limiting specifically
-							if (processedResponse.status === 429) {
-								throw new ApiError(
-									'Rate limit exceeded',
-									ApiErrorType.RATE_LIMIT_ERROR,
-									429
-								);
-							}
-
-							// Handle authentication errors
-							if (processedResponse.status === 401) {
-								throw new ApiError(
-									'Authentication failed',
-									ApiErrorType.AUTHENTICATION_ERROR,
-									401
-								);
-							}
-
-							// Handle validation errors
-							if (processedResponse.status === 400) {
-								throw new ApiError(
-									data.error || 'Validation error',
-									ApiErrorType.VALIDATION_ERROR,
-									400
-								);
-							}
-
-							// Handle server errors
-							if (processedResponse.status >= 500) {
-								throw new ApiError(
-									data.error || 'Server error',
-									ApiErrorType.SERVER_ERROR,
-									processedResponse.status
-								);
-							}
-
-							return {
-								success: false,
-								error:
-									data.error ||
-									`HTTP error! status: ${processedResponse.status}`,
-							};
-						}
-
-						// Demo logging: Success response
-						console.log(`✅ GET: ${endpoint} (${processedResponse.status})`);
-						const result = { success: true, data };
-
-						// Cache successful response
-						if (useCache) {
-							cacheRequest(endpoint, result);
-						}
-
-						return result;
-					} catch (error: unknown) {
-						clearTimeout(timeoutId);
-						this.cleanupAbortController(requestKey);
-
-						if (error instanceof ApiError) {
-							throw error;
-						}
-
-						// Handle network errors
-						if (error instanceof TypeError && error.message.includes('fetch')) {
-							throw new ApiError('Network error', ApiErrorType.NETWORK_ERROR);
-						}
-
-						// Handle timeout errors
-						if (error instanceof Error && error.name === 'AbortError') {
-							throw new ApiError('Request timeout', ApiErrorType.TIMEOUT_ERROR);
-						}
-
-						throw new ApiError(
-							error instanceof Error ? error.message : 'Unknown error',
-							ApiErrorType.UNKNOWN_ERROR
-						);
-					}
-				},
-				retries,
-				endpoint
+			throw new ApiError(
+				error.message || 'Network error',
+				ApiErrorType.NETWORK_ERROR
 			);
-		});
+		}
 	}
 
 	static async post<T>(endpoint: string, body: any): Promise<ApiResponse<T>> {

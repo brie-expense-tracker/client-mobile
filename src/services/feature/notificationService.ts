@@ -3,6 +3,10 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import {
+	normalizeNotificationsResponse,
+	normalizeUnreadCountResponse,
+} from '../notifications/normalizer';
 
 export interface NotificationData {
 	id?: string;
@@ -332,41 +336,86 @@ class NotificationService {
 		return this.expoPushToken;
 	}
 
-	// Update push token on backend
+	// Update push token on backend with retry logic for rate limiting
 	async updatePushToken(token: string): Promise<boolean> {
-		try {
-			const response = await ApiService.put('/api/notifications/push-token', {
-				expoPushToken: token,
-			});
+		const maxRetries = 3;
+		const baseDelay = 2000; // 2 seconds
 
-			if (response.success) {
-				console.log('✅ Push token updated on backend');
-				return true;
-			} else {
+		for (let attempt = 1; attempt <= maxRetries; attempt++) {
+			try {
+				// Add delay for first attempt to avoid immediate rate limiting
+				if (attempt === 1) {
+					await new Promise((resolve) => setTimeout(resolve, 1000));
+				}
+
+				const response = await ApiService.put('/api/notifications/push-token', {
+					expoPushToken: token,
+				});
+
+				if (response.success) {
+					console.log('✅ Push token updated on backend');
+					return true;
+				} else {
+					// Handle authentication errors gracefully
+					if (response.error?.includes('User not authenticated')) {
+						console.log(
+							'🔒 [Notifications] User not authenticated, skipping push token update'
+						);
+						return false;
+					}
+
+					// Check for rate limiting
+					if (response.error?.includes('Rate limit') && attempt < maxRetries) {
+						const delay = baseDelay * Math.pow(2, attempt - 1);
+						console.log(
+							`⏳ [Notifications] Rate limited, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`
+						);
+						await new Promise((resolve) => setTimeout(resolve, delay));
+						continue;
+					}
+
+					console.error('❌ Failed to update push token:', response.error);
+					return false;
+				}
+			} catch (error) {
 				// Handle authentication errors gracefully
-				if (response.error?.includes('User not authenticated')) {
+				if (
+					error instanceof Error &&
+					error.message.includes('User not authenticated')
+				) {
 					console.log(
 						'🔒 [Notifications] User not authenticated, skipping push token update'
 					);
 					return false;
 				}
-				console.error('❌ Failed to update push token:', response.error);
-				return false;
-			}
-		} catch (error) {
-			// Handle authentication errors gracefully
-			if (
-				error instanceof Error &&
-				error.message.includes('User not authenticated')
-			) {
-				console.log(
-					'🔒 [Notifications] User not authenticated, skipping push token update'
+
+				// Handle rate limiting errors
+				if (
+					error instanceof Error &&
+					error.message.includes('Rate limit') &&
+					attempt < maxRetries
+				) {
+					const delay = baseDelay * Math.pow(2, attempt - 1);
+					console.log(
+						`⏳ [Notifications] Rate limited, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`
+					);
+					await new Promise((resolve) => setTimeout(resolve, delay));
+					continue;
+				}
+
+				console.error(
+					`❌ Error updating push token (attempt ${attempt}/${maxRetries}):`,
+					error
 				);
-				return false;
+
+				// If this is the last attempt, return false
+				if (attempt === maxRetries) {
+					return false;
+				}
 			}
-			console.error('❌ Error updating push token:', error);
-			return false;
 		}
+
+		return false;
 	}
 
 	// Get notifications from backend
@@ -382,12 +431,24 @@ class NotificationService {
 				unreadOnly: unreadOnly.toString(),
 			});
 
-			const response = await ApiService.get<NotificationResponse>(
+			const response = await ApiService.get<any>(
 				`/api/notifications?${params}`
 			);
 
 			if (response.success && response.data) {
-				return response.data;
+				// Normalize the response to handle various API shapes
+				const normalized = normalizeNotificationsResponse(response.data, page);
+
+				// Convert back to expected NotificationResponse format
+				return {
+					notifications: normalized.items,
+					pagination: {
+						page: page,
+						limit: limit,
+						total: normalized.total || normalized.items.length,
+						pages: normalized.total ? Math.ceil(normalized.total / limit) : 1,
+					},
+				};
 			} else {
 				// Handle authentication errors gracefully
 				if (response.error?.includes('User not authenticated')) {
@@ -418,12 +479,12 @@ class NotificationService {
 	// Get unread count
 	async getUnreadCount(): Promise<number> {
 		try {
-			const response = await ApiService.get<UnreadCountResponse>(
+			const response = await ApiService.get<any>(
 				'/api/notifications/unread-count'
 			);
 
 			if (response.success && response.data) {
-				return response.data.count;
+				return normalizeUnreadCountResponse(response.data);
 			} else {
 				// Handle authentication errors gracefully
 				if (response.error?.includes('User not authenticated')) {
@@ -950,29 +1011,62 @@ class NotificationService {
 		try {
 			const { data } = notification.request.content;
 			const type = data?.type;
+			const entityId = data?.entityId;
+			const route = data?.route;
 
-			// You can implement navigation logic here based on notification type and data
-			// This would typically involve navigation to specific screens
 			console.log('🧭 Navigating based on notification:', { type, data });
 
-			// Example navigation logic (you'll need to implement actual navigation)
-			switch (type) {
-				case 'budget':
-					// Navigate to budget screen
-					break;
-				case 'goal':
-					// Navigate to goals screen
-					break;
-				case 'transaction':
-					// Navigate to transactions screen
-					break;
-				case 'ai_insight':
-					// Navigate to insights screen
-					break;
-				default:
-					// Navigate to notifications screen
-					break;
-			}
+			// Import router dynamically to avoid circular dependencies
+			import('expo-router').then(({ router }) => {
+				// If a specific route is provided, use it
+				if (route) {
+					router.push(route);
+					return;
+				}
+
+				// Otherwise, navigate based on notification type
+				switch (type) {
+					case 'budget':
+						if (entityId) {
+							router.push(`/(tabs)/budgets?budgetId=${entityId}`);
+						} else {
+							router.push('/(tabs)/budgets');
+						}
+						break;
+					case 'goal':
+						if (entityId) {
+							router.push(`/(tabs)/budgets?goalId=${entityId}`);
+						} else {
+							router.push('/(tabs)/budgets');
+						}
+						break;
+					case 'transaction':
+						if (entityId) {
+							router.push(`/(stack)/transactionDetails?id=${entityId}`);
+						} else {
+							router.push('/(tabs)/transaction');
+						}
+						break;
+					case 'ai_insight':
+						router.push('/(tabs)/assistant');
+						break;
+					case 'system':
+						router.push('/(stack)/settings');
+						break;
+					case 'reminder':
+						router.push('/(tabs)/dashboard');
+						break;
+					case 'marketing':
+					case 'promotional':
+						// For marketing/promotional notifications, just show the notifications screen
+						router.push('/(tabs)/dashboard/notifications');
+						break;
+					default:
+						// Navigate to notifications screen
+						router.push('/(tabs)/dashboard/notifications');
+						break;
+				}
+			});
 		} catch (error) {
 			console.error('❌ Error handling notification navigation:', error);
 		}

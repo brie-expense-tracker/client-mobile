@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
 	View,
 	Text,
@@ -31,6 +31,8 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 import { useNotification } from '@/src/context/notificationContext';
 import { NotificationData } from '@/src/services';
+import { router } from 'expo-router';
+import { debounce } from '@/src/utils/debounce';
 
 // Helper function to get notification type icon and color
 const getNotificationTypeInfo = (type?: string) => {
@@ -145,8 +147,75 @@ const NotificationItem = ({
 	}));
 
 	const handlePress = () => {
+		// Mark as read if unread
 		if (!item.read && item.id) {
 			onMarkAsRead(item.id);
+		}
+
+		// Navigate based on notification type and data
+		handleNotificationNavigation(item);
+	};
+
+	const handleNotificationNavigation = (notification: NotificationData) => {
+		try {
+			const { type, data } = notification;
+			const entityId = data?.entityId;
+			const route = data?.route;
+
+			console.log('🧭 Navigating based on notification tap:', {
+				type,
+				entityId,
+				route,
+			});
+
+			// If a specific route is provided, use it
+			if (route) {
+				router.push(route as any);
+				return;
+			}
+
+			// Otherwise, navigate based on notification type
+			switch (type) {
+				case 'budget':
+					if (entityId) {
+						router.push(`/(tabs)/budgets?budgetId=${entityId}` as any);
+					} else {
+						router.push('/(tabs)/budgets');
+					}
+					break;
+				case 'goal':
+					if (entityId) {
+						router.push(`/(tabs)/budgets?goalId=${entityId}` as any);
+					} else {
+						router.push('/(tabs)/budgets');
+					}
+					break;
+				case 'transaction':
+					if (entityId) {
+						router.push(`/(stack)/transactionDetails?id=${entityId}` as any);
+					} else {
+						router.push('/(tabs)/transaction');
+					}
+					break;
+				case 'ai_insight':
+					router.push('/(tabs)/assistant');
+					break;
+				case 'system':
+					router.push('/(stack)/settings');
+					break;
+				case 'reminder':
+					router.push('/(tabs)/dashboard');
+					break;
+				case 'marketing':
+				case 'promotional':
+					// For marketing/promotional notifications, stay on notifications screen
+					break;
+				default:
+					// Stay on notifications screen for unknown types
+					break;
+			}
+		} catch (error) {
+			console.error('❌ Error handling notification navigation:', error);
 		}
 	};
 
@@ -216,12 +285,30 @@ export default function NotificationsScreen() {
 	const { colors } = useTheme();
 	const [refreshing, setRefreshing] = useState(false);
 	const [searchQuery, setSearchQuery] = useState('');
+	const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
 	const [showFilterModal, setShowFilterModal] = useState(false);
 	const [showSettingsModal, setShowSettingsModal] = useState(false);
 	const [selectedType, setSelectedType] = useState<
 		NotificationData['type'] | undefined
 	>();
 	const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+
+	// Debounced search to prevent excessive filtering
+	const debouncedSetSearch = useMemo(
+		() =>
+			debounce((query: string) => {
+				setDebouncedSearchQuery(query);
+			}, 300),
+		[]
+	);
+
+	// Update debounced search when searchQuery changes
+	useEffect(() => {
+		debouncedSetSearch(searchQuery);
+		return () => {
+			debouncedSetSearch.cancel();
+		};
+	}, [searchQuery, debouncedSetSearch]);
 
 	// Get notification context - will throw if not within provider
 	const notificationContext = useNotification();
@@ -245,32 +332,33 @@ export default function NotificationsScreen() {
 
 	// Filter and search notifications
 	const filteredNotifications = useMemo(() => {
-		let filtered = notifications || [];
+		// Use safe array operations to prevent crashes
+		let filtered = Array.isArray(notifications) ? notifications : [];
 
-		// Apply search filter
-		if (searchQuery.trim()) {
-			const query = searchQuery.toLowerCase();
+		// Apply search filter using debounced query
+		if (debouncedSearchQuery.trim()) {
+			const query = debouncedSearchQuery.toLowerCase();
 			filtered = filtered.filter(
 				(notification) =>
-					notification.title.toLowerCase().includes(query) ||
-					notification.message.toLowerCase().includes(query)
+					notification?.title?.toLowerCase()?.includes(query) ||
+					notification?.message?.toLowerCase()?.includes(query)
 			);
 		}
 
 		// Apply type filter
 		if (selectedType) {
 			filtered = filtered.filter(
-				(notification) => notification.type === selectedType
+				(notification) => notification?.type === selectedType
 			);
 		}
 
 		// Apply unread filter
 		if (showUnreadOnly) {
-			filtered = filtered.filter((notification) => !notification.read);
+			filtered = filtered.filter((notification) => !notification?.read);
 		}
 
 		return filtered;
-	}, [notifications, searchQuery, selectedType, showUnreadOnly]);
+	}, [notifications, debouncedSearchQuery, selectedType, showUnreadOnly]);
 
 	// Apply filters to context
 	React.useEffect(() => {

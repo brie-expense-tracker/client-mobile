@@ -22,7 +22,6 @@ import {
 	TextInputSelectionChangeEventData,
 	AccessibilityInfo,
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,6 +33,7 @@ import { useBudget } from '../../../../src/context/budgetContext';
 import { useGoal } from '../../../../src/context/goalContext';
 import { useRecurringExpenses } from '../../../../src/hooks/useRecurringExpenses';
 import { normalizeIconName } from '../../../../src/constants/uiConstants';
+import { DateField } from '../../../../src/components/DateField';
 
 type TxType = 'income' | 'expense';
 
@@ -448,8 +448,9 @@ export default function EditTransactionScreen() {
 	const [description, setDescription] = useState('');
 	const [amountInput, setAmountInput] = useState(''); // numeric string like "1234.56"
 	const [type, setType] = useState<TxType>('expense');
-	const [date, setDate] = useState<Date>(new Date());
-	const [showDate, setShowDate] = useState(false);
+	const [date, setDate] = useState<string>(
+		new Date().toISOString().split('T')[0]
+	);
 	const [targetModel, setTargetModel] = useState<'Budget' | 'Goal' | undefined>(
 		undefined
 	);
@@ -483,10 +484,15 @@ export default function EditTransactionScreen() {
 		setDescription(tx.description ?? '');
 		setAmountInput(String(Number(tx.amount ?? 0).toFixed(2))); // numeric string
 		setType(tx.type);
+		// Convert date to ISO string format (yyyy-mm-dd)
 		const base = tx.date.includes('T')
 			? new Date(tx.date)
 			: new Date(`${tx.date}T00:00:00`);
-		setDate(isNaN(base.getTime()) ? new Date() : base);
+		setDate(
+			isNaN(base.getTime())
+				? new Date().toISOString().split('T')[0]
+				: base.toISOString().split('T')[0]
+		);
 		setTargetModel(tx.targetModel);
 		// Set the appropriate selection based on targetModel
 		if (tx.targetModel === 'Budget') {
@@ -595,7 +601,7 @@ export default function EditTransactionScreen() {
 				description: description.trim(),
 				amount: Number(parseMoney(amountInput).toFixed(2)),
 				type,
-				date: toLocalISODate(date),
+				date: date, // date is already in ISO string format (yyyy-mm-dd)
 				target: targetId || undefined,
 				targetModel: targetId ? targetModel : undefined,
 				recurringPattern: recurringExpenseId
@@ -609,7 +615,7 @@ export default function EditTransactionScreen() {
 							nextExpectedDate:
 								recurringExpenses.find(
 									(e) => e.patternId === recurringExpenseId
-								)?.nextExpectedDate || toLocalISODate(date),
+								)?.nextExpectedDate || date,
 					  }
 					: undefined,
 			};
@@ -814,53 +820,14 @@ export default function EditTransactionScreen() {
 
 				{/* Date */}
 				<View style={styles.group}>
-					<Text style={styles.label}>Date</Text>
-					<TouchableOpacity
-						style={[styles.selector, errors.date && styles.inputError]}
-						onPress={() => setShowDate(!showDate)}
-						accessibilityRole="button"
-					>
-						<View style={styles.dateLeftContent}>
-							<Ionicons
-								name="calendar-outline"
-								size={18}
-								color="#6b7280"
-								style={{ marginRight: SPACING.xs }}
-							/>
-							<Text style={styles.selectorText}>{toLocalISODate(date)}</Text>
-						</View>
-						<Ionicons
-							name={showDate ? 'chevron-up' : 'chevron-down'}
-							size={18}
-							color="#111827"
-						/>
-					</TouchableOpacity>
+					<DateField
+						value={date}
+						onChange={setDate}
+						title="Date"
+						placeholder="Select date"
+						containerStyle={{ marginBottom: errors.date ? 8 : 0 }}
+					/>
 					{errors.date && <Text style={styles.errorText}>{errors.date}</Text>}
-					{showDate && (
-						<View
-							style={Platform.OS === 'ios' ? styles.iosDateInline : undefined}
-						>
-							<DateTimePicker
-								value={date}
-								mode="date"
-								display={Platform.OS === 'ios' ? 'inline' : 'default'}
-								onChange={(_, d) => {
-									if (Platform.OS !== 'ios') setShowDate(false);
-									if (d) setDate(d);
-								}}
-							/>
-							{Platform.OS === 'ios' && (
-								<View style={styles.inlineDateActions}>
-									<TouchableOpacity
-										onPress={() => setShowDate(false)}
-										style={styles.inlineBtn}
-									>
-										<Text style={styles.inlineBtnText}>Done</Text>
-									</TouchableOpacity>
-								</View>
-							)}
-						</View>
-					)}
 				</View>
 
 				{/* Target (Budget/Goal) */}
@@ -1223,11 +1190,6 @@ const styles = StyleSheet.create({
 		borderColor: '#e5e7eb',
 		paddingHorizontal: 14,
 	},
-	dateLeftContent: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		flex: 1,
-	},
 	selectorText: { fontSize: 16, color: '#111827' },
 
 	// Combo-box trigger becomes flatter; when open it connects visually to the sheet
@@ -1329,20 +1291,6 @@ const styles = StyleSheet.create({
 		backgroundColor: '#eef0f3',
 		marginLeft: 14 + ICON_SIZE + 14, // align under text, not icon
 	},
-
-	iosDateInline: {
-		marginTop: SPACING.sm,
-		borderRadius: RADIUS_MD,
-		overflow: 'hidden',
-		backgroundColor: '#fff',
-	},
-	inlineDateActions: {
-		flexDirection: 'row',
-		justifyContent: 'flex-end',
-		paddingTop: SPACING.sm,
-	},
-	inlineBtn: { paddingHorizontal: 10, paddingVertical: SPACING.sm },
-	inlineBtnText: { color: '#0ea5e9', fontWeight: '600' },
 
 	segment: {
 		flexDirection: 'row',
