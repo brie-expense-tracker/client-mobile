@@ -9,10 +9,7 @@ import {
 	useState,
 } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import auth, {
-	FirebaseAuthTypes,
-	GoogleAuthProvider,
-} from '@react-native-firebase/auth';
+import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import { getItem, setItem, removeItem } from '../utils/safeStorage';
 import * as Sentry from '@sentry/react-native';
 import { UserService, User, Profile } from '../services';
@@ -836,7 +833,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			}
 
 			// Create a Google credential with the token
-			const googleCredential = GoogleAuthProvider.credential(idToken);
+			const googleCredential = auth.GoogleAuthProvider.credential(idToken);
 
 			// Sign-in the user with the credential
 			const userCredential = await auth().signInWithCredential(
@@ -934,7 +931,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 					if (tokens.idToken) {
 						console.log('✅ Got ID token from getTokens');
 						// Use the token from getTokens
-						const googleCredential = GoogleAuthProvider.credential(
+						const googleCredential = auth.GoogleAuthProvider.credential(
 							tokens.idToken
 						);
 						const userCredential = await auth().signInWithCredential(
@@ -958,7 +955,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 			// Create a Google credential with the token
 			console.log('🔐 Creating Firebase credential...');
-			const googleCredential = GoogleAuthProvider.credential(idToken);
+			const googleCredential = auth.GoogleAuthProvider.credential(idToken);
 
 			// Sign-in the user with the credential
 			console.log('🔥 Signing in with Firebase...');
@@ -1056,29 +1053,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			setError(null);
 
 			const currentUser = auth().currentUser;
-			if (!currentUser || !currentUser.email) {
-				throw new Error('No authenticated user or email not available');
+			if (!currentUser) {
+				throw Object.assign(new Error('No authenticated user'), {
+					code: 'auth/no-current-user',
+				});
+			}
+			if (!currentUser.email) {
+				// Email/password reauth requires an email. If email is missing, this account is not a pure password account.
+				throw Object.assign(new Error('Email not available for current user'), {
+					code: 'auth/no-email',
+				});
 			}
 
 			console.log('🔄 Starting password reauthentication...');
 
-			// Create email/password credential
+			// Create email/password credential using the correct react-native-firebase auth instance
 			const credential = auth.EmailAuthProvider.credential(
 				currentUser.email,
 				password
 			);
-
-			// Re-authenticate with Firebase
 			await currentUser.reauthenticateWithCredential(credential);
+
+			// Force refresh so providerData/state are up-to-date before delete
+			await currentUser.reload();
 			console.log('✅ Password reauthentication successful');
 		} catch (error: any) {
 			console.error('❌ Password reauthentication error:', error);
-			setError({
-				code: 'PASSWORD_REAUTH_ERROR',
-				message: 'Failed to reauthenticate with password',
+			// Normalize common errors for UI
+			const normalized = {
+				code: error?.code || 'auth/reauth-failed',
+				message:
+					error?.code === 'auth/wrong-password'
+						? 'Incorrect password.'
+						: error?.code === 'auth/user-mismatch'
+						? 'This credential does not match the current user.'
+						: error?.message || 'Failed to reauthenticate.',
 				details: error,
+			};
+			setError(normalized);
+			throw Object.assign(new Error(normalized.message), {
+				code: normalized.code,
 			});
-			throw error;
 		} finally {
 			setLoading(false);
 		}
@@ -1092,7 +1107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 			console.log('🔄 Starting Google reauthentication...');
 
-			// Ensure Google Sign-In is configured
+			// 1) Configure and sign-in to get an ID token
 			configureGoogleSignIn();
 
 			// Check if your device supports Google Play
@@ -1118,7 +1133,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				// Success case - data is in signInResult.data
 				({ idToken } = signInResult.data);
 			} else if (signInResult.type === 'cancelled') {
-				throw new Error('Google reauthentication was cancelled');
+				throw Object.assign(
+					new Error('Google reauthentication was cancelled'),
+					{ code: 'auth/popup-closed-by-user' }
+				);
 			} else {
 				// Direct access for other cases
 				({ idToken } = signInResult);
@@ -1131,29 +1149,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				if (tokens.idToken) {
 					idToken = tokens.idToken;
 				} else {
-					throw new Error('No ID token received from Google reauthentication');
+					throw Object.assign(
+						new Error('No ID token received from Google reauthentication'),
+						{ code: 'auth/no-id-token' }
+					);
 				}
 			}
 
-			// Create a Google credential with the token
-			const googleCredential = GoogleAuthProvider.credential(idToken);
+			// 2) Use RN Firebase's auth.GoogleAuthProvider
+			const googleCredential = auth.GoogleAuthProvider.credential(idToken);
 
-			// Re-authenticate the current user
 			const currentUser = auth().currentUser;
 			if (!currentUser) {
-				throw new Error('No user is currently signed in');
+				throw Object.assign(new Error('No authenticated user'), {
+					code: 'auth/no-current-user',
+				});
 			}
 
 			await currentUser.reauthenticateWithCredential(googleCredential);
+			await currentUser.reload(); // Force refresh to maintain "recent login" state
 			console.log('✅ Google reauthentication successful');
 		} catch (error: any) {
 			console.error('❌ Google reauthentication error:', error);
-			setError({
-				code: 'GOOGLE_REAUTH_ERROR',
-				message: 'Failed to reauthenticate with Google',
+			const normalized = {
+				code: error?.code || 'auth/google-reauth-failed',
+				message:
+					error?.code === 'auth/popup-closed-by-user'
+						? 'Verification was cancelled.'
+						: error?.message || 'Failed to reauthenticate with Google.',
 				details: error,
+			};
+			setError(normalized);
+			throw Object.assign(new Error(normalized.message), {
+				code: normalized.code,
 			});
-			throw error;
 		} finally {
 			setLoading(false);
 		}
@@ -1164,15 +1193,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		setLoading(true);
 		try {
 			const user = auth().currentUser;
-			if (!user) throw new Error('No user is currently signed in');
+			if (!user)
+				throw Object.assign(new Error('No user signed in'), {
+					code: 'auth/no-current-user',
+				});
 
-			// Delete backend data
+			// 1) Delete app backend data
 			await UserService.deleteUserAccount();
 
-			// Delete Firebase user
+			// 2) Delete Firebase user (must be within "recent login" window)
 			await user.delete();
 
-			// Clear AsyncStorage and context state
+			// 3) Local cleanup
 			await removeItem(UID_KEY);
 			setUser(null);
 			setProfile(null);
@@ -1182,13 +1214,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				clearTimeout(processingTimeoutRef.current);
 				processingTimeoutRef.current = null;
 			}
-		} catch (error) {
-			setError({
-				code: 'DELETE_ACCOUNT_ERROR',
-				message: 'Failed to delete account',
+		} catch (error: any) {
+			const normalized = {
+				code: error?.code || 'auth/delete-failed',
+				message:
+					error?.code === 'auth/requires-recent-login'
+						? 'Please verify your identity again and retry.'
+						: 'Failed to delete account.',
 				details: error,
+			};
+			setError(normalized);
+			throw Object.assign(new Error(normalized.message), {
+				code: normalized.code,
 			});
-			throw error;
 		} finally {
 			setLoading(false);
 		}
