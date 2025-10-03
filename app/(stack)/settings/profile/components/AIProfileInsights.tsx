@@ -20,6 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useBudgets } from '../../../../../src/hooks/useBudgets';
 import { useGoals } from '../../../../../src/hooks/useGoals';
 import { TransactionContext } from '../../../../../src/context/transactionContext';
+import { useTheme } from '../../../../../src/context/ThemeContext';
 
 interface Profile {
 	monthlyIncome?: number;
@@ -63,6 +64,21 @@ interface Goal {
 interface AIProfileInsightsProps {
 	profile: Profile;
 	onAction: (action: string) => void;
+	mode?: 'preview' | 'full';
+	theme?: {
+		isDark?: boolean;
+		bg: string;
+		text: string;
+		subtext: string;
+		subtle: string;
+		line: string;
+		card: string;
+		tint: string;
+		success: string;
+		warn: string;
+		danger: string;
+		slate: string;
+	};
 }
 
 interface Insight {
@@ -93,13 +109,19 @@ interface Insight {
 export default function AIProfileInsights({
 	profile,
 	onAction,
+	mode = 'full',
+	theme,
 }: AIProfileInsightsProps) {
+	const { colors: globalColors } = useTheme();
 	const [insights, setInsights] = useState<Insight[]>([]);
 	const [lastProfileUpdate, setLastProfileUpdate] = useState<Date | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [retryCount, setRetryCount] = useState(0);
+
+	// Use global theme colors, fallback to theme prop for backward compatibility
+	const localColors = globalColors;
 	const [dismissedInsights, setDismissedInsights] = useState<Set<string>>(
 		new Set()
 	);
@@ -1131,6 +1153,18 @@ export default function AIProfileInsights({
 		bookmarkedInsights,
 	]);
 
+	// Preview mode: show only top 3 highest priority insights
+	const insightsToRender = useMemo(() => {
+		if (mode === 'preview') {
+			// Sort by priority and pick top 3
+			const order = { critical: 4, high: 3, medium: 2, low: 1 };
+			return [...filteredInsights]
+				.sort((a, b) => order[b.priority] - order[a.priority])
+				.slice(0, 3);
+		}
+		return filteredInsights;
+	}, [filteredInsights, mode]);
+
 	// Insight statistics
 	const insightStats = useMemo(() => {
 		const stats = {
@@ -1216,32 +1250,32 @@ export default function AIProfileInsights({
 	const getInsightColor = (type: string) => {
 		switch (type) {
 			case 'warning':
-				return '#ef4444';
+				return localColors.danger;
 			case 'info':
-				return '#3b82f6';
+				return localColors.tint;
 			case 'suggestion':
-				return '#f59e0b';
+				return localColors.warn;
 			case 'success':
-				return '#10b981';
+				return localColors.success;
 			case 'critical':
-				return '#dc2626';
+				return localColors.danger;
 			default:
-				return '#3b82f6';
+				return localColors.tint;
 		}
 	};
 
 	const getPriorityColor = (priority: string) => {
 		switch (priority) {
 			case 'critical':
-				return '#dc2626';
+				return localColors.danger;
 			case 'high':
-				return '#ef4444';
+				return localColors.danger;
 			case 'medium':
-				return '#f59e0b';
+				return localColors.warn;
 			case 'low':
-				return '#10b981';
+				return localColors.success;
 			default:
-				return '#6b7280';
+				return localColors.subtle;
 		}
 	};
 
@@ -1261,7 +1295,7 @@ export default function AIProfileInsights({
 	return (
 		<View style={styles.container}>
 			<View style={styles.header}>
-				<Ionicons name="sparkles" size={20} color="#3b82f6" />
+				<Ionicons name="sparkles" size={20} color={localColors.tint} />
 				<Text style={styles.headerTitle}>AI-Powered Insights</Text>
 				<View style={styles.headerActions}>
 					<TouchableOpacity
@@ -1280,7 +1314,9 @@ export default function AIProfileInsights({
 						<Ionicons
 							name={insightFilter === 'all' ? 'filter' : 'filter-circle'}
 							size={16}
-							color={insightFilter === 'all' ? '#6b7280' : '#3b82f6'}
+							color={
+								insightFilter === 'all' ? localColors.subtle : localColors.tint
+							}
 						/>
 					</TouchableOpacity>
 					<TouchableOpacity
@@ -1292,7 +1328,7 @@ export default function AIProfileInsights({
 						<Ionicons
 							name="refresh"
 							size={18}
-							color="#3b82f6"
+							color={localColors.tint}
 							style={isRefreshing ? styles.refreshingIcon : undefined}
 						/>
 					</TouchableOpacity>
@@ -1303,14 +1339,18 @@ export default function AIProfileInsights({
 							accessibilityLabel="Export insights"
 							accessibilityRole="button"
 						>
-							<Ionicons name="share-outline" size={18} color="#3b82f6" />
+							<Ionicons
+								name="share-outline"
+								size={18}
+								color={localColors.tint}
+							/>
 						</TouchableOpacity>
 					)}
 				</View>
 			</View>
 
-			{/* Search and Filter Controls */}
-			{insights.length > 0 && (
+			{/* Search and Filter Controls - Hide in preview mode */}
+			{mode !== 'preview' && insights.length > 0 && (
 				<View style={styles.searchFilterContainer}>
 					<View style={styles.searchContainer}>
 						<Ionicons name="search" size={16} color="#6b7280" />
@@ -1385,8 +1425,8 @@ export default function AIProfileInsights({
 				</View>
 			)}
 
-			{/* Insight Statistics */}
-			{insights.length > 0 && (
+			{/* Insight Statistics - Hide in preview mode */}
+			{mode !== 'preview' && insights.length > 0 && (
 				<View style={styles.statsContainer}>
 					<Text style={styles.statsTitle}>Insight Summary</Text>
 					<View style={styles.statsGrid}>
@@ -1409,7 +1449,7 @@ export default function AIProfileInsights({
 							<Text style={styles.statLabel}>Medium</Text>
 						</View>
 						<View style={styles.statItem}>
-							<Text style={[styles.statNumber, { color: '#10b981' }]}>
+							<Text style={[styles.statNumber, { color: localColors.success }]}>
 								{insightStats.low}
 							</Text>
 							<Text style={styles.statLabel}>Low</Text>
@@ -1438,13 +1478,31 @@ export default function AIProfileInsights({
 					<ActivityIndicator size="large" color="#3b82f6" />
 					<Text style={styles.loadingText}>Generating insights...</Text>
 				</View>
-			) : filteredInsights.length === 0 ? (
-				<View style={styles.emptyState}>
-					<Ionicons name="checkmark-circle" size={48} color="#10b981" />
-					<Text style={styles.emptyStateText}>Your profile looks great!</Text>
-					<Text style={styles.emptyStateSubtext}>
-						Keep up the good financial habits.
+			) : insightsToRender.length === 0 ? (
+				<View
+					style={[
+						styles.emptyState,
+						mode === 'preview' && { paddingVertical: 12 },
+					]}
+				>
+					<Ionicons
+						name="checkmark-circle"
+						size={mode === 'preview' ? 24 : 48}
+						color={localColors.success}
+					/>
+					<Text
+						style={[
+							styles.emptyStateText,
+							mode === 'preview' && { fontSize: 13, marginTop: 6 },
+						]}
+					>
+						{mode === 'preview' ? 'All clear' : 'Your profile looks great!'}
 					</Text>
+					{mode !== 'preview' && (
+						<Text style={styles.emptyStateSubtext}>
+							Keep up the good financial habits.
+						</Text>
+					)}
 				</View>
 			) : (
 				<ScrollView
@@ -1460,10 +1518,13 @@ export default function AIProfileInsights({
 						/>
 					}
 				>
-					{filteredInsights.map((insight) => (
+					{insightsToRender.map((insight) => (
 						<View
 							key={insight.id}
-							style={styles.insightCard}
+							style={[
+								styles.insightCard,
+								mode === 'preview' && styles.insightCardPreview,
+							]}
 							accessibilityRole="text"
 							accessibilityLabel={`${insight.title}. ${insight.message}. Priority: ${insight.priority}`}
 						>
@@ -1745,6 +1806,14 @@ const styles = StyleSheet.create({
 		marginBottom: 12,
 		borderLeftWidth: 4,
 		borderLeftColor: '#e2e8f0',
+	},
+	insightCardPreview: {
+		backgroundColor: '#ffffff',
+		borderRadius: 10,
+		padding: 12,
+		marginBottom: 10,
+		borderWidth: 1,
+		borderColor: '#e2e8f0',
 	},
 	insightHeader: {
 		flexDirection: 'row',
