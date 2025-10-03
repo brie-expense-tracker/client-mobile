@@ -1,5 +1,6 @@
 // src/context/AuthContext.tsx
-import React, {
+import * as React from 'react';
+import {
 	createContext,
 	useCallback,
 	useEffect,
@@ -8,17 +9,17 @@ import React, {
 	useState,
 } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
-import { getApp } from '@react-native-firebase/app';
+import auth, {
+	FirebaseAuthTypes,
+	GoogleAuthProvider,
+} from '@react-native-firebase/auth';
 import { getItem, setItem, removeItem } from '../utils/safeStorage';
 import * as Sentry from '@sentry/react-native';
 import { UserService, User, Profile } from '../services';
 import { ApiService } from '../services/core/apiService';
-import { router } from 'expo-router';
 import { SampleDataService } from '../services/feature/sampleDataService';
 import { authService } from '../services/authService';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
-import { GoogleAuthProvider } from '@react-native-firebase/auth';
 import { configureGoogleSignIn } from '../config/googleSignIn';
 
 // Error types for better error handling
@@ -67,6 +68,9 @@ export type AuthContextType = {
 
 	// Account management
 	deleteAccount: (password: string) => Promise<void>;
+	deleteAccountAfterReauth: () => Promise<void>;
+	reauthWithPassword: (password: string) => Promise<void>;
+	reauthWithGoogle: () => Promise<void>;
 	refreshUserData: () => Promise<void>;
 
 	// Security features
@@ -368,7 +372,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				clearTimeout(processingTimeoutRef.current);
 			}
 		};
-	}, []); // ✅ Make completely stable - no dependencies
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []); // Remove dependencies to prevent infinite loop
 
 	// Refresh user data function
 	const refreshUserData = useCallback(async (): Promise<void> => {
@@ -394,7 +399,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				details: error,
 			});
 		}
-	}, []); // Remove firebaseUser dependency to prevent infinite loop
+	}, []); // No dependencies needed - function uses current Firebase user directly
 
 	// Foreground refresh via AppState (RN-friendly replacement for any `document` visibility logic)
 	useEffect(() => {
@@ -613,72 +618,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				console.log(
 					'✅ Firebase login successful, UID stored, MongoDB user ready'
 				);
-
-				// Directly navigate to dashboard after successful login
-				// Check if user has seen onboarding first
-				if (mongoUser.onboardingVersion > 0) {
-					console.log(
-						'🔍 [DEBUG] User has seen onboarding, checking current route before navigation'
-					);
-					// Use setTimeout to ensure navigation stack is ready
-					setTimeout(() => {
-						try {
-							// Check if we're already on a valid screen to prevent unwanted navigation
-							const currentPath = router.canGoBack() ? 'unknown' : 'root';
-							console.log('🔍 [DEBUG] Current navigation state:', {
-								currentPath,
-								canGoBack: router.canGoBack(),
-							});
-
-							// Only navigate if we're not already on a valid screen
-							if (!router.canGoBack()) {
-								router.replace('/(tabs)/dashboard');
-								console.log('✅ Navigation to dashboard successful');
-							} else {
-								console.log(
-									'🔍 [DEBUG] Already on a valid screen, skipping navigation'
-								);
-							}
-						} catch (navError) {
-							console.error('❌ Navigation error:', navError);
-							// Only fallback if we're not already on a valid screen
-							if (!router.canGoBack()) {
-								router.replace('/(tabs)/dashboard');
-							}
-						}
-					}, 100);
-				} else {
-					console.log(
-						'🔍 [DEBUG] User needs onboarding, checking current route before navigation'
-					);
-					// Use setTimeout to ensure navigation stack is ready
-					setTimeout(() => {
-						try {
-							// Check if we're already on a valid screen to prevent unwanted navigation
-							const currentPath = router.canGoBack() ? 'unknown' : 'root';
-							console.log('🔍 [DEBUG] Current navigation state:', {
-								currentPath,
-								canGoBack: router.canGoBack(),
-							});
-
-							// Only navigate if we're not already on a valid screen
-							if (!router.canGoBack()) {
-								router.replace('/(onboarding)/profileSetup');
-								console.log('✅ Navigation to onboarding successful');
-							} else {
-								console.log(
-									'🔍 [DEBUG] Already on a valid screen, skipping navigation'
-								);
-							}
-						} catch (navError) {
-							console.error('❌ Navigation error:', navError);
-							// Only fallback if we're not already on a valid screen
-							if (!router.canGoBack()) {
-								router.replace('/(onboarding)/profileSetup');
-							}
-						}
-					}, 100);
-				}
 			} catch (error) {
 				console.error('Error during login:', error);
 				setLoading(false);
@@ -703,15 +642,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 					createdAt: new Date().toISOString(),
 				};
 				setUser(fallbackUser as User);
-
-				// Navigate to onboarding as fallback (only if not already on a valid screen)
-				if (!router.canGoBack()) {
-					router.replace('/(onboarding)/profileSetup');
-				} else {
-					console.log(
-						'🔍 [DEBUG] Already on a valid screen, skipping fallback navigation'
-					);
-				}
 			} finally {
 				// Reset manual login flag
 				isManualLoginRef.current = false;
@@ -880,7 +810,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			});
 
 			// Get the users ID token
-			const { idToken } = await GoogleSignin.signIn();
+			const signInResult = await GoogleSignin.signIn();
+			let idToken: string | undefined;
+
+			if (signInResult.type === 'success' && signInResult.data) {
+				idToken = signInResult.data.idToken || undefined;
+			} else if (signInResult.type === 'cancelled') {
+				console.log('Google Sign-In cancelled by user');
+				setLoading(false);
+				return; // Exit silently without showing error
+			} else {
+				// Handle other response types
+				idToken = (signInResult as any).idToken || undefined;
+			}
+
+			if (!idToken) {
+				console.error('No ID token received from Google Sign-In');
+				setError({
+					code: 'GOOGLE_SIGNIN_ERROR',
+					message: 'No ID token received from Google Sign-In',
+					details: signInResult,
+				});
+				setLoading(false);
+				throw new Error('No ID token received from Google Sign-In');
+			}
 
 			// Create a Google credential with the token
 			const googleCredential = GoogleAuthProvider.credential(idToken);
@@ -902,6 +855,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				error.message?.includes('cancelled')
 			) {
 				console.log('Google Sign-In cancelled by user');
+				setLoading(false);
 				return; // Exit silently without showing error
 			}
 
@@ -910,9 +864,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				message: 'Failed to sign in with Google',
 				details: error,
 			});
-			throw error;
-		} finally {
 			setLoading(false);
+			throw error;
 		}
 	}, [login]);
 
@@ -938,7 +891,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			console.log('🔄 Signing out from any previous Google session...');
 			try {
 				await GoogleSignin.signOut();
-			} catch (signOutError) {
+			} catch {
 				console.log('ℹ️ No previous Google session to sign out from');
 			}
 
@@ -949,13 +902,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 			// Handle the actual data structure returned by Google Sign-In
 			let idToken, user, serverAuthCode;
-			
+
 			if (signInResult.type === 'success' && signInResult.data) {
 				// Success case - data is in signInResult.data
 				({ idToken, user, serverAuthCode } = signInResult.data);
 			} else if (signInResult.type === 'cancelled') {
 				// User cancelled - exit silently
 				console.log('ℹ️ Google Sign-In cancelled by user');
+				setLoading(false);
 				return;
 			} else {
 				// Direct access for other cases
@@ -1029,6 +983,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				error.message?.includes('cancelled')
 			) {
 				console.log('Google Sign-Up cancelled by user');
+				setLoading(false);
 				return; // Exit silently without showing error
 			}
 
@@ -1047,9 +1002,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				message: errorMessage,
 				details: error,
 			});
-			throw error;
-		} finally {
 			setLoading(false);
+			throw error;
 		}
 	}, [login]);
 
@@ -1066,6 +1020,151 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				password
 			);
 			await user.reauthenticateWithCredential(credential);
+
+			// Delete backend data
+			await UserService.deleteUserAccount();
+
+			// Delete Firebase user
+			await user.delete();
+
+			// Clear AsyncStorage and context state
+			await removeItem(UID_KEY);
+			setUser(null);
+			setProfile(null);
+			setFirebaseUser(null);
+			lastProcessedUIDRef.current = null;
+			if (processingTimeoutRef.current) {
+				clearTimeout(processingTimeoutRef.current);
+				processingTimeoutRef.current = null;
+			}
+		} catch (error) {
+			setError({
+				code: 'DELETE_ACCOUNT_ERROR',
+				message: 'Failed to delete account',
+				details: error,
+			});
+			throw error;
+		} finally {
+			setLoading(false);
+		}
+	}, []);
+
+	// Password reauthentication for account deletion
+	const reauthWithPassword = useCallback(async (password: string) => {
+		try {
+			setLoading(true);
+			setError(null);
+
+			const currentUser = auth().currentUser;
+			if (!currentUser || !currentUser.email) {
+				throw new Error('No authenticated user or email not available');
+			}
+
+			console.log('🔄 Starting password reauthentication...');
+
+			// Create email/password credential
+			const credential = auth.EmailAuthProvider.credential(
+				currentUser.email,
+				password
+			);
+
+			// Re-authenticate with Firebase
+			await currentUser.reauthenticateWithCredential(credential);
+			console.log('✅ Password reauthentication successful');
+		} catch (error: any) {
+			console.error('❌ Password reauthentication error:', error);
+			setError({
+				code: 'PASSWORD_REAUTH_ERROR',
+				message: 'Failed to reauthenticate with password',
+				details: error,
+			});
+			throw error;
+		} finally {
+			setLoading(false);
+		}
+	}, []);
+
+	// Google reauthentication for account deletion
+	const reauthWithGoogle = useCallback(async () => {
+		try {
+			setLoading(true);
+			setError(null);
+
+			console.log('🔄 Starting Google reauthentication...');
+
+			// Ensure Google Sign-In is configured
+			configureGoogleSignIn();
+
+			// Check if your device supports Google Play
+			await GoogleSignin.hasPlayServices({
+				showPlayServicesUpdateDialog: true,
+			});
+
+			// Sign out from any previous Google session to ensure clean state
+			try {
+				await GoogleSignin.signOut();
+			} catch {
+				console.log('ℹ️ No previous Google session to sign out from');
+			}
+
+			// Get the users ID token
+			const signInResult = await GoogleSignin.signIn();
+			console.log('📋 Google reauth result:', signInResult);
+
+			// Handle the actual data structure returned by Google Sign-In
+			let idToken;
+
+			if (signInResult.type === 'success' && signInResult.data) {
+				// Success case - data is in signInResult.data
+				({ idToken } = signInResult.data);
+			} else if (signInResult.type === 'cancelled') {
+				throw new Error('Google reauthentication was cancelled');
+			} else {
+				// Direct access for other cases
+				({ idToken } = signInResult);
+			}
+
+			if (!idToken) {
+				// Try to get the token separately
+				console.log('🔄 Attempting to get ID token separately...');
+				const tokens = await GoogleSignin.getTokens();
+				if (tokens.idToken) {
+					idToken = tokens.idToken;
+				} else {
+					throw new Error('No ID token received from Google reauthentication');
+				}
+			}
+
+			// Create a Google credential with the token
+			const googleCredential = GoogleAuthProvider.credential(idToken);
+
+			// Re-authenticate the current user
+			const currentUser = auth().currentUser;
+			if (!currentUser) {
+				throw new Error('No user is currently signed in');
+			}
+
+			await currentUser.reauthenticateWithCredential(googleCredential);
+			console.log('✅ Google reauthentication successful');
+		} catch (error: any) {
+			console.error('❌ Google reauthentication error:', error);
+			setError({
+				code: 'GOOGLE_REAUTH_ERROR',
+				message: 'Failed to reauthenticate with Google',
+				details: error,
+			});
+			throw error;
+		} finally {
+			setLoading(false);
+		}
+	}, []);
+
+	// Delete account after reauthentication (for Google/Apple users)
+	const deleteAccountAfterReauth = useCallback(async () => {
+		setLoading(true);
+		try {
+			const user = auth().currentUser;
+			if (!user) throw new Error('No user is currently signed in');
 
 			// Delete backend data
 			await UserService.deleteUserAccount();
@@ -1118,7 +1217,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		if (!currentFirebaseUser) return false;
 		const now = Date.now();
 		return now - lastActivity < sessionTimeout;
-	}, [lastActivity, sessionTimeout]); // Remove firebaseUser dependency
+	}, [lastActivity, sessionTimeout]); // No firebaseUser dependency needed - uses current user directly
 
 	const extendSession = useCallback((): void => {
 		setLastActivity(Date.now());
@@ -1198,6 +1297,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 			// Account management
 			deleteAccount,
+			deleteAccountAfterReauth,
+			reauthWithPassword,
+			reauthWithGoogle,
 			refreshUserData,
 
 			// Security features
@@ -1226,6 +1328,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			confirmPasswordResetCode,
 			updatePasswordToUser,
 			deleteAccount,
+			deleteAccountAfterReauth,
+			reauthWithPassword,
+			reauthWithGoogle,
 			refreshUserData,
 			checkSessionValidity,
 			extendSession,

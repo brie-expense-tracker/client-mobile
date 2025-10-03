@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
 	View,
 	Text,
@@ -6,6 +6,8 @@ import {
 	TextInput,
 	Alert,
 	ScrollView,
+	ActivityIndicator,
+	Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -14,74 +16,117 @@ import useAuth from '../../../../src/context/AuthContext';
 
 export default function DeleteAccountScreen() {
 	const router = useRouter();
+	const {
+		firebaseUser,
+		loading,
+		deleteAccountAfterReauth,
+		reauthWithPassword,
+		reauthWithGoogle,
+	} = useAuth();
+
 	const [confirmText, setConfirmText] = useState('');
 	const [password, setPassword] = useState('');
-	const { deleteAccount, loading } = useAuth();
+	const [showPassword, setShowPassword] = useState(false);
+	const [busy, setBusy] = useState(false);
+	const [reauthComplete, setReauthComplete] = useState(false);
+	const [formError, setFormError] = useState<string | null>(null);
 
-	const isDeleteButtonEnabled = () => {
-		return (
-			confirmText.trim().toLowerCase() === 'delete' &&
-			password.trim() !== '' &&
-			!loading
-		);
+	// Determine user's sign-in providers
+	const providers: string[] = useMemo(() => {
+		const ids =
+			firebaseUser?.providerData
+				?.map((p: any) => p?.providerId)
+				.filter(Boolean) ?? [];
+		return Array.from(new Set(ids));
+	}, [firebaseUser]);
+
+	const usesPassword = providers.includes('password');
+	const usesGoogle = providers.includes('google.com');
+	const usesApple = providers.includes('apple.com');
+
+	const canConfirmDeleteWord = confirmText.trim().toUpperCase() === 'DELETE';
+
+	const isDeleteEnabled =
+		canConfirmDeleteWord && reauthComplete && !busy && !loading;
+
+	const handleVerifyIdentity = async () => {
+		setFormError(null);
+		if (!canConfirmDeleteWord) {
+			setFormError('Type DELETE to confirm before verifying your identity.');
+			return;
+		}
+		if (usesPassword && password.trim().length < 6) {
+			setFormError('Please enter your password.');
+			return;
+		}
+
+		try {
+			setBusy(true);
+			if (usesPassword) {
+				// Reauthenticate with Firebase using password
+				await reauthWithPassword(password.trim());
+			} else if (usesGoogle) {
+				// Reauthenticate with Firebase using Google
+				await reauthWithGoogle();
+			} else if (usesApple) {
+				// Apple Sign-In not yet implemented
+				throw new Error(
+					'Apple Sign-In reauthentication not yet available. Please contact support.'
+				);
+			} else {
+				// Fallback: if no known provider, block to be safe
+				throw new Error('Unsupported sign-in method. Please contact support.');
+			}
+			setReauthComplete(true);
+		} catch (e: any) {
+			console.warn('Reauth failed:', e);
+			setFormError(
+				e?.code === 'auth/wrong-password'
+					? 'Incorrect password. Please try again.'
+					: e?.code === 'auth/popup-closed-by-user' ||
+					  e?.message?.includes('cancel')
+					? 'Verification was cancelled.'
+					: e?.message || 'Verification failed. Please try again.'
+			);
+		} finally {
+			setBusy(false);
+		}
 	};
 
-	const handleDeleteAccount = async () => {
-		if (confirmText.trim().toLowerCase() !== 'delete') {
-			Alert.alert('Error', 'Please type "DELETE" to confirm');
-			return;
-		}
-
-		if (password.trim() === '') {
-			Alert.alert('Error', 'Please enter your password');
-			return;
-		}
-
+	const handleDelete = async () => {
+		if (!isDeleteEnabled) return;
 		Alert.alert(
 			'Final Confirmation',
-			'This action cannot be undone. All your data will be permanently deleted. Are you absolutely sure?',
+			'This action cannot be undone. All your data will be permanently deleted. Are you sure?',
 			[
-				{
-					text: 'Cancel',
-					style: 'cancel',
-				},
+				{ text: 'Cancel', style: 'cancel' },
 				{
 					text: 'Delete Account',
 					style: 'destructive',
 					onPress: async () => {
 						try {
-							await deleteAccount(password);
+							setBusy(true);
+
+							// Since we've already reauthenticated, just delete the account
+							await deleteAccountAfterReauth();
+
 							Alert.alert(
 								'Account Deleted',
 								'Your account has been permanently deleted.',
-								[
-									{
-										text: 'OK',
-										onPress: () => {
-											// Let the AuthContext handle navigation automatically
-											// The onAuthStateChanged listener will redirect to signup
-										},
-									},
-								]
+								[{ text: 'OK', onPress: () => {} }]
 							);
+							// Auth listener should route to signup/login automatically
 						} catch (error: any) {
-							console.error('Error deleting account:', error);
-							if (error.code === 'auth/wrong-password') {
-								Alert.alert(
-									'Authentication Error',
-									'Incorrect password. Please try again.'
-								);
-							} else if (error.code === 'auth/too-many-requests') {
-								Alert.alert(
-									'Too Many Attempts',
-									'Too many failed attempts. Please try again later.'
-								);
-							} else {
-								Alert.alert(
-									'Error',
-									'Failed to delete account. Please try again.'
-								);
-							}
+							console.error('Delete error:', error);
+							Alert.alert(
+								'Error',
+								error?.code === 'auth/requires-recent-login'
+									? 'Please verify your identity again and retry.'
+									: 'Failed to delete account. Please try again.'
+							);
+							setReauthComplete(false); // force another reauth
+						} finally {
+							setBusy(false);
 						}
 					},
 				},
@@ -91,72 +136,171 @@ export default function DeleteAccountScreen() {
 
 	return (
 		<View style={styles.container}>
-			<ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-				<View style={styles.formContainer}>
-					<View style={styles.warningContainer}>
-						<Ionicons name="warning" size={48} color="#FF3B30" />
-						<Text style={styles.warningTitle}>Delete Account</Text>
-						<Text style={styles.warningText}>
-							This action cannot be undone. All your data, including
-							transactions, budgets, and settings will be permanently deleted.
-						</Text>
-					</View>
+			<ScrollView
+				style={styles.content}
+				contentContainerStyle={{ paddingBottom: 24 }}
+				showsVerticalScrollIndicator={false}
+			>
+				{/* Danger Warning Card */}
+				<View style={[styles.dangerCard, shadowCard]}>
+					<Ionicons name="warning" size={48} color="#DC2626" />
+					<Text style={styles.title}>Delete Account</Text>
+					<Text style={styles.subtitle}>
+						This is permanent. All transactions, budgets, goals, and settings
+						will be erased.
+					</Text>
+				</View>
 
-					<View style={styles.inputContainer}>
-						<Text style={styles.label}>Type &quot;DELETE&quot; to Confirm</Text>
-						<TextInput
-							style={styles.textInput}
-							value={confirmText}
-							onChangeText={setConfirmText}
-							placeholder="Type DELETE to confirm"
-							placeholderTextColor="#999"
-							autoCapitalize="none"
-							autoCorrect={false}
-						/>
-					</View>
+				{/* Step 1: Type DELETE */}
+				<View style={[styles.section, shadowLite]}>
+					<Text style={styles.sectionTitle}>Step 1 — Confirm</Text>
+					<Text style={styles.label}>
+						Type <Text style={styles.mono}>DELETE</Text> to proceed
+					</Text>
+					<TextInput
+						style={styles.input}
+						value={confirmText}
+						onChangeText={setConfirmText}
+						placeholder="Type DELETE"
+						placeholderTextColor="#9CA3AF"
+						autoCapitalize="characters"
+						autoCorrect={false}
+						keyboardType={Platform.OS === 'ios' ? 'ascii-capable' : 'default'}
+					/>
+					{!canConfirmDeleteWord && !!confirmText && (
+						<Text style={styles.errorText}>Please type DELETE exactly.</Text>
+					)}
+				</View>
 
-					<View style={styles.inputContainer}>
-						<Text style={styles.label}>Enter Your Password</Text>
-						<TextInput
-							style={styles.textInput}
-							value={password}
-							onChangeText={setPassword}
-							placeholder="Enter your password"
-							placeholderTextColor="#999"
-							secureTextEntry={true}
-							autoCapitalize="none"
-							autoCorrect={false}
-						/>
-					</View>
+				{/* Step 2: Verify identity (provider-aware) */}
+				<View style={[styles.section, shadowLite]}>
+					<Text style={styles.sectionTitle}>Step 2 — Verify your identity</Text>
 
-					<View style={styles.infoContainer}>
-						<Ionicons
-							name="information-circle-outline"
-							size={20}
-							color="#FF3B30"
-						/>
-						<Text style={styles.infoText}>
-							By deleting your account, you will lose access to all your
-							financial data and this action cannot be reversed. You will need
-							to enter your password to confirm this action.
-						</Text>
-					</View>
+					{usesPassword ? (
+						<>
+							<Text style={styles.label}>Password</Text>
+							<View style={styles.passwordContainer}>
+								<TextInput
+									style={styles.passwordInput}
+									value={password}
+									onChangeText={setPassword}
+									placeholder="Enter your password"
+									placeholderTextColor="#9CA3AF"
+									autoCapitalize="none"
+									autoCorrect={false}
+									secureTextEntry={!showPassword}
+								/>
+								<RectButton
+									style={styles.eyeButton}
+									onPress={() => setShowPassword(!showPassword)}
+								>
+									<Ionicons
+										name={showPassword ? 'eye-off' : 'eye'}
+										size={20}
+										color="#6B7280"
+									/>
+								</RectButton>
+							</View>
+						</>
+					) : (
+						<>
+							{usesGoogle && (
+								<RectButton
+									style={[styles.providerBtn, shadowLite]}
+									onPress={handleVerifyIdentity}
+									enabled={canConfirmDeleteWord && !busy && !loading}
+								>
+									{busy ? (
+										<ActivityIndicator size="small" color="#1F2937" />
+									) : (
+										<>
+											<Ionicons name="logo-google" size={20} color="#1D4ED8" />
+											<Text style={styles.providerBtnText}>
+												Verify with Google
+											</Text>
+										</>
+									)}
+								</RectButton>
+							)}
+							{usesApple && (
+								<RectButton
+									style={[styles.providerBtn, shadowLite, styles.btnDisabled]}
+									onPress={() => {
+										Alert.alert(
+											'Coming Soon',
+											'Apple Sign-In verification will be available soon.'
+										);
+									}}
+									enabled={false}
+								>
+									<Ionicons name="logo-apple" size={20} color="#9CA3AF" />
+									<Text style={[styles.providerBtnText, { color: '#9CA3AF' }]}>
+										Verify with Apple (Soon)
+									</Text>
+								</RectButton>
+							)}
+							{!usesGoogle && !usesApple && (
+								<Text style={styles.helperText}>
+									Your account uses a non-password sign-in method. Please
+									contact support.
+								</Text>
+							)}
+						</>
+					)}
+
+					{/* Verify button shown for password users */}
+					{usesPassword && (
+						<RectButton
+							style={[
+								styles.verifyBtn,
+								(!canConfirmDeleteWord || !password || busy || loading) &&
+									styles.btnDisabled,
+							]}
+							onPress={handleVerifyIdentity}
+							enabled={canConfirmDeleteWord && !!password && !busy && !loading}
+						>
+							{busy ? (
+								<ActivityIndicator size="small" color="#FFFFFF" />
+							) : (
+								<Text style={styles.verifyBtnText}>
+									{reauthComplete ? 'Verified ✓' : 'Verify'}
+								</Text>
+							)}
+						</RectButton>
+					)}
+
+					{!!formError && <Text style={styles.errorText}>{formError}</Text>}
+
+					{reauthComplete && (
+						<View style={styles.verifiedPill}>
+							<Ionicons name="checkmark-circle" size={18} color="#16A34A" />
+							<Text style={styles.verifiedText}>Identity verified</Text>
+						</View>
+					)}
+				</View>
+
+				{/* Step 3: Delete */}
+				<View style={[styles.section, shadowLite]}>
+					<Text style={styles.sectionTitle}>Step 3 — Delete account</Text>
+					<Text style={styles.helperText}>
+						This will remove your Brie account and all associated data. This
+						cannot be undone.
+					</Text>
 
 					<RectButton
-						style={[
-							styles.deleteButton,
-							!isDeleteButtonEnabled() && styles.deleteButtonDisabled,
-						]}
-						onPress={handleDeleteAccount}
-						enabled={isDeleteButtonEnabled()}
+						style={[styles.deleteBtn, !isDeleteEnabled && styles.btnDisabled]}
+						onPress={handleDelete}
+						enabled={isDeleteEnabled}
 					>
-						<Text style={styles.deleteButtonText}>
-							{loading ? 'Deleting...' : 'Delete Account'}
-						</Text>
+						{busy ? (
+							<ActivityIndicator size="small" color="#FFFFFF" />
+						) : (
+							<Text style={styles.deleteBtnText}>Delete Account</Text>
+						)}
 					</RectButton>
 
-					<RectButton style={styles.cancelButton} onPress={() => router.back()}>
-						<Text style={styles.cancelButtonText}>Cancel</Text>
+					<RectButton style={styles.cancelBtn} onPress={() => router.back()}>
+						<Text style={styles.cancelBtnText}>Cancel</Text>
 					</RectButton>
 				</View>
 			</ScrollView>
@@ -164,110 +308,172 @@ export default function DeleteAccountScreen() {
 	);
 }
 
+const shadowCard = Platform.select({
+	ios: {
+		shadowColor: '#000',
+		shadowOpacity: 0.07,
+		shadowOffset: { width: 0, height: 6 },
+		shadowRadius: 16,
+	},
+	android: { elevation: 2 },
+});
+
+const shadowLite = Platform.select({
+	ios: {
+		shadowColor: '#000',
+		shadowOpacity: 0.05,
+		shadowOffset: { width: 0, height: 3 },
+		shadowRadius: 8,
+	},
+	android: { elevation: 1 },
+});
+
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: '#f8f9fa',
-	},
-	content: {
-		flex: 1,
-	},
-	formContainer: {
-		padding: 20,
-	},
-	warningContainer: {
-		alignItems: 'center',
-		marginBottom: 32,
-		padding: 20,
-		backgroundColor: '#FFF5F5',
-		borderRadius: 12,
-		borderWidth: 1,
+	container: { flex: 1, backgroundColor: '#F8FAFC' },
+	content: { flex: 1, padding: 16 },
+
+	dangerCard: {
+		backgroundColor: '#FEF2F2',
 		borderColor: '#FECACA',
+		borderWidth: 1,
+		borderRadius: 14,
+		padding: 20,
+		alignItems: 'center',
+		marginBottom: 16,
 	},
-	warningTitle: {
-		fontSize: 24,
-		fontWeight: '700',
-		color: '#FF3B30',
-		marginTop: 12,
-		marginBottom: 8,
-		textAlign: 'center',
-	},
-	warningText: {
-		fontSize: 16,
+	title: {
+		fontSize: 22,
+		fontWeight: '800',
 		color: '#DC2626',
+		marginTop: 10,
 		textAlign: 'center',
-		lineHeight: 22,
+	},
+	subtitle: {
+		fontSize: 14,
+		color: '#7F1D1D',
+		textAlign: 'center',
+		marginTop: 6,
+	},
+
+	section: {
+		backgroundColor: '#FFFFFF',
+		borderRadius: 14,
+		padding: 16,
+		marginBottom: 16,
+		borderWidth: StyleSheet.hairlineWidth,
+		borderColor: '#E5E7EB',
 	},
 	sectionTitle: {
-		fontSize: 20,
-		fontWeight: '600',
-		color: '#333',
-		marginBottom: 24,
-	},
-	inputContainer: {
-		marginBottom: 20,
-	},
-	label: {
 		fontSize: 16,
-		fontWeight: '500',
-		color: '#333',
-		marginBottom: 8,
+		fontWeight: '700',
+		color: '#111827',
+		marginBottom: 10,
 	},
-	textInput: {
+
+	label: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 6 },
+	mono: {
+		fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+		fontWeight: '700',
+	},
+	input: {
 		height: 48,
 		backgroundColor: '#fff',
-		borderRadius: 8,
+		borderRadius: 10,
 		borderWidth: 1,
-		borderColor: '#ddd',
+		borderColor: '#E5E7EB',
 		paddingHorizontal: 12,
 		fontSize: 16,
-		color: '#333',
+		color: '#111827',
 	},
-	infoContainer: {
+	passwordContainer: {
+		position: 'relative',
 		flexDirection: 'row',
-		alignItems: 'flex-start',
-		marginBottom: 32,
-		padding: 16,
-		backgroundColor: '#FEF2F2',
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: '#FECACA',
-	},
-	infoText: {
-		flex: 1,
-		marginLeft: 8,
-		fontSize: 14,
-		color: '#DC2626',
-		lineHeight: 20,
-	},
-	deleteButton: {
-		backgroundColor: '#FF3B30',
-		height: 48,
-		borderRadius: 8,
-		justifyContent: 'center',
 		alignItems: 'center',
-		marginBottom: 12,
+		height: 48,
+		backgroundColor: '#fff',
+		borderRadius: 10,
+		borderWidth: 1,
+		borderColor: '#E5E7EB',
 	},
-	deleteButtonDisabled: {
-		backgroundColor: '#FFB3B3',
-	},
-	deleteButtonText: {
-		color: '#fff',
+	passwordInput: {
+		flex: 1,
+		height: 48,
+		paddingHorizontal: 12,
 		fontSize: 16,
-		fontWeight: '600',
+		color: '#111827',
 	},
-	cancelButton: {
+	eyeButton: {
+		position: 'absolute',
+		right: 12,
+		height: 48,
+		width: 32,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+
+	helperText: { color: '#6B7280', fontSize: 13, marginTop: 8 },
+	errorText: { color: '#DC2626', fontSize: 12, marginTop: 8 },
+
+	providerBtn: {
+		height: 48,
+		backgroundColor: '#FFFFFF',
+		borderRadius: 10,
+		borderWidth: 1,
+		borderColor: '#E5E7EB',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginTop: 6,
+		flexDirection: 'row',
+		gap: 10,
+	},
+	providerBtnText: { fontSize: 15, fontWeight: '600', color: '#1F2937' },
+
+	verifyBtn: {
+		height: 48,
+		backgroundColor: '#0EA5E9',
+		borderRadius: 10,
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginTop: 12,
+	},
+	verifyBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+
+	verifiedPill: {
+		marginTop: 10,
+		alignSelf: 'flex-start',
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+		paddingHorizontal: 10,
+		paddingVertical: 6,
+		borderRadius: 999,
+		backgroundColor: '#ECFDF5',
+		borderWidth: 1,
+		borderColor: '#A7F3D0',
+	},
+	verifiedText: { color: '#065F46', fontSize: 13, fontWeight: '700' },
+
+	deleteBtn: {
+		backgroundColor: '#EF4444',
+		height: 48,
+		borderRadius: 10,
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginTop: 12,
+	},
+	deleteBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+
+	cancelBtn: {
 		backgroundColor: '#fff',
 		height: 48,
-		borderRadius: 8,
+		borderRadius: 10,
 		borderWidth: 1,
-		borderColor: '#ddd',
-		justifyContent: 'center',
+		borderColor: '#E5E7EB',
 		alignItems: 'center',
+		justifyContent: 'center',
+		marginTop: 10,
 	},
-	cancelButtonText: {
-		color: '#666',
-		fontSize: 16,
-		fontWeight: '500',
-	},
+	cancelBtnText: { color: '#374151', fontSize: 16, fontWeight: '600' },
+
+	btnDisabled: { opacity: 0.6 },
 });
