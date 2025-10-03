@@ -13,7 +13,7 @@ export interface UseWeeklyReflectionReturn {
 	loading: boolean;
 	saving: boolean;
 	error: string | null;
-	saveReflection: (data: SaveReflectionData) => Promise<void>;
+	saveReflection: (data: SaveReflectionData) => Promise<WeeklyReflection>;
 	updateMoodRating: (rating: number) => Promise<void>;
 	updateWinOfTheWeek: (win: string) => Promise<void>;
 	updateReflectionNotes: (notes: string) => Promise<void>;
@@ -49,7 +49,7 @@ export function useWeeklyReflection(): UseWeeklyReflectionReturn {
 
 	// Save reflection data
 	const saveReflection = useCallback(
-		async (data: SaveReflectionData) => {
+		async (data: SaveReflectionData): Promise<WeeklyReflection> => {
 			try {
 				setSaving(true);
 				setError(null);
@@ -67,6 +67,7 @@ export function useWeeklyReflection(): UseWeeklyReflectionReturn {
 				const updatedReflection =
 					await WeeklyReflectionService.saveWeeklyReflection(data);
 				setCurrentReflection(updatedReflection);
+				return updatedReflection;
 			} catch (err) {
 				console.error('Error saving reflection:', err);
 				setError('Failed to save weekly reflection');
