@@ -7,9 +7,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 
 	return {
 		...config,
-		name: 'Brie - AI Financial Assistant',
-		slug: 'clientMobile',
-		version: '1.0.0',
+		name: 'Brie',
+		slug: 'brie',
+		version: '0.1.1',
 		orientation: 'portrait',
 		icon: './src/assets/icons/adaptive-icon.png',
 		scheme: 'brie',
@@ -18,7 +18,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 		ios: {
 			supportsTablet: true,
 			bundleIdentifier: 'com.brie.mobile',
-			buildNumber: '1',
+			buildNumber: '3',
 			googleServicesFile:
 				process.env.GOOGLE_SERVICE_INFO_PLIST || './GoogleService-Info.plist',
 			icon: {
@@ -29,6 +29,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 			infoPlist: {
 				ITSAppUsesNonExemptEncryption: false,
 				NSAppTransportSecurity: {
+					NSAllowsLocalNetworking: true,
 					NSExceptionDomains: {
 						'brie-staging-api.onrender.com': {
 							NSExceptionAllowsInsecureHTTPLoads: false,
@@ -70,12 +71,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 				{
 					ios: {
 						useFrameworks: 'static',
-						deploymentTarget: '15.1',
 					},
 					android: {
 						compileSdkVersion: 34,
-						targetSdkVersion: 35,
-						minSdkVersion: 24,
+						targetSdkVersion: 34,
 						buildToolsVersion: '34.0.0',
 					},
 				},
@@ -110,10 +109,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 		experiments: {
 			typedRoutes: true,
 		},
-		assetBundlePatterns: ['./src/assets/**/*'],
+		assetBundlePatterns: ['./src/assets/**/*', './assets/**/*'],
 		extra: {
 			eas: {
-				projectId: '5c37bf2f-48a8-4081-bddb-eb7ed5783845',
+				projectId: '86bf0001-bc3c-4327-85d5-9ceca2cd9150',
 			},
 		},
 		owner: 'xamata',
