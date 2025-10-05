@@ -163,7 +163,7 @@ export function useAssistantStream({
 					lastMessage: messages[messages.length - 1],
 					noDeltaMs,
 					lastDeltaAt: lastDeltaAt.current,
-					connectionState: currentConnection.current?.readyState,
+					hasConnection: !!currentConnection.current,
 					isConnecting: connecting.current,
 				});
 
@@ -350,7 +350,7 @@ export function useAssistantStream({
 				connecting.current = true;
 
 				es.addEventListener('open', () => {
-					console.log('🟩 [SSE] open', { readyState: (es as any).readyState });
+					console.log('🟩 [SSE] open');
 					connecting.current = false;
 				});
 
@@ -364,10 +364,10 @@ export function useAssistantStream({
 						// Use the aiId from closure instead of reading from state
 						const id = aiId;
 
-						// Session ID consistency check
-						const urlSession = new URLSearchParams(
-							es.url.split('?')[1] || ''
-						).get('sessionId');
+						// Session ID consistency check - use the original URL since es.url is not available in react-native-sse
+						const urlSession = new URLSearchParams(url.split('?')[1] || '').get(
+							'sessionId'
+						);
 						if (sessionId !== urlSession) {
 							console.warn(
 								'⚠️ sessionId mismatch - dropping stream to avoid corrupting state',
@@ -465,9 +465,7 @@ export function useAssistantStream({
 
 				es.addEventListener('error', (e) => {
 					console.error('🟥 [SSE] error event', {
-						readyState: (es as any).readyState,
 						error: JSON.stringify(e, Object.getOwnPropertyNames(e)),
-						url: es.url,
 						type: (e as any).type,
 					});
 
@@ -495,7 +493,7 @@ export function useAssistantStream({
 					// Check if we should retry
 					const shouldRetry =
 						streamState.retryCount < retryConfig.maxRetries &&
-						(e.type?.includes('error') || es.readyState === EventSource.CLOSED);
+						(e.type?.includes('error') || (e as any).type === 'close');
 
 					if (shouldRetry) {
 						const nextRetryCount = streamState.retryCount + 1;
@@ -772,7 +770,7 @@ I'm still here to help with your financial questions once the connection is rest
 	return {
 		startStream,
 		stopStream,
-		isConnected: currentConnection.current?.readyState === 1,
+		isConnected: !!currentConnection.current,
 		isConnecting: streamState.isConnecting,
 		isStreaming: streamState.isStreaming,
 		isRetrying: streamState.isRetrying,

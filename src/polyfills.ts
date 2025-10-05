@@ -3,17 +3,15 @@ import 'react-native-get-random-values';
 
 // EventSource polyfill for React Native/Expo
 // Import EventSource polyfill with proper error handling
+import EventSource from 'react-native-sse';
 let EventSourcePolyfill: any;
 
 try {
-	// Try to import the EventSource polyfill using dynamic import
-	// We need to use require here because the module might not be available
-	// eslint-disable-next-line @typescript-eslint/no-require-imports
-	const eventSourceModule = require('react-native-event-source');
-	EventSourcePolyfill = eventSourceModule.default || eventSourceModule;
+	// Use the maintained react-native-sse implementation
+	EventSourcePolyfill = EventSource;
 } catch {
 	console.warn(
-		'[Polyfill] react-native-event-source not available, EventSource will not be polyfilled'
+		'[Polyfill] react-native-sse not available, EventSource will not be polyfilled'
 	);
 	EventSourcePolyfill = undefined;
 }
@@ -67,16 +65,14 @@ export function debugEventSource(
 ) {
 	// Only enable debugging in development mode
 	if (__DEV__) {
-		console.log(`[${label}] URL:`, es.url);
-		console.log(`[${label}] ReadyState:`, es.readyState);
-		console.log(`[${label}] WithCredentials:`, (es as any).withCredentials);
+		console.log(`[${label}] EventSource instance created for debugging`);
 
 		// Add event listeners for debugging
 		es.addEventListener('open', () => {
 			console.log(`[${label}] Connection opened`);
 		});
 
-		es.addEventListener('error', (event) => {
+		es.addEventListener('error', (event: any) => {
 			console.error(`[${label}] Error:`, event);
 		});
 

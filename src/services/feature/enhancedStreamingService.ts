@@ -231,8 +231,7 @@ export async function startSSE({
 		};
 
 		// Add debugging for EventSource properties
-		console.log('[SSE] EventSource created with URL:', es.url);
-		console.log('[SSE] EventSource readyState:', es.readyState);
+		console.log('[SSE] EventSource created successfully');
 		console.log(
 			'[SSE] EventSource withCredentials:',
 			(es as any).withCredentials
@@ -729,8 +728,6 @@ export function startStream(args: {
 		console.error('[SSE] Error event received:', err);
 		console.error('[SSE] Error details:', {
 			type: err.type,
-			readyState: (es as any).readyState,
-			url: es.url,
 			withCredentials: (es as any).withCredentials,
 		});
 		cleanup();
