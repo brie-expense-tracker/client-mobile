@@ -99,6 +99,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const lastProcessedUIDRef = useRef<string | null>(null);
 	const processingTimeoutRef = useRef<number | null>(null);
 	const isManualLoginRef = useRef(false);
+	const isReauthInProgressRef = useRef(false);
+	const isGoogleSignInCancelledRef = useRef(false);
 	const [lastActivity, setLastActivity] = useState<number>(Date.now());
 	const [sessionTimeout] = useState<number>(4 * 60 * 60 * 1000); // 4 hours
 
@@ -292,10 +294,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				isManualLoginRef: isManualLoginRef.current,
 			});
 
-			// Skip processing if we're handling manual login
-			if (isManualLoginRef.current) {
+			// Skip processing if we're handling manual login, reauthentication, or cancelled Google Sign-In
+			if (
+				isManualLoginRef.current ||
+				isReauthInProgressRef.current ||
+				isGoogleSignInCancelledRef.current
+			) {
 				console.log(
-					'🔍 [DEBUG] Manual login in progress, skipping auth state change processing'
+					'🔍 [DEBUG] Manual login, reauthentication, or cancelled Google Sign-In in progress, skipping auth state change processing'
 				);
 				return;
 			}
@@ -804,6 +810,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		try {
 			setLoading(true);
 			setError(null);
+			isGoogleSignInCancelledRef.current = false;
 
 			// Check if your device supports Google Play
 			await GoogleSignin.hasPlayServices({
@@ -818,6 +825,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				idToken = signInResult.data.idToken || undefined;
 			} else if (signInResult.type === 'cancelled') {
 				console.log('Google Sign-In cancelled by user');
+				isGoogleSignInCancelledRef.current = true;
 				setLoading(false);
 				return; // Exit silently without showing error
 			} else {
@@ -856,6 +864,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				error.message?.includes('cancelled')
 			) {
 				console.log('Google Sign-In cancelled by user');
+				isGoogleSignInCancelledRef.current = true;
 				setLoading(false);
 				return; // Exit silently without showing error
 			}
@@ -867,6 +876,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			});
 			setLoading(false);
 			throw error;
+		} finally {
+			// Reset the cancellation flag after a delay to allow auth state changes to settle
+			setTimeout(() => {
+				isGoogleSignInCancelledRef.current = false;
+			}, 1000);
 		}
 	}, [login]);
 
@@ -1055,6 +1069,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		try {
 			setLoading(true);
 			setError(null);
+			isReauthInProgressRef.current = true;
 
 			const currentUser = auth().currentUser;
 			if (!currentUser) {
@@ -1100,6 +1115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			});
 		} finally {
 			setLoading(false);
+			isReauthInProgressRef.current = false;
 		}
 	}, []);
 
@@ -1108,6 +1124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		try {
 			setLoading(true);
 			setError(null);
+			isReauthInProgressRef.current = true;
 
 			console.log('🔄 Starting Google reauthentication...');
 
@@ -1189,6 +1206,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			});
 		} finally {
 			setLoading(false);
+			isReauthInProgressRef.current = false;
 		}
 	}, []);
 
