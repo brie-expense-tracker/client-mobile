@@ -6,7 +6,6 @@ import {
 	ScrollView,
 	Alert,
 	RefreshControl,
-	ActivityIndicator,
 } from 'react-native';
 import CustomSlidingModal from './components/CustomSlidingModal';
 import { RectButton } from 'react-native-gesture-handler';
@@ -23,6 +22,15 @@ import {
 	generateAccessibilityLabel,
 	voiceOverHints,
 } from '../../../src/utils/accessibility';
+import {
+	Page,
+	Card,
+	Section,
+	LoadingState,
+	ErrorState,
+	EmptyState,
+	SegmentedControl,
+} from '../../../src/ui';
 
 // ==========================================
 // Types
@@ -231,174 +239,55 @@ const RecurringExpensesScreen: React.FC = () => {
 		router.push('/(stack)/addRecurringExpense');
 	};
 
-	const handleViewToggle = () => {
-		setActiveView(activeView === 'monthly' ? 'weekly' : 'monthly');
-	};
-
-	// ==========================================
-	// Loading State Component
-	// ==========================================
-	const LoadingState = () => (
-		<View
-			style={styles.loadingContainer}
-			accessibilityRole="progressbar"
-			accessibilityLabel="Loading recurring expenses"
-		>
-			<ActivityIndicator
-				size="large"
-				color="#00a2ff"
-				accessibilityRole="progressbar"
-			/>
-			<Text
-				style={[styles.loadingText, dynamicTextStyle]}
-				accessibilityRole="text"
-			>
-				Loading recurring expenses...
-			</Text>
-		</View>
-	);
-
-	// ==========================================
-	// Error State Component
-	// ==========================================
-	const ErrorState = () => (
-		<View
-			style={styles.errorContainer}
-			accessibilityRole="alert"
-			accessibilityLabel="Error loading recurring expenses"
-		>
-			<View style={styles.errorContent}>
-				<Ionicons
-					name="warning-outline"
-					size={64}
-					color="#ff6b6b"
-					accessibilityRole="image"
-					accessibilityLabel="Warning icon"
-				/>
-				<Text
-					style={[styles.errorTitle, dynamicTextStyle]}
-					accessibilityRole="text"
-				>
-					Unable to Load Expenses
-				</Text>
-				<Text
-					style={[styles.errorSubtext, dynamicTextStyle]}
-					accessibilityRole="text"
-				>
-					There was a problem connecting to the server. Please check your
-					connection and try again.
-				</Text>
-				<RectButton
-					style={styles.errorButton}
-					onPress={() => router.replace('/(tabs)/budgets/recurringExpenses')}
-					{...accessibilityProps.button}
-					accessibilityLabel={generateAccessibilityLabel.button(
-						'Retry',
-						'loading'
-					)}
-					accessibilityHint={voiceOverHints.retry}
-				>
-					<Ionicons
-						name="refresh"
-						size={20}
-						color="#fff"
-						accessibilityRole="image"
-						accessibilityLabel="Retry icon"
-					/>
-					<Text
-						style={[styles.errorButtonText, dynamicTextStyle]}
-						accessibilityRole="text"
-					>
-						Retry
-					</Text>
-				</RectButton>
-			</View>
-		</View>
-	);
-
-	// ==========================================
-	// Empty State Component
-	// ==========================================
-	const EmptyState = () => (
-		<View
-			style={styles.emptyContainer}
-			accessibilityRole="text"
-			accessibilityLabel="No recurring expenses available"
-		>
-			<View style={styles.emptyContent}>
-				<Ionicons
-					name="repeat-outline"
-					size={64}
-					color="#e0e0e0"
-					accessibilityRole="image"
-					accessibilityLabel="Empty recurring expenses icon"
-				/>
-				<Text
-					style={[styles.emptyTitle, dynamicTextStyle]}
-					accessibilityRole="text"
-				>
-					No Recurring Expenses
-				</Text>
-				<Text
-					style={[styles.emptySubtext, dynamicTextStyle]}
-					accessibilityRole="text"
-				>
-					Add your first recurring expense to start tracking regular payments
-				</Text>
-				<RectButton
-					style={styles.emptyAddButton}
-					onPress={handleAddRecurringExpense}
-					{...accessibilityProps.button}
-					accessibilityLabel={generateAccessibilityLabel.button(
-						'Add',
-						'recurring expense'
-					)}
-					accessibilityHint={voiceOverHints.add}
-				>
-					<Ionicons
-						name="add"
-						size={20}
-						color="#fff"
-						accessibilityRole="image"
-						accessibilityLabel="Add icon"
-					/>
-					<Text
-						style={[styles.emptyAddButtonText, dynamicTextStyle]}
-						accessibilityRole="text"
-					>
-						Add Expense
-					</Text>
-				</RectButton>
-			</View>
-		</View>
-	);
-
 	// ==========================================
 	// Main Render
 	// ==========================================
 	// Show loading state while fetching data
 	if (isLoading && !hasLoaded) {
-		return <LoadingState />;
+		return <LoadingState label="Loading recurring expenses..." />;
 	}
 
 	// Show error state if there's an error
 	if (error && hasLoaded) {
-		return <ErrorState />;
+		return (
+			<ErrorState
+				title="Unable to load recurring expenses"
+				onRetry={onRefresh}
+			/>
+		);
 	}
 
 	// Show empty state if no expenses and data has loaded
 	if (expenses.length === 0 && hasLoaded) {
-		return <EmptyState />;
+		return (
+			<EmptyState
+				icon="repeat-outline"
+				title="No Recurring Expenses"
+				subtitle="Add your first recurring expense to track regular payments."
+				ctaLabel="Add Expense"
+				onPress={handleAddRecurringExpense}
+			/>
+		);
 	}
 
 	return (
-		<View
-			style={styles.mainContainer}
-			accessibilityLabel="Recurring expenses screen"
+		<Page
+			title="Recurring"
+			subtitle={`${overdueCount} overdue • ${dueThisWeekCount} due this week`}
+			right={
+				<SegmentedControl
+					segments={[
+						{ key: 'monthly', label: 'Monthly' },
+						{ key: 'weekly', label: 'Weekly' },
+					]}
+					value={activeView}
+					onChange={(k) => setActiveView(k as any)}
+				/>
+			}
 		>
 			<ScrollView
-				style={styles.content}
-				contentContainerStyle={styles.scrollContentContainer}
+				showsVerticalScrollIndicator={false}
+				contentContainerStyle={{ paddingBottom: 24 }}
 				refreshControl={
 					<RefreshControl
 						refreshing={refreshing}
@@ -408,29 +297,32 @@ const RecurringExpensesScreen: React.FC = () => {
 						accessibilityLabel="Pull to refresh recurring expenses"
 					/>
 				}
-				showsVerticalScrollIndicator={false}
 				accessibilityLabel="Recurring expenses list"
 			>
-				{/* Recurring Summary Card */}
-				<RecurringSummaryCard
-					expenses={expenses}
-					activeView={activeView}
-					onViewToggle={handleViewToggle}
-					onExpensePress={handleExpensePress}
-					onAddExpense={handleAddRecurringExpense}
-					overdueAmount={overdueAmount}
-					dueThisWeekAmount={dueThisWeekAmount}
-					overdueCount={overdueCount}
-					dueThisWeekCount={dueThisWeekCount}
-				/>
+				<Card style={{ marginTop: 0 }}>
+					<RecurringSummaryCard
+						expenses={expenses}
+						activeView={activeView}
+						onViewToggle={() => {}}
+						onExpensePress={handleExpensePress}
+						onAddExpense={handleAddRecurringExpense}
+						overdueAmount={overdueAmount}
+						dueThisWeekAmount={dueThisWeekAmount}
+						overdueCount={overdueCount}
+						dueThisWeekCount={dueThisWeekCount}
+					/>
+				</Card>
 
-				{/* Recurring Expenses Feed */}
-				<RecurringExpensesFeed
-					expenses={expenses}
-					onPressMenu={handleExpenseMenuPress}
-					onPressRow={handleExpenseRowPress}
-					scrollEnabled={false}
-				/>
+				<Section title="Your Expenses">
+					<Card>
+						<RecurringExpensesFeed
+							expenses={expenses}
+							onPressMenu={handleExpenseMenuPress}
+							onPressRow={handleExpenseRowPress}
+							scrollEnabled={false}
+						/>
+					</Card>
+				</Section>
 			</ScrollView>
 
 			{/* Options Modal */}
@@ -553,28 +445,12 @@ const RecurringExpensesScreen: React.FC = () => {
 					</RectButton>
 				</View>
 			</CustomSlidingModal>
-		</View>
+		</Page>
 	);
 };
 
-// ==========================================
-// Styles
-// ==========================================
+// Modal styles - keeping only what's needed for the options modal
 const styles = StyleSheet.create({
-	mainContainer: {
-		flex: 1,
-		backgroundColor: '#fff',
-	},
-
-	content: {
-		flex: 1,
-	},
-
-	scrollContentContainer: {
-		paddingHorizontal: 0,
-		marginTop: 8,
-	},
-
 	optionsModalContent: {
 		backgroundColor: 'white',
 		borderRadius: 16,
@@ -605,100 +481,6 @@ const styles = StyleSheet.create({
 		fontWeight: '500',
 		color: '#212121',
 		marginLeft: 12,
-	},
-
-	loadingContainer: {
-		flex: 1,
-		justifyContent: 'center',
-		alignItems: 'center',
-		backgroundColor: '#fff',
-	},
-	loadingText: {
-		marginTop: 16,
-		fontSize: 16,
-		color: '#757575',
-	},
-
-	errorContainer: {
-		flex: 1,
-		justifyContent: 'center',
-		alignItems: 'center',
-		paddingHorizontal: 24,
-		backgroundColor: '#fff',
-	},
-	errorContent: {
-		alignItems: 'center',
-		maxWidth: 280,
-	},
-	errorTitle: {
-		fontSize: 24,
-		fontWeight: '600',
-		color: '#212121',
-		marginTop: 16,
-		marginBottom: 8,
-		textAlign: 'center',
-	},
-	errorSubtext: {
-		fontSize: 16,
-		color: '#757575',
-		textAlign: 'center',
-		marginBottom: 32,
-		lineHeight: 22,
-	},
-	errorButton: {
-		backgroundColor: '#00a2ff',
-		borderRadius: 12,
-		paddingVertical: 16,
-		paddingHorizontal: 24,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-	},
-	errorButtonText: {
-		color: '#FFFFFF',
-		fontSize: 16,
-		fontWeight: '600',
-	},
-
-	emptyContainer: {
-		flex: 1,
-		justifyContent: 'center',
-		alignItems: 'center',
-		paddingHorizontal: 24,
-		backgroundColor: '#fff',
-	},
-	emptyContent: {
-		alignItems: 'center',
-		maxWidth: 280,
-	},
-	emptyTitle: {
-		fontSize: 24,
-		fontWeight: '600',
-		color: '#212121',
-		marginTop: 16,
-		marginBottom: 8,
-		textAlign: 'center',
-	},
-	emptySubtext: {
-		fontSize: 16,
-		color: '#757575',
-		textAlign: 'center',
-		marginBottom: 32,
-		lineHeight: 22,
-	},
-	emptyAddButton: {
-		backgroundColor: '#00a2ff',
-		borderRadius: 12,
-		paddingVertical: 16,
-		paddingHorizontal: 24,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-	},
-	emptyAddButtonText: {
-		color: '#FFFFFF',
-		fontSize: 16,
-		fontWeight: '600',
 	},
 });
 

@@ -5,10 +5,18 @@ import React, {
 	useEffect,
 	useCallback,
 	ReactNode,
+	startTransition,
 } from 'react';
 import { ApiService } from '../services';
 import useAuth from './AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+	AppEvents,
+	EVT_AI_INSIGHTS_CHANGED,
+	EVT_ASSISTANT_CONFIG_CHANGED,
+	AIInsightsChangedEvent,
+	AssistantConfigChangedEvent,
+} from '../lib/eventBus';
 
 interface ProfilePreferences {
 	adviceFrequency: string;
@@ -25,7 +33,16 @@ interface ProfilePreferences {
 		monthlyFinancialCheck: boolean;
 		monthlySavingsTransfer: boolean;
 	};
-	aiInsights: {
+	assistant: {
+		mode: 'private' | 'personalized' | 'proactive';
+		useBudgetsGoals: boolean;
+		useTransactions: boolean;
+		showProactiveCards: boolean;
+		costSaver: boolean;
+		privacyHardStop: boolean;
+	};
+	// Legacy support - keep for migration
+	aiInsights?: {
 		enabled: boolean;
 		frequency: 'daily' | 'weekly' | 'monthly' | 'disabled';
 		pushNotifications: boolean;
@@ -121,8 +138,8 @@ interface ProfileContextType {
 	updateNotificationSettings: (
 		settings: Partial<ProfilePreferences['notifications']>
 	) => Promise<void>;
-	updateAIInsightsSettings: (
-		settings: Partial<ProfilePreferences['aiInsights']>
+	updateAssistantSettings: (
+		settings: Partial<ProfilePreferences['assistant']>
 	) => Promise<void>;
 	updateBudgetSettings: (
 		settings: Partial<ProfilePreferences['budgetSettings']>
@@ -529,15 +546,33 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 			// Store the previous state for potential rollback
 			const previousProfile = profile;
 
-			// Optimistically update the profile state immediately
-			setProfile((prev) =>
-				prev
-					? {
-							...prev,
-							preferences: { ...prev.preferences, ...preferences },
-					  }
-					: null
-			);
+			// 1) Optimistic next state
+			const nextProfile = profile
+				? {
+						...profile,
+						preferences: { ...profile.preferences, ...preferences },
+				  }
+				: null;
+
+			// 2) Immediate UI update with transition
+			startTransition(() => {
+				setProfile(nextProfile);
+			});
+
+			// 3) Emit AI insights change event if relevant (legacy support)
+			if (preferences.aiInsights?.enabled !== undefined) {
+				const enabled = !!preferences.aiInsights.enabled;
+				AppEvents.emit(EVT_AI_INSIGHTS_CHANGED, {
+					enabled,
+				} as AIInsightsChangedEvent);
+			}
+
+			// 4) Emit assistant config change event if relevant
+			if (preferences.assistant) {
+				AppEvents.emit(EVT_ASSISTANT_CONFIG_CHANGED, {
+					config: preferences.assistant,
+				} as AssistantConfigChangedEvent);
+			}
 
 			try {
 				setError(null);
@@ -552,13 +587,44 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 					console.log('Preferences updated successfully');
 				} else {
 					// API call failed, revert to previous state
-					setProfile(previousProfile);
+					startTransition(() => setProfile(previousProfile));
+
+					// Emit rollback events
+					if (preferences.aiInsights?.enabled !== undefined) {
+						const enabled = !!previousProfile?.preferences?.aiInsights?.enabled;
+						AppEvents.emit(EVT_AI_INSIGHTS_CHANGED, {
+							enabled,
+						} as AIInsightsChangedEvent);
+					}
+					if (
+						preferences.assistant &&
+						previousProfile?.preferences?.assistant
+					) {
+						AppEvents.emit(EVT_ASSISTANT_CONFIG_CHANGED, {
+							config: previousProfile.preferences.assistant,
+						} as AssistantConfigChangedEvent);
+					}
+
 					throw new Error(response.error || 'Failed to update preferences');
 				}
 			} catch (err) {
 				console.error('Error updating preferences:', err);
 				// Revert to previous state on error
-				setProfile(previousProfile);
+				startTransition(() => setProfile(previousProfile));
+
+				// Emit rollback events
+				if (preferences.aiInsights?.enabled !== undefined) {
+					const enabled = !!previousProfile?.preferences?.aiInsights?.enabled;
+					AppEvents.emit(EVT_AI_INSIGHTS_CHANGED, {
+						enabled,
+					} as AIInsightsChangedEvent);
+				}
+				if (preferences.assistant && previousProfile?.preferences?.assistant) {
+					AppEvents.emit(EVT_ASSISTANT_CONFIG_CHANGED, {
+						config: previousProfile.preferences.assistant,
+					} as AssistantConfigChangedEvent);
+				}
+
 				setError(
 					err instanceof Error ? err.message : 'Failed to update preferences'
 				);
@@ -567,6 +633,80 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 		},
 		[user, firebaseUser, profile]
 	);
+
+	const updateAssistantSettings = async (
+		settings: Partial<ProfilePreferences['assistant']>
+	) => {
+		if (!user || !firebaseUser) {
+			throw new Error('User not authenticated');
+		}
+
+		// Store the previous state for potential rollback
+		const previousProfile = profile;
+
+		// Optimistically update the profile state immediately
+		setProfile((prev) =>
+			prev
+				? {
+						...prev,
+						preferences: {
+							...prev.preferences,
+							assistant: {
+								...prev.preferences.assistant,
+								...settings,
+							},
+						},
+				  }
+				: null
+		);
+
+		// Emit assistant config change event
+		if (settings) {
+			AppEvents.emit(EVT_ASSISTANT_CONFIG_CHANGED, {
+				config: { ...profile?.preferences?.assistant, ...settings },
+			} as AssistantConfigChangedEvent);
+		}
+
+		try {
+			setError(null);
+
+			const response = await ApiService.put<ProfilePreferences['assistant']>(
+				'/profiles/assistant',
+				settings
+			);
+
+			if (response.success && response.data) {
+				// The optimistic update was correct, no need to update again
+				console.log('Assistant settings updated successfully');
+			} else {
+				// API call failed, revert to previous state
+				setProfile(previousProfile);
+				if (previousProfile?.preferences?.assistant) {
+					AppEvents.emit(EVT_ASSISTANT_CONFIG_CHANGED, {
+						config: previousProfile.preferences.assistant,
+					} as AssistantConfigChangedEvent);
+				}
+				throw new Error(
+					response.error || 'Failed to update assistant settings'
+				);
+			}
+		} catch (err) {
+			console.error('Error updating assistant settings:', err);
+			// Revert to previous state on error
+			setProfile(previousProfile);
+			if (previousProfile?.preferences?.assistant) {
+				AppEvents.emit(EVT_ASSISTANT_CONFIG_CHANGED, {
+					config: previousProfile.preferences.assistant,
+				} as AssistantConfigChangedEvent);
+			}
+			setError(
+				err instanceof Error
+					? err.message
+					: 'Failed to update assistant settings'
+			);
+			throw err;
+		}
+	};
 
 	const updateNotificationSettings = async (
 		settings: Partial<ProfilePreferences['notifications']>
@@ -619,64 +759,6 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 				err instanceof Error
 					? err.message
 					: 'Failed to update notification settings'
-			);
-			throw err;
-		}
-	};
-
-	const updateAIInsightsSettings = async (
-		settings: Partial<ProfilePreferences['aiInsights']>
-	) => {
-		if (!user || !firebaseUser) {
-			throw new Error('User not authenticated');
-		}
-
-		// Store the previous state for potential rollback
-		const previousProfile = profile;
-
-		// Optimistically update the profile state immediately
-		setProfile((prev) =>
-			prev
-				? {
-						...prev,
-						preferences: {
-							...prev.preferences,
-							aiInsights: {
-								...prev.preferences.aiInsights,
-								...settings,
-							},
-						},
-				  }
-				: null
-		);
-
-		try {
-			setError(null);
-
-			const response = await ApiService.put<ProfilePreferences['aiInsights']>(
-				'/profiles/ai-insights',
-				settings
-			);
-
-			if (response.success && response.data) {
-				// The optimistic update was correct, no need to update again
-				// The profile state is already updated with the new settings
-				console.log('AI insights settings updated successfully');
-			} else {
-				// API call failed, revert to previous state
-				setProfile(previousProfile);
-				throw new Error(
-					response.error || 'Failed to update AI insights settings'
-				);
-			}
-		} catch (err) {
-			console.error('Error updating AI insights settings:', err);
-			// Revert to previous state on error
-			setProfile(previousProfile);
-			setError(
-				err instanceof Error
-					? err.message
-					: 'Failed to update AI insights settings'
 			);
 			throw err;
 		}
@@ -840,7 +922,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 		updateProfile,
 		updatePreferences,
 		updateNotificationSettings,
-		updateAIInsightsSettings,
+		updateAssistantSettings,
 		updateBudgetSettings,
 		updateGoalSettings,
 		refreshProfile,

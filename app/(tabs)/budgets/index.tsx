@@ -1,15 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-	View,
-	Text,
-	StyleSheet,
-	ScrollView,
-	Alert,
-	TouchableOpacity,
-	RefreshControl,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { RectButton } from 'react-native-gesture-handler';
+import { Text, ScrollView, Alert, RefreshControl, View } from 'react-native';
 import { useBudgets } from '../../../src/hooks/useBudgets';
 import { Budget } from '../../../src/context/budgetContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -17,13 +7,47 @@ import MonthlyBudgetSummary from './components/MonthlyBudgetSummary';
 import WeeklyBudgetSummary from './components/WeeklyBudgetSummary';
 import AllBudgetSummary from './components/AllBudgetSummary';
 import BudgetsFeed from './components/BudgetsFeed';
-import { InsightChipsRow } from '../../../src/components/InsightChipsRow';
-import { InsightCard } from '../../../src/components/InsightChip';
 import {
-	accessibilityProps,
-	dynamicTextStyle,
-	generateAccessibilityLabel,
-} from '../../../src/utils/accessibility';
+	Page,
+	Card,
+	Section,
+	LoadingState,
+	ErrorState,
+	EmptyState,
+	SegmentedControl,
+	palette,
+	type,
+	space,
+} from '../../../src/ui';
+
+// ========= ADDED: small helpers =========
+const currency = (n = 0) =>
+	new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(
+		Math.max(0, n)
+	);
+
+const startOfMonth = (d = new Date()) =>
+	new Date(d.getFullYear(), d.getMonth(), 1);
+const endOfMonth = (d = new Date()) =>
+	new Date(d.getFullYear(), d.getMonth() + 1, 0);
+
+// Sunday-start week (adjust if your app uses Monday)
+const startOfWeek = (d = new Date()) => {
+	const day = d.getDay(); // 0 Sun..6 Sat
+	const s = new Date(d);
+	s.setDate(d.getDate() - day);
+	s.setHours(0, 0, 0, 0);
+	return s;
+};
+const endOfWeek = (d = new Date()) => {
+	const e = startOfWeek(d);
+	e.setDate(e.getDate() + 6);
+	e.setHours(23, 59, 59, 999);
+	return e;
+};
+
+const daysBetween = (a: Date, b: Date) =>
+	Math.max(1, Math.ceil((b.getTime() - a.getTime()) / 86_400_000)); // avoid /0
 
 // ==========================================
 // Main Component
@@ -116,138 +140,8 @@ export default function BudgetScreen() {
 	}, [refetch]);
 
 	// ==========================================
-	// Skeleton Loading State Component
+	// Generate Budget Insights
 	// ==========================================
-	const SkeletonLoadingState = () => (
-		<View style={styles.mainContainer}>
-			<ScrollView
-				showsVerticalScrollIndicator={false}
-				contentContainerStyle={{ paddingBottom: 24 }}
-			>
-				{/* Page Header Skeleton */}
-				<View style={styles.pageHeader}>
-					<View style={styles.pageHeaderContent}>
-						<View style={[styles.skeletonText, { width: 150, height: 20 }]} />
-						<View
-							style={[
-								styles.skeletonText,
-								{ width: 200, height: 14, marginTop: 4 },
-							]}
-						/>
-					</View>
-					<View style={[styles.skeletonButton, { width: 100, height: 40 }]} />
-				</View>
-
-				{/* Summary Card Skeleton */}
-				<View style={[styles.skeletonCard, { height: 180, marginTop: 12 }]} />
-
-				{/* Insights Skeleton */}
-				<View style={styles.skeletonInsights}>
-					<View
-						style={[
-							styles.skeletonText,
-							{ width: 120, height: 16, marginBottom: 12 },
-						]}
-					/>
-					<View style={styles.skeletonChips}>
-						<View style={[styles.skeletonChip, { width: 150 }]} />
-						<View style={[styles.skeletonChip, { width: 180 }]} />
-						<View style={[styles.skeletonChip, { width: 160 }]} />
-					</View>
-				</View>
-
-				{/* Budget List Skeleton */}
-				<View style={styles.skeletonList}>
-					{[1, 2, 3].map((i) => (
-						<View key={i} style={styles.skeletonBudgetItem}>
-							<View style={styles.skeletonIcon} />
-							<View style={styles.skeletonContent}>
-								<View
-									style={[styles.skeletonText, { width: 120, height: 16 }]}
-								/>
-								<View
-									style={[
-										styles.skeletonText,
-										{ width: 80, height: 12, marginTop: 4 },
-									]}
-								/>
-								<View style={[styles.skeletonProgress, { marginTop: 8 }]} />
-								<View
-									style={[
-										styles.skeletonText,
-										{ width: 100, height: 12, marginTop: 6 },
-									]}
-								/>
-							</View>
-						</View>
-					))}
-				</View>
-			</ScrollView>
-		</View>
-	);
-
-	// ==========================================
-	// Error State Component
-	// ==========================================
-	const ErrorState = useCallback(
-		() => (
-			<View style={styles.errorContainer}>
-				<View style={styles.errorContent}>
-					<Ionicons name="warning-outline" size={64} color="#ff6b6b" />
-					<Text style={styles.errorTitle}>Unable to Load Budgets</Text>
-					<Text style={styles.errorSubtext}>
-						{error?.message ||
-							'There was a problem connecting to the server. Please check your connection and try again.'}
-					</Text>
-					<RectButton
-						style={styles.errorButton}
-						onPress={onRefresh}
-						{...accessibilityProps.button}
-						accessibilityLabel={generateAccessibilityLabel.button(
-							'Retry',
-							'loading budgets'
-						)}
-					>
-						<Ionicons name="refresh" size={20} color="#fff" />
-						<Text style={styles.errorButtonText}>Retry</Text>
-					</RectButton>
-				</View>
-			</View>
-		),
-		[error, onRefresh]
-	);
-
-	// ==========================================
-	// Empty State Component
-	// ==========================================
-	const EmptyState = useCallback(
-		() => (
-			<View style={styles.emptyContainer}>
-				<View style={styles.emptyContent}>
-					<Ionicons name="wallet-outline" size={64} color="#e0e0e0" />
-					<Text style={styles.emptyTitle}>No Budgets Yet</Text>
-					<Text style={styles.emptySubtext}>
-						Create your first budget to start tracking your spending and take
-						control of your finances
-					</Text>
-					<RectButton
-						style={styles.emptyAddButton}
-						onPress={showModal}
-						{...accessibilityProps.button}
-						accessibilityLabel={generateAccessibilityLabel.button(
-							'Add',
-							'first budget'
-						)}
-						accessibilityHint="Double tap to create your first budget"
-					>
-						<Ionicons name="add" size={20} color="#fff" />
-						<Text style={styles.emptyAddButtonText}>Add Budget</Text>
-					</RectButton>
-				</View>
-			</View>
-		),
-		[showModal]
-	);
 
 	// ==========================================
 	// Period Toggle Handler
@@ -263,6 +157,15 @@ export default function BudgetScreen() {
 		}
 	}, [activeTab]);
 
+	// ========= ADDED: computed period stats for the "professional" summary =========
+	const now = useMemo(() => new Date(), []);
+
+	const combined = useMemo(() => {
+		const total = monthlySummary.totalAllocated + weeklySummary.totalAllocated;
+		const spent = monthlySummary.totalSpent + weeklySummary.totalSpent;
+		return { total, spent };
+	}, [monthlySummary, weeklySummary]);
+
 	// ==========================================
 	// Budget Summary Components
 	// ==========================================
@@ -271,17 +174,18 @@ export default function BudgetScreen() {
 			<AllBudgetSummary
 				percentage={Math.min(
 					((monthlySummary.totalSpent + weeklySummary.totalSpent) /
-						(monthlySummary.totalAllocated + weeklySummary.totalAllocated)) *
+						(monthlySummary.totalAllocated + weeklySummary.totalAllocated ||
+							1)) *
 						100,
 					100
 				)}
-				spent={monthlySummary.totalSpent + weeklySummary.totalSpent}
-				total={monthlySummary.totalAllocated + weeklySummary.totalAllocated}
+				spent={combined.spent}
+				total={combined.total}
 				onPeriodToggle={handlePeriodToggle}
 				isActive={activeTab === 'all'}
 			/>
 		),
-		[monthlySummary, weeklySummary, handlePeriodToggle, activeTab]
+		[monthlySummary, weeklySummary, combined, handlePeriodToggle, activeTab]
 	);
 
 	const MonthlyBudgetSummaryComponent = useCallback(
@@ -328,128 +232,140 @@ export default function BudgetScreen() {
 		}
 	}, [budgets, activeTab]);
 
-	// ==========================================
-	// Generate Budget Insights
-	// ==========================================
-	const generateBudgetInsights = useCallback(
-		(budgets: Budget[]): InsightCard[] => {
-			const insights: InsightCard[] = [];
+	// Simplified period stats - just for the professional summary
+	const periodStats = useMemo(() => {
+		const fmt = (d: Date) =>
+			d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
-			// 1) Overspend risk insights
-			budgets.forEach((budget) => {
-				const ratio = budget.amount ? (budget.spent || 0) / budget.amount : 0;
-				if (ratio >= 0.8 && (budget.amount || 0) > (budget.spent || 0)) {
-					insights.push({
-						id: `overspend_${budget.id}`,
-						severity: 'warn',
-						headline: `${budget.name} at ${(ratio * 100).toFixed(0)}%`,
-						detail: `You're close to your limit. Consider adjusting spending.`,
-						cta: {
-							label: 'Adjust Budget',
-							action: 'OPEN_BUDGET',
-							payload: { category: budget.name },
-						},
-						evidence: { factIds: [budget.id] },
-					});
-				}
-			});
+		if (activeTab === 'monthly') {
+			const periodStart = startOfMonth(now);
+			const periodEnd = endOfMonth(now);
+			const total = monthlySummary.totalAllocated || 0;
+			const spent = monthlySummary.totalSpent || 0;
+			const remaining = Math.max(0, total - spent);
+			const totalDays = daysBetween(periodStart, periodEnd);
+			const elapsedDays = Math.min(totalDays, daysBetween(periodStart, now));
+			const daysLeft = Math.max(0, totalDays - elapsedDays);
+			const pacePerDay = elapsedDays > 0 ? spent / elapsedDays : 0;
+			const projected = pacePerDay * totalDays;
 
-			// 2) Critical overspend insights
-			budgets.forEach((budget) => {
-				const ratio = budget.amount ? (budget.spent || 0) / budget.amount : 0;
-				if (ratio >= 1.0) {
-					insights.push({
-						id: `critical_${budget.id}`,
-						severity: 'critical',
-						headline: `${budget.name} over budget`,
-						detail: `You've exceeded your budget by $${(
-							(budget.spent || 0) - budget.amount
-						).toFixed(2)}.`,
-						cta: {
-							label: 'Review Budget',
-							action: 'OPEN_BUDGET',
-							payload: { category: budget.name },
-						},
-						evidence: { factIds: [budget.id] },
-					});
-				}
-			});
+			return {
+				label: `This Month • ${fmt(periodStart)}–${fmt(periodEnd)}`,
+				total,
+				spent,
+				remaining,
+				daysLeft,
+				projected,
+			};
+		}
 
-			// 3) Good progress insights
-			budgets.forEach((budget) => {
-				const ratio = budget.amount ? (budget.spent || 0) / budget.amount : 0;
-				if (ratio <= 0.5 && (budget.spent || 0) > 0) {
-					insights.push({
-						id: `progress_${budget.id}`,
-						severity: 'info',
-						headline: `${budget.name} on track`,
-						detail: `Great job staying within budget!`,
-						evidence: { factIds: [budget.id] },
-					});
-				}
-			});
+		if (activeTab === 'weekly') {
+			const periodStart = startOfWeek(now);
+			const periodEnd = endOfWeek(now);
+			const total = weeklySummary.totalAllocated || 0;
+			const spent = weeklySummary.totalSpent || 0;
+			const remaining = Math.max(0, total - spent);
+			const totalDays = daysBetween(periodStart, periodEnd);
+			const elapsedDays = Math.min(totalDays, daysBetween(periodStart, now));
+			const daysLeft = Math.max(0, totalDays - elapsedDays);
+			const pacePerDay = elapsedDays > 0 ? spent / elapsedDays : 0;
+			const projected = pacePerDay * totalDays;
 
-			// 4) Budget creation suggestion
-			if (budgets.length < 3) {
-				insights.push({
-					id: 'create_more_budgets',
-					severity: 'info',
-					headline: 'Create more budgets',
-					detail:
-						'Add budgets for dining, entertainment, and other categories.',
-					cta: {
-						label: 'Add Budget',
-						action: 'OPEN_BUDGET',
-					},
-					evidence: { factIds: [] },
-				});
-			}
+			return {
+				label: `This Week • ${fmt(periodStart)}–${fmt(periodEnd)}`,
+				total,
+				spent,
+				remaining,
+				daysLeft,
+				projected,
+			};
+		}
 
-			// 5) Weekly vs Monthly budget balance insight
-			if (budgets.length > 0) {
-				const weeklyBudgets = budgets.filter((b) => b.period === 'weekly');
-				const monthlyBudgets = budgets.filter((b) => b.period === 'monthly');
+		// 'all' view
+		const periodStart = startOfWeek(now);
+		const periodEnd = endOfMonth(now);
+		const total = combined.total || 0;
+		const spent = combined.spent || 0;
+		const remaining = Math.max(0, total - spent);
 
-				if (weeklyBudgets.length > 0 && monthlyBudgets.length === 0) {
-					insights.push({
-						id: 'add_monthly_budgets',
-						severity: 'info',
-						headline: 'Consider monthly budgets',
-						detail: 'Add monthly budgets for better long-term planning.',
-						cta: {
-							label: 'Add Monthly Budget',
-							action: 'OPEN_BUDGET',
-						},
-						evidence: { factIds: [] },
-					});
-				}
-			}
+		return {
+			label: `Overview • ${periodStart.toLocaleDateString()}–${periodEnd.toLocaleDateString()}`,
+			total,
+			spent,
+			remaining,
+			daysLeft: null as number | null,
+			projected: null as number | null,
+		};
+	}, [activeTab, now, monthlySummary, weeklySummary, combined]);
 
-			return insights.slice(0, 3); // Limit to 3 insights
-		},
-		[]
+	// ========= ADDED: small stat cell =========
+	const Stat = ({
+		label,
+		value,
+		subtle,
+	}: {
+		label: string;
+		value: string;
+		subtle?: boolean;
+	}) => (
+		<View style={{ flex: 1, minWidth: 120, marginRight: 12, marginBottom: 12 }}>
+			<Text style={[type.small, { color: palette.textMuted }]}>{label}</Text>
+			<Text
+				style={[
+					type.body,
+					{ fontWeight: '600', color: subtle ? palette.text : palette.text },
+				]}
+				accessibilityLabel={`${label} ${value}`}
+			>
+				{value}
+			</Text>
+		</View>
 	);
 
 	// ==========================================
 	// Main Render
 	// ==========================================
-	// Show skeleton loading state while fetching data
+	// Show loading state while fetching data
 	if (isLoading && !hasLoaded) {
-		return <SkeletonLoadingState />;
+		return <LoadingState label="Loading budgets..." />;
 	}
 
 	// Show error state if there's an error
 	if (error && hasLoaded) {
-		return <ErrorState />;
+		return <ErrorState onRetry={onRefresh} title="Unable to load budgets" />;
 	}
 
 	// Show empty state if no budgets and data has loaded
 	if (budgets.length === 0 && hasLoaded) {
-		return <EmptyState />;
+		return (
+			<EmptyState
+				icon="wallet-outline"
+				title="No Budgets Yet"
+				subtitle="Create your first budget to start tracking your spending."
+				ctaLabel="Add Budget"
+				onPress={showModal}
+			/>
+		);
 	}
 
 	return (
-		<View style={styles.mainContainer}>
+		<Page
+			title="Budgets"
+			subtitle={`${budgets.length} ${
+				budgets.length === 1 ? 'budget' : 'budgets'
+			} • ${activeTab} view`}
+			right={
+				<SegmentedControl
+					segments={[
+						{ key: 'all', label: 'All' },
+						{ key: 'monthly', label: 'Monthly' },
+						{ key: 'weekly', label: 'Weekly' },
+					]}
+					value={activeTab}
+					onChange={(k) => setActiveTab(k as any)}
+				/>
+			}
+		>
 			<ScrollView
 				showsVerticalScrollIndicator={false}
 				contentContainerStyle={{ paddingBottom: 24 }}
@@ -463,45 +379,8 @@ export default function BudgetScreen() {
 				}
 				accessibilityLabel="Budgets overview content"
 			>
-				{/* Page Header with Add Button */}
-				<View style={styles.pageHeader}>
-					<View style={styles.pageHeaderContent}>
-						<Text
-							style={[styles.pageHeaderTitle, dynamicTextStyle]}
-							accessibilityRole="header"
-							accessibilityLabel="Budgets overview"
-						>
-							Budgets Overview
-						</Text>
-						<Text
-							style={[styles.pageHeaderSubtitle, dynamicTextStyle]}
-							accessibilityRole="text"
-							accessibilityLabel="Manage your spending across different categories"
-						>
-							{budgets.length > 0
-								? `${budgets.length} budget${
-										budgets.length === 1 ? '' : 's'
-								  } • ${activeTab} view`
-								: 'Manage your spending across different categories'}
-						</Text>
-					</View>
-					<TouchableOpacity
-						style={styles.addButton}
-						onPress={showModal}
-						{...accessibilityProps.button}
-						accessibilityLabel={generateAccessibilityLabel.button(
-							'Add',
-							'budget'
-						)}
-						accessibilityHint="Double tap to create a new budget"
-					>
-						<Ionicons name="add" size={20} color="#0f0f0f" />
-						<Text style={styles.addButtonText}>Add Budget</Text>
-					</TouchableOpacity>
-				</View>
-
-				{/* Header */}
-				<View style={{ marginTop: 12 }}>
+				{/* Summary */}
+				<Card style={{ marginTop: 0 }}>
 					{activeTab === 'all' ? (
 						<AllBudgetsSummaryComponent />
 					) : activeTab === 'monthly' ? (
@@ -509,291 +388,90 @@ export default function BudgetScreen() {
 					) : (
 						<WeeklyBudgetSummaryComponent />
 					)}
-				</View>
 
-				{/* AI Insight Chips */}
-				{/* Educational Disclaimer */}
-				<View style={styles.disclaimerContainer}>
-					<Ionicons name="information-circle" size={16} color="#ef4444" />
-					<Text style={styles.disclaimerText}>
-						These are educational insights, not financial advice.
-					</Text>
-				</View>
+					{/* ========= ADDED: Professional Summary Details ========= */}
+					<View
+						style={{
+							marginTop: space.md,
+							borderTopWidth: 1,
+							borderTopColor: palette.border,
+							paddingTop: space.md,
+						}}
+						accessibilityLabel="Budget summary details"
+					>
+						<Text
+							style={[
+								type.small,
+								{ color: palette.textMuted, marginBottom: 8 },
+							]}
+						>
+							{periodStats.label}
+						</Text>
 
-				<InsightChipsRow
-					insights={generateBudgetInsights(budgets)}
-					title="Budget Insights"
-					onInsightPress={(insight) => {
-						console.log('Budget insight pressed:', insight);
-					}}
-					onCTAPress={(action, payload) => {
-						console.log('Budget CTA pressed:', action, payload);
-						// Handle insight actions
-						if (action === 'OPEN_BUDGET') {
-							if (payload?.category) {
-								// Navigate to specific budget category
-								const budget = budgets.find((b) => b.name === payload.category);
-								if (budget) {
-									router.push(`/(stack)/editBudget?id=${budget.id}` as any);
-								}
-							} else {
-								router.push('/(stack)/addBudget' as any);
-							}
-						} else if (action === 'CREATE_RULE') {
-							router.push('/(stack)/addRecurringExpense' as any);
-						} else if (action === 'MARK_PAID') {
-							console.log('Mark as paid:', payload);
-						} else if (action === 'SHIFT_FUNDS') {
-							console.log('Shift funds:', payload);
-						}
-					}}
-					variant="compact"
-					showTitle={true}
-					maxInsights={3}
-				/>
-				<View
-					style={{
-						marginTop: 16,
-						borderTopWidth: 1,
-						borderTopColor: '#E0E0E0',
-					}}
-				>
-					<BudgetsFeed
-						scrollEnabled={false}
-						budgets={filteredBudgets}
-						onPressMenu={(id: string) => {
-							const b = budgets.find((bb) => bb.id === id);
-							if (b) {
+						<View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+							<Stat
+								label="Total Budget"
+								value={currency(periodStats.total || 0)}
+							/>
+							<Stat label="Spent" value={currency(periodStats.spent || 0)} />
+							<Stat
+								label="Remaining"
+								value={currency(periodStats.remaining || 0)}
+							/>
+							{periodStats.daysLeft !== null && (
+								<Stat
+									label="Days Left"
+									value={`${periodStats.daysLeft} day${
+										periodStats.daysLeft === 1 ? '' : 's'
+									}`}
+								/>
+							)}
+							{periodStats.projected !== null && (
+								<Stat
+									label="Projected EOM"
+									value={currency(periodStats.projected || 0)}
+								/>
+							)}
+						</View>
+
+						{/* Gentle risk note if projection exceeds total */}
+						{periodStats.projected !== null &&
+							periodStats.total > 0 &&
+							periodStats.projected! > periodStats.total && (
+								<Text
+									style={[type.small, { color: palette.danger, marginTop: 6 }]}
+								>
+									Heads-up: projected spend exceeds the plan by{' '}
+									{currency(periodStats.projected! - periodStats.total)}.
+								</Text>
+							)}
+					</View>
+				</Card>
+
+				{/* List */}
+				<Section title="Your Budgets">
+					<Card>
+						<BudgetsFeed
+							scrollEnabled={false}
+							budgets={filteredBudgets}
+							onPressMenu={(id: string) => {
+								const b = budgets.find((bb) => bb.id === id);
+								if (!b) return;
 								Alert.alert(
 									'Budget Options',
 									`What would you like to do with "${b.name}"?`,
 									[
-										{
-											text: 'Edit',
-											onPress: () => showEditModal(b),
-										},
-										{
-											text: 'Cancel',
-											style: 'cancel',
-										},
+										{ text: 'Edit', onPress: () => showEditModal(b) },
+										{ text: 'Cancel', style: 'cancel' },
 									]
 								);
-							}
-						}}
-					/>
-				</View>
+							}}
+						/>
+					</Card>
+				</Section>
 			</ScrollView>
-		</View>
+		</Page>
 	);
 }
 
-// ==========================================
-// Styles
-// ==========================================
-const styles = StyleSheet.create({
-	mainContainer: {
-		flex: 1,
-		backgroundColor: '#fff',
-	},
-	emptyContainer: {
-		flex: 1,
-		justifyContent: 'center',
-		alignItems: 'center',
-		paddingHorizontal: 24,
-	},
-	emptyContent: {
-		alignItems: 'center',
-		maxWidth: 280,
-	},
-	emptyTitle: {
-		fontSize: 24,
-		fontWeight: '600',
-		color: '#212121',
-		marginTop: 16,
-		marginBottom: 8,
-		textAlign: 'center',
-	},
-	emptySubtext: {
-		fontSize: 16,
-		color: '#757575',
-		textAlign: 'center',
-		marginBottom: 32,
-		lineHeight: 22,
-	},
-	emptyAddButton: {
-		backgroundColor: '#00a2ff',
-		borderRadius: 12,
-		paddingVertical: 16,
-		paddingHorizontal: 24,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-	},
-	emptyAddButtonText: {
-		fontSize: 16,
-		color: '#fff',
-		fontWeight: '600',
-	},
-	pageHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		paddingHorizontal: 24,
-		paddingTop: 16,
-	},
-	pageHeaderContent: {
-		flex: 1,
-	},
-	pageHeaderTitle: {
-		fontSize: 20,
-		fontWeight: '600',
-		color: '#212121',
-	},
-	pageHeaderSubtitle: {
-		fontSize: 14,
-		color: '#757575',
-		marginTop: 4,
-	},
-	addButton: {
-		backgroundColor: '#f7f7f7',
-		borderRadius: 12,
-		paddingVertical: 12,
-		paddingHorizontal: 10,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		borderWidth: 1,
-		borderColor: '#e5e5e5',
-	},
-	addButtonText: {
-		color: '#0f0f0f',
-		fontSize: 14,
-		fontWeight: '600',
-	},
-	loadingContainer: {
-		flex: 1,
-		justifyContent: 'center',
-		alignItems: 'center',
-		backgroundColor: '#fff',
-	},
-	loadingText: {
-		marginTop: 16,
-		fontSize: 16,
-		color: '#757575',
-	},
-	errorContainer: {
-		flex: 1,
-		justifyContent: 'center',
-		alignItems: 'center',
-		paddingHorizontal: 24,
-		backgroundColor: '#fff',
-	},
-	errorContent: {
-		alignItems: 'center',
-		maxWidth: 280,
-	},
-	errorTitle: {
-		fontSize: 24,
-		fontWeight: '600',
-		color: '#212121',
-		marginTop: 16,
-		marginBottom: 8,
-		textAlign: 'center',
-	},
-	errorSubtext: {
-		fontSize: 16,
-		color: '#757575',
-		textAlign: 'center',
-		marginBottom: 32,
-		lineHeight: 22,
-	},
-	errorButton: {
-		backgroundColor: '#00a2ff',
-		borderRadius: 12,
-		paddingVertical: 16,
-		paddingHorizontal: 24,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-	},
-	errorButtonText: {
-		color: '#FFFFFF',
-		fontSize: 16,
-		fontWeight: '600',
-	},
-
-	// Disclaimer styles
-	disclaimerContainer: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#fef2f2',
-		borderRadius: 8,
-		paddingHorizontal: 12,
-		paddingVertical: 8,
-		marginBottom: 16,
-		borderWidth: 1,
-		borderColor: '#fecaca',
-	},
-	disclaimerText: {
-		flex: 1,
-		fontSize: 12,
-		color: '#dc2626',
-		marginLeft: 8,
-		lineHeight: 16,
-		fontWeight: '500',
-	},
-
-	// Skeleton loading styles
-	skeletonText: {
-		backgroundColor: '#f0f0f0',
-		borderRadius: 4,
-	},
-	skeletonButton: {
-		backgroundColor: '#f0f0f0',
-		borderRadius: 12,
-	},
-	skeletonCard: {
-		backgroundColor: '#f0f0f0',
-		borderRadius: 16,
-		marginHorizontal: 24,
-	},
-	skeletonInsights: {
-		paddingHorizontal: 24,
-		marginTop: 16,
-	},
-	skeletonChips: {
-		flexDirection: 'row',
-		gap: 12,
-	},
-	skeletonChip: {
-		height: 60,
-		backgroundColor: '#f0f0f0',
-		borderRadius: 12,
-	},
-	skeletonList: {
-		marginTop: 16,
-		paddingHorizontal: 24,
-	},
-	skeletonBudgetItem: {
-		flexDirection: 'row',
-		alignItems: 'flex-start',
-		paddingVertical: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: '#e5e7eb',
-	},
-	skeletonIcon: {
-		width: 40,
-		height: 40,
-		backgroundColor: '#f0f0f0',
-		borderRadius: 12,
-		marginRight: 12,
-	},
-	skeletonContent: {
-		flex: 1,
-	},
-	skeletonProgress: {
-		height: 4,
-		backgroundColor: '#f0f0f0',
-		borderRadius: 2,
-	},
-});
+// Styles are now handled by the design system components

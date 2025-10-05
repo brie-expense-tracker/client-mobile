@@ -72,6 +72,20 @@ import {
 	Insight,
 } from '../../../src/services/insights/insightsContextService';
 import ContextualInsightsPanel from '../../../src/components/assistant/panels/ContextualInsightsPanel';
+import {
+	AppEvents,
+	EVT_AI_INSIGHTS_CHANGED,
+	EVT_ASSISTANT_CONFIG_CHANGED,
+	AIInsightsChangedEvent,
+	AssistantConfigChangedEvent,
+} from '../../../src/lib/eventBus';
+import {
+	toAssistantConfig,
+	AssistantConfig,
+	isPersonalizationOn,
+	allowProactive,
+	shouldEnrichPrompts,
+} from '../../../src/state/assistantConfig';
 
 export default function AssistantScreen() {
 	const router = useRouter();
@@ -81,6 +95,72 @@ export default function AssistantScreen() {
 	const { transactions } = useContext(TransactionContext) as {
 		transactions: any[];
 	};
+
+	// Keep local assistant config that reacts instantly to events
+	const [config, setConfig] = useState<AssistantConfig>(() =>
+		toAssistantConfig(
+			profile?.preferences?.assistant,
+			profile?.preferences?.aiInsights
+		)
+	);
+
+	// Stay in sync with profile when it refetches
+	useEffect(() => {
+		setConfig(
+			toAssistantConfig(
+				profile?.preferences?.assistant,
+				profile?.preferences?.aiInsights
+			)
+		);
+	}, [profile?.preferences?.assistant, profile?.preferences?.aiInsights]);
+
+	// React instantly to assistant config changes from anywhere in the app
+	useEffect(() => {
+		const handler = ({ config: newConfig }: AssistantConfigChangedEvent) => {
+			console.log('🔧 [DEBUG] Assistant config event received:', newConfig);
+			setConfig(newConfig);
+
+			// Clear context when personalization is disabled
+			if (!isPersonalizationOn(newConfig)) {
+				const insightsServiceInstance = InsightsContextService.getInstance();
+				insightsServiceInstance.clearContext();
+				setCurrentConversationContext('');
+			}
+		};
+
+		AppEvents.on(EVT_ASSISTANT_CONFIG_CHANGED, handler);
+		return () => {
+			AppEvents.off(EVT_ASSISTANT_CONFIG_CHANGED, handler);
+		};
+	}, []);
+
+	// Legacy support for AI insights events
+	useEffect(() => {
+		const handler = ({ enabled }: AIInsightsChangedEvent) => {
+			console.log('🔧 [DEBUG] Legacy AI insights event received:', { enabled });
+			// Convert to new config format
+			const newConfig = enabled
+				? { ...config, mode: 'personalized' as const }
+				: { ...config, mode: 'private' as const };
+			setConfig(newConfig);
+		};
+
+		AppEvents.on(EVT_AI_INSIGHTS_CHANGED, handler);
+		return () => {
+			AppEvents.off(EVT_AI_INSIGHTS_CHANGED, handler);
+		};
+	}, [config]);
+
+	// Debug: Log config changes
+	useEffect(() => {
+		console.log('🔧 [DEBUG] Assistant config changed:', {
+			config,
+			hasProfile: !!profile,
+			isPersonalizationOn: isPersonalizationOn(config),
+			allowProactive: allowProactive(config),
+			timestamp: new Date().toISOString(),
+		});
+	}, [config, profile]);
 
 	// Initialize messages with reducer
 	const initialMessages: Message[] = [
@@ -194,52 +274,77 @@ export default function AssistantScreen() {
 		});
 	}, [messages]);
 
-	// Load insights context from profile insights
+	// Load insights context (only if personalization is enabled)
 	const loadInsightsContext = useCallback(async () => {
+		if (!isPersonalizationOn(config)) return; // Guard: don't load if disabled
+
 		try {
 			// Load context from AsyncStorage (set by profile insights)
 			await insightsService.loadContext();
 
-			// Load insights with current data
-			await insightsService.loadInsights(profile, budgets, goals, transactions);
+			// Load insights with filtered data based on config
+			const filteredBudgets = config.useBudgetsGoals ? budgets : [];
+			const filteredGoals = config.useBudgetsGoals ? goals : [];
+			const filteredTransactions = config.useTransactions ? transactions : [];
 
-			console.log('[Assistant] Loaded insights context and data');
+			await insightsService.loadInsights(
+				profile,
+				filteredBudgets,
+				filteredGoals,
+				filteredTransactions
+			);
+
+			console.log(
+				'[Assistant] Loaded insights context and data with config:',
+				config
+			);
 		} catch (error) {
 			console.error('[Assistant] Failed to load insights context:', error);
 		}
-	}, [insightsService, profile, budgets, goals, transactions]);
+	}, [config, insightsService, profile, budgets, goals, transactions]);
 
 	// Initialize orchestrator service when profile is available
 	useEffect(() => {
-		if (profile) {
-			// Create a basic financial context from profile data
-			const financialContext = {
-				profile: {
-					monthlyIncome: profile.monthlyIncome || 0,
-					savings: profile.savings || 0,
-					debt: profile.debt || 0,
-					expenses:
-						(profile.expenses as unknown as Record<string, number>) || {},
-					financialGoal: profile.financialGoal || '',
-					riskProfile: profile.riskProfile || {
-						tolerance: 'moderate',
-						experience: 'beginner',
-					},
+		if (!profile) return;
+
+		// Create a basic financial context from profile data
+		const financialContext = {
+			profile: {
+				monthlyIncome: profile.monthlyIncome || 0,
+				savings: profile.savings || 0,
+				debt: profile.debt || 0,
+				expenses: (profile.expenses as unknown as Record<string, number>) || {},
+				financialGoal: profile.financialGoal || '',
+				riskProfile: profile.riskProfile || {
+					tolerance: 'moderate',
+					experience: 'beginner',
 				},
-				budgets: [],
-				goals: [],
-				transactions: [],
-			};
-			const service = new OrchestratorAIService(financialContext);
-			setOrchestratorService(service);
+			},
+			budgets: [],
+			goals: [],
+			transactions: [],
+		};
+		const service = new OrchestratorAIService(financialContext);
+		setOrchestratorService(service);
 
-			// Load fallback data
-			loadFallbackData();
+		// Load fallback data
+		loadFallbackData();
 
-			// Load insights context
+		// Handle insights based on config state
+		if (isPersonalizationOn(config)) {
 			loadInsightsContext();
+		} else {
+			insightsService.clearInsights(); // Clear cache when disabled
 		}
-	}, [profile, budgets, goals, transactions, loadInsightsContext]);
+	}, [
+		profile,
+		budgets,
+		goals,
+		transactions,
+		loadInsightsContext,
+		config,
+		insightsService,
+	]);
 
 	// Track when data is initialized
 	useEffect(() => {
@@ -258,6 +363,24 @@ export default function AssistantScreen() {
 		});
 		return unsubscribe;
 	}, []);
+
+	// Proactively clear cached insights when the user turns the toggle OFF
+	useEffect(() => {
+		const personalizationEnabled = isPersonalizationOn(config);
+		console.log('🔧 [DEBUG] Config change effect triggered:', {
+			config,
+			personalizationEnabled,
+			willClearContext: !personalizationEnabled,
+		});
+
+		if (!personalizationEnabled) {
+			console.log(
+				'🧹 [DEBUG] Clearing insights context and conversation context'
+			);
+			insightsService.clearInsights(); // Wipe any lingering context/insights
+			setCurrentConversationContext(''); // Clear conversation-derived context
+		}
+	}, [config, insightsService]);
 
 	// Track critical state changes only
 	useEffect(() => {
@@ -576,25 +699,27 @@ export default function AssistantScreen() {
 		// Update conversation context for insights
 		setCurrentConversationContext(currentInput);
 
-		// Get insights context for conversation
-		const insightsContext = insightsService.getContextForConversation();
-		const relevantInsights = insightsService.getRelevantInsights(
-			currentInput,
-			2
-		);
-
-		// Enhance user input with insights context if available
+		// Enhance user input with insights context based on config
 		let enhancedInput = currentInput;
-		if (insightsContext) {
-			enhancedInput = `${currentInput}\n\nContext: ${insightsContext}`;
-		}
 
-		// Add relevant insights to context
-		if (relevantInsights.length > 0) {
-			const insightsText = relevantInsights
-				.map((insight) => `- ${insight.title}: ${insight.message}`)
-				.join('\n');
-			enhancedInput += `\n\nRelevant insights:\n${insightsText}`;
+		if (shouldEnrichPrompts(config, currentInput)) {
+			const insightsContext = insightsService.getContextForConversation();
+			const relevantInsights = insightsService.getRelevantInsights(
+				currentInput,
+				2
+			);
+
+			if (insightsContext) {
+				enhancedInput += `\n\nContext: ${insightsContext}`;
+			}
+
+			// Add relevant insights to context
+			if (relevantInsights.length > 0) {
+				const insightsText = relevantInsights
+					.map((insight) => `- ${insight.title}: ${insight.message}`)
+					.join('\n');
+				enhancedInput += `\n\nRelevant insights:\n${insightsText}`;
+			}
 		}
 
 		// Check intent sufficiency before sending to AI
@@ -960,8 +1085,10 @@ export default function AssistantScreen() {
 							setLastProcessedMessage('');
 						}, 1000);
 
-						// Clear insights context after successful conversation
-						insightsService.clearContext();
+						// Clear insights context after successful conversation (only if personalization enabled)
+						if (isPersonalizationOn(config)) {
+							insightsService.clearContext();
+						}
 
 						if (uiTimeout) {
 							clearTimeout(uiTimeout);
@@ -1305,9 +1432,10 @@ export default function AssistantScreen() {
 					contentContainerStyle={styles.messagesContainer}
 					ListFooterComponent={
 						<View>
-							{/* Contextual Insights Panel */}
-							{!isStreaming && dataInitialized && (
+							{/* Contextual Insights Panel - only render when proactive mode is enabled */}
+							{allowProactive(config) && !isStreaming && dataInitialized && (
 								<ContextualInsightsPanel
+									key={`cip-${config.mode}-${config.showProactiveCards}`}
 									conversationContext={currentConversationContext}
 									onInsightPress={handleInsightPress}
 									onAskAboutInsight={handleAskAboutInsight}

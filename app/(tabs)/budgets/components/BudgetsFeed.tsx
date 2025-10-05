@@ -191,7 +191,6 @@ const styles = StyleSheet.create({
 
 	tabsRow: {
 		flexDirection: 'row',
-		paddingHorizontal: 16,
 		paddingTop: 12,
 		paddingBottom: 8,
 	},
@@ -213,7 +212,6 @@ const styles = StyleSheet.create({
 	rowContainer: {
 		flexDirection: 'row',
 		alignItems: 'flex-start',
-		paddingHorizontal: 16,
 		paddingVertical: 16,
 		borderBottomWidth: 1,
 		borderBottomColor: '#e5e7eb',

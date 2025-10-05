@@ -90,8 +90,7 @@ const GoalsSummaryCard: React.FC<Props> = ({
 const styles = StyleSheet.create({
 	container: {
 		backgroundColor: '#ffffff',
-		paddingHorizontal: 24,
-		paddingVertical: 12,
+		
 		borderBottomWidth: 1,
 		borderBottomColor: '#e5e7eb',
 	},

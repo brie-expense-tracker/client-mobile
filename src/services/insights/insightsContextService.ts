@@ -191,6 +191,14 @@ export class InsightsContextService {
 	}
 
 	/**
+	 * Clear all insights data
+	 */
+	public clearInsights(): void {
+		this.insights = [];
+		this.context = null;
+	}
+
+	/**
 	 * Get context for conversation
 	 */
 	public getContextForConversation(): string {
