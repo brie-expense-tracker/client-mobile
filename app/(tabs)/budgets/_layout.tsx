@@ -18,6 +18,7 @@ import {
 	generateAccessibilityLabel,
 	voiceOverHints,
 } from '../../../src/utils/accessibility';
+import { palette, space } from '../../../src/ui/theme';
 
 export default function BudgetLayout() {
 	const [activeTab, setActiveTab] = useState('budgets');
@@ -73,7 +74,9 @@ export default function BudgetLayout() {
 							<Ionicons
 								name="wallet-outline"
 								size={20}
-								color={activeTab === 'budgets' ? '#222222' : '#757575'}
+								color={
+									activeTab === 'budgets' ? palette.text : palette.textMuted
+								}
 								accessibilityRole="image"
 								accessibilityLabel="Budgets icon"
 							/>
@@ -104,7 +107,7 @@ export default function BudgetLayout() {
 							<Ionicons
 								name="flag-outline"
 								size={20}
-								color={activeTab === 'goals' ? '#222222' : '#757575'}
+								color={activeTab === 'goals' ? palette.text : palette.textMuted}
 								accessibilityRole="image"
 								accessibilityLabel="Goals icon"
 							/>
@@ -138,7 +141,9 @@ export default function BudgetLayout() {
 							<Ionicons
 								name="repeat-outline"
 								size={20}
-								color={activeTab === 'recurring' ? '#222222' : '#757575'}
+								color={
+									activeTab === 'recurring' ? palette.text : palette.textMuted
+								}
 								accessibilityRole="image"
 								accessibilityLabel="Recurring expenses icon"
 							/>
@@ -177,38 +182,39 @@ export default function BudgetLayout() {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: '#fff',
+		backgroundColor: palette.bg,
 	},
 	header: {
-		backgroundColor: '#fff',
+		backgroundColor: palette.bg,
 		borderBottomWidth: 1,
-		borderBottomColor: '#e0e0e0',
+		borderBottomColor: palette.border,
 	},
 	tabContainer: {
 		flexDirection: 'row',
-		paddingHorizontal: 24,
+		paddingHorizontal: space.xl,
 	},
 	tab: {
 		flex: 1,
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'center',
-		paddingVertical: 12,
+		paddingVertical: space.md,
 		marginHorizontal: 4,
+		borderBottomWidth: 2,
+		borderBottomColor: 'transparent',
 	},
 	activeTab: {
-		borderBottomWidth: 2,
-		borderBottomColor: '#222222',
+		borderBottomColor: palette.text,
 	},
 	tabText: {
 		marginLeft: 8,
 		fontSize: 16,
 		fontWeight: '600',
-		color: '#757575',
+		color: palette.textMuted,
 	},
 
 	activeTabText: {
-		color: '#222222',
+		color: palette.text,
 	},
 	content: {
 		flex: 1,

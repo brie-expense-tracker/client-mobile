@@ -74,6 +74,7 @@ export default function AIInsightsSettings() {
 		'basic' | 'standard' | 'premium'
 	>('standard');
 	const [aiEnabled, setAiEnabled] = useState(true);
+	const [saving, setSaving] = useState(false);
 
 	useEffect(() => {
 		if (profile?.preferences?.aiInsights) {
@@ -94,53 +95,67 @@ export default function AIInsightsSettings() {
 		}
 	}, [profile]);
 
-	const handlePresetChange = async (
-		preset: 'basic' | 'standard' | 'premium'
-	) => {
-		setSelectedPreset(preset);
-
-		const presetConfig = AI_PRESETS[preset];
-
+	const safeUpdate = async (fn: () => Promise<any>) => {
+		if (saving) return; // ignore double taps
+		setSaving(true);
 		try {
-			await updatePreferences({
-				aiInsights: {
-					enabled: aiEnabled,
-					frequency: presetConfig.frequency,
-					pushNotifications: presetConfig.pushNotifications,
-					emailAlerts: presetConfig.emailAlerts,
-					insightTypes: presetConfig.insightTypes,
-				},
-			});
-
-			Alert.alert('Success', `AI insights updated to ${presetConfig.name}`);
-		} catch (error) {
-			console.error('Error updating AI insights:', error);
-			Alert.alert('Error', 'Failed to update AI insights. Please try again.');
+			await fn();
+		} finally {
+			setSaving(false);
 		}
 	};
 
-	const handleToggleAI = async (value: boolean) => {
-		setAiEnabled(value);
+	const handlePresetChange = async (
+		preset: 'basic' | 'standard' | 'premium'
+	) => {
+		safeUpdate(async () => {
+			setSelectedPreset(preset);
 
-		try {
-			await updatePreferences({
-				aiInsights: {
-					enabled: value,
-					frequency: profile?.preferences?.aiInsights?.frequency || 'weekly',
-					pushNotifications:
-						profile?.preferences?.aiInsights?.pushNotifications ?? true,
-					emailAlerts: profile?.preferences?.aiInsights?.emailAlerts ?? false,
-					insightTypes: profile?.preferences?.aiInsights?.insightTypes || {
-						budgetingTips: true,
-						expenseReduction: true,
-						incomeSuggestions: false,
+			const presetConfig = AI_PRESETS[preset];
+
+			try {
+				await updatePreferences({
+					aiInsights: {
+						enabled: aiEnabled,
+						frequency: presetConfig.frequency,
+						pushNotifications: presetConfig.pushNotifications,
+						emailAlerts: presetConfig.emailAlerts,
+						insightTypes: presetConfig.insightTypes,
 					},
-				},
-			});
-		} catch (error) {
-			console.error('Error toggling AI insights:', error);
-			setAiEnabled(!value); // Revert on error
-		}
+				});
+
+				Alert.alert('Success', `AI insights updated to ${presetConfig.name}`);
+			} catch (error) {
+				console.error('Error updating AI insights:', error);
+				Alert.alert('Error', 'Failed to update AI insights. Please try again.');
+			}
+		});
+	};
+
+	const handleToggleAI = async (value: boolean) => {
+		safeUpdate(async () => {
+			setAiEnabled(value); // UI flips right away (ProfileContext will emit event)
+
+			try {
+				await updatePreferences({
+					aiInsights: {
+						enabled: value,
+						frequency: profile?.preferences?.aiInsights?.frequency || 'weekly',
+						pushNotifications:
+							profile?.preferences?.aiInsights?.pushNotifications ?? true,
+						emailAlerts: profile?.preferences?.aiInsights?.emailAlerts ?? false,
+						insightTypes: profile?.preferences?.aiInsights?.insightTypes || {
+							budgetingTips: true,
+							expenseReduction: true,
+							incomeSuggestions: false,
+						},
+					},
+				});
+			} catch (error) {
+				console.error('Error toggling AI insights:', error);
+				// ProfileContext will handle rollback automatically
+			}
+		});
 	};
 
 	return (
@@ -158,6 +173,7 @@ export default function AIInsightsSettings() {
 						<Switch
 							value={aiEnabled}
 							onValueChange={handleToggleAI}
+							disabled={saving}
 							trackColor={{ false: '#e5e7eb', true: '#0095FF' }}
 							thumbColor={aiEnabled ? '#fff' : '#f4f3f4'}
 						/>

@@ -549,7 +549,6 @@ const RecurringSummaryCard: React.FC<Props> = ({
 const styles = StyleSheet.create({
 	container: {
 		backgroundColor: '#fff',
-		paddingHorizontal: 16,
 		paddingVertical: 8,
 	},
 	headerSection: {

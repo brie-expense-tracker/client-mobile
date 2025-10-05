@@ -14,6 +14,7 @@ import { Goal } from '../../../../src/context/goalContext';
 import LinearProgressBar from './LinearProgressBar';
 import { router } from 'expo-router';
 import { normalizeIconName } from '../../../../src/constants/uiConstants';
+import { SegmentedControl, palette, type, space } from '../../../../src/ui';
 
 type GoalStatus = 'ongoing' | 'completed' | 'cancelled';
 
@@ -149,38 +150,53 @@ function GoalRow({
 	);
 }
 
-const TABS = [
-	{ key: 'all', label: 'All' },
-	{ key: 'ongoing', label: 'Active' },
-	{ key: 'completed', label: 'Completed' },
-	{ key: 'cancelled', label: 'Overdue' },
-] as const;
-type TabKey = (typeof TABS)[number]['key'];
-
 export default function GoalsFeed({
 	scrollEnabled = true,
 	onPressMenu,
 	goals: externalGoals,
+	filterBy = 'all',
+	onFilterChange,
+	sortBy = 'deadline',
+	onSortChange,
 }: {
 	scrollEnabled?: boolean;
 	onPressMenu?: (id: string) => void;
 	goals?: Goal[];
+	filterBy?: 'all' | 'active' | 'completed' | 'overdue';
+	onFilterChange?: (filter: 'all' | 'active' | 'completed' | 'overdue') => void;
+	sortBy?: 'name' | 'deadline' | 'progress' | 'target' | 'created';
+	onSortChange?: (
+		sort: 'name' | 'deadline' | 'progress' | 'target' | 'created'
+	) => void;
 }) {
-	const [tab, setTab] = useState<TabKey>('all');
 	const [refreshing, setRefreshing] = useState(false);
-	const { goals: hookGoals, isLoading, refetch } = useGoals();
+	const [showFilters, setShowFilters] = useState(false);
+	const { goals: hookGoals, isLoading, refetch, sortGoals } = useGoals();
 
 	// Use external goals if provided, otherwise use hook goals
 	const goals = externalGoals || hookGoals;
 
-	// Filter goals based on selected tab
-	const filtered = useMemo(() => {
+	// Filter and sort goals
+	const filteredAndSorted = useMemo(() => {
 		if (!goals || !Array.isArray(goals) || goals.length === 0) return [];
-		if (tab === 'all') return goals;
-		return goals.filter(
-			(goal) => goal && goal.id && getGoalStatus(goal) === tab
-		);
-	}, [tab, goals]);
+
+		// Apply filter
+		let filtered = goals;
+		if (filterBy !== 'all') {
+			const statusMap = {
+				active: 'ongoing',
+				completed: 'completed',
+				overdue: 'cancelled',
+			};
+			const targetStatus = statusMap[filterBy];
+			filtered = goals.filter(
+				(goal) => goal && goal.id && getGoalStatus(goal) === targetStatus
+			);
+		}
+
+		// Apply sorting
+		return sortGoals ? sortGoals(filtered, sortBy) : filtered;
+	}, [filterBy, sortBy, goals, sortGoals]);
 
 	const handleRefresh = async () => {
 		if (!refetch) return;
@@ -195,12 +211,12 @@ export default function GoalsFeed({
 	};
 
 	const getEmptyStateMessage = () => {
-		switch (tab) {
-			case 'ongoing':
+		switch (filterBy) {
+			case 'active':
 				return 'No active goals';
 			case 'completed':
 				return 'No completed goals';
-			case 'cancelled':
+			case 'overdue':
 				return 'No overdue goals';
 			default:
 				return 'No goals found';
@@ -208,12 +224,12 @@ export default function GoalsFeed({
 	};
 
 	const getEmptyStateSubtitle = () => {
-		switch (tab) {
-			case 'ongoing':
+		switch (filterBy) {
+			case 'active':
 				return 'Create a new goal to start tracking your progress';
 			case 'completed':
 				return 'Complete some goals to see them here';
-			case 'cancelled':
+			case 'overdue':
 				return 'All your goals are on track!';
 			default:
 				return 'Add your first goal to get started';
@@ -222,40 +238,99 @@ export default function GoalsFeed({
 
 	return (
 		<View style={styles.screen}>
-			{/* Segmented tabs */}
-			<View style={styles.tabsRow}>
-				{TABS.map((t) => {
-					const active = tab === t.key;
-					return (
-						<TouchableOpacity
-							key={t.key}
-							onPress={() => setTab(t.key)}
+			{/* Filter Toggle Button */}
+			<View style={styles.toggleContainer}>
+				<TouchableOpacity
+					style={styles.toggleButton}
+					onPress={() => setShowFilters(!showFilters)}
+					activeOpacity={0.7}
+				>
+					<Ionicons
+						name={showFilters ? 'chevron-up' : 'chevron-down'}
+						size={16}
+						color={palette.textMuted}
+					/>
+					<Text style={styles.toggleText}>
+						{showFilters ? 'Hide Filters' : 'Show Filters'}
+					</Text>
+				</TouchableOpacity>
+			</View>
+
+			{/* Filter and Sort Controls */}
+			{showFilters && (
+				<View
+					style={{
+						padding: space.md,
+						backgroundColor: palette.bg,
+						borderRadius: 12,
+						borderWidth: 1,
+						borderColor: palette.border,
+						marginBottom: space.md,
+					}}
+				>
+					{/* Row 1: Filter */}
+					<View style={{ marginBottom: space.md }}>
+						<Text
 							style={[
-								styles.tabBtn,
-								active ? styles.tabBtnActive : styles.tabBtnIdle,
+								type.small,
+								{ color: palette.textMuted, marginBottom: 8 },
 							]}
 						>
-							<Text
-								style={[
-									styles.tabText,
-									active ? styles.tabTextActive : styles.tabTextIdle,
-								]}
-							>
-								{t.label}
-							</Text>
-						</TouchableOpacity>
-					);
-				})}
-			</View>
+							Filter
+						</Text>
+						<SegmentedControl
+							value={filterBy}
+							onChange={(key) => onFilterChange?.(key as any)}
+							segments={[
+								{ key: 'all', label: 'All' },
+								{ key: 'active', label: 'Active' },
+								{ key: 'completed', label: 'Completed' },
+								{ key: 'overdue', label: 'Overdue' },
+							]}
+						/>
+					</View>
+
+					{/* Divider */}
+					<View
+						style={{
+							height: 1,
+							backgroundColor: palette.border,
+							marginVertical: 2,
+						}}
+					/>
+
+					{/* Row 2: Sort */}
+					<View style={{ marginTop: space.md }}>
+						<Text
+							style={[
+								type.small,
+								{ color: palette.textMuted, marginBottom: 8 },
+							]}
+						>
+							Sort by
+						</Text>
+						<SegmentedControl
+							value={sortBy}
+							onChange={(key) => onSortChange?.(key as any)}
+							segments={[
+								{ key: 'deadline', label: 'Deadline' },
+								{ key: 'progress', label: 'Progress' },
+								{ key: 'name', label: 'Name' },
+								{ key: 'target', label: 'Amount' },
+							]}
+						/>
+					</View>
+				</View>
+			)}
 
 			{isLoading ? (
 				<View style={styles.loadingState}>
 					<ActivityIndicator size="large" color="#007ACC" />
 					<Text style={styles.loadingText}>Loading goals...</Text>
 				</View>
-			) : filtered && filtered.length > 0 ? (
+			) : filteredAndSorted && filteredAndSorted.length > 0 ? (
 				<FlatList
-					data={filtered}
+					data={filteredAndSorted}
 					keyExtractor={(g) => g.id || `goal-${Math.random()}`}
 					renderItem={({ item }) => (
 						<GoalRow
@@ -280,7 +355,7 @@ export default function GoalsFeed({
 					<Ionicons name="flag-outline" size={48} color="#d1d5db" />
 					<Text style={styles.emptyTitle}>{getEmptyStateMessage()}</Text>
 					<Text style={styles.emptySubtitle}>{getEmptyStateSubtitle()}</Text>
-					{tab === 'all' && (
+					{filterBy === 'all' && (
 						<TouchableOpacity
 							style={styles.addGoalButton}
 							onPress={() => router.push('/(stack)/addGoal')}
@@ -298,31 +373,32 @@ export default function GoalsFeed({
 const styles = StyleSheet.create({
 	screen: { flex: 1, backgroundColor: '#ffffff' },
 
-	tabsRow: {
+	toggleContainer: {
+		marginBottom: space.md,
+		alignItems: 'center',
+	},
+	toggleButton: {
 		flexDirection: 'row',
-		paddingHorizontal: 16,
-		paddingTop: 12,
-		paddingBottom: 8,
-	},
-	tabBtn: {
-		paddingHorizontal: 16,
-		paddingVertical: 8,
-		borderRadius: 16,
+		alignItems: 'center',
+		paddingVertical: space.sm,
+		paddingHorizontal: space.md,
+		borderRadius: 20,
+		backgroundColor: palette.subtle,
 		borderWidth: 1,
-		marginRight: 8,
+		borderColor: palette.border,
 	},
-	tabBtnActive: { backgroundColor: '#18181b', borderColor: '#18181b' },
-	tabBtnIdle: { backgroundColor: '#ffffff', borderColor: '#e5e7eb' },
-	tabText: { fontSize: 13 },
-	tabTextActive: { color: '#ffffff', fontWeight: '600' },
-	tabTextIdle: { color: '#52525b' },
+	toggleText: {
+		marginLeft: space.xs,
+		fontSize: 12,
+		fontWeight: '500',
+		color: palette.textMuted,
+	},
 
 	separator: { height: 1, backgroundColor: '#f1f1f1' },
 
 	rowContainer: {
 		flexDirection: 'row',
 		alignItems: 'flex-start',
-		paddingHorizontal: 16,
 		paddingVertical: 16,
 		borderBottomWidth: 1,
 		borderBottomColor: '#e5e7eb',
