@@ -9,7 +9,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 		...config,
 		name: 'Brie',
 		slug: 'brie',
-		version: '0.1.1',
+		version: '0.1.2',
 		orientation: 'portrait',
 		icon: './src/assets/icons/adaptive-icon.png',
 		scheme: 'brie',
@@ -18,9 +18,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 		ios: {
 			supportsTablet: true,
 			bundleIdentifier: 'com.brie.mobile',
-			buildNumber: '3',
+			buildNumber: '5',
 			googleServicesFile:
-				process.env.GOOGLE_SERVICE_INFO_PLIST || './GoogleService-Info.plist',
+				process.env.GOOGLE_SERVICES_PLIST || './GoogleService-Info.plist',
 			icon: {
 				light: './src/assets/icons/ios-light.png',
 				dark: './src/assets/icons/ios-dark.png',
