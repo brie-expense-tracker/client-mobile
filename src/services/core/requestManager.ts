@@ -138,6 +138,16 @@ async function processQueue(
 		// Resolve all queued requests with the same result
 		queue.forEach(({ resolve }) => resolve(result));
 	} catch (error: any) {
+		// Don't retry on 4xx client errors (except 429)
+		if (error.status >= 400 && error.status < 500 && error.status !== 429) {
+			console.log(
+				`❌ [RequestManager] Client error ${error.status}, not retrying`
+			);
+			// Reject all queued requests with the error
+			queue.forEach(({ reject }) => reject(error));
+			return;
+		}
+
 		// Handle rate limiting
 		if (error.status === 429 || error.message?.includes('Rate limit')) {
 			setBackoff(key, error.message);
@@ -176,16 +186,28 @@ export class RequestManager {
 		const key = getRequestKey(method, url, body);
 		const now = Date.now();
 
-		// If there's already an identical request in flight, return its promise
+		// If there's already an identical request in flight, check if it's still valid
 		const existing = inflightRequests.get(key);
-		if (existing && now - existing.timestamp < 30000) {
-			// 30 second timeout
+		if (existing && now - existing.timestamp < 15000) {
+			// 15 second timeout for deduplication
 			console.log(`🔄 [RequestManager] Deduplicating request: ${key}`);
 			return existing.promise;
+		} else if (existing) {
+			// Timeout exceeded - abort the old request
+			console.log(
+				`⏰ [RequestManager] Request timeout exceeded, aborting: ${key}`
+			);
+			existing.abortController.abort();
+			inflightRequests.delete(key);
 		}
 
-		// Create abort controller for this request
+		// Create abort controller for this request with timeout
 		const abortController = new AbortController();
+		const timeoutId = setTimeout(() => {
+			console.log(`⏰ [RequestManager] Request timeout, aborting: ${key}`);
+			abortController.abort();
+			inflightRequests.delete(key);
+		}, 15000); // 15 second timeout
 
 		// Create the request executor
 		const executor = async (): Promise<T> => {
@@ -223,7 +245,20 @@ export class RequestManager {
 				}
 
 				const data = await response.json();
+				clearTimeout(timeoutId);
 				return data;
+			} catch (error: any) {
+				clearTimeout(timeoutId);
+				// Handle abort errors specifically
+				if (error.name === 'AbortError') {
+					const timeoutError = new ApiError(
+						'Request timeout',
+						ApiErrorType.NETWORK_ERROR,
+						408
+					);
+					throw timeoutError;
+				}
+				throw error;
 			} finally {
 				// Clean up inflight request
 				inflightRequests.delete(key);
