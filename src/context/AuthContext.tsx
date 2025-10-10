@@ -8,13 +8,12 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import { AppState, AppStateStatus } from 'react-native';
+import { AppState, AppStateStatus, Alert } from 'react-native';
 import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import { getItem, setItem, removeItem } from '../utils/safeStorage';
 import * as Sentry from '@sentry/react-native';
 import { UserService, User, Profile } from '../services';
 import { ApiService } from '../services/core/apiService';
-import { SampleDataService } from '../services/feature/sampleDataService';
 import { authService } from '../services/authService';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { configureGoogleSignIn } from '../config/googleSignIn';
@@ -146,24 +145,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 		// Define ensureUserExists inside useEffect to avoid dependency issues
 		const ensureUserExistsLocal = async (fbUser: FirebaseAuthTypes.User) => {
-			console.log('🚨 [DEBUG] ensureUserExistsLocal called');
+			console.log('🟠 [AUTH-STATE] ===== ensureUserExistsLocal called =====');
+			console.log(
+				'🟠 [AUTH-STATE] Firebase UID:',
+				fbUser.uid.substring(0, 12) + '...'
+			);
 			try {
-				console.log(
-					'🔍 [DEBUG] Ensuring user exists for Firebase UID:',
-					fbUser.uid.substring(0, 8) + '...'
-				);
-
 				// First, try to get existing user
+				console.log(
+					'🟠 [AUTH-STATE] Step 1: Checking if MongoDB user exists...'
+				);
 				let mongoUser = await UserService.getUserByFirebaseUID(fbUser.uid);
 
 				if (!mongoUser) {
 					// User doesn't exist, create them using the ensure endpoint
 					console.log(
-						'🔍 [DEBUG] User not found in database, creating new user...'
+						'🟡 [AUTH-STATE] MongoDB user NOT FOUND, attempting to create...'
 					);
 
 					try {
 						// Use the ensure endpoint to create the user
+						console.log('🟡 [AUTH-STATE] Calling /users/ensure endpoint...');
 						const response = await ApiService.post<{
 							user: User;
 							profile: Profile;
@@ -179,7 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 								setProfile(response.data.profile);
 							}
 							console.log(
-								'✅ [DEBUG] User and profile created successfully via ensure endpoint'
+								'🟢 [AUTH-STATE] ✅ User created via /users/ensure endpoint!'
 							);
 						} else {
 							throw new Error(
@@ -188,11 +190,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 						}
 					} catch (ensureError) {
 						console.error(
-							'❌ [DEBUG] Ensure endpoint failed, trying createUser:',
+							'🔴 [AUTH-STATE] ❌ /users/ensure failed:',
 							ensureError
 						);
 
 						// Fallback to createUser method
+						console.log('🟡 [AUTH-STATE] Trying createUser fallback...');
 						const createResponse = await UserService.createUser({
 							firebaseUID: fbUser.uid,
 							email: fbUser.email!,
@@ -202,51 +205,82 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 						mongoUser = createResponse.user;
 						setProfile(createResponse.profile);
 						console.log(
-							'✅ [DEBUG] User created successfully via createUser method'
+							'🟢 [AUTH-STATE] ✅ User created via createUser fallback!'
 						);
 					}
 				} else {
-					console.log('✅ [DEBUG] Existing user found in database');
+					console.log(
+						'🟢 [AUTH-STATE] ✅ MongoDB user EXISTS! ID:',
+						mongoUser._id
+					);
 				}
 
 				// Set the user in state
-				console.log(
-					'🔍 [DEBUG] Setting user state:',
-					mongoUser ? `ID: ${mongoUser._id}` : 'null'
-				);
+				console.log('🟠 [AUTH-STATE] Step 2: Setting user in state...');
 				setUser(mongoUser);
 
 				// Always try to fetch profile for existing users (don't depend on profile state)
 				if (mongoUser) {
 					try {
-						console.log('🔍 [DEBUG] Fetching profile for user:', mongoUser._id);
+						console.log('🟠 [AUTH-STATE] Step 3: Fetching profile...');
 						const profileResponse = await UserService.getProfileByUserId(
 							mongoUser._id
 						);
 						if (profileResponse) {
 							console.log(
-								'🔍 [DEBUG] Setting profile state:',
+								'🟢 [AUTH-STATE] ✅ Profile loaded!',
 								profileResponse._id
 							);
 							setProfile(profileResponse);
 						} else {
-							console.log('🔍 [DEBUG] No profile found for user');
+							console.log('🟡 [AUTH-STATE] No profile found for user');
 						}
 					} catch (profileError) {
-						console.log(
-							'🔍 [DEBUG] Profile fetch failed, continuing without profile:',
-							profileError
-						);
+						console.log('🟡 [AUTH-STATE] Profile fetch failed:', profileError);
 					}
 				}
-			} catch (e) {
-				console.error('❌ Error ensuring user exists:', e);
-				setError({
-					code: 'USER_CREATION_ERROR',
-					message: 'Failed to create or fetch user from database',
-					details: e,
-				});
-				Sentry.captureException(e);
+				console.log(
+					'🟢 [AUTH-STATE] ===== ensureUserExistsLocal completed successfully ====='
+				);
+			} catch (e: any) {
+				console.log(
+					'🔴 [AUTH-STATE] ===== ERROR in ensureUserExistsLocal ====='
+				);
+				console.error('🔴 [AUTH-STATE] Error:', e);
+				console.error('🔴 [AUTH-STATE] Error message:', e?.message);
+				console.error('🔴 [AUTH-STATE] Error code:', e?.code);
+				console.error('🔴 [AUTH-STATE] Error status:', e?.response?.status);
+
+				// If we can't create or fetch the MongoDB user, just set error state
+				// Don't automatically sign out - let the Google sign-in flows handle this
+				if (
+					e?.message?.includes('User account not found') ||
+					e?.message?.includes('User not found') ||
+					e?.message?.includes('Failed to create') ||
+					e?.response?.status === 404
+				) {
+					// This is expected behavior for new accounts during Google sign-up
+					console.warn(
+						'🟡 [AUTH-STATE] ⚠️ MongoDB user not found (EXPECTED for new accounts)'
+					);
+					console.log(
+						'🟡 [AUTH-STATE] NOT signing out - will let Google sign-in flow handle user creation'
+					);
+					setError({
+						code: 'ACCOUNT_NOT_FOUND',
+						message: 'Account not found. Please complete the sign-up process.',
+						details: e,
+					});
+				} else {
+					// Unexpected error - log and send to Sentry
+					console.error('🔴 [AUTH-STATE] ❌ Unexpected error!');
+					setError({
+						code: 'USER_CREATION_ERROR',
+						message: 'Failed to create or fetch user from database',
+						details: e,
+					});
+					Sentry.captureException(e);
+				}
 			}
 		};
 
@@ -327,8 +361,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			);
 			setFirebaseUser(fbUser);
 
+			// Skip orphaned account cleanup - let the Google sign-in flows handle this
+			// The cleanup was too aggressive and interfered with the signup flow
 			console.log('🔍 [DEBUG] Calling hydrateFromFirebaseLocal');
-			await hydrateFromFirebaseLocal(fbUser);
+
+			// Add timeout protection to prevent infinite loading
+			const timeoutPromise = new Promise<void>((resolve) => {
+				setTimeout(() => {
+					console.log('⏰ [DEBUG] hydrateFromFirebaseLocal timeout reached');
+					resolve();
+				}, 20000); // 20 second timeout
+			});
+
+			try {
+				await Promise.race([hydrateFromFirebaseLocal(fbUser), timeoutPromise]);
+			} catch (error) {
+				console.error('🔴 [DEBUG] Error in hydrateFromFirebaseLocal:', error);
+				// Don't throw - we still want to set loading to false
+			}
 
 			// Mark this UID as processed
 			if (fbUser) {
@@ -398,13 +448,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				const userProfile = await UserService.getProfileByUserId(mongoUser._id);
 				setProfile(userProfile);
 			}
-		} catch (error) {
-			console.error('Error refreshing user data:', error);
-			setError({
-				code: 'REFRESH_ERROR',
-				message: 'Failed to refresh user data',
-				details: error,
-			});
+		} catch (error: any) {
+			// Don't log orphaned account errors - these are expected
+			if (
+				error?.message?.includes('User not found') ||
+				error?.message?.includes('User account not found')
+			) {
+				console.warn('⚠️ Refresh skipped - user not found (orphaned account)');
+			} else {
+				console.error('Error refreshing user data:', error);
+				setError({
+					code: 'REFRESH_ERROR',
+					message: 'Failed to refresh user data',
+					details: error,
+				});
+			}
 		}
 	}, []); // No dependencies needed - function uses current Firebase user directly
 
@@ -481,181 +539,95 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		[]
 	);
 
-	// Sample data seeding for demo mode
-	const seedSampleData = async (userId: string) => {
+	const login = useCallback(async (firebaseUser: FirebaseAuthTypes.User) => {
 		try {
-			console.log('🎯 [DEMO] Starting sample data generation...');
+			// Set manual login flag to prevent auth state change interference
+			isManualLoginRef.current = true;
 
-			// Generate 90 days of sample data
-			const endDate = new Date();
-			const startDate = new Date();
-			startDate.setDate(startDate.getDate() - 90);
+			console.log('🔍 [DEBUG] Login attempt: Regular user');
 
-			const sampleData = SampleDataService.generateSampleData({
-				startDate,
-				endDate,
-				monthlyIncome: 6500,
-				userName: 'Demo User',
-			});
+			// Store the Firebase UID
+			await setItem(UID_KEY, firebaseUser.uid);
 
-			console.log(
-				`🎯 [DEMO] Generated ${sampleData.transactions.length} transactions, ${sampleData.budgets.length} budgets, ${sampleData.goals.length} goals`
-			);
-
-			// Store sample data in AsyncStorage for demo mode
-			await setItem(
-				'demo_transactions',
-				JSON.stringify(sampleData.transactions)
-			);
-			await setItem('demo_budgets', JSON.stringify(sampleData.budgets));
-			await setItem('demo_goals', JSON.stringify(sampleData.goals));
-			await setItem(
-				'demo_recurring',
-				JSON.stringify(sampleData.recurringExpenses)
-			);
-			await setItem('demo_data_timestamp', new Date().toISOString());
-
-			console.log('✅ [DEMO] Sample data stored in AsyncStorage');
-		} catch (error) {
-			console.error('❌ [DEMO] Error seeding sample data:', error);
-			throw error;
-		}
-	};
-
-	const refreshDemoData = useCallback(async (userId: string) => {
-		try {
-			const lastRefresh = await getItem('demo_data_timestamp');
-			if (lastRefresh) {
-				const lastRefreshDate = new Date(lastRefresh);
-				const daysSinceRefresh =
-					(Date.now() - lastRefreshDate.getTime()) / (1000 * 60 * 60 * 24);
-
-				// Refresh data if it's older than 7 days
-				if (daysSinceRefresh > 7) {
-					console.log('🎯 [DEMO] Demo data is stale, refreshing...');
-					await seedSampleData(userId);
-				} else {
-					console.log('🎯 [DEMO] Demo data is fresh, no refresh needed');
-				}
-			} else {
-				// No timestamp found, seed fresh data
-				console.log(
-					'🎯 [DEMO] No demo data timestamp found, seeding fresh data...'
-				);
-				await seedSampleData(userId);
-			}
-		} catch (error) {
-			console.error('❌ [DEMO] Error refreshing demo data:', error);
-			throw error;
-		}
-	}, []);
-
-	const login = useCallback(
-		async (firebaseUser: FirebaseAuthTypes.User) => {
+			// Check if user exists in MongoDB
+			let mongoUser;
 			try {
-				// Set manual login flag to prevent auth state change interference
-				isManualLoginRef.current = true;
-
-				// Check if this is a demo login
-				const isDemoLogin = firebaseUser.email === 'demo@brie.app';
-				console.log(
-					'🔍 [DEBUG] Login attempt:',
-					isDemoLogin ? 'DEMO MODE' : 'Regular user'
-				);
-
-				// Store the Firebase UID
-				await setItem(UID_KEY, firebaseUser.uid);
-
-				// Check if user exists in MongoDB
-				let mongoUser = await UserService.getUserByFirebaseUID(
-					firebaseUser.uid
-				);
-
-				if (!mongoUser) {
-					// User doesn't exist in MongoDB, create them
-					console.log('🔍 [DEBUG] Creating new user in MongoDB...');
-					const userData = {
-						firebaseUID: firebaseUser.uid,
-						email: firebaseUser.email!,
-						name: firebaseUser.displayName || undefined,
-					};
-
-					const response = await UserService.createUser(userData);
-					mongoUser = response.user;
-					setUser(mongoUser);
-					setProfile(response.profile);
-					console.log('✅ [DEBUG] New user created in MongoDB');
-
-					// Seed sample data for demo users
-					if (isDemoLogin) {
-						console.log('🎯 [DEMO] Seeding sample data for demo user...');
-						try {
-							await seedSampleData(mongoUser._id);
-							console.log('✅ [DEMO] Sample data seeded successfully');
-						} catch (seedError) {
-							console.error('❌ [DEMO] Error seeding sample data:', seedError);
-						}
-					}
+				console.log('🔍 [DEBUG] Checking if MongoDB user exists...');
+				mongoUser = await UserService.getUserByFirebaseUID(firebaseUser.uid);
+				console.log('🔍 [DEBUG] MongoDB user found!');
+			} catch (error: any) {
+				// If user doesn't exist (404), that's okay - we'll create them
+				if (
+					error?.message?.includes('User not found') ||
+					error?.message?.includes('User account not found') ||
+					error?.response?.status === 404
+				) {
+					console.log('🔍 [DEBUG] MongoDB user does not exist - will create');
+					mongoUser = null;
 				} else {
-					// User exists, fetch their profile
-					console.log('🔍 [DEBUG] Existing user found in MongoDB');
-					setUser(mongoUser);
-					const userProfile = await UserService.getProfileByUserId(
-						mongoUser._id
-					);
-					setProfile(userProfile);
-
-					// Check if demo user needs sample data refresh
-					if (isDemoLogin && mongoUser.email === 'demo@brie.app') {
-						console.log('🎯 [DEMO] Checking if sample data needs refresh...');
-						try {
-							await refreshDemoData(mongoUser._id);
-							console.log('✅ [DEMO] Demo data refreshed');
-						} catch (refreshError) {
-							console.error(
-								'❌ [DEMO] Error refreshing demo data:',
-								refreshError
-							);
-						}
-					}
+					// Unexpected error - re-throw it
+					throw error;
 				}
+			}
 
-				// Set loading to false to trigger navigation logic
-				setLoading(false);
-				console.log(
-					'✅ Firebase login successful, UID stored, MongoDB user ready'
-				);
-			} catch (error) {
-				console.error('Error during login:', error);
-				setLoading(false);
-				setError({
-					code: 'LOGIN_ERROR',
-					message: 'Failed to complete login process',
-					details: error,
-				});
-
-				// If MongoDB operations fail, still allow login with Firebase
-				// and let the auth state change listener handle navigation
-				console.log(
-					'⚠️ [DEBUG] MongoDB operations failed, falling back to Firebase-only auth'
-				);
-
-				// Create a minimal user object for navigation
-				const fallbackUser = {
-					_id: 'temp',
+			if (!mongoUser) {
+				// User doesn't exist in MongoDB, create them
+				console.log('🔍 [DEBUG] Creating new user in MongoDB...');
+				const userData = {
 					firebaseUID: firebaseUser.uid,
 					email: firebaseUser.email!,
-					onboardingVersion: 0, // Assume they need onboarding
-					createdAt: new Date().toISOString(),
+					name: firebaseUser.displayName || undefined,
 				};
-				setUser(fallbackUser as User);
-			} finally {
-				// Reset manual login flag
-				isManualLoginRef.current = false;
+
+				const response = await UserService.createUser(userData);
+				mongoUser = response.user;
+				setUser(mongoUser);
+				setProfile(response.profile);
+				console.log('✅ [DEBUG] New user created in MongoDB');
+			} else {
+				// User exists, fetch their profile
+				console.log('🔍 [DEBUG] Existing user found in MongoDB');
+				setUser(mongoUser);
+				const userProfile = await UserService.getProfileByUserId(mongoUser._id);
+				setProfile(userProfile);
 			}
-		},
-		[refreshDemoData]
-	);
+
+			// Set loading to false to trigger navigation logic
+			setLoading(false);
+			console.log(
+				'✅ Firebase login successful, UID stored, MongoDB user ready'
+			);
+		} catch (error: any) {
+			// Downgrade to warning for expected errors (orphaned accounts)
+			if (
+				error?.message?.includes('User not found') ||
+				error?.message?.includes('User account not found')
+			) {
+				console.warn(
+					'⚠️ Login failed - user not found (orphaned account):',
+					error.message
+				);
+			} else {
+				console.error('Error during login:', error);
+			}
+
+			setLoading(false);
+			setError({
+				code: 'LOGIN_ERROR',
+				message: 'Failed to complete login process',
+				details: error,
+			});
+
+			// Re-throw the error so the caller knows login failed
+			console.log(
+				'⚠️ [DEBUG] MongoDB operations failed - throwing error to caller'
+			);
+			throw error;
+		} finally {
+			// Reset manual login flag
+			isManualLoginRef.current = false;
+		}
+	}, []);
 
 	const logout = useCallback(async () => {
 		try {
@@ -808,33 +780,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	// Google Sign-In methods
 	const signInWithGoogle = useCallback(async () => {
 		try {
+			console.log('🔵 [SIGN-IN] ===== Starting Google Sign-In flow =====');
 			setLoading(true);
 			setError(null);
 			isGoogleSignInCancelledRef.current = false;
 
 			// Check if your device supports Google Play
+			console.log('🔵 [SIGN-IN] Step 1: Checking Google Play Services...');
 			await GoogleSignin.hasPlayServices({
 				showPlayServicesUpdateDialog: true,
 			});
+			console.log('🔵 [SIGN-IN] Google Play Services OK');
 
 			// Get the users ID token
+			console.log('🔵 [SIGN-IN] Step 2: Getting Google ID token...');
 			const signInResult = await GoogleSignin.signIn();
 			let idToken: string | undefined;
+			console.log('🔵 [SIGN-IN] Sign-in result type:', signInResult.type);
 
 			if (signInResult.type === 'success' && signInResult.data) {
 				idToken = signInResult.data.idToken || undefined;
+				console.log('🔵 [SIGN-IN] Got ID token from success data');
 			} else if (signInResult.type === 'cancelled') {
-				console.log('Google Sign-In cancelled by user');
+				console.log('🔵 [SIGN-IN] ❌ User cancelled sign-in');
 				isGoogleSignInCancelledRef.current = true;
 				setLoading(false);
 				return; // Exit silently without showing error
 			} else {
 				// Handle other response types
 				idToken = (signInResult as any).idToken || undefined;
+				console.log('🔵 [SIGN-IN] Got ID token from direct access');
 			}
 
 			if (!idToken) {
-				console.error('No ID token received from Google Sign-In');
+				console.error('🔴 [SIGN-IN] ❌ No ID token received!');
 				setError({
 					code: 'GOOGLE_SIGNIN_ERROR',
 					message: 'No ID token received from Google Sign-In',
@@ -845,18 +824,129 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			}
 
 			// Create a Google credential with the token
+			console.log('🔵 [SIGN-IN] Step 3: Creating Firebase credential...');
 			const googleCredential = auth.GoogleAuthProvider.credential(idToken);
 
 			// Sign-in the user with the credential
+			console.log('🔵 [SIGN-IN] Step 4: Signing in with Firebase...');
 			const userCredential = await auth().signInWithCredential(
 				googleCredential
 			);
 			const firebaseUser = userCredential.user;
 
-			// Use the existing login method to handle MongoDB user creation
-			await login(firebaseUser);
+			console.log(
+				'🟢 [SIGN-IN] Firebase auth successful! UID:',
+				firebaseUser.uid.substring(0, 12) + '...'
+			);
+			console.log('🔵 [SIGN-IN] Step 5: Checking if MongoDB user exists...');
+
+			// Check if MongoDB user exists (regardless of Firebase's isNewUser flag)
+			try {
+				console.log('🔵 [SIGN-IN] Calling UserService.getUserByFirebaseUID...');
+				const existingMongoUser = await UserService.getUserByFirebaseUID(
+					firebaseUser.uid
+				);
+
+				if (existingMongoUser) {
+					// User exists in both Firebase and MongoDB - proceed with login
+					console.log(
+						'🟢 [SIGN-IN] ✅ MongoDB user EXISTS! ID:',
+						existingMongoUser._id
+					);
+					console.log('🔵 [SIGN-IN] Step 6: Calling login() function...');
+					await login(firebaseUser);
+					console.log('🟢 [SIGN-IN] ✅ Login completed successfully!');
+					return;
+				}
+				console.log('🟡 [SIGN-IN] MongoDB query returned but no user found');
+			} catch (error: any) {
+				// User doesn't exist in MongoDB - this is okay, we'll create it
+				console.log('🟡 [SIGN-IN] ⚠️ MongoDB user NOT FOUND:', error.message);
+				console.log('🟡 [SIGN-IN] Error code:', error.code);
+			}
+
+			// No MongoDB user exists - ask user if they want to create an account
+			console.log(
+				'🟡 [SIGN-IN] Step 7: No MongoDB user - showing confirmation prompt...'
+			);
+
+			// Show confirmation prompt
+			return new Promise<void>((resolve, reject) => {
+				console.log('🟡 [SIGN-IN] Showing Alert dialog...');
+				Alert.alert(
+					'Create Account?',
+					`No account found for ${
+						firebaseUser.email || 'this Google account'
+					}. Would you like to create a new account?`,
+					[
+						{
+							text: 'Cancel',
+							style: 'cancel',
+							onPress: async () => {
+								console.log('🔴 [SIGN-IN] ❌ User CANCELLED account creation');
+								// Delete the Firebase user since they don't want to create an account
+								try {
+									console.log('🔴 [SIGN-IN] Deleting Firebase user...');
+									await firebaseUser.delete();
+									console.log('🔴 [SIGN-IN] Firebase user deleted');
+								} catch (err) {
+									console.warn(
+										'🔴 [SIGN-IN] Failed to delete Firebase user:',
+										err
+									);
+								}
+								setLoading(false);
+								reject(new Error('Account creation cancelled'));
+							},
+						},
+						{
+							text: 'Create Account',
+							onPress: async () => {
+								console.log('🟢 [SIGN-IN] ✅ User CONFIRMED account creation!');
+								try {
+									// Keep the Firebase user and create MongoDB user through login function
+									console.log(
+										'🟢 [SIGN-IN] Calling login() to create MongoDB user...'
+									);
+									await login(firebaseUser);
+									console.log(
+										'🟢 [SIGN-IN] ✅ Login completed! Account creation successful!'
+									);
+									resolve();
+								} catch (err) {
+									console.error(
+										'🔴 [SIGN-IN] ❌ Fatal error during login():',
+										err
+									);
+									console.error(
+										'🔴 [SIGN-IN] Error details:',
+										JSON.stringify(err)
+									);
+									// Delete Firebase user since account creation failed
+									try {
+										await firebaseUser.delete();
+										console.log(
+											'🔴 [SIGN-IN] Cleaned up Firebase user after failed creation'
+										);
+									} catch (deleteErr) {
+										console.error(
+											'🔴 [SIGN-IN] Failed to clean up Firebase user:',
+											deleteErr
+										);
+									}
+									setLoading(false);
+									reject(err);
+								}
+							},
+						},
+					],
+					{ cancelable: false }
+				);
+			});
 		} catch (error: any) {
-			console.error('Google Sign-In error:', error);
+			console.error('🔴 [SIGN-IN] ❌ ERROR in signInWithGoogle:', error);
+			console.error('🔴 [SIGN-IN] Error code:', error.code);
+			console.error('🔴 [SIGN-IN] Error message:', error.message);
 
 			// Handle user cancellation gracefully
 			if (
@@ -865,6 +955,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			) {
 				console.log('Google Sign-In cancelled by user');
 				isGoogleSignInCancelledRef.current = true;
+				setLoading(false);
+				return; // Exit silently without showing error
+			}
+
+			// Handle account creation cancellation gracefully
+			if (error.message?.includes('Account creation cancelled')) {
+				console.log('User declined account creation');
 				setLoading(false);
 				return; // Exit silently without showing error
 			}
@@ -886,34 +983,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 	const signUpWithGoogle = useCallback(async () => {
 		try {
+			console.log('🟣 [SIGN-UP] ===== Starting Google Sign-Up flow =====');
 			setLoading(true);
 			setError(null);
+			isGoogleSignInCancelledRef.current = false;
 
-			console.log('🔐 Starting Google Sign-Up process...');
+			console.log('🟣 [SIGN-UP] Step 1: Starting Google Sign-Up process...');
 
 			// Ensure Google Sign-In is configured
-			console.log('🔧 Ensuring Google Sign-In is configured...');
+			console.log('🟣 [SIGN-UP] Step 2: Configuring Google Sign-In...');
 			configureGoogleSignIn();
 
 			// Check if your device supports Google Play
-			console.log('🔍 Checking Google Play Services...');
+			console.log('🟣 [SIGN-UP] Step 3: Checking Google Play Services...');
 			await GoogleSignin.hasPlayServices({
 				showPlayServicesUpdateDialog: true,
 			});
-			console.log('✅ Google Play Services available');
+			console.log('🟣 [SIGN-UP] Google Play Services OK');
 
 			// Sign out from any previous Google session to ensure clean state
-			console.log('🔄 Signing out from any previous Google session...');
+			console.log(
+				'🟣 [SIGN-UP] Step 4: Signing out from previous Google session...'
+			);
 			try {
 				await GoogleSignin.signOut();
+				console.log('🟣 [SIGN-UP] Previous session signed out');
 			} catch {
-				console.log('ℹ️ No previous Google session to sign out from');
+				console.log('🟣 [SIGN-UP] No previous Google session to sign out from');
 			}
 
 			// Get the users ID token
-			console.log('🔑 Requesting Google Sign-In...');
+			console.log(
+				'🟣 [SIGN-UP] Step 5: Requesting Google Sign-In from user...'
+			);
 			const signInResult = await GoogleSignin.signIn();
-			console.log('📋 Google Sign-In result:', signInResult);
+			console.log('🟣 [SIGN-UP] Sign-In result type:', signInResult.type);
 
 			// Handle the actual data structure returned by Google Sign-In
 			let idToken, user, serverAuthCode;
@@ -921,72 +1025,168 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			if (signInResult.type === 'success' && signInResult.data) {
 				// Success case - data is in signInResult.data
 				({ idToken, user, serverAuthCode } = signInResult.data);
+				console.log('🟣 [SIGN-UP] Got data from success result');
 			} else if (signInResult.type === 'cancelled') {
 				// User cancelled - exit silently
-				console.log('ℹ️ Google Sign-In cancelled by user');
+				console.log('🟣 [SIGN-UP] ❌ User cancelled sign-in');
+				isGoogleSignInCancelledRef.current = true;
 				setLoading(false);
 				return;
 			} else {
 				// Direct access for other cases
 				({ idToken, user, serverAuthCode } = signInResult);
+				console.log('🟣 [SIGN-UP] Got data from direct access');
 			}
-			console.log('✅ Google Sign-In successful, user:', user?.email);
-			console.log('🔑 ID Token received:', idToken ? 'Yes' : 'No');
-			console.log(
-				'🔑 Server Auth Code received:',
-				serverAuthCode ? 'Yes' : 'No'
-			);
+			console.log('🟣 [SIGN-UP] User email:', user?.email);
+			console.log('🟣 [SIGN-UP] ID Token received:', idToken ? 'Yes' : 'No');
 
 			if (!idToken) {
-				console.error('❌ No ID token in sign-in result:', signInResult);
-				console.error('Available properties:', Object.keys(signInResult));
+				console.error('🔴 [SIGN-UP] ❌ No ID token in sign-in result!');
 
 				// Try to get the token separately
-				console.log('🔄 Attempting to get ID token separately...');
+				console.log('🟣 [SIGN-UP] Attempting to get ID token separately...');
 				try {
 					const tokens = await GoogleSignin.getTokens();
-					console.log('🔑 Tokens from getTokens:', tokens);
+					console.log('🟣 [SIGN-UP] Got tokens from getTokens()');
 					if (tokens.idToken) {
-						console.log('✅ Got ID token from getTokens');
-						// Use the token from getTokens
-						const googleCredential = auth.GoogleAuthProvider.credential(
-							tokens.idToken
-						);
-						const userCredential = await auth().signInWithCredential(
-							googleCredential
-						);
-						const firebaseUser = userCredential.user;
-						console.log(
-							'✅ Firebase authentication successful:',
-							firebaseUser.uid
-						);
-						await login(firebaseUser);
-						console.log('✅ Google Sign-Up completed successfully');
-						return;
+						console.log('🟣 [SIGN-UP] ID token found in getTokens()');
+						idToken = tokens.idToken;
+					} else {
+						throw new Error('No ID token received from Google Sign-In');
 					}
 				} catch (tokenError) {
-					console.error('❌ Failed to get tokens separately:', tokenError);
+					console.error('🔴 [SIGN-UP] ❌ Failed to get tokens:', tokenError);
+					throw new Error('No ID token received from Google Sign-In');
 				}
-
-				throw new Error('No ID token received from Google Sign-In');
 			}
 
 			// Create a Google credential with the token
-			console.log('🔐 Creating Firebase credential...');
+			console.log('🟣 [SIGN-UP] Step 6: Creating Firebase credential...');
 			const googleCredential = auth.GoogleAuthProvider.credential(idToken);
 
 			// Sign-in the user with the credential
-			console.log('🔥 Signing in with Firebase...');
+			console.log('🟣 [SIGN-UP] Step 7: Signing in with Firebase...');
 			const userCredential = await auth().signInWithCredential(
 				googleCredential
 			);
 			const firebaseUser = userCredential.user;
-			console.log('✅ Firebase authentication successful:', firebaseUser.uid);
+			console.log(
+				'🟣 [SIGN-UP] Firebase auth successful! UID:',
+				firebaseUser.uid.substring(0, 12) + '...'
+			);
 
-			// Use the existing login method to handle MongoDB user creation
-			console.log('👤 Creating user profile...');
-			await login(firebaseUser);
-			console.log('✅ Google Sign-Up completed successfully');
+			// Check if MongoDB user exists (regardless of Firebase's isNewUser flag)
+			console.log(
+				'🟣 [SIGN-UP] Step 8: Checking if MongoDB user already exists...'
+			);
+			try {
+				console.log('🟣 [SIGN-UP] Calling UserService.getUserByFirebaseUID...');
+				const existingMongoUser = await UserService.getUserByFirebaseUID(
+					firebaseUser.uid
+				);
+
+				if (existingMongoUser) {
+					// User already has a Brie account - direct them to login
+					console.log(
+						'🟡 [SIGN-UP] ⚠️ Account ALREADY EXISTS in MongoDB! ID:',
+						existingMongoUser._id
+					);
+					console.log('🟡 [SIGN-UP] Signing out Firebase and showing alert...');
+					await auth().signOut();
+					setLoading(false);
+					Alert.alert(
+						'Account Already Exists',
+						`An account with ${
+							firebaseUser.email || 'this Google account'
+						} already exists. Please use the Sign In screen instead.`,
+						[{ text: 'OK' }]
+					);
+					return;
+				}
+				console.log('🟣 [SIGN-UP] MongoDB query returned but no user found');
+			} catch (error: any) {
+				// User doesn't exist in MongoDB - this is what we want for signup
+				console.log(
+					'🟢 [SIGN-UP] ✅ MongoDB user NOT FOUND (good for signup):',
+					error.message
+				);
+			}
+
+			// No MongoDB user exists - show confirmation prompt to create account
+			console.log(
+				'🟣 [SIGN-UP] Step 9: Showing confirmation prompt to create account...'
+			);
+
+			return new Promise<void>((resolve, reject) => {
+				Alert.alert(
+					'Create Account?',
+					`Create a new Brie account with ${
+						firebaseUser.email || 'this Google account'
+					}?`,
+					[
+						{
+							text: 'Cancel',
+							style: 'cancel',
+							onPress: async () => {
+								console.log('❌ User cancelled account creation');
+								// Delete the Firebase user since they don't want to create an account
+								try {
+									await firebaseUser.delete();
+								} catch (err) {
+									console.warn('Failed to delete Firebase user:', err);
+								}
+								setLoading(false);
+								reject(
+									Object.assign(new Error('Account creation cancelled'), {
+										code: 'GOOGLE_SIGNUP_CANCELED',
+									})
+								);
+							},
+						},
+						{
+							text: 'Create Account',
+							onPress: async () => {
+								console.log('🟢 [SIGN-UP] ✅ User confirmed account creation');
+								try {
+									// Proceed with account creation
+									console.log(
+										'🟢 [SIGN-UP] Calling login() to create MongoDB user...'
+									);
+									await login(firebaseUser);
+									console.log(
+										'🟢 [SIGN-UP] ✅ Login completed! Account creation successful!'
+									);
+									resolve();
+								} catch (err) {
+									console.error(
+										'🔴 [SIGN-UP] ❌ Fatal error during login():',
+										err
+									);
+									console.error(
+										'🔴 [SIGN-UP] Error details:',
+										JSON.stringify(err)
+									);
+									// Delete Firebase user since account creation failed
+									try {
+										await firebaseUser.delete();
+										console.log(
+											'🔴 [SIGN-UP] Cleaned up Firebase user after failed creation'
+										);
+									} catch (deleteErr) {
+										console.error(
+											'🔴 [SIGN-UP] Failed to clean up Firebase user:',
+											deleteErr
+										);
+									}
+									setLoading(false);
+									reject(err);
+								}
+							},
+						},
+					],
+					{ cancelable: false }
+				);
+			});
 		} catch (error: any) {
 			console.error('❌ Google Sign-Up error:', error);
 			console.error('Error code:', error.code);
@@ -998,6 +1198,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				error.message?.includes('cancelled')
 			) {
 				console.log('Google Sign-Up cancelled by user');
+				isGoogleSignInCancelledRef.current = true;
+				setLoading(false);
+				return; // Exit silently without showing error
+			}
+
+			// Handle account creation cancellation gracefully
+			if (error.code === 'GOOGLE_SIGNUP_CANCELED') {
+				console.log('User cancelled account creation');
 				setLoading(false);
 				return; // Exit silently without showing error
 			}
@@ -1019,6 +1227,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			});
 			setLoading(false);
 			throw error;
+		} finally {
+			// Reset the cancellation flag after a delay to allow auth state changes to settle
+			setTimeout(() => {
+				isGoogleSignInCancelledRef.current = false;
+			}, 1000);
 		}
 	}, [login]);
 
@@ -1067,7 +1280,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	// Password reauthentication for account deletion
 	const reauthWithPassword = useCallback(async (password: string) => {
 		try {
-			setLoading(true);
 			setError(null);
 			isReauthInProgressRef.current = true;
 
@@ -1114,7 +1326,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				code: normalized.code,
 			});
 		} finally {
-			setLoading(false);
 			isReauthInProgressRef.current = false;
 		}
 	}, []);
@@ -1122,7 +1333,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	// Google reauthentication for account deletion
 	const reauthWithGoogle = useCallback(async () => {
 		try {
-			setLoading(true);
 			setError(null);
 			isReauthInProgressRef.current = true;
 
@@ -1205,7 +1415,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				code: normalized.code,
 			});
 		} finally {
-			setLoading(false);
 			isReauthInProgressRef.current = false;
 		}
 	}, []);
