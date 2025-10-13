@@ -6,7 +6,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Font from 'expo-font';
 import { Ionicons } from '@expo/vector-icons';
-import { getApp, initializeApp } from '@react-native-firebase/app';
+import { getApp } from '@react-native-firebase/app';
 // @ts-ignore - react-query types will be available after install
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -31,8 +31,8 @@ import { ProfileProvider } from '../src/context/profileContext';
 import { NotificationProvider } from '../src/context/notificationContext';
 import { TransactionProvider } from '../src/context/transactionContext';
 import { TransactionModalProvider } from '../src/context/transactionModalContext';
-import { DemoDataProvider } from '../src/context/demoDataContext';
 import { ThemeProvider } from '../src/context/ThemeContext';
+import { loadLocalOverrides, getResolvedFlags } from '../src/config/features';
 
 import * as Notifications from 'expo-notifications';
 
@@ -41,9 +41,6 @@ import { ensureBgPushRegistered } from '../src/services/notifications/background
 
 // Import app initialization hook
 import { useAppInit } from '../src/hooks/useAppInit';
-
-// Demo mode toggle - set to true to enable demo mode
-const DEMO_MODE = false; // Disable demo mode to enable authentication
 
 // Development mode toggle - set to true to allow onboarding access after completion
 const DEV_MODE = true; // Enable dev mode for testing onboarding
@@ -54,24 +51,9 @@ SplashScreen.preventAutoHideAsync();
 // Background task registration is now handled by backgroundTaskService
 
 const styles = StyleSheet.create({
-	demoIndicator: {
-		position: 'absolute',
-		top: 50,
-		right: 20,
-		backgroundColor: '#FF6B6B',
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		borderRadius: 20,
-		zIndex: 1000,
-	},
-	demoText: {
-		color: 'white',
-		fontSize: 12,
-		fontWeight: 'bold',
-	},
 	devIndicator: {
 		position: 'absolute',
-		top: 90,
+		top: 50,
 		right: 20,
 		backgroundColor: '#4CAF50',
 		paddingHorizontal: 12,
@@ -127,7 +109,6 @@ function RootLayoutContent() {
 				inTabsGroup: segments[0] === '(tabs)',
 				inOnboardingGroup: segments[0] === '(onboarding)',
 				inStackGroup: segments[0] === '(stack)',
-				DEMO_MODE,
 				DEV_MODE,
 			});
 		},
@@ -215,12 +196,15 @@ function RootLayoutContent() {
 	// Initialize telemetry services using the hook
 	useAppInit();
 
-	// Add timeout mechanism to prevent infinite loading
+	// Add timeout mechanism to prevent infinite loading ONLY when status is null
 	useEffect(() => {
-		if (loading || (user && hasSeenOnboarding === null)) {
-			// Set a timeout to prevent infinite loading
+		// Only set timeout if we're truly stuck (status is null, not false)
+		if (user && hasSeenOnboarding === null && !loading) {
+			// Set a timeout to prevent infinite loading when onboarding status won't load
 			const timeout = setTimeout(() => {
-				console.log('⚠️ [Layout] Loading timeout reached, forcing navigation');
+				console.log(
+					'⚠️ [Layout] Loading timeout reached for null onboarding status'
+				);
 				console.log('🔍 [Layout] Debug state:', {
 					loading,
 					user: !!user,
@@ -228,9 +212,12 @@ function RootLayoutContent() {
 					loadingTimeout,
 				});
 				setLoadingTimeout(true);
-			}, 5000); // Reduced to 5 second timeout
+			}, 10000); // Increased to 10 seconds to give more time for status to load
 
 			return () => clearTimeout(timeout);
+		} else if (hasSeenOnboarding !== null) {
+			// Reset timeout if we successfully got a status
+			setLoadingTimeout(false);
 		}
 	}, [loading, user, hasSeenOnboarding, loadingTimeout]);
 
@@ -241,33 +228,6 @@ function RootLayoutContent() {
 			// Debug logging
 			logState('nav-effect:start');
 
-			if (DEMO_MODE) {
-				// In dev mode, allow access to onboarding even in demo mode
-				if (DEV_MODE && segments[0] === '(onboarding)') {
-					// Allow staying on onboarding screens in dev mode
-					return;
-				}
-
-				// Allow access to (stack) group screens (like addGoal, addBudget, etc.)
-				if (segments[0] === '(stack)') {
-					// Allow staying on stack screens in demo mode
-					return;
-				}
-
-				if (segments[0] !== '(tabs)') {
-					setTimeout(() => {
-						try {
-							router.replace('/(tabs)/dashboard');
-						} catch (error) {
-							console.warn(
-								'Failed to navigate to dashboard in demo mode:',
-								error
-							);
-						}
-					}, 100);
-				}
-				return;
-			}
 			// If still loading or onboarding status is unknown and no timeout, wait
 			if (loading || (user && hasSeenOnboarding === null && !loadingTimeout))
 				return;
@@ -282,25 +242,48 @@ function RootLayoutContent() {
 					return;
 				}
 
-				// If timeout reached, assume user has completed onboarding
-				const shouldShowOnboarding = !hasSeenOnboarding && !loadingTimeout;
+				// Check if user needs onboarding (use hasSeenOnboarding === false explicitly)
+				// If hasSeenOnboarding is null and timeout reached, still check it - don't assume completed
+				const needsOnboarding = hasSeenOnboarding === false;
+				const hasCompletedOnboarding = hasSeenOnboarding === true;
 
-				if (shouldShowOnboarding && !inOnboardingGroup) {
+				if (needsOnboarding && !inOnboardingGroup) {
+					logState('nav-effect:redirecting-to-onboarding');
+					console.log(
+						'🧭 [Layout] User needs onboarding, redirecting to profile setup'
+					);
 					try {
 						router.replace('/(onboarding)/profileSetup');
 					} catch (error) {
 						console.warn('Failed to navigate to onboarding:', error);
 					}
 				} else if (
-					(hasSeenOnboarding || loadingTimeout) &&
+					hasCompletedOnboarding &&
 					!inTabsGroup &&
 					!inStackGroup &&
 					!inOnboardingGroup
 				) {
-					// Allow redirect even in DEV_MODE if we're "nowhere" (+not-found)
-					logState('nav-effect:redirecting');
+					// Only redirect to dashboard if onboarding is confirmed complete
+					logState('nav-effect:redirecting-to-dashboard');
 					console.log(
-						'🧭 [Layout] Redirecting to dashboard because we are not in any group'
+						'🧭 [Layout] User completed onboarding, redirecting to dashboard'
+					);
+					try {
+						router.replace('/(tabs)/dashboard');
+					} catch (error) {
+						console.warn('Failed to navigate to dashboard:', error);
+					}
+				} else if (
+					hasSeenOnboarding === null &&
+					loadingTimeout &&
+					!inTabsGroup &&
+					!inStackGroup &&
+					!inOnboardingGroup
+				) {
+					// Timeout reached and status still null - assume completed for now to unblock
+					logState('nav-effect:timeout-redirect');
+					console.log(
+						'🧭 [Layout] Timeout reached with null onboarding status, redirecting to dashboard'
 					);
 					try {
 						router.replace('/(tabs)/dashboard');
@@ -340,65 +323,6 @@ function RootLayoutContent() {
 		logState,
 	]);
 
-	if (DEMO_MODE) {
-		try {
-			return (
-				<GestureHandlerRootView style={{ flex: 1 }}>
-					<View style={styles.demoIndicator}>
-						<Text style={styles.demoText}>DEMO MODE</Text>
-					</View>
-					{DEV_MODE && (
-						<View style={styles.devIndicator}>
-							<Text style={styles.devText}>DEV MODE</Text>
-						</View>
-					)}
-					<ProfileProvider>
-						<TransactionProvider>
-							<TransactionModalProvider>
-								<DemoDataProvider>
-									<Stack
-										screenOptions={{
-											contentStyle: { backgroundColor: '#fff' },
-											animation: 'fade',
-										}}
-									>
-										<Stack.Screen
-											name="(auth)"
-											options={{ headerShown: false }}
-										/>
-										<Stack.Screen
-											name="(onboarding)"
-											options={{ headerShown: false }}
-										/>
-										<Stack.Screen
-											name="(tabs)"
-											options={{ headerShown: false }}
-										/>
-										<Stack.Screen
-											name="(stack)"
-											options={{ headerShown: false }}
-										/>
-									</Stack>
-								</DemoDataProvider>
-							</TransactionModalProvider>
-						</TransactionProvider>
-					</ProfileProvider>
-				</GestureHandlerRootView>
-			);
-		} catch (error) {
-			console.warn('Failed to render demo mode:', error);
-			// Fallback to basic loading screen
-			return (
-				<View
-					style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
-				>
-					<ActivityIndicator size="large" color="#007ACC" />
-					<Text style={{ color: '#007ACC', marginTop: 10 }}>Loading...</Text>
-				</View>
-			);
-		}
-	}
-
 	// Show spinner only while we're still genuinely loading AND we haven't timed out
 	if (
 		(loading && !loadingTimeout) ||
@@ -432,34 +356,32 @@ function RootLayoutContent() {
 					{/* Always mount all providers to ensure onboarding screens have access */}
 					<TransactionProvider>
 						<TransactionModalProvider>
-							<DemoDataProvider>
-								<GestureHandlerRootView style={{ flex: 1 }}>
-									<Stack
-										screenOptions={{
-											headerShown: false,
-											animation: 'none',
-											contentStyle: { backgroundColor: '#fff' },
-										}}
-									>
-										<Stack.Screen
-											name="(auth)"
-											options={{ headerShown: false, animation: 'none' }}
-										/>
-										<Stack.Screen
-											name="(onboarding)"
-											options={{ headerShown: false, animation: 'none' }}
-										/>
-										<Stack.Screen
-											name="(tabs)"
-											options={{ headerShown: false, animation: 'none' }}
-										/>
-										<Stack.Screen
-											name="(stack)"
-											options={{ headerShown: false, animation: 'none' }}
-										/>
-									</Stack>
-								</GestureHandlerRootView>
-							</DemoDataProvider>
+							<GestureHandlerRootView style={{ flex: 1 }}>
+								<Stack
+									screenOptions={{
+										headerShown: false,
+										animation: 'none',
+										contentStyle: { backgroundColor: '#fff' },
+									}}
+								>
+									<Stack.Screen
+										name="(auth)"
+										options={{ headerShown: false, animation: 'none' }}
+									/>
+									<Stack.Screen
+										name="(onboarding)"
+										options={{ headerShown: false, animation: 'none' }}
+									/>
+									<Stack.Screen
+										name="(tabs)"
+										options={{ headerShown: false, animation: 'none' }}
+									/>
+									<Stack.Screen
+										name="(stack)"
+										options={{ headerShown: false, animation: 'none' }}
+									/>
+								</Stack>
+							</GestureHandlerRootView>
 						</TransactionModalProvider>
 					</TransactionProvider>
 				</ProfileProvider>
@@ -523,6 +445,21 @@ export default function RootLayout() {
 					// Add custom fonts here if needed
 				});
 				setFontsLoaded(true);
+
+				// Load feature flag overrides
+				await loadLocalOverrides();
+
+				// Log resolved feature flags for debugging
+				const flags = getResolvedFlags();
+				console.log('🔧 [Features] Resolved flags:', flags);
+
+				// Production safety check
+				if (process.env.NODE_ENV === 'production') {
+					console.assert(
+						!flags.aiInsights,
+						'AI Insights must be off in production'
+					);
+				}
 
 				// Verify Firebase configuration
 				try {

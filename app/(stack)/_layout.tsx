@@ -12,6 +12,12 @@ const StackLayout = () => {
 				}}
 			/>
 			<Stack.Screen
+				name="editRecurringExpense"
+				options={{
+					headerShown: false,
+				}}
+			/>
+			<Stack.Screen
 				name="addGoal"
 				options={{
 					headerShown: false,

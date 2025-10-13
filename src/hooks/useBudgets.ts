@@ -11,7 +11,15 @@ import { ApiService } from '../services';
 // Budget-specific API functions
 // ==========================================
 const fetchBudgets = async (): Promise<Budget[]> => {
+	console.log('📡 [fetchBudgets] Fetching budgets from API...');
 	const response = await ApiService.get<{ data: Budget[] }>('/api/budgets');
+
+	console.log('📥 [fetchBudgets] Response:', {
+		success: response.success,
+		hasData: !!response.data,
+		dataIsArray: Array.isArray(response.data?.data),
+		count: response.data?.data?.length || 0,
+	});
 
 	// Handle authentication errors gracefully
 	if (!response.success && response.error?.includes('User not authenticated')) {
@@ -19,10 +27,13 @@ const fetchBudgets = async (): Promise<Budget[]> => {
 		return [];
 	}
 
-	return response.data?.data || [];
+	const budgets = response.data?.data || [];
+	console.log('✅ [fetchBudgets] Returning', budgets.length, 'budgets');
+	return budgets;
 };
 
 const createBudget = async (budgetData: CreateBudgetData): Promise<Budget> => {
+	console.log('🔍 [createBudget] Request data:', budgetData);
 	const response = await ApiService.post<{ data: Budget }>(
 		'/api/budgets',
 		budgetData
@@ -39,23 +50,33 @@ const createBudget = async (budgetData: CreateBudgetData): Promise<Budget> => {
 		throw new Error(`Failed to create budget: ${response.error}`);
 	}
 
+	let budget: Budget | null = null;
+
 	// Handle different response structures for successful responses
 	if (response.data?.data) {
 		// Expected structure: { data: { data: Budget } }
-		return response.data.data as Budget;
+		budget = response.data.data as Budget;
 	} else if (
 		response.data &&
 		typeof response.data === 'object' &&
-		'id' in response.data
+		'_id' in response.data
 	) {
-		// Direct structure: { data: Budget }
-		return response.data as unknown as Budget;
+		// MongoDB structure: { data: { _id, ... } }
+		budget = {
+			...response.data,
+			id: (response.data as any)._id || (response.data as any).id,
+		} as Budget;
 	} else if (response.success && response.data) {
 		// Fallback: assume response.data is the budget
-		return response.data as unknown as Budget;
+		budget = response.data as unknown as Budget;
 	}
 
-	throw new Error('Failed to create budget: No data received');
+	if (!budget) {
+		throw new Error('Failed to create budget: No data received');
+	}
+
+	console.log('✅ [createBudget] Returning budget with ID:', budget.id || (budget as any)._id);
+	return budget;
 };
 
 const updateBudget = async (
@@ -98,27 +119,40 @@ const updateBudget = async (
 };
 
 const deleteBudget = async (id: string): Promise<void> => {
+	console.log('🗑️ [deleteBudget] Starting deletion for ID:', id);
 	await ApiService.delete(`/api/budgets/${id}`);
+	console.log('✅ [deleteBudget] API delete complete, clearing cache...');
+
+	// Defensive: manually clear ALL budgets caches (prefix-based to catch all variants)
+	ApiService.clearCacheByPrefix('/api/budgets');
+	console.log('🗑️ [deleteBudget] All budgets caches cleared by prefix');
 };
 
 // ==========================================
 // Budget-specific data transformations
 // ==========================================
 const transformBudgetData = (budgets: Budget[]) => {
+	console.log('🔄 [transformBudgetData] Transforming', budgets.length, 'budgets');
 	// Add any budget-specific transformations here
 	// For example, sorting by period, calculating alerts, etc.
-	return budgets.map((budget) => ({
-		...budget,
-		// Map _id to id for client-side compatibility
-		id: (budget as any)._id || budget.id,
-		// Ensure spent is always a number
-		spent: budget.spent || 0,
-		// Calculate percentage
-		spentPercentage:
-			budget.amount > 0 ? (budget.spent || 0) / budget.amount : 0,
-		// Determine if should alert (over 90% spent)
-		shouldAlert: budget.amount > 0 && (budget.spent || 0) / budget.amount > 0.9,
-	}));
+	const transformed = budgets.map((budget) => {
+		const id = (budget as any)._id || budget.id;
+		console.log('🔄 [transformBudgetData] Budget:', budget.name, '- ID:', id, '- _id:', (budget as any)._id);
+		return {
+			...budget,
+			// Map _id to id for client-side compatibility
+			id,
+			// Ensure spent is always a number
+			spent: budget.spent || 0,
+			// Calculate percentage
+			spentPercentage:
+				budget.amount > 0 ? (budget.spent || 0) / budget.amount : 0,
+			// Determine if should alert (over 90% spent)
+			shouldAlert: budget.amount > 0 && (budget.spent || 0) / budget.amount > 0.9,
+		};
+	});
+	console.log('✅ [transformBudgetData] Transformed IDs:', transformed.map(b => b.id).join(', '));
+	return transformed;
 };
 
 // ==========================================

@@ -68,7 +68,7 @@ const AddBudgetScreen: React.FC = () => {
 	const [categories, setCategories] = useState<string[]>([]);
 	const [showCategoriesPicker, setShowCategoriesPicker] = useState(false);
 
-	const { addBudget } = useBudgets();
+	const { addBudget, refetch } = useBudgets();
 
 	const handleSave = async () => {
 		if (!name.trim() || !amount.trim()) {
@@ -84,21 +84,30 @@ const AddBudgetScreen: React.FC = () => {
 
 		setLoading(true);
 		try {
-			await addBudget({
-				name: name.trim(),
-				amount: amountValue,
-				icon,
-				color,
-				categories,
-				period,
-				weekStartDay,
-				monthStartDay,
-				rollover,
-			});
+		console.log('💾 [AddBudget] Creating new budget...');
+		const newBudget = await addBudget({
+			name: name.trim(),
+			amount: amountValue,
+			icon,
+			color,
+			categories,
+			period,
+			weekStartDay,
+			monthStartDay,
+			rollover,
+		});
 
-			Alert.alert('Success', 'Budget added successfully!', [
-				{ text: 'OK', onPress: () => router.back() },
-			]);
+		console.log('✅ [AddBudget] Budget created successfully:', newBudget);
+		console.log('🔙 [AddBudget] Navigating back - useFocusEffect will handle refetch');
+
+		// Navigate back immediately - optimistic update already added it to local state
+		// and useFocusEffect on budgets screen will trigger a fresh refetch
+		router.back();
+		
+		// Show success message without blocking
+		setTimeout(() => {
+			Alert.alert('Success', 'Budget added successfully!');
+		}, 300);
 		} catch (error) {
 			console.error('[AddBudgetScreen] Error saving:', error);
 

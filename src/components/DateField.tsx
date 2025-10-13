@@ -200,6 +200,7 @@ export const DateField: React.FC<DateFieldProps> = ({
 						maxDate={maxDate}
 						accessibilityElementsHidden={false}
 						importantForAccessibility="yes"
+						style={{ transform: [] }}
 					/>
 				</View>
 			)}

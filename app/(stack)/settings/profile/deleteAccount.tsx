@@ -203,10 +203,15 @@ export default function DeleteAccountScreen() {
 						try {
 							setBusy(true);
 							await deleteAccountAfterReauth();
-							Alert.alert(
-								'Account deleted',
-								'Your account has been permanently deleted.'
-							);
+							// Navigate to login immediately to avoid ProfileProvider unmount errors
+							router.replace('/(auth)/login');
+							// Show success message after a brief delay to ensure navigation completes
+							setTimeout(() => {
+								Alert.alert(
+									'Account deleted',
+									'Your account has been permanently deleted.'
+								);
+							}, 500);
 						} catch (error: any) {
 							console.error('Delete error:', error);
 							Alert.alert(
@@ -216,17 +221,16 @@ export default function DeleteAccountScreen() {
 									: 'Failed to delete account. Please try again.'
 							);
 							setReauthComplete(false);
-						} finally {
 							setBusy(false);
 						}
 					},
 				},
 			]
 		);
-	}, [confirmText, reauthComplete, deleteAccountAfterReauth]);
+	}, [confirmText, reauthComplete, deleteAccountAfterReauth, router]);
 
 	return (
-		<SafeAreaView style={styles.container}>
+		<SafeAreaView style={styles.container} edges={['top']}>
 			{/* Header */}
 			<View style={styles.header}>
 				<BorderlessButton
@@ -549,7 +553,7 @@ const shadowLite = Platform.select({
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: '#F8FAFC',
+		backgroundColor: '#fff',
 	},
 
 	// Header

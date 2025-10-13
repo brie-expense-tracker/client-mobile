@@ -13,6 +13,7 @@ import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useNotification } from '../../src/context/notificationContext';
 import { useProfile } from '../../src/context/profileContext';
+import { useOnboarding } from '../../src/context/OnboardingContext';
 import { NotificationConsent } from '../../src/services';
 
 type PresetKey = 'essential' | 'recommended' | 'quiet';
@@ -90,6 +91,7 @@ export default function NotificationPermissionScreen() {
 	const router = useRouter();
 	const { initialize } = useNotification();
 	const { updatePreferences } = useProfile();
+	const { markOnboardingComplete } = useOnboarding();
 
 	const [selectedPreset, setSelectedPreset] =
 		useState<PresetKey>('recommended');
@@ -105,14 +107,22 @@ export default function NotificationPermissionScreen() {
 	};
 
 	const handleContinue = async () => {
+		console.log('🚀 [NotificationSetup] handleContinue called');
 		setLoading(true);
 		try {
 			// Only ask for OS permission when user explicitly continues
-			const granted = await initialize();
+			console.log(
+				'📱 [NotificationSetup] Requesting notification permissions...'
+			);
+			await initialize();
+			// If initialize() completes without throwing, permissions were granted
+			const granted = true;
+			console.log('✅ [NotificationSetup] Permissions granted successfully');
 
+			console.log('💾 [NotificationSetup] Saving notification preferences...');
 			await updatePreferences({
 				notifications: {
-					enableNotifications: Boolean(granted),
+					enableNotifications: granted,
 					weeklySummary: consent.reminders.weeklySummary,
 					overspendingAlert: consent.reminders.overspendingAlerts,
 					aiSuggestion: consent.aiInsights.enabled,
@@ -123,8 +133,7 @@ export default function NotificationPermissionScreen() {
 				aiInsights: {
 					enabled: consent.aiInsights.enabled,
 					frequency: consent.aiInsights.frequency,
-					pushNotifications:
-						consent.aiInsights.pushNotifications && Boolean(granted),
+					pushNotifications: consent.aiInsights.pushNotifications && granted,
 					emailAlerts: consent.aiInsights.emailAlerts,
 					insightTypes: {
 						budgetingTips: true,
@@ -133,17 +142,53 @@ export default function NotificationPermissionScreen() {
 					},
 				},
 			});
+			console.log('✅ [NotificationSetup] Preferences saved successfully');
 
+			// Mark onboarding as complete
+			console.log('🎯 [NotificationSetup] Marking onboarding as complete...');
+			await markOnboardingComplete();
+			console.log('✅ [NotificationSetup] Onboarding marked as complete');
+
+			console.log('🎉 [NotificationSetup] Navigating to dashboard...');
 			router.replace('/(tabs)/dashboard');
 		} catch (error) {
-			console.error('Error setting up notifications:', error);
+			console.error(
+				'❌ [NotificationSetup] Error setting up notifications:',
+				error
+			);
+
+			// Extract error message
+			let errorMessage = 'Unknown error occurred';
+			if (error instanceof Error) {
+				errorMessage = error.message;
+				console.error('❌ [NotificationSetup] Error message:', errorMessage);
+				console.error('❌ [NotificationSetup] Error stack:', error.stack);
+			}
+
 			Alert.alert(
 				'Setup Incomplete',
 				'There was an issue setting up notifications. You can continue using the app and configure notifications later in settings.',
 				[
 					{
 						text: 'Continue Anyway',
-						onPress: () => router.replace('/(tabs)/dashboard'),
+						onPress: async () => {
+							try {
+								console.log(
+									'⚠️ [NotificationSetup] Continuing despite error, marking onboarding complete...'
+								);
+								await markOnboardingComplete();
+								console.log(
+									'✅ [NotificationSetup] Onboarding marked complete, navigating...'
+								);
+								router.replace('/(tabs)/dashboard');
+							} catch (fallbackError) {
+								console.error(
+									'❌ [NotificationSetup] Error in fallback:',
+									fallbackError
+								);
+								router.replace('/(tabs)/dashboard');
+							}
+						},
 					},
 					{
 						text: 'Try Again',
@@ -152,14 +197,19 @@ export default function NotificationPermissionScreen() {
 				]
 			);
 		} finally {
+			console.log('🏁 [NotificationSetup] Continue handler complete');
 			setLoading(false);
 		}
 	};
 
 	const handleSkip = async () => {
+		console.log('🚀 [NotificationSetup] handleSkip called');
 		setLoading(true);
 		try {
 			// Store preferences but with notifications disabled
+			console.log(
+				'💾 [NotificationSetup] Saving preferences with notifications disabled...'
+			);
 			await updatePreferences({
 				notifications: {
 					enableNotifications: false,
@@ -182,12 +232,43 @@ export default function NotificationPermissionScreen() {
 					},
 				},
 			});
+			console.log('✅ [NotificationSetup] Preferences saved successfully');
 
+			// Mark onboarding as complete even when skipping
+			console.log('🎯 [NotificationSetup] Marking onboarding as complete...');
+			await markOnboardingComplete();
+			console.log('✅ [NotificationSetup] Onboarding marked as complete');
+
+			console.log('🎉 [NotificationSetup] Navigating to dashboard...');
 			router.replace('/(tabs)/dashboard');
 		} catch (error) {
-			console.error('Error saving preferences:', error);
+			console.error('❌ [NotificationSetup] Error in skip handler:', error);
+
+			// Extract error message
+			if (error instanceof Error) {
+				console.error('❌ [NotificationSetup] Error message:', error.message);
+				console.error('❌ [NotificationSetup] Error stack:', error.stack);
+			}
+
+			// Even on error, mark onboarding complete and continue
+			try {
+				console.log(
+					'⚠️ [NotificationSetup] Error occurred, still marking onboarding complete...'
+				);
+				await markOnboardingComplete();
+				console.log(
+					'✅ [NotificationSetup] Onboarding marked complete despite error'
+				);
+			} catch (markError) {
+				console.error(
+					'❌ [NotificationSetup] Failed to mark onboarding complete:',
+					markError
+				);
+			}
+
 			router.replace('/(tabs)/dashboard');
 		} finally {
+			console.log('🏁 [NotificationSetup] Skip handler complete');
 			setLoading(false);
 		}
 	};

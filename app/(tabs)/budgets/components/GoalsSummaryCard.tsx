@@ -2,13 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import LinearProgressBar from './LinearProgressBar';
-
-const formatCurrency = (amount: number): string => {
-	return new Intl.NumberFormat('en-US', {
-		style: 'currency',
-		currency: 'USD',
-	}).format(amount);
-};
+import { palette, space, type as typography } from '../../../../src/ui';
+import { currency } from '../../../../src/utils/format';
 
 interface Props {
 	totalGoals: number;
@@ -40,8 +35,13 @@ const GoalsSummaryCard: React.FC<Props> = ({
 						Track your progress across all goals
 					</Text>
 				</View>
-				<TouchableOpacity style={styles.addButton} onPress={onAddGoal}>
-					<Ionicons name="add" size={20} color="#0f0f0f" />
+				<TouchableOpacity
+					style={styles.addButton}
+					onPress={onAddGoal}
+					accessibilityRole="button"
+					accessibilityLabel="Add new goal"
+				>
+					<Ionicons name="add" size={20} color={palette.text} />
 					<Text style={styles.addButtonText}>Add Goal</Text>
 				</TouchableOpacity>
 			</View>
@@ -51,11 +51,9 @@ const GoalsSummaryCard: React.FC<Props> = ({
 				<LinearProgressBar
 					percent={progressPercentage}
 					height={6}
-					color="#18181b"
-					trackColor="#e5e7eb"
-					leftLabel={`${formatCurrency(totalCurrent)} / ${formatCurrency(
-						totalTarget
-					)}`}
+					color={palette.text}
+					trackColor={palette.border}
+					leftLabel={`${currency(totalCurrent)} / ${currency(totalTarget)}`}
 					rightLabel={`${progressPercentage.toFixed(1)}%`}
 					style={styles.progressBar}
 				/>
@@ -74,12 +72,12 @@ const GoalsSummaryCard: React.FC<Props> = ({
 				</View>
 
 				<View style={styles.statCard}>
-					<Text style={styles.statValue}>{formatCurrency(totalCurrent)}</Text>
+					<Text style={styles.statValue}>{currency(totalCurrent)}</Text>
 					<Text style={styles.statLabel}>Saved</Text>
 				</View>
 
 				<View style={styles.statCard}>
-					<Text style={styles.statValue}>{formatCurrency(totalTarget)}</Text>
+					<Text style={styles.statValue}>{currency(totalTarget)}</Text>
 					<Text style={styles.statLabel}>Target</Text>
 				</View>
 			</View>
@@ -89,43 +87,41 @@ const GoalsSummaryCard: React.FC<Props> = ({
 
 const styles = StyleSheet.create({
 	container: {
-		backgroundColor: '#ffffff',
-		
+		backgroundColor: palette.surface,
 		borderBottomWidth: 1,
-		borderBottomColor: '#e5e7eb',
+		borderBottomColor: palette.border,
 	},
 	header: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		marginBottom: 12,
+		marginBottom: space.md,
 	},
 	iconWrapper: {
 		width: 40,
 		height: 40,
 		borderRadius: 12,
-		backgroundColor: '#f4f4f5',
+		backgroundColor: palette.surfaceAlt,
 		borderWidth: 1,
-		borderColor: '#e5e7eb',
+		borderColor: palette.border,
 		justifyContent: 'center',
 		alignItems: 'center',
-		marginRight: 12,
+		marginRight: space.md,
 	},
 	headerContent: {
 		flex: 1,
 	},
 	headerTitle: {
-		fontSize: 20,
-		fontWeight: '600',
-		color: '#212121',
+		...typography.titleMd,
+		color: palette.text,
 	},
 	headerSubtitle: {
-		fontSize: 14,
-		color: '#757575',
+		...typography.bodySm,
+		color: palette.textMuted,
 		marginTop: 4,
 	},
 	progressSection: {
-		marginBottom: 16,
+		marginBottom: space.lg,
 	},
 	progressBar: {
 		marginBottom: 0,
@@ -137,32 +133,33 @@ const styles = StyleSheet.create({
 	statCard: {
 		flex: 1,
 		alignItems: 'center',
-		paddingVertical: 8,
+		paddingVertical: space.sm,
 	},
 	statValue: {
-		fontSize: 16,
-		fontWeight: '600',
-		color: '#3f3f46',
+		...typography.numMd,
+		color: palette.text,
 		marginBottom: 2,
 	},
 	statLabel: {
 		fontSize: 12,
-		color: '#a1a1aa',
+		color: palette.textSubtle,
 		fontWeight: '500',
 		textAlign: 'center',
 	},
 	addButton: {
-		backgroundColor: '#f7f7f7',
+		backgroundColor: palette.surfaceAlt,
 		borderRadius: 12,
-		paddingVertical: 12,
+		paddingVertical: space.md,
 		paddingHorizontal: 10,
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 8,
-		marginLeft: 16,
+		marginLeft: space.lg,
+		borderWidth: 1,
+		borderColor: palette.borderMuted,
 	},
 	addButtonText: {
-		color: '#0f0f0f',
+		color: palette.text,
 		fontSize: 14,
 		fontWeight: '600',
 	},

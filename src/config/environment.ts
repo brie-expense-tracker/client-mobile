@@ -63,3 +63,12 @@ console.log('🔧 [Environment] Is Simulator:', isSimulator());
 console.log('🔧 [Environment] API URL:', ENV.API_URL);
 console.log('🔧 [Environment] API Base URL:', resolveApiBaseUrl());
 console.log('🔧 [Environment] Full API URL:', getApiUrl());
+console.log('🔧 [Environment] HMAC Secret available:', !!ENV.HMAC_SECRET_KEY);
+console.log(
+	'🔧 [Environment] HMAC Secret length:',
+	ENV.HMAC_SECRET_KEY?.length || 0
+);
+console.log(
+	'🔧 [Environment] HMAC Secret (first 8 chars):',
+	ENV.HMAC_SECRET_KEY?.substring(0, 8) + '...' || 'undefined'
+);

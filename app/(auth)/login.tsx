@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import {
 	View,
 	Text,
@@ -36,7 +36,8 @@ export default function Login() {
 	);
 	const [isLoading, setIsLoading] = useState(false);
 	const [showPassword, setShowPassword] = useState(false);
-	const { login, signInWithGoogle } = useAuth();
+	const [formError, setFormError] = useState<string | null>(null);
+	const { login, signInWithGoogle, error: authError, clearError } = useAuth();
 
 	const palette = useMemo(
 		() => ({
@@ -70,7 +71,42 @@ export default function Login() {
 	const canSubmit =
 		isValidEmail(email) && isValidPassword(password) && !isLoading;
 
+	// Watch for auth errors from the context
+	useEffect(() => {
+		if (authError) {
+			// Map auth error codes to user-friendly messages
+			let message =
+				authError.message || 'Something went wrong. Please try again.';
+
+			if (authError.code === 'ACCOUNT_NOT_FOUND') {
+				message =
+					'Your account was not found. Please sign up to create a new account.';
+			} else if (authError.code === 'LOGIN_ERROR') {
+				message = 'Unable to sign in. Please try again.';
+			} else if (authError.code === 'GOOGLE_SIGNIN_ERROR') {
+				message = 'Google Sign-In failed. Please try again.';
+			}
+
+			setFormError(message);
+		}
+	}, [authError]);
+
+	// Clear errors when user starts typing
+	useEffect(() => {
+		if (formError && (email || password)) {
+			setFormError(null);
+			if (authError) {
+				clearError();
+			}
+		}
+	}, [email, password, formError, authError, clearError]);
+
 	const handleLogin = useCallback(async () => {
+		// Clear any previous errors
+		setFormError(null);
+		if (authError) {
+			clearError();
+		}
 		// mark both fields as touched to reveal errors if present
 		setTouched({ email: true, password: true });
 
@@ -102,35 +138,42 @@ export default function Login() {
 				errorMessage = 'Too many attempts. Please try again later.';
 			else if (e?.message) errorMessage = e.message;
 
-			// Show a compact inline error message at the top of the form
-			// (You could also set a dedicated form error state; keeping simple here)
 			console.warn('Login error:', e, errorMessage);
-			// Optionally, set a banner state if you want a persistent bar.
+			setFormError(errorMessage);
 		} finally {
 			setIsLoading(false);
 		}
-	}, [email, password, isLoading, login]);
+	}, [email, password, isLoading, login, authError, clearError]);
 
 	const handleGoogleSignIn = useCallback(async () => {
 		if (isLoading) return;
+
+		// Clear any previous errors
+		setFormError(null);
+		if (authError) {
+			clearError();
+		}
+
 		setIsLoading(true);
 		try {
 			await signInWithGoogle();
 			await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 		} catch (error: any) {
-			// Silently ignore user cancellation
+			// Silently ignore user cancellation and account creation declination
 			const cancelled =
 				(error?.code === 'auth/internal-error' &&
 					error?.message?.includes('cancelled')) ||
-				error?.code === 'GOOGLE_SIGNIN_CANCELED';
+				error?.code === 'GOOGLE_SIGNIN_CANCELED' ||
+				error?.message?.includes('Account creation cancelled');
 			if (!cancelled) {
 				console.warn('Google Sign-In error:', error);
 				await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+				// Note: error will be set by authError effect above
 			}
 		} finally {
 			setIsLoading(false);
 		}
-	}, [isLoading, signInWithGoogle]);
+	}, [isLoading, signInWithGoogle, authError, clearError]);
 
 	const onBlurEmail = () => setTouched((t) => ({ ...t, email: true }));
 	const onBlurPassword = () => setTouched((t) => ({ ...t, password: true }));
@@ -261,6 +304,19 @@ export default function Login() {
 								<Text style={styles.errorText} accessibilityLiveRegion="polite">
 									{errors.password}
 								</Text>
+							)}
+
+							{/* Form-level error message */}
+							{!!formError && (
+								<View style={styles.formErrorContainer}>
+									<Ionicons name="alert-circle" size={18} color="#DC2626" />
+									<Text
+										style={styles.formErrorText}
+										accessibilityLiveRegion="polite"
+									>
+										{formError}
+									</Text>
+								</View>
 							)}
 
 							{/* Forgot password */}
@@ -431,6 +487,24 @@ const styles = StyleSheet.create({
 		color: '#DC2626',
 		fontSize: 12,
 		marginTop: 6,
+	},
+	formErrorContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#FEF2F2',
+		borderWidth: 1,
+		borderColor: '#FCA5A5',
+		borderRadius: 12,
+		padding: 12,
+		marginTop: 12,
+		gap: 8,
+	},
+	formErrorText: {
+		flex: 1,
+		color: '#DC2626',
+		fontSize: 13,
+		fontWeight: '600',
+		lineHeight: 18,
 	},
 	passwordInputContainer: {
 		position: 'relative',

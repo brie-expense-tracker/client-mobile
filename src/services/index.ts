@@ -10,10 +10,10 @@ export {
 } from './feature/recurringExpenseService';
 export { BudgetSuggestionService } from './feature/budgetSuggestionService';
 export { TieredAIService } from './feature/tieredAIService';
-export { 
-	InsightsService, 
+export {
+	InsightsService,
 	type AIInsight,
-	type InsightsResponse 
+	type InsightsResponse,
 } from './feature/insightsService';
 export {
 	notificationService,
@@ -34,11 +34,6 @@ export {
 	FinancialSnapshotService,
 	type BudgetHistoryItem,
 } from './feature/financialSnapshotService';
-export {
-	IntelligentActionService,
-	type IntelligentAction,
-	type ActionExecutionResult,
-} from './feature/intelligentActionService';
 export {
 	SpendingForecastService,
 	type MonthlyForecast,

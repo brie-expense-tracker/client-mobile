@@ -45,8 +45,28 @@ const addRecurringExpense = async (data: {
 	};
 };
 
-// Note: Update and delete functions are not implemented in the RecurringExpenseService
-// These would need to be added to the service layer first
+const updateRecurringExpense = async (
+	id: string,
+	data: {
+		vendor: string;
+		amount: number;
+		frequency: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+		nextExpectedDate: string;
+	}
+): Promise<RecurringExpenseWithId> => {
+	const expense = await RecurringExpenseService.updateRecurringExpense(
+		id,
+		data
+	);
+	return {
+		...expense,
+		id: expense.patternId,
+	};
+};
+
+const deleteRecurringExpense = async (id: string): Promise<void> => {
+	await RecurringExpenseService.deleteRecurringExpense(id);
+};
 
 // ==========================================
 // Recurring expense-specific data transformations
@@ -91,11 +111,14 @@ export function useRecurringExpenses() {
 		lastRefreshed,
 		refetch,
 		addItem: addExpenseItem,
+		updateItem: updateExpenseItem,
+		deleteItem: deleteExpenseItem,
 		clearError,
 	} = useDataFetching<RecurringExpenseWithId>({
 		fetchFunction: fetchRecurringExpenses,
 		addFunction: addRecurringExpense,
-		// Note: update and delete functions are not implemented in the service
+		updateFunction: updateRecurringExpense,
+		deleteFunction: deleteRecurringExpense,
 		autoRefresh: true,
 		refreshOnFocus: true,
 		transformData: transformRecurringExpenseData,
@@ -304,6 +327,8 @@ export function useRecurringExpenses() {
 		// Basic Actions
 		refetch,
 		addRecurringExpense: addRecurringExpenseWrapper,
+		updateRecurringExpense: updateExpenseItem,
+		deleteRecurringExpense: deleteExpenseItem,
 		markAsPaid,
 		getPaymentHistory,
 		checkPaymentStatus,

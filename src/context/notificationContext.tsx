@@ -116,8 +116,16 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 		try {
 			const count = await notificationService.getUnreadCount();
 			setUnreadCount(count);
-		} catch (err) {
-			console.error('Failed to refresh unread count:', err);
+		} catch (err: any) {
+			// Don't log errors for missing user account - this is expected after account deletion
+			if (err?.message?.includes('User account not found')) {
+				console.log(
+					'ℹ️ [Notifications] User account not found, skipping count refresh'
+				);
+				setUnreadCount(0);
+			} else {
+				console.error('Failed to refresh unread count:', err);
+			}
 		}
 	}, []);
 
@@ -204,11 +212,22 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 						`✅ [Notifications] Loaded ${notificationCount} notifications for page ${page}`
 					);
 				}
-			} catch (err) {
-				console.error('❌ [Notifications] Error getting notifications:', err);
-				setError(
-					err instanceof Error ? err : new Error('Failed to get notifications')
-				);
+			} catch (err: any) {
+				// Don't log errors for missing user account - this is expected after account deletion
+				if (err?.message?.includes('User account not found')) {
+					console.log(
+						'ℹ️ [Notifications] User account not found, skipping notifications fetch'
+					);
+					setNotifications([]);
+					setHasMore(false);
+				} else {
+					console.error('❌ [Notifications] Error getting notifications:', err);
+					setError(
+						err instanceof Error
+							? err
+							: new Error('Failed to get notifications')
+					);
+				}
 			} finally {
 				setLoading(false);
 			}
@@ -408,12 +427,16 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 	const { user, isAuthenticated } = useAuth();
 
 	useEffect(() => {
-		// Only initialize notifications when user is authenticated
-		if (isAuthenticated && user) {
+		// Only initialize notifications when user is authenticated AND has a real MongoDB ID (not 'temp')
+		if (isAuthenticated && user && user._id !== 'temp') {
 			console.log(
 				'🔔 [Notifications] User authenticated, initializing notifications'
 			);
 			initialize();
+		} else if (user && user._id === 'temp') {
+			console.log(
+				'ℹ️ [Notifications] Waiting for MongoDB user creation before initializing'
+			);
 		}
 
 		return () => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
 	View,
 	Text,
@@ -23,6 +23,18 @@ import {
 	normalizeIconName,
 } from '../../src/constants/uiConstants';
 
+// Helper to clean currency input
+const cleanCurrencyToNumberString = (v: string) =>
+	v.replace(/[^\d.]/g, '').replace(/^0+(\d)/, '$1');
+
+// Validate money format (up to 2 decimals, positive)
+const isValidMoney = (s: string): boolean => {
+	if (!s || s.trim() === '') return false;
+	const cleaned = cleanCurrencyToNumberString(s);
+	const num = parseFloat(cleaned);
+	return !isNaN(num) && num > 0 && /^[0-9]*\.?[0-9]{0,2}$/.test(cleaned);
+};
+
 const EditBudgetScreen: React.FC = () => {
 	const params = useLocalSearchParams();
 	const budgetId = params.id as string;
@@ -39,7 +51,7 @@ const EditBudgetScreen: React.FC = () => {
 	const [loading, setLoading] = useState(false);
 	const [budget, setBudget] = useState<Budget | null>(null);
 
-	const { budgets, updateBudget, deleteBudget } = useBudgets();
+	const { budgets, updateBudget, deleteBudget, refetch } = useBudgets();
 
 	// Load budget data when component mounts
 	useEffect(() => {
@@ -56,13 +68,33 @@ const EditBudgetScreen: React.FC = () => {
 				setIcon(normalizedIcon);
 				setColor(foundBudget.color || DEFAULT_COLOR);
 				setPeriod(foundBudget.period || 'monthly');
+				// Auto-detect if custom amount
+				const amountStr = foundBudget.amount?.toString() || '';
+				const isPreset = BUDGET_AMOUNT_PRESETS.some(
+					(preset) => preset.toString() === amountStr
+				);
+				setShowCustomAmount(!isPreset && amountStr !== '');
 			}
 		}
 	}, [budgetId, budgets]);
 
+	// Memoized validation for save button
+	const saveDisabled = useMemo(() => {
+		return loading || !name.trim() || !isValidMoney(amount);
+	}, [loading, name, amount]);
+
 	const handleSave = async () => {
-		if (!name.trim() || !amount.trim()) {
-			Alert.alert('Error', 'Please fill in all required fields');
+		// Validation
+		if (!name.trim()) {
+			Alert.alert('Error', 'Please enter a budget name');
+			return;
+		}
+
+		if (!isValidMoney(amount)) {
+			Alert.alert(
+				'Error',
+				'Please enter a valid amount (positive number with up to 2 decimals)'
+			);
 			return;
 		}
 
@@ -70,10 +102,12 @@ const EditBudgetScreen: React.FC = () => {
 
 		setLoading(true);
 		try {
+			const parsedAmount = parseFloat(cleanCurrencyToNumberString(amount));
+
 			await updateBudget(budget.id, {
 				name: name.trim(),
-				amount: parseFloat(amount),
-				icon: normalizeIconName(icon), // Ensure icon is normalized before saving
+				amount: parsedAmount,
+				icon: normalizeIconName(icon),
 				color,
 				categories: budget.categories || [],
 				period,
@@ -87,7 +121,11 @@ const EditBudgetScreen: React.FC = () => {
 			]);
 		} catch (error) {
 			console.error('[EditBudgetScreen] Error updating:', error);
-			Alert.alert('Error', 'Failed to update budget. Please try again.');
+			// More specific error message if available
+			const errorMessage =
+				(error as any)?.response?.data?.message ||
+				'Failed to update budget. Please try again.';
+			Alert.alert('Error', errorMessage);
 		} finally {
 			setLoading(false);
 		}
@@ -106,7 +144,12 @@ const EditBudgetScreen: React.FC = () => {
 					style: 'destructive',
 					onPress: async () => {
 						try {
+							console.log('🗑️ [EditBudget] Deleting budget:', budget.id);
 							await deleteBudget(budget.id);
+							console.log('✅ [EditBudget] Budget deleted, refetching list...');
+							// Force refetch to ensure list is up to date
+							await refetch();
+							console.log('✅ [EditBudget] Refetch complete, navigating back');
 							router.back();
 						} catch (error) {
 							console.error('[EditBudgetScreen] Error deleting:', error);
@@ -155,8 +198,8 @@ const EditBudgetScreen: React.FC = () => {
 				<Text style={styles.screenTitle}>Edit Budget</Text>
 				<TouchableOpacity
 					onPress={handleSave}
-					style={[styles.saveButton, loading && styles.saveButtonDisabled]}
-					disabled={loading}
+					style={[styles.saveButton, saveDisabled && styles.saveButtonDisabled]}
+					disabled={saveDisabled}
 				>
 					{loading ? (
 						<ActivityIndicator size="small" color="#fff" />
@@ -240,9 +283,11 @@ const EditBudgetScreen: React.FC = () => {
 								<TextInput
 									style={styles.textInput}
 									value={amount}
-									onChangeText={setAmount}
+									onChangeText={(v) =>
+										setAmount(cleanCurrencyToNumberString(v))
+									}
 									placeholder="e.g., 1500"
-									keyboardType="numeric"
+									keyboardType="decimal-pad"
 									placeholderTextColor="#999"
 								/>
 							</View>

@@ -7,7 +7,7 @@ export const useConnectivity = () => {
 	const [isChecking, setIsChecking] = useState(false);
 
 	const checkConnectivity = useCallback(async () => {
-		if (isChecking) return;
+		if (isChecking) return isOnline;
 
 		setIsChecking(true);
 		try {
@@ -18,22 +18,20 @@ export const useConnectivity = () => {
 				cache: 'no-cache',
 			});
 			setIsOnline(true);
+			return true;
 		} catch {
 			setIsOnline(false);
+			return false;
 		} finally {
-			setIsChecking(false);
+			// Small debounce to prevent UI flicker
+			setTimeout(() => setIsChecking(false), 150);
 		}
-	}, [isChecking]);
+	}, [isChecking, isOnline]);
 
 	useEffect(() => {
-		// Check initial connectivity
+		// Check initial connectivity only
 		checkConnectivity();
-
-		// Set up periodic connectivity checks
-		const interval = setInterval(checkConnectivity, 30000); // Check every 30 seconds
-
-		return () => clearInterval(interval);
-	}, [checkConnectivity]);
+	}, []); // Remove dependency to prevent re-runs
 
 	return {
 		isOnline,

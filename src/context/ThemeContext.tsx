@@ -55,7 +55,7 @@ interface ThemeProviderProps {
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
 	const systemColorScheme = useColorScheme();
-	const [theme, setThemeState] = useState<ThemeMode>('system');
+	const [theme, setThemeState] = useState<ThemeMode>('light');
 
 	// Load saved theme preference on app start
 	useEffect(() => {

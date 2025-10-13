@@ -32,6 +32,9 @@ import Svg, {
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { TransactionContext } from '../../../src/context/transactionContext';
 import { useNotification } from '../../../src/context/notificationContext';
+import { useRecurringExpenses } from '../../../src/hooks/useRecurringExpenses';
+import { useBudgets } from '../../../src/hooks/useBudgets';
+import { useGoals } from '../../../src/hooks/useGoals';
 import { TransactionHistory } from './components';
 import {
 	accessibilityProps,
@@ -53,6 +56,8 @@ const getLocalIsoDate = () => {
 export default function DashboardPro() {
 	const { transactions, isLoading, refetch } = useContext(TransactionContext);
 	const { unreadCount } = useNotification();
+	const { budgets, isLoading: budgetsLoading } = useBudgets();
+	const { goals, isLoading: goalsLoading } = useGoals();
 	const [refreshing, setRefreshing] = useState(false);
 
 	const onRefresh = useCallback(async () => {
@@ -102,6 +107,103 @@ export default function DashboardPro() {
 
 		return { totalBalance: balance, dailyChange: change, last7 };
 	}, [transactions]);
+
+	// Calculate real budget and goal metrics
+	const budgetMetrics = useMemo(() => {
+		if (budgetsLoading || budgets.length === 0) {
+			return {
+				budgetUsed: 0,
+				budgetHint: 'No budgets set',
+			};
+		}
+
+		const currentMonth = new Date().getMonth();
+		const currentYear = new Date().getFullYear();
+
+		let totalBudget = 0;
+		let totalSpent = 0;
+
+		for (const budget of budgets) {
+			totalBudget += budget.amount;
+
+			// Calculate spent amount for current month
+			const monthlyTransactions = transactions.filter((t) => {
+				const tDate = new Date(t.date);
+				return (
+					tDate.getMonth() === currentMonth &&
+					tDate.getFullYear() === currentYear &&
+					t.amount < 0
+				); // Only expenses
+			});
+
+			const monthlySpent = monthlyTransactions.reduce(
+				(sum, t) => sum + Math.abs(t.amount),
+				0
+			);
+			totalSpent += monthlySpent;
+		}
+
+		const budgetUsed = totalBudget > 0 ? totalSpent / totalBudget : 0;
+		let budgetHint = 'No budgets set';
+
+		if (totalBudget > 0) {
+			if (budgetUsed < 0.5) {
+				budgetHint = 'Under target this month';
+			} else if (budgetUsed < 0.8) {
+				budgetHint = 'On track this month';
+			} else if (budgetUsed < 1.0) {
+				budgetHint = 'Approaching limit';
+			} else {
+				budgetHint = 'Over budget this month';
+			}
+		}
+
+		return { budgetUsed, budgetHint };
+	}, [budgets, transactions, budgetsLoading]);
+
+	const goalMetrics = useMemo(() => {
+		if (goalsLoading || goals.length === 0) {
+			return {
+				savingsPace: 0,
+				savingsHint: 'No goals set',
+			};
+		}
+
+		if (goals.length === 0) {
+			return {
+				savingsPace: 0,
+				savingsHint: 'No goals set',
+			};
+		}
+
+		// Calculate overall progress across all goals
+		let totalProgress = 0;
+		let totalTarget = 0;
+
+		for (const goal of goals) {
+			totalProgress += goal.current || 0;
+			totalTarget += goal.target;
+		}
+
+		const savingsPace = totalTarget > 0 ? totalProgress / totalTarget : 0;
+		let savingsHint = 'No goals set';
+
+		if (totalTarget > 0) {
+			if (savingsPace < 0.25) {
+				savingsHint = 'Getting started';
+			} else if (savingsPace < 0.5) {
+				savingsHint = 'Making progress';
+			} else if (savingsPace < 0.75) {
+				savingsHint = 'On track for goal';
+			} else if (savingsPace < 1.0) {
+				savingsHint = 'Almost there!';
+			} else {
+				savingsHint = 'Goal achieved!';
+			}
+		}
+
+		return { savingsPace, savingsHint };
+	}, [goals, goalsLoading]);
 
 	if (isLoading) {
 		return (
@@ -205,13 +307,17 @@ export default function DashboardPro() {
 						items={[
 							{
 								label: 'Budget used',
-								value: 0.62,
-								hint: 'Under target this month',
+								value: budgetMetrics.budgetUsed,
+								hint: budgetMetrics.budgetHint,
 							},
-							{ label: 'Savings pace', value: 0.45, hint: 'On track for goal' },
+							{
+								label: 'Savings pace',
+								value: goalMetrics.savingsPace,
+								hint: goalMetrics.savingsHint,
+							},
 							{
 								label: 'Debt payoff',
-								value: 0.18,
+								value: 0.18, // TODO: Calculate real debt payoff metrics
 								hint: 'Consider rounding up payments',
 							},
 						]}
@@ -479,12 +585,42 @@ function RecurringPreview({
 	rowsLimit?: number;
 	onViewAll: () => void;
 }) {
-	// Placeholder skeleton you can wire to your recurring context:
-	const rows = [
-		{ name: 'Rent', due: 'Oct 1', amount: 1665, status: 'upcoming' },
-		{ name: 'Spotify', due: 'Sep 29', amount: 10.99, status: 'due-soon' },
-		{ name: 'Internet', due: 'Oct 3', amount: 70, status: 'upcoming' },
-	].slice(0, rowsLimit);
+	// Get real recurring expenses data
+	const { expenses } = useRecurringExpenses();
+
+	// Process recurring expenses for display
+	const rows = expenses
+		.map((expense) => {
+			const nextDue = new Date(expense.nextExpectedDate);
+			const today = new Date();
+			const daysUntilDue = Math.ceil(
+				(nextDue.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+			);
+
+			let status = 'upcoming';
+			if (daysUntilDue <= 0) {
+				status = 'overdue';
+			} else if (daysUntilDue <= 3) {
+				status = 'due-soon';
+			}
+
+			return {
+				name: expense.vendor,
+				due: nextDue.toLocaleDateString('en-US', {
+					month: 'short',
+					day: 'numeric',
+				}),
+				amount: expense.amount,
+				status,
+			};
+		})
+		.sort((a, b) => {
+			// Sort by due date
+			const aDate = new Date(a.due);
+			const bDate = new Date(b.due);
+			return aDate.getTime() - bDate.getTime();
+		})
+		.slice(0, rowsLimit);
 
 	return (
 		<View style={styles.card}>

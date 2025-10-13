@@ -69,7 +69,6 @@ The following services were removed as they were not being used in the applicati
 - Various AI evaluation and routing services (`evaluationService.ts`, `aiRouterService.ts`)
 - Enhanced AI services (`enhancedAIService.ts`, `intelligentLocalAIService.ts`)
 - Financial analysis services (`financialSnapshotService.ts`, `budgetAnalysisService.ts`)
-- Intelligent action services (`intelligentActionService.ts`)
 - Spending forecast services (`spendingForecastService.ts`)
 - AI categorization services (`aiCategorizationService.ts`)
 - Demo and test files (`MLDemo.ts`, `enhancedAIService.test.ts`)

@@ -11,7 +11,3 @@ export { default as Setting } from '../../app/(stack)/settings/components/settin
 export { sharedStyles } from './assistant/shared/sharedStyles';
 export { InterfaceMode, Message } from '../services/assistant/types';
 export { ColorPicker, IconPicker, ColorOption } from './budgets/FormPickers';
-
-// Demo Mode Components
-export { default as DemoIndicator } from './DemoIndicator';
-export { default as DemoDataDisplay } from './DemoDataDisplay';

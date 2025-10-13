@@ -1,11 +1,18 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Text, ScrollView, Alert, RefreshControl, View } from 'react-native';
+import {
+	ScrollView,
+	Alert,
+	RefreshControl,
+	TouchableOpacity,
+	View,
+	StyleSheet,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useBudgets } from '../../../src/hooks/useBudgets';
 import { Budget } from '../../../src/context/budgetContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import MonthlyBudgetSummary from './components/MonthlyBudgetSummary';
-import WeeklyBudgetSummary from './components/WeeklyBudgetSummary';
-import AllBudgetSummary from './components/AllBudgetSummary';
+import HeroBudget from './components/HeroBudget';
 import BudgetsFeed from './components/BudgetsFeed';
 import {
 	Page,
@@ -15,16 +22,7 @@ import {
 	ErrorState,
 	EmptyState,
 	SegmentedControl,
-	palette,
-	type,
-	space,
 } from '../../../src/ui';
-
-// ========= ADDED: small helpers =========
-const currency = (n = 0) =>
-	new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(
-		Math.max(0, n)
-	);
 
 const startOfMonth = (d = new Date()) =>
 	new Date(d.getFullYear(), d.getMonth(), 1);
@@ -99,6 +97,22 @@ export default function BudgetScreen() {
 		}
 	}, [refetch, hasLoaded]);
 
+	// Force refetch when screen comes into focus (fixes cache issues after delete/update)
+	useFocusEffect(
+		useCallback(() => {
+			console.log('🔄 [Budgets] Screen focused, clearing cache and refetching...');
+			// Import ApiService and clear cache before refetch
+			import('../../../src/services').then(({ ApiService }) => {
+				ApiService.clearCacheByPrefix('/api/budgets');
+				console.log('🗑️ [Budgets] Cache cleared on focus');
+				refetch();
+			}).catch(err => {
+				console.error('❌ [Budgets] Error in focus effect:', err);
+				refetch(); // Fallback to refetch without cache clear
+			});
+		}, [refetch])
+	);
+
 	// Handle modal opening from URL parameters
 	useEffect(() => {
 		// Check if we should auto-open the modal
@@ -129,11 +143,17 @@ export default function BudgetScreen() {
 	// Pull to Refresh Handler
 	// ==========================================
 	const onRefresh = useCallback(async () => {
+		console.log('🔄 [Budgets] Pull-to-refresh triggered');
 		setRefreshing(true);
 		try {
+			// Clear cache before refetching to ensure fresh data
+			const { ApiService } = await import('../../../src/services');
+			ApiService.clearCacheByPrefix('/api/budgets');
+			console.log('🗑️ [Budgets] Cache cleared, fetching fresh data...');
 			await refetch();
+			console.log('✅ [Budgets] Refresh complete');
 		} catch (error) {
-			console.error('Error refreshing budgets:', error);
+			console.error('❌ [Budgets] Error refreshing:', error);
 		} finally {
 			setRefreshing(false);
 		}
@@ -165,54 +185,6 @@ export default function BudgetScreen() {
 		const spent = monthlySummary.totalSpent + weeklySummary.totalSpent;
 		return { total, spent };
 	}, [monthlySummary, weeklySummary]);
-
-	// ==========================================
-	// Budget Summary Components
-	// ==========================================
-	const AllBudgetsSummaryComponent = useCallback(
-		() => (
-			<AllBudgetSummary
-				percentage={Math.min(
-					((monthlySummary.totalSpent + weeklySummary.totalSpent) /
-						(monthlySummary.totalAllocated + weeklySummary.totalAllocated ||
-							1)) *
-						100,
-					100
-				)}
-				spent={combined.spent}
-				total={combined.total}
-				onPeriodToggle={handlePeriodToggle}
-				isActive={activeTab === 'all'}
-			/>
-		),
-		[monthlySummary, weeklySummary, combined, handlePeriodToggle, activeTab]
-	);
-
-	const MonthlyBudgetSummaryComponent = useCallback(
-		() => (
-			<MonthlyBudgetSummary
-				percentage={monthlyPercentage}
-				spent={monthlySummary.totalSpent}
-				total={monthlySummary.totalAllocated}
-				onPeriodToggle={handlePeriodToggle}
-				isActive={activeTab === 'monthly'}
-			/>
-		),
-		[monthlyPercentage, monthlySummary, handlePeriodToggle, activeTab]
-	);
-
-	const WeeklyBudgetSummaryComponent = useCallback(
-		() => (
-			<WeeklyBudgetSummary
-				percentage={weeklyPercentage}
-				spent={weeklySummary.totalSpent}
-				total={weeklySummary.totalAllocated}
-				onPeriodToggle={handlePeriodToggle}
-				isActive={activeTab === 'weekly'}
-			/>
-		),
-		[weeklyPercentage, weeklySummary, handlePeriodToggle, activeTab]
-	);
 
 	// ==========================================
 	// Modal Handlers
@@ -298,29 +270,55 @@ export default function BudgetScreen() {
 		};
 	}, [activeTab, now, monthlySummary, weeklySummary, combined]);
 
-	// ========= ADDED: small stat cell =========
-	const Stat = ({
-		label,
-		value,
-		subtle,
-	}: {
-		label: string;
-		value: string;
-		subtle?: boolean;
-	}) => (
-		<View style={{ flex: 1, minWidth: 120, marginRight: 12, marginBottom: 12 }}>
-			<Text style={[type.small, { color: palette.textMuted }]}>{label}</Text>
-			<Text
-				style={[
-					type.body,
-					{ fontWeight: '600', color: subtle ? palette.text : palette.text },
-				]}
-				accessibilityLabel={`${label} ${value}`}
-			>
-				{value}
-			</Text>
-		</View>
-	);
+	// ==========================================
+	// Hero Budget Props
+	// ==========================================
+	const heroProps = useMemo(() => {
+		if (activeTab === 'monthly') {
+			return {
+				mode: 'monthly' as const,
+				percent: monthlyPercentage,
+				spent: monthlySummary.totalSpent,
+				total: monthlySummary.totalAllocated,
+				subtitle: periodStats.label,
+				daysLeft: periodStats.daysLeft,
+				projected: periodStats.projected,
+			};
+		}
+		if (activeTab === 'weekly') {
+			return {
+				mode: 'weekly' as const,
+				percent: weeklyPercentage,
+				spent: weeklySummary.totalSpent,
+				total: weeklySummary.totalAllocated,
+				subtitle: periodStats.label,
+				daysLeft: periodStats.daysLeft,
+				projected: periodStats.projected,
+			};
+		}
+		// 'all' view
+		const percent =
+			((monthlySummary.totalSpent + weeklySummary.totalSpent) /
+				(monthlySummary.totalAllocated + weeklySummary.totalAllocated || 1)) *
+			100;
+		return {
+			mode: 'all' as const,
+			percent: Math.min(percent, 100),
+			spent: combined.spent,
+			total: combined.total,
+			subtitle: periodStats.label,
+			daysLeft: null,
+			projected: null,
+		};
+	}, [
+		activeTab,
+		monthlyPercentage,
+		weeklyPercentage,
+		monthlySummary,
+		weeklySummary,
+		combined,
+		periodStats,
+	]);
 
 	// ==========================================
 	// Main Render
@@ -355,15 +353,26 @@ export default function BudgetScreen() {
 				budgets.length === 1 ? 'budget' : 'budgets'
 			} • ${activeTab} view`}
 			right={
-				<SegmentedControl
-					segments={[
-						{ key: 'all', label: 'All' },
-						{ key: 'monthly', label: 'Monthly' },
-						{ key: 'weekly', label: 'Weekly' },
-					]}
-					value={activeTab}
-					onChange={(k) => setActiveTab(k as any)}
-				/>
+				<View style={styles.headerRight}>
+					<SegmentedControl
+						segments={[
+							{ key: 'all', label: 'All' },
+							{ key: 'monthly', label: 'Monthly' },
+							{ key: 'weekly', label: 'Weekly' },
+						]}
+						value={activeTab}
+						onChange={(k) => setActiveTab(k as any)}
+					/>
+					<TouchableOpacity
+						onPress={showModal}
+						style={styles.headerAddBtn}
+						accessibilityRole="button"
+						accessibilityLabel="Add budget"
+						hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+					>
+						<Ionicons name="add-circle-outline" size={24} color="#007ACC" />
+					</TouchableOpacity>
+				</View>
 			}
 		>
 			<ScrollView
@@ -379,74 +388,18 @@ export default function BudgetScreen() {
 				}
 				accessibilityLabel="Budgets overview content"
 			>
-				{/* Summary */}
-				<Card style={{ marginTop: 0 }}>
-					{activeTab === 'all' ? (
-						<AllBudgetsSummaryComponent />
-					) : activeTab === 'monthly' ? (
-						<MonthlyBudgetSummaryComponent />
-					) : (
-						<WeeklyBudgetSummaryComponent />
-					)}
-
-					{/* ========= ADDED: Professional Summary Details ========= */}
-					<View
-						style={{
-							marginTop: space.md,
-							borderTopWidth: 1,
-							borderTopColor: palette.border,
-							paddingTop: space.md,
-						}}
-						accessibilityLabel="Budget summary details"
-					>
-						<Text
-							style={[
-								type.small,
-								{ color: palette.textMuted, marginBottom: 8 },
-							]}
-						>
-							{periodStats.label}
-						</Text>
-
-						<View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-							<Stat
-								label="Total Budget"
-								value={currency(periodStats.total || 0)}
-							/>
-							<Stat label="Spent" value={currency(periodStats.spent || 0)} />
-							<Stat
-								label="Remaining"
-								value={currency(periodStats.remaining || 0)}
-							/>
-							{periodStats.daysLeft !== null && (
-								<Stat
-									label="Days Left"
-									value={`${periodStats.daysLeft} day${
-										periodStats.daysLeft === 1 ? '' : 's'
-									}`}
-								/>
-							)}
-							{periodStats.projected !== null && (
-								<Stat
-									label="Projected EOM"
-									value={currency(periodStats.projected || 0)}
-								/>
-							)}
-						</View>
-
-						{/* Gentle risk note if projection exceeds total */}
-						{periodStats.projected !== null &&
-							periodStats.total > 0 &&
-							periodStats.projected! > periodStats.total && (
-								<Text
-									style={[type.small, { color: palette.danger, marginTop: 6 }]}
-								>
-									Heads-up: projected spend exceeds the plan by{' '}
-									{currency(periodStats.projected! - periodStats.total)}.
-								</Text>
-							)}
-					</View>
-				</Card>
+				{/* Hero */}
+				<HeroBudget
+					mode={heroProps.mode}
+					percent={heroProps.percent}
+					spent={heroProps.spent}
+					total={heroProps.total}
+					subtitle={heroProps.subtitle}
+					daysLeft={heroProps.daysLeft}
+					projected={heroProps.projected}
+					onPress={handlePeriodToggle}
+					variant="compact"
+				/>
 
 				{/* List */}
 				<Section title="Your Budgets">
@@ -454,6 +407,7 @@ export default function BudgetScreen() {
 						<BudgetsFeed
 							scrollEnabled={false}
 							budgets={filteredBudgets}
+							activeTab={activeTab}
 							onPressMenu={(id: string) => {
 								const b = budgets.find((bb) => bb.id === id);
 								if (!b) return;
@@ -470,8 +424,45 @@ export default function BudgetScreen() {
 					</Card>
 				</Section>
 			</ScrollView>
+
+			{/* Floating action button */}
+			<TouchableOpacity
+				onPress={showModal}
+				style={styles.fab}
+				accessibilityRole="button"
+				accessibilityLabel="Add budget"
+				activeOpacity={0.9}
+			>
+				<Ionicons name="add" size={28} color="#fff" />
+			</TouchableOpacity>
 		</Page>
 	);
 }
 
-// Styles are now handled by the design system components
+const styles = StyleSheet.create({
+	headerRight: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+	},
+	headerAddBtn: {
+		padding: 4,
+		borderRadius: 999,
+	},
+	fab: {
+		position: 'absolute',
+		right: 20,
+		bottom: 20,
+		width: 56,
+		height: 56,
+		borderRadius: 28,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#007ACC',
+		shadowColor: '#000',
+		shadowOpacity: 0.18,
+		shadowRadius: 8,
+		shadowOffset: { width: 0, height: 4 },
+		elevation: 6,
+	},
+});

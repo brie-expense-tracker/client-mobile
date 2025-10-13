@@ -14,7 +14,6 @@ import { Goal } from '../../../../src/context/goalContext';
 import LinearProgressBar from './LinearProgressBar';
 import { router } from 'expo-router';
 import { normalizeIconName } from '../../../../src/constants/uiConstants';
-import { SegmentedControl, palette, type, space } from '../../../../src/ui';
 
 type GoalStatus = 'ongoing' | 'completed' | 'cancelled';
 
@@ -38,14 +37,23 @@ function StatusPill({ status }: { status: GoalStatus }) {
 			: status === 'cancelled'
 			? 'Overdue'
 			: 'Active';
-	const color =
+	const colors =
 		status === 'completed'
-			? styles.textGreen
+			? { bg: '#ECFDF5', text: '#059669', border: '#D1FAE5' }
 			: status === 'cancelled'
-			? styles.textRed
-			: styles.textBlue;
+			? { bg: '#FFF1F2', text: '#e11d48', border: '#FFE4E6' }
+			: { bg: '#EFF6FF', text: '#0284c7', border: '#DBEAFE' };
 
-	return <Text style={[styles.statusText, color]}>{label}</Text>;
+	return (
+		<View
+			style={[
+				styles.pill,
+				{ backgroundColor: colors.bg, borderColor: colors.border },
+			]}
+		>
+			<Text style={[styles.pillText, { color: colors.text }]}>{label}</Text>
+		</View>
+	);
 }
 
 function GoalRow({
@@ -113,7 +121,7 @@ function GoalRow({
 				<View style={styles.progressSection}>
 					<LinearProgressBar
 						percent={progressPercent}
-						height={4}
+						height={6}
 						color={goal.color}
 						trackColor="#f1f5f9"
 						leftLabel={`$${goal.current.toFixed(0)} / $${goal.target.toFixed(
@@ -126,7 +134,6 @@ function GoalRow({
 
 				<View style={styles.statusRow}>
 					<View style={styles.statusRowLeft}>
-						<Text style={styles.statusLabel}>Status:</Text>
 						<StatusPill status={status} />
 					</View>
 					<Text style={styles.metaDate}>
@@ -142,7 +149,13 @@ function GoalRow({
 			{/* Right meta */}
 			<View style={styles.rightMeta}>
 				{/* Menu button */}
-				<TouchableOpacity onPress={handleKebabPress} style={styles.kebabHit}>
+				<TouchableOpacity
+					onPress={handleKebabPress}
+					style={styles.kebabHit}
+					hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+					accessibilityRole="button"
+					accessibilityLabel={`More options for ${goal.name}`}
+				>
 					<Ionicons name="ellipsis-vertical" size={18} color="#a1a1aa" />
 				</TouchableOpacity>
 			</View>
@@ -155,7 +168,6 @@ export default function GoalsFeed({
 	onPressMenu,
 	goals: externalGoals,
 	filterBy = 'all',
-	onFilterChange,
 	sortBy = 'deadline',
 	onSortChange,
 }: {
@@ -163,14 +175,12 @@ export default function GoalsFeed({
 	onPressMenu?: (id: string) => void;
 	goals?: Goal[];
 	filterBy?: 'all' | 'active' | 'completed' | 'overdue';
-	onFilterChange?: (filter: 'all' | 'active' | 'completed' | 'overdue') => void;
 	sortBy?: 'name' | 'deadline' | 'progress' | 'target' | 'created';
 	onSortChange?: (
 		sort: 'name' | 'deadline' | 'progress' | 'target' | 'created'
 	) => void;
 }) {
 	const [refreshing, setRefreshing] = useState(false);
-	const [showFilters, setShowFilters] = useState(false);
 	const { goals: hookGoals, isLoading, refetch, sortGoals } = useGoals();
 
 	// Use external goals if provided, otherwise use hook goals
@@ -238,97 +248,12 @@ export default function GoalsFeed({
 
 	return (
 		<View style={styles.screen}>
-			{/* Filter Toggle Button */}
-			<View style={styles.toggleContainer}>
-				<TouchableOpacity
-					style={styles.toggleButton}
-					onPress={() => setShowFilters(!showFilters)}
-					activeOpacity={0.7}
-				>
-					<Ionicons
-						name={showFilters ? 'chevron-up' : 'chevron-down'}
-						size={16}
-						color={palette.textMuted}
-					/>
-					<Text style={styles.toggleText}>
-						{showFilters ? 'Hide Filters' : 'Show Filters'}
-					</Text>
-				</TouchableOpacity>
-			</View>
-
-			{/* Filter and Sort Controls */}
-			{showFilters && (
-				<View
-					style={{
-						padding: space.md,
-						backgroundColor: palette.bg,
-						borderRadius: 12,
-						borderWidth: 1,
-						borderColor: palette.border,
-						marginBottom: space.md,
-					}}
-				>
-					{/* Row 1: Filter */}
-					<View style={{ marginBottom: space.md }}>
-						<Text
-							style={[
-								type.small,
-								{ color: palette.textMuted, marginBottom: 8 },
-							]}
-						>
-							Filter
-						</Text>
-						<SegmentedControl
-							value={filterBy}
-							onChange={(key) => onFilterChange?.(key as any)}
-							segments={[
-								{ key: 'all', label: 'All' },
-								{ key: 'active', label: 'Active' },
-								{ key: 'completed', label: 'Completed' },
-								{ key: 'overdue', label: 'Overdue' },
-							]}
-						/>
-					</View>
-
-					{/* Divider */}
-					<View
-						style={{
-							height: 1,
-							backgroundColor: palette.border,
-							marginVertical: 2,
-						}}
-					/>
-
-					{/* Row 2: Sort */}
-					<View style={{ marginTop: space.md }}>
-						<Text
-							style={[
-								type.small,
-								{ color: palette.textMuted, marginBottom: 8 },
-							]}
-						>
-							Sort by
-						</Text>
-						<SegmentedControl
-							value={sortBy}
-							onChange={(key) => onSortChange?.(key as any)}
-							segments={[
-								{ key: 'deadline', label: 'Deadline' },
-								{ key: 'progress', label: 'Progress' },
-								{ key: 'name', label: 'Name' },
-								{ key: 'target', label: 'Amount' },
-							]}
-						/>
-					</View>
-				</View>
-			)}
-
 			{isLoading ? (
 				<View style={styles.loadingState}>
 					<ActivityIndicator size="large" color="#007ACC" />
 					<Text style={styles.loadingText}>Loading goals...</Text>
 				</View>
-			) : filteredAndSorted && filteredAndSorted.length > 0 ? (
+			) : (
 				<FlatList
 					data={filteredAndSorted}
 					keyExtractor={(g) => g.id || `goal-${Math.random()}`}
@@ -339,7 +264,6 @@ export default function GoalsFeed({
 						/>
 					)}
 					ItemSeparatorComponent={() => <View style={styles.separator} />}
-					contentContainerStyle={{ paddingBottom: 24 }}
 					scrollEnabled={scrollEnabled}
 					refreshControl={
 						<RefreshControl
@@ -349,22 +273,25 @@ export default function GoalsFeed({
 							colors={['#007ACC']}
 						/>
 					}
+					ListEmptyComponent={
+						<View style={styles.emptyState}>
+							<Ionicons name="flag-outline" size={48} color="#d1d5db" />
+							<Text style={styles.emptyTitle}>{getEmptyStateMessage()}</Text>
+							<Text style={styles.emptySubtitle}>
+								{getEmptyStateSubtitle()}
+							</Text>
+							{filterBy === 'all' && (
+								<TouchableOpacity
+									style={styles.addGoalButton}
+									onPress={() => router.push('/(stack)/addGoal')}
+								>
+									<Ionicons name="add" size={16} color="#007ACC" />
+									<Text style={styles.addGoalButtonText}>Add Goal</Text>
+								</TouchableOpacity>
+							)}
+						</View>
+					}
 				/>
-			) : (
-				<View style={styles.emptyState}>
-					<Ionicons name="flag-outline" size={48} color="#d1d5db" />
-					<Text style={styles.emptyTitle}>{getEmptyStateMessage()}</Text>
-					<Text style={styles.emptySubtitle}>{getEmptyStateSubtitle()}</Text>
-					{filterBy === 'all' && (
-						<TouchableOpacity
-							style={styles.addGoalButton}
-							onPress={() => router.push('/(stack)/addGoal')}
-						>
-							<Ionicons name="add" size={16} color="#007ACC" />
-							<Text style={styles.addGoalButtonText}>Add Goal</Text>
-						</TouchableOpacity>
-					)}
-				</View>
 			)}
 		</View>
 	);
@@ -373,35 +300,18 @@ export default function GoalsFeed({
 const styles = StyleSheet.create({
 	screen: { flex: 1, backgroundColor: '#ffffff' },
 
-	toggleContainer: {
-		marginBottom: space.md,
-		alignItems: 'center',
+	// Inset divider (matches BudgetsFeed)
+	separator: {
+		height: StyleSheet.hairlineWidth,
+		backgroundColor: '#ECEFF3',
+		marginLeft: 60,
 	},
-	toggleButton: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingVertical: space.sm,
-		paddingHorizontal: space.md,
-		borderRadius: 20,
-		backgroundColor: palette.subtle,
-		borderWidth: 1,
-		borderColor: palette.border,
-	},
-	toggleText: {
-		marginLeft: space.xs,
-		fontSize: 12,
-		fontWeight: '500',
-		color: palette.textMuted,
-	},
-
-	separator: { height: 1, backgroundColor: '#f1f1f1' },
 
 	rowContainer: {
 		flexDirection: 'row',
 		alignItems: 'flex-start',
 		paddingVertical: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: '#e5e7eb',
+		// No bottom border; separator handles dividers
 	},
 	iconWrapper: {
 		width: 48,
@@ -430,12 +340,16 @@ const styles = StyleSheet.create({
 		marginTop: 8,
 		justifyContent: 'space-between',
 	},
-	statusRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-	statusLabel: { fontSize: 13, color: '#a1a1aa' },
-	statusText: { fontSize: 13, fontWeight: '500' },
-	textGreen: { color: '#059669' },
-	textRed: { color: '#e11d48' },
-	textBlue: { color: '#0284c7' },
+	statusRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+
+	// Status pill styling
+	pill: {
+		paddingHorizontal: 10,
+		paddingVertical: 4,
+		borderRadius: 999,
+		borderWidth: 1,
+	},
+	pillText: { fontSize: 12, fontWeight: '600' },
 
 	rightMeta: { alignItems: 'flex-end', marginLeft: 12 },
 	metaDate: {

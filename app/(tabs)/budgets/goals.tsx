@@ -13,6 +13,7 @@ import {
 	LoadingState,
 	ErrorState,
 	EmptyState,
+	SegmentedControl,
 } from '../../../src/ui';
 
 // ==========================================
@@ -154,6 +155,18 @@ export default function GoalsScreen() {
 		<Page
 			title="Goals"
 			subtitle={`${summaryStats.completedGoals}/${summaryStats.totalGoals} completed`}
+			right={
+				<SegmentedControl
+					value={filterBy}
+					onChange={(key) => setFilterBy(key as any)}
+					segments={[
+						{ key: 'all', label: 'All' },
+						{ key: 'active', label: 'Active' },
+						{ key: 'completed', label: 'Done' },
+						{ key: 'overdue', label: 'Overdue' },
+					]}
+				/>
+			}
 		>
 			<ScrollView
 				showsVerticalScrollIndicator={false}
@@ -175,7 +188,6 @@ export default function GoalsScreen() {
 							scrollEnabled={false}
 							goals={goals}
 							filterBy={filterBy}
-							onFilterChange={setFilterBy}
 							sortBy={sortBy}
 							onSortChange={setSortBy}
 							onPressMenu={(id: string) => {

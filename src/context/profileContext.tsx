@@ -106,6 +106,41 @@ interface Expenses {
 	subscriptions: number;
 }
 
+interface PayInfo {
+	cadence?:
+		| 'weekly'
+		| 'biweekly'
+		| 'semimonthly'
+		| 'monthly'
+		| 'irregular'
+		| null;
+	netPerPaycheck?: number | null;
+	derivedMonthlyIncome?: number | null;
+	varies?: boolean;
+	lastConfirmedAt?: string | null;
+}
+
+interface IncomeEstimate {
+	monthlyIncome: number;
+	source: 'user-declared' | 'observed' | 'none';
+	confidence: number;
+	metadata?: {
+		cadence?: string;
+		netPerPaycheck?: number;
+		observedCadence?: string;
+		lastPaycheckAt?: string;
+		paycheckCount?: number;
+		derivedFrom?: string;
+	};
+}
+
+interface IncomeComparison {
+	userDeclared: IncomeEstimate | null;
+	observed: IncomeEstimate | null;
+	divergence: number | null;
+	recommended: IncomeEstimate;
+}
+
 interface Profile {
 	_id: string;
 	userId: string;
@@ -120,17 +155,23 @@ interface Profile {
 	riskProfile: RiskProfile;
 	preferences: ProfilePreferences;
 	phone?: string;
+	pay?: PayInfo;
+	emergencyFundMonths?: number;
 	createdAt: string;
 	updatedAt: string;
 }
 
 interface ProfileContextType {
 	profile: Profile | null;
+	incomeEstimate: IncomeEstimate | null;
+	incomeComparison: IncomeComparison | null;
 	loading: boolean;
 	error: string | null;
 	isOffline: boolean;
 	lastSyncTime: number | null;
 	fetchProfile: () => Promise<void>;
+	fetchIncomeEstimate: () => Promise<void>;
+	fetchIncomeComparison: () => Promise<void>;
 	updateProfile: (updates: Partial<Profile>) => Promise<void>;
 	updatePreferences: (
 		preferences: Partial<ProfilePreferences>
@@ -284,6 +325,11 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 	children,
 }) => {
 	const [profile, setProfile] = useState<Profile | null>(null);
+	const [incomeEstimate, setIncomeEstimate] = useState<IncomeEstimate | null>(
+		null
+	);
+	const [incomeComparison, setIncomeComparison] =
+		useState<IncomeComparison | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [isOffline, setIsOffline] = useState(false);
@@ -897,6 +943,46 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 		}
 	}, [isOffline, user, firebaseUser]);
 
+	const fetchIncomeEstimate = useCallback(async () => {
+		if (!user || !firebaseUser) {
+			setIncomeEstimate(null);
+			return;
+		}
+
+		try {
+			const response = await ApiService.get<{ data: IncomeEstimate }>(
+				'/api/income/estimate'
+			);
+
+			if (response.success && response.data) {
+				const estimateData = response.data.data || response.data;
+				setIncomeEstimate(estimateData);
+			}
+		} catch (err) {
+			console.warn('Error fetching income estimate:', err);
+		}
+	}, [user, firebaseUser]);
+
+	const fetchIncomeComparison = useCallback(async () => {
+		if (!user || !firebaseUser) {
+			setIncomeComparison(null);
+			return;
+		}
+
+		try {
+			const response = await ApiService.get<{ data: IncomeComparison }>(
+				'/api/income/comparison'
+			);
+
+			if (response.success && response.data) {
+				const comparisonData = response.data.data || response.data;
+				setIncomeComparison(comparisonData);
+			}
+		} catch (err) {
+			console.warn('Error fetching income comparison:', err);
+		}
+	}, [user, firebaseUser]);
+
 	// Fetch profile when user changes (only listen to user, not firebaseUser)
 	useEffect(() => {
 		// console.log('ProfileProvider: User changed:', {
@@ -905,20 +991,28 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 		// });
 		if (user) {
 			fetchProfile();
+			// Also fetch income estimate when profile loads
+			fetchIncomeEstimate();
 		} else {
 			setProfile(null);
+			setIncomeEstimate(null);
+			setIncomeComparison(null);
 			setLoading(false);
 			setError(null);
 		}
-	}, [user, firebaseUser, fetchProfile]); // Include firebaseUser to ensure we have auth before fetching
+	}, [user, firebaseUser, fetchProfile, fetchIncomeEstimate]); // Include firebaseUser to ensure we have auth before fetching
 
 	const value: ProfileContextType = {
 		profile,
+		incomeEstimate,
+		incomeComparison,
 		loading,
 		error,
 		isOffline,
 		lastSyncTime,
 		fetchProfile,
+		fetchIncomeEstimate,
+		fetchIncomeComparison,
 		updateProfile,
 		updatePreferences,
 		updateNotificationSettings,

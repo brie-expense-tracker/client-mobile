@@ -198,6 +198,37 @@ export class RecurringExpenseService {
 	}
 
 	/**
+	 * Update an existing recurring expense
+	 */
+	static async updateRecurringExpense(
+		patternId: string,
+		data: {
+			vendor: string;
+			amount: number;
+			frequency: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+			nextExpectedDate: string;
+		}
+	): Promise<RecurringExpense> {
+		try {
+			const response = await ApiService.put<{
+				recurringExpense: RecurringExpense;
+			}>(`/api/recurring-expenses/${patternId}`, data);
+
+			if (response.success && response.data) {
+				return response.data.recurringExpense;
+			}
+
+			throw new Error(response.error || 'Failed to update recurring expense');
+		} catch (error) {
+			console.error(
+				'[RecurringExpenseService] Error updating recurring expense:',
+				error
+			);
+			throw error;
+		}
+	}
+
+	/**
 	 * Manually trigger recurring expense processing
 	 */
 	static async processRecurringExpenses(): Promise<{
@@ -257,6 +288,36 @@ export class RecurringExpenseService {
 		} catch (error) {
 			console.error(
 				'[RecurringExpenseService] Error cleaning up duplicate expenses:',
+				error
+			);
+			throw error;
+		}
+	}
+
+	/**
+	 * Delete a recurring expense
+	 */
+	static async deleteRecurringExpense(patternId: string): Promise<{
+		success: boolean;
+		message: string;
+	}> {
+		try {
+			const response = await ApiService.delete<{ message: string }>(
+				`/api/recurring-expenses/${patternId}`
+			);
+
+			if (response.success && response.data) {
+				return {
+					success: true,
+					message:
+						response.data.message || 'Recurring expense deleted successfully',
+				};
+			}
+
+			throw new Error(response.error || 'Failed to delete recurring expense');
+		} catch (error) {
+			console.error(
+				'[RecurringExpenseService] Error deleting recurring expense:',
 				error
 			);
 			throw error;

@@ -1,5 +1,8 @@
 import React from 'react';
+import { TouchableOpacity, StyleSheet } from 'react-native';
 import CircularProgressBar from './CircularProgressBar';
+import { palette, space } from '../../../../src/ui';
+import { currency } from '../../../../src/utils/format';
 
 interface WeeklyBudgetSummaryProps {
 	percentage?: number;
@@ -10,16 +13,45 @@ interface WeeklyBudgetSummaryProps {
 }
 
 const WeeklyBudgetSummary = (props: WeeklyBudgetSummaryProps) => {
-	const { percentage = 0, spent = 0, total = 0 } = props;
+	const {
+		percentage = 0,
+		spent = 0,
+		total = 0,
+		onPeriodToggle,
+		isActive = false,
+	} = props;
 
 	return (
-		<CircularProgressBar
-			percent={percentage}
-			centerLabel={`$${spent.toFixed(0)}`}
-			subtitle={`of $${total.toFixed(0)}`}
-			color={percentage > 100 ? '#ef4444' : '#00a2ff'}
-		/>
+		<TouchableOpacity
+			onPress={onPeriodToggle}
+			activeOpacity={0.7}
+			accessibilityRole="button"
+			accessibilityLabel="Toggle weekly budget summary"
+			style={styles.container}
+		>
+			<CircularProgressBar
+				percent={percentage}
+				centerLabel={currency(spent)}
+				subtitle={`of ${currency(total)}`}
+				color={
+					percentage > 100
+						? palette.danger
+						: isActive
+						? palette.primary
+						: palette.primaryMuted
+				}
+				trackColor={palette.track}
+			/>
+		</TouchableOpacity>
 	);
 };
+
+const styles = StyleSheet.create({
+	container: {
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingVertical: space.lg,
+	},
+});
 
 export default WeeklyBudgetSummary;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
 	View,
 	Text,
@@ -9,166 +9,233 @@ import {
 	Share,
 	Platform,
 } from 'react-native';
-import { ApiService } from '../services/core/apiService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useConnectivity } from '../utils/connectivity';
+import { ApiService } from '../services/core/apiService';
+import useAuth from '../context/AuthContext';
+
+type StepStatus = 'pass' | 'fail' | 'skip';
+type Result = {
+	id: string;
+	label: string;
+	status: StepStatus;
+	detail?: string;
+	durationMs?: number;
+};
 
 export default function ConnectivityTest() {
-	const [isLoading, setIsLoading] = useState(false);
-	const [results, setResults] = useState<string[]>([]);
-	const { isOnline, isChecking, checkConnectivity } = useConnectivity();
+	const [running, setRunning] = useState(false);
+	const [results, setResults] = useState<Result[]>([]);
+	const { isOnline, checkConnectivity } = useConnectivity();
+	const { firebaseUser } = useAuth();
 
-	const addResult = (message: string) => {
-		setResults((prev) => [
-			...prev,
-			`${new Date().toLocaleTimeString()}: ${message}`,
+	const add = (r: Result) => setResults((prev) => [...prev, r]);
+
+	const badge = (s: StepStatus) =>
+		s === 'pass' ? '🟢' : s === 'fail' ? '🔴' : '🟡';
+
+	const computed = useMemo(() => {
+		const pass = results.filter((r) => r.status === 'pass').length;
+		const fail = results.filter((r) => r.status === 'fail').length;
+		const skip = results.filter((r) => r.status === 'skip').length;
+		return { pass, fail, skip };
+	}, [results]);
+
+	// ⏱️ hard timeout wrapper for any step to avoid hangs
+	const withTimeout = <T,>(p: Promise<T>, ms = 5000) =>
+		Promise.race<T>([
+			p,
+			new Promise<T>((_, rej) =>
+				setTimeout(() => rej(new Error('timeout')), ms)
+			) as any,
 		]);
+
+	const runStep = async (
+		id: string,
+		label: string,
+		fn: () => Promise<{ ok: boolean; detail?: string }>
+	) => {
+		const start = Date.now();
+		try {
+			const { ok, detail } = await withTimeout(fn());
+			const durationMs = Date.now() - start;
+			add({ id, label, status: ok ? 'pass' : 'fail', detail, durationMs });
+			return ok;
+		} catch (e: any) {
+			const durationMs = Date.now() - start;
+			add({
+				id,
+				label,
+				status: 'fail',
+				detail: e?.message || 'Unknown error',
+				durationMs,
+			});
+			return false;
+		}
 	};
 
-	// No need for useEffect since useConnectivity handles network monitoring
+	const skipStep = (id: string, label: string, detail: string) => {
+		add({ id, label, status: 'skip', detail });
+	};
 
-	const testConnectivity = async () => {
-		setIsLoading(true);
+	const run = async () => {
+		if (running) return;
+		setRunning(true);
 		setResults([]);
 
 		try {
-			// Test 0: Network information
-			addResult('Checking network information...');
-			addResult(`📡 Connection: ${isOnline ? 'Connected' : 'Disconnected'}`);
-			addResult(`🔄 Checking: ${isChecking ? 'Yes' : 'No'}`);
+			// 0) Fresh connectivity
+			const fresh = await withTimeout(checkConnectivity());
+			const online = typeof fresh === 'boolean' ? fresh : isOnline;
 
-			// Force a connectivity check
-			await checkConnectivity();
-			addResult(`📡 After check: ${isOnline ? 'Connected' : 'Disconnected'}`);
+			add({
+				id: 'net.state',
+				label: 'Network status',
+				status: online ? 'pass' : 'fail',
+				detail: online ? 'Connected' : 'Disconnected',
+			});
 
-			// Test 1: Basic connectivity
-			addResult('Testing server connectivity...');
-			const isConnected = await ApiService.testConnection();
-			if (isConnected) {
-				addResult('✅ Server connectivity: SUCCESS');
-			} else {
-				addResult('❌ Server connectivity: FAILED');
+			if (!online) {
+				skipStep(
+					'srv.reach',
+					'Server connectivity (ping)',
+					'Skipped (offline)'
+				);
+				skipStep('auth.state', 'Auth state', 'Skipped (offline)');
+				skipStep('auth.token', 'Token validity', 'Skipped (offline)');
+				skipStep('api.health', 'GET /health', 'Skipped (offline)');
+				skipStep('perf.latency', 'Latency check', 'Skipped (offline)');
+				return;
 			}
 
-			// Test 2: Check AsyncStorage
-			addResult('Checking AsyncStorage...');
-			const firebaseUID = await AsyncStorage.getItem('firebaseUID');
-			if (firebaseUID) {
-				addResult(`✅ Firebase UID found: ${firebaseUID.substring(0, 8)}...`);
-			} else {
-				addResult('❌ No Firebase UID in AsyncStorage');
-			}
-
-			// Test 3: Test authentication
-			if (firebaseUID) {
-				addResult('Testing authentication...');
-				const isAuthenticated = await ApiService.testAuthentication();
-				if (isAuthenticated) {
-					addResult('✅ Authentication: SUCCESS');
-				} else {
-					addResult('❌ Authentication: FAILED');
+			// 1) Server ping
+			const serverOk = await runStep(
+				'srv.reach',
+				'Server connectivity (ping)',
+				async () => {
+					const ok = await ApiService.testConnection();
+					return { ok, detail: ok ? 'Ping succeeded' : 'Ping failed' };
 				}
-			} else {
-				addResult('⚠️ Skipping authentication test (no Firebase UID)');
-			}
-
-			// Test 4: Test API endpoints
-			addResult('Testing API endpoints...');
-			try {
-				const response = await ApiService.get('/health');
-				if (response.success) {
-					addResult('✅ Health endpoint: SUCCESS');
-				} else {
-					addResult('❌ Health endpoint: FAILED');
-				}
-			} catch {
-				addResult('❌ Health endpoint: ERROR');
-			}
-
-			// Test 5: Performance test
-			addResult('Running performance test...');
-			const startTime = Date.now();
-			try {
-				await ApiService.testConnection();
-				const endTime = Date.now();
-				const responseTime = endTime - startTime;
-				addResult(`⏱️ Response time: ${responseTime}ms`);
-				if (responseTime < 1000) {
-					addResult('✅ Performance: EXCELLENT');
-				} else if (responseTime < 3000) {
-					addResult('⚠️ Performance: ACCEPTABLE');
-				} else {
-					addResult('❌ Performance: SLOW');
-				}
-			} catch {
-				addResult('❌ Performance test failed');
-			}
-		} catch (error) {
-			addResult(
-				`❌ Test error: ${
-					error instanceof Error ? error.message : 'Unknown error'
-				}`
 			);
-		} finally {
-			setIsLoading(false);
-		}
-	};
 
-	const clearResults = () => {
-		setResults([]);
+			// 2) Auth state (from useAuth context)
+			add({
+				id: 'auth.state',
+				label: 'Auth state',
+				status: firebaseUser ? 'pass' : 'skip',
+				detail: firebaseUser
+					? `Signed in (${firebaseUser.uid.slice(0, 8)}…)`
+					: 'Signed out',
+			});
+
+			// 3) Token validity (only if server ok + user present)
+			if (serverOk && firebaseUser) {
+				await runStep('auth.token', 'Token validity', async () => {
+					const token = await firebaseUser.getIdToken();
+					const ok = !!token;
+					return { ok, detail: ok ? 'Firebase ID token acquired' : 'No token' };
+				});
+			} else {
+				skipStep(
+					'auth.token',
+					'Token validity',
+					!serverOk ? 'Skipped (server down)' : 'Skipped (signed out)'
+				);
+			}
+
+			// 4) Health endpoint
+			await runStep('api.health', 'GET /health', async () => {
+				const resp = await ApiService.get('/health');
+				const ok = !!resp?.success;
+				return {
+					ok,
+					detail: ok ? 'Service healthy' : 'Service reported unhealthy',
+				};
+			});
+
+			// 5) Latency
+			await runStep('perf.latency', 'Latency check', async () => {
+				const t0 = Date.now();
+				await ApiService.testConnection();
+				const dt = Date.now() - t0;
+				const grade =
+					dt < 500
+						? 'Excellent (<500ms)'
+						: dt < 1500
+						? 'Good (<1500ms)'
+						: dt < 3000
+						? 'Acceptable (<3s)'
+						: 'Slow (>=3s)';
+				return { ok: dt < 3000, detail: `${dt}ms — ${grade}` };
+			});
+		} catch (e: any) {
+			// Catch any unexpected top-level error so UI never hangs
+			add({
+				id: 'runner.error',
+				label: 'Unexpected error',
+				status: 'fail',
+				detail: e?.message || 'Unknown error',
+			});
+		} finally {
+			setRunning(false); // ✅ always clear the spinner
+		}
 	};
 
 	const exportResults = async () => {
-		if (results.length === 0) {
-			return;
-		}
-
-		const report = [
+		if (results.length === 0) return;
+		const lines = [
 			'=== Connectivity Test Report ===',
 			`Generated: ${new Date().toLocaleString()}`,
 			`Platform: ${Platform.OS} ${Platform.Version}`,
 			'',
-			'Test Results:',
-			...results,
+			`Summary: ✅ ${computed.pass}  🔴 ${computed.fail}  ⚠️ ${computed.skip}`,
+			'',
+			...results.map(
+				(r) =>
+					`${r.label}: ${r.status.toUpperCase()}` +
+					(r.durationMs != null ? ` (${r.durationMs}ms)` : '') +
+					(r.detail ? ` — ${r.detail}` : '')
+			),
 			'',
 			'=== End Report ===',
-		].join('\n');
-
-		try {
-			await Share.share({
-				message: report,
-				title: 'Connectivity Test Report',
-			});
-		} catch (error) {
-			console.error('Failed to share results:', error);
-		}
+		];
+		await Share.share({
+			message: lines.join('\n'),
+			title: 'Connectivity Test Report',
+		});
 	};
 
 	return (
 		<View style={styles.container}>
 			<Text style={styles.title}>Connectivity Test</Text>
 
-			{/* Network Info Display */}
+			{/* Live network indicator from hook (FYI) */}
 			<View style={styles.networkInfoContainer}>
 				<Text style={styles.networkInfoTitle}>Network Status</Text>
 				<Text style={styles.networkInfoText}>
-					{isOnline ? '🟢 Connected' : '🔴 Disconnected'}{' '}
-					{isChecking && '- Checking...'}
+					{isOnline ? '🟢 Connected' : '🔴 Disconnected'}
+					{running ? '  · Checking…' : ''}
 				</Text>
 			</View>
 
+			{/* Summary pill */}
+			<View style={styles.summaryRow}>
+				<Text style={styles.summaryPill}>✅ {computed.pass}</Text>
+				<Text style={styles.summaryPill}>🔴 {computed.fail}</Text>
+				<Text style={styles.summaryPill}>⚠️ {computed.skip}</Text>
+			</View>
+
 			<TouchableOpacity
-				style={[styles.testButton, isLoading && styles.testButtonDisabled]}
-				onPress={testConnectivity}
-				disabled={isLoading}
+				style={[styles.testButton, running && styles.testButtonDisabled]}
+				onPress={run}
+				disabled={running}
 				accessibilityLabel="Run connectivity test"
-				accessibilityHint="Tap to test server connectivity, authentication, and performance"
+				accessibilityHint="Runs reachability, auth, health, and latency checks"
 				accessibilityRole="button"
 			>
-				{isLoading ? (
+				{running ? (
 					<View style={styles.loadingContainer}>
 						<ActivityIndicator size="small" color="white" />
-						<Text style={styles.buttonText}>Testing...</Text>
+						<Text style={styles.buttonText}>Testing…</Text>
 					</View>
 				) : (
 					<Text style={styles.buttonText}>Run Connectivity Test</Text>
@@ -178,7 +245,9 @@ export default function ConnectivityTest() {
 			<View style={styles.buttonRow}>
 				<TouchableOpacity
 					style={styles.clearButton}
-					onPress={clearResults}
+					onPress={() => {
+						setResults([]);
+					}}
 					accessibilityLabel="Clear test results"
 					accessibilityRole="button"
 				>
@@ -197,20 +266,26 @@ export default function ConnectivityTest() {
 				)}
 			</View>
 
-			<ScrollView
-				style={styles.resultsContainer}
-				showsVerticalScrollIndicator={true}
-			>
-				<Text style={styles.resultsTitle}>Test Results:</Text>
+			<ScrollView style={styles.resultsContainer} showsVerticalScrollIndicator>
+				<Text style={styles.resultsTitle}>Steps</Text>
 				{results.length === 0 ? (
 					<Text style={styles.noResultsText}>
-						No test results yet. Run a test to see results here.
+						No results yet. Run a test to begin.
 					</Text>
 				) : (
-					results.map((result, index) => (
-						<Text key={index} style={styles.resultText}>
-							{result}
-						</Text>
+					results.map((r) => (
+						<View key={r.id} style={styles.resultRow}>
+							<Text style={styles.resultBadge}>{badge(r.status)}</Text>
+							<View style={{ flex: 1 }}>
+								<Text style={styles.resultLabel}>{r.label}</Text>
+								{!!r.detail && (
+									<Text style={styles.resultDetail}>{r.detail}</Text>
+								)}
+							</View>
+							{!!r.durationMs && (
+								<Text style={styles.resultTime}>{r.durationMs}ms</Text>
+							)}
+						</View>
 					))
 				)}
 			</ScrollView>
@@ -218,24 +293,22 @@ export default function ConnectivityTest() {
 	);
 }
 
+/* ---------- styles (kept close to yours; added a few chips/rows) ---------- */
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		padding: 20,
-		backgroundColor: '#f8f9fa',
-	},
+	container: { flex: 1, padding: 20, backgroundColor: '#f8f9fa' },
 	title: {
 		fontSize: 20,
-		fontWeight: 'bold',
+		fontWeight: '700',
 		marginBottom: 16,
 		textAlign: 'center',
 		color: '#333',
 	},
+
 	networkInfoContainer: {
 		backgroundColor: '#e3f2fd',
 		padding: 12,
 		borderRadius: 8,
-		marginBottom: 16,
+		marginBottom: 12,
 		borderLeftWidth: 4,
 		borderLeftColor: '#2196f3',
 	},
@@ -245,23 +318,32 @@ const styles = StyleSheet.create({
 		color: '#1976d2',
 		marginBottom: 4,
 	},
-	networkInfoText: {
+	networkInfoText: { fontSize: 12, color: '#424242' },
+
+	summaryRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+	summaryPill: {
+		backgroundColor: '#fff',
+		borderWidth: 1,
+		borderColor: '#e5e7eb',
+		borderRadius: 20,
+		paddingHorizontal: 10,
+		paddingVertical: 6,
 		fontSize: 12,
-		color: '#424242',
+		color: '#111827',
 	},
+
 	testButton: {
 		backgroundColor: '#007AFF',
 		padding: 16,
 		borderRadius: 8,
-		marginBottom: 16,
+		marginBottom: 12,
 	},
-	testButtonDisabled: {
-		backgroundColor: '#a0a0a0',
-	},
+	testButtonDisabled: { backgroundColor: '#a0a0a0' },
 	loadingContainer: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'center',
+		gap: 8,
 	},
 	buttonText: {
 		color: 'white',
@@ -269,10 +351,11 @@ const styles = StyleSheet.create({
 		fontWeight: '600',
 		fontSize: 16,
 	},
+
 	buttonRow: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
-		marginBottom: 16,
+		marginBottom: 12,
 		gap: 12,
 	},
 	clearButton: {
@@ -299,18 +382,19 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		fontWeight: '500',
 	},
+
 	resultsContainer: {
 		backgroundColor: 'white',
-		padding: 16,
+		padding: 12,
 		borderRadius: 8,
 		borderWidth: 1,
 		borderColor: '#dee2e6',
 		flex: 1,
-		maxHeight: 300,
+		maxHeight: 320,
 	},
 	resultsTitle: {
-		fontWeight: 'bold',
-		marginBottom: 12,
+		fontWeight: '700',
+		marginBottom: 8,
 		color: '#333',
 		fontSize: 16,
 	},
@@ -319,13 +403,19 @@ const styles = StyleSheet.create({
 		color: '#666',
 		textAlign: 'center',
 		fontStyle: 'italic',
-		marginTop: 20,
+		marginTop: 12,
 	},
-	resultText: {
-		fontSize: 12,
-		marginBottom: 6,
-		color: '#666',
-		fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-		lineHeight: 16,
+
+	resultRow: {
+		flexDirection: 'row',
+		alignItems: 'flex-start',
+		gap: 10,
+		paddingVertical: 8,
+		borderBottomWidth: StyleSheet.hairlineWidth,
+		borderBottomColor: '#eee',
 	},
+	resultBadge: { fontSize: 16, width: 22, textAlign: 'center' },
+	resultLabel: { fontSize: 14, color: '#111827', fontWeight: '600' },
+	resultDetail: { fontSize: 12, color: '#6b7280', marginTop: 2 },
+	resultTime: { fontSize: 12, color: '#6b7280', marginLeft: 8 },
 });

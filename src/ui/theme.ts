@@ -1,13 +1,34 @@
 export const palette = {
+	// Base
 	bg: '#FFFFFF',
+	surface: '#FFFFFF',
+	surfaceAlt: '#F8FAFC',
 	text: '#111827',
 	textMuted: '#6B7280',
+	textSubtle: '#9CA3AF',
 	border: '#E5E7EB',
+	borderMuted: '#E5E5E5',
+
+	// Primary
 	primary: '#00A2FF',
+	primaryMuted: '#0EA5E9',
+	primarySubtle: '#E0F2FE',
 	primaryTextOn: '#FFFFFF',
+
+	// Semantic
 	warning: '#F59E0B',
 	danger: '#EF4444',
+	dangerSubtle: '#FEF2F2',
+	dangerBorder: '#FECACA',
 	success: '#10B981',
+	successSubtle: '#F0FDF4',
+	info: '#00A2FF',
+	infoSubtle: '#F0F8FF',
+
+	// Track/Progress
+	track: '#EEF2F7',
+
+	// UI Elements
 	chipBg: '#F8FAFC',
 	chipText: '#0F172A',
 	subtle: '#F3F4F6',
@@ -44,5 +65,16 @@ export const type = {
 	h1: { fontSize: 20, fontWeight: '700' as const },
 	h2: { fontSize: 16, fontWeight: '600' as const },
 	body: { fontSize: 14, fontWeight: '400' as const },
+	bodySm: { fontSize: 14, fontWeight: '400' as const },
 	small: { fontSize: 12, fontWeight: '500' as const },
+	labelSm: {
+		fontSize: 14,
+		fontWeight: '600' as const,
+		textTransform: 'uppercase' as const,
+		letterSpacing: 0.5,
+	},
+	titleMd: { fontSize: 20, fontWeight: '600' as const },
+	num2xl: { fontSize: 32, fontWeight: '700' as const },
+	numLg: { fontSize: 18, fontWeight: '700' as const },
+	numMd: { fontSize: 16, fontWeight: '600' as const },
 };

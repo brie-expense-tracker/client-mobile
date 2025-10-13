@@ -243,44 +243,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 					'🟢 [AUTH-STATE] ===== ensureUserExistsLocal completed successfully ====='
 				);
 			} catch (e: any) {
-				console.log(
-					'🔴 [AUTH-STATE] ===== ERROR in ensureUserExistsLocal ====='
-				);
-				console.error('🔴 [AUTH-STATE] Error:', e);
-				console.error('🔴 [AUTH-STATE] Error message:', e?.message);
-				console.error('🔴 [AUTH-STATE] Error code:', e?.code);
-				console.error('🔴 [AUTH-STATE] Error status:', e?.response?.status);
+				console.log('🟡 [AUTH-STATE] Could not verify user with server');
 
-				// If we can't create or fetch the MongoDB user, just set error state
-				// Don't automatically sign out - let the Google sign-in flows handle this
+				// Network timeouts and auth errors should be treated gracefully
+				// Sign out to avoid orphaned Firebase accounts
 				if (
+					e?.message?.includes('timeout') ||
+					e?.message?.includes('Aborted') ||
+					e?.message?.includes('Network') ||
 					e?.message?.includes('User account not found') ||
 					e?.message?.includes('User not found') ||
 					e?.message?.includes('Failed to create') ||
-					e?.response?.status === 404
+					e?.response?.status === 404 ||
+					e?.response?.status === 408
 				) {
-					// This is expected behavior for new accounts during Google sign-up
-					console.warn(
-						'🟡 [AUTH-STATE] ⚠️ MongoDB user not found (EXPECTED for new accounts)'
-					);
 					console.log(
-						'🟡 [AUTH-STATE] NOT signing out - will let Google sign-in flow handle user creation'
+						'🟡 [AUTH-STATE] Network/timeout - signing out to prevent orphaned account'
 					);
-					setError({
-						code: 'ACCOUNT_NOT_FOUND',
-						message: 'Account not found. Please complete the sign-up process.',
-						details: e,
-					});
-				} else {
-					// Unexpected error - log and send to Sentry
-					console.error('🔴 [AUTH-STATE] ❌ Unexpected error!');
-					setError({
-						code: 'USER_CREATION_ERROR',
-						message: 'Failed to create or fetch user from database',
-						details: e,
-					});
-					Sentry.captureException(e);
+
+					// Sign out of Firebase to clear orphaned state
+					try {
+						await auth().signOut();
+						setFirebaseUser(null);
+						setUser(null);
+						setProfile(null);
+						console.log('🟡 [AUTH-STATE] Signed out successfully');
+					} catch (signOutError) {
+						console.warn('🟡 [AUTH-STATE] Failed to sign out:', signOutError);
+					}
+
+					return;
 				}
+
+				// Only log truly unexpected errors
+				console.error('🔴 [AUTH-STATE] Unexpected error:', e?.message);
+				setError({
+					code: 'USER_CREATION_ERROR',
+					message: 'Failed to create or fetch user from database',
+					details: e,
+				});
+				Sentry.captureException(e);
 			}
 		};
 
@@ -370,7 +372,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				setTimeout(() => {
 					console.log('⏰ [DEBUG] hydrateFromFirebaseLocal timeout reached');
 					resolve();
-				}, 20000); // 20 second timeout
+				}, 5000); // 5 second timeout (fast fail for better UX)
 			});
 
 			try {
@@ -540,64 +542,99 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	);
 
 	const login = useCallback(async (firebaseUser: FirebaseAuthTypes.User) => {
+		// Add timeout protection
+		const timeoutPromise = new Promise<never>((_, reject) => {
+			setTimeout(() => {
+				console.log('⏰ [DEBUG] Login timeout after 5s');
+				reject(new Error('Login timeout'));
+			}, 5000);
+		});
+
 		try {
 			// Set manual login flag to prevent auth state change interference
 			isManualLoginRef.current = true;
 
 			console.log('🔍 [DEBUG] Login attempt: Regular user');
 
-			// Store the Firebase UID
-			await setItem(UID_KEY, firebaseUser.uid);
+			// Race the login operation against timeout
+			await Promise.race([
+				(async () => {
+					// Store the Firebase UID
+					await setItem(UID_KEY, firebaseUser.uid);
 
-			// Check if user exists in MongoDB
-			let mongoUser;
-			try {
-				console.log('🔍 [DEBUG] Checking if MongoDB user exists...');
-				mongoUser = await UserService.getUserByFirebaseUID(firebaseUser.uid);
-				console.log('🔍 [DEBUG] MongoDB user found!');
-			} catch (error: any) {
-				// If user doesn't exist (404), that's okay - we'll create them
-				if (
-					error?.message?.includes('User not found') ||
-					error?.message?.includes('User account not found') ||
-					error?.response?.status === 404
-				) {
-					console.log('🔍 [DEBUG] MongoDB user does not exist - will create');
-					mongoUser = null;
-				} else {
-					// Unexpected error - re-throw it
-					throw error;
-				}
-			}
+					// Check if user exists in MongoDB
+					let mongoUser;
+					try {
+						console.log('🔍 [DEBUG] Checking if MongoDB user exists...');
+						mongoUser = await UserService.getUserByFirebaseUID(
+							firebaseUser.uid
+						);
+						console.log('🔍 [DEBUG] MongoDB user found!');
+					} catch (error: any) {
+						// If user doesn't exist (404), that's okay - we'll create them
+						if (
+							error?.message?.includes('User not found') ||
+							error?.message?.includes('User account not found') ||
+							error?.message?.includes('timeout') ||
+							error?.message?.includes('Aborted') ||
+							error?.response?.status === 404 ||
+							error?.response?.status === 408
+						) {
+							console.log(
+								'🔍 [DEBUG] MongoDB user does not exist or timeout - will create'
+							);
+							mongoUser = null;
+						} else {
+							// Unexpected error - re-throw it
+							throw error;
+						}
+					}
 
-			if (!mongoUser) {
-				// User doesn't exist in MongoDB, create them
-				console.log('🔍 [DEBUG] Creating new user in MongoDB...');
-				const userData = {
-					firebaseUID: firebaseUser.uid,
-					email: firebaseUser.email!,
-					name: firebaseUser.displayName || undefined,
-				};
+					if (!mongoUser) {
+						// User doesn't exist in MongoDB, create them
+						console.log('🔍 [DEBUG] Creating new user in MongoDB...');
+						const userData = {
+							firebaseUID: firebaseUser.uid,
+							email: firebaseUser.email!,
+							name: firebaseUser.displayName || undefined,
+						};
 
-				const response = await UserService.createUser(userData);
-				mongoUser = response.user;
-				setUser(mongoUser);
-				setProfile(response.profile);
-				console.log('✅ [DEBUG] New user created in MongoDB');
-			} else {
-				// User exists, fetch their profile
-				console.log('🔍 [DEBUG] Existing user found in MongoDB');
-				setUser(mongoUser);
-				const userProfile = await UserService.getProfileByUserId(mongoUser._id);
-				setProfile(userProfile);
-			}
+						const response = await UserService.createUser(userData);
+						mongoUser = response.user;
+						setUser(mongoUser);
+						setProfile(response.profile);
+						console.log('✅ [DEBUG] New user created in MongoDB');
+					} else {
+						// User exists, fetch their profile
+						console.log('🔍 [DEBUG] Existing user found in MongoDB');
+						setUser(mongoUser);
+						const userProfile = await UserService.getProfileByUserId(
+							mongoUser._id
+						);
+						setProfile(userProfile);
+					}
 
-			// Set loading to false to trigger navigation logic
-			setLoading(false);
-			console.log(
-				'✅ Firebase login successful, UID stored, MongoDB user ready'
-			);
+					// Set loading to false to trigger navigation logic
+					setLoading(false);
+					console.log(
+						'✅ Firebase login successful, UID stored, MongoDB user ready'
+					);
+				})(),
+				timeoutPromise,
+			]);
 		} catch (error: any) {
+			// Handle timeout gracefully
+			if (
+				error?.message?.includes('Login timeout') ||
+				error?.message?.includes('timeout') ||
+				error?.message?.includes('Aborted')
+			) {
+				console.log('🟡 [DEBUG] Login timeout - will retry on next app open');
+				setLoading(false);
+				// Don't throw for timeout - just let the user try again
+				return;
+			}
+
 			// Downgrade to warning for expected errors (orphaned accounts)
 			if (
 				error?.message?.includes('User not found') ||

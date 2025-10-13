@@ -1,27 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-	View,
-	Text,
-	StyleSheet,
-	ScrollView,
-	Alert,
-	RefreshControl,
-} from 'react-native';
-import CustomSlidingModal from './components/CustomSlidingModal';
-import { RectButton } from 'react-native-gesture-handler';
-import { Ionicons } from '@expo/vector-icons';
+import { ScrollView, Alert, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 
 import RecurringExpensesFeed from './components/RecurringExpensesFeed';
 import RecurringSummaryCard from './components/RecurringSummaryCard';
 import { useRecurringExpenses } from '../../../src/hooks/useRecurringExpenses';
 import { RecurringExpenseService } from '../../../src/services';
-import {
-	accessibilityProps,
-	dynamicTextStyle,
-	generateAccessibilityLabel,
-	voiceOverHints,
-} from '../../../src/utils/accessibility';
 import {
 	Page,
 	Card,
@@ -56,14 +40,19 @@ interface RecurringExpenseWithPaymentStatus {
 
 const RecurringExpensesScreen: React.FC = () => {
 	const [refreshing, setRefreshing] = useState(false);
-	const [isOptionsModalVisible, setIsOptionsModalVisible] = useState(false);
-	const [selectedExpense, setSelectedExpense] =
-		useState<RecurringExpenseWithPaymentStatus | null>(null);
-	const [activeView, setActiveView] = useState<'monthly' | 'weekly'>('monthly');
+	const [activeView, setActiveView] = useState<'all' | 'monthly' | 'weekly'>(
+		'all'
+	);
 
 	// Use only the hook, not both context and hook
-	const { expenses, refetch, markAsPaid, isLoading, hasLoaded, error } =
-		useRecurringExpenses();
+	const {
+		expenses,
+		refetch,
+		deleteRecurringExpense,
+		isLoading,
+		hasLoaded,
+		error,
+	} = useRecurringExpenses();
 
 	// ==========================================
 	// Memoized Calculations
@@ -120,22 +109,22 @@ const RecurringExpensesScreen: React.FC = () => {
 		onRefresh();
 	}, [onRefresh]);
 
-	const handleExpensePress = (expense: RecurringExpenseWithPaymentStatus) => {
-		setSelectedExpense(expense);
-		setIsOptionsModalVisible(true);
-	};
-
 	const handleExpenseMenuPress = (patternId: string) => {
 		const expense = expenses.find((e) => e.patternId === patternId);
 		if (expense) {
-			// Convert to payment status interface
-			const expenseWithStatus: RecurringExpenseWithPaymentStatus = {
-				...expense,
-				isPaid: false,
-				nextDueDate: expense.nextExpectedDate,
-			};
-			setSelectedExpense(expenseWithStatus);
-			setIsOptionsModalVisible(true);
+			Alert.alert(
+				'Recurring Expense Options',
+				`What would you like to do with "${expense.vendor}"?`,
+				[
+					{ text: 'Edit', onPress: () => handleEditExpense(expense) },
+					{
+						text: 'Delete',
+						style: 'destructive',
+						onPress: () => handleDeleteExpense(expense.patternId),
+					},
+					{ text: 'Cancel', style: 'cancel' },
+				]
+			);
 		}
 	};
 
@@ -150,88 +139,18 @@ const RecurringExpensesScreen: React.FC = () => {
 		});
 	};
 
-	const hideOptionsModal = () => {
-		setIsOptionsModalVisible(false);
-		setSelectedExpense(null);
+	const handleEditExpense = (expense: any) => {
+		router.push({
+			pathname: '/(stack)/editRecurringExpense',
+			params: { id: expense.patternId },
+		});
 	};
 
-	const handleViewPaymentHistory = () => {
-		if (selectedExpense) {
-			// Navigate to the recurring expense summary screen
-			router.push({
-				pathname: '/(stack)/recurringExpenseDetails',
-				params: {
-					patternId: selectedExpense.patternId,
-					vendor: selectedExpense.vendor,
-					amount: selectedExpense.amount.toString(),
-					frequency: selectedExpense.frequency,
-				},
-			});
-			hideOptionsModal();
-		}
-	};
-
-	const handleEditExpense = () => {
-		if (selectedExpense) {
-			Alert.alert('Coming Soon', 'Edit functionality will be available soon!');
-			hideOptionsModal();
-		}
-	};
-
-	const handleMarkAsPaid = async () => {
-		if (selectedExpense) {
-			try {
-				// Calculate period dates based on frequency
-				const now = new Date();
-				let periodStart, periodEnd;
-
-				switch (selectedExpense.frequency) {
-					case 'monthly':
-						periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
-						periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-						break;
-					case 'weekly':
-						const dayOfWeek = now.getDay();
-						const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-						periodStart = new Date(now);
-						periodStart.setDate(now.getDate() - daysFromMonday);
-						periodStart.setHours(0, 0, 0, 0);
-						periodEnd = new Date(periodStart);
-						periodEnd.setDate(periodStart.getDate() + 6);
-						periodEnd.setHours(23, 59, 59, 999);
-						break;
-					case 'quarterly':
-						const quarter = Math.floor(now.getMonth() / 3);
-						periodStart = new Date(now.getFullYear(), quarter * 3, 1);
-						periodEnd = new Date(now.getFullYear(), (quarter + 1) * 3, 0);
-						break;
-					case 'yearly':
-						periodStart = new Date(now.getFullYear(), 0, 1);
-						periodEnd = new Date(now.getFullYear(), 11, 31);
-						break;
-					default:
-						periodStart = new Date(now);
-						periodEnd = new Date(now);
-				}
-
-				await markAsPaid(
-					selectedExpense.patternId,
-					periodStart.toISOString(),
-					periodEnd.toISOString()
-				);
-
-				Alert.alert(
-					'Success',
-					`${selectedExpense.vendor} has been marked as paid for this period.`,
-					[{ text: 'OK' }]
-				);
-				hideOptionsModal();
-			} catch (error) {
-				console.error('Error marking as paid:', error);
-				Alert.alert('Error', 'Failed to mark as paid. Please try again.', [
-					{ text: 'OK' },
-				]);
-			}
+	const handleDeleteExpense = async (patternId: string) => {
+		try {
+			await deleteRecurringExpense(patternId);
+		} catch (error) {
+			console.error('Error deleting recurring expense:', error);
 		}
 	};
 
@@ -277,11 +196,12 @@ const RecurringExpensesScreen: React.FC = () => {
 			right={
 				<SegmentedControl
 					segments={[
+						{ key: 'all', label: 'All' },
 						{ key: 'monthly', label: 'Monthly' },
 						{ key: 'weekly', label: 'Weekly' },
 					]}
 					value={activeView}
-					onChange={(k) => setActiveView(k as any)}
+					onChange={(k) => setActiveView(k as 'all' | 'monthly' | 'weekly')}
 				/>
 			}
 		>
@@ -304,7 +224,6 @@ const RecurringExpensesScreen: React.FC = () => {
 						expenses={expenses}
 						activeView={activeView}
 						onViewToggle={() => {}}
-						onExpensePress={handleExpensePress}
 						onAddExpense={handleAddRecurringExpense}
 						overdueAmount={overdueAmount}
 						dueThisWeekAmount={dueThisWeekAmount}
@@ -320,168 +239,13 @@ const RecurringExpensesScreen: React.FC = () => {
 							onPressMenu={handleExpenseMenuPress}
 							onPressRow={handleExpenseRowPress}
 							scrollEnabled={false}
+							activeTab={activeView}
 						/>
 					</Card>
 				</Section>
 			</ScrollView>
-
-			{/* Options Modal */}
-			<CustomSlidingModal
-				isVisible={isOptionsModalVisible}
-				onClose={hideOptionsModal}
-				title={selectedExpense?.vendor || 'Expense Options'}
-				icon="ellipsis-horizontal"
-			>
-				<View
-					style={styles.optionsModalContent}
-					accessibilityLabel="Expense options menu"
-				>
-					<RectButton
-						style={styles.optionButton}
-						onPress={handleViewPaymentHistory}
-						{...accessibilityProps.button}
-						accessibilityLabel={generateAccessibilityLabel.button(
-							'View',
-							'payment history'
-						)}
-						accessibilityHint={voiceOverHints.navigate}
-					>
-						<View style={styles.optionContent}>
-							<Ionicons
-								name="time-outline"
-								size={20}
-								color="#00a2ff"
-								accessibilityRole="image"
-								accessibilityLabel="Payment history icon"
-							/>
-							<Text
-								style={[styles.optionText, dynamicTextStyle]}
-								accessibilityRole="text"
-							>
-								View Payment History
-							</Text>
-						</View>
-					</RectButton>
-
-					<RectButton
-						style={styles.optionButton}
-						onPress={handleEditExpense}
-						{...accessibilityProps.button}
-						accessibilityLabel={generateAccessibilityLabel.button(
-							'Edit',
-							'expense'
-						)}
-						accessibilityHint={voiceOverHints.edit}
-					>
-						<View style={styles.optionContent}>
-							<Ionicons
-								name="create-outline"
-								size={20}
-								color="#00a2ff"
-								accessibilityRole="image"
-								accessibilityLabel="Edit icon"
-							/>
-							<Text
-								style={[styles.optionText, dynamicTextStyle]}
-								accessibilityRole="text"
-							>
-								Edit Expense
-							</Text>
-						</View>
-					</RectButton>
-
-					<RectButton
-						style={styles.optionButton}
-						onPress={handleMarkAsPaid}
-						{...accessibilityProps.button}
-						accessibilityLabel={generateAccessibilityLabel.button(
-							'Mark as paid',
-							'expense'
-						)}
-						accessibilityHint={voiceOverHints.save}
-					>
-						<View style={styles.optionContent}>
-							<Ionicons
-								name="checkmark-circle-outline"
-								size={20}
-								color="#00a2ff"
-								accessibilityRole="image"
-								accessibilityLabel="Mark as paid icon"
-							/>
-							<Text
-								style={[styles.optionText, dynamicTextStyle]}
-								accessibilityRole="text"
-							>
-								Mark as Paid
-							</Text>
-						</View>
-					</RectButton>
-
-					<RectButton
-						style={styles.optionButton}
-						onPress={hideOptionsModal}
-						{...accessibilityProps.button}
-						accessibilityLabel={generateAccessibilityLabel.button(
-							'Cancel',
-							'options'
-						)}
-						accessibilityHint={voiceOverHints.cancel}
-					>
-						<View style={styles.optionContent}>
-							<Ionicons
-								name="close-outline"
-								size={20}
-								color="#757575"
-								accessibilityRole="image"
-								accessibilityLabel="Cancel icon"
-							/>
-							<Text
-								style={[styles.optionText, dynamicTextStyle]}
-								accessibilityRole="text"
-							>
-								Cancel
-							</Text>
-						</View>
-					</RectButton>
-				</View>
-			</CustomSlidingModal>
 		</Page>
 	);
 };
-
-// Modal styles - keeping only what's needed for the options modal
-const styles = StyleSheet.create({
-	optionsModalContent: {
-		backgroundColor: 'white',
-		borderRadius: 16,
-		maxWidth: 400,
-		alignItems: 'center',
-		paddingHorizontal: 0,
-	},
-
-	optionButton: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#f8f9fa',
-		paddingVertical: 16,
-		paddingHorizontal: 20,
-		borderRadius: 12,
-		marginBottom: 12,
-		width: '100%',
-		justifyContent: 'center',
-	},
-
-	optionContent: {
-		flexDirection: 'row',
-		alignItems: 'center',
-	},
-
-	optionText: {
-		fontSize: 16,
-		fontWeight: '500',
-		color: '#212121',
-		marginLeft: 12,
-	},
-});
 
 export default RecurringExpensesScreen;

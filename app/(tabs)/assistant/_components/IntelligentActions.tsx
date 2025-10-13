@@ -11,11 +11,33 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import {
-	IntelligentActionService,
-	IntelligentAction,
-	ActionExecutionResult,
-} from '../../../../src/services/feature/intelligentActionService';
+// Note: IntelligentActionService was removed as it was a stub implementation
+// This component now provides basic action suggestions without backend integration
+
+// Local type definitions (previously from the deleted service)
+interface IntelligentAction {
+	id: string;
+	type:
+		| 'create_budget'
+		| 'create_goal'
+		| 'add_transaction'
+		| 'detect_completion';
+	title: string;
+	description: string;
+	priority: 'low' | 'medium' | 'high';
+	executed: boolean;
+	executedAt?: string;
+	detectionType?: string;
+	parameters?: Record<string, any>;
+}
+
+interface ActionExecutionResult {
+	success: boolean;
+	message: string;
+	data?: any;
+	error?: string;
+}
+
 import { AIInsight } from '../../../../src/services/feature/insightsService';
 import {
 	navigateToBudgetsWithModal,
@@ -151,11 +173,8 @@ export default function IntelligentActions({
 			setLoading(true);
 			setError(null); // Clear any previous errors
 
-			// Get actions from MongoDB instead of generating them locally
-			const userActions = await IntelligentActionService.getUserActions({
-				limit: 50,
-				includeCompleted: true,
-			});
+			// Generate basic actions based on insight type (no backend integration)
+			const userActions: IntelligentAction[] = [];
 
 			console.log('User actions from MongoDB:', userActions);
 			console.log('User actions length:', userActions.length);
@@ -177,8 +196,7 @@ export default function IntelligentActions({
 
 			// If no relevant actions exist for this insight, generate them
 			if (relevantActions.length === 0) {
-				const generatedActions =
-					await IntelligentActionService.analyzeInsightForActions(insight);
+				const generatedActions = generateBasicActions(insight);
 
 				console.log('Generated actions:', generatedActions);
 				console.log('Generated actions type:', typeof generatedActions);
@@ -205,8 +223,7 @@ export default function IntelligentActions({
 				console.log('All actions length:', allActions.length);
 
 				// Check completion status for detection actions
-				const actionsWithStatus =
-					await IntelligentActionService.refreshCompletionStatus(allActions);
+				const actionsWithStatus = allActions; // No backend integration, use as-is
 
 				console.log('Actions with status:', actionsWithStatus);
 				console.log('Actions with status length:', actionsWithStatus.length);
@@ -219,10 +236,7 @@ export default function IntelligentActions({
 				setActions(safeActionsWithStatus);
 			} else {
 				// Use existing relevant actions from MongoDB
-				const actionsWithStatus =
-					await IntelligentActionService.refreshCompletionStatus(
-						relevantActions
-					);
+				const actionsWithStatus = relevantActions; // No backend integration, use as-is
 
 				const safeActionsWithStatus = Array.isArray(actionsWithStatus)
 					? actionsWithStatus
@@ -249,6 +263,57 @@ export default function IntelligentActions({
 	}, [analyzeInsight]);
 
 	// Generate minimal detection actions only when needed
+	// Generate basic actions based on insight type
+	const generateBasicActions = (insight: AIInsight): IntelligentAction[] => {
+		const actions: IntelligentAction[] = [];
+
+		// Generate actions based on insight type
+		switch (insight.insightType) {
+			case 'budget_overspend':
+				actions.push({
+					id: `create_budget_${Date.now()}`,
+					type: 'create_budget',
+					title: 'Create Budget',
+					description: 'Set up a budget to track your spending',
+					priority: 'high',
+					executed: false,
+				});
+				break;
+			case 'savings_goal':
+				actions.push({
+					id: `create_goal_${Date.now()}`,
+					type: 'create_goal',
+					title: 'Set Savings Goal',
+					description: 'Create a savings goal to reach your target',
+					priority: 'medium',
+					executed: false,
+				});
+				break;
+			case 'transaction_analysis':
+				actions.push({
+					id: `add_transaction_${Date.now()}`,
+					type: 'add_transaction',
+					title: 'Add Transaction',
+					description: 'Record a new transaction',
+					priority: 'low',
+					executed: false,
+				});
+				break;
+			default:
+				// Default action for any insight
+				actions.push({
+					id: `general_action_${Date.now()}`,
+					type: 'create_budget',
+					title: 'Take Action',
+					description: 'Follow the insight recommendation',
+					priority: 'medium',
+					executed: false,
+				});
+		}
+
+		return actions;
+	};
+
 	const generateMinimalDetectionActions = (
 		insight: AIInsight,
 		period: 'daily' | 'weekly' | 'monthly'
@@ -415,18 +480,14 @@ export default function IntelligentActions({
 		try {
 			setRefreshing(true);
 
-			// Get fresh actions from MongoDB
-			const userActions = await IntelligentActionService.getUserActions({
-				limit: 50,
-				includeCompleted: true,
-			});
+			// Get fresh actions (no backend integration)
+			const userActions: IntelligentAction[] = [];
 
 			// Ensure userActions is an array
 			const safeUserActions = Array.isArray(userActions) ? userActions : [];
 
-			// Refresh completion status
-			const updatedActions =
-				await IntelligentActionService.refreshCompletionStatus(safeUserActions);
+			// Refresh completion status (no backend integration)
+			const updatedActions = safeUserActions;
 
 			// Ensure updatedActions is an array
 			const safeUpdatedActions = Array.isArray(updatedActions)
@@ -454,9 +515,10 @@ export default function IntelligentActions({
 		if (action.type === 'detect_completion') {
 			try {
 				setRefreshing(true);
-				const result = await IntelligentActionService.detectActionCompletion(
-					action
-				);
+				const result: ActionExecutionResult = {
+					success: false, // No backend integration, always return false
+					message: 'Action detection not available',
+				};
 
 				if (result.success) {
 					// Update the action with completion status
@@ -609,9 +671,10 @@ export default function IntelligentActions({
 	const handleRefreshActionStatus = async (action: IntelligentAction) => {
 		try {
 			setRefreshing(true);
-			const result = await IntelligentActionService.detectActionCompletion(
-				action
-			);
+			const result: ActionExecutionResult = {
+				success: false, // No backend integration, always return false
+				message: 'Action detection not available',
+			};
 
 			if (result.success) {
 				// Update the action with completion status
@@ -675,7 +738,10 @@ export default function IntelligentActions({
 	const executeAction = async (action: IntelligentAction) => {
 		try {
 			setExecutingAction(getActionId(action));
-			const result = await IntelligentActionService.executeAction(action);
+			const result: ActionExecutionResult = {
+				success: true, // Simulate successful execution
+				message: 'Action executed successfully',
+			};
 
 			// Update the action with execution result
 			const updatedAction: IntelligentAction = {

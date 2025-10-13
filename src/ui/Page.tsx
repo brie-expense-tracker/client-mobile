@@ -53,6 +53,5 @@ const styles = StyleSheet.create({
 		flex: 1,
 		paddingHorizontal: space.xl,
 		paddingTop: space.lg,
-		paddingBottom: space.xl,
 	},
 });
