@@ -613,30 +613,33 @@ export class ApiService {
 				const contentType = response.headers.get('content-type');
 				let data: any;
 
-			if (contentType && contentType.includes('application/json')) {
-				try {
-					data = await response.json();
-					console.log('🔍 [ApiService] JSON response parsed successfully:', {
-						success: data.success,
-						message: data.message,
-						hasData: !!data.data,
-						dataKeys: data.data ? Object.keys(data.data) : [],
-					});
-					
-					// Log full debug data if present (HMAC debugging)
-					if (data.debug) {
-						console.log('🐛 [ApiService] Server Debug Info:', data.debug);
-					}
-					
-					// Log full error response for debugging
-					if (!response.ok) {
-						console.log('🔍 [ApiService] Full error response:', JSON.stringify(data, null, 2));
-					}
-				} catch (parseError) {
-					console.error('❌ [ApiService] JSON parse error:', parseError);
-					return {
-						success: false,
-						error: 'Invalid JSON response from server',
+				if (contentType && contentType.includes('application/json')) {
+					try {
+						data = await response.json();
+						console.log('🔍 [ApiService] JSON response parsed successfully:', {
+							success: data.success,
+							message: data.message,
+							hasData: !!data.data,
+							dataKeys: data.data ? Object.keys(data.data) : [],
+						});
+
+						// Log full debug data if present (HMAC debugging)
+						if (data.debug) {
+							console.log('🐛 [ApiService] Server Debug Info:', data.debug);
+						}
+
+						// Log full error response for debugging
+						if (!response.ok) {
+							console.log(
+								'🔍 [ApiService] Full error response:',
+								JSON.stringify(data, null, 2)
+							);
+						}
+					} catch (parseError) {
+						console.error('❌ [ApiService] JSON parse error:', parseError);
+						return {
+							success: false,
+							error: 'Invalid JSON response from server',
 						};
 					}
 				} else {
@@ -699,16 +702,21 @@ export class ApiService {
 					}
 				}
 
-				// API logging: Success response
-				console.log(`✅ [ApiService] POST: ${endpoint} (${response.status})`);
-				return {
-					success: true,
-					data: data.data || data, // Use data.data if it exists, otherwise use the entire response
-					usage: data.usage,
-				};
-			});
+			// API logging: Success response
+			console.log(`✅ [ApiService] POST: ${endpoint} (${response.status})`);
+			
+			// Clear cache after successful POST (resource created)
+			this.clearCache(endpoint);
+			console.log(`🗑️ [ApiService] Cache cleared for: ${endpoint}`);
+			
+			return {
+				success: true,
+				data: data.data || data, // Use data.data if it exists, otherwise use the entire response
+				usage: data.usage,
+			};
 		});
-	}
+	});
+}
 
 	static async put<T>(endpoint: string, body: any): Promise<ApiResponse<T>> {
 		try {
@@ -853,18 +861,29 @@ export class ApiService {
 				};
 			}
 
-			// API logging: Success response
-			console.log(`✅ [PUT] Success: ${endpoint} (${response.status})`);
-			console.log('✅ [PUT] Response data:', data);
-			return { success: true, data };
-		} catch (error) {
-			console.error('❌ API PUT error:', error);
-			return {
-				success: false,
-				error: error instanceof Error ? error.message : 'Unknown error',
-			};
+		// API logging: Success response
+		console.log(`✅ [PUT] Success: ${endpoint} (${response.status})`);
+		console.log('✅ [PUT] Response data:', data);
+		
+		// Clear cache after successful PUT (resource updated)
+		this.clearCache(endpoint);
+		
+		// Also clear list cache (e.g., if updating /api/budgets/123, also clear /api/budgets)
+		const baseEndpoint = endpoint.replace(/\/[^/]+$/, '');
+		if (baseEndpoint !== endpoint) {
+			this.clearCache(baseEndpoint);
+			console.log(`🗑️ [ApiService] Also cleared list cache: ${baseEndpoint}`);
 		}
+		
+		return { success: true, data };
+	} catch (error) {
+		console.error('❌ API PUT error:', error);
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : 'Unknown error',
+		};
 	}
+}
 
 	static async patch<T>(endpoint: string, body: any): Promise<ApiResponse<T>> {
 		try {
@@ -938,11 +957,22 @@ export class ApiService {
 				};
 			}
 
-			// API logging: Success response
-			console.log(`✅ PATCH: ${endpoint} (${response.status})`);
-			return { success: true, data };
-		} catch (error) {
-			console.error('❌ API PATCH error:', error);
+		// API logging: Success response
+		console.log(`✅ PATCH: ${endpoint} (${response.status})`);
+		
+		// Clear cache after successful PATCH (resource updated)
+		this.clearCache(endpoint);
+		
+		// Also clear list cache (e.g., if patching /api/budgets/123, also clear /api/budgets)
+		const baseEndpoint = endpoint.replace(/\/[^/]+$/, '');
+		if (baseEndpoint !== endpoint) {
+			this.clearCache(baseEndpoint);
+			console.log(`🗑️ [ApiService] Also cleared list cache: ${baseEndpoint}`);
+		}
+		
+		return { success: true, data };
+	} catch (error) {
+		console.error('❌ API PATCH error:', error);
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : 'Unknown error',
@@ -1049,17 +1079,28 @@ export class ApiService {
 				};
 			}
 
-			// API logging: Success response
-			console.log(`✅ DELETE: ${endpoint} (${response.status})`);
-			return { success: true, data };
-		} catch (error) {
-			console.error('❌ API DELETE error:', error);
-			return {
-				success: false,
-				error: error instanceof Error ? error.message : 'Unknown error',
-			};
+		// API logging: Success response
+		console.log(`✅ DELETE: ${endpoint} (${response.status})`);
+		
+		// Clear cache for the deleted item's endpoint
+		this.clearCache(endpoint);
+		
+		// Also clear list cache (e.g., if deleting /api/budgets/123, also clear /api/budgets)
+		const baseEndpoint = endpoint.replace(/\/[^/]+$/, '');
+		if (baseEndpoint !== endpoint) {
+			this.clearCache(baseEndpoint);
+			console.log(`🗑️ [ApiService] Also cleared list cache: ${baseEndpoint}`);
 		}
+		
+		return { success: true, data };
+	} catch (error) {
+		console.error('❌ API DELETE error:', error);
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : 'Unknown error',
+		};
 	}
+}
 
 	/**
 	 * Test basic connectivity to the server (no authentication required)
