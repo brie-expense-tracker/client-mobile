@@ -26,6 +26,23 @@ export class HMACSigningService {
 	}
 
 	/**
+	 * Normalize path: strip trailing slashes (but keep root "/")
+	 * This ensures client and server sign the same canonical path
+	 */
+	private normalizePath(path: string): string {
+		try {
+			// Parse to extract just the pathname
+			const url = new URL(path, 'http://localhost');
+			// Strip trailing slashes, but keep root "/"
+			const normalized = url.pathname.replace(/\/+$/, '') || '/';
+			return normalized;
+		} catch {
+			// Fallback for relative paths
+			return path.replace(/\/+$/, '') || '/';
+		}
+	}
+
+	/**
 	 * Generate a cryptographically secure nonce
 	 */
 	generateNonce(): string {
@@ -46,20 +63,33 @@ export class HMACSigningService {
 		method: string,
 		path: string
 	): string {
+		// Normalize the path to match server-side normalization
+		const normalizedPath = this.normalizePath(path);
+		
 		// Create the payload to sign: timestamp + nonce + method + path + body
-		const payload = `${timestamp}.${nonce}.${method.toUpperCase()}.${path}.${body}`;
+		const payload = `${timestamp}.${nonce}.${method.toUpperCase()}.${normalizedPath}.${body}`;
 
-		console.log('🔐 [HMAC] Debug - Payload to sign:', payload);
+		console.log('🔐 [HMAC] Debug - Full signing details:');
+		console.log('  📅 Timestamp:', timestamp);
+		console.log('  🎲 Nonce:', nonce);
+		console.log('  🔧 Method:', method.toUpperCase());
+		console.log('  🛣️  Original Path:', path);
+		console.log('  🛣️  Normalized Path:', normalizedPath);
+		console.log('  📦 Body length:', body.length);
+		console.log('  📦 Body content:', body);
+		console.log('  🔗 Payload to sign:', payload);
 		console.log(
-			'🔐 [HMAC] Debug - Secret key (first 8 chars):',
+			'  🔑 Secret key (first 8 chars):',
 			this.secretKey.substring(0, 8) + '...'
 		);
+		console.log('  🔑 Secret key length:', this.secretKey.length);
 
 		// Create HMAC signature using CryptoJS
 		const hmac = hmacSHA256(payload, this.secretKey);
 		const signature = hmac.toString(encHex);
 
-		console.log('🔐 [HMAC] Debug - Generated signature:', signature);
+		console.log('  ✅ Generated signature:', signature);
+		console.log('  ✅ Signature length:', signature.length);
 
 		return signature;
 	}
@@ -70,7 +100,12 @@ export class HMACSigningService {
 	createSignedRequest(body: any, method: string, path: string): SignedRequest {
 		const timestamp = Math.floor(Date.now() / 1000);
 		const nonce = this.generateNonce();
-		const bodyString = typeof body === 'string' ? body : JSON.stringify(body);
+
+		// Create stable JSON string with sorted keys for consistency
+		const bodyString =
+			typeof body === 'string'
+				? body
+				: JSON.stringify(body, Object.keys(body || {}).sort());
 
 		const signature = this.signRequest(
 			timestamp,
@@ -96,7 +131,7 @@ export class HMACSigningService {
 	}
 
 	/**
-	 * Sign a request and add the signature header
+	 * Sign a request and add the signature headers
 	 */
 	signRequestHeaders(
 		body: any,
@@ -104,13 +139,41 @@ export class HMACSigningService {
 		path: string,
 		existingHeaders: Record<string, string> = {}
 	): Record<string, string> {
-		const signedRequest = this.createSignedRequest(body, method, path);
-		const signatureHeader = this.createSignatureHeader(signedRequest);
+		console.log('🔐 [HMAC] signRequestHeaders called with:');
+		console.log('  📦 Body type:', typeof body);
+		console.log('  📦 Body:', body);
+		console.log('  🔧 Method:', method);
+		console.log('  🛣️  Path:', path);
+		console.log('  📋 Existing headers:', Object.keys(existingHeaders));
 
-		return {
+		const signedRequest = this.createSignedRequest(body, method, path);
+		const normalizedPath = this.normalizePath(path);
+
+		// Send both new separate headers AND old combined header for compatibility
+		const signatureHeader = this.createSignatureHeader(signedRequest);
+		const finalHeaders = {
 			...existingHeaders,
+			// New separate headers
+			'x-timestamp': signedRequest.timestamp.toString(),
+			'x-nonce': signedRequest.nonce,
+			'x-signature': signedRequest.signature,
+			// Old combined header for backward compatibility
 			'x-hmac-signature': signatureHeader,
+			// Debug headers - use normalized path to match what was signed
+			'x-debug-canonical-path': normalizedPath,
+			'x-debug-signed-payload': `${signedRequest.timestamp}.${
+				signedRequest.nonce
+			}.${method.toUpperCase()}.${normalizedPath}.${signedRequest.body}`,
 		};
+
+		console.log('🔐 [HMAC] Final headers with both formats for compatibility:');
+		console.log('  📅 x-timestamp:', signedRequest.timestamp);
+		console.log('  🎲 x-nonce:', signedRequest.nonce);
+		console.log('  ✅ x-signature:', signedRequest.signature);
+		console.log('  🔗 x-hmac-signature (old format):', signatureHeader);
+		console.log('🔐 [HMAC] Final headers keys:', Object.keys(finalHeaders));
+
+		return finalHeaders;
 	}
 }
 
@@ -121,7 +184,20 @@ export function getHMACService(): HMACSigningService {
 	if (!hmacService) {
 		const secretKey =
 			process.env.EXPO_PUBLIC_HMAC_SECRET_KEY ||
+			process.env.HMAC_SECRET_KEY ||
 			'dev-hmac-secret-key-32-chars-minimum-required-for-development';
+
+		console.log('🔐 [HMAC] Initializing HMAC service:');
+		console.log(
+			'  🔑 EXPO_PUBLIC_HMAC_SECRET_KEY exists:',
+			!!process.env.EXPO_PUBLIC_HMAC_SECRET_KEY
+		);
+		console.log('  🔑 HMAC_SECRET_KEY exists:', !!process.env.HMAC_SECRET_KEY);
+		console.log(
+			'  🔑 Using secret key (first 8 chars):',
+			secretKey.substring(0, 8) + '...'
+		);
+		console.log('  🔑 Secret key length:', secretKey.length);
 
 		hmacService = new HMACSigningService({
 			secretKey,
