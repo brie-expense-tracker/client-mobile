@@ -6,7 +6,9 @@ import {
 	TouchableOpacity,
 	StyleSheet,
 	ActivityIndicator,
-	TextInput,
+	Platform,
+	ActionSheetIOS,
+	Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -370,6 +372,9 @@ function RecurringExpenseRow({
 					onPressMenu?.(expense.patternId);
 				}}
 				style={styles.kebabHit}
+				hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+				accessibilityRole="button"
+				accessibilityLabel={`More options for ${expense.vendor}`}
 			>
 				<Ionicons name="ellipsis-vertical" size={18} color="#a1a1aa" />
 			</TouchableOpacity>
@@ -377,26 +382,19 @@ function RecurringExpenseRow({
 	);
 }
 
-const TABS = [
-	{ key: 'all', label: 'All' },
-	{ key: 'weekly', label: 'Weekly' },
-	{ key: 'monthly', label: 'Monthly' },
-] as const;
-type TabKey = (typeof TABS)[number]['key'];
-
 export default function RecurringExpensesFeed({
 	scrollEnabled = true,
 	onPressMenu,
 	onPressRow,
 	expenses = [],
+	activeTab = 'all',
 }: {
 	scrollEnabled?: boolean;
 	onPressMenu?: (id: string) => void;
 	onPressRow?: (expense: RecurringExpenseWithPaymentStatus) => void;
 	expenses?: RecurringExpense[];
+	activeTab?: 'all' | 'monthly' | 'weekly';
 }) {
-	const [tab, setTab] = useState<TabKey>('all');
-	const [searchQuery, setSearchQuery] = useState('');
 	const [sortBy, setSortBy] = useState<
 		'vendor' | 'amount' | 'dueDate' | 'frequency'
 	>('dueDate');
@@ -475,18 +473,10 @@ export default function RecurringExpensesFeed({
 	const filtered = useMemo(() => {
 		let filteredExpenses = expensesWithPaymentStatus;
 
-		// Filter by tab
-		if (tab !== 'all') {
+		// Filter by parent-controlled tab
+		if (activeTab !== 'all') {
 			filteredExpenses = filteredExpenses.filter(
-				(expense) => expense.frequency === tab
-			);
-		}
-
-		// Filter by search query
-		if (searchQuery.trim()) {
-			const query = searchQuery.toLowerCase();
-			filteredExpenses = filteredExpenses.filter((expense) =>
-				expense.vendor.toLowerCase().includes(query)
+				(expense) => expense.frequency === activeTab
 			);
 		}
 
@@ -508,7 +498,34 @@ export default function RecurringExpensesFeed({
 					return 0;
 			}
 		});
-	}, [tab, searchQuery, sortBy, expensesWithPaymentStatus]);
+	}, [activeTab, sortBy, expensesWithPaymentStatus]);
+
+	const openSortPicker = () => {
+		const labels = ['Due Date', 'Vendor', 'Amount', 'Frequency', 'Cancel'];
+		const keys: (typeof sortBy)[] = [
+			'dueDate',
+			'vendor',
+			'amount',
+			'frequency',
+		];
+		if (Platform.OS === 'ios') {
+			ActionSheetIOS.showActionSheetWithOptions(
+				{ title: 'Sort by', options: labels, cancelButtonIndex: 4 },
+				(idx) => {
+					if (idx == null || idx === 4) return;
+					setSortBy(keys[idx]);
+				}
+			);
+		} else {
+			Alert.alert('Sort by', undefined, [
+				{ text: 'Due Date', onPress: () => setSortBy('dueDate') },
+				{ text: 'Vendor', onPress: () => setSortBy('vendor') },
+				{ text: 'Amount', onPress: () => setSortBy('amount') },
+				{ text: 'Frequency', onPress: () => setSortBy('frequency') },
+				{ text: 'Cancel', style: 'cancel' },
+			]);
+		}
+	};
 
 	// Show loading state while checking payment status
 	if (isLoadingPaymentStatus && expenses.length > 0) {
@@ -546,117 +563,53 @@ export default function RecurringExpensesFeed({
 			<Ionicons name="repeat-outline" size={64} color="#e0e0e0" />
 			<Text style={styles.emptyTitle}>No Recurring Expenses</Text>
 			<Text style={styles.emptySubtext}>
-				{searchQuery.trim()
-					? `No expenses found matching "${searchQuery}"`
-					: 'Add your first recurring expense to get started'}
+				{activeTab === 'all'
+					? 'Add your first recurring expense to get started'
+					: `No ${activeTab} recurring expenses`}
 			</Text>
 		</View>
 	);
 
 	return (
 		<View style={styles.screen}>
-			{/* Search Bar */}
-			<View style={styles.searchContainer}>
-				<View style={styles.searchInputContainer}>
-					<Ionicons
-						name="search"
-						size={20}
-						color="#9ca3af"
-						style={styles.searchIcon}
+			{/* Toolbar */}
+			<View style={styles.toolbar}>
+				<TouchableOpacity
+					onPress={openSortPicker}
+					activeOpacity={0.7}
+					style={styles.toolbarChip}
+					accessibilityRole="button"
+					accessibilityLabel="Change sort order"
+				>
+					<Ionicons name="swap-vertical" size={14} color="#0A84FF" />
+					<Text style={styles.toolbarChipText}>
+						Sort:{' '}
+						{sortBy === 'dueDate'
+							? 'Due Date'
+							: sortBy === 'vendor'
+							? 'Vendor'
+							: sortBy === 'amount'
+							? 'Amount'
+							: 'Frequency'}
+					</Text>
+				</TouchableOpacity>
+			</View>
+
+			{/* List */}
+			<FlatList
+				data={filtered}
+				keyExtractor={(expense) => expense.patternId}
+				renderItem={({ item }) => (
+					<RecurringExpenseRow
+						expense={item}
+						onPressMenu={onPressMenu ?? ((id) => console.log('menu:', id))}
+						onPressRow={onPressRow}
 					/>
-					<TextInput
-						style={styles.searchInput}
-						placeholder="Search expenses..."
-						value={searchQuery}
-						onChangeText={setSearchQuery}
-						placeholderTextColor="#9ca3af"
-					/>
-					{searchQuery.length > 0 && (
-						<TouchableOpacity
-							onPress={() => setSearchQuery('')}
-							style={styles.clearButton}
-						>
-							<Ionicons name="close-circle" size={20} color="#9ca3af" />
-						</TouchableOpacity>
-					)}
-				</View>
-			</View>
-
-			{/* Sort Controls */}
-			<View style={styles.sortContainer}>
-				<Text style={styles.sortLabel}>Sort by:</Text>
-				<View style={styles.sortButtons}>
-					{[
-						{ key: 'dueDate', label: 'Due Date' },
-						{ key: 'vendor', label: 'Vendor' },
-						{ key: 'amount', label: 'Amount' },
-						{ key: 'frequency', label: 'Frequency' },
-					].map((sort) => (
-						<TouchableOpacity
-							key={sort.key}
-							style={[
-								styles.sortButton,
-								sortBy === sort.key && styles.sortButtonActive,
-							]}
-							onPress={() => setSortBy(sort.key as any)}
-						>
-							<Text
-								style={[
-									styles.sortButtonText,
-									sortBy === sort.key && styles.sortButtonTextActive,
-								]}
-							>
-								{sort.label}
-							</Text>
-						</TouchableOpacity>
-					))}
-				</View>
-			</View>
-
-			{/* Segmented tabs */}
-			<View style={styles.tabsRow}>
-				{TABS.map((t) => {
-					const active = tab === t.key;
-					return (
-						<TouchableOpacity
-							key={t.key}
-							onPress={() => setTab(t.key)}
-							style={[
-								styles.tabBtn,
-								active ? styles.tabBtnActive : styles.tabBtnIdle,
-							]}
-						>
-							<Text
-								style={[
-									styles.tabText,
-									active ? styles.tabTextActive : styles.tabTextIdle,
-								]}
-							>
-								{t.label}
-							</Text>
-						</TouchableOpacity>
-					);
-				})}
-			</View>
-
-			{filtered.length === 0 ? (
-				<EmptyState />
-			) : (
-				<FlatList
-					data={filtered}
-					keyExtractor={(expense) => expense.patternId}
-					renderItem={({ item }) => (
-						<RecurringExpenseRow
-							expense={item}
-							onPressMenu={onPressMenu ?? ((id) => console.log('menu:', id))}
-							onPressRow={onPressRow}
-						/>
-					)}
-					ItemSeparatorComponent={() => <View style={styles.separator} />}
-					contentContainerStyle={{ paddingBottom: 24 }}
-					scrollEnabled={scrollEnabled}
-				/>
-			)}
+				)}
+				ItemSeparatorComponent={() => <View style={styles.separator} />}
+				scrollEnabled={scrollEnabled}
+				ListEmptyComponent={<EmptyState />}
+			/>
 		</View>
 	);
 }
@@ -664,34 +617,18 @@ export default function RecurringExpensesFeed({
 const styles = StyleSheet.create({
 	screen: { flex: 1, backgroundColor: '#ffffff' },
 
-	tabsRow: {
-		flexDirection: 'row',
-		paddingHorizontal: 16,
-		paddingTop: 12,
-		paddingBottom: 8,
+	// Inset divider (matches BudgetsFeed/GoalsFeed)
+	separator: {
+		height: StyleSheet.hairlineWidth,
+		backgroundColor: '#ECEFF3',
+		marginLeft: 60,
 	},
-	tabBtn: {
-		paddingHorizontal: 16,
-		paddingVertical: 8,
-		borderRadius: 16,
-		borderWidth: 1,
-		marginRight: 8,
-	},
-	tabBtnActive: { backgroundColor: '#18181b', borderColor: '#18181b' },
-	tabBtnIdle: { backgroundColor: '#ffffff', borderColor: '#e5e7eb' },
-	tabText: { fontSize: 13 },
-	tabTextActive: { color: '#ffffff', fontWeight: '600' },
-	tabTextIdle: { color: '#52525b' },
-
-	separator: { height: 1, backgroundColor: '#f1f1f1' },
 
 	rowContainer: {
 		flexDirection: 'row',
 		alignItems: 'flex-start',
-		paddingHorizontal: 16,
 		paddingVertical: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: '#e5e7eb',
+		// No bottom border; separator handles dividers
 	},
 	iconWrapper: {
 		width: 48,
@@ -774,78 +711,24 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		fontWeight: '600',
 	},
-	// Search and Sort Styles
-	searchContainer: {
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		backgroundColor: '#f8f9fa',
-		borderBottomWidth: 1,
-		borderBottomColor: '#e9ecef',
+	// Minimal toolbar (never overflows)
+	toolbar: {
+		paddingTop: 8,
+		paddingBottom: 6,
 	},
-	searchInputContainer: {
+	toolbarChip: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		backgroundColor: '#fff',
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: '#dee2e6',
-		paddingHorizontal: 12,
-		paddingVertical: 8,
-	},
-	searchIcon: {
-		marginRight: 8,
-	},
-	searchInput: {
-		flex: 1,
-		fontSize: 16,
-		color: '#333',
-		paddingVertical: 4,
-	},
-	clearButton: {
-		marginLeft: 8,
-		padding: 2,
-	},
-	sortContainer: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingHorizontal: 16,
-		paddingVertical: 8,
-		backgroundColor: '#f8f9fa',
-		borderBottomWidth: 1,
-		borderBottomColor: '#e9ecef',
-	},
-	sortLabel: {
-		fontSize: 14,
-		fontWeight: '600',
-		color: '#495057',
-		marginRight: 12,
-		minWidth: 60,
-	},
-	sortButtons: {
-		flexDirection: 'row',
-		flex: 1,
 		gap: 6,
-	},
-	sortButton: {
-		paddingHorizontal: 10,
-		paddingVertical: 4,
-		borderRadius: 12,
+		alignSelf: 'flex-start',
 		backgroundColor: '#fff',
+		borderRadius: 16,
 		borderWidth: 1,
-		borderColor: '#dee2e6',
+		borderColor: '#E5E7EB',
+		paddingHorizontal: 10,
+		paddingVertical: 6,
 	},
-	sortButtonActive: {
-		backgroundColor: '#007ACC',
-		borderColor: '#007ACC',
-	},
-	sortButtonText: {
-		fontSize: 11,
-		fontWeight: '500',
-		color: '#6c757d',
-	},
-	sortButtonTextActive: {
-		color: '#fff',
-	},
+	toolbarChipText: { fontSize: 12, fontWeight: '600', color: '#0A84FF' },
 	// Empty State Styles
 	emptyContainer: {
 		flex: 1,

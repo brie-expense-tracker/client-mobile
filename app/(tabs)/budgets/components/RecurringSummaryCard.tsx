@@ -9,6 +9,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { RectButton } from 'react-native-gesture-handler';
 import { RecurringExpenseService } from '../../../../src/services';
+import { palette, space, type as typography } from '../../../../src/ui';
+import { currency } from '../../../../src/utils/format';
 
 interface RecurringExpense {
 	patternId: string;
@@ -31,7 +33,7 @@ interface Props {
 	expenses: RecurringExpense[];
 	monthlyBudget?: number;
 	onExpensePress?: (expense: RecurringExpenseWithPaymentStatus) => void;
-	activeView: 'monthly' | 'weekly';
+	activeView: 'all' | 'monthly' | 'weekly';
 	onViewToggle: () => void;
 	onAddExpense: () => void;
 	onRefresh?: () => void;
@@ -245,100 +247,140 @@ const RecurringSummaryCard: React.FC<Props> = ({
 		}
 	};
 
-	const getCurrentPeriodAmount = (
-		expense: RecurringExpenseWithPaymentStatus
-	) => {
-		const now = new Date();
-		const nextDate = new Date(expense.nextDueDate);
+	const getCurrentPeriodAmount = useCallback(
+		(expense: RecurringExpenseWithPaymentStatus) => {
+			const now = new Date();
+			const nextDate = new Date(expense.nextDueDate);
 
-		// If overdue or due this period, include the amount
-		if (activeView === 'monthly') {
-			// For monthly view, include if due this month
-			const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-			if (nextDate <= nextMonth) {
+			// If overdue or due this period, include the amount
+			if (activeView === 'monthly') {
+				// For monthly view, include if due this month
+				const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+				if (nextDate <= nextMonth) {
+					return getMonthlyEquivalent(expense.amount, expense.frequency);
+				}
+			} else if (activeView === 'weekly') {
+				// For weekly view, only include weekly expenses due this week
+				if (expense.frequency === 'weekly') {
+					const endOfWeek = new Date(now);
+					endOfWeek.setDate(now.getDate() + 7);
+					if (nextDate <= endOfWeek) {
+						return getWeeklyEquivalent(expense.amount, expense.frequency);
+					}
+				}
+			} else {
+				// For 'all' view, include all expenses as monthly equivalents
 				return getMonthlyEquivalent(expense.amount, expense.frequency);
 			}
-		} else {
-			// For weekly view, only include weekly expenses due this week
-			if (expense.frequency === 'weekly') {
-				const endOfWeek = new Date(now);
-				endOfWeek.setDate(now.getDate() + 7);
-				if (nextDate <= endOfWeek) {
-					return getWeeklyEquivalent(expense.amount, expense.frequency);
-				}
-			}
-		}
-		return 0;
-	};
-
-	const totalPeriodAmount = (expenses || []).reduce(
-		(sum, expense) =>
-			sum +
-			getCurrentPeriodAmount(expense as RecurringExpenseWithPaymentStatus),
-		0
+			return 0;
+		},
+		[activeView]
 	);
 
-	const totalAllTime =
-		activeView === 'monthly'
-			? (expenses || []).reduce(
-					(sum, expense) =>
-						sum + getMonthlyEquivalent(expense.amount, expense.frequency),
-					0
-			  )
-			: (expenses || []).reduce(
-					(sum, expense) =>
-						sum + getWeeklyEquivalent(expense.amount, expense.frequency),
-					0
-			  );
+	// Memoize expensive calculations to avoid recomputation on every render
+	const overdueExpenses = useMemo(
+		() =>
+			(expenses || []).filter((expense) => {
+				const daysUntilDue = Math.ceil(
+					(new Date(expense.nextExpectedDate).getTime() -
+						new Date().getTime()) /
+						(1000 * 60 * 60 * 24)
+				);
+				return daysUntilDue <= 0;
+			}),
+		[expenses]
+	);
 
-	const overdueExpenses = (expenses || []).filter((expense) => {
-		const daysUntilDue = Math.ceil(
-			(new Date(expense.nextExpectedDate).getTime() - new Date().getTime()) /
-				(1000 * 60 * 60 * 24)
+	const dueThisPeriodExpenses = useMemo(
+		() =>
+			(expenses || []).filter((expense) => {
+				const daysUntilDue = Math.ceil(
+					(new Date(expense.nextExpectedDate).getTime() -
+						new Date().getTime()) /
+						(1000 * 60 * 60 * 24)
+				);
+				if (activeView === 'monthly') {
+					return daysUntilDue > 0 && daysUntilDue <= 30;
+				} else if (activeView === 'weekly') {
+					return daysUntilDue > 0 && daysUntilDue <= 7;
+				}
+				// 'all' view: include all upcoming expenses
+				return daysUntilDue > 0;
+			}),
+		[expenses, activeView]
+	);
+
+	const totalPeriodAmount = useMemo(
+		() =>
+			(expenses || []).reduce(
+				(sum, expense) =>
+					sum +
+					getCurrentPeriodAmount(expense as RecurringExpenseWithPaymentStatus),
+				0
+			),
+		[expenses, getCurrentPeriodAmount]
+	);
+
+	const totalAllTime = useMemo(() => {
+		if (activeView === 'monthly') {
+			return (expenses || []).reduce(
+				(sum, expense) =>
+					sum + getMonthlyEquivalent(expense.amount, expense.frequency),
+				0
+			);
+		} else if (activeView === 'weekly') {
+			return (expenses || []).reduce(
+				(sum, expense) =>
+					sum + getWeeklyEquivalent(expense.amount, expense.frequency),
+				0
+			);
+		}
+		// 'all' view: sum all monthly equivalents
+		return (expenses || []).reduce(
+			(sum, expense) =>
+				sum + getMonthlyEquivalent(expense.amount, expense.frequency),
+			0
 		);
-		return daysUntilDue <= 0;
-	});
+	}, [expenses, activeView]);
 
-	const dueThisPeriodExpenses = (expenses || []).filter((expense) => {
-		const daysUntilDue = Math.ceil(
-			(new Date(expense.nextExpectedDate).getTime() - new Date().getTime()) /
-				(1000 * 60 * 60 * 24)
-		);
-		if (activeView === 'monthly') {
-			// Due this month
-			return daysUntilDue > 0 && daysUntilDue <= 30;
-		} else {
-			// Due this week
-			return daysUntilDue > 0 && daysUntilDue <= 7;
-		}
-	});
+	const localOverdueAmount = useMemo(
+		() =>
+			overdueExpenses.reduce((sum, expense) => {
+				if (activeView === 'monthly' || activeView === 'all') {
+					return sum + getMonthlyEquivalent(expense.amount, expense.frequency);
+				} else {
+					// For weekly view, only include weekly expenses
+					if (expense.frequency === 'weekly') {
+						return sum + getWeeklyEquivalent(expense.amount, expense.frequency);
+					}
+					return sum;
+				}
+			}, 0),
+		[overdueExpenses, activeView]
+	);
 
-	const localOverdueAmount = overdueExpenses.reduce((sum, expense) => {
-		if (activeView === 'monthly') {
-			return sum + getMonthlyEquivalent(expense.amount, expense.frequency);
-		} else {
-			// For weekly view, only include weekly expenses
-			if (expense.frequency === 'weekly') {
-				return sum + getWeeklyEquivalent(expense.amount, expense.frequency);
-			}
-			return sum;
-		}
-	}, 0);
-
-	const dueThisPeriodAmount = dueThisPeriodExpenses.reduce((sum, expense) => {
-		if (activeView === 'monthly') {
-			return sum + getMonthlyEquivalent(expense.amount, expense.frequency);
-		} else {
-			// For weekly view, only include weekly expenses
-			if (expense.frequency === 'weekly') {
-				return sum + getWeeklyEquivalent(expense.amount, expense.frequency);
-			}
-			return sum;
-		}
-	}, 0);
+	const dueThisPeriodAmount = useMemo(
+		() =>
+			dueThisPeriodExpenses.reduce((sum, expense) => {
+				if (activeView === 'monthly' || activeView === 'all') {
+					return sum + getMonthlyEquivalent(expense.amount, expense.frequency);
+				} else {
+					// For weekly view, only include weekly expenses
+					if (expense.frequency === 'weekly') {
+						return sum + getWeeklyEquivalent(expense.amount, expense.frequency);
+					}
+					return sum;
+				}
+			}, 0),
+		[dueThisPeriodExpenses, activeView]
+	);
 
 	const currentPeriodLabel =
-		activeView === 'monthly' ? 'This Month' : 'This Week';
+		activeView === 'monthly'
+			? 'This Month'
+			: activeView === 'weekly'
+			? 'This Week'
+			: 'All Time';
 	// const currentPeriodUnit = activeView === 'monthly' ? '/mo' : '/wk';
 
 	return (
@@ -354,24 +396,6 @@ const RecurringSummaryCard: React.FC<Props> = ({
 
 				{/* Header Controls */}
 				<View style={styles.headerControls}>
-					{/* Refresh Button */}
-					<TouchableOpacity
-						style={styles.refreshButton}
-						onPress={handleRefresh}
-						disabled={isLoadingPaymentStatus || isRefreshing}
-						accessibilityLabel="Refresh payment status"
-						accessibilityHint="Tap to refresh the payment status of recurring expenses"
-						accessibilityRole="button"
-					>
-						<Ionicons
-							name="refresh"
-							size={16}
-							color={
-								isLoadingPaymentStatus || isRefreshing ? '#ccc' : '#007ACC'
-							}
-						/>
-					</TouchableOpacity>
-
 					{/* Add Button */}
 					<TouchableOpacity
 						style={styles.addButton}
@@ -380,7 +404,7 @@ const RecurringSummaryCard: React.FC<Props> = ({
 						accessibilityHint="Tap to add a new recurring expense"
 						accessibilityRole="button"
 					>
-						<Ionicons name="add" size={20} color="#0f0f0f" />
+						<Ionicons name="add" size={20} color={palette.text} />
 						<Text style={styles.addButtonText}>Add Expense</Text>
 					</TouchableOpacity>
 				</View>
@@ -393,7 +417,7 @@ const RecurringSummaryCard: React.FC<Props> = ({
 					{/* Primary Metric - Current Period Total */}
 					<View style={styles.primaryMetric}>
 						<Text style={styles.primaryMetricValue}>
-							${totalPeriodAmount.toFixed(0)}
+							{currency(totalPeriodAmount)}
 						</Text>
 						<Text style={styles.primaryMetricLabel}>
 							Due {currentPeriodLabel}
@@ -422,19 +446,23 @@ const RecurringSummaryCard: React.FC<Props> = ({
 				<View style={styles.secondaryMetricsRow}>
 					<View style={styles.metricItem}>
 						<Text style={styles.metricValue}>
-							${overdueAmount || localOverdueAmount}
+							{currency(overdueAmount || localOverdueAmount)}
 						</Text>
 						<Text style={styles.metricLabel}>Overdue</Text>
 						{(overdueCount || overdueExpenses.length) > 0 && (
 							<Text style={styles.metricCount}>
-								({overdueCount || overdueExpenses.length})
+								({overdueCount || overdueExpenses.length}{' '}
+								{(overdueCount || overdueExpenses.length) === 1
+									? 'expense'
+									: 'expenses'}
+								)
 							</Text>
 						)}
 					</View>
 
 					<View style={styles.metricItem}>
 						<Text style={styles.metricValue}>
-							${dueThisPeriodAmount.toFixed(0)}
+							{currency(dueThisPeriodAmount)}
 						</Text>
 						<Text style={styles.metricLabel}>Due Soon</Text>
 						{dueThisPeriodExpenses.length > 0 && (
@@ -445,7 +473,7 @@ const RecurringSummaryCard: React.FC<Props> = ({
 					</View>
 
 					<View style={styles.metricItem}>
-						<Text style={styles.metricValue}>${totalAllTime.toFixed(0)}</Text>
+						<Text style={styles.metricValue}>{currency(totalAllTime)}</Text>
 						<Text style={styles.metricLabel}>
 							Total {activeView === 'monthly' ? 'Monthly' : 'Weekly'}
 						</Text>
@@ -459,17 +487,25 @@ const RecurringSummaryCard: React.FC<Props> = ({
 							<Ionicons
 								name="checkmark-circle-outline"
 								size={16}
-								color="#10b981"
+								color={palette.success}
 							/>
 							<Text style={styles.paymentStatusTitle}>Payment Status</Text>
 						</View>
 						<View style={styles.paymentStatusContent}>
 							<View style={styles.paymentStatusItem}>
-								<Ionicons name="checkmark-circle" size={16} color="#10b981" />
+								<Ionicons
+									name="checkmark-circle"
+									size={16}
+									color={palette.success}
+								/>
 								<Text style={styles.paymentStatusText}>{paidCount} paid</Text>
 							</View>
 							<View style={styles.paymentStatusItem}>
-								<Ionicons name="remove-circle" size={16} color="#f59e0b" />
+								<Ionicons
+									name="remove-circle"
+									size={16}
+									color={palette.warning}
+								/>
 								<Text style={styles.paymentStatusText}>
 									{unpaidCount} upcoming
 								</Text>
@@ -481,7 +517,7 @@ const RecurringSummaryCard: React.FC<Props> = ({
 				{/* Payment Status Loading */}
 				{isLoadingPaymentStatus && expenses.length > 0 && (
 					<View style={styles.paymentStatusLoading}>
-						<ActivityIndicator size="small" color="#007ACC" />
+						<ActivityIndicator size="small" color={palette.primary} />
 						<Text style={styles.paymentStatusLoadingText}>
 							Checking payment status...
 						</Text>
@@ -491,7 +527,7 @@ const RecurringSummaryCard: React.FC<Props> = ({
 				{/* Payment Status Error */}
 				{paymentStatusError && (
 					<View style={styles.paymentStatusError}>
-						<Ionicons name="warning-outline" size={16} color="#ef4444" />
+						<Ionicons name="warning-outline" size={16} color={palette.danger} />
 						<Text style={styles.paymentStatusErrorText}>
 							{paymentStatusError}
 						</Text>
@@ -511,14 +547,20 @@ const RecurringSummaryCard: React.FC<Props> = ({
 				{(overdueAmount > 0 || overdueCount > 0) && (
 					<View style={styles.overdueSection}>
 						<View style={styles.overdueHeader}>
-							<Ionicons name="warning-outline" size={16} color="#ef4444" />
+							<Ionicons
+								name="warning-outline"
+								size={16}
+								color={palette.danger}
+							/>
 							<Text style={styles.overdueTitle}>Overdue</Text>
 						</View>
 						<View style={styles.overdueContent}>
 							<Text style={styles.overdueAmount}>
-								${overdueAmount.toFixed(0)}
+								{currency(overdueAmount)}
 							</Text>
-							<Text style={styles.overdueCount}>({overdueCount} expenses)</Text>
+							<Text style={styles.overdueCount}>
+								({overdueCount} {overdueCount === 1 ? 'expense' : 'expenses'})
+							</Text>
 						</View>
 					</View>
 				)}
@@ -528,15 +570,20 @@ const RecurringSummaryCard: React.FC<Props> = ({
 					(dueThisWeekAmount > 0 || dueThisWeekCount > 0) && (
 						<View style={styles.dueThisWeekSection}>
 							<View style={styles.dueThisWeekHeader}>
-								<Ionicons name="calendar-outline" size={16} color="#00a2ff" />
+								<Ionicons
+									name="calendar-outline"
+									size={16}
+									color={palette.info}
+								/>
 								<Text style={styles.dueThisWeekTitle}>Due This Week</Text>
 							</View>
 							<View style={styles.dueThisWeekContent}>
 								<Text style={styles.dueThisWeekAmount}>
-									${dueThisWeekAmount.toFixed(0)}
+									{currency(dueThisWeekAmount)}
 								</Text>
 								<Text style={styles.dueThisWeekCount}>
-									({dueThisWeekCount} expenses)
+									({dueThisWeekCount}{' '}
+									{dueThisWeekCount === 1 ? 'expense' : 'expenses'})
 								</Text>
 							</View>
 						</View>
@@ -548,39 +595,38 @@ const RecurringSummaryCard: React.FC<Props> = ({
 
 const styles = StyleSheet.create({
 	container: {
-		backgroundColor: '#fff',
-		paddingVertical: 8,
+		backgroundColor: palette.surface,
+		paddingVertical: space.sm,
 	},
 	headerSection: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		marginBottom: 16,
-		paddingHorizontal: 8,
+		marginBottom: space.lg,
+		paddingHorizontal: space.sm,
 	},
 	headerContent: {
 		flex: 1,
 	},
 	headerTitle: {
-		fontSize: 20,
-		fontWeight: '600',
-		color: '#212121',
+		...typography.titleMd,
+		color: palette.text,
 		marginBottom: 4,
 	},
 	headerSubtitle: {
-		fontSize: 14,
-		color: '#757575',
+		...typography.bodySm,
+		color: palette.textMuted,
 	},
 	viewToggleButton: {
 		position: 'absolute',
 		right: 0,
 		top: 0,
 		paddingVertical: 6,
-		paddingHorizontal: 12,
+		paddingHorizontal: space.md,
 		borderRadius: 16,
-		backgroundColor: '#f5f5f5',
+		backgroundColor: palette.surfaceAlt,
 		borderWidth: 1,
-		borderColor: '#E0E0E0',
+		borderColor: palette.borderMuted,
 	},
 	viewToggleContent: {
 		flexDirection: 'row',
@@ -590,49 +636,39 @@ const styles = StyleSheet.create({
 	viewToggleText: {
 		fontSize: 12,
 		fontWeight: '500',
-		color: '#212121',
+		color: palette.text,
 	},
 	headerControls: {
 		flexDirection: 'column',
 		alignItems: 'flex-end',
 		gap: 8,
 	},
-	refreshButton: {
-		width: 32,
-		height: 32,
-		borderRadius: 16,
-		backgroundColor: '#f0f8ff',
-		justifyContent: 'center',
-		alignItems: 'center',
-		borderWidth: 1,
-		borderColor: '#e0f2fe',
-	},
 	toggleSection: {
 		alignItems: 'flex-end',
-		marginBottom: 8,
-		paddingHorizontal: 8,
+		marginBottom: space.sm,
+		paddingHorizontal: space.sm,
 	},
 	addButton: {
-		backgroundColor: '#f7f7f7',
+		backgroundColor: palette.surfaceAlt,
 		borderRadius: 12,
-		paddingVertical: 12,
+		paddingVertical: space.md,
 		paddingHorizontal: 10,
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 8,
 		borderWidth: 1,
-		borderColor: '#e5e5e5',
+		borderColor: palette.borderMuted,
 	},
 	addButtonText: {
-		color: '#0f0f0f',
+		color: palette.text,
 		fontSize: 14,
 		fontWeight: '600',
 	},
 	statsContainer: {
-		backgroundColor: '#ffffff',
+		backgroundColor: palette.surface,
 		borderBottomWidth: 1,
-		borderColor: '#e5e7eb',
-		paddingBottom: 12,
+		borderColor: palette.border,
+		paddingBottom: space.md,
 	},
 	primaryMetricRow: {
 		flexDirection: 'row',
@@ -645,17 +681,13 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 	},
 	primaryMetricValue: {
-		fontSize: 32,
-		fontWeight: '700',
-		color: '#212121',
+		...typography.num2xl,
+		color: palette.text,
 		marginBottom: 4,
 	},
 	primaryMetricLabel: {
-		fontSize: 14,
-		fontWeight: '600',
-		color: '#9ca3af',
-		textTransform: 'uppercase',
-		letterSpacing: 0.5,
+		...typography.labelSm,
+		color: palette.textSubtle,
 	},
 	secondaryMetricsRow: {
 		flexDirection: 'row',
@@ -667,42 +699,41 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 	metricValue: {
-		fontSize: 18,
-		fontWeight: '700',
-		color: '#212121',
+		...typography.numLg,
+		color: palette.text,
 		marginBottom: 4,
 	},
 	metricLabel: {
 		fontSize: 12,
 		fontWeight: '600',
-		color: '#9ca3af',
+		color: palette.textSubtle,
 		textTransform: 'uppercase',
 		letterSpacing: 0.5,
 		marginBottom: 2,
 	},
 	metricCount: {
 		fontSize: 10,
-		color: '#6b7280',
+		color: palette.textMuted,
 		fontWeight: '500',
 	},
 	dueThisWeekSection: {
-		marginTop: 16,
-		padding: 12,
-		backgroundColor: '#f8f9fa',
+		marginTop: space.lg,
+		padding: space.md,
+		backgroundColor: palette.surfaceAlt,
 		borderRadius: 12,
 		borderLeftWidth: 3,
-		borderLeftColor: '#00a2ff',
+		borderLeftColor: palette.info,
 	},
 	dueThisWeekHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		marginBottom: 8,
+		marginBottom: space.sm,
 	},
 	dueThisWeekTitle: {
 		fontSize: 14,
 		fontWeight: '600',
-		color: '#212121',
-		marginLeft: 8,
+		color: palette.text,
+		marginLeft: space.sm,
 	},
 	dueThisWeekContent: {
 		flexDirection: 'row',
@@ -710,32 +741,31 @@ const styles = StyleSheet.create({
 		justifyContent: 'space-between',
 	},
 	dueThisWeekAmount: {
-		fontSize: 18,
-		fontWeight: '700',
-		color: '#00a2ff',
+		...typography.numLg,
+		color: palette.info,
 	},
 	dueThisWeekCount: {
 		fontSize: 12,
-		color: '#757575',
+		color: palette.textMuted,
 	},
 	overdueSection: {
-		marginTop: 16,
-		padding: 12,
-		backgroundColor: '#fef2f2',
+		marginTop: space.lg,
+		padding: space.md,
+		backgroundColor: palette.dangerSubtle,
 		borderRadius: 12,
 		borderLeftWidth: 3,
-		borderLeftColor: '#ef4444',
+		borderLeftColor: palette.danger,
 	},
 	overdueHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		marginBottom: 8,
+		marginBottom: space.sm,
 	},
 	overdueTitle: {
 		fontSize: 14,
 		fontWeight: '600',
-		color: '#dc2626',
-		marginLeft: 8,
+		color: palette.danger,
+		marginLeft: space.sm,
 	},
 	overdueContent: {
 		flexDirection: 'row',
@@ -743,21 +773,20 @@ const styles = StyleSheet.create({
 		justifyContent: 'space-between',
 	},
 	overdueAmount: {
-		fontSize: 18,
-		fontWeight: '700',
-		color: '#ef4444',
+		...typography.numLg,
+		color: palette.danger,
 	},
 	overdueCount: {
 		fontSize: 12,
-		color: '#dc2626',
+		color: palette.danger,
 	},
 	paymentStatusSection: {
-		marginTop: 16,
-		padding: 16,
-		backgroundColor: '#f8fafc',
+		marginTop: space.lg,
+		padding: space.lg,
+		backgroundColor: palette.surfaceAlt,
 		borderRadius: 16,
 		borderWidth: 1,
-		borderColor: '#e2e8f0',
+		borderColor: palette.border,
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 1 },
 		shadowOpacity: 0.05,
@@ -767,32 +796,32 @@ const styles = StyleSheet.create({
 	paymentStatusHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		marginBottom: 12,
-		paddingBottom: 8,
+		marginBottom: space.md,
+		paddingBottom: space.sm,
 		borderBottomWidth: 1,
-		borderBottomColor: '#e2e8f0',
+		borderBottomColor: palette.border,
 	},
 	paymentStatusTitle: {
 		fontSize: 15,
 		fontWeight: '700',
-		color: '#1e293b',
-		marginLeft: 8,
+		color: palette.text,
+		marginLeft: space.sm,
 	},
 	paymentStatusContent: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
-		paddingHorizontal: 8,
+		paddingHorizontal: space.sm,
 	},
 	paymentStatusItem: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 8,
-		paddingVertical: 8,
-		paddingHorizontal: 12,
-		backgroundColor: '#ffffff',
+		paddingVertical: space.sm,
+		paddingHorizontal: space.md,
+		backgroundColor: palette.surface,
 		borderRadius: 12,
 		borderWidth: 1,
-		borderColor: '#e2e8f0',
+		borderColor: palette.border,
 		flex: 1,
 		marginHorizontal: 4,
 		justifyContent: 'center',
@@ -800,19 +829,19 @@ const styles = StyleSheet.create({
 	paymentStatusText: {
 		fontSize: 13,
 		fontWeight: '600',
-		color: '#374151',
+		color: palette.text,
 	},
 	paymentStatusLoading: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'center',
-		marginTop: 16,
-		paddingVertical: 16,
+		marginTop: space.lg,
+		paddingVertical: space.lg,
 		paddingHorizontal: 20,
-		backgroundColor: '#f8fafc',
+		backgroundColor: palette.surfaceAlt,
 		borderRadius: 16,
 		borderWidth: 1,
-		borderColor: '#e2e8f0',
+		borderColor: palette.border,
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 1 },
 		shadowOpacity: 0.05,
@@ -820,40 +849,40 @@ const styles = StyleSheet.create({
 		elevation: 1,
 	},
 	paymentStatusLoadingText: {
-		marginLeft: 12,
+		marginLeft: space.md,
 		fontSize: 14,
 		fontWeight: '600',
-		color: '#64748b',
+		color: palette.textMuted,
 	},
 	paymentStatusError: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		marginTop: 16,
-		paddingVertical: 12,
-		paddingHorizontal: 16,
-		backgroundColor: '#fef2f2',
+		marginTop: space.lg,
+		paddingVertical: space.md,
+		paddingHorizontal: space.lg,
+		backgroundColor: palette.dangerSubtle,
 		borderRadius: 12,
 		borderWidth: 1,
-		borderColor: '#fecaca',
+		borderColor: palette.dangerBorder,
 	},
 	paymentStatusErrorText: {
 		flex: 1,
-		marginLeft: 8,
+		marginLeft: space.sm,
 		fontSize: 14,
 		fontWeight: '500',
-		color: '#dc2626',
+		color: palette.danger,
 	},
 	retryButton: {
 		paddingVertical: 6,
-		paddingHorizontal: 12,
-		backgroundColor: '#dc2626',
+		paddingHorizontal: space.md,
+		backgroundColor: palette.danger,
 		borderRadius: 8,
 	},
 	retryButtonText: {
 		fontSize: 12,
 		fontWeight: '600',
-		color: '#ffffff',
+		color: palette.surface,
 	},
 });
 

@@ -17,6 +17,9 @@ import useAuth from '../../../../src/context/AuthContext';
 import { useTheme } from '../../../../src/context/ThemeContext';
 import AIProfileInsights from './components/AIProfileInsights';
 import CircularProgress from '../../../../src/components/CircularProgress';
+import { useFeature } from '../../../../src/config/features';
+import IncomeSourceBadge from '../../../../src/components/IncomeSourceBadge';
+import IncomeDivergenceWarning from '../../../../src/components/IncomeDivergenceWarning';
 
 const currency = (n?: number) =>
 	typeof n === 'number' && !Number.isNaN(n) ? `$${n.toLocaleString()}` : '$0';
@@ -62,7 +65,7 @@ const Card = ({ children, colors, style }: any) => (
 	</View>
 );
 
-const Row = ({ icon, label, value, onPress, colors }: any) => (
+const Row = ({ icon, label, value, onPress, colors, badge }: any) => (
 	<TouchableOpacity
 		activeOpacity={0.7}
 		onPress={onPress}
@@ -72,17 +75,20 @@ const Row = ({ icon, label, value, onPress, colors }: any) => (
 			style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}
 		>
 			<Ionicons name={icon} size={18} color={colors.subtext} />
-			<Text
-				style={{
-					fontSize: 14,
-					color: colors.text,
-					fontWeight: '600',
-					flexShrink: 1,
-				}}
-				numberOfLines={1}
-			>
-				{label}
-			</Text>
+			<View style={{ flexDirection: 'column', gap: 4, flex: 1 }}>
+				<Text
+					style={{
+						fontSize: 14,
+						color: colors.text,
+						fontWeight: '600',
+						flexShrink: 1,
+					}}
+					numberOfLines={1}
+				>
+					{label}
+				</Text>
+				{badge}
+			</View>
 		</View>
 		<View
 			style={{
@@ -110,8 +116,17 @@ const Row = ({ icon, label, value, onPress, colors }: any) => (
 export default function AccountScreen() {
 	const { colors } = useTheme();
 	const router = useRouter();
-	const { profile, loading, error, fetchProfile } = useProfile();
+	const {
+		profile,
+		loading,
+		error,
+		fetchProfile,
+		incomeEstimate,
+		incomeComparison,
+		fetchIncomeComparison,
+	} = useProfile();
 	const { user } = useAuth();
+	const aiInsightsPreviewEnabled = useFeature('aiInsightsPreview');
 	const [profileCompletion, setProfileCompletion] = useState(0);
 	const [refreshing, setRefreshing] = useState(false);
 
@@ -119,10 +134,11 @@ export default function AccountScreen() {
 		setRefreshing(true);
 		try {
 			await fetchProfile();
+			await fetchIncomeComparison();
 		} finally {
 			setRefreshing(false);
 		}
-	}, [fetchProfile]);
+	}, [fetchProfile, fetchIncomeComparison]);
 
 	const calculateProfileCompletion = useCallback((profileData: any) => {
 		if (!profileData) return 0;
@@ -145,7 +161,8 @@ export default function AccountScreen() {
 
 	useEffect(() => {
 		fetchProfile();
-	}, [fetchProfile]);
+		fetchIncomeComparison();
+	}, [fetchProfile, fetchIncomeComparison]);
 
 	useEffect(() => {
 		if (profile) {
@@ -449,17 +466,43 @@ export default function AccountScreen() {
 				</Card>
 			</Section>
 
+			{/* Income Divergence Warning */}
+			{incomeComparison &&
+				incomeComparison.userDeclared &&
+				incomeComparison.observed &&
+				incomeComparison.divergence && (
+					<IncomeDivergenceWarning
+						userDeclaredAmount={incomeComparison.userDeclared.monthlyIncome}
+						observedAmount={incomeComparison.observed.monthlyIncome}
+						divergencePercent={incomeComparison.divergence}
+						onUpdateIncome={() =>
+							router.push('/(stack)/settings/profile/editFinancial')
+						}
+					/>
+				)}
+
 			{/* Financial */}
 			<Section title="Financial" colors={colors}>
 				<Card colors={colors}>
 					<Row
 						icon="cash-outline"
 						label="Monthly Income"
-						value={currency(profile.monthlyIncome)}
+						value={currency(
+							incomeEstimate?.monthlyIncome || profile.monthlyIncome
+						)}
 						onPress={() =>
 							router.push('/(stack)/settings/profile/editFinancial')
 						}
 						colors={colors}
+						badge={
+							incomeEstimate && (
+								<IncomeSourceBadge
+									source={incomeEstimate.source}
+									confidence={incomeEstimate.confidence}
+									compact
+								/>
+							)
+						}
 					/>
 					<View style={{ height: 1, backgroundColor: colors.line }} />
 					<Row
@@ -615,56 +658,62 @@ export default function AccountScreen() {
 				</View>
 			</Section>
 
-			{/* AI Insights (Preview) */}
-			<Section
-				title="AI Insights"
-				colors={colors}
-				right={
-					<TouchableOpacity
-						onPress={() => {
-							// Navigate to assistant with insights context
-							router.push('/(tabs)/assistant');
-						}}
-						style={{
-							flexDirection: 'row',
-							alignItems: 'center',
-							gap: 6,
-							paddingHorizontal: 8,
-							paddingVertical: 4,
-						}}
-					>
-						<Text style={{ color: colors.tint, fontWeight: '700' }}>
-							Chat about insights
-						</Text>
-						<Ionicons name="chatbubble-outline" size={16} color={colors.tint} />
-					</TouchableOpacity>
-				}
-			>
-				<Card colors={colors}>
-					<AIProfileInsights
-						profile={profile}
-						onAction={(a) => {
-							if (a === 'export_insights') {
-								Alert.alert(
-									'Export',
-									'Use Share from the insights screen to export.'
-								);
-								return;
-							}
-							if (a === 'optimize_income' || a === 'debt_strategy')
-								router.push('/(stack)/settings/profile/editFinancial');
-							else if (a === 'reduce_expenses')
-								router.push('/(stack)/settings/profile/editExpenses');
-							else if (a === 'set_savings_goal')
-								router.push('/(tabs)/budgets?tab=goals');
-							else if (a === 'create_budget')
-								router.push('/(tabs)/budgets?tab=budgets');
-							else router.push('/(tabs)/assistant');
-						}}
-						mode="preview"
-					/>
-				</Card>
-			</Section>
+			{/* AI Insights (Preview) - Only show if feature is enabled */}
+			{aiInsightsPreviewEnabled && (
+				<Section
+					title="AI Insights"
+					colors={colors}
+					right={
+						<TouchableOpacity
+							onPress={() => {
+								// Navigate to assistant with insights context
+								router.push('/(tabs)/assistant');
+							}}
+							style={{
+								flexDirection: 'row',
+								alignItems: 'center',
+								gap: 6,
+								paddingHorizontal: 8,
+								paddingVertical: 4,
+							}}
+						>
+							<Text style={{ color: colors.tint, fontWeight: '700' }}>
+								Chat about insights
+							</Text>
+							<Ionicons
+								name="chatbubble-outline"
+								size={16}
+								color={colors.tint}
+							/>
+						</TouchableOpacity>
+					}
+				>
+					<Card colors={colors}>
+						<AIProfileInsights
+							profile={profile}
+							onAction={(a) => {
+								if (a === 'export_insights') {
+									Alert.alert(
+										'Export',
+										'Use Share from the insights screen to export.'
+									);
+									return;
+								}
+								if (a === 'optimize_income' || a === 'debt_strategy')
+									router.push('/(stack)/settings/profile/editFinancial');
+								else if (a === 'reduce_expenses')
+									router.push('/(stack)/settings/profile/editExpenses');
+								else if (a === 'set_savings_goal')
+									router.push('/(tabs)/budgets?tab=goals');
+								else if (a === 'create_budget')
+									router.push('/(tabs)/budgets?tab=budgets');
+								else router.push('/(tabs)/assistant');
+							}}
+							mode="preview"
+						/>
+					</Card>
+				</Section>
+			)}
 
 			{/* Management */}
 			<Section title="Management" colors={colors}>

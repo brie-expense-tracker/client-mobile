@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Features, guardFeature } from '../../config/features';
 
 export interface Insight {
 	id: string;
@@ -60,25 +61,33 @@ export class InsightsContextService {
 		goals: any[],
 		transactions: any[]
 	): Promise<Insight[]> {
-		try {
-			const insights = await this.generateInsights(
-				profile,
-				budgets,
-				goals,
-				transactions
-			);
-			this.insights = insights;
-			return insights;
-		} catch (error) {
-			console.error('[InsightsContextService] Failed to load insights:', error);
-			return [];
-		}
+		return (
+			guardFeature('aiInsights', async () => {
+				try {
+					const insights = await this.generateInsights(
+						profile,
+						budgets,
+						goals,
+						transactions
+					);
+					this.insights = insights;
+					return insights;
+				} catch (error) {
+					console.error(
+						'[InsightsContextService] Failed to load insights:',
+						error
+					);
+					return [];
+				}
+			}) || []
+		);
 	}
 
 	/**
 	 * Get insights relevant to a conversation context
 	 */
 	public getRelevantInsights(context: string, limit: number = 3): Insight[] {
+		if (!Features.aiInsights) return [];
 		if (this.insights.length === 0) return [];
 
 		const contextLower = context.toLowerCase();
@@ -149,6 +158,8 @@ export class InsightsContextService {
 	 * Get critical insights that need immediate attention
 	 */
 	public getCriticalInsights(): Insight[] {
+		if (!Features.aiInsights) return [];
+
 		return this.insights.filter(
 			(insight) =>
 				insight.priority === 'critical' || insight.priority === 'high'

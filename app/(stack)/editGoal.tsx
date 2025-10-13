@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
 	View,
 	Text,
@@ -24,6 +24,22 @@ import {
 	normalizeIconName,
 } from '../../src/constants/uiConstants';
 import { DateField } from '../../src/components/DateField';
+
+// Helper to clean currency input
+const cleanCurrencyToNumberString = (v: string) =>
+	v.replace(/[^\d.]/g, '').replace(/^0+(\d)/, '$1');
+
+// Stricter date validation to prevent invalid dates
+const validateDate = (dateString: string): boolean => {
+	if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return false;
+	const [y, m, d] = dateString.split('-').map(Number);
+	const dt = new Date(Date.UTC(y, m - 1, d));
+	return (
+		dt.getUTCFullYear() === y &&
+		dt.getUTCMonth() === m - 1 &&
+		dt.getUTCDate() === d
+	);
+};
 
 const EditGoalScreen: React.FC = () => {
 	const params = useLocalSearchParams();
@@ -66,30 +82,63 @@ const EditGoalScreen: React.FC = () => {
 					setIcon(DEFAULT_GOAL_ICON);
 				}
 				setColor(foundGoal.color || DEFAULT_COLOR);
-				setSelectedDate(new Date(foundGoal.deadline));
+				// Auto-detect if custom amount
+				const targetStr = foundGoal.target?.toString() || '';
+				const isPreset = GOAL_TARGET_PRESETS.some(
+					(preset) => preset.toString() === targetStr
+				);
+				setShowCustomTarget(!isPreset && targetStr !== '');
 			} else {
 				console.log('[EditGoalScreen] Goal not found with ID:', goalId);
 			}
 		}
 	}, [goalId, goals]);
 
-	const validateDate = (dateString: string): boolean => {
-		const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-		if (!dateRegex.test(dateString)) return false;
-		const date = new Date(dateString);
-		return date instanceof Date && !isNaN(date.getTime());
-	};
+	// Memoized validation for save button
+	const saveDisabled = useMemo(() => {
+		const parsedTarget = parseFloat(cleanCurrencyToNumberString(target));
+		return (
+			loading ||
+			!name.trim() ||
+			!target.trim() ||
+			isNaN(parsedTarget) ||
+			parsedTarget <= 0 ||
+			!validateDate(deadline)
+		);
+	}, [loading, name, target, deadline]);
 
 	const handleSave = async () => {
-		if (!name.trim() || !target.trim() || !deadline.trim()) {
-			Alert.alert('Error', 'Please fill in all required fields');
+		// Validation
+		const parsedTarget = parseFloat(cleanCurrencyToNumberString(target));
+
+		if (!name.trim()) {
+			Alert.alert('Error', 'Please enter a goal name');
+			return;
+		}
+
+		if (!target.trim() || isNaN(parsedTarget) || parsedTarget <= 0) {
+			Alert.alert('Error', 'Please enter a valid target amount');
 			return;
 		}
 
 		if (!validateDate(deadline)) {
 			Alert.alert(
 				'Invalid Date',
-				'Please enter a valid date in YYYY-MM-DD format (e.g., 2024-12-31)'
+				'Please enter a valid date in YYYY-MM-DD format (e.g., 2025-12-31)'
+			);
+			return;
+		}
+
+		// Check if deadline is in the past
+		const todayISO = new Date(
+			Date.now() - new Date().getTimezoneOffset() * 60000
+		)
+			.toISOString()
+			.split('T')[0];
+		if (deadline < todayISO) {
+			Alert.alert(
+				'Invalid Date',
+				'Goal deadline must be today or in the future'
 			);
 			return;
 		}
@@ -107,10 +156,9 @@ const EditGoalScreen: React.FC = () => {
 			console.log('[EditGoalScreen] Updating goal:', {
 				goalId: goalIdToUse,
 				originalGoalId: goal.id,
-				goal_id: (goal as any)._id,
 				updates: {
 					name: name.trim(),
-					target: parseFloat(target),
+					target: parsedTarget,
 					deadline,
 					icon: selectedIcon,
 					color,
@@ -120,7 +168,7 @@ const EditGoalScreen: React.FC = () => {
 
 			await updateGoal(goalIdToUse, {
 				name: name.trim(),
-				target: parseFloat(target),
+				target: parsedTarget,
 				deadline,
 				icon: selectedIcon,
 				color,
@@ -132,7 +180,11 @@ const EditGoalScreen: React.FC = () => {
 			]);
 		} catch (error) {
 			console.error('[EditGoalScreen] Error updating:', error);
-			Alert.alert('Error', 'Failed to update goal. Please try again.');
+			// More specific error message if available
+			const errorMessage =
+				(error as any)?.response?.data?.message ||
+				'Failed to update goal. Please try again.';
+			Alert.alert('Error', errorMessage);
 		} finally {
 			setLoading(false);
 		}
@@ -201,8 +253,8 @@ const EditGoalScreen: React.FC = () => {
 				<Text style={styles.screenTitle}>Edit Goal</Text>
 				<TouchableOpacity
 					onPress={handleSave}
-					style={[styles.saveButton, loading && styles.saveButtonDisabled]}
-					disabled={loading}
+					style={[styles.saveButton, saveDisabled && styles.saveButtonDisabled]}
+					disabled={saveDisabled}
 				>
 					{loading ? (
 						<ActivityIndicator size="small" color="#fff" />
@@ -285,9 +337,11 @@ const EditGoalScreen: React.FC = () => {
 								<TextInput
 									style={styles.textInput}
 									value={target}
-									onChangeText={setTarget}
+									onChangeText={(v) =>
+										setTarget(cleanCurrencyToNumberString(v))
+									}
 									placeholder="e.g., 10000"
-									keyboardType="numeric"
+									keyboardType="decimal-pad"
 									placeholderTextColor="#999"
 								/>
 							</View>
@@ -342,7 +396,7 @@ const EditGoalScreen: React.FC = () => {
 												icon === iconName && { backgroundColor: color },
 											]}
 											onPress={() => {
-												setIcon(iconName);
+												setIcon(normalizeIconName(iconName));
 												setShowIconPicker(false);
 											}}
 										>

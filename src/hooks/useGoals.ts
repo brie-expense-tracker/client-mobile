@@ -83,19 +83,40 @@ export function useGoals(options: { refreshOnFocus?: boolean } = {}) {
 	// Create wrapper functions for the API calls
 	const updateGoalDirect = useCallback(
 		async (id: string, updates: UpdateGoalData): Promise<Goal> => {
-			console.log('[useGoals] updateGoalDirect called with:', { id, updates });
+			console.log('🎯 [useGoals] updateGoalDirect called with:');
+			console.log('  🆔 Goal ID:', id);
+			console.log('  📝 Updates:', updates);
+			console.log('  📝 Updates type:', typeof updates);
+			console.log('  📝 Updates keys:', Object.keys(updates));
+
 			const response = await ApiService.put<{ data: Goal }>(
 				`/api/goals/${id}`,
 				updates
 			);
-			console.log('[useGoals] updateGoalDirect response:', response);
+
+			console.log('🎯 [useGoals] updateGoalDirect response:');
+			console.log('  ✅ Success:', response.success);
+			console.log('  ❌ Error:', response.error);
+			console.log('  📦 Data:', response.data);
+			console.log('  📊 Status:', (response as any).status);
+
+			// Check if the request failed
+			if (!response.success) {
+				console.error('🎯 [useGoals] Update failed:', response.error);
+				throw new Error(response.error || 'Failed to update goal');
+			}
+
 			const responseData = response.data?.data || response.data;
 			if (
 				!responseData ||
 				(typeof responseData === 'object' && 'data' in responseData)
 			) {
+				console.error('🎯 [useGoals] No valid response data received');
+				console.error('  📦 Raw response:', response);
 				throw new Error('Failed to update goal: No data received');
 			}
+
+			console.log('🎯 [useGoals] Returning goal data:', responseData);
 			return responseData as Goal;
 		},
 		[]

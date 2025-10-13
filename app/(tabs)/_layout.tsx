@@ -13,13 +13,13 @@ export default function TabLayout() {
 						screenOptions={{
 							tabBarStyle: {
 								elevation: 5,
-								paddingTop: 10,
-								height: 80,
+								paddingTop: 4,
+								height: 70,
 							},
 							tabBarLabelStyle: {
 								fontSize: 16,
-								paddingBottom: 10,
-								paddingTop: 2,
+								paddingBottom: 4,
+								paddingTop: 0,
 							},
 							tabBarInactiveTintColor: '#000',
 							tabBarActiveTintColor: '#007ACC',

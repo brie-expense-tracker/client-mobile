@@ -16,6 +16,5 @@ const styles = StyleSheet.create({
 		borderWidth: 1,
 		borderColor: palette.border,
 		padding: space.lg,
-		...shadow.card,
 	},
 });

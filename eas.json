@@ -10,7 +10,9 @@
 			"autoIncrement": true,
 			"env": {
 				"EXPO_PUBLIC_API_URL": "https://brie-staging-api.onrender.com",
-				"EXPO_PUBLIC_ENV": "dev"
+				"EXPO_PUBLIC_ENV": "dev",
+				"EXPO_PUBLIC_AI_INSIGHTS": "1",
+				"EXPO_PUBLIC_AI_INSIGHTS_PREVIEW": "0"
 			}
 		},
 		"preview": {
@@ -19,7 +21,9 @@
 			"autoIncrement": true,
 			"env": {
 				"EXPO_PUBLIC_API_URL": "https://brie-staging-api.onrender.com",
-				"EXPO_PUBLIC_ENV": "staging"
+				"EXPO_PUBLIC_ENV": "staging",
+				"EXPO_PUBLIC_AI_INSIGHTS": "1",
+				"EXPO_PUBLIC_AI_INSIGHTS_PREVIEW": "0"
 			}
 		},
 		"testflight": {
@@ -28,7 +32,9 @@
 			"autoIncrement": true,
 			"env": {
 				"EXPO_PUBLIC_API_URL": "https://brie-staging-api.onrender.com",
-				"EXPO_PUBLIC_ENV": "testflight"
+				"EXPO_PUBLIC_ENV": "testflight",
+				"EXPO_PUBLIC_AI_INSIGHTS": "1",
+				"EXPO_PUBLIC_AI_INSIGHTS_PREVIEW": "0"
 			},
 			"ios": {
 				"image": "latest"
@@ -40,7 +46,9 @@
 			"autoIncrement": true,
 			"env": {
 				"EXPO_PUBLIC_API_URL": "https://brie-staging-api.onrender.com",
-				"EXPO_PUBLIC_ENV": "production"
+				"EXPO_PUBLIC_ENV": "production",
+				"EXPO_PUBLIC_AI_INSIGHTS": "1",
+				"EXPO_PUBLIC_AI_INSIGHTS_PREVIEW": "0"
 			}
 		}
 	},

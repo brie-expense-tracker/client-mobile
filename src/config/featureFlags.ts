@@ -1,52 +1,36 @@
-// Feature flags configuration
-// This file manages feature toggles for different environments
+// Legacy feature flags - DEPRECATED
+// Use src/config/features.ts instead
 
-export interface FeatureFlags {
-	devHud: boolean;
-	analytics: boolean;
-	debugLogging: boolean;
-}
+import { Features, useFeature, getResolvedFlags } from './features';
 
-// Default feature flags (production-safe)
-const defaultFeatureFlags: FeatureFlags = {
-	devHud: false, // Disabled by default for safety
+// Legacy compatibility exports
+export const getEffectiveFeatureFlags = () => ({
+	devHud: __DEV__, // Always true in dev, false in prod
 	analytics: true,
-	debugLogging: false,
-};
+	debugLogging: __DEV__,
+	aiInsights: Features.aiInsights,
+});
 
-// Development feature flags
-const devFeatureFlags: FeatureFlags = {
-	devHud: true,
-	analytics: true,
-	debugLogging: true,
-};
+export { useFeature, getResolvedFlags as getFeatureFlags };
 
-// Get feature flags based on environment
-export function getFeatureFlags(): FeatureFlags {
-	if (__DEV__) {
-		return devFeatureFlags;
-	}
-
-	return defaultFeatureFlags;
+// Legacy function for backward compatibility
+export async function loadFeatureFlagOverrides() {
+	// This is now handled by the new features system
+	console.warn(
+		'loadFeatureFlagOverrides is deprecated, use loadLocalOverrides from features.ts'
+	);
 }
 
-// Runtime feature flag override (for remote config in the future)
-let runtimeOverrides: Partial<FeatureFlags> = {};
-
-export function setFeatureFlagOverrides(overrides: Partial<FeatureFlags>) {
-	runtimeOverrides = { ...runtimeOverrides, ...overrides };
+export function setFeatureFlagOverrides(overrides: any) {
+	console.warn(
+		'setFeatureFlagOverrides is deprecated, use setLocalOverride from features.ts'
+	);
 }
 
-export function getEffectiveFeatureFlags(): FeatureFlags {
-	const baseFlags = getFeatureFlags();
-	return { ...baseFlags, ...runtimeOverrides };
-}
-
-// Production safety assertion
 export function assertProductionSafety() {
-	const flags = getEffectiveFeatureFlags();
+	const flags = getResolvedFlags();
 
 	if (process.env.NODE_ENV === 'production') {
-		console.assert(!flags.devHud, 'Dev HUD must be off in production');
+		console.assert(!flags.aiInsights, 'AI Insights must be off in production');
 	}
 }

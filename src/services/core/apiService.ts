@@ -705,9 +705,8 @@ export class ApiService {
 				// API logging: Success response
 				console.log(`✅ [ApiService] POST: ${endpoint} (${response.status})`);
 
-				// Clear cache after successful POST (resource created)
-				this.clearCache(endpoint);
-				console.log(`🗑️ [ApiService] Cache cleared for: ${endpoint}`);
+				// Clear cache by prefix after successful POST (resource created)
+				this.clearCacheByPrefix(endpoint);
 
 				return {
 					success: true,
@@ -865,14 +864,13 @@ export class ApiService {
 			console.log(`✅ [PUT] Success: ${endpoint} (${response.status})`);
 			console.log('✅ [PUT] Response data:', data);
 
-			// Clear cache after successful PUT (resource updated)
-			this.clearCache(endpoint);
-
-			// Also clear list cache (e.g., if updating /api/budgets/123, also clear /api/budgets)
+			// Clear cache by prefix to handle all variants
 			const baseEndpoint = endpoint.replace(/\/[^/]+$/, '');
+			this.clearCacheByPrefix(baseEndpoint);
+
+			// Also clear the specific item cache if different
 			if (baseEndpoint !== endpoint) {
-				this.clearCache(baseEndpoint);
-				console.log(`🗑️ [ApiService] Also cleared list cache: ${baseEndpoint}`);
+				this.clearCache(endpoint);
 			}
 
 			return { success: true, data };
@@ -960,14 +958,13 @@ export class ApiService {
 			// API logging: Success response
 			console.log(`✅ PATCH: ${endpoint} (${response.status})`);
 
-			// Clear cache after successful PATCH (resource updated)
-			this.clearCache(endpoint);
-
-			// Also clear list cache (e.g., if patching /api/budgets/123, also clear /api/budgets)
+			// Clear cache by prefix to handle all variants
 			const baseEndpoint = endpoint.replace(/\/[^/]+$/, '');
+			this.clearCacheByPrefix(baseEndpoint);
+
+			// Also clear the specific item cache if different
 			if (baseEndpoint !== endpoint) {
-				this.clearCache(baseEndpoint);
-				console.log(`🗑️ [ApiService] Also cleared list cache: ${baseEndpoint}`);
+				this.clearCache(endpoint);
 			}
 
 			return { success: true, data };
@@ -1079,25 +1076,25 @@ export class ApiService {
 				};
 			}
 
-		// API logging: Success response
-		console.log(`✅ DELETE: ${endpoint} (${response.status})`);
-		console.log(`🔍 [DELETE] About to clear cache for endpoint: ${endpoint}`);
+			// API logging: Success response
+			console.log(`✅ DELETE: ${endpoint} (${response.status})`);
+			console.log(`🔍 [DELETE] About to clear cache for endpoint: ${endpoint}`);
 
-		// Clear cache for the deleted item's endpoint
-		this.clearCache(endpoint);
-		console.log(`🗑️ [ApiService] Cache cleared for: ${endpoint}`);
+			// Clear cache by prefix to handle all variants
+			const baseEndpoint = endpoint.replace(/\/[^/]+$/, '');
+			console.log(
+				`🔍 [DELETE] Base endpoint: ${baseEndpoint}, Original: ${endpoint}`
+			);
 
-		// Also clear list cache (e.g., if deleting /api/budgets/123, also clear /api/budgets)
-		const baseEndpoint = endpoint.replace(/\/[^/]+$/, '');
-		console.log(`🔍 [DELETE] Base endpoint: ${baseEndpoint}, Original: ${endpoint}`);
-		if (baseEndpoint !== endpoint) {
-			this.clearCache(baseEndpoint);
-			console.log(`🗑️ [ApiService] Also cleared list cache: ${baseEndpoint}`);
-		} else {
-			console.log(`🔍 [DELETE] No list cache to clear (baseEndpoint === endpoint)`);
-		}
+			// Clear all caches starting with the base endpoint (e.g., /api/budgets, /api/budgets/123, etc.)
+			this.clearCacheByPrefix(baseEndpoint);
 
-		return { success: true, data };
+			// Also clear the specific item cache if different
+			if (baseEndpoint !== endpoint) {
+				this.clearCache(endpoint);
+			}
+
+			return { success: true, data };
 		} catch (error) {
 			console.error('❌ API DELETE error:', error);
 			return {
@@ -1242,6 +1239,41 @@ export class ApiService {
 			requestCache.clear();
 			console.log(`🗑️ [ApiService] All cache cleared`);
 		}
+	}
+
+	/**
+	 * Clear cache for all endpoints starting with a prefix
+	 */
+	static clearCacheByPrefix(prefix: string): void {
+		let clearedCount = 0;
+		const keysToDelete: string[] = [];
+
+		// Collect keys to delete
+		for (const key of requestCache.keys()) {
+			if (key.startsWith(prefix)) {
+				keysToDelete.push(key);
+			}
+		}
+
+		// Delete them
+		for (const key of keysToDelete) {
+			requestCache.delete(key);
+			clearedCount++;
+		}
+
+		// Also clear inflight requests for this prefix
+		for (const key of inflight.keys()) {
+			if (key.includes(prefix)) {
+				inflight.delete(key);
+				console.log(
+					`🧹 [ApiService] Cleared inflight request: ${key.substring(0, 50)}...`
+				);
+			}
+		}
+
+		console.log(
+			`🗑️ [ApiService] Cleared ${clearedCount} cached entries with prefix: ${prefix}`
+		);
 	}
 
 	/**

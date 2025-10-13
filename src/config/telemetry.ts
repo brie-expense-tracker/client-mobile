@@ -46,7 +46,6 @@ export const TELEMETRY_CONFIG = {
 	// Feature Flags
 	FEATURES: {
 		ENABLED: process.env.FEATURE_FLAGS_ENABLED !== 'false',
-		DEMO_MODE: process.env.DEMO_MODE_ENABLED === 'true',
 		SHADOW_AB_TESTING: process.env.SHADOW_AB_TESTING_ENABLED !== 'false',
 	},
 
@@ -68,7 +67,6 @@ export const TELEMETRY_CONFIG = {
 
 // Feature flag keys for remote config
 export const FEATURE_FLAG_KEYS = {
-	DEMO_MODE: 'demo_mode_enabled',
 	SHADOW_AB_TESTING: 'shadow_ab_testing_enabled',
 	AI_MODEL_SELECTION: 'ai_model_selection_enabled',
 	GROUNDING_LAYER: 'grounding_layer_enabled',
@@ -82,7 +80,6 @@ export const FEATURE_FLAG_KEYS = {
 
 // Default feature flag values
 export const DEFAULT_FEATURE_FLAGS = {
-	[FEATURE_FLAG_KEYS.DEMO_MODE]: true,
 	[FEATURE_FLAG_KEYS.SHADOW_AB_TESTING]: true,
 	[FEATURE_FLAG_KEYS.AI_MODEL_SELECTION]: true,
 	[FEATURE_FLAG_KEYS.GROUNDING_LAYER]: true,

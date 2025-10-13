@@ -21,6 +21,28 @@ const requestQueue = new Map<
 	Array<{ resolve: Function; reject: Function }>
 >();
 
+// Clear stale requests periodically
+setInterval(() => {
+	const now = Date.now();
+	let clearedCount = 0;
+
+	inflightRequests.forEach((state, key) => {
+		// Clear any request older than 5 seconds
+		if (now - state.timestamp > 5000) {
+			console.log(
+				`🧹 [RequestManager] Clearing stale request: ${key.substring(0, 100)}`
+			);
+			state.abortController.abort();
+			inflightRequests.delete(key);
+			clearedCount++;
+		}
+	});
+
+	if (clearedCount > 0) {
+		console.log(`🧹 [RequestManager] Cleared ${clearedCount} stale requests`);
+	}
+}, 2000); // Check every 2 seconds
+
 // Configuration
 const MAX_RETRY_ATTEMPTS = 3;
 const BASE_BACKOFF_MS = 1000;
@@ -188,30 +210,44 @@ export class RequestManager {
 
 		// If there's already an identical request in flight, check if it's still valid
 		const existing = inflightRequests.get(key);
-		if (existing && now - existing.timestamp < 15000) {
-			// 15 second timeout for deduplication
-			console.log(`🔄 [RequestManager] Deduplicating request: ${key}`);
+		if (existing && now - existing.timestamp < 3000) {
+			// 3 second timeout for deduplication
+			console.log(
+				`🔄 [RequestManager] Deduplicating request: ${key.substring(0, 80)}`
+			);
 			return existing.promise;
 		} else if (existing) {
-			// Timeout exceeded - abort the old request
+			// Timeout exceeded - abort the old request and create new one
 			console.log(
-				`⏰ [RequestManager] Request timeout exceeded, aborting: ${key}`
+				`⏰ [RequestManager] Dedup timeout exceeded, creating new request: ${key.substring(
+					0,
+					80
+				)}`
 			);
 			existing.abortController.abort();
 			inflightRequests.delete(key);
+			// Don't return - continue to create a new request
 		}
 
 		// Create abort controller for this request with timeout
 		const abortController = new AbortController();
 		const timeoutId = setTimeout(() => {
-			console.log(`⏰ [RequestManager] Request timeout, aborting: ${key}`);
+			console.log(
+				`⏰ [RequestManager] Request timeout after 3s, aborting: ${key.substring(
+					0,
+					80
+				)}`
+			);
 			abortController.abort();
 			inflightRequests.delete(key);
-		}, 15000); // 15 second timeout
+		}, 3000); // 3 second timeout (fast fail for UX)
 
 		// Create the request executor
 		const executor = async (): Promise<T> => {
 			try {
+				console.log(
+					`🚀 [RequestManager] Starting fetch for: ${key.substring(0, 100)}`
+				);
 				const response = await fetch(url, {
 					...options,
 					method,
@@ -221,6 +257,11 @@ export class RequestManager {
 						...options.headers,
 					},
 				});
+				console.log(
+					`📥 [RequestManager] Received response: ${
+						response.status
+					} for ${key.substring(0, 100)}`
+				);
 
 				if (!response.ok) {
 					let errorMessage = response.statusText;
@@ -240,15 +281,21 @@ export class RequestManager {
 							: ApiErrorType.SERVER_ERROR,
 						response.status
 					);
-
+					console.log(`❌ [RequestManager] Request failed: ${error.message}`);
 					throw error;
 				}
 
 				const data = await response.json();
+				console.log(
+					`✅ [RequestManager] Request succeeded for ${key.substring(0, 100)}`
+				);
 				clearTimeout(timeoutId);
 				return data;
 			} catch (error: any) {
 				clearTimeout(timeoutId);
+				console.log(
+					`💥 [RequestManager] Request error: ${error.name} - ${error.message}`
+				);
 				// Handle abort errors specifically
 				if (error.name === 'AbortError') {
 					const timeoutError = new ApiError(
@@ -261,6 +308,9 @@ export class RequestManager {
 				throw error;
 			} finally {
 				// Clean up inflight request
+				console.log(
+					`🧹 [RequestManager] Cleaning up request: ${key.substring(0, 100)}`
+				);
 				inflightRequests.delete(key);
 			}
 		};

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
 	View,
 	Text,
@@ -11,6 +11,12 @@ import { useRouter } from 'expo-router';
 import useAuth from '../../../src/context/AuthContext';
 import { useTheme } from '../../../src/context/ThemeContext';
 import ConnectivityTest from '../../../src/components/ConnectivityTest';
+import {
+	useFeature,
+	setLocalOverride,
+	clearLocalOverrides,
+	debugFeatureFlags,
+} from '../../../src/config/features';
 
 /* --------------------------------- UI --------------------------------- */
 
@@ -70,6 +76,34 @@ export default function SettingsScreen() {
 	const router = useRouter();
 	const { logout } = useAuth();
 	const { colors } = useTheme();
+	const aiInsightsEnabled = useFeature('aiInsights');
+	const aiInsightsPreviewEnabled = useFeature('aiInsightsPreview');
+	const newBudgetsV2Enabled = useFeature('newBudgetsV2');
+	const goalsTimelineEnabled = useFeature('goalsTimeline');
+
+	// Force re-render when feature flags change
+	const [refreshKey, setRefreshKey] = useState(0);
+
+	useEffect(() => {
+		console.log('🔧 [Settings] Feature flags updated:', {
+			aiInsights: aiInsightsEnabled,
+			aiInsightsPreview: aiInsightsPreviewEnabled,
+			newBudgetsV2: newBudgetsV2Enabled,
+			goalsTimeline: goalsTimelineEnabled,
+		});
+		console.log('🔧 [Settings] Environment variables:', {
+			EXPO_PUBLIC_AI_INSIGHTS: process.env.EXPO_PUBLIC_AI_INSIGHTS,
+			EXPO_PUBLIC_AI_INSIGHTS_PREVIEW:
+				process.env.EXPO_PUBLIC_AI_INSIGHTS_PREVIEW,
+			EXPO_PUBLIC_NEW_BUDGETS_V2: process.env.EXPO_PUBLIC_NEW_BUDGETS_V2,
+			EXPO_PUBLIC_GOALS_TIMELINE: process.env.EXPO_PUBLIC_GOALS_TIMELINE,
+		});
+	}, [
+		aiInsightsEnabled,
+		aiInsightsPreviewEnabled,
+		newBudgetsV2Enabled,
+		goalsTimelineEnabled,
+	]);
 
 	const handleLogout = async () => {
 		try {
@@ -77,6 +111,72 @@ export default function SettingsScreen() {
 			// Navigation is handled automatically by AuthContext when firebaseUser becomes null
 		} catch (error) {
 			console.error('Logout error:', error);
+		}
+	};
+
+	const toggleAIInsights = async () => {
+		try {
+			const newValue = !aiInsightsEnabled;
+			await setLocalOverride('aiInsights', newValue);
+			console.log('AI Insights toggled:', newValue);
+			setRefreshKey((prev) => prev + 1); // Force re-render
+		} catch (error) {
+			console.error('Failed to toggle AI Insights:', error);
+		}
+	};
+
+	const toggleAIInsightsPreview = async () => {
+		try {
+			const newValue = !aiInsightsPreviewEnabled;
+			await setLocalOverride('aiInsightsPreview', newValue);
+			console.log('AI Insights Preview toggled:', newValue);
+			setRefreshKey((prev) => prev + 1); // Force re-render
+		} catch (error) {
+			console.error('Failed to toggle AI Insights Preview:', error);
+		}
+	};
+
+	const toggleNewBudgetsV2 = async () => {
+		try {
+			const newValue = !newBudgetsV2Enabled;
+			await setLocalOverride('newBudgetsV2', newValue);
+			console.log('New Budgets V2 toggled:', newValue);
+			setRefreshKey((prev) => prev + 1); // Force re-render
+		} catch (error) {
+			console.error('Failed to toggle New Budgets V2:', error);
+		}
+	};
+
+	const toggleGoalsTimeline = async () => {
+		try {
+			const newValue = !goalsTimelineEnabled;
+			await setLocalOverride('goalsTimeline', newValue);
+			console.log('Goals Timeline toggled:', newValue);
+			setRefreshKey((prev) => prev + 1); // Force re-render
+		} catch (error) {
+			console.error('Failed to toggle Goals Timeline:', error);
+		}
+	};
+
+	const resetLabs = async () => {
+		try {
+			clearLocalOverrides();
+			console.log('Labs settings reset - cleared local overrides');
+			console.log(
+				'Note: Environment variables (.env) cannot be reset at runtime'
+			);
+			console.log('Current base values from .env:');
+			console.log(
+				'- EXPO_PUBLIC_AI_INSIGHTS:',
+				process.env.EXPO_PUBLIC_AI_INSIGHTS
+			);
+			console.log(
+				'- EXPO_PUBLIC_AI_INSIGHTS_PREVIEW:',
+				process.env.EXPO_PUBLIC_AI_INSIGHTS_PREVIEW
+			);
+			setRefreshKey((prev) => prev + 1); // Force re-render
+		} catch (error) {
+			console.error('Failed to reset labs:', error);
 		}
 	};
 
@@ -119,11 +219,26 @@ export default function SettingsScreen() {
 
 	return (
 		<ScrollView
+			key={refreshKey}
 			style={[styles.container, { backgroundColor: colors.bg }]}
 			contentContainerStyle={styles.scrollContent}
 			showsVerticalScrollIndicator={false}
 		>
 			{/* Debug / Testing (kept simple and white) - Only show in development */}
+			{__DEV__ && (
+				<View>
+					<Text
+						style={{
+							color: 'red',
+							fontSize: 16,
+							fontWeight: 'bold',
+							padding: 10,
+						}}
+					>
+						DEBUG MODE: __DEV__ = {__DEV__ ? 'true' : 'false'}
+					</Text>
+				</View>
+			)}
 			{__DEV__ && (
 				<View style={[styles.section, { backgroundColor: colors.bg }]}>
 					<Text style={[styles.sectionTitle, { color: colors.text }]}>
@@ -136,6 +251,158 @@ export default function SettingsScreen() {
 						]}
 					>
 						<ConnectivityTest />
+
+						{/* AI Insights Toggle */}
+						<View style={styles.debugRow}>
+							<Text style={[styles.debugLabel, { color: colors.text }]}>
+								AI Insights
+							</Text>
+							<TouchableOpacity
+								style={[
+									styles.toggleButton,
+									{
+										backgroundColor: aiInsightsEnabled ? '#10b981' : '#e5e7eb',
+									},
+								]}
+								onPress={toggleAIInsights}
+							>
+								<Text style={styles.toggleText}>
+									{aiInsightsEnabled ? 'ON' : 'OFF'}
+								</Text>
+							</TouchableOpacity>
+						</View>
+
+						{/* AI Insights Preview Toggle */}
+						<View style={styles.debugRow}>
+							<Text style={[styles.debugLabel, { color: colors.text }]}>
+								AI Insights Preview
+							</Text>
+							<TouchableOpacity
+								style={[
+									styles.toggleButton,
+									{
+										backgroundColor: aiInsightsPreviewEnabled
+											? '#10b981'
+											: '#e5e7eb',
+									},
+								]}
+								onPress={toggleAIInsightsPreview}
+							>
+								<Text style={styles.toggleText}>
+									{aiInsightsPreviewEnabled ? 'ON' : 'OFF'}
+								</Text>
+							</TouchableOpacity>
+						</View>
+
+						{/* New Budgets V2 Toggle */}
+						<View style={styles.debugRow}>
+							<Text style={[styles.debugLabel, { color: colors.text }]}>
+								New Budgets V2
+							</Text>
+							<TouchableOpacity
+								style={[
+									styles.toggleButton,
+									{
+										backgroundColor: newBudgetsV2Enabled
+											? '#10b981'
+											: '#e5e7eb',
+									},
+								]}
+								onPress={toggleNewBudgetsV2}
+							>
+								<Text style={styles.toggleText}>
+									{newBudgetsV2Enabled ? 'ON' : 'OFF'}
+								</Text>
+							</TouchableOpacity>
+						</View>
+
+						{/* Goals Timeline Toggle */}
+						<View style={styles.debugRow}>
+							<Text style={[styles.debugLabel, { color: colors.text }]}>
+								Goals Timeline
+							</Text>
+							<TouchableOpacity
+								style={[
+									styles.toggleButton,
+									{
+										backgroundColor: goalsTimelineEnabled
+											? '#10b981'
+											: '#e5e7eb',
+									},
+								]}
+								onPress={toggleGoalsTimeline}
+							>
+								<Text style={styles.toggleText}>
+									{goalsTimelineEnabled ? 'ON' : 'OFF'}
+								</Text>
+							</TouchableOpacity>
+						</View>
+
+						{/* Feature Flag Status */}
+						<View style={styles.debugRow}>
+							<Text style={[styles.debugLabel, { color: colors.text }]}>
+								Base Values (.env)
+							</Text>
+							<View style={styles.debugValueContainer}>
+								<Text style={[styles.debugValue, { color: colors.subtext }]}>
+									AI: {process.env.EXPO_PUBLIC_AI_INSIGHTS || 'undefined'}
+								</Text>
+								<Text style={[styles.debugValue, { color: colors.subtext }]}>
+									Preview:{' '}
+									{process.env.EXPO_PUBLIC_AI_INSIGHTS_PREVIEW || 'undefined'}
+								</Text>
+								<Text style={[styles.debugValue, { color: colors.subtext }]}>
+									Budgets:{' '}
+									{process.env.EXPO_PUBLIC_NEW_BUDGETS_V2 || 'undefined'}
+								</Text>
+								<Text style={[styles.debugValue, { color: colors.subtext }]}>
+									Goals: {process.env.EXPO_PUBLIC_GOALS_TIMELINE || 'undefined'}
+								</Text>
+							</View>
+						</View>
+
+						{/* Debug Feature Flags Button */}
+						<View style={styles.debugRow}>
+							<Text style={[styles.debugLabel, { color: colors.text }]}>
+								Debug Flags
+							</Text>
+							<TouchableOpacity
+								style={[styles.debugButton]}
+								onPress={() => {
+									console.log('🔧 [Settings] Debug button pressed!');
+									console.log(
+										'🔧 [Settings] debugFeatureFlags function:',
+										typeof debugFeatureFlags
+									);
+									try {
+										debugFeatureFlags();
+										console.log(
+											'🔧 [Settings] debugFeatureFlags called successfully'
+										);
+									} catch (error) {
+										console.error(
+											'🔧 [Settings] Error calling debugFeatureFlags:',
+											error
+										);
+									}
+								}}
+							>
+								<Text style={styles.debugButtonText}>Debug</Text>
+							</TouchableOpacity>
+						</View>
+
+						{/* Reset Labs Button */}
+						<View style={styles.debugRow}>
+							<Text style={[styles.debugLabel, { color: colors.text }]}>
+								Reset Labs
+							</Text>
+							<TouchableOpacity
+								style={[styles.resetButton]}
+								onPress={resetLabs}
+							>
+								<Text style={styles.resetText}>Reset</Text>
+							</TouchableOpacity>
+						</View>
 					</View>
 				</View>
 			)}
@@ -154,7 +421,7 @@ export default function SettingsScreen() {
 			{/* Logout */}
 			<View style={styles.logoutContainer}>
 				<TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-					<Ionicons name="log-out-outline" size={24} color="#fff" />
+					<Ionicons name="log-out-outline" size={20} color="#6B7280" />
 					<Text style={styles.logoutText}>Logout</Text>
 				</TouchableOpacity>
 			</View>
@@ -233,14 +500,78 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'center',
-		paddingVertical: 15,
-		backgroundColor: '#FF3B30',
+		paddingVertical: 12,
+		backgroundColor: 'transparent',
 		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#E5E7EB',
 	},
 	logoutText: {
-		color: '#fff',
-		fontSize: 16,
-		fontWeight: '600',
+		color: '#6B7280',
+		fontSize: 15,
+		fontWeight: '500',
 		marginLeft: 8,
+	},
+
+	/* Debug Toggle */
+	debugRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		marginTop: 12,
+		paddingTop: 12,
+		borderTopWidth: 1,
+		borderTopColor: '#E5E7EB',
+	},
+	debugLabel: {
+		fontSize: 14,
+		fontWeight: '500',
+	},
+	debugValue: {
+		fontSize: 12,
+		fontWeight: '400',
+		fontFamily: 'monospace',
+	},
+	debugValueContainer: {
+		flex: 1,
+		marginLeft: 8,
+	},
+	toggleButton: {
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		borderRadius: 16,
+		minWidth: 50,
+		alignItems: 'center',
+	},
+	toggleText: {
+		color: '#fff',
+		fontSize: 12,
+		fontWeight: '600',
+	},
+	resetButton: {
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		borderRadius: 16,
+		backgroundColor: '#ef4444',
+		minWidth: 50,
+		alignItems: 'center',
+	},
+	resetText: {
+		color: '#fff',
+		fontSize: 12,
+		fontWeight: '600',
+	},
+	debugButton: {
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		borderRadius: 16,
+		backgroundColor: '#3b82f6',
+		minWidth: 50,
+		alignItems: 'center',
+	},
+	debugButtonText: {
+		color: '#fff',
+		fontSize: 12,
+		fontWeight: '600',
 	},
 });

@@ -14,8 +14,8 @@ import {
 	Platform,
 	Keyboard,
 	ActivityIndicator,
+	Alert,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -25,8 +25,11 @@ type FieldErrors = {
 	firstName?: string;
 	lastName?: string;
 	monthlyIncome?: string;
+	netPerPaycheck?: string;
+	payCadence?: string;
 	financialGoal?: string;
 	housingExpense?: string;
+	budgetCycleStart?: string;
 };
 
 const { width } = Dimensions.get('window');
@@ -35,6 +38,9 @@ const { width } = Dimensions.get('window');
 const validateCurrencyInput = (value: string): boolean => {
 	// Allow empty string
 	if (!value) return true;
+
+	// Disallow dangling dots or minus signs
+	if (value === '.' || value === '-' || value === '-.') return false;
 
 	// Check if it's a valid number
 	const numValue = parseFloat(value);
@@ -56,8 +62,8 @@ const validateCurrencyInput = (value: string): boolean => {
 };
 
 const formatCurrencyInput = (value: string): string => {
-	// Remove any non-digit characters except decimal point
-	const cleaned = value.replace(/[^\d.]/g, '');
+	// Normalize commas; keep digits and one dot
+	const cleaned = value.replace(/,/g, '').replace(/[^\d.]/g, '');
 
 	// Ensure only one decimal point
 	const parts = cleaned.split('.');
@@ -68,6 +74,11 @@ const formatCurrencyInput = (value: string): string => {
 	// Limit decimal places to 2
 	if (parts.length === 2 && parts[1].length > 2) {
 		return parts[0] + '.' + parts[1].slice(0, 2);
+	}
+
+	// Trim leading zeros like "00012" -> "12" but preserve "0.X"
+	if (!cleaned.includes('.') && /^0+\d+$/.test(cleaned)) {
+		return String(parseInt(cleaned, 10));
 	}
 
 	// Limit total length to prevent overflow
@@ -82,29 +93,46 @@ const OnboardingScreen = () => {
 	// Basic Info
 	const [firstName, setFirstName] = useState('');
 	const [lastName, setLastName] = useState('');
-	const [monthlyIncome, setMonthlyIncome] = useState('');
+	const [monthlyIncome, setMonthlyIncome] = useState(''); // optional manual override
+	const [payCadence, setPayCadence] = useState<
+		'weekly' | 'biweekly' | 'semimonthly' | 'monthly' | ''
+	>('');
+	const [netPerPaycheck, setNetPerPaycheck] = useState('');
 
 	// Goals and Expenses
 	const [financialGoal, setFinancialGoal] = useState('');
 	const [housingExpense, setHousingExpense] = useState('');
+	const [budgetCycleStart, setBudgetCycleStart] = useState<number | null>(1); // 1,5,10,15,25 or 31
+	const [emergencyFundMonths, setEmergencyFundMonths] = useState<number | null>(
+		3
+	);
 
 	// UI State
 	const [touched, setTouched] = useState<{
 		firstName: boolean;
 		lastName: boolean;
 		monthlyIncome: boolean;
+		netPerPaycheck: boolean;
+		payCadence: boolean;
 		financialGoal: boolean;
 		housingExpense: boolean;
+		budgetCycleStart: boolean;
 	}>({
 		firstName: false,
 		lastName: false,
 		monthlyIncome: false,
+		netPerPaycheck: false,
+		payCadence: false,
 		financialGoal: false,
 		housingExpense: false,
+		budgetCycleStart: false,
 	});
 	const [submitting, setSubmitting] = useState(false);
 
 	const flatListRef = useRef<FlatList>(null);
+	const firstNameRef = useRef<TextInput>(null);
+	const lastNameRef = useRef<TextInput>(null);
+	const incomeRef = useRef<TextInput>(null);
 	const [currentIndex, setCurrentIndex] = useState(0);
 
 	const { updateProfile } = useProfile();
@@ -125,26 +153,62 @@ const OnboardingScreen = () => {
 		[]
 	);
 
-	// Validation logic
-	const isValidName = (val: string) => val.trim().length >= 1;
-	const isValidCurrency = (val: string) => !val || validateCurrencyInput(val);
+	// Validation logic (matches backend requirements)
+	const isValidName = (val: string) => val.trim().length >= 2; // Backend requires min 2 chars
+	const isValidCurrency = (val: string) => {
+		// Allow empty (optional)
+		if (!val) return true;
+		return validateCurrencyInput(val);
+	};
 	const isValidGoal = (val: string) => val.length > 0;
+	const isValidCadence = (val: string) =>
+		['weekly', 'biweekly', 'semimonthly', 'monthly'].includes(val);
+	const isValidCycleStart = (val: number | null) =>
+		val !== null && [1, 5, 10, 15, 25, 31].includes(val);
+
+	// Derived monthly income (from pay cadence + net per paycheck)
+	const derivedMonthlyIncome = useMemo(() => {
+		const npp = parseFloat(netPerPaycheck || '0');
+		if (!npp || !payCadence) return 0;
+		// Reasonable monthly conversion (avoids 52/12 ≈ 4.333 edge illusions)
+		switch (payCadence) {
+			case 'weekly':
+				return +(npp * 4.333).toFixed(2);
+			case 'biweekly':
+				return +(npp * 2.167).toFixed(2);
+			case 'semimonthly':
+				return +(npp * 2).toFixed(2);
+			case 'monthly':
+				return +npp.toFixed(2);
+			default:
+				return 0;
+		}
+	}, [payCadence, netPerPaycheck]);
 
 	const errors: FieldErrors = {};
 	if (touched.firstName && !isValidName(firstName)) {
-		errors.firstName = 'First name is required.';
+		errors.firstName = 'First name must be at least 2 characters.';
 	}
 	if (touched.lastName && !isValidName(lastName)) {
-		errors.lastName = 'Last name is required.';
+		errors.lastName = 'Last name must be at least 2 characters.';
 	}
 	if (touched.monthlyIncome && !isValidCurrency(monthlyIncome)) {
 		errors.monthlyIncome = 'Please enter a valid amount (e.g., 2450.50).';
+	}
+	if (touched.payCadence && !isValidCadence(payCadence)) {
+		errors.payCadence = 'Select your pay schedule.';
+	}
+	if (touched.netPerPaycheck && !isValidCurrency(netPerPaycheck)) {
+		errors.netPerPaycheck = 'Enter your net amount per paycheck.';
 	}
 	if (touched.financialGoal && !isValidGoal(financialGoal)) {
 		errors.financialGoal = 'Please select a financial goal.';
 	}
 	if (touched.housingExpense && !isValidCurrency(housingExpense)) {
 		errors.housingExpense = 'Please enter a valid amount.';
+	}
+	if (touched.budgetCycleStart && !isValidCycleStart(budgetCycleStart)) {
+		errors.budgetCycleStart = 'Choose your budget cycle day.';
 	}
 
 	const stepValid = useMemo(() => {
@@ -153,11 +217,17 @@ const OnboardingScreen = () => {
 			return (
 				isValidName(firstName) &&
 				isValidName(lastName) &&
-				isValidCurrency(monthlyIncome)
+				// either a valid manual monthly income OR a valid cadence + net per paycheck
+				(isValidCurrency(monthlyIncome) ||
+					(isValidCadence(payCadence) && isValidCurrency(netPerPaycheck)))
 			);
 		}
 		if (currentIndex === 2) {
-			return isValidGoal(financialGoal) && isValidCurrency(housingExpense);
+			return (
+				isValidGoal(financialGoal) &&
+				isValidCurrency(housingExpense) &&
+				isValidCycleStart(budgetCycleStart)
+			);
 		}
 		return false;
 	}, [
@@ -165,8 +235,11 @@ const OnboardingScreen = () => {
 		firstName,
 		lastName,
 		monthlyIncome,
+		payCadence,
+		netPerPaycheck,
 		financialGoal,
 		housingExpense,
+		budgetCycleStart,
 	]);
 
 	// Currency input handlers
@@ -184,31 +257,119 @@ const OnboardingScreen = () => {
 		setTouched((prev) => ({ ...prev, [field]: true }));
 	}, []);
 
+	const markTouchedForStep = useCallback(() => {
+		if (currentIndex === 1) {
+			setTouched((prev) => ({
+				...prev,
+				firstName: true,
+				lastName: true,
+				monthlyIncome: true,
+				payCadence: true,
+				netPerPaycheck: true,
+			}));
+		} else if (currentIndex === 2) {
+			setTouched((prev) => ({
+				...prev,
+				financialGoal: true,
+				housingExpense: true,
+				budgetCycleStart: true,
+			}));
+		}
+	}, [currentIndex]);
+
 	const handleSubmit = useCallback(async () => {
-		if (submitting) return;
+		console.log('🚀 [ProfileSetup] handleSubmit called');
+
+		if (submitting) {
+			console.log('⚠️ [ProfileSetup] Already submitting, ignoring');
+			return;
+		}
 
 		// Mark all fields as touched to reveal errors
 		setTouched({
 			firstName: true,
 			lastName: true,
 			monthlyIncome: true,
+			netPerPaycheck: true,
+			payCadence: true,
 			financialGoal: true,
 			housingExpense: true,
+			budgetCycleStart: true,
 		});
 
 		// Check if form is valid
 		if (!stepValid) {
+			console.log('❌ [ProfileSetup] Form is not valid, aborting submission');
+			console.log('📋 [ProfileSetup] Current field values:', {
+				firstName: firstName.trim(),
+				firstNameLength: firstName.trim().length,
+				lastName: lastName.trim(),
+				lastNameLength: lastName.trim().length,
+				monthlyIncome,
+				payCadence,
+				netPerPaycheck,
+				financialGoal,
+				housingExpense,
+				budgetCycleStart,
+			});
 			await Haptics.selectionAsync();
 			return;
 		}
 
+		console.log('✅ [ProfileSetup] Form is valid, proceeding with submission');
 		setSubmitting(true);
 		try {
+			const monthlyIncomeNumber =
+				monthlyIncome && parseFloat(monthlyIncome) > 0
+					? parseFloat(monthlyIncome)
+					: derivedMonthlyIncome;
+
+			const trimmedFirstName = firstName.trim();
+			const trimmedLastName = lastName.trim();
+
+			// Pre-submission validation
+			if (trimmedFirstName.length < 2) {
+				Alert.alert(
+					'Invalid First Name',
+					'Please enter at least 2 characters for your first name.',
+					[{ text: 'OK' }]
+				);
+				throw new Error('First name must be at least 2 characters long');
+			}
+			if (trimmedLastName.length < 2) {
+				Alert.alert(
+					'Invalid Last Name',
+					'Please enter at least 2 characters for your last name.',
+					[{ text: 'OK' }]
+				);
+				throw new Error('Last name must be at least 2 characters long');
+			}
+
+			console.log('📤 [ProfileSetup] Preparing profile data with:', {
+				firstName: trimmedFirstName,
+				firstNameLength: trimmedFirstName.length,
+				lastName: trimmedLastName,
+				lastNameLength: trimmedLastName.length,
+				monthlyIncomeNumber,
+				payCadence,
+				netPerPaycheck: netPerPaycheck ? parseFloat(netPerPaycheck) : 0,
+				derivedMonthlyIncome,
+				financialGoal,
+				housingExpense: housingExpense ? parseFloat(housingExpense) : 0,
+				budgetCycleStart,
+			});
+
 			const profileData = {
-				firstName: firstName.trim(),
-				lastName: lastName.trim(),
-				ageRange: '25-34', // Default age range
-				monthlyIncome: monthlyIncome ? parseFloat(monthlyIncome) : 0,
+				firstName: trimmedFirstName,
+				lastName: trimmedLastName,
+				monthlyIncome: isNaN(monthlyIncomeNumber) ? 0 : monthlyIncomeNumber,
+				pay: {
+					cadence: payCadence || null,
+					netPerPaycheck: netPerPaycheck ? parseFloat(netPerPaycheck) : 0,
+					derivedMonthlyIncome,
+					varies: false,
+				},
+				emergencyFundMonths: emergencyFundMonths || 3,
 				financialGoal,
 				expenses: {
 					housing: housingExpense ? parseFloat(housingExpense) : 0,
@@ -249,17 +410,23 @@ const OnboardingScreen = () => {
 					},
 					budgetSettings: {
 						cycleType: 'monthly' as const,
-						cycleStart: 1,
+						cycleStart: budgetCycleStart ?? 1,
 						alertPct: 80,
 						carryOver: false,
 						autoSync: true,
 					},
 					goalSettings: {
 						defaults: {
-							target: 1000,
+							target:
+								financialGoal === 'Build an emergency fund' &&
+								emergencyFundMonths
+									? (housingExpense ? parseFloat(housingExpense) : 0) *
+									  emergencyFundMonths
+									: 1000,
 							dueDays: 90,
 							sortBy: 'percent',
 							currency: 'USD',
+							emergencyFundMonths: emergencyFundMonths || 3,
 						},
 						ai: {
 							enabled: true,
@@ -286,24 +453,79 @@ const OnboardingScreen = () => {
 			};
 
 			// Update profile using profileContext
+			console.log('📡 [ProfileSetup] Calling updateProfile...');
 			await updateProfile(profileData as any);
+			console.log('✅ [ProfileSetup] Profile updated successfully');
 			await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 			router.push('/(onboarding)/notificationSetup');
 		} catch (error) {
-			console.error('Error submitting profile:', error);
+			console.error('❌ [ProfileSetup] Error submitting profile:', error);
+
+			// Extract error message
+			let errorMessage = 'Unknown error occurred';
+			if (error instanceof Error) {
+				errorMessage = error.message;
+				console.error('❌ [ProfileSetup] Error message:', errorMessage);
+				console.error('❌ [ProfileSetup] Error stack:', error.stack);
+			}
+
+			// Log the data that failed to submit
+			console.error(
+				'📋 [ProfileSetup] Failed data:',
+				JSON.stringify(
+					{
+						firstName: firstName.trim(),
+						firstNameLength: firstName.trim().length,
+						lastName: lastName.trim(),
+						lastNameLength: lastName.trim().length,
+						monthlyIncome,
+						payCadence,
+						netPerPaycheck,
+					},
+					null,
+					2
+				)
+			);
+
 			await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-			// Even if profile submission fails, try to continue to notification setup
+
+			// Show user-friendly error
+			if (
+				errorMessage.includes('First name') ||
+				errorMessage.includes('Last name')
+			) {
+				console.error(
+					'⚠️ [ProfileSetup] Validation error, staying on current screen'
+				);
+				// Don't navigate away on validation errors (Alert already shown above)
+				return;
+			}
+
+			// Show generic error for other issues
+			Alert.alert(
+				'Error Saving Profile',
+				`We encountered an issue: ${errorMessage}. You can continue setup and try again later in Settings.`,
+				[{ text: 'OK' }]
+			);
+
+			// For other errors, try to continue to notification setup
+			console.log(
+				'⚠️ [ProfileSetup] Non-validation error, attempting to continue...'
+			);
 			try {
 				router.push('/(onboarding)/notificationSetup');
 			} catch (onboardingError) {
 				console.error(
-					'Error navigating to notification setup:',
+					'❌ [ProfileSetup] Error navigating to notification setup:',
 					onboardingError
 				);
 				// Fallback to dashboard if navigation fails
 				router.replace('/(tabs)/dashboard');
 			}
 		} finally {
+			console.log(
+				'🏁 [ProfileSetup] Submission complete, resetting submitting flag'
+			);
 			setSubmitting(false);
 		}
 	}, [
@@ -312,8 +534,13 @@ const OnboardingScreen = () => {
 		firstName,
 		lastName,
 		monthlyIncome,
+		payCadence,
+		netPerPaycheck,
+		derivedMonthlyIncome,
 		financialGoal,
 		housingExpense,
+		budgetCycleStart,
+		emergencyFundMonths,
 		updateProfile,
 	]);
 
@@ -386,15 +613,18 @@ const OnboardingScreen = () => {
 									We&apos;ll use this to personalize your experience
 								</Text>
 								<TextInput
+									ref={firstNameRef}
 									value={firstName}
 									onChangeText={setFirstName}
 									onBlur={() => onBlurField('firstName')}
+									onSubmitEditing={() => lastNameRef.current?.focus()}
 									style={[styles.input, inputShadow]}
 									placeholderTextColor="#94A3B8"
 									placeholder="Enter your first name"
 									accessibilityLabel="First name"
 									returnKeyType="next"
 									autoCapitalize="words"
+									autoCorrect={false}
 								/>
 								{!!errors.firstName && (
 									<Text
@@ -413,15 +643,18 @@ const OnboardingScreen = () => {
 									Helps with account security and support
 								</Text>
 								<TextInput
+									ref={lastNameRef}
 									value={lastName}
 									onChangeText={setLastName}
 									onBlur={() => onBlurField('lastName')}
+									onSubmitEditing={() => incomeRef.current?.focus()}
 									style={[styles.input, inputShadow]}
 									placeholderTextColor="#94A3B8"
 									placeholder="Enter your last name"
 									accessibilityLabel="Last name"
 									returnKeyType="next"
 									autoCapitalize="words"
+									autoCorrect={false}
 								/>
 								{!!errors.lastName && (
 									<Text
@@ -434,11 +667,108 @@ const OnboardingScreen = () => {
 							</View>
 							<View style={styles.inputContainer}>
 								<Text style={[styles.label, { color: palette.subtext }]}>
-									Monthly take-home income
+									How do you get paid?
 								</Text>
 								<Text style={[styles.subtext, { color: palette.subtext }]}>
-									After taxes; this improves budget suggestions
+									Choose your pay schedule and net amount per paycheck.
+									We&apos;ll compute the monthly estimate.
 								</Text>
+								<View style={styles.chipRow} accessibilityRole="tablist">
+									{[
+										{ k: 'weekly', label: 'Weekly' },
+										{ k: 'biweekly', label: 'Every 2 wks' },
+										{ k: 'semimonthly', label: 'Twice / mo' },
+										{ k: 'monthly', label: 'Monthly' },
+									].map((opt) => (
+										<Pressable
+											key={opt.k}
+											onPress={() => {
+												setPayCadence(opt.k as any);
+												onBlurField('payCadence');
+											}}
+											style={[
+												styles.chip,
+												payCadence === opt.k && styles.chipSelected,
+												cardShadow,
+											]}
+											accessibilityRole="tab"
+											accessibilityState={{ selected: payCadence === opt.k }}
+											accessibilityLabel={opt.label}
+										>
+											<Text
+												style={[
+													styles.chipText,
+													payCadence === opt.k && styles.chipTextSelected,
+												]}
+											>
+												{opt.label}
+											</Text>
+										</Pressable>
+									))}
+								</View>
+								{!!errors.payCadence && (
+									<Text
+										style={styles.errorText}
+										accessibilityLiveRegion="polite"
+									>
+										{errors.payCadence}
+									</Text>
+								)}
+							</View>
+							<View style={styles.inputContainer}>
+								<Text style={[styles.label, { color: palette.subtext }]}>
+									Net per paycheck
+								</Text>
+								<View style={[styles.inputWithIcon, inputShadow]}>
+									<View style={styles.inputIcon}>
+										<Ionicons name="logo-usd" size={18} color="#6b7280" />
+									</View>
+									<TextInput
+										value={netPerPaycheck}
+										onChangeText={(t) =>
+											handleCurrencyInput(t, setNetPerPaycheck)
+										}
+										onBlur={() => onBlurField('netPerPaycheck')}
+										keyboardType={
+											Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'
+										}
+										inputMode="decimal"
+										returnKeyType="done"
+										style={styles.inputWithIconText}
+										placeholderTextColor="#94A3B8"
+										placeholder="0.00"
+										accessibilityLabel="Net per paycheck"
+									/>
+								</View>
+								{!!errors.netPerPaycheck && (
+									<Text
+										style={styles.errorText}
+										accessibilityLiveRegion="polite"
+									>
+										{errors.netPerPaycheck}
+									</Text>
+								)}
+								{payCadence && derivedMonthlyIncome > 0 ? (
+									<Text style={styles.helperPositive}>
+										Estimated monthly: $
+										{derivedMonthlyIncome.toLocaleString(undefined, {
+											minimumFractionDigits: 2,
+											maximumFractionDigits: 2,
+										})}
+									</Text>
+								) : null}
+							</View>
+							<View style={[styles.inputContainer, { marginTop: 8 }]}>
+								<Text style={[styles.label, { color: palette.subtext }]}>
+									Or enter total monthly income
+								</Text>
+								{monthlyIncome &&
+									parseFloat(monthlyIncome) > 0 &&
+									derivedMonthlyIncome > 0 && (
+										<Text style={[styles.helperPositive, { marginBottom: 4 }]}>
+											ℹ️ Using monthly income (pay schedule will be ignored)
+										</Text>
+									)}
 								<View style={[styles.inputWithIcon, inputShadow]}>
 									<View style={styles.inputIcon}>
 										<Ionicons name="logo-usd" size={18} color="#6b7280" />
@@ -449,9 +779,16 @@ const OnboardingScreen = () => {
 											handleCurrencyInput(text, setMonthlyIncome)
 										}
 										onBlur={() => onBlurField('monthlyIncome')}
+										onSubmitEditing={() => {
+											if (stepValid) {
+												handleNext();
+											}
+										}}
 										keyboardType={
 											Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'
 										}
+										inputMode="decimal"
+										returnKeyType="done"
 										style={styles.inputWithIconText}
 										placeholderTextColor="#94A3B8"
 										placeholder="0.00"
@@ -489,7 +826,11 @@ const OnboardingScreen = () => {
 								<Text style={[styles.subtext, { color: palette.subtext }]}>
 									You can add more later
 								</Text>
-								<View style={styles.goalContainer}>
+								<View
+									style={styles.goalContainer}
+									accessibilityRole="radiogroup"
+									accessibilityLabel="Primary financial goal"
+								>
 									{[
 										'Build an emergency fund',
 										'Pay down high-interest debt',
@@ -508,7 +849,7 @@ const OnboardingScreen = () => {
 												financialGoal === goal && styles.selectedGoal,
 												cardShadow,
 											]}
-											accessibilityRole="button"
+											accessibilityRole="radio"
 											accessibilityState={{ selected: financialGoal === goal }}
 											accessibilityLabel={goal}
 										>
@@ -531,6 +872,43 @@ const OnboardingScreen = () => {
 										{errors.financialGoal}
 									</Text>
 								)}
+								{financialGoal === 'Build an emergency fund' ? (
+									<View style={{ marginTop: 12 }}>
+										<Text style={[styles.label, { color: palette.subtext }]}>
+											Target months of expenses (common: 3–6)
+										</Text>
+										<View style={styles.chipRow}>
+											{[1, 3, 6].map((m) => (
+												<Pressable
+													key={m}
+													onPress={() => {
+														setEmergencyFundMonths(m);
+													}}
+													style={[
+														styles.chip,
+														emergencyFundMonths === m && styles.chipSelected,
+														cardShadow,
+													]}
+													accessibilityLabel={`${m} months`}
+													accessibilityRole="radio"
+													accessibilityState={{
+														selected: emergencyFundMonths === m,
+													}}
+												>
+													<Text
+														style={[
+															styles.chipText,
+															emergencyFundMonths === m &&
+																styles.chipTextSelected,
+														]}
+													>
+														{m} mo
+													</Text>
+												</Pressable>
+											))}
+										</View>
+									</View>
+								) : null}
 							</View>
 							<View style={styles.inputContainer}>
 								<Text style={[styles.label, { color: palette.subtext }]}>
@@ -552,6 +930,7 @@ const OnboardingScreen = () => {
 										keyboardType={
 											Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'
 										}
+										inputMode="decimal"
 										style={styles.inputWithIconText}
 										placeholderTextColor="#94A3B8"
 										placeholder="0.00"
@@ -567,32 +946,50 @@ const OnboardingScreen = () => {
 									</Text>
 								)}
 							</View>
-
-							<Pressable
-								onPress={handleSubmit}
-								style={[
-									styles.submitButton,
-									{ opacity: stepValid && !submitting ? 1 : 0.6 },
-								]}
-								disabled={!stepValid || submitting}
-								accessibilityRole="button"
-								accessibilityLabel="Complete setup"
-							>
-								<LinearGradient
-									colors={[palette.brand, palette.brandDark]}
-									style={styles.gradient}
-								>
-									{submitting ? (
-										<ActivityIndicator
-											size="small"
-											color="#FFFFFF"
-											style={{ paddingVertical: 16 }}
-										/>
-									) : (
-										<Text style={styles.submitButtonText}>Complete Setup</Text>
-									)}
-								</LinearGradient>
-							</Pressable>
+							<View style={styles.inputContainer}>
+								<Text style={[styles.label, { color: palette.subtext }]}>
+									When should your monthly budget cycle reset?
+								</Text>
+								<Text style={[styles.subtext, { color: palette.subtext }]}>
+									Pick the day most bills are due or your paycheck lands.
+								</Text>
+								<View style={styles.chipRow} accessibilityRole="radiogroup">
+									{[1, 5, 10, 15, 25, 31].map((d) => (
+										<Pressable
+											key={d}
+											onPress={() => {
+												setBudgetCycleStart(d);
+												setTouched((p) => ({ ...p, budgetCycleStart: true }));
+											}}
+											style={[
+												styles.chip,
+												budgetCycleStart === d && styles.chipSelected,
+												cardShadow,
+											]}
+											accessibilityRole="radio"
+											accessibilityState={{ selected: budgetCycleStart === d }}
+											accessibilityLabel={`Day ${d}`}
+										>
+											<Text
+												style={[
+													styles.chipText,
+													budgetCycleStart === d && styles.chipTextSelected,
+												]}
+											>
+												{d === 31 ? 'Last day' : `Day ${d}`}
+											</Text>
+										</Pressable>
+									))}
+								</View>
+								{!!errors.budgetCycleStart && (
+									<Text
+										style={styles.errorText}
+										accessibilityLiveRegion="polite"
+									>
+										{errors.budgetCycleStart}
+									</Text>
+								)}
+							</View>
 						</ScrollView>
 					</View>
 				);
@@ -605,6 +1002,7 @@ const OnboardingScreen = () => {
 		Keyboard.dismiss();
 
 		if (!stepValid) {
+			markTouchedForStep();
 			await Haptics.selectionAsync();
 			return;
 		}
@@ -619,7 +1017,7 @@ const OnboardingScreen = () => {
 		} else {
 			await handleSubmit();
 		}
-	}, [currentIndex, stepValid, handleSubmit]);
+	}, [currentIndex, stepValid, handleSubmit, markTouchedForStep]);
 
 	const handleBack = useCallback(() => {
 		if (currentIndex > 0) {
@@ -636,16 +1034,20 @@ const OnboardingScreen = () => {
 			<KeyboardAvoidingView
 				style={styles.keyboardAvoidingView}
 				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-				keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+				keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 20}
 			>
 				<View style={styles.header}>
 					<View style={styles.logoContainer}>
 						<Image
 							style={styles.logoImage}
-							source={require('../../src/assets/images/brie-logos.png')}
+							source={require('../../src/assets/logos/brie-logo.png')}
 						/>
 					</View>
-					<Pressable style={styles.skipButton} onPress={handleSkip}>
+					<Pressable
+						style={styles.skipButton}
+						onPress={handleSkip}
+						accessibilityHint="You can finish setup later in Settings"
+					>
 						<Text style={styles.skipButtonText}>Skip</Text>
 					</Pressable>
 				</View>
@@ -694,13 +1096,17 @@ const OnboardingScreen = () => {
 							styles.navButton,
 							styles.nextButton,
 							cardShadow,
-							{ opacity: stepValid ? 1 : 0.6 },
+							{ opacity: stepValid && !submitting ? 1 : 0.6 },
 						]}
-						disabled={!stepValid}
+						disabled={!stepValid || submitting}
 					>
-						<Text style={styles.navButtonText}>
-							{currentIndex < 2 ? 'Continue' : 'Complete Setup'}
-						</Text>
+						{submitting && currentIndex === 2 ? (
+							<ActivityIndicator size="small" color="#0A84FF" />
+						) : (
+							<Text style={styles.navButtonText} numberOfLines={1}>
+								{currentIndex < 2 ? 'Continue' : 'Complete Setup'}
+							</Text>
+						)}
 					</Pressable>
 				</View>
 			</KeyboardAvoidingView>
@@ -754,7 +1160,7 @@ const styles = StyleSheet.create({
 	},
 	logoImage: {
 		width: 100,
-		height: 30,
+		height: 40,
 		resizeMode: 'contain',
 	},
 	skipButton: {
@@ -838,6 +1244,39 @@ const styles = StyleSheet.create({
 	},
 	inputIcon: {
 		paddingLeft: 16,
+	},
+	chipRow: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		gap: 8,
+		marginTop: 6,
+		marginBottom: 6,
+	},
+	chip: {
+		paddingVertical: 10,
+		paddingHorizontal: 12,
+		borderRadius: 999,
+		backgroundColor: '#FFFFFF',
+		borderWidth: StyleSheet.hairlineWidth,
+		borderColor: '#E2E8F0',
+	},
+	chipSelected: {
+		backgroundColor: '#f0f9ff',
+		borderColor: '#0A84FF',
+	},
+	chipText: {
+		fontSize: 14,
+		color: '#374151',
+		fontWeight: '600',
+	},
+	chipTextSelected: {
+		color: '#0A84FF',
+	},
+	helperPositive: {
+		marginTop: 6,
+		fontSize: 13,
+		color: '#065f46',
+		fontWeight: '600',
 	},
 	ageRangeContainer: {
 		flexDirection: 'row',
@@ -964,7 +1403,7 @@ const styles = StyleSheet.create({
 		paddingVertical: 12,
 	},
 	paginationDot: {
-		width: '16.67%',
+		width: '30%',
 		height: 7,
 		borderRadius: 4,
 		backgroundColor: '#e5e7eb',
@@ -979,14 +1418,15 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		paddingHorizontal: 24,
-		paddingBottom: 24,
 	},
 	navButton: {
 		padding: 12,
+		paddingHorizontal: 16,
 		borderRadius: 20,
 		backgroundColor: '#FFFFFF',
-		width: 120,
+		minWidth: 120,
 		alignItems: 'center',
+		justifyContent: 'center',
 	},
 	nextButton: {
 		backgroundColor: '#FFFFFF',
@@ -1000,6 +1440,7 @@ const styles = StyleSheet.create({
 		color: '#0A84FF',
 		fontWeight: '700',
 		fontSize: 18,
+		textAlign: 'center',
 	},
 	sectionTitle: {
 		fontSize: 20,

@@ -1,12 +1,5 @@
 import React from 'react';
-import {
-	View,
-	Text,
-	StyleSheet,
-	TouchableOpacity,
-	ColorSchemeName,
-	useColorScheme,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Modal from 'react-native-modal';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -26,23 +19,34 @@ const CustomSlidingModal: React.FC<CustomSlidingModalProps> = ({
 	icon = 'information-circle-outline',
 	children,
 }) => {
-	const colorScheme: ColorSchemeName = useColorScheme();
-	const isDark = colorScheme === 'dark';
-
 	return (
 		<Modal
 			isVisible={isVisible}
 			onBackdropPress={onClose}
+			onBackButtonPress={onClose}
+			onSwipeComplete={onClose}
+			swipeDirection="down"
+			propagateSwipe
 			style={styles.modal}
 			backdropOpacity={0.4}
-			useNativeDriver
+			animationIn="slideInUp"
+			animationOut="slideOutDown"
+			animationInTiming={260}
+			animationOutTiming={220}
+			backdropTransitionInTiming={180}
+			backdropTransitionOutTiming={140}
+			useNativeDriver={false}
+			useNativeDriverForBackdrop={false}
+			hideModalContentWhileAnimating
+			statusBarTranslucent
+			accessibilityViewIsModal
 		>
 			<GestureHandlerRootView style={{ flex: 1 }}>
 				<View
 					style={[
 						styles.container,
 						{
-							backgroundColor: isDark ? '#121212' : '#fff',
+							backgroundColor: '#FFFFFF',
 						},
 					]}
 				>
@@ -52,24 +56,18 @@ const CustomSlidingModal: React.FC<CustomSlidingModalProps> = ({
 						{/* Header */}
 						<View style={styles.header}>
 							<View
-								style={[
-									styles.iconWrapper,
-									{ backgroundColor: isDark ? '#333' : '#e0f7fa' },
-								]}
+								style={[styles.iconWrapper, { backgroundColor: '#E7F5FF' }]}
 							>
-								<Ionicons name={icon} size={20} color="#00a2ff" />
+								<Ionicons name={icon} size={20} color="#0095FF" />
 							</View>
-							<Text
-								style={[styles.title, { color: isDark ? '#fff' : '#212121' }]}
+							<Text style={[styles.title, { color: '#0F172A' }]}>{title}</Text>
+							<TouchableOpacity
+								onPress={onClose}
+								accessibilityRole="button"
+								accessibilityLabel="Close modal"
+								accessibilityHint="Closes this panel"
 							>
-								{title}
-							</Text>
-							<TouchableOpacity onPress={onClose}>
-								<Ionicons
-									name="close"
-									size={24}
-									color={isDark ? '#ccc' : '#757575'}
-								/>
+								<Ionicons name="close" size={24} color="#64748B" />
 							</TouchableOpacity>
 						</View>
 					</View>
@@ -99,12 +97,13 @@ const styles = StyleSheet.create({
 		bottom: 0,
 		left: 0,
 		right: 0,
+		overflow: 'hidden', // avoids shadow pop during slideOutDown
 	},
 	dragHandle: {
 		width: 40,
 		height: 5,
 		borderRadius: 3,
-		backgroundColor: '#ccc',
+		backgroundColor: '#E5E9EF',
 		alignSelf: 'center',
 		marginBottom: 8,
 	},

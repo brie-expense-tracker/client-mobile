@@ -7,7 +7,6 @@ import {
 	TouchableOpacity,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RectButton } from 'react-native-gesture-handler';
 import { Budget } from '../../../../src/context/budgetContext';
 import LinearProgressBar from './LinearProgressBar';
 import { router } from 'expo-router';
@@ -83,7 +82,7 @@ function BudgetRow({
 
 				<LinearProgressBar
 					percent={percent}
-					height={4}
+					height={6}
 					color={budget.color ?? '#18181b'}
 					trackColor="#e5e7eb"
 					animated={true}
@@ -96,15 +95,23 @@ function BudgetRow({
 						<Text style={styles.metaFaint}>/ {currency(budget.amount)}</Text>
 					</Text>
 					{budget.amount > 0 && (
-						<Text
+						<View
 							style={[
-								styles.metaSmall,
-								over ? styles.textRed : styles.textBlue,
+								styles.statusChip,
+								over ? styles.statusChipOver : styles.statusChipLeft,
 							]}
 						>
-							{over ? 'over ' : 'left '}
-							{currency(left)}
-						</Text>
+							<Text
+								style={[
+									styles.metaSmall,
+									styles.statusChipText,
+									over ? styles.textRed : styles.textBlue,
+								]}
+							>
+								{over ? 'Over ' : 'Left '}
+								{currency(left)}
+							</Text>
+						</View>
 					)}
 				</View>
 			</View>
@@ -114,6 +121,9 @@ function BudgetRow({
 				onPress={handleKebabPress}
 				style={styles.kebabHit}
 				activeOpacity={0.7}
+				hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+				accessibilityRole="button"
+				accessibilityLabel={`More options for ${budget.name}`}
 			>
 				<Ionicons name="ellipsis-vertical" size={18} color="#a1a1aa" />
 			</TouchableOpacity>
@@ -121,57 +131,24 @@ function BudgetRow({
 	);
 }
 
-const TABS = [
-	{ key: 'all', label: 'All' },
-	{ key: 'monthly', label: 'Monthly' },
-	{ key: 'weekly', label: 'Weekly' },
-] as const;
-type TabKey = (typeof TABS)[number]['key'];
-
 export default function BudgetsFeed({
 	scrollEnabled = true,
 	onPressMenu,
 	budgets = [],
+	activeTab = 'all',
 }: {
 	scrollEnabled?: boolean;
 	onPressMenu?: (id: string) => void;
 	budgets?: Budget[];
+	activeTab?: 'all' | 'monthly' | 'weekly';
 }) {
-	const [tab, setTab] = useState<TabKey>('all');
-
 	const filtered = useMemo(() => {
-		if (tab === 'all') return budgets;
-		return budgets.filter((b) => b.period === tab);
-	}, [tab, budgets]);
+		if (activeTab === 'all') return budgets;
+		return budgets.filter((b) => b.period === activeTab);
+	}, [activeTab, budgets]);
 
 	return (
 		<View style={styles.screen}>
-			{/* segmented tabs */}
-			<View style={styles.tabsRow}>
-				{TABS.map((t) => {
-					const active = tab === t.key;
-					return (
-						<RectButton
-							key={t.key}
-							onPress={() => setTab(t.key)}
-							style={[
-								styles.tabBtn,
-								active ? styles.tabBtnActive : styles.tabBtnIdle,
-							]}
-						>
-							<Text
-								style={[
-									styles.tabText,
-									active ? styles.tabTextActive : styles.tabTextIdle,
-								]}
-							>
-								{t.label}
-							</Text>
-						</RectButton>
-					);
-				})}
-			</View>
-
 			<FlatList
 				data={filtered}
 				keyExtractor={(b) => b.id}
@@ -179,7 +156,16 @@ export default function BudgetsFeed({
 					<BudgetRow budget={item} onPressMenu={onPressMenu} />
 				)}
 				ItemSeparatorComponent={() => <View style={styles.separator} />}
-				contentContainerStyle={{ paddingBottom: 24 }}
+				ListEmptyComponent={
+					<View style={styles.emptyWrap}>
+						<Ionicons name="wallet-outline" size={20} color="#9aa3ad" />
+						<Text style={styles.emptyText}>
+							{activeTab === 'all'
+								? 'No budgets yet.'
+								: `No ${activeTab} budgets.`}
+						</Text>
+					</View>
+				}
 				scrollEnabled={scrollEnabled}
 			/>
 		</View>
@@ -189,32 +175,18 @@ export default function BudgetsFeed({
 const styles = StyleSheet.create({
 	screen: { flex: 1, backgroundColor: '#ffffff' },
 
-	tabsRow: {
-		flexDirection: 'row',
-		paddingTop: 12,
-		paddingBottom: 8,
+	// Inset divider (between items only, not after last)
+	separator: {
+		height: StyleSheet.hairlineWidth,
+		backgroundColor: '#ECEFF3',
+		marginLeft: 52,
 	},
-	tabBtn: {
-		paddingHorizontal: 16,
-		paddingVertical: 8,
-		borderRadius: 16,
-		borderWidth: 1,
-		marginRight: 8,
-	},
-	tabBtnActive: { backgroundColor: '#18181b', borderColor: '#18181b' },
-	tabBtnIdle: { backgroundColor: '#ffffff', borderColor: '#e5e7eb' },
-	tabText: { fontSize: 13 },
-	tabTextActive: { color: '#ffffff', fontWeight: '600' },
-	tabTextIdle: { color: '#52525b' },
-
-	separator: { height: 1, backgroundColor: '#f1f1f1' },
 
 	rowContainer: {
 		flexDirection: 'row',
 		alignItems: 'flex-start',
 		paddingVertical: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: '#e5e7eb',
+		// No bottom border; separator handles dividers
 	},
 	iconBubble: {
 		width: 40,
@@ -238,7 +210,23 @@ const styles = StyleSheet.create({
 	metaSmall: { fontSize: 12, color: '#3f3f46' },
 	metaFaint: { color: '#a1a1aa' },
 	textRed: { color: '#e11d48' },
-	textBlue: { color: '#0284c7' },
+	textBlue: { color: '#0ea5e9' },
+
+	// Status chips
+	statusChip: {
+		borderRadius: 999,
+		paddingHorizontal: 10,
+		paddingVertical: 4,
+	},
+	statusChipOver: {
+		backgroundColor: '#FFF1F2',
+	},
+	statusChipLeft: {
+		backgroundColor: '#EFF6FF',
+	},
+	statusChipText: {
+		fontWeight: '600',
+	},
 
 	kebabHit: {
 		paddingLeft: 8,
@@ -247,4 +235,12 @@ const styles = StyleSheet.create({
 		paddingBottom: 8,
 		marginLeft: 4,
 	},
+
+	// Empty state
+	emptyWrap: {
+		alignItems: 'center',
+		gap: 8,
+		paddingVertical: 24,
+	},
+	emptyText: { fontSize: 13, color: '#9aa3ad' },
 });

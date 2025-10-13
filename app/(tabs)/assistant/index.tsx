@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import {
 	OrchestratorAIService,
 	OrchestratorAIResponse,
@@ -86,11 +87,15 @@ import {
 	allowProactive,
 	shouldEnrichPrompts,
 } from '../../../src/state/assistantConfig';
+import { useFeature } from '../../../src/config/features';
+import { FooterBar } from '../../../src/ui';
 
 export default function AssistantScreen() {
 	const router = useRouter();
+	const tabBarHeight = useBottomTabBarHeight();
 	const { profile } = useProfile();
 	const { budgets } = useBudgets() as { budgets: any[] };
+	const aiInsightsEnabled = useFeature('aiInsights');
 	const { goals } = useGoals() as { goals: any[] };
 	const { transactions } = useContext(TransactionContext) as {
 		transactions: any[];
@@ -1322,6 +1327,7 @@ export default function AssistantScreen() {
 			<KeyboardAvoidingView
 				style={styles.container}
 				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+				keyboardVerticalOffset={tabBarHeight}
 			>
 				<FlatList
 					data={messages}
@@ -1432,16 +1438,19 @@ export default function AssistantScreen() {
 					contentContainerStyle={styles.messagesContainer}
 					ListFooterComponent={
 						<View>
-							{/* Contextual Insights Panel - only render when proactive mode is enabled */}
-							{allowProactive(config) && !isStreaming && dataInitialized && (
-								<ContextualInsightsPanel
-									key={`cip-${config.mode}-${config.showProactiveCards}`}
-									conversationContext={currentConversationContext}
-									onInsightPress={handleInsightPress}
-									onAskAboutInsight={handleAskAboutInsight}
-									maxInsights={3}
-								/>
-							)}
+							{/* Contextual Insights Panel - only render when proactive mode is enabled and AI Insights feature is enabled */}
+							{aiInsightsEnabled &&
+								allowProactive(config) &&
+								!isStreaming &&
+								dataInitialized && (
+									<ContextualInsightsPanel
+										key={`cip-${config.mode}-${config.showProactiveCards}`}
+										conversationContext={currentConversationContext}
+										onInsightPress={handleInsightPress}
+										onAskAboutInsight={handleAskAboutInsight}
+										maxInsights={3}
+									/>
+								)}
 							{isStreaming && !streamingMessageId && (
 								<View style={styles.loadingContainer}>
 									<ActivityIndicator size="small" color="#3b82f6" />
@@ -1573,39 +1582,41 @@ export default function AssistantScreen() {
 									isRetrying={isRetrying}
 								/>
 							)}
+							{/* Spacer for footer input bar - accounts for FooterBar + tab bar height */}
+							<View style={{ height: 100 }} />
 						</View>
 					}
 				/>
-
-				<View style={styles.inputContainer}>
-					<TextInput
-						style={styles.textInput}
-						value={inputText}
-						onChangeText={setInputText}
-						placeholder="Ask about your finances..."
-						placeholderTextColor="#9ca3af"
-						multiline
-					/>
-					<TouchableOpacity
-						style={[
-							styles.sendButton,
-							(!inputText.trim() || isStreaming) && styles.sendButtonDisabled,
-						]}
-						onPress={handleSendMessage}
-						disabled={!inputText.trim() || isStreaming}
-					>
-						{isStreaming ? (
-							<ActivityIndicator size="small" color="#fff" />
-						) : (
-							<Ionicons
-								name="send"
-								size={20}
-								color={inputText.trim() ? '#fff' : '#9ca3af'}
-							/>
-						)}
-					</TouchableOpacity>
-				</View>
 			</KeyboardAvoidingView>
+
+			<FooterBar style={styles.inputContainer}>
+				<TextInput
+					style={styles.textInput}
+					value={inputText}
+					onChangeText={setInputText}
+					placeholder="Ask about your finances..."
+					placeholderTextColor="#9ca3af"
+					multiline
+				/>
+				<TouchableOpacity
+					style={[
+						styles.sendButton,
+						(!inputText.trim() || isStreaming) && styles.sendButtonDisabled,
+					]}
+					onPress={handleSendMessage}
+					disabled={!inputText.trim() || isStreaming}
+				>
+					{isStreaming ? (
+						<ActivityIndicator size="small" color="#fff" />
+					) : (
+						<Ionicons
+							name="send"
+							size={20}
+							color={inputText.trim() ? '#fff' : '#9ca3af'}
+						/>
+					)}
+				</TouchableOpacity>
+			</FooterBar>
 		</SafeAreaView>
 	);
 }
@@ -1675,11 +1686,6 @@ const styles = StyleSheet.create({
 	inputContainer: {
 		flexDirection: 'row',
 		alignItems: 'flex-end',
-		padding: 20,
-		paddingBottom: Platform.OS === 'ios' ? 34 : 20,
-		backgroundColor: '#ffffff',
-		borderTopWidth: 1,
-		borderTopColor: '#e5e7eb',
 	},
 	textInput: {
 		flex: 1,

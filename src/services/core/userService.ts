@@ -112,9 +112,11 @@ export class UserService {
 		});
 
 		try {
-			console.log('🔍 [UserService] Making POST request to /users endpoint');
+			console.log(
+				'🔍 [UserService] Making POST request to /api/users endpoint'
+			);
 			const response = await ApiService.post<CreateUserResponse>(
-				'/users',
+				'/api/users',
 				userData
 			);
 
@@ -169,17 +171,23 @@ export class UserService {
 	}
 
 	static async getUserByFirebaseUID(firebaseUID: string): Promise<User | null> {
+		console.log('🔍 [UserService] Getting user by Firebase UID');
 		const response = await ApiService.get<{ user: User }>(
-			`/api/users/${firebaseUID}`
+			`/api/users/${firebaseUID}`,
+			2, // retries
+			false // don't use cache for user lookups
 		);
 
 		if (!response.success) {
 			if (response.error?.includes('404')) {
+				console.log('🔍 [UserService] User not found (404)');
 				return null;
 			}
+			console.error('🔍 [UserService] Failed to fetch user:', response.error);
 			throw new Error(response.error || 'Failed to fetch user');
 		}
 
+		console.log('🔍 [UserService] User fetched successfully');
 		return response.data?.user || null;
 	}
 
@@ -194,7 +202,10 @@ export class UserService {
 	}
 
 	static async updateUserProfile(updates: UpdateUserRequest): Promise<User> {
-		const response = await ApiService.put<{ user: User }>('/api/users/me', updates);
+		const response = await ApiService.put<{ user: User }>(
+			'/api/users/me',
+			updates
+		);
 
 		if (!response.success || !response.data?.user) {
 			throw new Error(response.error || 'Failed to update user');
@@ -219,7 +230,9 @@ export class UserService {
 	}
 
 	static async deleteUserAccount(): Promise<void> {
-		const response = await ApiService.delete<{ message: string }>('/api/users/me');
+		const response = await ApiService.delete<{ message: string }>(
+			'/api/users/me'
+		);
 
 		if (!response.success) {
 			throw new Error(response.error || 'Failed to delete user account');
@@ -249,7 +262,9 @@ export class UserService {
 		usersWithoutFirebaseUID: number;
 		syncPercentage: number;
 	}> {
-		const response = await ApiService.get<{ stats: any }>('/api/users/sync-stats');
+		const response = await ApiService.get<{ stats: any }>(
+			'/api/users/sync-stats'
+		);
 
 		if (!response.success || !response.data?.stats) {
 			throw new Error(response.error || 'Failed to get sync stats');
