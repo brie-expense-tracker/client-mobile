@@ -2,7 +2,7 @@ import { API_BASE_URL, API_CONFIG } from '../../config/api';
 import { getHMACService } from '../../utils/hmacSigning';
 import { RequestManager } from './requestManager';
 
-// Demo logging: Keep essential info but reduce noise
+// API logging: Keep essential info but reduce noise
 console.log(`🌐 API: ${__DEV__ ? 'DEV' : 'PROD'} | Base: ${API_BASE_URL}`);
 
 // Rate limiting and deduplication
@@ -227,7 +227,12 @@ export class ApiService {
 
 	// Check if endpoint requires HMAC signing
 	private static requiresHMACSigning(endpoint: string): boolean {
-		const hmacEndpoints = ['/api/budgets', '/api/budgets/'];
+		const hmacEndpoints = [
+			'/api/budgets',
+			'/api/budgets/',
+			'/api/goals',
+			'/api/goals/',
+		];
 
 		return hmacEndpoints.some((hmacEndpoint) =>
 			endpoint.startsWith(hmacEndpoint)
@@ -240,17 +245,37 @@ export class ApiService {
 		method: string,
 		body: any,
 		headers: Record<string, string>
-	): Promise<Record<string, string>> {
+	): Promise<{ headers: Record<string, string>; bodyString: string }> {
 		if (!this.requiresHMACSigning(endpoint)) {
-			return headers;
+			return {
+				headers,
+				bodyString: typeof body === 'string' ? body : JSON.stringify(body),
+			};
 		}
 
 		try {
 			const hmacService = getHMACService();
-			const bodyString = JSON.stringify(body);
-			console.log('🔐 [ApiService] HMAC Debug - Body string:', bodyString);
+
+			console.log('🔐 [ApiService] HMAC signing process starting...');
+			console.log('🔐 [ApiService] Original body:', body);
+			console.log('🔐 [ApiService] Body type:', typeof body);
+
+			// Create a stable JSON string - sort keys for consistency
+			const bodyString =
+				typeof body === 'string'
+					? body
+					: JSON.stringify(body, Object.keys(body || {}).sort());
+
+			console.log(
+				'🔐 [ApiService] HMAC Debug - Stable body string:',
+				bodyString
+			);
 			console.log('🔐 [ApiService] HMAC Debug - Method:', method);
 			console.log('🔐 [ApiService] HMAC Debug - Endpoint:', endpoint);
+			console.log(
+				'🔐 [ApiService] HMAC Debug - Original headers:',
+				Object.keys(headers)
+			);
 
 			const signedHeaders = hmacService.signRequestHeaders(
 				body,
@@ -259,12 +284,22 @@ export class ApiService {
 				headers
 			);
 
-			console.log('🔐 [ApiService] Added HMAC signature for:', endpoint);
-			return signedHeaders;
+			console.log('🔐 [ApiService] HMAC signing completed for:', endpoint);
+			console.log(
+				'🔐 [ApiService] Final signed headers keys:',
+				Object.keys(signedHeaders)
+			);
+			console.log('🔐 [ApiService] Will send body string:', bodyString);
+
+			return { headers: signedHeaders, bodyString };
 		} catch (error) {
 			console.error('❌ [ApiService] Failed to add HMAC signature:', error);
+			console.error('❌ [ApiService] Error details:', error);
 			// Continue without HMAC signature - let the server handle the error
-			return headers;
+			return {
+				headers,
+				bodyString: typeof body === 'string' ? body : JSON.stringify(body),
+			};
 		}
 	}
 
@@ -449,7 +484,7 @@ export class ApiService {
 			console.log('🔧 [DEBUG] endpoint:', endpoint);
 			console.log('🔧 [DEBUG] final URL:', url);
 
-			// Demo logging: Keep essential request info
+			// API logging: Keep essential request info
 			console.log(`📡 GET: ${endpoint}`);
 
 			// Use RequestManager for intelligent request handling
@@ -507,6 +542,26 @@ export class ApiService {
 				let headers: Record<string, string>;
 				try {
 					headers = await this.getAuthHeaders();
+
+					// Add Firebase ID token for write operations
+					if (this.requiresHMACSigning(endpoint)) {
+						const auth = (await import('@react-native-firebase/auth')).default;
+						const currentUser = auth().currentUser;
+						if (currentUser) {
+							try {
+								const idToken = await currentUser.getIdToken();
+								headers['Authorization'] = `Bearer ${idToken}`;
+								console.log(
+									'🔐 [ApiService] Added Firebase ID token for write operation'
+								);
+							} catch (tokenError) {
+								console.warn(
+									'⚠️ [ApiService] Failed to get Firebase ID token:',
+									tokenError
+								);
+							}
+						}
+					}
 				} catch (authError: any) {
 					// Handle authentication errors gracefully
 					if (authError.isAuthError) {
@@ -522,12 +577,13 @@ export class ApiService {
 				}
 
 				// Add HMAC signature if required
-				headers = await this.addHMACSignatureIfRequired(
-					endpoint,
-					'POST',
-					body,
-					headers
-				);
+				const { headers: signedHeaders, bodyString } =
+					await this.addHMACSignatureIfRequired(
+						endpoint,
+						'POST',
+						body,
+						headers
+					);
 
 				const url = `${API_BASE_URL}${endpoint}`;
 
@@ -536,14 +592,14 @@ export class ApiService {
 					endpoint,
 					headers: {
 						'x-firebase-uid':
-							headers['x-firebase-uid']?.substring(0, 8) + '...',
+							signedHeaders['x-firebase-uid']?.substring(0, 8) + '...',
 					},
 				});
 
 				const response = await fetch(url, {
 					method: 'POST',
-					headers,
-					body: JSON.stringify(body),
+					headers: signedHeaders,
+					body: bodyString,
 				});
 
 				console.log('🔍 [ApiService] POST response received:', {
@@ -557,20 +613,30 @@ export class ApiService {
 				const contentType = response.headers.get('content-type');
 				let data: any;
 
-				if (contentType && contentType.includes('application/json')) {
-					try {
-						data = await response.json();
-						console.log('🔍 [ApiService] JSON response parsed successfully:', {
-							success: data.success,
-							message: data.message,
-							hasData: !!data.data,
-							dataKeys: data.data ? Object.keys(data.data) : [],
-						});
-					} catch (parseError) {
-						console.error('❌ [ApiService] JSON parse error:', parseError);
-						return {
-							success: false,
-							error: 'Invalid JSON response from server',
+			if (contentType && contentType.includes('application/json')) {
+				try {
+					data = await response.json();
+					console.log('🔍 [ApiService] JSON response parsed successfully:', {
+						success: data.success,
+						message: data.message,
+						hasData: !!data.data,
+						dataKeys: data.data ? Object.keys(data.data) : [],
+					});
+					
+					// Log full debug data if present (HMAC debugging)
+					if (data.debug) {
+						console.log('🐛 [ApiService] Server Debug Info:', data.debug);
+					}
+					
+					// Log full error response for debugging
+					if (!response.ok) {
+						console.log('🔍 [ApiService] Full error response:', JSON.stringify(data, null, 2));
+					}
+				} catch (parseError) {
+					console.error('❌ [ApiService] JSON parse error:', parseError);
+					return {
+						success: false,
+						error: 'Invalid JSON response from server',
 						};
 					}
 				} else {
@@ -633,7 +699,7 @@ export class ApiService {
 					}
 				}
 
-				// Demo logging: Success response
+				// API logging: Success response
 				console.log(`✅ [ApiService] POST: ${endpoint} (${response.status})`);
 				return {
 					success: true,
@@ -649,6 +715,26 @@ export class ApiService {
 			let headers: Record<string, string>;
 			try {
 				headers = await this.getAuthHeaders();
+
+				// Add Firebase ID token for write operations
+				if (this.requiresHMACSigning(endpoint)) {
+					const auth = (await import('@react-native-firebase/auth')).default;
+					const currentUser = auth().currentUser;
+					if (currentUser) {
+						try {
+							const idToken = await currentUser.getIdToken();
+							headers['Authorization'] = `Bearer ${idToken}`;
+							console.log(
+								'🔐 [ApiService] Added Firebase ID token for write operation'
+							);
+						} catch (tokenError) {
+							console.warn(
+								'⚠️ [ApiService] Failed to get Firebase ID token:',
+								tokenError
+							);
+						}
+					}
+				}
 			} catch (authError: any) {
 				// Handle authentication errors gracefully
 				if (authError.isAuthError) {
@@ -662,68 +748,114 @@ export class ApiService {
 			}
 
 			// Add HMAC signature if required
-			headers = await this.addHMACSignatureIfRequired(
-				endpoint,
-				'PUT',
-				body,
-				headers
-			);
+			const { headers: signedHeaders, bodyString } =
+				await this.addHMACSignatureIfRequired(endpoint, 'PUT', body, headers);
 
 			const url = `${API_BASE_URL}${endpoint}`;
 
-			// Demo logging: Keep essential request info
+			// Comprehensive request debugging
 			console.log(`📝 PUT: ${endpoint}`);
+			console.log('📝 [PUT] Complete request details:');
+			console.log('  🌐 URL:', url);
+			console.log('  🔧 Method: PUT');
+			console.log('  📋 Headers:');
+			Object.entries(signedHeaders).forEach(([key, value]) => {
+				if (
+					key.toLowerCase().includes('signature') ||
+					key.toLowerCase().includes('authorization')
+				) {
+					console.log(`    ${key}: ${value.substring(0, 20)}...`);
+				} else if (key === 'x-hmac-signature') {
+					console.log(`    ${key}: ${value.substring(0, 30)}...`);
+				} else {
+					console.log(`    ${key}: ${value}`);
+				}
+			});
+			console.log('  📦 Body string:', bodyString);
+			console.log('  📦 Body string length:', bodyString.length);
 
 			const response = await fetch(url, {
 				method: 'PUT',
-				headers,
-				body: JSON.stringify(body),
+				headers: signedHeaders,
+				body: bodyString,
 			});
+
+			console.log('📝 [PUT] Response received:');
+			console.log('  📊 Status:', response.status);
+			console.log('  📊 Status Text:', response.statusText);
+			console.log('  ✅ OK:', response.ok);
+			console.log('  🌐 Response URL:', response.url);
 
 			// Check if response is JSON before parsing
 			const contentType = response.headers.get('content-type');
 			let data: any;
 
+			console.log('📝 [PUT] Response content type:', contentType);
+			console.log('📝 [PUT] Response headers:');
+			response.headers.forEach((value, key) => {
+				console.log(`  ${key}: ${value}`);
+			});
+
 			if (contentType && contentType.includes('application/json')) {
 				try {
 					data = await response.json();
+					console.log('📝 [PUT] JSON response data:', data);
 				} catch (parseError) {
-					console.error('❌ API: JSON parse error:', parseError);
+					console.error('❌ [PUT] JSON parse error:', parseError);
+					const textResponse = await response.text();
+					console.error('❌ [PUT] Raw response text:', textResponse);
 					return {
 						success: false,
 						error: 'Invalid JSON response from server',
+						rawResponse: textResponse,
 					};
 				}
 			} else {
 				// Handle non-JSON responses
 				const textResponse = await response.text();
-				console.log(
-					'⚠️ API: Non-JSON response:',
-					textResponse.substring(0, 100)
-				);
+				console.log('📝 [PUT] Non-JSON response:', textResponse);
 
 				if (!response.ok) {
+					console.error('❌ [PUT] Non-JSON error response:', {
+						status: response.status,
+						statusText: response.statusText,
+						text: textResponse,
+					});
 					return {
 						success: false,
 						error: `HTTP error! status: ${response.status}`,
+						rawResponse: textResponse,
 					};
 				}
 
 				return {
 					success: false,
 					error: 'Server returned non-JSON response',
+					rawResponse: textResponse,
 				};
 			}
 
 			if (!response.ok) {
+				console.error('❌ [PUT] Request failed:');
+				console.error('  📊 Status:', response.status);
+				console.error('  📊 Status Text:', response.statusText);
+				console.error('  📦 Response Data:', data);
+
 				return {
 					success: false,
-					error: data.error || `HTTP error! status: ${response.status}`,
+					error:
+						data?.error ||
+						data?.message ||
+						`HTTP error! status: ${response.status}`,
+					data,
+					status: response.status,
+					statusText: response.statusText,
 				};
 			}
 
-			// Demo logging: Success response
-			console.log(`✅ PUT: ${endpoint} (${response.status})`);
+			// API logging: Success response
+			console.log(`✅ [PUT] Success: ${endpoint} (${response.status})`);
+			console.log('✅ [PUT] Response data:', data);
 			return { success: true, data };
 		} catch (error) {
 			console.error('❌ API PUT error:', error);
@@ -755,7 +887,7 @@ export class ApiService {
 
 			const url = `${API_BASE_URL}${endpoint}`;
 
-			// Demo logging: Keep essential request info
+			// API logging: Keep essential request info
 			console.log(`🔧 PATCH: ${endpoint}`);
 
 			const response = await fetch(url, {
@@ -806,7 +938,7 @@ export class ApiService {
 				};
 			}
 
-			// Demo logging: Success response
+			// API logging: Success response
 			console.log(`✅ PATCH: ${endpoint} (${response.status})`);
 			return { success: true, data };
 		} catch (error) {
@@ -823,6 +955,26 @@ export class ApiService {
 			let headers: Record<string, string>;
 			try {
 				headers = await this.getAuthHeaders();
+
+				// Add Firebase ID token for write operations
+				if (this.requiresHMACSigning(endpoint)) {
+					const auth = (await import('@react-native-firebase/auth')).default;
+					const currentUser = auth().currentUser;
+					if (currentUser) {
+						try {
+							const idToken = await currentUser.getIdToken();
+							headers['Authorization'] = `Bearer ${idToken}`;
+							console.log(
+								'🔐 [ApiService] Added Firebase ID token for write operation'
+							);
+						} catch (tokenError) {
+							console.warn(
+								'⚠️ [ApiService] Failed to get Firebase ID token:',
+								tokenError
+							);
+						}
+					}
+				}
 			} catch (authError: any) {
 				// Handle authentication errors gracefully
 				if (authError.isAuthError) {
@@ -837,14 +989,22 @@ export class ApiService {
 				throw authError;
 			}
 
+			// Add HMAC signature if required
+			const { headers: signedHeaders } = await this.addHMACSignatureIfRequired(
+				endpoint,
+				'DELETE',
+				null,
+				headers
+			);
+
 			const url = `${API_BASE_URL}${endpoint}`;
 
-			// Demo logging: Keep essential request info
+			// API logging: Keep essential request info
 			console.log(`🗑️ DELETE: ${endpoint}`);
 
 			const response = await fetch(url, {
 				method: 'DELETE',
-				headers,
+				headers: signedHeaders,
 			});
 
 			// Check if response is JSON before parsing
@@ -889,7 +1049,7 @@ export class ApiService {
 				};
 			}
 
-			// Demo logging: Success response
+			// API logging: Success response
 			console.log(`✅ DELETE: ${endpoint} (${response.status})`);
 			return { success: true, data };
 		} catch (error) {
