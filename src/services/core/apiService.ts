@@ -702,21 +702,21 @@ export class ApiService {
 					}
 				}
 
-			// API logging: Success response
-			console.log(`✅ [ApiService] POST: ${endpoint} (${response.status})`);
-			
-			// Clear cache after successful POST (resource created)
-			this.clearCache(endpoint);
-			console.log(`🗑️ [ApiService] Cache cleared for: ${endpoint}`);
-			
-			return {
-				success: true,
-				data: data.data || data, // Use data.data if it exists, otherwise use the entire response
-				usage: data.usage,
-			};
+				// API logging: Success response
+				console.log(`✅ [ApiService] POST: ${endpoint} (${response.status})`);
+
+				// Clear cache after successful POST (resource created)
+				this.clearCache(endpoint);
+				console.log(`🗑️ [ApiService] Cache cleared for: ${endpoint}`);
+
+				return {
+					success: true,
+					data: data.data || data, // Use data.data if it exists, otherwise use the entire response
+					usage: data.usage,
+				};
+			});
 		});
-	});
-}
+	}
 
 	static async put<T>(endpoint: string, body: any): Promise<ApiResponse<T>> {
 		try {
@@ -861,29 +861,29 @@ export class ApiService {
 				};
 			}
 
-		// API logging: Success response
-		console.log(`✅ [PUT] Success: ${endpoint} (${response.status})`);
-		console.log('✅ [PUT] Response data:', data);
-		
-		// Clear cache after successful PUT (resource updated)
-		this.clearCache(endpoint);
-		
-		// Also clear list cache (e.g., if updating /api/budgets/123, also clear /api/budgets)
-		const baseEndpoint = endpoint.replace(/\/[^/]+$/, '');
-		if (baseEndpoint !== endpoint) {
-			this.clearCache(baseEndpoint);
-			console.log(`🗑️ [ApiService] Also cleared list cache: ${baseEndpoint}`);
+			// API logging: Success response
+			console.log(`✅ [PUT] Success: ${endpoint} (${response.status})`);
+			console.log('✅ [PUT] Response data:', data);
+
+			// Clear cache after successful PUT (resource updated)
+			this.clearCache(endpoint);
+
+			// Also clear list cache (e.g., if updating /api/budgets/123, also clear /api/budgets)
+			const baseEndpoint = endpoint.replace(/\/[^/]+$/, '');
+			if (baseEndpoint !== endpoint) {
+				this.clearCache(baseEndpoint);
+				console.log(`🗑️ [ApiService] Also cleared list cache: ${baseEndpoint}`);
+			}
+
+			return { success: true, data };
+		} catch (error) {
+			console.error('❌ API PUT error:', error);
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : 'Unknown error',
+			};
 		}
-		
-		return { success: true, data };
-	} catch (error) {
-		console.error('❌ API PUT error:', error);
-		return {
-			success: false,
-			error: error instanceof Error ? error.message : 'Unknown error',
-		};
 	}
-}
 
 	static async patch<T>(endpoint: string, body: any): Promise<ApiResponse<T>> {
 		try {
@@ -957,22 +957,22 @@ export class ApiService {
 				};
 			}
 
-		// API logging: Success response
-		console.log(`✅ PATCH: ${endpoint} (${response.status})`);
-		
-		// Clear cache after successful PATCH (resource updated)
-		this.clearCache(endpoint);
-		
-		// Also clear list cache (e.g., if patching /api/budgets/123, also clear /api/budgets)
-		const baseEndpoint = endpoint.replace(/\/[^/]+$/, '');
-		if (baseEndpoint !== endpoint) {
-			this.clearCache(baseEndpoint);
-			console.log(`🗑️ [ApiService] Also cleared list cache: ${baseEndpoint}`);
-		}
-		
-		return { success: true, data };
-	} catch (error) {
-		console.error('❌ API PATCH error:', error);
+			// API logging: Success response
+			console.log(`✅ PATCH: ${endpoint} (${response.status})`);
+
+			// Clear cache after successful PATCH (resource updated)
+			this.clearCache(endpoint);
+
+			// Also clear list cache (e.g., if patching /api/budgets/123, also clear /api/budgets)
+			const baseEndpoint = endpoint.replace(/\/[^/]+$/, '');
+			if (baseEndpoint !== endpoint) {
+				this.clearCache(baseEndpoint);
+				console.log(`🗑️ [ApiService] Also cleared list cache: ${baseEndpoint}`);
+			}
+
+			return { success: true, data };
+		} catch (error) {
+			console.error('❌ API PATCH error:', error);
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : 'Unknown error',
@@ -1081,26 +1081,31 @@ export class ApiService {
 
 		// API logging: Success response
 		console.log(`✅ DELETE: ${endpoint} (${response.status})`);
-		
+		console.log(`🔍 [DELETE] About to clear cache for endpoint: ${endpoint}`);
+
 		// Clear cache for the deleted item's endpoint
 		this.clearCache(endpoint);
-		
+		console.log(`🗑️ [ApiService] Cache cleared for: ${endpoint}`);
+
 		// Also clear list cache (e.g., if deleting /api/budgets/123, also clear /api/budgets)
 		const baseEndpoint = endpoint.replace(/\/[^/]+$/, '');
+		console.log(`🔍 [DELETE] Base endpoint: ${baseEndpoint}, Original: ${endpoint}`);
 		if (baseEndpoint !== endpoint) {
 			this.clearCache(baseEndpoint);
 			console.log(`🗑️ [ApiService] Also cleared list cache: ${baseEndpoint}`);
+		} else {
+			console.log(`🔍 [DELETE] No list cache to clear (baseEndpoint === endpoint)`);
 		}
-		
+
 		return { success: true, data };
-	} catch (error) {
-		console.error('❌ API DELETE error:', error);
-		return {
-			success: false,
-			error: error instanceof Error ? error.message : 'Unknown error',
-		};
+		} catch (error) {
+			console.error('❌ API DELETE error:', error);
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : 'Unknown error',
+			};
+		}
 	}
-}
 
 	/**
 	 * Test basic connectivity to the server (no authentication required)
