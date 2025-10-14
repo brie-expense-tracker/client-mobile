@@ -100,11 +100,6 @@ export const DateField: React.FC<DateFieldProps> = ({
 		setOpen(false);
 	}, [onChange]);
 
-	const setYesterday = useCallback(() => {
-		onChange(dayjs().subtract(1, 'day').format('YYYY-MM-DD'));
-		setOpen(false);
-	}, [onChange]);
-
 	const clearDate = useCallback(() => {
 		// Set to today for safety
 		onChange(dayjs().format('YYYY-MM-DD'));
@@ -147,13 +142,6 @@ export const DateField: React.FC<DateFieldProps> = ({
 								testID="quick-today"
 							>
 								<Text style={calendarStyles.quickText}>Today</Text>
-							</RectButton>
-							<RectButton
-								style={calendarStyles.quickBtn}
-								onPress={setYesterday}
-								testID="quick-yesterday"
-							>
-								<Text style={calendarStyles.quickText}>Yesterday</Text>
 							</RectButton>
 							<RectButton
 								style={calendarStyles.quickBtn}
@@ -250,7 +238,7 @@ const calendarStyles = StyleSheet.create({
 	},
 	quickRow: {
 		flexDirection: 'row',
-		gap: 8,
+		justifyContent: 'space-between',
 		paddingHorizontal: 12,
 		paddingTop: 12,
 	},
