@@ -120,30 +120,41 @@ export function resolveRecurringExpenseAppearance(
 	color: string;
 	source: 'custom' | 'brand' | 'default';
 } {
+	console.log('🎨 [AppearanceResolver] Resolving for:', expense.vendor);
+	console.log('  - appearanceMode:', expense.appearanceMode);
+	console.log('  - icon:', expense.icon);
+	console.log('  - color:', expense.color);
+
 	// 1) Custom overrides win - user explicitly chose icon/color
 	if (expense.appearanceMode === 'custom') {
-		return {
+		const result = {
 			icon:
 				(expense.icon as keyof typeof Ionicons.glyphMap) || 'repeat-outline',
 			color: expense.color || '#1E88E5',
-			source: 'custom',
+			source: 'custom' as const,
 		};
+		console.log('  ✅ Using CUSTOM appearance:', result);
+		return result;
 	}
 
 	// 2) Brand mapping if enabled (default for most expenses)
 	if (expense.appearanceMode === 'brand' || expense.appearanceMode == null) {
 		const brandMapping = getVendorBrandMapping(expense.vendor);
-		return {
+		const result = {
 			icon: brandMapping.icon,
 			color: brandMapping.color,
-			source: 'brand',
+			source: 'brand' as const,
 		};
+		console.log('  ✅ Using BRAND appearance:', result);
+		return result;
 	}
 
 	// 3) Neutral default
-	return {
-		icon: 'repeat-outline',
+	const result = {
+		icon: 'repeat-outline' as keyof typeof Ionicons.glyphMap,
 		color: '#1E88E5',
-		source: 'default',
+		source: 'default' as const,
 	};
+	console.log('  ✅ Using DEFAULT appearance:', result);
+	return result;
 }
