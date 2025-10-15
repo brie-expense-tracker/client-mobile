@@ -238,14 +238,15 @@ export default function BudgetsFeed({
 						</TouchableOpacity>
 					</View>
 
-					<FlatList
-						data={filteredAndSorted}
-						keyExtractor={(b) => getBudgetId(b)}
-						renderItem={({ item }) => (
-							<BudgetRow budget={item} onPressMenu={onPressMenu} />
-						)}
-						ItemSeparatorComponent={() => <View style={styles.separator} />}
-						refreshControl={
+				<FlatList
+					data={filteredAndSorted}
+					extraData={filteredAndSorted}
+					keyExtractor={(b) => getBudgetId(b)}
+					renderItem={({ item }) => (
+						<BudgetRow budget={item} onPressMenu={onPressMenu} />
+					)}
+					ItemSeparatorComponent={() => <View style={styles.separator} />}
+					refreshControl={
 							<RefreshControl
 								refreshing={refreshing}
 								onRefresh={handleRefresh}
