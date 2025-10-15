@@ -65,9 +65,13 @@ export class HMACSigningService {
 	): string {
 		// Normalize the path to match server-side normalization
 		const normalizedPath = this.normalizePath(path);
-		
-		// Create the payload to sign: timestamp + nonce + method + path + body
-		const payload = `${timestamp}.${nonce}.${method.toUpperCase()}.${normalizedPath}.${body}`;
+
+		// Build payload parts - CRITICAL: only include body if non-empty (no trailing dot)
+		const parts = [timestamp, nonce, method.toUpperCase(), normalizedPath];
+		if (body && body.length > 0) {
+			parts.push(body);
+		}
+		const payload = parts.join('.');
 
 		console.log('🔐 [HMAC] Debug - Full signing details:');
 		console.log('  📅 Timestamp:', timestamp);
@@ -76,7 +80,8 @@ export class HMACSigningService {
 		console.log('  🛣️  Original Path:', path);
 		console.log('  🛣️  Normalized Path:', normalizedPath);
 		console.log('  📦 Body length:', body.length);
-		console.log('  📦 Body content:', body);
+		console.log('  📦 Body content:', body || '(empty)');
+		console.log('  📦 Has body:', body && body.length > 0 ? 'YES' : 'NO');
 		console.log('  🔗 Payload to sign:', payload);
 		console.log(
 			'  🔑 Secret key (first 8 chars):',
@@ -101,11 +106,13 @@ export class HMACSigningService {
 		const timestamp = Math.floor(Date.now() / 1000);
 		const nonce = this.generateNonce();
 
-		// Create stable JSON string with sorted keys for consistency
-		const bodyString =
-			typeof body === 'string'
+		// For bodyless requests (DELETE, GET), use empty string, NOT "null"
+		const hasBody = body !== undefined && body !== null;
+		const bodyString = hasBody
+			? typeof body === 'string'
 				? body
-				: JSON.stringify(body, Object.keys(body || {}).sort());
+				: JSON.stringify(body, Object.keys(body || {}).sort())
+			: ''; // Empty string for no-body requests
 
 		const signature = this.signRequest(
 			timestamp,

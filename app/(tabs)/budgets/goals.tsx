@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Alert, ScrollView } from 'react-native';
-import { useGoals } from '../../../src/hooks/useGoals';
-import { Goal } from '../../../src/context/goalContext';
+import { useFocusEffect } from '@react-navigation/native';
+import { useGoal, Goal, getGoalId } from '../../../src/context/goalContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import QuickAddTransaction from './components/QuickAddTransaction';
 import GoalsSummaryCard from './components/GoalsSummaryCard';
@@ -23,7 +23,7 @@ export default function GoalsScreen() {
 	// ==========================================
 	// Data Fetching
 	// ==========================================
-	const { goals, deleteGoal, isLoading, hasLoaded, error } = useGoals();
+	const { goals, deleteGoal, isLoading, hasLoaded, refetch } = useGoal();
 
 	// ==========================================
 	// Route Parameters
@@ -79,13 +79,32 @@ export default function GoalsScreen() {
 	);
 
 	// ==========================================
+	// Focus Effect - Refresh on Screen Focus
+	// ==========================================
+	useFocusEffect(
+		useCallback(() => {
+			if (!hasLoaded) {
+				console.log(
+					'🔄 [Goals] Screen focused, no data loaded yet - fetching...'
+				);
+				refetch();
+			} else {
+				console.log('✅ [Goals] Screen focused, using cached data');
+			}
+		}, [refetch, hasLoaded])
+	);
+
+	// ==========================================
 	// Goal Management
 	// ==========================================
 	const handleDeleteGoal = async (goalId: string) => {
 		try {
 			await deleteGoal(goalId);
 		} catch (error) {
-			console.error('Error deleting goal:', error);
+			console.error('❌ [Goals] Error deleting goal:', error);
+			const errorMsg =
+				error instanceof Error ? error.message : 'Failed to delete goal';
+			Alert.alert('Delete Failed', errorMsg);
 		}
 	};
 
@@ -126,16 +145,6 @@ export default function GoalsScreen() {
 	// Show loading state while fetching data
 	if (isLoading && !hasLoaded) {
 		return <LoadingState label="Loading goals..." />;
-	}
-
-	// Show error state if there's an error
-	if (error && hasLoaded) {
-		return (
-			<ErrorState
-				title="Unable to load goals"
-				onRetry={() => router.replace('/(tabs)/budgets/goals')}
-			/>
-		);
 	}
 
 	// Show empty state if no goals and data has loaded

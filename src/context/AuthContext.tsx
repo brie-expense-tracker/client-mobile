@@ -473,6 +473,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		console.log(
 			'🚨 [DEBUG] AppState useEffect triggered with refreshUserData dependency'
 		);
+		let lastRefreshTime = 0;
+		const REFRESH_COOLDOWN = 60000; // Only refresh once per minute
+
 		const onChange = async (nextState: AppStateStatus) => {
 			console.log(
 				'🚨 [DEBUG] AppState changed from',
@@ -483,12 +486,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			const prev = appState.current;
 			appState.current = nextState;
 			if (prev.match(/inactive|background/) && nextState === 'active') {
+				const now = Date.now();
+				const timeSinceLastRefresh = now - lastRefreshTime;
+
+				if (timeSinceLastRefresh < REFRESH_COOLDOWN) {
+					console.log(
+						`⏭️ [DEBUG] Skipping refresh, last refresh was ${timeSinceLastRefresh}ms ago`
+					);
+					return;
+				}
+
 				console.log('🚨 [DEBUG] App became active, refreshing user data');
+				lastRefreshTime = now;
 				try {
 					const fbUser = auth().currentUser;
 					if (fbUser) {
+						// Only refresh token, don't refetch all user data
 						await fbUser.getIdToken(true);
-						await refreshUserData();
+						// Skip refreshUserData() - cached data is sufficient
 					}
 				} catch (err) {
 					Sentry.captureException(err);
@@ -501,7 +516,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			console.log('🚨 [DEBUG] AppState useEffect cleanup');
 			sub.remove();
 		};
-	}, [refreshUserData]);
+	}, []);
 
 	// Cleanup effect for component unmount
 	useEffect(() => {

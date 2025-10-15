@@ -1,19 +1,28 @@
 import React, { useState } from 'react';
 import {
 	View,
-	Text,
 	StyleSheet,
-	TouchableOpacity,
 	TextInput,
 	ScrollView,
 	Alert,
-	ActivityIndicator,
 	SafeAreaView,
+	Text,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { RecurringExpenseService } from '../../src/services';
 import { DateField } from '../../src/components/DateField';
+import {
+	FormHeader,
+	FormInputGroup,
+	PeriodSelector,
+} from '../../src/components/forms';
+
+const FREQUENCY_OPTIONS = [
+	{ value: 'weekly', label: 'Weekly', icon: 'time-outline' as const },
+	{ value: 'monthly', label: 'Monthly', icon: 'calendar-outline' as const },
+	{ value: 'yearly', label: 'Yearly', icon: 'calendar-outline' as const },
+];
 
 const AddRecurringExpenseScreen: React.FC = () => {
 	const [vendor, setVendor] = useState('');
@@ -25,12 +34,6 @@ const AddRecurringExpenseScreen: React.FC = () => {
 		new Date().toISOString().split('T')[0]
 	);
 	const [loading, setLoading] = useState(false);
-
-	const frequencies = [
-		{ value: 'weekly', label: 'Weekly' },
-		{ value: 'monthly', label: 'Monthly' },
-		{ value: 'yearly', label: 'Yearly' },
-	] as const;
 
 	const handleSave = async () => {
 		if (!vendor.trim()) {
@@ -75,33 +78,17 @@ const AddRecurringExpenseScreen: React.FC = () => {
 
 	return (
 		<SafeAreaView style={styles.container}>
-			{/* Custom Back Button */}
-			<View style={styles.backButtonContainer}>
-				<TouchableOpacity
-					style={styles.backButton}
-					onPress={() => router.back()}
-				>
-					<Ionicons name="chevron-back" size={24} color="#007ACC" />
-				</TouchableOpacity>
-				<Text style={styles.screenTitle}>Add Recurring Expense</Text>
-				<TouchableOpacity
-					onPress={handleSave}
-					style={[styles.saveButton, loading && styles.saveButtonDisabled]}
-					disabled={loading}
-				>
-					{loading ? (
-						<ActivityIndicator size="small" color="#fff" />
-					) : (
-						<Text style={styles.saveButtonText}>Save</Text>
-					)}
-				</TouchableOpacity>
-			</View>
+			<FormHeader
+				title="Add Recurring Expense"
+				onSave={handleSave}
+				saveDisabled={loading}
+				loading={loading}
+			/>
 
 			<ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
 				<View style={styles.formContainer}>
 					{/* Vendor Name */}
-					<View style={styles.inputGroup}>
-						<Text style={styles.label}>Vendor Name</Text>
+					<FormInputGroup label="Vendor Name">
 						<TextInput
 							style={styles.textInput}
 							value={vendor}
@@ -109,11 +96,10 @@ const AddRecurringExpenseScreen: React.FC = () => {
 							placeholder="e.g., Netflix, Spotify, Rent"
 							placeholderTextColor="#999"
 						/>
-					</View>
+					</FormInputGroup>
 
 					{/* Amount */}
-					<View style={styles.inputGroup}>
-						<Text style={styles.label}>Amount</Text>
+					<FormInputGroup label="Amount">
 						<View style={styles.amountContainer}>
 							<Text style={styles.currencySymbol}>$</Text>
 							<TextInput
@@ -125,45 +111,29 @@ const AddRecurringExpenseScreen: React.FC = () => {
 								keyboardType="decimal-pad"
 							/>
 						</View>
-					</View>
+					</FormInputGroup>
 
 					{/* Frequency */}
-					<View style={styles.inputGroup}>
-						<Text style={styles.label}>Frequency</Text>
-						<View style={styles.frequencyContainer}>
-							{frequencies.map((freq) => (
-								<TouchableOpacity
-									key={freq.value}
-									style={[
-										styles.frequencyButton,
-										frequency === freq.value && styles.frequencyButtonActive,
-									]}
-									onPress={() => setFrequency(freq.value)}
-								>
-									<Text
-										style={[
-											styles.frequencyButtonText,
-											frequency === freq.value &&
-												styles.frequencyButtonTextActive,
-										]}
-									>
-										{freq.label}
-									</Text>
-								</TouchableOpacity>
-							))}
-						</View>
-					</View>
+					<FormInputGroup label="Frequency">
+						<PeriodSelector
+							options={FREQUENCY_OPTIONS}
+							selectedPeriod={frequency}
+							onPeriodSelect={(f) =>
+								setFrequency(f as 'weekly' | 'monthly' | 'quarterly' | 'yearly')
+							}
+						/>
+					</FormInputGroup>
 
 					{/* Next Due Date */}
-					<View style={styles.inputGroup}>
+					<FormInputGroup label="Next Due Date">
 						<DateField
 							value={nextDueDate}
 							onChange={handleDateChange}
-							title="Next Due Date"
+							title=""
 							placeholder="Select date"
-							minDate={new Date().toISOString().split('T')[0]} // Today or later
+							minDate={new Date().toISOString().split('T')[0]}
 						/>
-					</View>
+					</FormInputGroup>
 
 					{/* Info Card */}
 					<View style={styles.infoCard}>
@@ -185,61 +155,11 @@ const styles = StyleSheet.create({
 		backgroundColor: '#ffffff',
 		paddingTop: 0,
 	},
-	backButtonContainer: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		borderBottomWidth: 1,
-		borderBottomColor: '#e5e7eb',
-		backgroundColor: '#ffffff',
-	},
-	backButton: {
-		flexDirection: 'row',
-		alignItems: 'center',
-	},
-	backButtonText: {
-		marginLeft: 8,
-		fontSize: 16,
-		color: '#007ACC',
-		fontWeight: '500',
-	},
-	screenTitle: {
-		fontSize: 20,
-		fontWeight: 'bold',
-		color: '#0a0a0a',
-		flex: 1,
-		textAlign: 'center',
-	},
-	saveButton: {
-		backgroundColor: '#18181b',
-		paddingHorizontal: 16,
-		paddingVertical: 8,
-		borderRadius: 16,
-	},
-	saveButtonDisabled: {
-		backgroundColor: '#a1a1aa',
-	},
-	saveButtonText: {
-		color: '#ffffff',
-		fontSize: 14,
-		fontWeight: '600',
-	},
 	content: {
 		flex: 1,
 	},
 	formContainer: {
 		padding: 16,
-	},
-	inputGroup: {
-		marginBottom: 24,
-	},
-	label: {
-		fontSize: 17,
-		fontWeight: '700',
-		color: '#0a0a0a',
-		marginBottom: 8,
 	},
 	textInput: {
 		borderWidth: 1,
@@ -273,33 +193,6 @@ const styles = StyleSheet.create({
 		fontSize: 18,
 		fontWeight: '600',
 		color: '#0a0a0a',
-	},
-	frequencyContainer: {
-		flexDirection: 'row',
-		gap: 8,
-	},
-	frequencyButton: {
-		flex: 1,
-		paddingVertical: 12,
-		paddingHorizontal: 16,
-		borderWidth: 1,
-		borderColor: '#e5e7eb',
-		borderRadius: 16,
-		alignItems: 'center',
-		backgroundColor: '#ffffff',
-	},
-	frequencyButtonActive: {
-		backgroundColor: '#18181b',
-		borderColor: '#18181b',
-	},
-	frequencyButtonText: {
-		fontSize: 13,
-		fontWeight: '500',
-		color: '#52525b',
-	},
-	frequencyButtonTextActive: {
-		color: '#ffffff',
-		fontWeight: '600',
 	},
 	infoCard: {
 		flexDirection: 'row',

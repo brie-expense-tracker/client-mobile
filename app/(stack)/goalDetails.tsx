@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, router } from 'expo-router';
-import { useGoals } from '../../src/hooks/useGoals';
+import { useGoal } from '../../src/context/goalContext';
 import { Goal } from '../../src/context/goalContext';
 import LinearProgressBar from '../(tabs)/budgets/components/LinearProgressBar';
 import { normalizeIconName } from '../../src/constants/uiConstants';
@@ -17,7 +17,7 @@ import { normalizeIconName } from '../../src/constants/uiConstants';
 const GoalSummaryScreen: React.FC = () => {
 	const params = useLocalSearchParams();
 	const goalId = params.id as string;
-	const { goals, isLoading, hasLoaded } = useGoals();
+	const { goals, isLoading, hasLoaded } = useGoal();
 	const [goal, setGoal] = useState<Goal | null>(null);
 
 	// Load goal data when component mounts or goals change

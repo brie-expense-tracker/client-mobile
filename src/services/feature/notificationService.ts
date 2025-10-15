@@ -336,86 +336,60 @@ class NotificationService {
 		return this.expoPushToken;
 	}
 
-	// Update push token on backend with retry logic for rate limiting
+	// Update push token on backend with minimal retry logic to avoid rate limiting
 	async updatePushToken(token: string): Promise<boolean> {
-		const maxRetries = 3;
-		const baseDelay = 2000; // 2 seconds
+		try {
+			const response = await ApiService.put('/api/notifications/push-token', {
+				expoPushToken: token,
+			});
 
-		for (let attempt = 1; attempt <= maxRetries; attempt++) {
-			try {
-				// Add delay for first attempt to avoid immediate rate limiting
-				if (attempt === 1) {
-					await new Promise((resolve) => setTimeout(resolve, 1000));
-				}
-
-				const response = await ApiService.put('/api/notifications/push-token', {
-					expoPushToken: token,
-				});
-
-				if (response.success) {
-					console.log('✅ Push token updated on backend');
-					return true;
-				} else {
-					// Handle authentication errors gracefully
-					if (response.error?.includes('User not authenticated')) {
-						console.log(
-							'🔒 [Notifications] User not authenticated, skipping push token update'
-						);
-						return false;
-					}
-
-					// Check for rate limiting
-					if (response.error?.includes('Rate limit') && attempt < maxRetries) {
-						const delay = baseDelay * Math.pow(2, attempt - 1);
-						console.log(
-							`⏳ [Notifications] Rate limited, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`
-						);
-						await new Promise((resolve) => setTimeout(resolve, delay));
-						continue;
-					}
-
-					console.error('❌ Failed to update push token:', response.error);
-					return false;
-				}
-			} catch (error) {
+			if (response.success) {
+				console.log('✅ Push token updated on backend');
+				return true;
+			} else {
 				// Handle authentication errors gracefully
-				if (
-					error instanceof Error &&
-					error.message.includes('User not authenticated')
-				) {
+				if (response.error?.includes('User not authenticated')) {
 					console.log(
 						'🔒 [Notifications] User not authenticated, skipping push token update'
 					);
 					return false;
 				}
 
-				// Handle rate limiting errors
-				if (
-					error instanceof Error &&
-					error.message.includes('Rate limit') &&
-					attempt < maxRetries
-				) {
-					const delay = baseDelay * Math.pow(2, attempt - 1);
+				// For rate limiting, don't retry - just fail silently
+				// The token will be retried on next app launch
+				if (response.error?.includes('Rate limit')) {
 					console.log(
-						`⏳ [Notifications] Rate limited, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`
+						'⏸️ [Notifications] Rate limited, will retry on next app launch'
 					);
-					await new Promise((resolve) => setTimeout(resolve, delay));
-					continue;
-				}
-
-				console.error(
-					`❌ Error updating push token (attempt ${attempt}/${maxRetries}):`,
-					error
-				);
-
-				// If this is the last attempt, return false
-				if (attempt === maxRetries) {
 					return false;
 				}
-			}
-		}
 
-		return false;
+				console.error('❌ Failed to update push token:', response.error);
+				return false;
+			}
+		} catch (error) {
+			// Handle authentication errors gracefully
+			if (
+				error instanceof Error &&
+				error.message.includes('User not authenticated')
+			) {
+				console.log(
+					'🔒 [Notifications] User not authenticated, skipping push token update'
+				);
+				return false;
+			}
+
+			// Handle rate limiting errors - no retry, just fail silently
+			if (error instanceof Error && error.message.includes('Rate limit')) {
+				console.log(
+					'⏸️ [Notifications] Rate limited, will retry on next app launch'
+				);
+				return false;
+			}
+
+			console.error('❌ Error updating push token:', error);
+			return false;
+		}
 	}
 
 	// Get notifications from backend

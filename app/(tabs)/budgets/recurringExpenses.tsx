@@ -1,17 +1,17 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { ScrollView, Alert, RefreshControl } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
 
 import RecurringExpensesFeed from './components/RecurringExpensesFeed';
 import RecurringSummaryCard from './components/RecurringSummaryCard';
-import { useRecurringExpenses } from '../../../src/hooks/useRecurringExpenses';
+import { useRecurringExpense } from '../../../src/context/recurringExpenseContext';
 import { RecurringExpenseService } from '../../../src/services';
 import {
 	Page,
 	Card,
 	Section,
 	LoadingState,
-	ErrorState,
 	EmptyState,
 	SegmentedControl,
 } from '../../../src/ui';
@@ -44,15 +44,25 @@ const RecurringExpensesScreen: React.FC = () => {
 		'all'
 	);
 
-	// Use only the hook, not both context and hook
-	const {
-		expenses,
-		refetch,
-		deleteRecurringExpense,
-		isLoading,
-		hasLoaded,
-		error,
-	} = useRecurringExpenses();
+	// Use the context
+	const { expenses, refetch, deleteRecurringExpense, isLoading, hasLoaded } =
+		useRecurringExpense();
+
+	// ==========================================
+	// Focus Effect - Refresh on Screen Focus
+	// ==========================================
+	useFocusEffect(
+		useCallback(() => {
+			if (!hasLoaded) {
+				console.log(
+					'🔄 [RecurringExpenses] Screen focused, no data loaded yet - fetching...'
+				);
+				refetch();
+			} else {
+				console.log('✅ [RecurringExpenses] Screen focused, using cached data');
+			}
+		}, [refetch, hasLoaded])
+	);
 
 	// ==========================================
 	// Memoized Calculations
@@ -60,6 +70,14 @@ const RecurringExpensesScreen: React.FC = () => {
 
 	const overdueExpenses = useMemo(() => {
 		return expenses.filter((expense) => {
+			// Safety check: ensure expense has required fields
+			if (!expense || !expense.nextExpectedDate) {
+				console.warn(
+					'⚠️ [RecurringExpenses] Skipping invalid expense in overdueExpenses:',
+					expense
+				);
+				return false;
+			}
 			const daysUntilDue = RecurringExpenseService.getDaysUntilNext(
 				expense.nextExpectedDate
 			);
@@ -69,6 +87,14 @@ const RecurringExpensesScreen: React.FC = () => {
 
 	const dueThisWeekExpenses = useMemo(() => {
 		return expenses.filter((expense) => {
+			// Safety check: ensure expense has required fields
+			if (!expense || !expense.nextExpectedDate) {
+				console.warn(
+					'⚠️ [RecurringExpenses] Skipping invalid expense in dueThisWeekExpenses:',
+					expense
+				);
+				return false;
+			}
 			const daysUntilDue = RecurringExpenseService.getDaysUntilNext(
 				expense.nextExpectedDate
 			);
@@ -94,20 +120,28 @@ const RecurringExpensesScreen: React.FC = () => {
 	);
 
 	const onRefresh = useCallback(async () => {
+		console.log('🔄 [RecurringExpenses] Pull-to-refresh triggered');
 		setRefreshing(true);
 		try {
+			// Clear cache before refetching to ensure fresh data
+			const { ApiService } = await import('../../../src/services');
+			ApiService.clearCacheByPrefix('/api/recurring-expenses');
+			console.log(
+				'🗑️ [RecurringExpenses] Cache cleared, fetching fresh data...'
+			);
 			await refetch();
+			console.log('✅ [RecurringExpenses] Refresh complete');
 		} catch (error) {
-			console.error('Error refreshing recurring expenses:', error);
+			console.error('❌ [RecurringExpenses] Error refreshing:', error);
+			Alert.alert(
+				'Error',
+				'Failed to refresh recurring expenses. Please try again.'
+			);
 		} finally {
+			// Always reset refreshing state, even on error
 			setRefreshing(false);
 		}
 	}, [refetch]);
-
-	// Refresh when component mounts
-	useEffect(() => {
-		onRefresh();
-	}, [onRefresh]);
 
 	const handleExpenseMenuPress = (patternId: string) => {
 		const expense = expenses.find((e) => e.patternId === patternId);
@@ -150,7 +184,12 @@ const RecurringExpensesScreen: React.FC = () => {
 		try {
 			await deleteRecurringExpense(patternId);
 		} catch (error) {
-			console.error('Error deleting recurring expense:', error);
+			console.error('❌ [RecurringExpenses] Error deleting expense:', error);
+			const errorMsg =
+				error instanceof Error
+					? error.message
+					: 'Failed to delete recurring expense';
+			Alert.alert('Delete Failed', errorMsg);
 		}
 	};
 
@@ -164,16 +203,6 @@ const RecurringExpensesScreen: React.FC = () => {
 	// Show loading state while fetching data
 	if (isLoading && !hasLoaded) {
 		return <LoadingState label="Loading recurring expenses..." />;
-	}
-
-	// Show error state if there's an error
-	if (error && hasLoaded) {
-		return (
-			<ErrorState
-				title="Unable to load recurring expenses"
-				onRetry={onRefresh}
-			/>
-		);
 	}
 
 	// Show empty state if no expenses and data has loaded

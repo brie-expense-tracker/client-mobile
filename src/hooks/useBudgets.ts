@@ -1,3 +1,32 @@
+/**
+ * DEPRECATED ADAPTER
+ *
+ * This file now acts as a thin adapter to the BudgetProvider context.
+ * Migrate your imports from:
+ *   import { useBudgets } from '.../hooks/useBudgets'
+ * to:
+ *   import { useBudget } from '.../context/budgetContext'
+ *
+ * Once all imports are migrated, this file can be deleted.
+ */
+
+import { useBudget } from '../context/budgetContext';
+
+// Show deprecation warning in development
+if (__DEV__) {
+	console.warn(
+		'[Deprecation] useBudgets from hooks is deprecated. ' +
+			'Import { useBudget } from context/budgetContext instead. ' +
+			'This adapter will be removed in a future version.'
+	);
+}
+
+export { useBudget as useBudgets };
+
+/* ==========================================
+ * OLD IMPLEMENTATION BELOW (kept for reference, not used)
+ * ==========================================
+
 import { useMemo } from 'react';
 import { useDataFetching } from './useDataFetching';
 import {
@@ -10,7 +39,7 @@ import { ApiService } from '../services';
 // ==========================================
 // Budget-specific API functions
 // ==========================================
-const fetchBudgets = async (): Promise<Budget[]> => {
+const fetchBudgets_OLD = async (): Promise<Budget[]> => {
 	console.log('📡 [fetchBudgets] Fetching budgets from API...');
 	const response = await ApiService.get<{ data: Budget[] }>('/api/budgets');
 
@@ -75,7 +104,10 @@ const createBudget = async (budgetData: CreateBudgetData): Promise<Budget> => {
 		throw new Error('Failed to create budget: No data received');
 	}
 
-	console.log('✅ [createBudget] Returning budget with ID:', budget.id || (budget as any)._id);
+	console.log(
+		'✅ [createBudget] Returning budget with ID:',
+		budget.id || (budget as any)._id
+	);
 	return budget;
 };
 
@@ -132,12 +164,23 @@ const deleteBudget = async (id: string): Promise<void> => {
 // Budget-specific data transformations
 // ==========================================
 const transformBudgetData = (budgets: Budget[]) => {
-	console.log('🔄 [transformBudgetData] Transforming', budgets.length, 'budgets');
+	console.log(
+		'🔄 [transformBudgetData] Transforming',
+		budgets.length,
+		'budgets'
+	);
 	// Add any budget-specific transformations here
 	// For example, sorting by period, calculating alerts, etc.
 	const transformed = budgets.map((budget) => {
 		const id = (budget as any)._id || budget.id;
-		console.log('🔄 [transformBudgetData] Budget:', budget.name, '- ID:', id, '- _id:', (budget as any)._id);
+		console.log(
+			'🔄 [transformBudgetData] Budget:',
+			budget.name,
+			'- ID:',
+			id,
+			'- _id:',
+			(budget as any)._id
+		);
 		return {
 			...budget,
 			// Map _id to id for client-side compatibility
@@ -148,10 +191,14 @@ const transformBudgetData = (budgets: Budget[]) => {
 			spentPercentage:
 				budget.amount > 0 ? (budget.spent || 0) / budget.amount : 0,
 			// Determine if should alert (over 90% spent)
-			shouldAlert: budget.amount > 0 && (budget.spent || 0) / budget.amount > 0.9,
+			shouldAlert:
+				budget.amount > 0 && (budget.spent || 0) / budget.amount > 0.9,
 		};
 	});
-	console.log('✅ [transformBudgetData] Transformed IDs:', transformed.map(b => b.id).join(', '));
+	console.log(
+		'✅ [transformBudgetData] Transformed IDs:',
+		transformed.map((b) => b.id).join(', ')
+	);
 	return transformed;
 };
 
@@ -305,3 +352,5 @@ export function useBudgets() {
 		clearError,
 	};
 }
+
+*/

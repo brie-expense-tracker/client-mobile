@@ -79,6 +79,7 @@ export interface FinancialContext {
 	budgets: Budget[];
 	goals: Goal[];
 	transactions: Transaction[];
+	recurringExpenses?: any[];
 	balances?: {
 		accountId: string;
 		name: string;
@@ -472,6 +473,14 @@ export class EnhancedTieredAIService {
 				targetAmount: g.targetAmount,
 				deadline: g.deadline,
 			})),
+			recurringExpensesSummary: (this.context.recurringExpenses || []).map(
+				(r: any) => ({
+					vendor: r.vendor,
+					amount: r.amount,
+					frequency: r.frequency,
+					nextDue: r.nextExpectedDate,
+				})
+			),
 		};
 
 		return context;

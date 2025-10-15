@@ -25,9 +25,10 @@ import {
 	OrchestratorAIResponse,
 } from '../../../src/services/feature/orchestratorAIService';
 import { useProfile } from '../../../src/context/profileContext';
-import { useBudgets } from '../../../src/hooks/useBudgets';
-import { useGoals } from '../../../src/hooks/useGoals';
+import { useBudget } from '../../../src/context/budgetContext';
+import { useGoal } from '../../../src/context/goalContext';
 import { TransactionContext } from '../../../src/context/transactionContext';
+import { useRecurringExpense } from '../../../src/context/recurringExpenseContext';
 import MissingInfoCard, {
 	MissingInfoChip,
 } from '../../../src/components/assistant/cards/MissingInfoCard';
@@ -94,12 +95,13 @@ export default function AssistantScreen() {
 	const router = useRouter();
 	const tabBarHeight = useBottomTabBarHeight();
 	const { profile } = useProfile();
-	const { budgets } = useBudgets() as { budgets: any[] };
+	const { budgets } = useBudget();
 	const aiInsightsEnabled = useFeature('aiInsights');
-	const { goals } = useGoals() as { goals: any[] };
+	const { goals } = useGoal() as { goals: any[] };
 	const { transactions } = useContext(TransactionContext) as {
 		transactions: any[];
 	};
+	const { expenses: recurringExpenses } = useRecurringExpense();
 
 	// Keep local assistant config that reacts instantly to events
 	const [config, setConfig] = useState<AssistantConfig>(() =>
@@ -306,7 +308,15 @@ export default function AssistantScreen() {
 		} catch (error) {
 			console.error('[Assistant] Failed to load insights context:', error);
 		}
-	}, [config, insightsService, profile, budgets, goals, transactions]);
+	}, [
+		config,
+		insightsService,
+		profile,
+		budgets,
+		goals,
+		transactions,
+		recurringExpenses,
+	]);
 
 	// Initialize orchestrator service when profile is available
 	useEffect(() => {
@@ -328,6 +338,7 @@ export default function AssistantScreen() {
 			budgets: [],
 			goals: [],
 			transactions: [],
+			recurringExpenses: [],
 		};
 		const service = new OrchestratorAIService(financialContext);
 		setOrchestratorService(service);
@@ -346,6 +357,7 @@ export default function AssistantScreen() {
 		budgets,
 		goals,
 		transactions,
+		recurringExpenses,
 		loadInsightsContext,
 		config,
 		insightsService,

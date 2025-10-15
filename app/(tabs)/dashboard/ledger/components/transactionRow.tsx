@@ -14,7 +14,7 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 import { useBudget } from '../../../../../src/context/budgetContext';
 import { useGoal } from '../../../../../src/context/goalContext';
-import { useRecurringExpenses } from '../../../../../src/hooks/useRecurringExpenses';
+import { useRecurringExpense } from '../../../../../src/context/recurringExpenseContext';
 import { normalizeIconName } from '../../../../../src/constants/uiConstants';
 
 // Transaction interface defined inline since we removed the mock data file
@@ -257,7 +257,7 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 	// Get budget, goal, and recurring expense contexts
 	const { budgets } = useBudget();
 	const { goals } = useGoal();
-	const { expenses: recurringExpenses } = useRecurringExpenses();
+	const { expenses: recurringExpenses } = useRecurringExpense();
 
 	// Memoize the transaction context calculation to prevent unnecessary recalculations
 	const transactionContext = useMemo(() => {

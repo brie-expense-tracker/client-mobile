@@ -9,6 +9,7 @@ interface AICoachProps {
 		budgets: any[];
 		goals: any[];
 		transactions: any[];
+		recurringExpenses: any[];
 	};
 }
 
@@ -31,43 +32,63 @@ export default function AICoach({
 	);
 
 	const getFinancialHealthScore = () => {
-		const { budgets, goals, transactions } = userFinancialState;
+		const { budgets, goals, transactions, recurringExpenses } =
+			userFinancialState;
 
 		let score = 0;
 		let maxScore = 100;
 
-		// Budget utilization (30 points)
+		// Budget utilization (25 points)
 		if (budgets.length > 0) {
 			const totalBudget = budgets.reduce((sum, b) => sum + (b.amount || 0), 0);
 			const totalSpent = budgets.reduce((sum, b) => sum + (b.spent || 0), 0);
 			if (totalBudget > 0) {
 				const utilization = (totalSpent / totalBudget) * 100;
-				if (utilization <= 80) score += 30;
-				else if (utilization <= 90) score += 20;
-				else if (utilization <= 100) score += 10;
+				if (utilization <= 80) score += 25;
+				else if (utilization <= 90) score += 17;
+				else if (utilization <= 100) score += 8;
 			}
 		}
 
-		// Goal progress (25 points)
+		// Goal progress (20 points)
 		if (goals.length > 0) {
 			const avgProgress =
 				goals.reduce((sum, g) => sum + (g.percent || 0), 0) / goals.length;
-			if (avgProgress >= 70) score += 25;
-			else if (avgProgress >= 50) score += 20;
-			else if (avgProgress >= 30) score += 15;
-			else score += 10;
+			if (avgProgress >= 70) score += 20;
+			else if (avgProgress >= 50) score += 15;
+			else if (avgProgress >= 30) score += 10;
+			else score += 5;
 		}
 
-		// Transaction tracking (25 points)
-		if (transactions.length >= 20) score += 25;
-		else if (transactions.length >= 10) score += 20;
-		else if (transactions.length >= 5) score += 15;
-		else if (transactions.length > 0) score += 10;
+		// Transaction tracking (20 points)
+		if (transactions.length >= 20) score += 20;
+		else if (transactions.length >= 10) score += 15;
+		else if (transactions.length >= 5) score += 10;
+		else if (transactions.length > 0) score += 5;
+
+		// Recurring expense tracking (15 points)
+		if (recurringExpenses && recurringExpenses.length > 0) {
+			// Give points for tracking recurring expenses
+			score += 5;
+			// Check if they're up to date (no overdue)
+			const overdueCount = recurringExpenses.filter((exp: any) => {
+				const dueDate = new Date(exp.nextExpectedDate);
+				return dueDate < new Date();
+			}).length;
+			if (overdueCount === 0) score += 10; // All bills on time
+			else if (overdueCount <= 2) score += 5; // Few overdue
+		}
 
 		// Financial foundation (20 points)
-		if (budgets.length >= 3 && goals.length >= 1) score += 20;
-		else if (budgets.length >= 2 || goals.length >= 1) score += 15;
-		else if (budgets.length >= 1) score += 10;
+		const hasRecurring = recurringExpenses && recurringExpenses.length > 0;
+		if (budgets.length >= 3 && goals.length >= 1 && hasRecurring) score += 20;
+		else if (
+			(budgets.length >= 2 && goals.length >= 1) ||
+			(budgets.length >= 1 && hasRecurring)
+		)
+			score += 15;
+		else if (budgets.length >= 2 || goals.length >= 1) score += 12;
+		else if (budgets.length >= 1) score += 8;
 
 		return Math.min(score, maxScore);
 	};

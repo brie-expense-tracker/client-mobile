@@ -17,9 +17,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useBudgets } from '../../../../../src/hooks/useBudgets';
-import { useGoals } from '../../../../../src/hooks/useGoals';
+import { useBudget } from '../../../../../src/context/budgetContext';
+import { useGoal } from '../../../../../src/context/goalContext';
 import { TransactionContext } from '../../../../../src/context/transactionContext';
+import { useRecurringExpense } from '../../../../../src/context/recurringExpenseContext';
 import { useTheme } from '../../../../../src/context/ThemeContext';
 
 interface Profile {
@@ -136,11 +137,12 @@ export default function AIProfileInsights({
 	);
 
 	// Data hooks
-	const { budgets } = useBudgets() as { budgets: Budget[] };
-	const { goals } = useGoals() as { goals: Goal[] };
+	const { budgets } = useBudget();
+	const { goals } = useGoal() as { goals: Goal[] };
 	const { transactions } = useContext(TransactionContext) as {
 		transactions: Transaction[];
 	};
+	const { expenses: recurringExpenses } = useRecurringExpense();
 
 	// Memoized calculations for better performance
 
@@ -468,7 +470,7 @@ export default function AIProfileInsights({
 				amount: profile.debt || 0,
 			},
 		};
-	}, [transactions, budgets, goals, profile]);
+	}, [transactions, budgets, goals, profile, recurringExpenses]);
 
 	const loadDismissedInsights = useCallback(async () => {
 		try {
@@ -851,7 +853,137 @@ export default function AIProfileInsights({
 				});
 			}
 
-			// 2. Recurring Bills Insights
+			// 2. Recurring Expenses Insights
+			if (recurringExpenses.length > 0) {
+				const totalMonthlyRecurring = recurringExpenses
+					.filter((exp: any) => exp.frequency === 'monthly')
+					.reduce((sum: number, exp: any) => sum + exp.amount, 0);
+
+				const totalAnnualRecurring = recurringExpenses.reduce(
+					(sum: number, exp: any) => {
+						const multiplier =
+							exp.frequency === 'weekly'
+								? 52
+								: exp.frequency === 'monthly'
+								? 12
+								: exp.frequency === 'quarterly'
+								? 4
+								: exp.frequency === 'yearly'
+								? 1
+								: 0;
+						return sum + exp.amount * multiplier;
+					},
+					0
+				);
+
+				// Check for overdue recurring expenses
+				const overdueExpenses = recurringExpenses.filter((exp: any) => {
+					const dueDate = new Date(exp.nextExpectedDate);
+					return dueDate < new Date();
+				});
+
+				if (overdueExpenses.length > 0) {
+					const totalOverdue = overdueExpenses.reduce(
+						(sum: number, exp: any) => sum + exp.amount,
+						0
+					);
+					newInsights.push({
+						id: 'recurring_overdue',
+						type: 'critical',
+						title: 'Overdue Recurring Expenses',
+						message: `You have ${
+							overdueExpenses.length
+						} overdue recurring expense${
+							overdueExpenses.length > 1 ? 's' : ''
+						} totaling $${totalOverdue.toFixed(
+							2
+						)}. Pay them soon to avoid late fees.`,
+						priority: 'critical',
+						value: totalOverdue,
+						trend: 'down',
+						action: 'pay_recurring',
+						actionLabel: 'Pay Now',
+						category: 'budget',
+					});
+				}
+
+				// Monthly commitment insight
+				if (totalMonthlyRecurring > 0) {
+					const monthlyIncome =
+						profile.monthlyIncome ||
+						(financialAnalysis.totalIncome / 30) * 30 ||
+						0;
+					const recurringPercentage =
+						monthlyIncome > 0
+							? (totalMonthlyRecurring / monthlyIncome) * 100
+							: 0;
+
+					if (recurringPercentage > 50) {
+						newInsights.push({
+							id: 'recurring_high_commitment',
+							type: 'warning',
+							title: 'High Recurring Commitment',
+							message: `Your monthly recurring expenses ($${totalMonthlyRecurring.toFixed(
+								2
+							)}) are ${recurringPercentage.toFixed(
+								1
+							)}% of your income. Consider reducing subscriptions or recurring costs.`,
+							priority: 'high',
+							value: recurringPercentage,
+							action: 'review_recurring',
+							actionLabel: 'Review Expenses',
+							category: 'budget',
+						});
+					} else if (recurringPercentage > 30) {
+						newInsights.push({
+							id: 'recurring_moderate_commitment',
+							type: 'info',
+							title: 'Moderate Recurring Expenses',
+							message: `Your monthly recurring expenses ($${totalMonthlyRecurring.toFixed(
+								2
+							)}) are ${recurringPercentage.toFixed(
+								1
+							)}% of your income. This is manageable but keep an eye on it.`,
+							priority: 'medium',
+							value: recurringPercentage,
+							action: 'view_recurring',
+							actionLabel: 'View Details',
+							category: 'budget',
+						});
+					}
+				}
+
+				// Annual projection
+				if (totalAnnualRecurring > 0) {
+					newInsights.push({
+						id: 'recurring_annual_projection',
+						type: 'info',
+						title: 'Annual Recurring Expense Projection',
+						message: `Your recurring expenses will cost approximately $${totalAnnualRecurring.toFixed(
+							0
+						)} this year. Factor this into your financial planning.`,
+						priority: 'low',
+						value: totalAnnualRecurring,
+						action: 'view_annual_projection',
+						actionLabel: 'View Projection',
+						category: 'budget',
+					});
+				}
+			} else {
+				newInsights.push({
+					id: 'no_recurring_expenses',
+					type: 'info',
+					title: 'Track Recurring Expenses',
+					message:
+						'Add your recurring expenses (subscriptions, bills, rent) to better manage your monthly commitments and cash flow.',
+					priority: 'medium',
+					action: 'add_recurring_expense',
+					actionLabel: 'Add Recurring',
+					category: 'budget',
+				});
+			}
+
+			// Legacy recurring bills detection from transactions
 			if (financialAnalysis.potentialRecurringBills.length > 0) {
 				const topRecurringBill = financialAnalysis.potentialRecurringBills[0];
 				newInsights.push({

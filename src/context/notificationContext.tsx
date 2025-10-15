@@ -425,13 +425,21 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 
 	// Defer notification initialization until user is authenticated
 	const { user, isAuthenticated } = useAuth();
+	const hasInitializedRef = React.useRef(false);
 
 	useEffect(() => {
 		// Only initialize notifications when user is authenticated AND has a real MongoDB ID (not 'temp')
-		if (isAuthenticated && user && user._id !== 'temp') {
+		// And only initialize once
+		if (
+			isAuthenticated &&
+			user &&
+			user._id !== 'temp' &&
+			!hasInitializedRef.current
+		) {
 			console.log(
 				'🔔 [Notifications] User authenticated, initializing notifications'
 			);
+			hasInitializedRef.current = true;
 			initialize();
 		} else if (user && user._id === 'temp') {
 			console.log(
@@ -448,6 +456,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 			}
 			// Clean up periodic refresh
 			stopPeriodicRefresh();
+			// Reset on cleanup
+			hasInitializedRef.current = false;
 		};
 	}, [initialize, stopPeriodicRefresh, isAuthenticated, user]);
 

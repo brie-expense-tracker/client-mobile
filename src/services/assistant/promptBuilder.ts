@@ -20,6 +20,13 @@ export interface NarrationFacts {
 		date: string;
 		description: string;
 	}[];
+	recurringExpenses?: {
+		vendor: string;
+		amount: number;
+		frequency: string;
+		nextDue: string;
+		isOverdue: boolean;
+	}[];
 	profile?: {
 		monthlyIncome?: number;
 		savings?: number;
@@ -64,6 +71,7 @@ Use these action IDs for buttons (choose 1-2 most relevant):
 - **Budget Management**: OPEN_BUDGETS, CREATE_RULE, ADJUST_LIMIT, OPEN_BUDGET_WIZARD, MAKE_BUDGETS_FROM_PLAN
 - **Goal Management**: CREATE_GOAL, UPDATE_GOAL, DELETE_GOAL, OPEN_GOAL_WIZARD, ADJUST_GOAL_PRIORITY
 - **Transaction Management**: VIEW_TRANSACTIONS, OPEN_TRANSACTION_FORM, MARK_PAID
+- **Recurring Expenses**: OPEN_RECURRING_EXPENSES, ADD_RECURRING_EXPENSE, PAY_RECURRING_EXPENSE, REVIEW_RECURRING
 - **Analysis & Insights**: VIEW_ANALYTICS, EXPORT_DATA, SHARE_INSIGHT
 - **Setup & Configuration**: OPEN_SETUP_WIZARD, CONNECT_ACCOUNT, OPEN_INCOME_FORM, OPEN_RECURRING_FORM
 - **Advanced Features**: OPEN_PLAN_TUNER, SETUP_AUTO_TRANSFER, ALLOCATE_REMAINING, SCHEDULE_REMINDER

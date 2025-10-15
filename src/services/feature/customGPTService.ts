@@ -36,6 +36,7 @@ export interface FinancialContext {
 	budgets: Budget[];
 	goals: Goal[];
 	transactions: Transaction[];
+	recurringExpenses?: any[];
 	userProfile?: {
 		monthlyIncome?: number;
 		financialGoal?: string;
@@ -226,13 +227,33 @@ export class CustomGPTService {
 	 * Prepare financial context for the AI
 	 */
 	private prepareFinancialContext() {
-		const { budgets, goals, transactions, userProfile } = this.context;
+		const { budgets, goals, transactions, recurringExpenses, userProfile } =
+			this.context;
 
 		// Calculate key financial metrics
 		const totalBudget = budgets.reduce((sum, b) => sum + (b.amount || 0), 0);
 		const totalSpent = budgets.reduce((sum, b) => sum + (b.spent || 0), 0);
 		const totalGoals = goals.reduce((sum, g) => sum + (g.target || 0), 0);
 		const totalSaved = goals.reduce((sum, g) => sum + (g.current || 0), 0);
+
+		// Calculate recurring expenses metrics
+		const recurringExpensesSummary = (recurringExpenses || []).map(
+			(r: any) => ({
+				vendor: r.vendor,
+				amount: r.amount,
+				frequency: r.frequency,
+				nextDue: r.nextExpectedDate,
+				isOverdue: new Date(r.nextExpectedDate) < new Date(),
+			})
+		);
+
+		const totalMonthlyRecurring = (recurringExpenses || [])
+			.filter((r: any) => r.frequency === 'monthly')
+			.reduce((sum: number, r: any) => sum + r.amount, 0);
+
+		const overdueRecurring = recurringExpensesSummary.filter(
+			(r) => r.isOverdue
+		);
 
 		// Get recent spending patterns
 		const recentTransactions = transactions.slice(-10).map((t) => ({
@@ -270,10 +291,13 @@ export class CustomGPTService {
 				monthlyIncome: userProfile?.monthlyIncome || 0,
 				financialGoal: userProfile?.financialGoal || 'General financial health',
 				riskProfile: userProfile?.riskProfile || 'Moderate',
+				totalMonthlyRecurring,
+				overdueRecurringCount: overdueRecurring.length,
 			},
 			budgets: budgetUtilization,
 			goals: goalProgress,
 			recentTransactions,
+			recurringExpenses: recurringExpensesSummary,
 			spendingTrends: this.calculateSpendingTrends(transactions),
 		};
 	}
@@ -489,6 +513,7 @@ export class CustomGPTService {
 			(sum, g) => sum + (g.target || 0),
 			0
 		);
+		const recurringCount = (this.context.recurringExpenses || []).length;
 
 		return `I'm here to help with your finances! I can see you have ${
 			this.context.budgets.length
@@ -496,7 +521,7 @@ export class CustomGPTService {
 			totalBudget > 0 ? `$${totalBudget.toFixed(2)} total` : 'no budgets set'
 		}), ${this.context.goals.length} goals (${
 			totalGoals > 0 ? `$${totalGoals.toFixed(2)} target` : 'no goals set'
-		}), and ${
+		}), ${recurringCount} recurring expenses, and ${
 			this.context.transactions.length
 		} transactions. What specific aspect would you like to know about?`;
 	}
@@ -505,6 +530,14 @@ export class CustomGPTService {
 	 * Get conversation context (simplified)
 	 */
 	async getConversationContext() {
+		const totalMonthlyRecurring = (this.context.recurringExpenses || [])
+			.filter((r: any) => r.frequency === 'monthly')
+			.reduce((sum: number, r: any) => sum + r.amount, 0);
+
+		const overdueRecurring = (this.context.recurringExpenses || []).filter(
+			(r: any) => new Date(r.nextExpectedDate) < new Date()
+		).length;
+
 		return {
 			financial: {
 				currentBudgets: this.context.budgets.map((b) => ({
@@ -522,6 +555,15 @@ export class CustomGPTService {
 					targetAmount: g.target || 0,
 					currentAmount: g.current || 0,
 				})),
+				recurringExpenses: (this.context.recurringExpenses || []).map(
+					(r: any) => ({
+						vendor: r.vendor,
+						amount: r.amount,
+						frequency: r.frequency,
+						nextDue: r.nextExpectedDate,
+						isOverdue: new Date(r.nextExpectedDate) < new Date(),
+					})
+				),
 				recentSpending: {
 					total: this.context.transactions
 						.slice(-10)
@@ -536,6 +578,8 @@ export class CustomGPTService {
 						(sum, t) => sum + (t.amount || 0),
 						0
 					),
+					recurringCommitments: totalMonthlyRecurring,
+					overdueRecurringCount: overdueRecurring,
 					netSavings:
 						(this.context.userProfile?.monthlyIncome || 0) -
 						this.context.transactions.reduce(

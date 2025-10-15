@@ -5,6 +5,24 @@ import { RequestManager } from './requestManager';
 // API logging: Keep essential info but reduce noise
 console.log(`🌐 API: ${__DEV__ ? 'DEV' : 'PROD'} | Base: ${API_BASE_URL}`);
 
+// ==========================================
+// Utilities
+// ==========================================
+
+/**
+ * Stable JSON stringify with sorted keys
+ * Use this for HMAC signing, cache keys, and deduplication
+ */
+export const stableStringify = (value: unknown): string => {
+	if (value === null || value === undefined) {
+		return String(value);
+	}
+	if (typeof value !== 'object') {
+		return JSON.stringify(value);
+	}
+	return JSON.stringify(value, Object.keys(value as any).sort());
+};
+
 // Rate limiting and deduplication
 const inflight = new Map<string, Promise<any>>();
 
@@ -185,6 +203,8 @@ export interface ApiResponse<T = any> {
 	data?: T;
 	error?: string;
 	message?: string;
+	status?: number;
+	statusText?: string;
 	usage?: {
 		estimatedTokens: number;
 		remainingTokens: number;
@@ -245,11 +265,18 @@ export class ApiService {
 		method: string,
 		body: any,
 		headers: Record<string, string>
-	): Promise<{ headers: Record<string, string>; bodyString: string }> {
+	): Promise<{ headers: Record<string, string>; bodyString: string | null }> {
+		// Determine if this request has a body
+		const hasBody = body !== undefined && body !== null;
+
 		if (!this.requiresHMACSigning(endpoint)) {
 			return {
 				headers,
-				bodyString: typeof body === 'string' ? body : JSON.stringify(body),
+				bodyString: hasBody
+					? typeof body === 'string'
+						? body
+						: JSON.stringify(body)
+					: null,
 			};
 		}
 
@@ -257,25 +284,21 @@ export class ApiService {
 			const hmacService = getHMACService();
 
 			console.log('🔐 [ApiService] HMAC signing process starting...');
+			console.log('🔐 [ApiService] Has body:', hasBody);
 			console.log('🔐 [ApiService] Original body:', body);
 			console.log('🔐 [ApiService] Body type:', typeof body);
 
-			// Create a stable JSON string - sort keys for consistency
-			const bodyString =
-				typeof body === 'string'
+			// For bodyless requests, bodyString will be empty string for signing
+			// but we return null to indicate no body should be sent in fetch
+			const bodyString = hasBody
+				? typeof body === 'string'
 					? body
-					: JSON.stringify(body, Object.keys(body || {}).sort());
+					: stableStringify(body)
+				: null;
 
-			console.log(
-				'🔐 [ApiService] HMAC Debug - Stable body string:',
-				bodyString
-			);
+			console.log('🔐 [ApiService] HMAC Debug - Body string:', bodyString);
 			console.log('🔐 [ApiService] HMAC Debug - Method:', method);
 			console.log('🔐 [ApiService] HMAC Debug - Endpoint:', endpoint);
-			console.log(
-				'🔐 [ApiService] HMAC Debug - Original headers:',
-				Object.keys(headers)
-			);
 
 			const signedHeaders = hmacService.signRequestHeaders(
 				body,
@@ -289,7 +312,10 @@ export class ApiService {
 				'🔐 [ApiService] Final signed headers keys:',
 				Object.keys(signedHeaders)
 			);
-			console.log('🔐 [ApiService] Will send body string:', bodyString);
+			console.log(
+				'🔐 [ApiService] Will send body:',
+				bodyString === null ? 'NO BODY' : `"${bodyString.substring(0, 100)}..."`
+			);
 
 			return { headers: signedHeaders, bodyString };
 		} catch (error) {
@@ -298,7 +324,11 @@ export class ApiService {
 			// Continue without HMAC signature - let the server handle the error
 			return {
 				headers,
-				bodyString: typeof body === 'string' ? body : JSON.stringify(body),
+				bodyString: hasBody
+					? typeof body === 'string'
+						? body
+						: JSON.stringify(body)
+					: null,
 			};
 		}
 	}
@@ -443,9 +473,10 @@ export class ApiService {
 
 	static async get<T>(
 		endpoint: string,
-		retries: number = 2,
-		useCache: boolean = true
+		options?: { retries?: number; useCache?: boolean; signal?: AbortSignal }
 	): Promise<ApiResponse<T>> {
+		const { retries = 2, useCache = true, signal } = options || {};
+
 		// Check if offline
 		if (!this.isOnline()) {
 			throw new ApiError('No internet connection', ApiErrorType.OFFLINE_ERROR);
@@ -490,6 +521,7 @@ export class ApiService {
 			// Use RequestManager for intelligent request handling
 			const data = await RequestManager.request<T>('GET', url, {
 				headers,
+				...(signal && { signal }),
 			});
 
 			const result: ApiResponse<T> = {
@@ -525,8 +557,8 @@ export class ApiService {
 			throw new ApiError('No internet connection', ApiErrorType.OFFLINE_ERROR);
 		}
 
-		// Create a unique key for deduplication (include body hash for POST requests)
-		const bodyHash = JSON.stringify(body).slice(0, 50); // Use first 50 chars as hash
+		// Create a unique key for deduplication (use stable stringify to prevent key drift)
+		const bodyHash = stableStringify(body).slice(0, 50);
 		const requestKey = `POST:${endpoint}:${bodyHash}`;
 
 		return singleflight(requestKey, async () => {
@@ -1016,23 +1048,78 @@ export class ApiService {
 				throw authError;
 			}
 
-			// Add HMAC signature if required
-			const { headers: signedHeaders } = await this.addHMACSignatureIfRequired(
-				endpoint,
-				'DELETE',
-				null,
-				headers
-			);
+			// Add HMAC signature if required (pass null for body since DELETE is bodyless)
+			const { headers: signedHeaders, bodyString } =
+				await this.addHMACSignatureIfRequired(
+					endpoint,
+					'DELETE',
+					null,
+					headers
+				);
 
 			const url = `${API_BASE_URL}${endpoint}`;
 
-			// API logging: Keep essential request info
-			console.log(`🗑️ DELETE: ${endpoint}`);
+			// Determine if we have a body to send
+			const hasBody = bodyString !== null;
 
-			const response = await fetch(url, {
-				method: 'DELETE',
-				headers: signedHeaders,
-			});
+			// IMPORTANT: Keep Content-Type for DELETE (server policy requires it)
+			// But we still won't send a body - Content-Length: 0 prevents JSON parsing
+			const requestHeaders: Record<string, string> = {
+				...signedHeaders,
+				// Ensure Content-Type is set even for bodyless DELETE (server requires it)
+				'Content-Type': 'application/json',
+			};
+
+			// API logging: Request details
+			console.log(`🗑️ [ApiService] Sending DELETE to ${url}`);
+			console.log(`🔑 [ApiService] DELETE has body:`, hasBody);
+			console.log(
+				`🔑 [ApiService] DELETE headers:`,
+				Object.keys(requestHeaders)
+			);
+
+			let response: Response;
+			try {
+				// Build fetch options - omit body property entirely if bodyless
+				const fetchOptions: RequestInit = {
+					method: 'DELETE',
+					headers: requestHeaders,
+				};
+
+				// CRITICAL: Only include body if we actually have one
+				// DELETE typically has no body, so this will be skipped
+				if (hasBody && bodyString) {
+					fetchOptions.body = bodyString;
+					console.log(
+						`🔑 [ApiService] Including body in DELETE:`,
+						bodyString.substring(0, 100)
+					);
+				} else {
+					console.log(`🔑 [ApiService] DELETE is bodyless (Content-Length: 0)`);
+				}
+
+				response = await fetch(url, fetchOptions);
+			} catch (networkError) {
+				console.error('❌ [ApiService] DELETE network error:', networkError);
+				throw networkError;
+			}
+
+			// CRITICAL: Log response immediately
+			console.log(
+				`📥 [ApiService] DELETE response: ${response.status} ${response.statusText}`
+			);
+
+			// Handle 204 No Content (successful delete with no body)
+			if (response.status === 204) {
+				console.log(`✅ [ApiService] DELETE successful (204 No Content)`);
+				// Skip to cache clearing
+				const baseEndpoint = endpoint.replace(/\/[^/]+$/, '');
+				this.clearCacheByPrefix(baseEndpoint);
+				if (baseEndpoint !== endpoint) {
+					this.clearCache(endpoint);
+				}
+				return { success: true, data: {} as T };
+			}
 
 			// Check if response is JSON before parsing
 			const contentType = response.headers.get('content-type');
@@ -1042,42 +1129,72 @@ export class ApiService {
 				try {
 					data = await response.json();
 				} catch (parseError) {
-					console.error('❌ API: JSON parse error:', parseError);
+					console.error('❌ [ApiService] DELETE JSON parse error:', parseError);
 					return {
 						success: false,
 						error: 'Invalid JSON response from server',
 					};
 				}
 			} else {
-				// Handle non-JSON responses
+				// Handle non-JSON responses (but not 204, already handled above)
 				const textResponse = await response.text();
 				console.log(
-					'⚠️ API: Non-JSON response:',
-					textResponse.substring(0, 100)
+					`⚠️ [ApiService] DELETE non-JSON response: ${textResponse.substring(
+						0,
+						100
+					)}`
 				);
 
 				if (!response.ok) {
+					console.error(
+						`❌ [ApiService] DELETE failed (${response.status}): ${textResponse}`
+					);
 					return {
 						success: false,
-						error: `HTTP error! status: ${response.status}`,
+						error: `HTTP ${response.status}: ${
+							textResponse || response.statusText
+						}`,
 					};
+				}
+
+				// Success but no JSON body - treat as 200 OK
+				data = {};
+			}
+
+			if (!response.ok) {
+				const errorMsg = data.error || `HTTP error! status: ${response.status}`;
+				console.error(
+					`❌ [ApiService] DELETE failed (${response.status}): ${errorMsg}`
+				);
+
+				// Log response headers for debugging
+				console.error('❌ [ApiService] DELETE failed - Response headers:', {
+					'content-type': response.headers.get('content-type'),
+					'content-length': response.headers.get('content-length'),
+				});
+
+				// Log full server response for debugging
+				console.error(
+					`🔍 [ApiService] DELETE failed - Full server response:`,
+					data
+				);
+
+				// Log server debug info if available
+				if (data?.debug) {
+					console.error(`🔍 [ApiService] Server debug info:`, data.debug);
+				}
+				if (data?.stack) {
+					console.error(`🔍 [ApiService] Server stack trace:`, data.stack);
 				}
 
 				return {
 					success: false,
-					error: 'Server returned non-JSON response',
-				};
-			}
-
-			if (!response.ok) {
-				return {
-					success: false,
-					error: data.error || `HTTP error! status: ${response.status}`,
+					error: errorMsg,
 				};
 			}
 
 			// API logging: Success response
-			console.log(`✅ DELETE: ${endpoint} (${response.status})`);
+			console.log(`✅ [ApiService] DELETE successful (${response.status})`);
 			console.log(`🔍 [DELETE] About to clear cache for endpoint: ${endpoint}`);
 
 			// Clear cache by prefix to handle all variants
@@ -1243,36 +1360,66 @@ export class ApiService {
 
 	/**
 	 * Clear cache for all endpoints starting with a prefix
+	 * Handles query strings: /api/budgets clears /api/budgets, /api/budgets?foo=bar, etc.
+	 * Normalizes URLs to handle trailing slashes and different origins (staging/prod)
 	 */
 	static clearCacheByPrefix(prefix: string): void {
-		let clearedCount = 0;
+		let clearedCacheCount = 0;
+		let clearedInflightCount = 0;
 		const keysToDelete: string[] = [];
 
-		// Collect keys to delete
+		// Normalize URL: extract pathname, strip trailing slashes
+		const normalizeUrl = (url: string): string => {
+			try {
+				if (url.startsWith('http')) {
+					const parsed = new URL(url);
+					return parsed.pathname.replace(/\/+$/, '');
+				}
+				return url.replace(/\/+$/, '');
+			} catch {
+				return url.replace(/\/+$/, '');
+			}
+		};
+
+		const normalizedPrefix = normalizeUrl(prefix);
+
+		// Collect cache keys to delete (matches /api/budgets and /api/budgets?...)
 		for (const key of requestCache.keys()) {
-			if (key.startsWith(prefix)) {
+			const normalizedKey = normalizeUrl(key);
+			if (normalizedKey.startsWith(normalizedPrefix)) {
 				keysToDelete.push(key);
 			}
 		}
 
-		// Delete them
+		// Delete cache entries
 		for (const key of keysToDelete) {
 			requestCache.delete(key);
-			clearedCount++;
+			clearedCacheCount++;
 		}
 
-		// Also clear inflight requests for this prefix
+		// Clear inflight requests for this prefix
+		// Inflight keys are like "GET:https://example.com/api/budgets:{}"
 		for (const key of inflight.keys()) {
-			if (key.includes(prefix)) {
-				inflight.delete(key);
-				console.log(
-					`🧹 [ApiService] Cleared inflight request: ${key.substring(0, 50)}...`
-				);
+			const parts = key.split(':');
+			if (parts.length >= 2) {
+				const url = parts[1];
+				const normalizedUrl = normalizeUrl(url);
+				// Match normalized URLs and fallback to includes for safety
+				if (
+					normalizedUrl.startsWith(normalizedPrefix) ||
+					url.includes(prefix)
+				) {
+					inflight.delete(key);
+					clearedInflightCount++;
+					console.log(
+						`🧹 [ApiService] Cleared inflight: ${key.substring(0, 60)}...`
+					);
+				}
 			}
 		}
 
 		console.log(
-			`🗑️ [ApiService] Cleared ${clearedCount} cached entries with prefix: ${prefix}`
+			`🗑️ [ApiService] Cleared ${clearedCacheCount} cache + ${clearedInflightCount} inflight with prefix: ${normalizedPrefix}`
 		);
 	}
 
@@ -1313,8 +1460,8 @@ export class ApiService {
 	 */
 	static async getFresh<T>(
 		endpoint: string,
-		retries: number = 2
+		options?: { retries?: number; signal?: AbortSignal }
 	): Promise<ApiResponse<T>> {
-		return this.get<T>(endpoint, retries, false);
+		return this.get<T>(endpoint, { ...options, useCache: false });
 	}
 }

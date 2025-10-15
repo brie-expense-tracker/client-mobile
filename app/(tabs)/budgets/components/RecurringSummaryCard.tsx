@@ -73,13 +73,34 @@ const RecurringSummaryCard: React.FC<Props> = ({
 			setIsLoadingPaymentStatus(true);
 			setPaymentStatusError(null);
 			try {
-				// Use batch API for better performance
-				const patternIds = expenses.map((expense) => expense.patternId);
+				// Use batch API for better performance - build from current state
+				// Only send valid ObjectIds (24-char hex) to avoid querying manual_* IDs
+				const objectIdRe = /^[0-9a-fA-F]{24}$/;
+				const patternIds = expenses
+					.map((expense) => expense.patternId || (expense as any).id)
+					.filter((id) => id && objectIdRe.test(id));
+
+				if (patternIds.length === 0) {
+					console.log(
+						'⚠️ [RecurringSummaryCard] No valid ObjectIds to check payment status'
+					);
+					setExpensesWithPaymentStatus(
+						expenses.map((expense) => ({
+							...expense,
+							isPaid: false,
+							nextDueDate: expense.nextExpectedDate,
+						}))
+					);
+					setIsLoadingPaymentStatus(false);
+					return;
+				}
+
 				const paymentStatuses =
 					await RecurringExpenseService.checkBatchPaidStatus(patternIds);
 
 				const expensesWithStatus = expenses.map((expense) => {
-					const isPaid = paymentStatuses[expense.patternId] === true;
+					const expenseId = expense.patternId || (expense as any).id;
+					const isPaid = paymentStatuses[expenseId] === true;
 					let paymentDate: string | undefined;
 					let nextDueDate: string = expense.nextExpectedDate;
 

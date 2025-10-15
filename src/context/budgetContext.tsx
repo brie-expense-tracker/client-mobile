@@ -10,6 +10,18 @@ import { ApiService } from '../services';
 import { setCacheInvalidationFlags } from '../services/utility/cacheInvalidationUtils';
 
 // ==========================================
+// Utilities
+// ==========================================
+
+/**
+ * Normalize budget ID - handles both MongoDB _id and client id
+ * Use this everywhere for consistent ID access
+ */
+export const getBudgetId = (b: { id?: string; _id?: string }): string => {
+	return (b.id ?? (b as any)._id)!;
+};
+
+// ==========================================
 // Types
 // ==========================================
 export interface Budget {
@@ -185,6 +197,11 @@ interface BudgetContextType {
 	filterBudgets: (filter: BudgetFilter) => Budget[];
 	getAllCategories: () => string[];
 	getBudgetsByCategory: (category: string) => Budget[];
+	// Summary calculations (computed from budgets)
+	monthlySummary: { totalAllocated: number; totalSpent: number };
+	weeklySummary: { totalAllocated: number; totalSpent: number };
+	monthlyPercentage: number;
+	weeklyPercentage: number;
 }
 
 export const BudgetContext = createContext<BudgetContextType>({
@@ -221,6 +238,11 @@ export const BudgetContext = createContext<BudgetContextType>({
 	filterBudgets: () => [],
 	getAllCategories: () => [],
 	getBudgetsByCategory: () => [],
+	// Summary calculations
+	monthlySummary: { totalAllocated: 0, totalSpent: 0 },
+	weeklySummary: { totalAllocated: 0, totalSpent: 0 },
+	monthlyPercentage: 0,
+	weeklyPercentage: 0,
 });
 
 export const BudgetProvider = ({ children }: { children: ReactNode }) => {
@@ -228,10 +250,22 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 	const [isLoading, setIsLoading] = useState<boolean>(false); // Changed from true to false
 	const [hasLoaded, setHasLoaded] = useState<boolean>(false); // Track if data has been loaded
 
+	// Abort controller for cancelling stale fetches
+	const abortControllerRef = React.useRef<AbortController | null>(null);
+
 	// Note: Transaction refresh is handled by the transaction context itself
 	// when budgets are updated via the API
 
 	const refetch = useCallback(async () => {
+		// Cancel any in-flight request
+		if (abortControllerRef.current) {
+			abortControllerRef.current.abort();
+			console.log('🛑 [BudgetContext] Aborted previous fetch');
+		}
+
+		// Create new abort controller for this fetch
+		abortControllerRef.current = new AbortController();
+
 		setIsLoading(true);
 		try {
 			const response = await ApiService.get<any>('/api/budgets');
@@ -263,19 +297,27 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 					shouldAlert: budget.shouldAlert || false,
 					spentPercentage: budget.spentPercentage || 0,
 				}));
-				setBudgets(formatted);
+				// Use functional update to avoid dropping concurrent optimistic updates
+				setBudgets(() => formatted);
 				setHasLoaded(true); // Mark as loaded
 			} else {
 				console.warn('[Budgets] Unexpected response:', response);
-				setBudgets([]);
+				setBudgets(() => []);
 				setHasLoaded(true); // Mark as loaded even if empty
 			}
-		} catch (err) {
+		} catch (err: any) {
+			// Ignore abort errors (expected when a new fetch cancels the old one)
+			if (err?.name === 'AbortError') {
+				console.log('🛑 [BudgetContext] Fetch aborted (new fetch started)');
+				return;
+			}
 			console.warn('[Budgets] Failed to fetch budgets, using empty array', err);
-			setBudgets([]);
+			setBudgets(() => []);
 			setHasLoaded(true); // Mark as loaded even on error
 		} finally {
 			setIsLoading(false);
+			// Clean up abort controller
+			abortControllerRef.current = null;
 		}
 	}, []);
 
@@ -355,13 +397,31 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 
 				// Replace the temporary budget with the real one
 				setBudgets((prev) => {
+					// Check if temp budget still exists (might have been removed by another operation)
+					const hasTempBudget = prev.some((b) => b.id === tempId);
+					if (!hasTempBudget) {
+						console.warn(
+							'⚠️ [BudgetContext] Temp budget already removed, adding server budget'
+						);
+						return [serverBudget, ...prev];
+					}
+
 					const updated = prev.map((b) => (b.id === tempId ? serverBudget : b));
-					console.log('Updated budgets state (server):', updated);
+					console.log(
+						'✅ [BudgetContext] Replaced temp budget with server budget:',
+						{
+							tempId,
+							realId: serverBudget.id,
+							count: updated.length,
+						}
+					);
 					return updated;
 				});
 
 				// Invalidate relevant cache entries
 				setCacheInvalidationFlags.onBudgetChange();
+				ApiService.clearCacheByPrefix('/api/budgets');
+				console.log('🗑️ [BudgetContext] Cache cleared after budget creation');
 
 				return serverBudget;
 			} else {
@@ -424,6 +484,8 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 
 					// Invalidate relevant cache entries
 					setCacheInvalidationFlags.onBudgetChange();
+					ApiService.clearCacheByPrefix('/api/budgets');
+					console.log('🗑️ [BudgetContext] Cache cleared after budget creation');
 
 					return updatedBudget;
 				} else {
@@ -439,21 +501,61 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 
 	const deleteBudget = useCallback(
 		async (id: string) => {
-			// Optimistically update UI
-			setBudgets((prev) => prev.filter((b) => b.id !== id));
+			console.log('🗑️ [BudgetContext] Deleting budget:', id);
+
+			// Save previous state for rollback
+			let previousBudgets: Budget[] = [];
+			setBudgets((prev) => {
+				previousBudgets = prev;
+				// Optimistically remove from UI
+				return prev.filter((b) => getBudgetId(b) !== id);
+			});
 
 			try {
-				await ApiService.delete(`/api/budgets/${id}`);
+				console.log('🗑️ [BudgetContext] Calling API delete...');
+				const result = await ApiService.delete(`/api/budgets/${id}`);
 
+				if (!result.success) {
+					// Parse structured error from server
+					const errorData = result.data as any;
+					const errorCode = errorData?.error || 'Unknown';
+					const errorMessage = result.error || 'Delete failed';
+
+					console.error('❌ [BudgetContext] Server error:', {
+						code: errorCode,
+						message: errorMessage,
+						data: errorData,
+					});
+
+					// Map error codes to user-friendly messages
+					if (errorCode === 'BudgetInUse') {
+						throw new Error(
+							'This budget has linked transactions. Please remove or reassign those transactions before deleting the budget.'
+						);
+					} else if (errorCode === 'BudgetNotFound') {
+						throw new Error('Budget not found or already deleted.');
+					} else if (errorCode === 'InvalidBudgetId') {
+						throw new Error('Invalid budget ID.');
+					} else {
+						throw new Error(errorMessage);
+					}
+				}
+
+				console.log('✅ [BudgetContext] Delete successful, clearing cache...');
 				// Invalidate relevant cache entries
 				setCacheInvalidationFlags.onBudgetChange();
+				ApiService.clearCacheByPrefix('/api/budgets');
+				console.log('🗑️ [BudgetContext] Cache cleared after budget deletion');
 			} catch (err) {
-				console.warn('Delete failed, refetching', err);
-				// Rollback or just refetch
-				await refetch();
+				console.error('❌ [BudgetContext] Delete failed, rolling back:', err);
+				// Rollback to previous state
+				setBudgets(previousBudgets);
+
+				// Re-throw with user-friendly message (already formatted above)
+				throw err;
 			}
 		},
-		[refetch]
+		[] // No dependencies - function is stable
 	);
 
 	const updateBudgetSpent = useCallback(
@@ -516,6 +618,8 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 
 					// Invalidate relevant cache entries
 					setCacheInvalidationFlags.onBudgetChange();
+					ApiService.clearCacheByPrefix('/api/budgets');
+					console.log('🗑️ [BudgetContext] Cache cleared after budget creation');
 
 					return updatedBudget;
 				} else {
@@ -680,6 +784,60 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 		}
 	}, [refetch, hasLoaded]);
 
+	// Memoized summary calculations for monthly and weekly budgets
+	const summaryCalculations = useMemo(() => {
+		const monthlyBudgets = budgets.filter((b) => b.period === 'monthly');
+		const weeklyBudgets = budgets.filter((b) => b.period === 'weekly');
+
+		const monthlySummary = monthlyBudgets.reduce(
+			(acc, budget) => {
+				acc.totalAllocated += Number(budget.amount) || 0;
+				acc.totalSpent += Number(budget.spent) || 0;
+				return acc;
+			},
+			{ totalAllocated: 0, totalSpent: 0 }
+		);
+
+		const weeklySummary = weeklyBudgets.reduce(
+			(acc, budget) => {
+				acc.totalAllocated += Number(budget.amount) || 0;
+				acc.totalSpent += Number(budget.spent) || 0;
+				return acc;
+			},
+			{ totalAllocated: 0, totalSpent: 0 }
+		);
+
+		// Guard against divide-by-zero and NaN
+		const monthlyPercentage =
+			monthlySummary.totalAllocated > 0 && !isNaN(monthlySummary.totalSpent)
+				? Math.min(
+						Math.max(
+							0,
+							(monthlySummary.totalSpent / monthlySummary.totalAllocated) * 100
+						),
+						100
+				  )
+				: 0;
+
+		const weeklyPercentage =
+			weeklySummary.totalAllocated > 0 && !isNaN(weeklySummary.totalSpent)
+				? Math.min(
+						Math.max(
+							0,
+							(weeklySummary.totalSpent / weeklySummary.totalAllocated) * 100
+						),
+						100
+				  )
+				: 0;
+
+		return {
+			monthlySummary,
+			weeklySummary,
+			monthlyPercentage,
+			weeklyPercentage,
+		};
+	}, [budgets]);
+
 	const value = useMemo(
 		() => ({
 			budgets,
@@ -698,6 +856,8 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 			filterBudgets,
 			getAllCategories,
 			getBudgetsByCategory,
+			// Summary calculations
+			...summaryCalculations,
 		}),
 		[
 			budgets,
@@ -716,6 +876,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 			filterBudgets,
 			getAllCategories,
 			getBudgetsByCategory,
+			summaryCalculations,
 		]
 	);
 
