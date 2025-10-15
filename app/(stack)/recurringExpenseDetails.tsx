@@ -9,9 +9,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useRecurringExpenses } from '../../src/hooks/useRecurringExpenses';
+import { useRecurringExpense } from '../../src/context/recurringExpenseContext';
 import { RecurringExpense, RecurringExpenseService } from '../../src/services';
 import LinearProgressBar from '../(tabs)/budgets/components/LinearProgressBar';
+import { resolveRecurringExpenseAppearance } from '../../src/utils/recurringExpenseAppearance';
 
 interface RecurringTransaction {
 	id: string;
@@ -28,7 +29,7 @@ interface RecurringTransaction {
 const RecurringExpenseSummaryScreen: React.FC = () => {
 	const params = useLocalSearchParams();
 	const patternId = params.patternId as string;
-	const { expenses } = useRecurringExpenses();
+	const { expenses } = useRecurringExpense();
 	const [expense, setExpense] = useState<RecurringExpense | null>(null);
 	const [transactions, setTransactions] = useState<RecurringTransaction[]>([]);
 	const [loadingTransactions, setLoadingTransactions] = useState(false);
@@ -85,80 +86,12 @@ const RecurringExpenseSummaryScreen: React.FC = () => {
 		);
 	}
 
-	// Helper function to get vendor icon and color
-	const getVendorIconAndColor = (vendor: string) => {
-		const vendorMappings: Record<
-			string,
-			{ icon: keyof typeof Ionicons.glyphMap; color: string }
-		> = {
-			Netflix: { icon: 'film-outline', color: '#E50914' },
-			Spotify: { icon: 'musical-notes-outline', color: '#1DB954' },
-			Amazon: { icon: 'bag-outline', color: '#FF9900' },
-			Uber: { icon: 'car-outline', color: '#000000' },
-			Lyft: { icon: 'car-outline', color: '#FF00BF' },
-			DoorDash: { icon: 'restaurant-outline', color: '#FF3008' },
-			Grubhub: { icon: 'restaurant-outline', color: '#F63440' },
-			Instacart: { icon: 'cart-outline', color: '#43B02A' },
-			Apple: { icon: 'logo-apple', color: '#000000' },
-			Google: { icon: 'logo-google', color: '#4285F4' },
-			Microsoft: { icon: 'logo-microsoft', color: '#00A1F1' },
-			Adobe: { icon: 'color-palette-outline', color: '#FF0000' },
-			Zoom: { icon: 'videocam-outline', color: '#2D8CFF' },
-			Slack: { icon: 'chatbubbles-outline', color: '#4A154B' },
-			Notion: { icon: 'document-text-outline', color: '#000000' },
-			Figma: { icon: 'color-palette-outline', color: '#F24E1E' },
-			Canva: { icon: 'color-palette-outline', color: '#00C4CC' },
-			Dropbox: { icon: 'cloud-outline', color: '#0061FF' },
-			Box: { icon: 'cube-outline', color: '#0061D5' },
-			GitHub: { icon: 'logo-github', color: '#181717' },
-			GitLab: { icon: 'logo-github', color: '#FCA326' },
-			Bitbucket: { icon: 'logo-github', color: '#0052CC' },
-			Heroku: { icon: 'cloud-outline', color: '#430098' },
-			Vercel: { icon: 'cloud-outline', color: '#000000' },
-			Netlify: { icon: 'cloud-outline', color: '#00AD9F' },
-			DigitalOcean: { icon: 'water-outline', color: '#0080FF' },
-			AWS: { icon: 'cloud-outline', color: '#FF9900' },
-			Azure: { icon: 'cloud-outline', color: '#0089D6' },
-			GCP: { icon: 'cloud-outline', color: '#4285F4' },
-			Stripe: { icon: 'card-outline', color: '#6772E5' },
-			PayPal: { icon: 'card-outline', color: '#003087' },
-			Squarespace: { icon: 'globe-outline', color: '#000000' },
-			Wix: { icon: 'globe-outline', color: '#000000' },
-			Shopify: { icon: 'bag-outline', color: '#95BF47' },
-			WooCommerce: { icon: 'bag-outline', color: '#7F54B3' },
-			Mailchimp: { icon: 'mail-outline', color: '#FFE01B' },
-			ConvertKit: { icon: 'mail-outline', color: '#FB6970' },
-			Klaviyo: { icon: 'mail-outline', color: '#E31C79' },
-			HubSpot: { icon: 'business-outline', color: '#FF7A59' },
-			Salesforce: { icon: 'business-outline', color: '#00A1E0' },
-			Zendesk: { icon: 'chatbubbles-outline', color: '#03363D' },
-			Intercom: { icon: 'chatbubbles-outline', color: '#1F8DED' },
-			Drift: { icon: 'chatbubbles-outline', color: '#FF6B6B' },
-			Calendly: { icon: 'calendar-outline', color: '#006BFF' },
-			Acuity: { icon: 'calendar-outline', color: '#4A90E2' },
-			Typeform: { icon: 'document-text-outline', color: '#262627' },
-			SurveyMonkey: { icon: 'document-text-outline', color: '#00BF6F' },
-		};
-
-		// Check for exact matches first
-		if (vendorMappings[vendor]) {
-			return vendorMappings[vendor];
-		}
-
-		// Check for partial matches
-		for (const [key, value] of Object.entries(vendorMappings)) {
-			if (vendor.toLowerCase().includes(key.toLowerCase())) {
-				return value;
-			}
-		}
-
-		return { icon: 'repeat-outline', color: '#1E88E5' };
-	};
-
 	const daysUntilNext = RecurringExpenseService.getDaysUntilNext(
 		expense.nextExpectedDate
 	);
-	const { icon, color } = getVendorIconAndColor(expense.vendor);
+	
+	// Resolve appearance based on appearanceMode (respects user customization)
+	const { icon, color } = resolveRecurringExpenseAppearance(expense);
 
 	// Get urgency status
 	const getUrgencyStatus = () => {
