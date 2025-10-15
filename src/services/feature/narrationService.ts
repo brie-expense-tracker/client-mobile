@@ -335,7 +335,8 @@ Please keep your response concise (max ${maxTokens} tokens) and maintain a profe
 		goals: any[],
 		transactions: any[],
 		profile: any,
-		insights: any[] = []
+		insights: any[] = [],
+		recurringExpenses: any[] = []
 	): NarrationFacts {
 		return {
 			budgets:
@@ -360,6 +361,15 @@ Please keep your response concise (max ${maxTokens} tokens) and maintain a profe
 					category: t.category || 'Unknown',
 					date: t.date || new Date().toISOString(),
 					description: t.description || 'No description',
+				})) || [],
+
+			recurringExpenses:
+				recurringExpenses?.map((r) => ({
+					vendor: r.vendor || 'Unknown',
+					amount: r.amount || 0,
+					frequency: r.frequency || 'monthly',
+					nextDue: r.nextExpectedDate,
+					isOverdue: new Date(r.nextExpectedDate) < new Date(),
 				})) || [],
 
 			profile: profile

@@ -9,8 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { useBudgets } from '../../../src/hooks/useBudgets';
-import { Budget } from '../../../src/context/budgetContext';
+import { useBudget, Budget } from '../../../src/context/budgetContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import HeroBudget from './components/HeroBudget';
 import BudgetsFeed from './components/BudgetsFeed';
@@ -64,7 +63,7 @@ export default function BudgetScreen() {
 		weeklyPercentage,
 		hasLoaded,
 		error,
-	} = useBudgets();
+	} = useBudget();
 
 	// ==========================================
 	// Route Parameters
@@ -73,7 +72,7 @@ export default function BudgetScreen() {
 	const router = useRouter();
 
 	// ==========================================
-	// State Management
+	// State Managementnpm run
 	// ==========================================
 	const [activeTab, setActiveTab] = useState<'monthly' | 'weekly' | 'all'>(
 		'all'
@@ -97,20 +96,19 @@ export default function BudgetScreen() {
 		}
 	}, [refetch, hasLoaded]);
 
-	// Force refetch when screen comes into focus (fixes cache issues after delete/update)
+	// Only refetch when screen comes into focus if we don't have data yet
+	// Avoid clearing cache on every navigation to reduce API calls
 	useFocusEffect(
 		useCallback(() => {
-			console.log('🔄 [Budgets] Screen focused, clearing cache and refetching...');
-			// Import ApiService and clear cache before refetch
-			import('../../../src/services').then(({ ApiService }) => {
-				ApiService.clearCacheByPrefix('/api/budgets');
-				console.log('🗑️ [Budgets] Cache cleared on focus');
+			if (!hasLoaded) {
+				console.log(
+					'🔄 [Budgets] Screen focused, no data loaded yet - fetching...'
+				);
 				refetch();
-			}).catch(err => {
-				console.error('❌ [Budgets] Error in focus effect:', err);
-				refetch(); // Fallback to refetch without cache clear
-			});
-		}, [refetch])
+			} else {
+				console.log('✅ [Budgets] Screen focused, using cached data');
+			}
+		}, [refetch, hasLoaded])
 	);
 
 	// Handle modal opening from URL parameters
@@ -154,7 +152,9 @@ export default function BudgetScreen() {
 			console.log('✅ [Budgets] Refresh complete');
 		} catch (error) {
 			console.error('❌ [Budgets] Error refreshing:', error);
+			Alert.alert('Error', 'Failed to refresh budgets. Please try again.');
 		} finally {
+			// Always reset refreshing state, even on error
 			setRefreshing(false);
 		}
 	}, [refetch]);

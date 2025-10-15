@@ -208,9 +208,15 @@ export default function RecurringExpensesFeed({
 		const checkPaymentStatus = async () => {
 			if (expenses.length === 0) return;
 
-			// Create a cache key from expense IDs
+			// Create a cache key from expense IDs AND appearance data
+			// This ensures we re-render when icon/color changes
 			const cacheKey = expenses
-				.map((e) => e.patternId || (e as any).id)
+				.map(
+					(e) =>
+						`${e.patternId || (e as any).id}:${e.icon}:${e.color}:${
+							(e as any).appearanceMode || 'brand'
+						}`
+				)
 				.sort()
 				.join(',');
 

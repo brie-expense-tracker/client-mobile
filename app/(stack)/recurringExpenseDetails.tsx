@@ -89,7 +89,7 @@ const RecurringExpenseSummaryScreen: React.FC = () => {
 	const daysUntilNext = RecurringExpenseService.getDaysUntilNext(
 		expense.nextExpectedDate
 	);
-	
+
 	// Resolve appearance based on appearanceMode (respects user customization)
 	const { icon, color } = resolveRecurringExpenseAppearance(expense);
 

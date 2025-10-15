@@ -32,9 +32,9 @@ import Svg, {
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { TransactionContext } from '../../../src/context/transactionContext';
 import { useNotification } from '../../../src/context/notificationContext';
-import { useRecurringExpenses } from '../../../src/hooks/useRecurringExpenses';
-import { useBudgets } from '../../../src/hooks/useBudgets';
-import { useGoals } from '../../../src/hooks/useGoals';
+import { useRecurringExpense } from '../../../src/context/recurringExpenseContext';
+import { useBudget } from '../../../src/context/budgetContext';
+import { useGoal } from '../../../src/context/goalContext';
 import { TransactionHistory } from './components';
 import {
 	accessibilityProps,
@@ -56,8 +56,8 @@ const getLocalIsoDate = () => {
 export default function DashboardPro() {
 	const { transactions, isLoading, refetch } = useContext(TransactionContext);
 	const { unreadCount } = useNotification();
-	const { budgets, isLoading: budgetsLoading } = useBudgets();
-	const { goals, isLoading: goalsLoading } = useGoals();
+	const { budgets, isLoading: budgetsLoading } = useBudget();
+	const { goals, isLoading: goalsLoading } = useGoal();
 	const [refreshing, setRefreshing] = useState(false);
 
 	const onRefresh = useCallback(async () => {
@@ -586,10 +586,21 @@ function RecurringPreview({
 	onViewAll: () => void;
 }) {
 	// Get real recurring expenses data
-	const { expenses } = useRecurringExpenses();
+	const { expenses } = useRecurringExpense();
 
 	// Process recurring expenses for display
 	const rows = expenses
+		.filter((expense) => {
+			// Safety check: ensure expense has required fields
+			if (!expense || !expense.nextExpectedDate || !expense.vendor) {
+				console.warn(
+					'⚠️ [RecurringPreview] Skipping invalid expense:',
+					expense
+				);
+				return false;
+			}
+			return true;
+		})
 		.map((expense) => {
 			const nextDue = new Date(expense.nextExpectedDate);
 			const today = new Date();

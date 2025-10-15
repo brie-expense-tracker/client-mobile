@@ -14,8 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
-import { useBudgets } from '../../src/hooks/useBudgets';
-import { Budget } from '../../src/context/budgetContext';
+import { useBudget, Budget } from '../../src/context/budgetContext';
 import LinearProgressBar from '../(tabs)/budgets/components/LinearProgressBar';
 import {
 	BudgetAnalysisService,
@@ -30,7 +29,7 @@ import { useProfile } from '../../src/context/profileContext';
 const BudgetSummaryScreen: React.FC = () => {
 	const params = useLocalSearchParams();
 	const budgetId = params.id as string;
-	const { budgets } = useBudgets();
+	const { budgets } = useBudget();
 	const { profile } = useProfile();
 	const [budget, setBudget] = useState<Budget | null>(null);
 	const [analysis, setAnalysis] = useState<BudgetAnalysis | null>(null);

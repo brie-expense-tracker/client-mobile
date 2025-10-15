@@ -10,9 +10,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { RecurringExpenseService } from '../../../../src/services';
 import {
-	useRecurringExpenses,
+	useRecurringExpense,
 	TransformedRecurringExpense,
-} from '../../../../src/hooks/useRecurringExpenses';
+} from '../../../../src/context/recurringExpenseContext';
 
 interface RecurringExpensesSummaryWidgetProps {
 	title?: string;
@@ -29,11 +29,7 @@ const RecurringExpensesSummaryWidget: React.FC<
 	onExpensePress,
 	showViewAllButton = true,
 }) => {
-	const {
-		expenses,
-		isLoading: loading,
-		summaryStats,
-	} = useRecurringExpenses();
+	const { expenses, isLoading: loading, summaryStats } = useRecurringExpense();
 
 	// State for payment status
 	const [expensesWithPaymentStatus, setExpensesWithPaymentStatus] = useState<
@@ -56,50 +52,71 @@ const RecurringExpensesSummaryWidget: React.FC<
 			setIsLoadingPaymentStatus(true);
 			setPaymentStatusError(null);
 			try {
-				const expensesWithStatus = await Promise.all(
-					transformedExpenses.map(async (expense) => {
-						try {
-							const isPaid =
-								await RecurringExpenseService.checkIfCurrentPeriodPaid(
-									expense.patternId
-								);
+				// Use batch API for better performance - build from current state
+				// Only send valid ObjectIds (24-char hex) to avoid querying manual_* IDs
+				const objectIdRe = /^[0-9a-fA-F]{24}$/;
+				const patternIds = transformedExpenses
+					.map((expense) => expense.patternId || (expense as any).id)
+					.filter((id) => id && objectIdRe.test(id));
 
-							// Check if paid within 2 weeks of the monthly expense
-							let isPaidWithinTwoWeeks = false;
-							let paymentDate: string | undefined;
-							let nextDueDate: string = expense.nextExpectedDate;
+				if (patternIds.length === 0) {
+					console.log(
+						'⚠️ [RecurringExpensesSummaryWidget] No valid ObjectIds to check payment status'
+					);
+					setExpensesWithPaymentStatus(
+						transformedExpenses.map((expense) => ({
+							...expense,
+							isPaid: false,
+							nextDueDate: expense.nextExpectedDate,
+						}))
+					);
+					setIsLoadingPaymentStatus(false);
+					return;
+				}
 
-							if (isPaid) {
-								// Since we only get a boolean now, we'll assume it's paid within the period
-								isPaidWithinTwoWeeks = true;
-								paymentDate = new Date().toLocaleDateString();
-								// Calculate next due date based on frequency
-								nextDueDate = calculateNextDueDate(
-									expense.nextExpectedDate,
-									expense.frequency
-								);
-							}
+				const paymentStatuses =
+					await RecurringExpenseService.checkBatchPaidStatus(patternIds);
 
-							return {
-								...expense,
-								isPaid: isPaidWithinTwoWeeks,
-								paymentDate,
-								nextDueDate,
-							};
-						} catch (error) {
-							console.error(
-								`Error checking payment status for ${expense.patternId}:`,
-								error
+				const expensesWithStatus = transformedExpenses.map((expense) => {
+					try {
+						const expenseId = expense.patternId || (expense as any).id;
+						const isPaid = paymentStatuses[expenseId] === true;
+
+						// Check if paid within 2 weeks of the monthly expense
+						let isPaidWithinTwoWeeks = false;
+						let paymentDate: string | undefined;
+						let nextDueDate: string = expense.nextExpectedDate;
+
+						if (isPaid) {
+							// Since we only get a boolean now, we'll assume it's paid within the period
+							isPaidWithinTwoWeeks = true;
+							paymentDate = new Date().toLocaleDateString();
+							// Calculate next due date based on frequency
+							nextDueDate = calculateNextDueDate(
+								expense.nextExpectedDate,
+								expense.frequency
 							);
-							// Return expense with default unpaid status on error
-							return {
-								...expense,
-								isPaid: false,
-								nextDueDate: expense.nextExpectedDate,
-							};
 						}
-					})
-				);
+
+						return {
+							...expense,
+							isPaid: isPaidWithinTwoWeeks,
+							paymentDate,
+							nextDueDate,
+						};
+					} catch (error) {
+						console.error(
+							`Error checking payment status for ${expenseId}:`,
+							error
+						);
+						// Return expense with default unpaid status on error
+						return {
+							...expense,
+							isPaid: false,
+							nextDueDate: expense.nextExpectedDate,
+						};
+					}
+				});
 
 				setExpensesWithPaymentStatus(expensesWithStatus);
 				setRetryCount(0); // Reset retry count on success

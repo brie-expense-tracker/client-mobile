@@ -49,12 +49,25 @@ export interface UpdateGoalData {
 }
 
 // ==========================================
+// Helpers
+// ==========================================
+
+/**
+ * Get goal ID - handles both MongoDB _id and client id
+ * Single source of truth for ID access
+ */
+export const getGoalId = (g: { id?: string; _id?: string }): string => {
+	return (g.id ?? (g as any)._id)!;
+};
+
+// ==========================================
 // Context
 // ==========================================
 
 interface GoalContextType {
 	goals: Goal[];
 	isLoading: boolean;
+	hasLoaded: boolean;
 	refetch: () => Promise<void>;
 	addGoal: (goalData: CreateGoalData) => Promise<Goal>;
 	updateGoal: (id: string, updates: UpdateGoalData) => Promise<Goal>;
@@ -65,6 +78,7 @@ interface GoalContextType {
 export const GoalContext = createContext<GoalContextType>({
 	goals: [],
 	isLoading: true,
+	hasLoaded: false,
 	refetch: async () => {},
 	addGoal: async () => {
 		throw new Error('addGoal not implemented');
@@ -80,14 +94,22 @@ export const GoalContext = createContext<GoalContextType>({
 
 export const GoalProvider = ({ children }: { children: ReactNode }) => {
 	const [goals, setGoals] = useState<Goal[]>([]);
-	const [isLoading, setIsLoading] = useState<boolean>(true);
-	// Note: Transaction refresh is handled by the transaction context itself
-	// when goals are updated via the API
+	const [isLoading, setIsLoading] = useState<boolean>(false);
+	const [hasLoaded, setHasLoaded] = useState<boolean>(false);
 
-	// Memoize the goals data to prevent unnecessary re-renders
-	const memoizedGoals = useMemo(() => goals, [goals]);
+	// Abort controller for cancelling stale fetches
+	const abortControllerRef = React.useRef<AbortController | null>(null);
 
 	const refetch = useCallback(async () => {
+		// Cancel any in-flight request
+		if (abortControllerRef.current) {
+			abortControllerRef.current.abort();
+			console.log('🛑 [GoalContext] Aborted previous fetch');
+		}
+
+		// Create new abort controller for this fetch
+		abortControllerRef.current = new AbortController();
+
 		setIsLoading(true);
 		try {
 			const response = await ApiService.get<any>('/api/goals');
@@ -113,16 +135,27 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 					createdAt: goal.createdAt,
 					updatedAt: goal.updatedAt,
 				}));
-				setGoals(formatted);
+				// Use functional update to avoid dropping concurrent optimistic updates
+				setGoals(() => formatted);
+				setHasLoaded(true);
 			} else {
 				console.warn('[Goals] Unexpected response:', response);
-				setGoals([]);
+				setGoals(() => []);
+				setHasLoaded(true);
 			}
-		} catch (err) {
+		} catch (err: any) {
+			// Ignore abort errors (expected when a new fetch cancels the old one)
+			if (err?.name === 'AbortError') {
+				console.log('🛑 [GoalContext] Fetch aborted (new fetch started)');
+				return;
+			}
 			console.warn('[Goals] Failed to fetch goals, using empty array', err);
-			setGoals([]);
+			setGoals(() => []);
+			setHasLoaded(true);
 		} finally {
 			setIsLoading(false);
+			// Clean up abort controller
+			abortControllerRef.current = null;
 		}
 	}, []);
 
@@ -143,6 +176,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 		});
 
 		try {
+			console.log('💾 [GoalContext] Creating goal on server...');
 			const response = await ApiService.post<any>('/api/goals', goalData);
 
 			// Handle the response format properly
@@ -152,7 +186,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 			if (actualSuccess && actualData) {
 				// Update with the real ID from the server
 				const serverGoal: Goal = {
-					id: actualData._id ?? actualData.id ?? tempId,
+					id: actualData._id ?? actualData.id,
 					name: actualData.name,
 					target: Number(actualData.target) || 0,
 					current: Number(actualData.current) || 0,
@@ -167,11 +201,27 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 					updatedAt: actualData.updatedAt,
 				};
 
+				console.log('✅ [GoalContext] Goal created, replacing temp ID:', {
+					tempId,
+					realId: serverGoal.id,
+				});
+
 				// Replace the temporary goal with the real one
 				setGoals((prev) => {
-					const updated = prev.map((g) => (g.id === tempId ? serverGoal : g));
-					return updated;
+					// Defensive: if temp already removed, add server goal
+					const hasTempGoal = prev.some((g) => g.id === tempId);
+					if (!hasTempGoal) {
+						console.warn(
+							'[GoalContext] Temp goal already removed, adding server goal'
+						);
+						return [serverGoal, ...prev];
+					}
+					return prev.map((g) => (g.id === tempId ? serverGoal : g));
 				});
+
+				// Clear cache to ensure fresh data
+				ApiService.clearCacheByPrefix('/api/goals');
+				console.log('🗑️ [GoalContext] Cache cleared after goal creation');
 
 				return serverGoal;
 			} else {
@@ -179,12 +229,9 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 				throw new Error(response.error || 'Failed to create goal');
 			}
 		} catch (error) {
+			console.error('❌ [GoalContext] Error adding goal:', error);
 			// Remove the optimistic goal on error
-			setGoals((prev) => {
-				const updated = prev.filter((g) => g.id !== tempId);
-				return updated;
-			});
-			console.error('Error adding goal:', error);
+			setGoals((prev) => prev.filter((g) => g.id !== tempId));
 			throw error;
 		}
 	}, []);
@@ -217,44 +264,87 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 
 					setGoals((prev) => prev.map((g) => (g.id === id ? updatedGoal : g)));
 
-					// Note: Transaction refresh is handled by the transaction context itself
-					// when goals are updated via the API
+					// Clear cache to ensure fresh data
+					ApiService.clearCacheByPrefix('/api/goals');
+					console.log('🗑️ [GoalContext] Cache cleared after goal update');
 
 					return updatedGoal;
 				} else {
 					throw new Error(response.error || 'Failed to update goal');
 				}
 			} catch (error) {
-				console.error('Failed to update goal:', error);
+				console.error('❌ [GoalContext] Failed to update goal:', error);
 				throw error;
 			}
 		},
 		[]
 	);
 
-	const deleteGoal = useCallback(
-		async (id: string) => {
-			// Optimistically update UI
-			setGoals((prev) => prev.filter((g) => g.id !== id));
+	const deleteGoal = useCallback(async (id: string) => {
+		console.log('🗑️ [GoalContext] Deleting goal:', id);
 
-			try {
-				await ApiService.delete(`/api/goals/${id}`);
-			} catch (err) {
-				console.warn('Delete failed, refetching', err);
-				// Rollback or just refetch
-				await refetch();
+		// Save previous state for rollback
+		let previousGoals: Goal[] = [];
+		setGoals((prev) => {
+			previousGoals = prev;
+			// Optimistically remove from UI
+			return prev.filter((g) => getGoalId(g) !== id);
+		});
+
+		try {
+			console.log('🗑️ [GoalContext] Calling API delete...');
+			const result = await ApiService.delete(`/api/goals/${id}`);
+
+			if (!result.success) {
+				// Parse structured error from server
+				const errorData = result.data as any;
+				const errorCode = errorData?.error || 'Unknown';
+				const errorMessage = result.error || 'Delete failed';
+
+				console.error('❌ [GoalContext] Server error:', {
+					code: errorCode,
+					message: errorMessage,
+					data: errorData,
+				});
+
+				// Map error codes to user-friendly messages
+				if (errorCode === 'GoalInUse') {
+					throw new Error(
+						'This goal has linked transactions. Please remove or reassign those transactions before deleting the goal.'
+					);
+				} else if (errorCode === 'GoalNotFound') {
+					throw new Error('Goal not found or already deleted.');
+				} else if (errorCode === 'InvalidGoalId') {
+					throw new Error('Invalid goal ID.');
+				} else {
+					throw new Error(errorMessage);
+				}
 			}
-		},
-		[refetch]
-	);
+
+			console.log('✅ [GoalContext] Delete successful, clearing cache...');
+			// Clear cache to ensure fresh data
+			ApiService.clearCacheByPrefix('/api/goals');
+			console.log('🗑️ [GoalContext] Cache cleared after goal deletion');
+		} catch (err) {
+			console.error('❌ [GoalContext] Delete failed, rolling back:', err);
+			// Rollback to previous state
+			setGoals(previousGoals);
+
+			// Re-throw with user-friendly message (already formatted above)
+			throw err;
+		}
+	}, []);
 
 	const updateGoalCurrent = useCallback(
 		async (goalId: string, amount: number) => {
 			try {
-				const response = await ApiService.post<any>('/api/goals/update-current', {
-					goalId,
-					amount,
-				});
+				const response = await ApiService.post<any>(
+					'/api/goals/update-current',
+					{
+						goalId,
+						amount,
+					}
+				);
 
 				// Handle the response format properly
 				const actualData = response.data?.data || response.data;
@@ -281,12 +371,18 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 						prev.map((g) => (g.id === updatedGoal.id ? updatedGoal : g))
 					);
 
+					// Clear cache to ensure fresh data
+					ApiService.clearCacheByPrefix('/api/goals');
+					console.log(
+						'🗑️ [GoalContext] Cache cleared after goal current update'
+					);
+
 					return updatedGoal;
 				} else {
 					throw new Error(response.error || 'Failed to update goal current');
 				}
 			} catch (error) {
-				console.error('Failed to update goal current:', error);
+				console.error('❌ [GoalContext] Failed to update goal current:', error);
 				throw error;
 			}
 		},
@@ -294,14 +390,17 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 	);
 
 	useEffect(() => {
-		refetch();
-	}, [refetch]);
+		if (!hasLoaded) {
+			refetch();
+		}
+	}, [refetch, hasLoaded]);
 
 	// Memoize the context value to prevent unnecessary re-renders
 	const value = useMemo(
 		() => ({
-			goals: memoizedGoals,
+			goals,
 			isLoading,
+			hasLoaded,
 			refetch,
 			addGoal,
 			updateGoal,
@@ -309,8 +408,9 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 			updateGoalCurrent,
 		}),
 		[
-			memoizedGoals,
+			goals,
 			isLoading,
+			hasLoaded,
 			refetch,
 			addGoal,
 			updateGoal,

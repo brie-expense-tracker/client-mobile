@@ -32,6 +32,12 @@ export interface IntentContext {
 		amount: number;
 		category: string;
 	}[];
+	recurringExpenses?: {
+		vendor: string;
+		amount: number;
+		frequency: string;
+		nextDue: string;
+	}[];
 }
 
 export interface IntentMissingInfoState {

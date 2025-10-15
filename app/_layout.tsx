@@ -31,6 +31,9 @@ import { ProfileProvider } from '../src/context/profileContext';
 import { NotificationProvider } from '../src/context/notificationContext';
 import { TransactionProvider } from '../src/context/transactionContext';
 import { TransactionModalProvider } from '../src/context/transactionModalContext';
+import { BudgetProvider } from '../src/context/budgetContext';
+import { GoalProvider } from '../src/context/goalContext';
+import { RecurringExpenseProvider } from '../src/context/recurringExpenseContext';
 import { ThemeProvider } from '../src/context/ThemeContext';
 import { loadLocalOverrides, getResolvedFlags } from '../src/config/features';
 
@@ -354,36 +357,42 @@ function RootLayoutContent() {
 						</View>
 					)}
 					{/* Always mount all providers to ensure onboarding screens have access */}
-					<TransactionProvider>
-						<TransactionModalProvider>
-							<GestureHandlerRootView style={{ flex: 1 }}>
-								<Stack
-									screenOptions={{
-										headerShown: false,
-										animation: 'none',
-										contentStyle: { backgroundColor: '#fff' },
-									}}
-								>
-									<Stack.Screen
-										name="(auth)"
-										options={{ headerShown: false, animation: 'none' }}
-									/>
-									<Stack.Screen
-										name="(onboarding)"
-										options={{ headerShown: false, animation: 'none' }}
-									/>
-									<Stack.Screen
-										name="(tabs)"
-										options={{ headerShown: false, animation: 'none' }}
-									/>
-									<Stack.Screen
-										name="(stack)"
-										options={{ headerShown: false, animation: 'none' }}
-									/>
-								</Stack>
-							</GestureHandlerRootView>
-						</TransactionModalProvider>
-					</TransactionProvider>
+					<BudgetProvider>
+						<GoalProvider>
+							<RecurringExpenseProvider>
+								<TransactionProvider>
+									<TransactionModalProvider>
+										<GestureHandlerRootView style={{ flex: 1 }}>
+											<Stack
+												screenOptions={{
+													headerShown: false,
+													animation: 'none',
+													contentStyle: { backgroundColor: '#fff' },
+												}}
+											>
+												<Stack.Screen
+													name="(auth)"
+													options={{ headerShown: false, animation: 'none' }}
+												/>
+												<Stack.Screen
+													name="(onboarding)"
+													options={{ headerShown: false, animation: 'none' }}
+												/>
+												<Stack.Screen
+													name="(tabs)"
+													options={{ headerShown: false, animation: 'none' }}
+												/>
+												<Stack.Screen
+													name="(stack)"
+													options={{ headerShown: false, animation: 'none' }}
+												/>
+											</Stack>
+										</GestureHandlerRootView>
+									</TransactionModalProvider>
+								</TransactionProvider>
+							</RecurringExpenseProvider>
+						</GoalProvider>
+					</BudgetProvider>
 				</ProfileProvider>
 			);
 		} catch (error) {

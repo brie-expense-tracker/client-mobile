@@ -31,7 +31,7 @@ import * as Haptics from 'expo-haptics';
 import { TransactionContext } from '../../../../src/context/transactionContext';
 import { useBudget } from '../../../../src/context/budgetContext';
 import { useGoal } from '../../../../src/context/goalContext';
-import { useRecurringExpenses } from '../../../../src/hooks/useRecurringExpenses';
+import { useRecurringExpense } from '../../../../src/context/recurringExpenseContext';
 import { normalizeIconName } from '../../../../src/constants/uiConstants';
 import { DateField } from '../../../../src/components/DateField';
 
@@ -437,7 +437,7 @@ export default function EditTransactionScreen() {
 		React.useContext(TransactionContext);
 	const { budgets } = useBudget();
 	const { goals } = useGoal();
-	const { expenses: recurringExpenses } = useRecurringExpenses();
+	const { expenses: recurringExpenses } = useRecurringExpense();
 
 	const tx = useMemo(
 		() => transactions.find((t) => t.id === id),

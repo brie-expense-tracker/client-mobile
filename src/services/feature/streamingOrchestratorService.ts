@@ -24,6 +24,7 @@ interface FinancialContext {
 	budgets: any[];
 	goals: any[];
 	transactions: any[];
+	recurringExpenses?: any[];
 }
 
 export interface StreamingOrchestratorRequest {
