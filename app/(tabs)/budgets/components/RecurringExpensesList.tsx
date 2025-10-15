@@ -15,9 +15,10 @@ import {
 	RecurringExpenseService,
 	RecurringExpense,
 } from '../../../../src/services';
-import { useRecurringExpenses } from '../../../../src/hooks/useRecurringExpenses';
+import { useRecurringExpense } from '../../../../src/context/recurringExpenseContext';
 import { FilterContext } from '../../../../src/context/filterContext';
 import RecurringExpenseCard from './RecurringExpenseCard';
+import { resolveRecurringExpenseAppearance } from '../../../../src/utils/recurringExpenseAppearance';
 
 interface RecurringExpensesListProps {
 	title?: string;
@@ -40,7 +41,7 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 		isLoading: loading,
 		refetch,
 		markAsPaid,
-	} = useRecurringExpenses();
+	} = useRecurringExpense();
 	const [expenses, setExpenses] = useState<RecurringExpense[]>([]);
 	const [markingAsPaid, setMarkingAsPaid] = useState<string | null>(null);
 	const [paymentStatuses, setPaymentStatuses] = useState<
@@ -74,7 +75,21 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 			if (expenses.length === 0) return;
 
 			try {
-				const patternIds = expenses.map((expense) => expense.patternId);
+				// Build IDs from current state (handles both patternId and id fields)
+				// Only send valid ObjectIds (24-char hex) to avoid querying manual_* IDs
+				const objectIdRe = /^[0-9a-fA-F]{24}$/;
+				const patternIds = expenses
+					.map((expense) => expense.patternId || (expense as any).id)
+					.filter((id) => id && objectIdRe.test(id));
+
+				if (patternIds.length === 0) {
+					console.log(
+						'⚠️ [RecurringExpensesList] No valid ObjectIds to check payment status'
+					);
+					setPaymentStatuses({});
+					return;
+				}
+
 				const statuses = await RecurringExpenseService.checkBatchPaidStatus(
 					patternIds
 				);
@@ -227,81 +242,8 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 		const isPaid = paymentStatuses[expense.patternId] === true;
 		const isMarkingAsPaid = markingAsPaid === expense.patternId;
 
-		// Determine icon and color based on vendor
-		const getVendorIconAndColor = (vendor: string) => {
-			const vendorLower = vendor.toLowerCase();
-			if (vendorLower.includes('netflix'))
-				return {
-					icon: 'play-circle-outline' as keyof typeof Ionicons.glyphMap,
-					color: '#E50914',
-				};
-			if (vendorLower.includes('spotify'))
-				return {
-					icon: 'musical-notes-outline' as keyof typeof Ionicons.glyphMap,
-					color: '#1DB954',
-				};
-			if (vendorLower.includes('amazon'))
-				return {
-					icon: 'bag-outline' as keyof typeof Ionicons.glyphMap,
-					color: '#FF9900',
-				};
-			if (vendorLower.includes('uber'))
-				return {
-					icon: 'car-outline' as keyof typeof Ionicons.glyphMap,
-					color: '#000000',
-				};
-			if (vendorLower.includes('lyft'))
-				return {
-					icon: 'car-outline' as keyof typeof Ionicons.glyphMap,
-					color: '#FF00BF',
-				};
-			if (vendorLower.includes('doordash') || vendorLower.includes('grubhub'))
-				return {
-					icon: 'restaurant-outline' as keyof typeof Ionicons.glyphMap,
-					color: '#FF6B35',
-				};
-			if (vendorLower.includes('rent') || vendorLower.includes('apartment'))
-				return {
-					icon: 'home-outline' as keyof typeof Ionicons.glyphMap,
-					color: '#4CAF50',
-				};
-			if (vendorLower.includes('electric') || vendorLower.includes('power'))
-				return {
-					icon: 'flash-outline' as keyof typeof Ionicons.glyphMap,
-					color: '#FFC107',
-				};
-			if (vendorLower.includes('water'))
-				return {
-					icon: 'water-outline' as keyof typeof Ionicons.glyphMap,
-					color: '#2196F3',
-				};
-			if (vendorLower.includes('internet') || vendorLower.includes('wifi'))
-				return {
-					icon: 'wifi-outline' as keyof typeof Ionicons.glyphMap,
-					color: '#9C27B0',
-				};
-			if (vendorLower.includes('phone') || vendorLower.includes('mobile'))
-				return {
-					icon: 'call-outline' as keyof typeof Ionicons.glyphMap,
-					color: '#00BCD4',
-				};
-			if (vendorLower.includes('insurance'))
-				return {
-					icon: 'shield-outline' as keyof typeof Ionicons.glyphMap,
-					color: '#795548',
-				};
-			if (vendorLower.includes('gym') || vendorLower.includes('fitness'))
-				return {
-					icon: 'fitness-outline' as keyof typeof Ionicons.glyphMap,
-					color: '#F44336',
-				};
-			return {
-				icon: 'repeat-outline' as keyof typeof Ionicons.glyphMap,
-				color: '#1E88E5',
-			};
-		};
-
-		const { icon, color } = getVendorIconAndColor(expense.vendor);
+		// Resolve appearance based on appearanceMode (respects user customization)
+		const { icon, color } = resolveRecurringExpenseAppearance(expense);
 
 		return (
 			<TouchableOpacity

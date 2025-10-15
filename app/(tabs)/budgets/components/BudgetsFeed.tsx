@@ -5,9 +5,14 @@ import {
 	FlatList,
 	StyleSheet,
 	TouchableOpacity,
+	ActivityIndicator,
+	RefreshControl,
+	Platform,
+	ActionSheetIOS,
+	Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Budget } from '../../../../src/context/budgetContext';
+import { Budget, getBudgetId } from '../../../../src/context/budgetContext';
 import LinearProgressBar from './LinearProgressBar';
 import { router } from 'expo-router';
 import { normalizeIconName } from '../../../../src/constants/uiConstants';
@@ -68,7 +73,7 @@ function BudgetRow({
 			>
 				<Ionicons
 					name={normalizeIconName(budget.icon || 'wallet-outline')}
-					size={20}
+					size={24}
 					color={budget.color ?? '#18181b'}
 				/>
 			</View>
@@ -136,38 +141,137 @@ export default function BudgetsFeed({
 	onPressMenu,
 	budgets = [],
 	activeTab = 'all',
+	isLoading = false,
+	onRefresh,
 }: {
 	scrollEnabled?: boolean;
 	onPressMenu?: (id: string) => void;
 	budgets?: Budget[];
 	activeTab?: 'all' | 'monthly' | 'weekly';
+	isLoading?: boolean;
+	onRefresh?: () => Promise<void>;
 }) {
-	const filtered = useMemo(() => {
-		if (activeTab === 'all') return budgets;
-		return budgets.filter((b) => b.period === activeTab);
-	}, [activeTab, budgets]);
+	const [refreshing, setRefreshing] = useState(false);
+	const [sortBy, setSortBy] = useState<'name' | 'amount' | 'spent'>('name');
+
+	const filteredAndSorted = useMemo(() => {
+		let filtered = budgets;
+		if (activeTab !== 'all') {
+			filtered = budgets.filter((b) => b.period === activeTab);
+		}
+
+		// Sort budgets
+		return [...filtered].sort((a, b) => {
+			switch (sortBy) {
+				case 'name':
+					return a.name.localeCompare(b.name);
+				case 'amount':
+					return b.amount - a.amount; // Higher amount first
+				case 'spent':
+					return (b.spent || 0) - (a.spent || 0); // Higher spent first
+				default:
+					return 0;
+			}
+		});
+	}, [activeTab, sortBy, budgets]);
+
+	const handleRefresh = async () => {
+		if (!onRefresh) return;
+		setRefreshing(true);
+		try {
+			await onRefresh();
+		} catch (error) {
+			console.error('Error refreshing budgets:', error);
+		} finally {
+			setRefreshing(false);
+		}
+	};
+
+	const openSortPicker = () => {
+		const labels = ['Name', 'Amount', 'Spent', 'Cancel'];
+		const keys: (typeof sortBy)[] = ['name', 'amount', 'spent'];
+		if (Platform.OS === 'ios') {
+			ActionSheetIOS.showActionSheetWithOptions(
+				{ title: 'Sort by', options: labels, cancelButtonIndex: 3 },
+				(idx) => {
+					if (idx == null || idx === 3) return;
+					setSortBy(keys[idx]);
+				}
+			);
+		} else {
+			Alert.alert('Sort by', undefined, [
+				{ text: 'Name', onPress: () => setSortBy('name') },
+				{ text: 'Amount', onPress: () => setSortBy('amount') },
+				{ text: 'Spent', onPress: () => setSortBy('spent') },
+				{ text: 'Cancel', style: 'cancel' },
+			]);
+		}
+	};
 
 	return (
 		<View style={styles.screen}>
-			<FlatList
-				data={filtered}
-				keyExtractor={(b) => b.id}
-				renderItem={({ item }) => (
-					<BudgetRow budget={item} onPressMenu={onPressMenu} />
-				)}
-				ItemSeparatorComponent={() => <View style={styles.separator} />}
-				ListEmptyComponent={
-					<View style={styles.emptyWrap}>
-						<Ionicons name="wallet-outline" size={20} color="#9aa3ad" />
-						<Text style={styles.emptyText}>
-							{activeTab === 'all'
-								? 'No budgets yet.'
-								: `No ${activeTab} budgets.`}
-						</Text>
+			{isLoading ? (
+				<View style={styles.loadingState}>
+					<ActivityIndicator size="large" color="#007ACC" />
+					<Text style={styles.loadingText}>Loading budgets...</Text>
+				</View>
+			) : (
+				<>
+					{/* Toolbar */}
+					<View style={styles.toolbar}>
+						<TouchableOpacity
+							onPress={openSortPicker}
+							activeOpacity={0.7}
+							style={styles.toolbarChip}
+							accessibilityRole="button"
+							accessibilityLabel="Change sort order"
+						>
+							<Ionicons name="swap-vertical" size={14} color="#0A84FF" />
+							<Text style={styles.toolbarChipText}>
+								Sort:{' '}
+								{sortBy === 'name'
+									? 'Name'
+									: sortBy === 'amount'
+									? 'Amount'
+									: 'Spent'}
+							</Text>
+						</TouchableOpacity>
 					</View>
-				}
-				scrollEnabled={scrollEnabled}
-			/>
+
+					<FlatList
+						data={filteredAndSorted}
+						keyExtractor={(b) => getBudgetId(b)}
+						renderItem={({ item }) => (
+							<BudgetRow budget={item} onPressMenu={onPressMenu} />
+						)}
+						ItemSeparatorComponent={() => <View style={styles.separator} />}
+						refreshControl={
+							<RefreshControl
+								refreshing={refreshing}
+								onRefresh={handleRefresh}
+								tintColor="#007ACC"
+								colors={['#007ACC']}
+							/>
+						}
+						ListEmptyComponent={
+							<View style={styles.emptyState}>
+								<Ionicons name="wallet-outline" size={48} color="#d1d5db" />
+								<Text style={styles.emptyTitle}>
+									{activeTab === 'all'
+										? 'No budgets found'
+										: `No ${activeTab} budgets`}
+								</Text>
+								<Text style={styles.emptySubtitle}>
+									{activeTab === 'all'
+										? 'Create a budget to start tracking your spending'
+										: `Create a ${activeTab} budget to get started`}
+								</Text>
+							</View>
+						}
+						scrollEnabled={scrollEnabled}
+					/>
+				</>
+			)}
 		</View>
 	);
 }
@@ -179,7 +283,6 @@ const styles = StyleSheet.create({
 	separator: {
 		height: StyleSheet.hairlineWidth,
 		backgroundColor: '#ECEFF3',
-		marginLeft: 52,
 	},
 
 	rowContainer: {
@@ -189,9 +292,9 @@ const styles = StyleSheet.create({
 		// No bottom border; separator handles dividers
 	},
 	iconBubble: {
-		width: 40,
-		height: 40,
-		borderRadius: 12,
+		width: 48,
+		height: 48,
+		borderRadius: 24,
 		marginRight: 12,
 		alignItems: 'center',
 		justifyContent: 'center',
@@ -229,18 +332,67 @@ const styles = StyleSheet.create({
 	},
 
 	kebabHit: {
-		paddingLeft: 8,
-		paddingTop: 8,
-		paddingRight: 8,
-		paddingBottom: 8,
+		paddingLeft: 4,
+		paddingTop: 4,
 		marginLeft: 4,
 	},
 
-	// Empty state
-	emptyWrap: {
+	loadingState: {
+		flex: 1,
+		justifyContent: 'center',
 		alignItems: 'center',
-		gap: 8,
-		paddingVertical: 24,
+		paddingVertical: 40,
 	},
-	emptyText: { fontSize: 13, color: '#9aa3ad' },
+	loadingText: {
+		fontSize: 16,
+		color: '#71717a',
+		textAlign: 'center',
+		marginTop: 12,
+	},
+
+	// Toolbar
+	toolbar: {
+		paddingTop: 8,
+		paddingBottom: 6,
+	},
+	toolbarChip: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+		alignSelf: 'flex-start',
+		backgroundColor: '#fff',
+		borderRadius: 16,
+		borderWidth: 1,
+		borderColor: '#E5E7EB',
+		paddingHorizontal: 10,
+		paddingVertical: 6,
+	},
+	toolbarChipText: {
+		fontSize: 12,
+		fontWeight: '600',
+		color: '#0A84FF',
+	},
+
+	// Empty state
+	emptyState: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		paddingVertical: 40,
+		paddingHorizontal: 32,
+	},
+	emptyTitle: {
+		fontSize: 18,
+		fontWeight: '600',
+		color: '#374151',
+		textAlign: 'center',
+		marginTop: 16,
+	},
+	emptySubtitle: {
+		fontSize: 14,
+		color: '#6b7280',
+		textAlign: 'center',
+		marginTop: 8,
+		lineHeight: 20,
+	},
 });

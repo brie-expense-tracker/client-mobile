@@ -19,6 +19,11 @@ export interface RecurringExpense {
 	confidence: number;
 	nextExpectedDate: string;
 	transactions: any[];
+	// Appearance customization
+	appearanceMode?: 'custom' | 'brand' | 'default';
+	icon?: string;
+	color?: string;
+	categories?: string[];
 }
 
 export interface RecurringExpenseAlert {
@@ -64,12 +69,14 @@ export class RecurringExpenseService {
 	/**
 	 * Get all recurring expenses for the current user
 	 */
-	static async getRecurringExpenses(): Promise<RecurringExpense[]> {
+	static async getRecurringExpenses(opts?: {
+		signal?: AbortSignal;
+	}): Promise<RecurringExpense[]> {
 		try {
 			console.log('🔄 Fetching recurring expenses...');
 			const response = await ApiService.get<{
 				recurringExpenses: RecurringExpense[];
-			}>('/api/recurring-expenses');
+			}>('/api/recurring-expenses', { signal: opts?.signal });
 
 			if (response.success && response.data) {
 				const expenses = response.data.recurringExpenses || [];
@@ -177,17 +184,122 @@ export class RecurringExpenseService {
 		amount: number;
 		frequency: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 		nextExpectedDate: string;
+		appearanceMode?: 'custom' | 'brand' | 'default';
+		icon?: string;
+		color?: string;
+		categories?: string[];
 	}): Promise<RecurringExpense> {
 		try {
 			const response = await ApiService.post<{
-				recurringExpense: RecurringExpense;
+				recurringExpense?: RecurringExpense;
 			}>('/api/recurring-expenses', data);
 
-			if (response.success && response.data) {
-				return response.data.recurringExpense;
+			// Check for recurringExpense in data first, then at top level
+			const recurringExpense =
+				response.data?.recurringExpense ||
+				(response as any).recurringExpense ||
+				((response as any).data as RecurringExpense);
+
+			if (response.success && recurringExpense) {
+				console.log(
+					`✅ [RecurringExpenseService] Server returned created item: ${
+						recurringExpense.patternId ||
+						(recurringExpense as any).id ||
+						(recurringExpense as any)._id
+					}`
+				);
+
+				// WORKAROUND: Backend might not return appearance fields immediately after deploy
+				// Merge them from the request data if missing from response
+				if (!recurringExpense.appearanceMode && data.appearanceMode) {
+					console.warn(
+						'⚠️ [RecurringExpenseService] Backend did not return appearanceMode on create, using request data:',
+						data.appearanceMode
+					);
+					recurringExpense.appearanceMode = data.appearanceMode;
+				}
+				if (!recurringExpense.icon && data.icon) {
+					console.warn(
+						'⚠️ [RecurringExpenseService] Backend did not return icon field on create, using request data:',
+						data.icon
+					);
+					recurringExpense.icon = data.icon;
+				}
+				if (!recurringExpense.color && data.color) {
+					console.warn(
+						'⚠️ [RecurringExpenseService] Backend did not return color field on create, using request data:',
+						data.color
+					);
+					recurringExpense.color = data.color;
+				}
+				if (!recurringExpense.categories && data.categories) {
+					console.warn(
+						'⚠️ [RecurringExpenseService] Backend did not return categories field on create, using request data:',
+						data.categories
+					);
+					recurringExpense.categories = data.categories;
+				}
+
+				return recurringExpense;
 			}
 
-			throw new Error(response.error || 'Failed to create recurring expense');
+			// Fallback: server didn't return the created item → refetch & match
+			console.log(
+				'⚠️ [RecurringExpenseService] POST succeeded but no data returned, fetching to resolve ID...'
+			);
+			console.log('🔍 [RecurringExpenseService] Response structure:', {
+				hasData: !!response.data,
+				dataKeys: response.data ? Object.keys(response.data) : [],
+				topLevelKeys: Object.keys(response),
+			});
+
+			ApiService.clearCacheByPrefix('/api/recurring-expenses');
+
+			// Small delay to allow DB persistence
+			await new Promise((resolve) => setTimeout(resolve, 500));
+
+			const all = await this.getRecurringExpenses();
+			console.log(
+				`🔍 [RecurringExpenseService] Matching: ${data.vendor} / $${data.amount} / ${data.frequency} / ${data.nextExpectedDate}`
+			);
+			console.log(
+				`🔍 [RecurringExpenseService] Candidates (${all.length}):`,
+				all.map((e) => ({
+					vendor: e.vendor,
+					amount: e.amount,
+					frequency: e.frequency,
+					date: e.nextExpectedDate?.slice(0, 10),
+					id: e.patternId || (e as any).id || (e as any)._id,
+				}))
+			);
+
+			const created = all.find(
+				(e) =>
+					e.vendor === data.vendor &&
+					Number(e.amount) === Number(data.amount) &&
+					e.frequency === data.frequency &&
+					// Allow same-day string equality OR near-equality on date
+					e.nextExpectedDate?.slice(0, 10) ===
+						data.nextExpectedDate.slice(0, 10)
+			);
+
+			if (created) {
+				const resolvedId =
+					created.patternId || (created as any).id || (created as any)._id;
+				console.log(
+					`✅ [RecurringExpenseService] Resolved created item: ${resolvedId}`
+				);
+				return created;
+			}
+
+			console.error('❌ [RecurringExpenseService] No match found!', {
+				searchCriteria: data,
+				fetchedCount: all.length,
+			});
+			throw new Error(
+				response.error ||
+					'Created, but could not resolve new recurring expense ID'
+			);
 		} catch (error) {
 			console.error(
 				'[RecurringExpenseService] Error creating recurring expense:',
@@ -203,27 +315,102 @@ export class RecurringExpenseService {
 	static async updateRecurringExpense(
 		patternId: string,
 		data: {
-			vendor: string;
-			amount: number;
-			frequency: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
-			nextExpectedDate: string;
+			vendor?: string;
+			amount?: number;
+			frequency?: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+			nextExpectedDate?: string;
+			appearanceMode?: 'custom' | 'brand' | 'default';
+			icon?: string;
+			color?: string;
+			categories?: string[];
 		}
 	): Promise<RecurringExpense> {
 		try {
 			const response = await ApiService.put<{
-				recurringExpense: RecurringExpense;
-			}>(`/api/recurring-expenses/${patternId}`, data);
+				data?: RecurringExpense;
+				recurringExpense?: RecurringExpense;
+			}>(`/api/recurring-expenses/${encodeURIComponent(patternId)}`, data);
+
+			console.log(
+				'📝 [RecurringExpenseService] Update response:',
+				JSON.stringify(response, null, 2)
+			);
 
 			if (response.success && response.data) {
-				return response.data.recurringExpense;
+				// Backend returns expense in response.data.data (nested)
+				const updatedExpense =
+					response.data.data || response.data.recurringExpense;
+
+				if (!updatedExpense) {
+					console.error(
+						'⚠️ [RecurringExpenseService] No expense found in response:',
+						response
+					);
+					throw new Error('Server returned success but no expense data');
+				}
+
+				console.log(
+					'✅ [RecurringExpenseService] Extracted expense:',
+					updatedExpense
+				);
+
+				// WORKAROUND: Backend might not return appearance fields immediately after deploy
+				// Merge them from the request data if missing from response
+				if (!updatedExpense.appearanceMode && data.appearanceMode) {
+					console.warn(
+						'⚠️ [RecurringExpenseService] Backend did not return appearanceMode, using request data:',
+						data.appearanceMode
+					);
+					updatedExpense.appearanceMode = data.appearanceMode;
+				}
+				if (!updatedExpense.icon && data.icon) {
+					console.warn(
+						'⚠️ [RecurringExpenseService] Backend did not return icon field, using request data:',
+						data.icon
+					);
+					updatedExpense.icon = data.icon;
+				}
+				if (!updatedExpense.color && data.color) {
+					console.warn(
+						'⚠️ [RecurringExpenseService] Backend did not return color field, using request data:',
+						data.color
+					);
+					updatedExpense.color = data.color;
+				}
+				if (!updatedExpense.categories && data.categories) {
+					console.warn(
+						'⚠️ [RecurringExpenseService] Backend did not return categories field, using request data:',
+						data.categories
+					);
+					updatedExpense.categories = data.categories;
+				}
+
+				console.log(
+					'✅ [RecurringExpenseService] Final merged expense:',
+					updatedExpense
+				);
+
+				return updatedExpense;
 			}
 
-			throw new Error(response.error || 'Failed to update recurring expense');
-		} catch (error) {
+			// Preserve HTTP status for error handling (especially 404 detection)
+			const error: any = new Error(
+				response.error || 'Failed to update recurring expense'
+			);
+			if ('status' in response) {
+				error.status = response.status;
+			}
+			error.response = response;
+			throw error;
+		} catch (error: any) {
 			console.error(
 				'[RecurringExpenseService] Error updating recurring expense:',
 				error
 			);
+			// Re-throw with status preserved
+			if (!error.status && error.response) {
+				error.status = error.response.status;
+			}
 			throw error;
 		}
 	}
@@ -303,7 +490,7 @@ export class RecurringExpenseService {
 	}> {
 		try {
 			const response = await ApiService.delete<{ message: string }>(
-				`/api/recurring-expenses/${patternId}`
+				`/api/recurring-expenses/${encodeURIComponent(patternId)}`
 			);
 
 			if (response.success && response.data) {
@@ -659,42 +846,6 @@ export class RecurringExpenseService {
 				error
 			);
 			throw error;
-		}
-	}
-
-	/**
-	 * Check if a recurring expense is paid for the current period
-	 */
-	static async isCurrentPeriodPaid(patternId: string): Promise<{
-		isPaid: boolean;
-		payment?: {
-			paidAt: string;
-			amount: number;
-		};
-	}> {
-		try {
-			const response = await ApiService.get<{
-				isPaid: boolean;
-				payment?: {
-					paidAt: string;
-					amount: number;
-				};
-			}>(`/api/recurring-expenses/${patternId}/paid`);
-
-			if (response.success && response.data) {
-				return {
-					isPaid: response.data.isPaid || false,
-					payment: response.data.payment,
-				};
-			}
-
-			return { isPaid: false };
-		} catch (error) {
-			console.error(
-				'[RecurringExpenseService] Error checking if current period is paid:',
-				error
-			);
-			return { isPaid: false };
 		}
 	}
 }

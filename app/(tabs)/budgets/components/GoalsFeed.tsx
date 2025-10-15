@@ -7,10 +7,12 @@ import {
 	StyleSheet,
 	ActivityIndicator,
 	RefreshControl,
+	Platform,
+	ActionSheetIOS,
+	Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useGoals } from '../../../../src/hooks/useGoals';
-import { Goal } from '../../../../src/context/goalContext';
+import { useGoal, Goal } from '../../../../src/context/goalContext';
 import LinearProgressBar from './LinearProgressBar';
 import { router } from 'expo-router';
 import { normalizeIconName } from '../../../../src/constants/uiConstants';
@@ -168,20 +170,17 @@ export default function GoalsFeed({
 	onPressMenu,
 	goals: externalGoals,
 	filterBy = 'all',
-	sortBy = 'deadline',
-	onSortChange,
 }: {
 	scrollEnabled?: boolean;
 	onPressMenu?: (id: string) => void;
 	goals?: Goal[];
 	filterBy?: 'all' | 'active' | 'completed' | 'overdue';
-	sortBy?: 'name' | 'deadline' | 'progress' | 'target' | 'created';
-	onSortChange?: (
-		sort: 'name' | 'deadline' | 'progress' | 'target' | 'created'
-	) => void;
 }) {
 	const [refreshing, setRefreshing] = useState(false);
-	const { goals: hookGoals, isLoading, refetch, sortGoals } = useGoals();
+	const [sortBy, setSortBy] = useState<
+		'name' | 'deadline' | 'progress' | 'target' | 'created'
+	>('deadline');
+	const { goals: hookGoals, isLoading, refetch } = useGoal();
 
 	// Use external goals if provided, otherwise use hook goals
 	const goals = externalGoals || hookGoals;
@@ -205,8 +204,34 @@ export default function GoalsFeed({
 		}
 
 		// Apply sorting
-		return sortGoals ? sortGoals(filtered, sortBy) : filtered;
-	}, [filterBy, sortBy, goals, sortGoals]);
+		const sorted = [...filtered].sort((a, b) => {
+			switch (sortBy) {
+				case 'name':
+					return a.name.localeCompare(b.name);
+				case 'deadline': {
+					const dateA = new Date(a.deadline).getTime();
+					const dateB = new Date(b.deadline).getTime();
+					return dateA - dateB;
+				}
+				case 'progress': {
+					const percentA = a.target > 0 ? (a.current / a.target) * 100 : 0;
+					const percentB = b.target > 0 ? (b.current / b.target) * 100 : 0;
+					return percentB - percentA; // Higher progress first
+				}
+				case 'target':
+					return b.target - a.target; // Higher target first
+				case 'created': {
+					const createdA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+					const createdB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+					return createdB - createdA; // Newer first
+				}
+				default:
+					return 0;
+			}
+		});
+
+		return sorted;
+	}, [filterBy, sortBy, goals]);
 
 	const handleRefresh = async () => {
 		if (!refetch) return;
@@ -217,6 +242,42 @@ export default function GoalsFeed({
 			console.error('Error refreshing goals:', error);
 		} finally {
 			setRefreshing(false);
+		}
+	};
+
+	const openSortPicker = () => {
+		const labels = [
+			'Deadline',
+			'Name',
+			'Progress',
+			'Target',
+			'Created',
+			'Cancel',
+		];
+		const keys: (typeof sortBy)[] = [
+			'deadline',
+			'name',
+			'progress',
+			'target',
+			'created',
+		];
+		if (Platform.OS === 'ios') {
+			ActionSheetIOS.showActionSheetWithOptions(
+				{ title: 'Sort by', options: labels, cancelButtonIndex: 5 },
+				(idx) => {
+					if (idx == null || idx === 5) return;
+					setSortBy(keys[idx]);
+				}
+			);
+		} else {
+			Alert.alert('Sort by', undefined, [
+				{ text: 'Deadline', onPress: () => setSortBy('deadline') },
+				{ text: 'Name', onPress: () => setSortBy('name') },
+				{ text: 'Progress', onPress: () => setSortBy('progress') },
+				{ text: 'Target', onPress: () => setSortBy('target') },
+				{ text: 'Created', onPress: () => setSortBy('created') },
+				{ text: 'Cancel', style: 'cancel' },
+			]);
 		}
 	};
 
@@ -254,44 +315,71 @@ export default function GoalsFeed({
 					<Text style={styles.loadingText}>Loading goals...</Text>
 				</View>
 			) : (
-				<FlatList
-					data={filteredAndSorted}
-					keyExtractor={(g) => g.id || `goal-${Math.random()}`}
-					renderItem={({ item }) => (
-						<GoalRow
-							goal={item}
-							onPressMenu={onPressMenu ?? ((id) => console.log('menu:', id))}
-						/>
-					)}
-					ItemSeparatorComponent={() => <View style={styles.separator} />}
-					scrollEnabled={scrollEnabled}
-					refreshControl={
-						<RefreshControl
-							refreshing={refreshing}
-							onRefresh={handleRefresh}
-							tintColor="#007ACC"
-							colors={['#007ACC']}
-						/>
-					}
-					ListEmptyComponent={
-						<View style={styles.emptyState}>
-							<Ionicons name="flag-outline" size={48} color="#d1d5db" />
-							<Text style={styles.emptyTitle}>{getEmptyStateMessage()}</Text>
-							<Text style={styles.emptySubtitle}>
-								{getEmptyStateSubtitle()}
+				<>
+					{/* Toolbar */}
+					<View style={styles.toolbar}>
+						<TouchableOpacity
+							onPress={openSortPicker}
+							activeOpacity={0.7}
+							style={styles.toolbarChip}
+							accessibilityRole="button"
+							accessibilityLabel="Change sort order"
+						>
+							<Ionicons name="swap-vertical" size={14} color="#0A84FF" />
+							<Text style={styles.toolbarChipText}>
+								Sort:{' '}
+								{sortBy === 'deadline'
+									? 'Deadline'
+									: sortBy === 'name'
+									? 'Name'
+									: sortBy === 'progress'
+									? 'Progress'
+									: sortBy === 'target'
+									? 'Target'
+									: 'Created'}
 							</Text>
-							{filterBy === 'all' && (
-								<TouchableOpacity
-									style={styles.addGoalButton}
-									onPress={() => router.push('/(stack)/addGoal')}
-								>
-									<Ionicons name="add" size={16} color="#007ACC" />
-									<Text style={styles.addGoalButtonText}>Add Goal</Text>
-								</TouchableOpacity>
-							)}
-						</View>
-					}
-				/>
+						</TouchableOpacity>
+					</View>
+
+					<FlatList
+						data={filteredAndSorted}
+						keyExtractor={(g) => g.id || `goal-${Math.random()}`}
+						renderItem={({ item }) => (
+							<GoalRow
+								goal={item}
+								onPressMenu={onPressMenu ?? ((id) => console.log('menu:', id))}
+							/>
+						)}
+						ItemSeparatorComponent={() => <View style={styles.separator} />}
+						scrollEnabled={scrollEnabled}
+						refreshControl={
+							<RefreshControl
+								refreshing={refreshing}
+								onRefresh={handleRefresh}
+								tintColor="#007ACC"
+								colors={['#007ACC']}
+							/>
+						}
+						ListEmptyComponent={
+							<View style={styles.emptyState}>
+								<Ionicons name="flag-outline" size={48} color="#d1d5db" />
+								<Text style={styles.emptyTitle}>{getEmptyStateMessage()}</Text>
+								<Text style={styles.emptySubtitle}>
+									{getEmptyStateSubtitle()}
+								</Text>
+								{filterBy === 'all' && (
+									<TouchableOpacity
+										style={styles.addGoalButton}
+										onPress={() => router.push('/(stack)/addGoal')}
+									>
+										<Ionicons name="add" size={16} color="#007ACC" />
+										<Text style={styles.addGoalButtonText}>Add Goal</Text>
+									</TouchableOpacity>
+								)}
+							</View>
+						}
+					/>
+				</>
 			)}
 		</View>
 	);
@@ -304,7 +392,6 @@ const styles = StyleSheet.create({
 	separator: {
 		height: StyleSheet.hairlineWidth,
 		backgroundColor: '#ECEFF3',
-		marginLeft: 60,
 	},
 
 	rowContainer: {
@@ -358,6 +445,7 @@ const styles = StyleSheet.create({
 	},
 
 	kebabHit: { paddingLeft: 4, paddingTop: 4, marginLeft: 4 },
+
 	loadingState: {
 		flex: 1,
 		justifyContent: 'center',
@@ -370,6 +458,31 @@ const styles = StyleSheet.create({
 		textAlign: 'center',
 		marginTop: 12,
 	},
+
+	// Toolbar
+	toolbar: {
+		paddingTop: 8,
+		paddingBottom: 6,
+	},
+	toolbarChip: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+		alignSelf: 'flex-start',
+		backgroundColor: '#fff',
+		borderRadius: 16,
+		borderWidth: 1,
+		borderColor: '#E5E7EB',
+		paddingHorizontal: 10,
+		paddingVertical: 6,
+	},
+	toolbarChipText: {
+		fontSize: 12,
+		fontWeight: '600',
+		color: '#0A84FF',
+	},
+
+	// Empty state
 	emptyState: {
 		flex: 1,
 		justifyContent: 'center',
