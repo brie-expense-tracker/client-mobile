@@ -341,18 +341,19 @@ export default function GoalsFeed({
 						</TouchableOpacity>
 					</View>
 
-					<FlatList
-						data={filteredAndSorted}
-						keyExtractor={(g) => g.id || `goal-${Math.random()}`}
-						renderItem={({ item }) => (
-							<GoalRow
-								goal={item}
-								onPressMenu={onPressMenu ?? ((id) => console.log('menu:', id))}
-							/>
-						)}
-						ItemSeparatorComponent={() => <View style={styles.separator} />}
-						scrollEnabled={scrollEnabled}
-						refreshControl={
+				<FlatList
+					data={filteredAndSorted}
+					extraData={filteredAndSorted}
+					keyExtractor={(g) => g.id || `goal-${Math.random()}`}
+					renderItem={({ item }) => (
+						<GoalRow
+							goal={item}
+							onPressMenu={onPressMenu ?? ((id) => console.log('menu:', id))}
+						/>
+					)}
+					ItemSeparatorComponent={() => <View style={styles.separator} />}
+					scrollEnabled={scrollEnabled}
+					refreshControl={
 							<RefreshControl
 								refreshing={refreshing}
 								onRefresh={handleRefresh}
