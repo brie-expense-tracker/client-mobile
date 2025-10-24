@@ -96,6 +96,7 @@ export class HybridAIService {
 	 */
 	async initialize(): Promise<void> {
 		try {
+			console.log('[HybridAIService] Starting initialization...');
 
 			// Add individual timeouts for each service
 			const cacheInitPromise = this.cacheService.initialize().catch((error) => {
@@ -120,6 +121,7 @@ export class HybridAIService {
 				mlInitPromise,
 			]);
 
+			console.log('[HybridAIService] Service initialization results:', results);
 
 			// Check if at least one service initialized successfully
 			const successfulServices = results.filter(
@@ -136,6 +138,7 @@ export class HybridAIService {
 				);
 			}
 
+			console.log('[HybridAIService] Initialization complete');
 		} catch (error) {
 			console.error(
 				'[HybridAIService] Critical error during initialization:',
@@ -774,6 +777,7 @@ export class HybridAIService {
 		if (this.circuitBreakerState === 'half-open') {
 			this.circuitBreakerState = 'closed';
 			this.circuitBreakerFailures = 0;
+			console.log('[HybridAIService] Circuit breaker reset to closed');
 		}
 	}
 

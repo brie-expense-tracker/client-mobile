@@ -80,6 +80,7 @@ export class EnhancedAnalyticsService {
 
 		// Apply sampling
 		if (!this.shouldSample()) {
+			console.log('📊 [Analytics] Event sampled out:', event.type);
 			return;
 		}
 
@@ -105,6 +106,7 @@ export class EnhancedAnalyticsService {
 
 			// Log to console in development
 			if (__DEV__) {
+				console.log('📊 [Analytics] Event (development):', enhancedEvent);
 			}
 		}
 	}
@@ -264,6 +266,7 @@ export class EnhancedAnalyticsService {
 	 */
 	startNewSession(): void {
 		this.sessionId = this.generateSessionId();
+		console.log('📊 [Analytics] New session started:', this.sessionId);
 	}
 
 	/**

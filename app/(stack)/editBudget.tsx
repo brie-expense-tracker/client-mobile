@@ -155,7 +155,9 @@ const EditBudgetScreen: React.FC = () => {
 					style: 'destructive',
 					onPress: async () => {
 						try {
+							console.log('🗑️ [EditBudget] Deleting budget:', budget.id);
 							await deleteBudget(budget.id);
+							console.log('✅ [EditBudget] Budget deleted successfully');
 							router.back();
 						} catch (error) {
 							console.error('❌ [EditBudget] Delete failed:', error);

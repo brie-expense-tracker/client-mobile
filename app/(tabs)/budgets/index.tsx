@@ -106,6 +106,7 @@ export default function BudgetScreen() {
 				);
 				refetch();
 			} else {
+				console.log('✅ [Budgets] Screen focused, using cached data');
 			}
 		}, [refetch, hasLoaded])
 	);
@@ -140,12 +141,15 @@ export default function BudgetScreen() {
 	// Pull to Refresh Handler
 	// ==========================================
 	const onRefresh = useCallback(async () => {
+		console.log('🔄 [Budgets] Pull-to-refresh triggered');
 		setRefreshing(true);
 		try {
 			// Clear cache before refetching to ensure fresh data
 			const { ApiService } = await import('../../../src/services');
 			ApiService.clearCacheByPrefix('/api/budgets');
+			console.log('🗑️ [Budgets] Cache cleared, fetching fresh data...');
 			await refetch();
+			console.log('✅ [Budgets] Refresh complete');
 		} catch (error) {
 			console.error('❌ [Budgets] Error refreshing:', error);
 			Alert.alert('Error', 'Failed to refresh budgets. Please try again.');

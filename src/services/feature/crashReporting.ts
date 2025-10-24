@@ -53,6 +53,7 @@ export class CrashReportingService {
 		try {
 			// Check if crash reporting is enabled via feature flags
 			if (!featureFlags.isCrashReportingEnabled()) {
+				console.log('🚨 [CrashReporting] Disabled by feature flag');
 				this.isInitialized = true;
 				return;
 			}
@@ -68,6 +69,7 @@ export class CrashReportingService {
 			}
 
 			this.isInitialized = true;
+			console.log('🚨 [CrashReporting] Service initialized');
 		} catch (error) {
 			console.warn('🚨 [CrashReporting] Failed to initialize:', error);
 			this.isInitialized = true;
@@ -124,6 +126,7 @@ export class CrashReportingService {
 			});
 
 			this.sentry = Sentry;
+			console.log('🚨 [CrashReporting] Sentry initialized');
 		} catch (error) {
 			console.warn('🚨 [CrashReporting] Failed to initialize Sentry:', error);
 		}
@@ -199,6 +202,7 @@ export class CrashReportingService {
 			}
 
 			this.crashlytics = getCrashlytics;
+			console.log('🚨 [CrashReporting] Crashlytics initialized');
 		} catch (error) {
 			console.warn(
 				'🚨 [CrashReporting] Failed to initialize Crashlytics:',
@@ -363,6 +367,7 @@ export class CrashReportingService {
 				}
 			}
 
+			console.log(`🚨 [CrashReporting] User consent set to: ${consent}`);
 		} catch (error) {
 			console.warn('🚨 [CrashReporting] Failed to set user consent:', error);
 		}
@@ -551,6 +556,7 @@ export class CrashReportingService {
 	 */
 	testCrashReporting(): void {
 		if (__DEV__ && this.sentry) {
+			console.log('🚨 [CrashReporting] Testing crash reporting...');
 			this.captureMessage('Test message from development', 'info', {
 				screen: 'test',
 				action: 'test_crash_reporting',
@@ -568,6 +574,7 @@ export class CrashReportingService {
 	async testCrashlytics(): Promise<void> {
 		if (__DEV__ && this.crashlytics) {
 			try {
+				console.log('🚨 [CrashReporting] Testing Crashlytics...');
 
 				// Test logging
 				try {
@@ -609,6 +616,7 @@ export class CrashReportingService {
 					);
 				}
 
+				console.log('🚨 [CrashReporting] Crashlytics test completed');
 			} catch (error) {
 				console.warn('🚨 [CrashReporting] Failed to test Crashlytics:', error);
 			}
@@ -805,6 +813,7 @@ export class CrashReportingService {
 				// Note: Crashlytics doesn't have a direct way to clear all attributes
 			}
 
+			console.log('🚨 [CrashReporting] Context cleared');
 		} catch (error) {
 			console.warn('🚨 [CrashReporting] Failed to clear context:', error);
 		}
@@ -885,6 +894,7 @@ export class CrashReportingService {
 				});
 			});
 
+			console.log('🚨 [CrashReporting] Unhandled rejection capture setup');
 		} catch (error) {
 			console.warn(
 				'🚨 [CrashReporting] Failed to setup unhandled rejection capture:',
@@ -898,6 +908,7 @@ export class CrashReportingService {
 	 */
 	async testAllFeatures(): Promise<void> {
 		if (!__DEV__) {
+			console.log('🚨 [CrashReporting] Testing only available in development');
 			return;
 		}
 
@@ -955,6 +966,7 @@ export class CrashReportingService {
 			// Test Crashlytics
 			await this.testCrashlytics();
 
+			console.log('🚨 [CrashReporting] All features tested successfully');
 		} catch (error) {
 			console.warn('🚨 [CrashReporting] Failed to test all features:', error);
 		}

@@ -80,6 +80,7 @@ export class IntentMissingInfoService {
 			// Check cache first
 			const cacheKey = `${intentId}_${JSON.stringify(context)}`;
 			if (this.cache.has(cacheKey)) {
+				console.log('[IntentMissingInfoService] Using cached result');
 				return this.cache.get(cacheKey);
 			}
 
@@ -438,6 +439,7 @@ export class IntentMissingInfoService {
 	 */
 	clearCache(): void {
 		this.cache.clear();
+		console.log('[IntentMissingInfoService] Cache cleared');
 	}
 
 	/**

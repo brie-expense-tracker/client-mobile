@@ -27,8 +27,12 @@ export default function MessageBubble({
 	showPremiumHint,
 	onAction,
 }: MessageBubbleProps) {
+	console.log('🔍 [DEBUG] MessageBubble rendering message:', m);
+	console.log('🔍 [DEBUG] Message type:', m.type);
+	console.log('🔍 [DEBUG] onPickPrompt function:', onPickPrompt);
 
 	if (m.type === 'suggestion') {
+		console.log('🔍 [DEBUG] Rendering suggestion component');
 		// Check if this is welcome suggestions or regular suggestions
 		if (m.data?.isWelcomeSuggestions) {
 			return <WelcomeSuggestions onPick={onPickPrompt!} />;
@@ -42,6 +46,7 @@ export default function MessageBubble({
 	}
 
 	if (m.type === 'insight') {
+		console.log('🔍 [DEBUG] Rendering InsightsCard component');
 		return (
 			<InsightsCard
 				insights={m.data?.insights || []}
@@ -52,6 +57,7 @@ export default function MessageBubble({
 	}
 
 	if (m.type === 'fallback') {
+		console.log('🔍 [DEBUG] Rendering FallbackActionCard component');
 		return (
 			<View style={[sharedStyles.msgWrap, sharedStyles.msgAI]}>
 				<FallbackActionCard
@@ -82,6 +88,7 @@ export default function MessageBubble({
 	}
 
 	if (m.type === 'structured') {
+		console.log('🔍 [DEBUG] Rendering StructuredResponse component');
 		return (
 			<View style={[sharedStyles.msgWrap, sharedStyles.msgAI]}>
 				<StructuredResponse

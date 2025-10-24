@@ -188,6 +188,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 							`[TransactionContext] Backend handled budget update for ${transaction.target}, refreshing budgets...`
 						);
 						await refetchBudgetsRef.current();
+						console.log('[TransactionContext] Budgets refreshed successfully');
 					} else if (transaction.targetModel === 'Goal') {
 						// Backend now handles goal updates automatically when creating transactions
 						// So we just need to refresh the goals to get the latest data
@@ -195,6 +196,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 							`[TransactionContext] Backend handled goal update for ${transaction.target}, refreshing goals...`
 						);
 						await refetchGoalsRef.current();
+						console.log('[TransactionContext] Goals refreshed successfully');
 					}
 				} else {
 					console.log(
@@ -417,6 +419,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 					let targetId = transactionData.target; // Use update data as fallback
 					let targetModel = transactionData.targetModel; // Use update data as fallback
 
+					console.log('[TransactionContext] Processing server response:', {
 						hasTarget: !!response.data.target,
 						targetType: typeof response.data.target,
 						targetValue: response.data.target,
@@ -426,6 +429,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 					});
 
 					if (response.data.target) {
+						console.log('[TransactionContext] Target object details:', {
 							hasId: !!response.data.target._id,
 							idValue: response.data.target._id,
 							targetKeys: Object.keys(response.data.target),
@@ -466,6 +470,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 							}
 						}
 					} else {
+						console.log('[TransactionContext] No target in response');
 					}
 
 					// Fallback: if we still don't have target data, try to get it from the original transactionData

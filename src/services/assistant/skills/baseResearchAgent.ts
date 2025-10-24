@@ -23,9 +23,11 @@ export class BaseResearchAgent<T> {
 		const cached = this.cache.get(key);
 
 		if (cached) {
+			console.log(`[BaseResearchAgent] Using cached results for: ${key}`);
 			return cached;
 		}
 
+		console.log(`[BaseResearchAgent] Starting fresh research for: ${query}`);
 
 		try {
 			const recency = this.sources.recencyDays ?? 30;
@@ -36,6 +38,7 @@ export class BaseResearchAgent<T> {
 				.slice(0, 8);
 
 			if (editorial.length === 0) {
+				console.log('[BaseResearchAgent] No editorial results found');
 				return null;
 			}
 
@@ -78,6 +81,7 @@ export class BaseResearchAgent<T> {
 			});
 
 			if (items.length === 0) {
+				console.log('[BaseResearchAgent] No valid items extracted');
 				return null;
 			}
 

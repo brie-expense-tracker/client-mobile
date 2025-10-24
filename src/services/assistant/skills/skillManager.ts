@@ -111,6 +111,7 @@ export class SkillManager {
 		this.skills.delete(skillId);
 		this.metrics.delete(skillId);
 		this.clearCacheForSkill(skillId);
+		console.log(`[SkillManager] Unregistered skill: ${skillId}`);
 		return true;
 	}
 

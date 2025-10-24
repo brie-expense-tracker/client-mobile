@@ -42,6 +42,7 @@ export interface ActionStats {
 const Api = {
 	post: async (endpoint: string, body: any) => {
 		// This should be replaced with your actual API service
+		console.log(`[ActionHandler] POST ${endpoint}:`, body);
 
 		// Mock successful response
 		return {
@@ -53,6 +54,7 @@ const Api = {
 		};
 	},
 	put: async (endpoint: string, body: any) => {
+		console.log(`[ActionHandler] PUT ${endpoint}:`, body);
 		return {
 			json: async () => ({
 				_id: endpoint.split('/').pop(),
@@ -62,6 +64,7 @@ const Api = {
 		};
 	},
 	delete: async (endpoint: string) => {
+		console.log(`[ActionHandler] DELETE ${endpoint}`);
 		return {
 			json: async () => ({
 				success: true,
@@ -113,6 +116,7 @@ export class ActionHandler {
 			(this.stats.actionTypes[action.type] || 0) + 1;
 
 		if (this.config.enableLogging) {
+			console.log(`[ActionHandler] Executing action: ${action.type}`, action);
 		}
 
 		try {
@@ -462,6 +466,7 @@ export async function handleActionIntent(
 	const action = ConversationState.consumePendingAction(conversationId);
 
 	if (!action) {
+		console.log('[ActionHandler] No pending action found');
 		return {
 			message: 'Got it! What would you like me to do?',
 			details: '',

@@ -455,6 +455,7 @@ export class Logger {
 
 			// Also log to console in development
 			if (__DEV__) {
+				console.log(`[${level}] ${reasonCode}: ${message}`, context, metadata);
 			}
 		} catch (error) {
 			console.error('Error logging entry:', error);

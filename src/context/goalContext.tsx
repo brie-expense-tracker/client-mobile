@@ -104,6 +104,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 		// Cancel any in-flight request
 		if (abortControllerRef.current) {
 			abortControllerRef.current.abort();
+			console.log('🛑 [GoalContext] Aborted previous fetch');
 		}
 
 		// Create new abort controller for this fetch
@@ -145,6 +146,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 		} catch (err: any) {
 			// Ignore abort errors (expected when a new fetch cancels the old one)
 			if (err?.name === 'AbortError') {
+				console.log('🛑 [GoalContext] Fetch aborted (new fetch started)');
 				return;
 			}
 			console.warn('[Goals] Failed to fetch goals, using empty array', err);
@@ -174,6 +176,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 		});
 
 		try {
+			console.log('💾 [GoalContext] Creating goal on server...');
 			const response = await ApiService.post<any>('/api/goals', goalData);
 
 			// Handle the response format properly
@@ -198,6 +201,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 					updatedAt: actualData.updatedAt,
 				};
 
+				console.log('✅ [GoalContext] Goal created, replacing temp ID:', {
 					tempId,
 					realId: serverGoal.id,
 				});
@@ -217,6 +221,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 
 				// Clear cache to ensure fresh data
 				ApiService.clearCacheByPrefix('/api/goals');
+				console.log('🗑️ [GoalContext] Cache cleared after goal creation');
 
 				return serverGoal;
 			} else {
@@ -261,6 +266,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 
 					// Clear cache to ensure fresh data
 					ApiService.clearCacheByPrefix('/api/goals');
+					console.log('🗑️ [GoalContext] Cache cleared after goal update');
 
 					return updatedGoal;
 				} else {
@@ -275,6 +281,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 	);
 
 	const deleteGoal = useCallback(async (id: string) => {
+		console.log('🗑️ [GoalContext] Deleting goal:', id);
 
 		// Save previous state for rollback
 		let previousGoals: Goal[] = [];
@@ -285,6 +292,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 		});
 
 		try {
+			console.log('🗑️ [GoalContext] Calling API delete...');
 			const result = await ApiService.delete(`/api/goals/${id}`);
 
 			if (!result.success) {
@@ -313,8 +321,10 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 				}
 			}
 
+			console.log('✅ [GoalContext] Delete successful, clearing cache...');
 			// Clear cache to ensure fresh data
 			ApiService.clearCacheByPrefix('/api/goals');
+			console.log('🗑️ [GoalContext] Cache cleared after goal deletion');
 		} catch (err) {
 			console.error('❌ [GoalContext] Delete failed, rolling back:', err);
 			// Rollback to previous state

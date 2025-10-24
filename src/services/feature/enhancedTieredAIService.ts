@@ -142,10 +142,12 @@ export class EnhancedTieredAIService {
 	 * Main method to get AI response with grounding layer
 	 */
 	async getResponse(query: string): Promise<EnhancedTieredAIResponse> {
+		console.log('🔍 [EnhancedTieredAI] Processing query:', query);
 		this.startTime = Date.now();
 
 		// Step 1: Detect intent
 		const intent = detectIntent(query);
+		console.log('🔍 [EnhancedTieredAI] Detected intent:', intent);
 
 		// Step 2: Try grounding layer first
 		const groundedResponse = await this.tryGroundedResponse(query, intent);
@@ -182,6 +184,7 @@ export class EnhancedTieredAIService {
 		}
 
 		// Step 3: Try cascade system for complex queries
+		console.log('🔍 [EnhancedTieredAI] Trying cascade system');
 		try {
 			const factPack = this.createFactPackFromContext();
 
@@ -264,6 +267,7 @@ export class EnhancedTieredAIService {
 		}
 
 		// Step 4: Fall back to LLM with appropriate model selection
+		console.log('🔍 [EnhancedTieredAI] Using LLM fallback');
 		this.modelUsageStats.llmResponses++;
 
 		return await this.getLLMResponse(query, intent);
@@ -1060,6 +1064,7 @@ Please provide a helpful response based on this data for the intent: ${
 		try {
 			// Detect intent for routing
 			const intent = detectIntent(query);
+			console.log('🔍 [EnhancedTieredAI] Detected intent:', intent);
 
 			// Execute the complete 4-step hybrid cost optimization process
 			const hybridResult = await executeHybridCostOptimization(
@@ -1117,6 +1122,7 @@ Please provide a helpful response based on this data for the intent: ${
 				},
 			};
 
+			console.log('🔍 [EnhancedTieredAI] Hybrid optimization completed:', {
 				modelUsed: hybridResult.modelUsed,
 				totalTokens: hybridResult.totalTokens,
 				totalCost: hybridResult.totalCost,

@@ -35,6 +35,7 @@ export default function Header({
 		}
 
 		// Debug logging to see actual usage values
+		console.log('🔍 [Header] Current usage:', {
 			tokens: `${currentUsage.currentTokens}/${currentUsage.tokenLimit}`,
 			requests: `${currentUsage.currentRequests}/${currentUsage.requestLimit}`,
 			conversations: `${currentUsage.currentConversations}/${currentUsage.conversationLimit}`,
@@ -49,6 +50,7 @@ export default function Header({
 			(currentUsage.currentConversations / currentUsage.conversationLimit) *
 			100;
 
+		console.log('🔍 [Header] Usage percentages:', {
 			tokens: tokenUsagePercent.toFixed(1) + '%',
 			requests: requestUsagePercent.toFixed(1) + '%',
 			conversations: conversationUsagePercent.toFixed(1) + '%',
@@ -70,6 +72,7 @@ export default function Header({
 			setUsagePercent(maxUsagePercent);
 			setShowUsageIndicator(true);
 		} else {
+			console.log('🔍 [Header] Hiding usage indicator (usage below 60%)');
 			setShowUsageIndicator(false);
 		}
 	}, [currentUsage]);

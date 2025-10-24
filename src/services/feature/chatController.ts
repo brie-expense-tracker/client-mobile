@@ -106,6 +106,7 @@ export class ChatController {
 		let analyticsData: any = {};
 
 		try {
+			console.log('🔍 [ChatController] Processing query:', query);
 
 			// Step 0: Check for pending action confirmations first
 			const conversationId = ConversationState.getConversationId();
@@ -115,10 +116,12 @@ export class ChatController {
 				routeResult.mode === 'ACTIONS' &&
 				routeResult.intent === 'CONFIRM_PENDING_ACTION'
 			) {
+				console.log('🔍 [ChatController] Handling pending action confirmation');
 				return await handleActionIntent(conversationId);
 			}
 
 			if (routeResult.intent === 'DECLINE_PENDING_ACTION') {
+				console.log('🔍 [ChatController] Handling pending action decline');
 				ConversationState.clearPendingAction(conversationId);
 				return {
 					message: 'No problem! What else can I help you with?',
@@ -164,6 +167,7 @@ export class ChatController {
 				}
 				// If research fails, continue with normal flow
 			}
+			console.log('🔍 [ChatController] Enhanced intent detection:', {
 				primary: routeDecision.primary.intent,
 				confidence: routeDecision.primary.calibratedP,
 				routeType: routeDecision.routeType,
@@ -192,12 +196,14 @@ export class ChatController {
 
 			// Step 1.5: Simple QA Lane - Try to answer simple questions immediately
 			if (simpleQALane.shouldUseSimpleQA(query, intent)) {
+				console.log('🔍 [ChatController] Trying Simple QA lane for:', query);
 				const simpleResult = await simpleQALane.tryAnswer(
 					query,
 					context,
 					intent
 				);
 				if (simpleResult) {
+					console.log('🔍 [ChatController] Simple QA success:', {
 						usedMicroSolver: simpleResult.usedMicroSolver,
 						usedKnowledgeBase: simpleResult.usedKnowledgeBase,
 						usedMiniModel: simpleResult.usedMiniModel,
@@ -246,6 +252,7 @@ export class ChatController {
 			// Step 1.5: Skill Engine - Try hybrid skills for finance topics
 			const skillResp = await trySkills(query, context);
 			if (skillResp) {
+				console.log('🔍 [ChatController] Skill engine success');
 
 				// Set session context focus for HYSA topics
 				if (
@@ -299,6 +306,7 @@ export class ChatController {
 					context
 				);
 				if (research) {
+					console.log('🔍 [ChatController] HYSA research agent success');
 					return research;
 				}
 				// If research fails, fall through to other methods
@@ -306,6 +314,7 @@ export class ChatController {
 
 			// Step 1.6: Answerability Gate - Check if we have enough data
 			const answerability = evaluateAnswerability(intent, context);
+			console.log('🔍 [ChatController] Answerability check:', {
 				level: answerability.level,
 				missing: answerability.missing,
 				reason: answerability.reason,
@@ -347,6 +356,7 @@ export class ChatController {
 				{ query },
 				context
 			);
+			console.log('🔍 [ChatController] Grounding result:', {
 				success: !!grounded,
 				confidence: grounded?.confidence,
 				payload: grounded?.payload ? 'has_data' : 'no_data',
@@ -354,9 +364,11 @@ export class ChatController {
 
 			// Step 3: Pick appropriate model
 			const model = pickModel(intent as IntentType, query);
+			console.log('🔍 [ChatController] Selected model:', model);
 
 			// Step 4: Extract facts from grounding
 			const facts = grounded?.payload ?? { note: 'no facts available' };
+			console.log('🔍 [ChatController] Facts extracted:', {
 				hasFacts: !!grounded?.payload,
 				factCount: grounded?.payload ? Object.keys(grounded.payload).length : 0,
 			});
@@ -417,6 +429,7 @@ export class ChatController {
 					const overview = buildFinancialOverview(context, 'last_30d');
 					const response = renderOverviewResponse(overview, context);
 
+					console.log('🔍 [ChatController] Generated financial overview:', {
 						cashflow: overview.cashflow,
 						categories: overview.categories.length,
 						budgets: overview.budgets.length,
@@ -445,6 +458,7 @@ export class ChatController {
 						context.userProfile,
 						query
 					);
+					console.log('🔍 [ChatController] Narration generated:', {
 						length: narration?.length,
 						model: model,
 					});
@@ -463,6 +477,7 @@ export class ChatController {
 			if (this.config.enableCritic && narration) {
 				try {
 					vetted = await this.criticValidation('mini', narration, facts);
+					console.log('🔍 [ChatController] Critic validation:', {
 						passed: vetted?.ok,
 						issues: vetted?.issues?.length || 0,
 					});
@@ -480,6 +495,7 @@ export class ChatController {
 					facts,
 					intent as IntentType
 				);
+				console.log('🔍 [ChatController] Using validated narration response');
 			} else if (
 				grounded &&
 				routeDecision.primary.calibratedP > this.config.fallbackThreshold
@@ -490,9 +506,11 @@ export class ChatController {
 					facts,
 					query
 				);
+				console.log('🔍 [ChatController] Using grounded facts response');
 			} else {
 				// Fallback to helpful response
 				response = helpfulFallback(query, context);
+				console.log('🔍 [ChatController] Using helpful fallback response');
 			}
 
 			// Step 7.5: Critic pass - Check for low-value responses
@@ -655,6 +673,7 @@ export class ChatController {
 			);
 		}
 
+		console.log('🔍 [ChatController] Response composed:', {
 			messageLength: response.message.length,
 			hasActions: !!response.actions?.length,
 			hasCards: !!response.cards?.length,
@@ -1109,6 +1128,7 @@ export class ChatController {
 	 */
 	updateConfig(newConfig: Partial<ChatControllerConfig>): void {
 		this.config = { ...this.config, ...newConfig };
+		console.log('🔍 [ChatController] Configuration updated:', this.config);
 	}
 
 	/**
@@ -1157,6 +1177,7 @@ export class ChatController {
 	 */
 	reset(): void {
 		// Reset any internal state if needed
+		console.log('🔍 [ChatController] Controller reset');
 	}
 }
 

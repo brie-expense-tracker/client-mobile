@@ -429,6 +429,7 @@ This is *educational, not advice* and rates change—please verify before openin
 		}
 
 		// user tapped consent → run your research agent (already implemented)
+		console.log(`[HYSA Skill] Running research agent for: ${q}`);
 
 		// Clear consent flags and set focus
 		ctx.sessionContext = ctx.sessionContext || {};

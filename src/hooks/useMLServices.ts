@@ -48,6 +48,7 @@ export const useMLServices = () => {
 	const { goals } = useGoal();
 	const { transactions } = useContext(TransactionContext);
 
+	console.log('[useMLServices] Hook initialized with:', {
 		hasUser: !!user,
 		userId: user?._id,
 		hasBudgets: !!budgets,
@@ -73,6 +74,7 @@ export const useMLServices = () => {
 	 */
 	const initializeML = useCallback(async () => {
 		if (!user?._id) {
+			console.log('[useMLServices] No user ID, skipping initialization');
 			return;
 		}
 
@@ -80,6 +82,8 @@ export const useMLServices = () => {
 			setIsLoading(true);
 			setError(null);
 
+			console.log('[useMLServices] Starting ML services initialization...');
+			console.log('[useMLServices] User ID:', user._id);
 
 			// Add timeout to prevent hanging
 			const timeoutPromise = new Promise((_, reject) => {
@@ -92,7 +96,9 @@ export const useMLServices = () => {
 			const initPromise = HybridAIService.getInstance().initialize();
 
 			try {
+				console.log('[useMLServices] Waiting for service initialization...');
 				await Promise.race([initPromise, timeoutPromise]);
+				console.log('[useMLServices] HybridAIService initialized successfully');
 			} catch (initError) {
 				console.warn(
 					'[useMLServices] Service initialization had issues, but continuing:',
@@ -104,6 +110,7 @@ export const useMLServices = () => {
 			// Update status
 			try {
 				const metrics = HybridAIService.getInstance().getServiceMetrics();
+				console.log('[useMLServices] Got service metrics:', metrics);
 
 				setStatus((prev) => ({
 					...prev,
@@ -129,6 +136,7 @@ export const useMLServices = () => {
 				}));
 			}
 
+			console.log('[useMLServices] ML services initialization complete');
 		} catch (err) {
 			console.error(
 				'[useMLServices] Critical error during initialization:',
@@ -148,6 +156,7 @@ export const useMLServices = () => {
 					costSavings: 0,
 					totalRequests: 0,
 				}));
+				console.log('[useMLServices] Set fallback initialized state');
 			} catch (fallbackError) {
 				console.error(
 					'[useMLServices] Failed to set fallback state:',
@@ -156,6 +165,7 @@ export const useMLServices = () => {
 			}
 		} finally {
 			setIsLoading(false);
+			console.log('[useMLServices] Initialization process finished');
 		}
 	}, [user?._id]);
 
@@ -421,6 +431,7 @@ export const useMLServices = () => {
 		try {
 			await SmartCacheService.getInstance().cleanupExpiredCache();
 			updateStatus();
+			console.log('[useMLServices] Cache cleared successfully');
 		} catch (error) {
 			console.error('[useMLServices] Error clearing cache:', error);
 		}
@@ -605,6 +616,7 @@ export const useMLServices = () => {
 	// Initialize ML services when user is available
 	useEffect(() => {
 		if (user?._id && !status.isInitialized) {
+			console.log('[useMLServices] User available, starting initialization...');
 			initializeML();
 		}
 	}, [user?._id, status.isInitialized, initializeML]);

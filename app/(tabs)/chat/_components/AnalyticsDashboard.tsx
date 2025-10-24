@@ -27,6 +27,7 @@ export default function AnalyticsDashboard() {
 
   const exportAnalytics = () => {
     const data = analyticsService.exportAnalytics();
+    console.log('📊 [Analytics] Export:', data);
     Alert.alert('Analytics Exported', 'Check console for data export');
   };
 

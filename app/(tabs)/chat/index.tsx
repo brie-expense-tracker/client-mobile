@@ -51,6 +51,7 @@ import {
 	CachedGoal,
 } from '../../../src/services/resilience/fallbackService';
 import { TraceEventData } from '../../../src/services/feature/enhancedStreamingService';
+import DevHud from './_components/DevHud';
 import {
 	useMessagesReducerV2,
 	Message,
@@ -1283,6 +1284,7 @@ export default function ChatScreen() {
 
 	return (
 		<SafeAreaView style={styles.safeArea}>
+			<DevHud modeState={modeState} />
 			<View style={styles.header}>
 				<TouchableOpacity
 					onPress={() => router.push('/(stack)/settings/aiInsights')}

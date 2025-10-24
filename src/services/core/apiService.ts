@@ -70,6 +70,7 @@ function getCachedRequest<T>(endpoint: string): T | null {
 		const isExpired = now - cached.timestamp > cached.ttl;
 
 		if (!isExpired) {
+			console.log(`💾 [ApiService] Cache hit for: ${endpoint}`);
 			return cached.data as T;
 		} else {
 			requestCache.delete(cacheKey);
@@ -102,6 +103,7 @@ function shouldThrottleRequest(endpoint: string): boolean {
 	const lastRequest = requestThrottle.get(endpoint);
 
 	if (lastRequest && now - lastRequest < THROTTLE_DELAY) {
+		console.log(`⏳ [ApiService] Throttling request: ${endpoint}`);
 		return true;
 	}
 
@@ -138,6 +140,7 @@ function setRateLimitBackoff(
 // Single-flight pattern to prevent duplicate requests
 async function singleflight<T>(key: string, fn: () => Promise<T>): Promise<T> {
 	if (inflight.has(key)) {
+		console.log(`🔄 [ApiService] Deduplicating request: ${key}`);
 		return inflight.get(key) as Promise<T>;
 	}
 
@@ -280,6 +283,10 @@ export class ApiService {
 		try {
 			const hmacService = getHMACService();
 
+			console.log('🔐 [ApiService] HMAC signing process starting...');
+			console.log('🔐 [ApiService] Has body:', hasBody);
+			console.log('🔐 [ApiService] Original body:', body);
+			console.log('🔐 [ApiService] Body type:', typeof body);
 
 			// For bodyless requests, bodyString will be empty string for signing
 			// but we return null to indicate no body should be sent in fetch
@@ -289,6 +296,9 @@ export class ApiService {
 					: stableStringify(body)
 				: null;
 
+			console.log('🔐 [ApiService] HMAC Debug - Body string:', bodyString);
+			console.log('🔐 [ApiService] HMAC Debug - Method:', method);
+			console.log('🔐 [ApiService] HMAC Debug - Endpoint:', endpoint);
 
 			const signedHeaders = hmacService.signRequestHeaders(
 				body,
@@ -297,6 +307,7 @@ export class ApiService {
 				headers
 			);
 
+			console.log('🔐 [ApiService] HMAC signing completed for:', endpoint);
 			console.log(
 				'🔐 [ApiService] Final signed headers keys:',
 				Object.keys(signedHeaders)
@@ -446,6 +457,7 @@ export class ApiService {
 				'x-firebase-uid': firebaseUID,
 			};
 
+			console.log('🔍 [DEBUG] API Headers prepared:', {
 				'x-firebase-uid': `${firebaseUID.substring(0, 8)}...`,
 			});
 			return headers;
@@ -485,6 +497,7 @@ export class ApiService {
 			} catch (authError: any) {
 				// Handle authentication errors gracefully
 				if (authError.isAuthError) {
+					console.log('🔒 [API] User not authenticated, skipping request');
 					return {
 						success: false,
 						error: 'User not authenticated',
@@ -497,6 +510,10 @@ export class ApiService {
 			const url = `${API_BASE_URL}${endpoint}`;
 
 			// Debug logging for URL construction
+			console.log('🔧 [DEBUG] URL Construction:');
+			console.log('🔧 [DEBUG] API_BASE_URL:', API_BASE_URL);
+			console.log('🔧 [DEBUG] endpoint:', endpoint);
+			console.log('🔧 [DEBUG] final URL:', url);
 
 			// API logging: Keep essential request info
 			console.log(`📡 GET: ${endpoint}`);
@@ -546,6 +563,7 @@ export class ApiService {
 
 		return singleflight(requestKey, async () => {
 			return retryWithBackoff(async () => {
+				console.log('🔍 [ApiService] POST request details:', {
 					endpoint,
 					dataKeys: Object.keys(body),
 					firebaseUID: body.firebaseUID
@@ -601,6 +619,7 @@ export class ApiService {
 
 				const url = `${API_BASE_URL}${endpoint}`;
 
+				console.log('🔍 [ApiService] POST request details:', {
 					url,
 					endpoint,
 					headers: {
@@ -615,6 +634,7 @@ export class ApiService {
 					body: bodyString,
 				});
 
+				console.log('🔍 [ApiService] POST response received:', {
 					status: response.status,
 					statusText: response.statusText,
 					ok: response.ok,
@@ -628,6 +648,7 @@ export class ApiService {
 				if (contentType && contentType.includes('application/json')) {
 					try {
 						data = await response.json();
+						console.log('🔍 [ApiService] JSON response parsed successfully:', {
 							success: data.success,
 							message: data.message,
 							hasData: !!data.data,
@@ -636,6 +657,7 @@ export class ApiService {
 
 						// Log full debug data if present (HMAC debugging)
 						if (data.debug) {
+							console.log('🐛 [ApiService] Server Debug Info:', data.debug);
 						}
 
 						// Log full error response for debugging
@@ -713,6 +735,7 @@ export class ApiService {
 				}
 
 				// API logging: Success response
+				console.log(`✅ [ApiService] POST: ${endpoint} (${response.status})`);
 
 				// Clear cache by prefix after successful POST (resource created)
 				this.clearCacheByPrefix(endpoint);
@@ -754,6 +777,7 @@ export class ApiService {
 			} catch (authError: any) {
 				// Handle authentication errors gracefully
 				if (authError.isAuthError) {
+					console.log('🔒 [API] User not authenticated, skipping PUT request');
 					return {
 						success: false,
 						error: 'User not authenticated',
@@ -770,6 +794,7 @@ export class ApiService {
 
 			// Comprehensive request debugging
 			console.log(`📝 PUT: ${endpoint}`);
+			console.log('📝 [PUT] Complete request details:');
 			console.log('  🌐 URL:', url);
 			console.log('  🔧 Method: PUT');
 			console.log('  📋 Headers:');
@@ -794,6 +819,7 @@ export class ApiService {
 				body: bodyString,
 			});
 
+			console.log('📝 [PUT] Response received:');
 			console.log('  📊 Status:', response.status);
 			console.log('  📊 Status Text:', response.statusText);
 			console.log('  ✅ OK:', response.ok);
@@ -803,6 +829,8 @@ export class ApiService {
 			const contentType = response.headers.get('content-type');
 			let data: any;
 
+			console.log('📝 [PUT] Response content type:', contentType);
+			console.log('📝 [PUT] Response headers:');
 			response.headers.forEach((value, key) => {
 				console.log(`  ${key}: ${value}`);
 			});
@@ -810,6 +838,7 @@ export class ApiService {
 			if (contentType && contentType.includes('application/json')) {
 				try {
 					data = await response.json();
+					console.log('📝 [PUT] JSON response data:', data);
 				} catch (parseError) {
 					console.error('❌ [PUT] JSON parse error:', parseError);
 					const textResponse = await response.text();
@@ -823,6 +852,7 @@ export class ApiService {
 			} else {
 				// Handle non-JSON responses
 				const textResponse = await response.text();
+				console.log('📝 [PUT] Non-JSON response:', textResponse);
 
 				if (!response.ok) {
 					console.error('❌ [PUT] Non-JSON error response:', {
@@ -863,6 +893,8 @@ export class ApiService {
 			}
 
 			// API logging: Success response
+			console.log(`✅ [PUT] Success: ${endpoint} (${response.status})`);
+			console.log('✅ [PUT] Response data:', data);
 
 			// Clear cache by prefix to handle all variants
 			const baseEndpoint = endpoint.replace(/\/[^/]+$/, '');
@@ -1039,6 +1071,8 @@ export class ApiService {
 			};
 
 			// API logging: Request details
+			console.log(`🗑️ [ApiService] Sending DELETE to ${url}`);
+			console.log(`🔑 [ApiService] DELETE has body:`, hasBody);
 			console.log(
 				`🔑 [ApiService] DELETE headers:`,
 				Object.keys(requestHeaders)
@@ -1061,6 +1095,7 @@ export class ApiService {
 						bodyString.substring(0, 100)
 					);
 				} else {
+					console.log(`🔑 [ApiService] DELETE is bodyless (Content-Length: 0)`);
 				}
 
 				response = await fetch(url, fetchOptions);
@@ -1076,6 +1111,7 @@ export class ApiService {
 
 			// Handle 204 No Content (successful delete with no body)
 			if (response.status === 204) {
+				console.log(`✅ [ApiService] DELETE successful (204 No Content)`);
 				// Skip to cache clearing
 				const baseEndpoint = endpoint.replace(/\/[^/]+$/, '');
 				this.clearCacheByPrefix(baseEndpoint);
@@ -1158,6 +1194,8 @@ export class ApiService {
 			}
 
 			// API logging: Success response
+			console.log(`✅ [ApiService] DELETE successful (${response.status})`);
+			console.log(`🔍 [DELETE] About to clear cache for endpoint: ${endpoint}`);
 
 			// Clear cache by prefix to handle all variants
 			const baseEndpoint = endpoint.replace(/\/[^/]+$/, '');
@@ -1188,9 +1226,12 @@ export class ApiService {
 	 */
 	static async testConnection(): Promise<boolean> {
 		try {
+			console.log('🔍 [DEBUG] Testing server connectivity...');
+			console.log('🔧 [DEBUG] testConnection - API_BASE_URL:', API_BASE_URL);
 
 			// Use a simple ping endpoint or just test if the server is reachable
 			const url = `${API_BASE_URL}/api/budgets`;
+			console.log('🔧 [DEBUG] testConnection - final URL:', url);
 
 			// Get auth headers to include Firebase UID
 			const headers = await this.getAuthHeaders();
@@ -1201,6 +1242,7 @@ export class ApiService {
 			});
 
 			if (response.ok) {
+				console.log('✅ [DEBUG] Server connectivity test successful');
 				return true;
 			} else {
 				console.error(
@@ -1221,7 +1263,9 @@ export class ApiService {
 	 */
 	static async testAuthentication(): Promise<boolean> {
 		try {
+			console.log('🔍 [DEBUG] Testing authentication...');
 			const response = await this.get('/api/profiles/me');
+			console.log('✅ [DEBUG] Authentication test result:', response);
 			return response.success;
 		} catch (error) {
 			console.error('❌ [DEBUG] Authentication test error:', error);
@@ -1307,8 +1351,10 @@ export class ApiService {
 	static clearCache(endpoint?: string): void {
 		if (endpoint) {
 			requestCache.delete(endpoint);
+			console.log(`🗑️ [ApiService] Cache cleared for: ${endpoint}`);
 		} else {
 			requestCache.clear();
+			console.log(`🗑️ [ApiService] All cache cleared`);
 		}
 	}
 
@@ -1383,8 +1429,10 @@ export class ApiService {
 	static clearRateLimit(endpoint?: string): void {
 		if (endpoint) {
 			rateLimitBackoff.delete(endpoint);
+			console.log(`🚫 [ApiService] Rate limit cleared for: ${endpoint}`);
 		} else {
 			rateLimitBackoff.clear();
+			console.log(`🚫 [ApiService] All rate limits cleared`);
 		}
 	}
 
@@ -1394,6 +1442,7 @@ export class ApiService {
 	static resetRateLimits(): void {
 		rateLimitBackoff.clear();
 		requestThrottle.clear();
+		console.log(`🚫 [ApiService] All rate limits and throttles reset`);
 	}
 
 	/**

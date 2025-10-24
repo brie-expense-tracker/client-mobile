@@ -120,6 +120,8 @@ const EditRecurringExpenseScreen: React.FC = () => {
 		if (patternId && expenses.length > 0) {
 			const found = expenses.find((e) => e.patternId === patternId);
 			if (found) {
+				console.log('🔍 [EditRecurringExpense] Loading expense:', found);
+				console.log('🎨 [EditRecurringExpense] Icon/Color from data:');
 				console.log('  - icon:', found.icon);
 				console.log('  - color:', found.color);
 				console.log('  - categories:', found.categories);
@@ -139,9 +141,11 @@ const EditRecurringExpenseScreen: React.FC = () => {
 				setColor(found.color || DEFAULT_COLOR);
 				setSelectedCategories(found.categories || []);
 
+				console.log('🎨 [EditRecurringExpense] Set state to:');
 				console.log('  - appearanceMode:', expenseMode);
 				console.log('  - icon:', normalized);
 				console.log('  - color:', found.color || DEFAULT_COLOR);
+				console.log('  - categories:', found.categories || []);
 			}
 		}
 	}, [patternId, expenses]);
@@ -160,12 +164,14 @@ const EditRecurringExpenseScreen: React.FC = () => {
 
 	// Wrapper to set icon and switch to custom mode
 	const handleIconChange = (newIcon: keyof typeof Ionicons.glyphMap) => {
+		console.log('🎨 [EditRecurringExpense] User changed icon to:', newIcon);
 		setIcon(newIcon);
 		setAppearanceMode('custom');
 	};
 
 	// Wrapper to set color and switch to custom mode
 	const handleColorChange = (newColor: string) => {
+		console.log('🎨 [EditRecurringExpense] User changed color to:', newColor);
 		setColor(newColor);
 		setAppearanceMode('custom');
 	};
@@ -211,6 +217,7 @@ const EditRecurringExpenseScreen: React.FC = () => {
 				'✅ [EditRecurringExpense] Update succeeded, result:',
 				result
 			);
+			console.log('🎨 [EditRecurringExpense] Checking fields in result:');
 			console.log('  - appearanceMode:', result.appearanceMode);
 			console.log('  - icon:', result.icon);
 			console.log('  - color:', result.color);
