@@ -667,7 +667,7 @@ export default function AccountScreen() {
 						<TouchableOpacity
 							onPress={() => {
 								// Navigate to assistant with insights context
-								router.push('/(tabs)/assistant');
+								router.push('/(tabs)/chat');
 							}}
 							style={{
 								flexDirection: 'row',
@@ -707,7 +707,7 @@ export default function AccountScreen() {
 									router.push('/(tabs)/budgets?tab=goals');
 								else if (a === 'create_budget')
 									router.push('/(tabs)/budgets?tab=budgets');
-								else router.push('/(tabs)/assistant');
+								else router.push('/(tabs)/chat');
 							}}
 							mode="preview"
 						/>

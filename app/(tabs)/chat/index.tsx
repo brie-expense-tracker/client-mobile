@@ -11,15 +11,13 @@ import {
 	StyleSheet,
 	SafeAreaView,
 	TouchableOpacity,
-	TextInput,
 	KeyboardAvoidingView,
 	Platform,
-	FlatList,
-	ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
 	OrchestratorAIService,
 	OrchestratorAIResponse,
@@ -29,10 +27,7 @@ import { useBudget } from '../../../src/context/budgetContext';
 import { useGoal } from '../../../src/context/goalContext';
 import { TransactionContext } from '../../../src/context/transactionContext';
 import { useRecurringExpense } from '../../../src/context/recurringExpenseContext';
-import MissingInfoCard, {
-	MissingInfoChip,
-} from '../../../src/components/assistant/cards/MissingInfoCard';
-import IntentMissingInfoCard from '../../../src/components/assistant/cards/IntentMissingInfoCard';
+import { MissingInfoChip } from '../../../src/components/assistant/cards/MissingInfoCard';
 import {
 	missingInfoService,
 	MissingInfoState,
@@ -55,10 +50,7 @@ import {
 	CachedBudget,
 	CachedGoal,
 } from '../../../src/services/resilience/fallbackService';
-import FallbackCard from '../../../src/components/assistant/cards/FallbackCard';
-import ServiceStatusIndicator from '../../../src/components/assistant/indicators/ServiceStatusIndicator';
 import { TraceEventData } from '../../../src/services/feature/enhancedStreamingService';
-import WhyThisTray from './components/WhyThisTray';
 import DevHud from './_components/DevHud';
 import {
 	useMessagesReducerV2,
@@ -73,7 +65,6 @@ import {
 	InsightsContextService,
 	Insight,
 } from '../../../src/services/insights/insightsContextService';
-import ContextualInsightsPanel from '../../../src/components/assistant/panels/ContextualInsightsPanel';
 import {
 	AppEvents,
 	EVT_AI_INSIGHTS_CHANGED,
@@ -90,10 +81,18 @@ import {
 } from '../../../src/state/assistantConfig';
 import { useFeature } from '../../../src/config/features';
 import { FooterBar } from '../../../src/ui';
+import ChatComposer from './components/ChatComposer';
 
-export default function AssistantScreen() {
+// New components
+import { MessagesList } from './components/MessagesList';
+import { AssistantListFooter } from './components/AssistantListFooter';
+import { useComposerHeight } from './hooks/useComposerHeight';
+
+export default function ChatScreen() {
 	const router = useRouter();
 	const tabBarHeight = useBottomTabBarHeight();
+	const insets = useSafeAreaInsets();
+	const [composerH, onComposerLayout] = useComposerHeight(56);
 	const { profile } = useProfile();
 	const { budgets } = useBudget();
 	const aiInsightsEnabled = useFeature('aiInsights');
@@ -124,7 +123,7 @@ export default function AssistantScreen() {
 	// React instantly to assistant config changes from anywhere in the app
 	useEffect(() => {
 		const handler = ({ config: newConfig }: AssistantConfigChangedEvent) => {
-			console.log('🔧 [DEBUG] Assistant config event received:', newConfig);
+			console.log('🔧 [DEBUG] Chat config event received:', newConfig);
 			setConfig(newConfig);
 
 			// Clear context when personalization is disabled
@@ -160,7 +159,7 @@ export default function AssistantScreen() {
 
 	// Debug: Log config changes
 	useEffect(() => {
-		console.log('🔧 [DEBUG] Assistant config changed:', {
+		console.log('🔧 [DEBUG] Chat config changed:', {
 			config,
 			hasProfile: !!profile,
 			isPersonalizationOn: isPersonalizationOn(config),
@@ -302,21 +301,13 @@ export default function AssistantScreen() {
 			);
 
 			console.log(
-				'[Assistant] Loaded insights context and data with config:',
+				'[Chat] Loaded insights context and data with config:',
 				config
 			);
 		} catch (error) {
-			console.error('[Assistant] Failed to load insights context:', error);
+			console.error('[Chat] Failed to load insights context:', error);
 		}
-	}, [
-		config,
-		insightsService,
-		profile,
-		budgets,
-		goals,
-		transactions,
-		recurringExpenses,
-	]);
+	}, [config, insightsService, profile, budgets, goals, transactions]);
 
 	// Initialize orchestrator service when profile is available
 	useEffect(() => {
@@ -403,9 +394,9 @@ export default function AssistantScreen() {
 	useEffect(() => {
 		const lastMessage = messages[messages.length - 1];
 		if (lastMessage && lastMessage.isStreaming) {
-			console.log('🔄 [Assistant] Stream started for message:', lastMessage.id);
+			console.log('🔄 [Chat] Stream started for message:', lastMessage.id);
 		} else if (lastMessage && !lastMessage.isStreaming && lastMessage.text) {
-			console.log('✅ [Assistant] Message completed:', {
+			console.log('✅ [Chat] Message completed:', {
 				id: lastMessage.id,
 				length: lastMessage.text.length,
 				isUser: lastMessage.isUser,
@@ -430,7 +421,7 @@ export default function AssistantScreen() {
 				lastSync,
 			});
 		} catch (error) {
-			console.error('[Assistant] Failed to load fallback data:', error);
+			console.error('[Chat] Failed to load fallback data:', error);
 		}
 	};
 
@@ -653,6 +644,14 @@ export default function AssistantScreen() {
 		}
 	};
 
+	// Helper function to bridge ChatComposer with existing handleSendMessage
+	const sendFromComposer = async (text: string) => {
+		// Set the input text temporarily for handleSendMessage to use
+		setInputText(text);
+		// Call handleSendMessage which will clear inputText after processing
+		await handleSendMessage();
+	};
+
 	const handleSendMessage = async () => {
 		const trimmedInput = inputText.trim();
 
@@ -663,7 +662,7 @@ export default function AssistantScreen() {
 
 		// Prevent duplicate message processing
 		if (lastProcessedMessage === trimmedInput) {
-			console.warn('🚨 [Assistant] Duplicate message detected, ignoring');
+			console.warn('🚨 [Chat] Duplicate message detected, ignoring');
 			setDebugInfo('Duplicate message ignored');
 			return;
 		}
@@ -679,7 +678,7 @@ export default function AssistantScreen() {
 					: 0;
 
 				if (timeSinceLastUpdate > 10000) {
-					console.warn('🚨 [Assistant] Stuck stream detected, recovering...', {
+					console.warn('🚨 [Chat] Stuck stream detected, recovering...', {
 						messageId: streamingMessage.id,
 						timeSinceLastUpdate: `${Math.round(timeSinceLastUpdate / 1000)}s`,
 						hasContent: !!(streamingMessage.buffered || streamingMessage.text),
@@ -775,7 +774,7 @@ export default function AssistantScreen() {
 				sufficiencyResult.refusalMessage
 			);
 			console.log(
-				'🤖 [Assistant] Added missing info message with ID:',
+				'🤖 [Chat] Added missing info message with ID:',
 				missingInfoMessageId
 			);
 			return;
@@ -813,21 +812,15 @@ export default function AssistantScreen() {
 		}
 
 		if (!verifyMessage) {
-			console.error(
-				'🚨 [Assistant] Message not found after adding placeholder:',
-				{
-					aiMessageId,
-					availableIds: messagesRef.current.map((m) => m.id),
-					attempts,
-				}
-			);
+			console.error('🚨 [Chat] Message not found after adding placeholder:', {
+				aiMessageId,
+				availableIds: messagesRef.current.map((m) => m.id),
+				attempts,
+			});
 
 			// Try one more time with a new ID
 			const newAiMessageId = (Date.now() + 2).toString();
-			console.log(
-				'🔄 [Assistant] Creating new message with ID:',
-				newAiMessageId
-			);
+			console.log('🔄 [Chat] Creating new message with ID:', newAiMessageId);
 
 			addAIPlaceholder(newAiMessageId);
 
@@ -842,7 +835,7 @@ export default function AssistantScreen() {
 			}
 
 			if (!verifyMessage) {
-				console.error('🚨 [Assistant] Message creation failed, aborting');
+				console.error('🚨 [Chat] Message creation failed, aborting');
 				return;
 			}
 
@@ -865,7 +858,7 @@ export default function AssistantScreen() {
 			);
 
 			console.warn(
-				'🚨 [Assistant] UI fallback timeout after 3m (stream layer should have handled this)',
+				'🚨 [Chat] UI fallback timeout after 3m (stream layer should have handled this)',
 				{
 					messageId: streamingMessageId,
 					hasStreamingMessage: !!streamingMessage,
@@ -893,7 +886,7 @@ export default function AssistantScreen() {
 		}, 180000); // 3 minute fallback timeout (stream layer handles real timeouts)
 		setUiTimeout(timeout as any);
 
-		console.log('🚀 [Assistant] Starting stream for message:', aiMessageId);
+		console.log('🚀 [Chat] Starting stream for message:', aiMessageId);
 
 		// Ensure the streaming ref is set to the correct message ID and sessionId
 		streamingRef.current.messageId = aiMessageId;
@@ -927,14 +920,14 @@ export default function AssistantScreen() {
 				})),
 			});
 
-			console.log('🚀 [Assistant] Calling startStream function...');
+			console.log('🚀 [Chat] Calling startStream function...');
 			await startStream(
 				enhancedInput,
 				{
 					onMeta: (data) => {
 						if (data.timeToFirstToken) {
 							console.log(
-								'⚡ [Assistant] First token received:',
+								'⚡ [Chat] First token received:',
 								data.timeToFirstToken + 'ms'
 							);
 						}
@@ -954,7 +947,7 @@ export default function AssistantScreen() {
 						}
 
 						console.log('[CALLBACK onDelta] len=', data.text?.length || 0);
-						console.log('📝 [Assistant] Stream delta received:', {
+						console.log('📝 [Chat] Stream delta received:', {
 							chars: bufferedText.length,
 							messageId: aiMessageId,
 							deltaText: data.text?.substring(0, 50) + '...',
@@ -967,7 +960,7 @@ export default function AssistantScreen() {
 						);
 						if (!targetMessage) {
 							console.error(
-								'🚨 [Assistant] Target message not found during delta:',
+								'🚨 [Chat] Target message not found during delta:',
 								{
 									aiMessageId,
 									availableIds: messagesRef.current.map((m) => m.id),
@@ -975,7 +968,7 @@ export default function AssistantScreen() {
 							);
 
 							// Try to create the message if it doesn't exist
-							console.log('🔄 [Assistant] Creating missing message for delta');
+							console.log('🔄 [Chat] Creating missing message for delta');
 							addAIPlaceholder(aiMessageId);
 							// Add a small delay to ensure the message is created
 							setTimeout(() => {
@@ -994,7 +987,7 @@ export default function AssistantScreen() {
 						);
 					},
 					onFinal: (data) => {
-						console.log('✅ [Assistant] Stream completed:', {
+						console.log('✅ [Chat] Stream completed:', {
 							responseLength: data.response?.length || 0,
 							messageId: aiMessageId,
 						});
@@ -1032,14 +1025,11 @@ export default function AssistantScreen() {
 						);
 
 						if (!currentMessage) {
-							console.error(
-								'🚨 [Assistant] Message not found for finalization:',
-								{
-									messageIdToFinalize,
-									streamingMessageId,
-									availableIds: messagesRef.current.map((m) => m.id),
-								}
-							);
+							console.error('🚨 [Chat] Message not found for finalization:', {
+								messageIdToFinalize,
+								streamingMessageId,
+								availableIds: messagesRef.current.map((m) => m.id),
+							});
 
 							// Recovery: Try to find any streaming message
 							const streamingMessage = messagesRef.current.find(
@@ -1047,13 +1037,13 @@ export default function AssistantScreen() {
 							);
 							if (streamingMessage) {
 								console.log(
-									'🔄 [Assistant] Recovery: Found streaming message:',
+									'🔄 [Chat] Recovery: Found streaming message:',
 									streamingMessage.id
 								);
 								currentMessage = streamingMessage;
 							} else {
 								// Last resort: create a new message with the buffered text
-								console.log('🔄 [Assistant] Creating recovery message');
+								console.log('🔄 [Chat] Creating recovery message');
 								addAIPlaceholder(messageIdToFinalize);
 								// Wait a moment for the message to be created
 								setTimeout(() => {
@@ -1074,7 +1064,7 @@ export default function AssistantScreen() {
 								: currentMessage.text ||
 								  'Response received but content not found';
 
-						console.log('✅ [Assistant] Finalizing message:', {
+						console.log('✅ [Chat] Finalizing message:', {
 							id: messageIdToFinalize,
 							length: finalText.length,
 							hasContent: finalText.length > 0,
@@ -1116,7 +1106,7 @@ export default function AssistantScreen() {
 						// Transition to error mode
 						modeStateService.transitionTo('error', `stream error: ${error}`);
 
-						console.error('🚨 [Assistant] Stream failed:', {
+						console.error('🚨 [Chat] Stream failed:', {
 							error,
 							messageId: aiMessageId,
 							streamingState: isStreaming,
@@ -1153,9 +1143,9 @@ export default function AssistantScreen() {
 				}
 			);
 
-			console.log('✅ [Assistant] Stream call completed successfully');
+			console.log('✅ [Chat] Stream call completed successfully');
 		} catch (error) {
-			console.error('💥 [Assistant] Failed to start stream:', {
+			console.error('💥 [Chat] Failed to start stream:', {
 				error: error instanceof Error ? error.message : String(error),
 				messageId: aiMessageId,
 				inputLength: currentInput.length,
@@ -1187,7 +1177,7 @@ export default function AssistantScreen() {
 				await handleSendMessage();
 			}
 		} catch (error) {
-			console.error('[Assistant] Retry failed:', error);
+			console.error('[Chat] Retry failed:', error);
 		} finally {
 			setIsRetrying(false);
 		}
@@ -1196,12 +1186,6 @@ export default function AssistantScreen() {
 	// Handle refresh of fallback data
 	const handleRefresh = async () => {
 		await loadFallbackData();
-	};
-
-	// Handle show work button
-	const handleShowWork = () => {
-		console.log('Show work button pressed');
-		// TODO: Implement show work functionality
 	};
 
 	// Handle insight press
@@ -1229,22 +1213,17 @@ export default function AssistantScreen() {
 	};
 
 	// Handle asking about insight
-	const handleAskAboutInsight = (insight: Insight) => {
+	const handleAskAboutInsight = async (insight: Insight) => {
 		console.log('Ask about insight:', insight.title);
 
 		// Create a contextual question about the insight
 		const question = `Can you help me understand this insight: "${insight.title}" - ${insight.message}`;
 
-		// Set the input text and send the message
-		setInputText(question);
-
 		// Update conversation context
 		setCurrentConversationContext(`${insight.title} ${insight.message}`);
 
-		// Auto-send after a short delay
-		setTimeout(() => {
-			handleSendMessage();
-		}, 100);
+		// Send directly without setTimeout
+		await sendFromComposer(question);
 	};
 
 	// Handle expand button
@@ -1256,14 +1235,9 @@ export default function AssistantScreen() {
 			const lastUserMessage = userMessages[userMessages.length - 1];
 
 			if (lastUserMessage) {
-				// Set the input text and trigger expand
-				setInputText(lastUserMessage.text || '');
 				setShowExpandButton(true); // Keep expand button visible to pass the flag
-
-				// Trigger the message send with expand flag
-				setTimeout(() => {
-					handleSendMessage();
-				}, 100);
+				// Send directly without setTimeout
+				await sendFromComposer(lastUserMessage.text || '');
 			}
 		}
 	};
@@ -1321,7 +1295,7 @@ export default function AssistantScreen() {
 					<Image
 						source={require('../../../src/assets/logos/brieai-logo.png')}
 						style={styles.logo}
-						resizeMode="contain"
+						contentFit="contain"
 						accessibilityRole="image"
 						accessibilityLabel="Brie app logo"
 					/>
@@ -1336,299 +1310,57 @@ export default function AssistantScreen() {
 				<View style={{ width: 24 }} />
 			</View>
 
-			<KeyboardAvoidingView
-				style={styles.container}
-				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-				keyboardVerticalOffset={tabBarHeight}
-			>
-				<FlatList
-					data={messages}
-					keyExtractor={(item) => item.id}
-					renderItem={({ item }) => {
-						return (
-							<View
-								style={[
-									styles.message,
-									item.isUser ? styles.userMessage : styles.aiMessage,
-								]}
-							>
-								<Text
-									style={[
-										styles.messageText,
-										item.isUser ? styles.userMessageText : styles.aiMessageText,
-									]}
-								>
-									{item.isStreaming ? item.buffered : item.text}
-									{item.isStreaming && (
-										<Text style={styles.streamingCursor}>|</Text>
-									)}
-								</Text>
-								{__DEV__ && !item.isUser && (
-									<Text style={styles.debugText}>
-										Debug: {item.isStreaming ? 'streaming' : 'final'} | Text:{' '}
-										{item.text?.length || 0} chars | Buffered:{' '}
-										{item.buffered?.length || 0} chars
-									</Text>
-								)}
-								{!item.isUser && item.performance && (
-									<View style={styles.performanceInfo}>
-										<Text style={styles.performanceText}>
-											⚡ {item.performance.totalLatency}ms
-											{item.performance.timeToFirstToken && (
-												<Text style={styles.timeToFirstToken}>
-													{' '}
-													(first token: {item.performance.timeToFirstToken}ms)
-												</Text>
-											)}
-											{item.performance.cacheHit ? ' (cached)' : ''}
-										</Text>
-										{item.performance.parallelTools &&
-											item.performance.parallelTools.executed.length > 0 && (
-												<Text style={styles.parallelInfo}>
-													🔧 {item.performance.parallelTools.executed.length}{' '}
-													tools ({item.performance.parallelTools.successCount}✓,{' '}
-													{item.performance.parallelTools.failureCount}✗)
-													{item.performance.parallelTools.timeoutCount > 0 &&
-														`, ${item.performance.parallelTools.timeoutCount}⏱`}
-												</Text>
-											)}
-										{item.performance.parallelFacts &&
-											item.performance.parallelFacts.queriesExecuted > 0 && (
-												<Text style={styles.parallelInfo}>
-													📊 {item.performance.parallelFacts.queriesExecuted}{' '}
-													queries ({item.performance.parallelFacts.successCount}
-													✓, {item.performance.parallelFacts.failureCount}✗)
-												</Text>
-											)}
-										{item.performance.optimizations && (
-											<Text style={styles.optimizationInfo}>
-												🚀 Parallel:{' '}
-												{Object.entries(item.performance.optimizations)
-													.filter(([_, enabled]) => enabled)
-													.map(([key, _]) =>
-														key.replace(/([A-Z])/g, ' $1').toLowerCase()
-													)
-													.join(', ')}
-											</Text>
-										)}
-										{item.showWorkButton && (
-											<TouchableOpacity
-												style={styles.showWorkButton}
-												onPress={() => {
-													// TODO: Implement show work functionality
-													console.log('Show work button pressed');
-												}}
-											>
-												<Text style={styles.showWorkButtonText}>
-													📊 Show your work
-												</Text>
-											</TouchableOpacity>
-										)}
-									</View>
-								)}
-								{/* Why This Tray for AI messages */}
-								{!item.isUser && (traceData || performanceData) && (
-									<WhyThisTray
-										traceData={traceData || undefined}
-										performance={performanceData || undefined}
-									/>
-								)}
-								{/* Expand button for short responses */}
-								{!item.isUser && !item.isStreaming && showExpandButton && (
-									<TouchableOpacity
-										style={styles.expandButton}
-										onPress={handleExpand}
-									>
-										<Text style={styles.expandButtonText}>
-											📈 Expand with more detail
-										</Text>
-									</TouchableOpacity>
-								)}
-							</View>
-						);
-					}}
-					contentContainerStyle={styles.messagesContainer}
-					ListFooterComponent={
-						<View>
-							{/* Contextual Insights Panel - only render when proactive mode is enabled and AI Insights feature is enabled */}
-							{aiInsightsEnabled &&
-								allowProactive(config) &&
-								!isStreaming &&
-								dataInitialized && (
-									<ContextualInsightsPanel
-										key={`cip-${config.mode}-${config.showProactiveCards}`}
-										conversationContext={currentConversationContext}
-										onInsightPress={handleInsightPress}
-										onAskAboutInsight={handleAskAboutInsight}
-										maxInsights={3}
-									/>
-								)}
-							{isStreaming && !streamingMessageId && (
-								<View style={styles.loadingContainer}>
-									<ActivityIndicator size="small" color="#3b82f6" />
-									<Text style={styles.loadingText}>AI is thinking...</Text>
-								</View>
-							)}
-							{streamingMessageId && (
-								<View style={styles.streamingContainer}>
-									<ActivityIndicator size="small" color="#10b981" />
-									<Text style={styles.streamingText}>AI is responding...</Text>
-								</View>
-							)}
-							{__DEV__ && (
-								<View style={styles.debugContainer}>
-									<Text style={styles.debugText}>
-										Debug: {debugInfo || 'No debug info'}
-									</Text>
-									<Text style={styles.debugText}>
-										Streaming: {isStreaming ? 'true' : 'false'}
-									</Text>
-									<Text style={styles.debugText}>
-										Streaming ID: {streamingMessageId || 'none'}
-									</Text>
-									<Text style={styles.debugText}>
-										Session ID: {streamingRef.current.sessionId || 'none'}
-									</Text>
-									<Text style={styles.debugText}>
-										Connected: {isStreaming ? 'true' : 'false'}
-									</Text>
-									<Text style={styles.debugText}>
-										Connecting: {isStreaming ? 'true' : 'false'}
-									</Text>
-									<Text style={styles.debugText}>
-										Messages: {messages.length}
-									</Text>
-									<Text style={styles.debugText}>
-										Last message streaming:{' '}
-										{messages[messages.length - 1]?.isStreaming
-											? 'true'
-											: 'false'}
-									</Text>
-									<Text style={styles.debugText}>
-										Last processed: {lastProcessedMessage.substring(0, 30)}...
-									</Text>
-									<Text style={styles.debugText}>
-										Recovery status:{' '}
-										{debugInfo.includes('Recovered')
-											? '✅ Recovered'
-											: 'Normal'}
-									</Text>
-									{messages[messages.length - 1]?.buffered && (
-										<Text style={styles.debugText}>
-											Buffered text:{' '}
-											{messages[messages.length - 1].buffered?.substring(0, 60)}
-											...
-										</Text>
-									)}
-									<TouchableOpacity
-										style={styles.testButton}
-										onPress={testStreaming}
-									>
-										<Text style={styles.testButtonText}>🧪 Test Streaming</Text>
-									</TouchableOpacity>
-								</View>
-							)}
-							{missingInfoState.isCollecting &&
-								missingInfoState.chips.length > 0 && (
-									<View style={styles.missingInfoContainer}>
-										<MissingInfoCard
-											chips={missingInfoState.chips}
-											onChipPress={handleChipPress}
-											onValueSubmit={handleValueSubmit}
-										/>
-										{missingInfoService.isComplete() && (
-											<TouchableOpacity
-												style={styles.completeButton}
-												onPress={handleMissingInfoComplete}
-											>
-												<Text style={styles.completeButtonText}>
-													Complete & Continue
-												</Text>
-											</TouchableOpacity>
-										)}
-									</View>
-								)}
-							{intentMissingInfoState.isCollecting &&
-								intentMissingInfoState.chips.length > 0 && (
-									<View style={styles.missingInfoContainer}>
-										<IntentMissingInfoCard
-											intent={intentMissingInfoState.currentIntent || 'unknown'}
-											missing={intentMissingInfoState.chips.map((chip) => ({
-												id: chip.id,
-												label: chip.label,
-												description: chip.description,
-												required: chip.required,
-												priority: chip.priority,
-												examples: chip.examples,
-												placeholder: chip.placeholder,
-												inputType: chip.inputType,
-												options: chip.options,
-											}))}
-											onSubmit={(data) => {
-												console.log('Intent missing info submitted:', data);
-												handleIntentMissingInfoComplete();
-											}}
-											onCancel={() => {
-												console.log('Intent missing info cancelled');
-												intentMissingInfoService.clearCollectedData();
-											}}
-										/>
-									</View>
-								)}
-							{showFallback && (
-								<FallbackCard
-									spendPlan={fallbackData.spendPlan}
-									budgets={fallbackData.budgets}
-									goals={fallbackData.goals}
-									lastSync={fallbackData.lastSync}
-									onRetry={handleRetry}
-									onRefresh={handleRefresh}
-									isRetrying={isRetrying}
-									showWorkButton={true}
-									onShowWork={handleShowWork}
-								/>
-							)}
-							{__DEV__ && (
-								<ServiceStatusIndicator
-									onRetry={handleRetry}
-									isRetrying={isRetrying}
-								/>
-							)}
-							{/* Spacer for footer input bar - accounts for FooterBar + tab bar height */}
-							<View style={{ height: 100 }} />
-						</View>
-					}
-				/>
-			</KeyboardAvoidingView>
-
-			<FooterBar style={styles.inputContainer}>
-				<TextInput
-					style={styles.textInput}
-					value={inputText}
-					onChangeText={setInputText}
-					placeholder="Ask about your finances..."
-					placeholderTextColor="#9ca3af"
-					multiline
-				/>
-				<TouchableOpacity
-					style={[
-						styles.sendButton,
-						(!inputText.trim() || isStreaming) && styles.sendButtonDisabled,
-					]}
-					onPress={handleSendMessage}
-					disabled={!inputText.trim() || isStreaming}
+			<View style={styles.container}>
+				<MessagesList
+					messages={messages}
+					streamingMessageId={streamingMessageId}
+					traceData={traceData}
+					performanceData={performanceData}
+					showExpandButton={showExpandButton}
+					onExpandPress={handleExpand}
+					contentPaddingBottom={composerH + insets.bottom + 12}
 				>
-					{isStreaming ? (
-						<ActivityIndicator size="small" color="#fff" />
-					) : (
-						<Ionicons
-							name="send"
-							size={20}
-							color={inputText.trim() ? '#fff' : '#9ca3af'}
-						/>
-					)}
-				</TouchableOpacity>
-			</FooterBar>
+					<AssistantListFooter
+						aiInsightsEnabled={aiInsightsEnabled}
+						allowProactive={allowProactive(config)}
+						isStreaming={isStreaming}
+						hasStreamingId={!!streamingMessageId}
+						dataInitialized={dataInitialized}
+						conversationContext={currentConversationContext}
+						onInsightPress={handleInsightPress}
+						onAskAboutInsight={handleAskAboutInsight}
+						debugInfo={debugInfo}
+						streamingRef={streamingRef}
+						messagesCount={messages.length}
+						lastProcessedMessage={lastProcessedMessage}
+						onTestStreaming={testStreaming}
+						showFallback={showFallback}
+						fallbackData={fallbackData}
+						onRetry={handleRetry}
+						onRefresh={handleRefresh}
+						isRetrying={isRetrying}
+						showServiceStatus={__DEV__}
+						onMissingInfoComplete={handleMissingInfoComplete}
+						onIntentMissingInfoComplete={handleIntentMissingInfoComplete}
+						missingInfoState={missingInfoState}
+						intentMissingInfoState={intentMissingInfoState}
+						onChipPress={handleChipPress}
+						onValueSubmit={handleValueSubmit}
+					/>
+				</MessagesList>
+			</View>
+
+			{/* KeyboardAvoidingView only around the footer/composer */}
+			<KeyboardAvoidingView
+				behavior={Platform.OS === 'ios' ? 'position' : undefined}
+				keyboardVerticalOffset={0}
+			>
+				<View onLayout={onComposerLayout}>
+					<FooterBar style={styles.inputContainer}>
+						<ChatComposer onSend={sendFromComposer} isSending={isStreaming} />
+					</FooterBar>
+				</View>
+			</KeyboardAvoidingView>
 		</SafeAreaView>
 	);
 }
@@ -1652,11 +1384,6 @@ const styles = StyleSheet.create({
 		flex: 1,
 		alignItems: 'center',
 	},
-	headerTitle: {
-		fontSize: 18,
-		fontWeight: '600',
-		color: '#111827',
-	},
 	budgetIndicator: {
 		fontSize: 12,
 		color: '#6b7280',
@@ -1665,185 +1392,8 @@ const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 	},
-	messagesContainer: {
-		padding: 20,
-		flexGrow: 1,
-	},
-	message: {
-		maxWidth: '80%',
-		marginBottom: 16,
-		padding: 12,
-		borderRadius: 18,
-	},
-	userMessage: {
-		alignSelf: 'flex-end',
-		backgroundColor: '#3b82f6',
-		borderBottomRightRadius: 4,
-	},
-	aiMessage: {
-		alignSelf: 'flex-start',
-		backgroundColor: '#f3f4f6',
-		borderBottomLeftRadius: 4,
-	},
-	messageText: {
-		fontSize: 16,
-		lineHeight: 22,
-	},
-	userMessageText: {
-		color: '#ffffff',
-	},
-	aiMessageText: {
-		color: '#111827',
-	},
 	inputContainer: {
 		flexDirection: 'row',
 		alignItems: 'flex-end',
-	},
-	textInput: {
-		flex: 1,
-		backgroundColor: '#f9fafb',
-		borderWidth: 1,
-		borderColor: '#d1d5db',
-		borderRadius: 20,
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		fontSize: 16,
-		maxHeight: 100,
-		marginRight: 12,
-	},
-	sendButton: {
-		width: 40,
-		height: 40,
-		borderRadius: 20,
-		backgroundColor: '#3b82f6',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	sendButtonDisabled: {
-		backgroundColor: '#e5e7eb',
-	},
-	performanceInfo: {
-		marginTop: 8,
-		paddingTop: 8,
-		borderTopWidth: 1,
-		borderTopColor: '#e5e7eb',
-	},
-	performanceText: {
-		fontSize: 12,
-		color: '#6b7280',
-		fontStyle: 'italic',
-	},
-	parallelInfo: {
-		fontSize: 11,
-		color: '#9ca3af',
-		fontStyle: 'italic',
-		marginTop: 2,
-	},
-	optimizationInfo: {
-		fontSize: 10,
-		color: '#10b981',
-		fontStyle: 'italic',
-		marginTop: 2,
-		fontWeight: '500',
-	},
-	loadingContainer: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
-		padding: 16,
-	},
-	loadingText: {
-		marginLeft: 8,
-		fontSize: 14,
-		color: '#6b7280',
-	},
-	streamingContainer: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
-		padding: 16,
-	},
-	streamingText: {
-		marginLeft: 8,
-		fontSize: 14,
-		color: '#10b981',
-		fontWeight: '500',
-	},
-	missingInfoContainer: {
-		marginTop: 16,
-	},
-	completeButton: {
-		backgroundColor: '#10b981',
-		borderRadius: 8,
-		padding: 12,
-		marginTop: 12,
-		alignItems: 'center',
-	},
-	completeButtonText: {
-		color: '#ffffff',
-		fontSize: 16,
-		fontWeight: '600',
-	},
-	streamingCursor: {
-		color: '#3b82f6',
-		fontWeight: 'bold',
-	},
-	timeToFirstToken: {
-		fontSize: 11,
-		color: '#10b981',
-		fontWeight: '500',
-	},
-	showWorkButton: {
-		backgroundColor: '#f3f4f6',
-		borderRadius: 8,
-		padding: 8,
-		marginTop: 8,
-		alignItems: 'center',
-		borderWidth: 1,
-		borderColor: '#e5e7eb',
-	},
-	showWorkButtonText: {
-		color: '#374151',
-		fontSize: 14,
-		fontWeight: '500',
-	},
-	expandButton: {
-		backgroundColor: '#f0f9ff',
-		borderRadius: 8,
-		padding: 8,
-		marginTop: 8,
-		alignItems: 'center',
-		borderWidth: 1,
-		borderColor: '#0ea5e9',
-	},
-	expandButtonText: {
-		color: '#0369a1',
-		fontSize: 14,
-		fontWeight: '500',
-	},
-	debugContainer: {
-		backgroundColor: '#fef3c7',
-		borderRadius: 8,
-		padding: 8,
-		marginTop: 8,
-		borderWidth: 1,
-		borderColor: '#f59e0b',
-	},
-	debugText: {
-		fontSize: 12,
-		color: '#92400e',
-		fontFamily: 'monospace',
-	},
-	testButton: {
-		backgroundColor: '#3b82f6',
-		borderRadius: 8,
-		padding: 8,
-		marginTop: 8,
-		alignItems: 'center',
-	},
-	testButtonText: {
-		color: '#ffffff',
-		fontSize: 14,
-		fontWeight: '600',
 	},
 });

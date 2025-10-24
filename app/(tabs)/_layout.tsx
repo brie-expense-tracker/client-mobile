@@ -37,13 +37,13 @@ export default function TabLayout() {
 							}}
 						/>
 						<Tabs.Screen
-							name="assistant"
+							name="chat"
 							options={{
 								tabBarIcon: ({ color, size }) => (
 									<Ionicons name="sparkles-outline" color={color} size={size} />
 								),
 								tabBarShowLabel: false,
-								tabBarLabel: 'Assistant',
+								tabBarLabel: 'Chat',
 							}}
 						/>
 						<Tabs.Screen

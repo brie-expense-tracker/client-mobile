@@ -1022,7 +1022,7 @@ class NotificationService {
 						}
 						break;
 					case 'ai_insight':
-						router.push('/(tabs)/assistant');
+						router.push('/(tabs)/chat');
 						break;
 					case 'system':
 						router.push('/(stack)/settings');

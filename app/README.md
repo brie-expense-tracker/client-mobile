@@ -41,11 +41,11 @@ This directory contains the main navigation structure for the Brie mobile app us
 - **`_layout.tsx`** - Budgets stack layout
 - **`components/`** - Budget-specific components
 
-#### 📁 `assistant/` - AI Assistant Tab
+#### 📁 `chat/` - AI Chat Tab
 
-- **`index.tsx`** - Main AI assistant screen
-- **`_layout.tsx`** - Assistant stack layout
-- **`components/`** - Assistant-specific components
+- **`index.tsx`** - Main AI chat screen
+- **`_layout.tsx`** - Chat stack layout
+- **`components/`** - Chat-specific components
 
 #### 📁 `transaction/` - Transaction Tab
 

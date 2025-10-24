@@ -51,7 +51,7 @@ When not in Private mode, users can fine-tune:
 - `src/lib/eventBus.ts` - Event system for instant updates
 - `src/context/profileContext.tsx` - Profile management with new preferences
 - `app/(stack)/settings/assistant/index.tsx` - New settings screen
-- `app/(tabs)/assistant/index.tsx` - Updated assistant screen
+- `app/(tabs)/chat/index.tsx` - Updated chat screen
 
 ### Key Functions
 
