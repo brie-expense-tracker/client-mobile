@@ -30,7 +30,6 @@ export const ConversationState = {
 
 	clearPendingAction: (convId: string) => {
 		pendingActions.set(convId, null);
-		console.log(`[ConversationState] Cleared pending action for ${convId}`);
 	},
 
 	setLastExecutedAction: (convId: string, actionId: string) => {

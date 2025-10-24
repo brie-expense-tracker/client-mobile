@@ -158,7 +158,6 @@ export class SimpleQALane {
 			return null;
 		}
 
-		console.log('🔍 [SimpleQA] Attempting simple answer for:', question);
 
 		// Step 1: Try micro-solvers first (fastest)
 		const microResult = microSolve(question, context);
@@ -237,7 +236,6 @@ export class SimpleQALane {
 
 			// Check repetition guard
 			if (this.shouldAvoidRepeat(question, patternKey)) {
-				console.log('🔍 [SimpleQA] Avoiding repeat of KB item:', patternKey);
 				return null;
 			}
 
@@ -814,7 +812,6 @@ What specific financial topic would you like help with?`;
 			'What is compound interest?',
 		];
 
-		console.log('🔍 [SimpleQA] Warming cache with common questions...');
 
 		for (const question of commonQuestions) {
 			try {
@@ -838,7 +835,6 @@ What specific financial topic would you like help with?`;
 			}
 		}
 
-		console.log('🔍 [SimpleQA] Cache warming completed');
 	}
 
 	/**
@@ -865,7 +861,6 @@ What specific financial topic would you like help with?`;
 		this.topicHistory = [];
 		this.lastPatternKey = null;
 		this.lastPatternTimestamp = null;
-		console.log('🔍 [SimpleQA] Reset completed');
 	}
 }
 

@@ -72,7 +72,6 @@ export class BudgetAnalysisService {
 			const cached = this.analysisCache.get(cacheKey);
 			if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
 				this.performanceMetrics.cacheHits++;
-				console.log('[BudgetAnalysisService] Returning cached analysis');
 				return cached.data;
 			}
 
@@ -114,7 +113,6 @@ export class BudgetAnalysisService {
 			this.performanceMetrics.successfulRequests++;
 			this.updateResponseTime(responseTime);
 
-			console.log('[BudgetAnalysisService] Analysis completed:', {
 				budgetId,
 				responseTime,
 				spent: analysis.spent,
@@ -438,7 +436,6 @@ export class BudgetAnalysisService {
 	 */
 	static clearCache(): void {
 		this.analysisCache.clear();
-		console.log('[BudgetAnalysisService] Cache cleared');
 	}
 
 	/**

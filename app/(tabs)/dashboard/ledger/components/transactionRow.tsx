@@ -605,7 +605,6 @@ export const TransactionRow = React.memo(
 
 		// Debug logging for transaction updates
 		if (!shouldUpdate) {
-			console.log('[TransactionRow] Re-rendering due to changes:', {
 				id: prevProps.item.id,
 				prevDescription: prevProps.item.description,
 				nextDescription: nextProps.item.description,

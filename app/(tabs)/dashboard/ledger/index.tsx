@@ -144,7 +144,6 @@ export default function TransactionScreen() {
 
 	// Debug logging
 	useEffect(() => {
-		console.log('[Ledger] Current state:', {
 			transactionsCount: transactions.length,
 			transactions: transactions.map((tx) => ({
 				id: tx.id,
@@ -179,7 +178,6 @@ export default function TransactionScreen() {
 
 	// filter transactions
 	const filtered = useMemo(() => {
-		console.log('[Ledger] Filtering transactions:', {
 			totalTransactions: transactions.length,
 			selectedGoals,
 			selectedBudgets,
@@ -344,7 +342,6 @@ export default function TransactionScreen() {
 				const shouldInclude =
 					patternMatch && goalBudgetMatch && dateMatch && searchMatch;
 				if (shouldInclude) {
-					console.log('[Ledger] Transaction included:', tx.description);
 				}
 
 				return shouldInclude;

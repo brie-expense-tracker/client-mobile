@@ -70,7 +70,6 @@ export class SmartCacheService {
 	 */
 	setInvalidationFlag(flag: string): void {
 		this.invalidationFlags.add(flag);
-		console.log(`[SmartCacheService] Set invalidation flag: ${flag}`);
 	}
 
 	/**
@@ -78,7 +77,6 @@ export class SmartCacheService {
 	 */
 	clearInvalidationFlag(flag: string): void {
 		this.invalidationFlags.delete(flag);
-		console.log(`[SmartCacheService] Cleared invalidation flag: ${flag}`);
 	}
 
 	/**
@@ -137,7 +135,6 @@ export class SmartCacheService {
 	 */
 	async initialize(): Promise<void> {
 		try {
-			console.log('[SmartCacheService] Starting cache initialization...');
 
 			// Add timeout protection for storage operations
 			const storageTimeout = new Promise((_, reject) => {
@@ -151,7 +148,6 @@ export class SmartCacheService {
 
 			await Promise.race([initPromise, storageTimeout]);
 
-			console.log('[SmartCacheService] Cache initialized successfully');
 		} catch (error) {
 			console.error('[SmartCacheService] Error initializing cache:', error);
 			// Don't throw - allow service to continue with empty cache

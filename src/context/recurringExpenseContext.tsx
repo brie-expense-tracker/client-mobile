@@ -100,7 +100,6 @@ export const RecurringExpenseProvider: React.FC<{ children: ReactNode }> = ({
 		// Cancel any in-flight request
 		if (abortControllerRef.current) {
 			abortControllerRef.current.abort();
-			console.log('🛑 [RecurringExpenseContext] Aborted previous fetch');
 		}
 
 		// Create new abort controller for this fetch
@@ -143,7 +142,6 @@ export const RecurringExpenseProvider: React.FC<{ children: ReactNode }> = ({
 			for (const e of normalized) {
 				const id = getRecurringExpenseId(e);
 				if (!id || seen.has(id)) {
-					console.log(`🗑️ [RecurringExpenseContext] Skipping duplicate: ${id}`);
 					continue;
 				}
 				seen.add(id);
@@ -368,7 +366,6 @@ export const RecurringExpenseProvider: React.FC<{ children: ReactNode }> = ({
 	);
 
 	const deleteRecurringExpense = useCallback(async (id: string) => {
-		console.log('🗑️ [RecurringExpenseContext] Deleting expense:', id);
 
 		// Guard: If ID is manual_*, just remove locally (it doesn't exist on server)
 		const isManualId = id.startsWith('manual_');
@@ -396,7 +393,6 @@ export const RecurringExpenseProvider: React.FC<{ children: ReactNode }> = ({
 		});
 
 		try {
-			console.log('🗑️ [RecurringExpenseContext] Calling API delete...');
 			await RecurringExpenseService.deleteRecurringExpense(id);
 
 			console.log(

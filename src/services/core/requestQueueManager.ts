@@ -50,7 +50,6 @@ class RequestQueueManager {
 
 			// Check if request is already active
 			if (this.activeRequests.has(requestId)) {
-				console.log(`🔄 [RequestQueue] Request already active: ${requestId}`);
 				reject(new Error('Request already in progress'));
 				return;
 			}
@@ -101,7 +100,6 @@ class RequestQueueManager {
 			// Check if request is too old (5 minutes)
 			const age = Date.now() - request.timestamp;
 			if (age > 300000) {
-				console.log(`⏰ [RequestQueue] Request expired: ${request.id}`);
 				request.reject(new Error('Request expired'));
 				continue;
 			}
@@ -117,7 +115,6 @@ class RequestQueueManager {
 	 * Execute a single request
 	 */
 	private async executeRequest(request: QueuedRequest): Promise<void> {
-		console.log(`🚀 [RequestQueue] Executing request: ${request.id}`);
 
 		try {
 			// Simulate the actual request execution
@@ -167,7 +164,6 @@ class RequestQueueManager {
 			request.reject(new Error('Queue cleared'));
 		});
 		this.queue = [];
-		console.log(`🗑️ [RequestQueue] Queue cleared`);
 	}
 
 	/**
@@ -175,7 +171,6 @@ class RequestQueueManager {
 	 */
 	updateConfig(newConfig: Partial<QueueConfig>): void {
 		this.config = { ...this.config, ...newConfig };
-		console.log(`⚙️ [RequestQueue] Config updated:`, this.config);
 	}
 }
 

@@ -48,7 +48,6 @@ const QuickAddBudgetTransaction: React.FC<QuickAddBudgetTransactionProps> = ({
 	budgetColor = '#00a2ff',
 	onTransactionAdded,
 }) => {
-	console.log('[QuickAddBudgetTransaction] Props received:', {
 		isVisible,
 		budgetId,
 		budgetName,

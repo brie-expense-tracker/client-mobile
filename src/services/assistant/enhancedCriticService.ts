@@ -346,7 +346,6 @@ export class EnhancedCriticService {
 				const factPackTotal =
 					this.factPack.budgets?.reduce((sum, b) => sum + b.limit, 0) || 0;
 				if (Math.abs(mentionedTotal - factPackTotal) > 0.01) {
-					console.log('🔍 [EnhancedCritic] Budget total mismatch:', {
 						mentioned: mentionedTotal,
 						factPack: factPackTotal,
 					});
@@ -359,7 +358,6 @@ export class EnhancedCriticService {
 				const factPackTotal =
 					this.factPack.goals?.reduce((sum, g) => sum + g.targetAmount, 0) || 0;
 				if (Math.abs(mentionedTotal - factPackTotal) > 0.01) {
-					console.log('🔍 [EnhancedCritic] Goal total mismatch:', {
 						mentioned: mentionedTotal,
 						factPack: factPackTotal,
 					});
@@ -409,7 +407,6 @@ export class EnhancedCriticService {
 			const totalRemaining =
 				this.factPack.budgets?.reduce((sum, b) => sum + b.remaining, 0) || 0;
 			if (suggestedSpending > totalRemaining) {
-				console.log('🔍 [EnhancedCritic] Budget limit exceeded:', {
 					suggested: suggestedSpending,
 					remaining: totalRemaining,
 				});

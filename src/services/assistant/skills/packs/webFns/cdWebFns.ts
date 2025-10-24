@@ -62,14 +62,12 @@ export const webFnsForCD: WebFns = {
 		query: string,
 		recencyDays = 30
 	): Promise<{ title: string; url: string }[]> {
-		console.log(`[CD WebFns] Searching for: ${query} (${recencyDays} days)`);
 
 		try {
 			// Check cache first
 			const cacheKey = `search:${query}:${recencyDays}`;
 			const cached = requestCache.get(cacheKey);
 			if (cached && Date.now() - cached.timestamp < DEFAULT_CONFIG.cacheTtl) {
-				console.log('[CD WebFns] Returning cached search results');
 				return cached.data;
 			}
 
@@ -108,14 +106,12 @@ export const webFnsForCD: WebFns = {
 	},
 
 	async fetchText(url: string): Promise<string> {
-		console.log(`[CD WebFns] Fetching: ${url}`);
 
 		try {
 			// Check cache first
 			const cacheKey = `fetch:${url}`;
 			const cached = requestCache.get(cacheKey);
 			if (cached && Date.now() - cached.timestamp < DEFAULT_CONFIG.cacheTtl) {
-				console.log('[CD WebFns] Returning cached content');
 				return cached.data;
 			}
 

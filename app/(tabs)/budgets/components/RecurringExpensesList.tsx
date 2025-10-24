@@ -64,7 +64,6 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 			);
 			setExpenses(upcoming);
 		} else {
-			console.log('[RecurringExpensesList] Setting all expenses:', allExpenses);
 			setExpenses(allExpenses);
 		}
 	}, [allExpenses, showUpcomingOnly]);

@@ -81,7 +81,6 @@ export class FeatureFlagsService {
 			}
 
 			this.isInitialized = true;
-			console.log('🚩 [FeatureFlags] Service initialized');
 		} catch (error) {
 			console.warn(
 				'🚩 [FeatureFlags] Failed to initialize service, using defaults:',
@@ -157,7 +156,6 @@ export class FeatureFlagsService {
 				);
 			}
 
-			console.log('🚩 [FeatureFlags] Remote config initialized');
 		} catch (error) {
 			console.warn(
 				'🚩 [FeatureFlags] Failed to initialize remote config, using defaults:',
@@ -418,7 +416,6 @@ export class FeatureFlagsService {
 				source: 'local',
 			});
 
-			console.log(`🚩 [FeatureFlags] Local override set: ${key} = ${value}`);
 		} catch (error) {
 			console.warn(
 				`🚩 [FeatureFlags] Failed to set local override for ${key}:`,
@@ -442,7 +439,6 @@ export class FeatureFlagsService {
 			const flag = this.flags.get(key);
 			if (flag?.source === 'local') {
 				this.flags.delete(key);
-				console.log(`🚩 [FeatureFlags] Local override removed: ${key}`);
 			}
 		} catch (error) {
 			console.warn(
@@ -498,7 +494,6 @@ export class FeatureFlagsService {
 			}
 
 			this.lastFetchTime = Date.now();
-			console.log('🚩 [FeatureFlags] Refreshed from remote config');
 		} catch (error) {
 			console.warn('🚩 [FeatureFlags] Failed to refresh:', error);
 		}
@@ -835,7 +830,6 @@ export class FeatureFlagsService {
 				clearedCount++;
 			});
 
-			console.log(`🚩 [FeatureFlags] Cleared ${clearedCount} local overrides`);
 			return { success: true, clearedCount };
 		} catch (error) {
 			console.warn('🚩 [FeatureFlags] Failed to clear local overrides:', error);
@@ -1000,7 +994,6 @@ export class FeatureFlagsService {
 				}
 			}
 
-			console.log(`🚩 [FeatureFlags] Imported ${importedCount} flags`);
 			return {
 				success: errors.length === 0,
 				importedCount,
@@ -1205,7 +1198,6 @@ export class FeatureFlagsService {
 				source: 'default',
 			});
 
-			console.log(`🚩 [FeatureFlags] Reset flag ${key} to default value`);
 			return { success: true };
 		} catch (error) {
 			console.warn(

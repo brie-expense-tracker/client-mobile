@@ -40,10 +40,8 @@ import { ApiService } from '../services';
 // Budget-specific API functions
 // ==========================================
 const fetchBudgets_OLD = async (): Promise<Budget[]> => {
-	console.log('📡 [fetchBudgets] Fetching budgets from API...');
 	const response = await ApiService.get<{ data: Budget[] }>('/api/budgets');
 
-	console.log('📥 [fetchBudgets] Response:', {
 		success: response.success,
 		hasData: !!response.data,
 		dataIsArray: Array.isArray(response.data?.data),
@@ -52,17 +50,14 @@ const fetchBudgets_OLD = async (): Promise<Budget[]> => {
 
 	// Handle authentication errors gracefully
 	if (!response.success && response.error?.includes('User not authenticated')) {
-		console.log('🔒 [Budgets] User not authenticated, returning empty array');
 		return [];
 	}
 
 	const budgets = response.data?.data || [];
-	console.log('✅ [fetchBudgets] Returning', budgets.length, 'budgets');
 	return budgets;
 };
 
 const createBudget = async (budgetData: CreateBudgetData): Promise<Budget> => {
-	console.log('🔍 [createBudget] Request data:', budgetData);
 	const response = await ApiService.post<{ data: Budget }>(
 		'/api/budgets',
 		budgetData
@@ -151,13 +146,10 @@ const updateBudget = async (
 };
 
 const deleteBudget = async (id: string): Promise<void> => {
-	console.log('🗑️ [deleteBudget] Starting deletion for ID:', id);
 	await ApiService.delete(`/api/budgets/${id}`);
-	console.log('✅ [deleteBudget] API delete complete, clearing cache...');
 
 	// Defensive: manually clear ALL budgets caches (prefix-based to catch all variants)
 	ApiService.clearCacheByPrefix('/api/budgets');
-	console.log('🗑️ [deleteBudget] All budgets caches cleared by prefix');
 };
 
 // ==========================================

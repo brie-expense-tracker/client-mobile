@@ -57,7 +57,6 @@ export default function SmartSuggestions({
 					<TouchableOpacity
 						key={index}
 						onPress={() => {
-							console.log('🔍 [DEBUG] Smart suggestion tapped:', text);
 							onPick(text);
 						}}
 						style={[

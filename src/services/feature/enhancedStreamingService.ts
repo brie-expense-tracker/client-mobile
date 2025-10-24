@@ -200,11 +200,6 @@ export async function startSSE({
 			.toString(36)
 			.substr(2, 9)}`;
 
-		console.log('[EnhancedStreamingService] URL building debug:');
-		console.log('[EnhancedStreamingService] body:', body);
-		console.log('[EnhancedStreamingService] body.message:', body?.message);
-		console.log('[EnhancedStreamingService] messageToSend:', messageToSend);
-		console.log('[EnhancedStreamingService] sessionIdToSend:', sessionIdToSend);
 
 		const urlWithUid = buildSseUrl({
 			sessionId: sessionIdToSend,
@@ -213,7 +208,6 @@ export async function startSSE({
 			clientMessageId: messageId,
 		});
 
-		console.log('[EnhancedStreamingService] Final URL:', urlWithUid);
 
 		// Create EventSource - only pass URL, no options
 		const es = new (global as any).EventSource(urlWithUid);
@@ -226,12 +220,10 @@ export async function startSSE({
 			listener: any,
 			options?: any
 		) {
-			console.log('[SSE] Adding event listener for type:', type);
 			return originalAddEventListener(type, listener, options);
 		};
 
 		// Add debugging for EventSource properties
-		console.log('[SSE] EventSource created successfully');
 		console.log(
 			'[SSE] EventSource withCredentials:',
 			(es as any).withCredentials
@@ -251,7 +243,6 @@ export async function startSSE({
 				console.warn('[SSE] URL:', urlWithUid);
 
 				// Try fetch streaming fallback instead of immediate error
-				console.log('[SSE] Trying fetch streaming fallback due to timeout');
 				tryFetchStreaming();
 			}
 		}, 5000);
@@ -267,7 +258,6 @@ export async function startSSE({
 
 		// Add a fallback mechanism to try fetch streaming if EventSource fails
 		const tryFetchStreaming = async () => {
-			console.log('[SSE] EventSource failed, trying fetch streaming fallback');
 			try {
 				const response = await fetch(urlWithUid, {
 					method: 'GET',
@@ -302,13 +292,11 @@ export async function startSSE({
 
 					for (const event of events) {
 						if (event.trim()) {
-							console.log('[SSE] Processing fetch event:', event);
 							parseSSEData(event + '\n\n');
 						}
 					}
 				}
 
-				console.log('[SSE] Fetch streaming completed');
 				onDone?.();
 			} catch (error) {
 				console.error('[SSE] Fetch streaming failed:', error);
@@ -334,9 +322,6 @@ export async function startSSE({
 		};
 
 		es.addEventListener('open', () => {
-			console.log('[SSE] open');
-			console.log('[SSE] Connection state:', es.readyState);
-			console.log('[SSE] URL:', urlWithUid);
 			connecting = false;
 			onOpen?.();
 
@@ -357,13 +342,11 @@ export async function startSSE({
 
 		// Manual SSE parser to handle raw data
 		const parseSSEData = (data: string) => {
-			console.log('[SSE] Parsing raw data:', data);
 
 			// Split by double newlines to get individual SSE events
 			const events = data.split('\n\n').filter((event) => event.trim());
 
 			for (const event of events) {
-				console.log('[SSE] Processing SSE event:', event);
 
 				// Split by newlines to get individual lines
 				const lines = event.split('\n');
@@ -379,11 +362,8 @@ export async function startSSE({
 				}
 
 				if (eventData) {
-					console.log('[SSE] Extracted event data:', eventData);
-					console.log('[SSE] Event type:', eventType);
 
 					if (eventData === '[DONE]') {
-						console.log('[SSE] Received DONE signal');
 						close();
 						onDone?.();
 						return;
@@ -391,11 +371,9 @@ export async function startSSE({
 
 					try {
 						const chunk = JSON.parse(eventData);
-						console.log('[SSE] Parsed SSE chunk:', chunk);
 						gotFirstChunk = true;
 						onMessage(JSON.stringify(chunk));
 					} catch (parseError) {
-						console.log('[SSE] Failed to parse SSE JSON:', parseError);
 						gotFirstChunk = true;
 						onMessage(eventData);
 					}
@@ -405,34 +383,21 @@ export async function startSSE({
 
 		// Handle chunks from all possible SSE event names
 		const handleChunk = (ev: MessageEvent) => {
-			console.log('[SSE] Received chunk:', ev.data);
-			console.log('[SSE] Event type:', ev.type);
-			console.log('[SSE] Event origin:', ev.origin);
-			console.log('[SSE] Raw event object:', ev);
-			console.log('[SSE] Data is empty object?', ev.data === '{}');
-			console.log('[SSE] Data is empty string?', ev.data === '');
-			console.log('[SSE] Data is null/undefined?', ev.data == null);
 
 			if (!ev?.data) {
-				console.log('[SSE] No data in event, skipping');
 				return;
 			}
 
 			// Handle empty object case specifically
 			if (ev.data === '{}') {
-				console.log('[SSE] Received empty object, skipping chunk');
 				return;
 			}
 
 			// Handle SSE data format
 			if (ev.data.startsWith('data: ')) {
 				const jsonData = ev.data.substring(6);
-				console.log('[SSE] Extracted JSON from SSE format:', jsonData);
-				console.log('[SSE] JSON data type:', typeof jsonData);
-				console.log('[SSE] JSON data length:', jsonData.length);
 
 				if (jsonData === '[DONE]') {
-					console.log('[SSE] Received DONE signal via SSE');
 					close();
 					onDone?.();
 					return;
@@ -440,48 +405,36 @@ export async function startSSE({
 
 				try {
 					const chunk = JSON.parse(jsonData);
-					console.log('[SSE] Parsed SSE chunk:', chunk);
-					console.log('[SSE] Chunk type:', chunk.type);
-					console.log('[SSE] Chunk keys:', Object.keys(chunk || {}));
 					gotFirstChunk = true;
 					onMessage(JSON.stringify(chunk));
 				} catch (parseError) {
-					console.log('[SSE] Failed to parse SSE JSON:', parseError);
-					console.log('[SSE] Raw data that failed to parse:', jsonData);
 					gotFirstChunk = true;
 					onMessage(ev.data);
 				}
 			} else if (ev.data === '[DONE]') {
-				console.log('[SSE] Received DONE signal');
 				close();
 				onDone?.();
 				return;
 			} else if (ev.data.includes('data: ') || ev.data.includes('\n')) {
 				// This might be raw SSE data that needs manual parsing
-				console.log('[SSE] Detected potential raw SSE data, parsing manually');
 				parseSSEData(ev.data);
 			} else {
 				// Try to parse as JSON for non-SSE format
 				try {
 					const p = JSON.parse(ev.data);
-					console.log('[SSE] Parsed non-SSE JSON:', p);
 					const text =
 						typeof p === 'string'
 							? p
 							: p.text ?? p.delta ?? p.token ?? p.content ?? '';
 					if (text) {
 						gotFirstChunk = true;
-						console.log('[SSE] Parsed text chunk:', text);
 						onMessage(text);
 					} else {
 						gotFirstChunk = true;
-						console.log('[SSE] Raw data chunk:', ev.data);
 						onMessage(ev.data);
 					}
 				} catch (parseError) {
 					gotFirstChunk = true;
-					console.log('[SSE] Raw data chunk (parse failed):', ev.data);
-					console.log('[SSE] Parse error:', parseError);
 					onMessage(ev.data);
 				}
 			}
@@ -489,13 +442,6 @@ export async function startSSE({
 
 		// Override the default onmessage handler to ensure we get the raw data
 		es.onmessage = (ev: MessageEvent) => {
-			console.log('[SSE] onmessage event received:', ev);
-			console.log('[SSE] onmessage data:', ev.data);
-			console.log('[SSE] onmessage data type:', typeof ev.data);
-			console.log('[SSE] onmessage data length:', ev.data?.length);
-			console.log('[SSE] onmessage lastEventId:', ev.lastEventId);
-			console.log('[SSE] onmessage origin:', ev.origin);
-			console.log('[SSE] onmessage type:', ev.type);
 
 			// Always call handleChunk - let it decide what to do with the data
 			handleChunk(ev);
@@ -508,11 +454,9 @@ export async function startSSE({
 
 		// Add a raw data listener to catch any unparsed data
 		es.addEventListener('open', () => {
-			console.log('[SSE] Connection opened, setting up raw data listener');
 		});
 
 		es.addEventListener('done', () => {
-			console.log('[SSE] Done event received');
 			close();
 			onDone?.();
 		});
@@ -666,23 +610,16 @@ export function startStream(args: {
 	currentConnection = es;
 
 	es.addEventListener('open', () => {
-		console.log('[SSE] open');
-		console.log('[SSE] Connection state:', (es as any).readyState);
-		console.log('[SSE] URL:', url);
 		connecting = false;
 	});
 
 	const handleChunk = (ev: any) => {
-		console.log('[SSE] Received chunk:', ev);
-		console.log('[SSE] Raw data chunk:', ev?.data);
 
 		if (!ev?.data) {
-			console.log('[SSE] No data in event, skipping');
 			return;
 		}
 
 		if (ev.data === '[DONE]') {
-			console.log('[SSE] Received [DONE] signal, cleaning up');
 			cleanup();
 			args.onDone();
 			return;
@@ -691,7 +628,6 @@ export function startStream(args: {
 		// Try to parse structured payloads; fall back to raw text
 		try {
 			const payload = JSON.parse(ev.data);
-			console.log('[SSE] Parsed JSON payload:', payload);
 
 			const text =
 				typeof payload === 'string'
@@ -702,15 +638,12 @@ export function startStream(args: {
 					  payload.content ??
 					  '';
 			if (text) {
-				console.log('[SSE] Extracted text from payload:', text);
 				args.onChunk(text);
 				return;
 			}
 		} catch (parseError) {
-			console.log('[SSE] Failed to parse as JSON, using raw data:', parseError);
 		}
 
-		console.log('[SSE] Using raw data as text:', ev.data);
 		args.onChunk(ev.data);
 	};
 
@@ -719,7 +652,6 @@ export function startStream(args: {
 	es.onmessage = handleChunk; // default event
 	EVENTS.forEach((n) => es.addEventListener(n, handleChunk));
 	es.addEventListener('done', () => {
-		console.log('[SSE] Done event received');
 		cleanup();
 		args.onDone();
 	});
@@ -876,7 +808,6 @@ export class EnhancedStreamingService {
 
 		// Single-flight guard - close existing connection first
 		if (currentConnection) {
-			console.log('[SSE] Closing existing connection before starting new one');
 			try {
 				currentConnection.close();
 			} catch (e) {
@@ -899,14 +830,10 @@ export class EnhancedStreamingService {
 		this.bufferedText = '';
 
 		try {
-			console.log('[EnhancedStreamingService] Starting stream for:', message);
-			console.log('[EnhancedStreamingService] Session ID:', this.sessionId);
-			console.log('[EnhancedStreamingService] Base URL:', this.baseUrl);
 
 			// Get auth headers for UID
 			const authHeaders = await getApiHeaders();
 			const firebaseUid = authHeaders['x-firebase-uid'];
-			console.log('[EnhancedStreamingService] Firebase UID:', firebaseUid);
 
 			// Build URL using centralized function with UID
 			const url = buildSseUrl({
@@ -915,8 +842,6 @@ export class EnhancedStreamingService {
 				uid: firebaseUid,
 				clientMessageId: messageId,
 			});
-			console.log('[EnhancedStreamingService] SSE URL:', url);
-			console.log('[EnhancedStreamingService] Callbacks provided:', {
 				onMeta: !!callbacks.onMeta,
 				onDelta: !!callbacks.onDelta,
 				onFinal: !!callbacks.onFinal,
@@ -924,7 +849,6 @@ export class EnhancedStreamingService {
 				onDone: !!callbacks.onDone,
 				onError: !!callbacks.onError,
 			});
-			console.log('[EnhancedStreamingService] Callback functions:', {
 				onMeta: typeof callbacks.onMeta,
 				onDelta: typeof callbacks.onDelta,
 				onFinal: typeof callbacks.onFinal,
@@ -950,8 +874,6 @@ export class EnhancedStreamingService {
 							'[EnhancedStreamingService] Raw message received:',
 							data
 						);
-						console.log('[EnhancedStreamingService] Data type:', typeof data);
-						console.log('[EnhancedStreamingService] Data length:', data.length);
 						console.log(
 							'[EnhancedStreamingService] Data is empty object?',
 							data === '{}'
@@ -1000,8 +922,6 @@ export class EnhancedStreamingService {
 							}
 
 							const chunk: StreamingChunk = JSON.parse(jsonData);
-							console.log('[EnhancedStreamingService] Parsed chunk:', chunk);
-							console.log('[EnhancedStreamingService] Chunk type:', chunk.type);
 							console.log(
 								'[EnhancedStreamingService] Chunk keys:',
 								Object.keys(chunk || {})
@@ -1137,10 +1057,8 @@ export class EnhancedStreamingService {
 					}
 				},
 				onOpen: () => {
-					console.log('[EnhancedStreamingService] Stream opened');
 				},
 				onDone: () => {
-					console.log('[EnhancedStreamingService] Stream completed');
 					this.isStreaming = false;
 				},
 				fallback: async () => {

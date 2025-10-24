@@ -56,7 +56,6 @@ export async function trySkills(
 		const cacheKey = generateCacheKey(q, ctx);
 		const cached = executionCache.get(cacheKey);
 		if (cached && Date.now() - cached.timestamp < engineConfig.cacheTtlMs) {
-			console.log('[Skill Engine] Returning cached result');
 			return cached.result;
 		}
 	}
@@ -64,7 +63,6 @@ export async function trySkills(
 	// Find all skills that match this question
 	const skills = skillRegistry.find(q);
 	if (skills.length === 0) {
-		console.log('[Skill Engine] No matching skills found');
 		return null;
 	}
 
@@ -75,11 +73,9 @@ export async function trySkills(
 
 	// Try each skill in priority order
 	for (const skill of skills) {
-		console.log(`[Skill Engine] Trying skill: ${skill.id}`);
 
 		// Check circuit breaker
 		if (engineConfig.enableCircuitBreaker && isCircuitBreakerOpen(skill.id)) {
-			console.log(`[Skill Engine] Circuit breaker open for skill: ${skill.id}`);
 			continue;
 		}
 
@@ -386,7 +382,6 @@ function recordCircuitBreakerFailure(skillId: string): void {
 	// Open circuit after 5 failures
 	if (state.failures >= 5) {
 		state.state = 'open';
-		console.log(`[Skill Engine] Circuit breaker opened for skill: ${skillId}`);
 	}
 
 	circuitBreakerState.set(skillId, state);

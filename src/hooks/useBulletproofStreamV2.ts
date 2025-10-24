@@ -195,7 +195,6 @@ export function useBulletproofStreamV2({
 			currentMessageId.current = messageId;
 			streamingRef.current.messageId = messageId;
 
-			console.log('🚀 [Stream] Starting:', {
 				messageId,
 				messageLength: message.length,
 				retryCount:
@@ -217,7 +216,6 @@ export function useBulletproofStreamV2({
 					throw new Error('No authenticated user found');
 				}
 
-				console.log('🔑 [Stream] Using Firebase UID for auth:', {
 					uid: firebaseUID.substring(0, 10) + '...',
 				});
 
@@ -229,12 +227,10 @@ export function useBulletproofStreamV2({
 					clientMessageId: messageId,
 				});
 
-				console.log('🔧 [Stream] Built URL with UID:', {
 					url: url.substring(0, 100) + '...',
 					hasUID: !!firebaseUID,
 				});
 
-				console.log('🔗 [Stream] Connecting to server');
 
 				// Start health monitoring
 				startHealthMonitoring();
@@ -259,7 +255,6 @@ export function useBulletproofStreamV2({
 								isConnecting: false,
 							}));
 
-							console.log('📝 [Stream] Received delta:', {
 								textLength: text.length,
 								text: text.substring(0, 50) + '...',
 								messageId,
@@ -278,7 +273,6 @@ export function useBulletproofStreamV2({
 							const startTime = streamState.startTime || endTime;
 							const duration = endTime - startTime;
 
-							console.log('✅ [Stream] Completed:', {
 								messageId,
 								clientMessageId: id,
 								duration: `${duration}ms`,
@@ -359,7 +353,6 @@ export function useBulletproofStreamV2({
 								const nextRetryCount = streamState.retryCount + 1;
 								const delay = calculateRetryDelay(nextRetryCount - 1);
 
-								console.log('🔄 [Stream] Retrying:', {
 									attempt: `${nextRetryCount}/${retryConfig.maxRetries}`,
 									delay: `${delay}ms`,
 									reason: err.message.includes('network')
@@ -437,7 +430,6 @@ export function useBulletproofStreamV2({
 					const nextRetryCount = streamState.retryCount + 1;
 					const delay = calculateRetryDelay(nextRetryCount - 1);
 
-					console.log('🔄 [Stream] Retrying after error:', {
 						attempt: `${nextRetryCount}/${retryConfig.maxRetries}`,
 						delay: `${delay}ms`,
 						error: error.message || String(error),

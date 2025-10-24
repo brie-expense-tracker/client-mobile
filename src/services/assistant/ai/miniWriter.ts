@@ -88,7 +88,6 @@ export class MiniWriter {
 		if (this.config.enableCaching) {
 			const cached = this.getCachedResponse(cacheKey);
 			if (cached) {
-				console.log('[MiniWriter] Using cached response');
 				return cached;
 			}
 		}
@@ -98,7 +97,6 @@ export class MiniWriter {
 		let tokensOut = 0;
 
 		try {
-			console.log('[MiniWriter] Starting response generation', {
 				intent,
 				queryLength: userQuery.length,
 				factPackSize: JSON.stringify(factPack).length,
@@ -119,7 +117,6 @@ export class MiniWriter {
 
 			tokensIn = systemPrompt.length + userPrompt.length;
 
-			console.log('[MiniWriter] Calling LLM', {
 				systemPromptLength: systemPrompt.length,
 				userPromptLength: userPrompt.length,
 				model: this.config.model,
@@ -130,7 +127,6 @@ export class MiniWriter {
 
 			tokensOut = response.length;
 
-			console.log('[MiniWriter] LLM response received', {
 				responseLength: response.length,
 			});
 
@@ -172,7 +168,6 @@ export class MiniWriter {
 				});
 			}
 
-			console.log('[MiniWriter] Response generated successfully', {
 				contentKind: writerOutput.content_kind,
 				requiresClarification: writerOutput.requires_clarification,
 				processingTime: Date.now() - startTime,
@@ -353,7 +348,6 @@ Generate a response using ONLY the data from toolsOut. Do not invent any numbers
 				// Wait before retrying (exponential backoff)
 				if (attempt < this.config.retryAttempts!) {
 					const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-					console.log(`[MiniWriter] Waiting ${delay}ms before retry`);
 					await new Promise((resolve) => setTimeout(resolve, delay));
 				}
 			}
@@ -485,7 +479,6 @@ Generate a response using ONLY the data from toolsOut. Do not invent any numbers
 		this.analytics.push(analyticsEvent as any);
 
 		// In production, you would send this to your analytics service
-		console.log('[MiniWriter] Analytics event:', analyticsEvent);
 	}
 
 	/**

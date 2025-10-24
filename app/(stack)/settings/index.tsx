@@ -85,13 +85,11 @@ export default function SettingsScreen() {
 	const [refreshKey, setRefreshKey] = useState(0);
 
 	useEffect(() => {
-		console.log('🔧 [Settings] Feature flags updated:', {
 			aiInsights: aiInsightsEnabled,
 			aiInsightsPreview: aiInsightsPreviewEnabled,
 			newBudgetsV2: newBudgetsV2Enabled,
 			goalsTimeline: goalsTimelineEnabled,
 		});
-		console.log('🔧 [Settings] Environment variables:', {
 			EXPO_PUBLIC_AI_INSIGHTS: process.env.EXPO_PUBLIC_AI_INSIGHTS,
 			EXPO_PUBLIC_AI_INSIGHTS_PREVIEW:
 				process.env.EXPO_PUBLIC_AI_INSIGHTS_PREVIEW,
@@ -369,7 +367,6 @@ export default function SettingsScreen() {
 							<TouchableOpacity
 								style={[styles.debugButton]}
 								onPress={() => {
-									console.log('🔧 [Settings] Debug button pressed!');
 									console.log(
 										'🔧 [Settings] debugFeatureFlags function:',
 										typeof debugFeatureFlags

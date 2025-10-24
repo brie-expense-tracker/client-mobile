@@ -313,7 +313,6 @@ export class HierarchicalRouter {
 	}
 
 	async route(utterance: string, context: ChatContext): Promise<RouteDecision> {
-		console.log(`[HierarchicalRouter] Routing: "${utterance}"`);
 
 		// Pass 1: Rules-based routing (fast path)
 		const ruleResult = this.rulesRouter.route(utterance, context);

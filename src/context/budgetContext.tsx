@@ -260,7 +260,6 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 		// Cancel any in-flight request
 		if (abortControllerRef.current) {
 			abortControllerRef.current.abort();
-			console.log('🛑 [BudgetContext] Aborted previous fetch');
 		}
 
 		// Create new abort controller for this fetch
@@ -308,7 +307,6 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 		} catch (err: any) {
 			// Ignore abort errors (expected when a new fetch cancels the old one)
 			if (err?.name === 'AbortError') {
-				console.log('🛑 [BudgetContext] Fetch aborted (new fetch started)');
 				return;
 			}
 			console.warn('[Budgets] Failed to fetch budgets, using empty array', err);
@@ -421,7 +419,6 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 				// Invalidate relevant cache entries
 				setCacheInvalidationFlags.onBudgetChange();
 				ApiService.clearCacheByPrefix('/api/budgets');
-				console.log('🗑️ [BudgetContext] Cache cleared after budget creation');
 
 				return serverBudget;
 			} else {
@@ -485,7 +482,6 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 					// Invalidate relevant cache entries
 					setCacheInvalidationFlags.onBudgetChange();
 					ApiService.clearCacheByPrefix('/api/budgets');
-					console.log('🗑️ [BudgetContext] Cache cleared after budget creation');
 
 					return updatedBudget;
 				} else {
@@ -501,7 +497,6 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 
 	const deleteBudget = useCallback(
 		async (id: string) => {
-			console.log('🗑️ [BudgetContext] Deleting budget:', id);
 
 			// Save previous state for rollback
 			let previousBudgets: Budget[] = [];
@@ -512,7 +507,6 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 			});
 
 			try {
-				console.log('🗑️ [BudgetContext] Calling API delete...');
 				const result = await ApiService.delete(`/api/budgets/${id}`);
 
 				if (!result.success) {
@@ -541,11 +535,9 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 					}
 				}
 
-				console.log('✅ [BudgetContext] Delete successful, clearing cache...');
 				// Invalidate relevant cache entries
 				setCacheInvalidationFlags.onBudgetChange();
 				ApiService.clearCacheByPrefix('/api/budgets');
-				console.log('🗑️ [BudgetContext] Cache cleared after budget deletion');
 			} catch (err) {
 				console.error('❌ [BudgetContext] Delete failed, rolling back:', err);
 				// Rollback to previous state
@@ -560,8 +552,6 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 
 	const updateBudgetSpent = useCallback(
 		async (budgetId: string, amount: number) => {
-			console.log('[Budgets] updateBudgetSpent called:', { budgetId, amount });
-			console.log('[Budgets] Current budgets before update:', budgets);
 
 			try {
 				const response = await ApiService.post<any>(
@@ -572,13 +562,11 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 					}
 				);
 
-				console.log('[Budgets] updateBudgetSpent API response:', response);
 
 				// Handle the response format properly
 				const actualData = response.data?.data || response.data;
 				const actualSuccess = response.success;
 
-				console.log('[Budgets] Processed response:', {
 					actualSuccess,
 					actualData,
 				});
@@ -606,20 +594,17 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 						spentPercentage: actualData.spentPercentage || 0,
 					};
 
-					console.log('[Budgets] Updated budget object:', updatedBudget);
 
 					setBudgets((prev) => {
 						const updated = prev.map((b) =>
 							b.id === updatedBudget.id ? updatedBudget : b
 						);
-						console.log('[Budgets] Budgets state after update:', updated);
 						return updated;
 					});
 
 					// Invalidate relevant cache entries
 					setCacheInvalidationFlags.onBudgetChange();
 					ApiService.clearCacheByPrefix('/api/budgets');
-					console.log('🗑️ [BudgetContext] Cache cleared after budget creation');
 
 					return updatedBudget;
 				} else {
