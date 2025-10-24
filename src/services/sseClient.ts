@@ -40,7 +40,6 @@ export function startChatStream(
 		if (!guard(m.clientMessageId)) return;
 		started = true;
 		current.connecting = false;
-		console.log('🧠 [SSE] meta', m);
 		handlers.onMeta?.(m);
 	});
 
@@ -81,6 +80,5 @@ export function startChatStream(
 		current = { id: null, connecting: false };
 	});
 
-	console.log('🚀 [SSE] Started', { clientMessageId, url: url.toString() });
 	return clientMessageId;
 }

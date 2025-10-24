@@ -119,7 +119,6 @@ export function transition(
 	};
 
 	// Log transition for analytics
-	console.log('🔍 [ModeMachine] Transition:', {
 		from: currentMode,
 		to: newMode,
 		reason,

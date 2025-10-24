@@ -105,7 +105,6 @@ export class UserService {
 	static async createUser(
 		userData: CreateUserRequest
 	): Promise<CreateUserResponse> {
-		console.log('🔍 [UserService] Creating user with data:', {
 			firebaseUID: userData.firebaseUID.substring(0, 8) + '...',
 			email: userData.email,
 			name: userData.name || 'not provided',
@@ -120,7 +119,6 @@ export class UserService {
 				userData
 			);
 
-			console.log('🔍 [UserService] API response received:', {
 				success: response.success,
 				status: response.status,
 				error: response.error,
@@ -158,7 +156,6 @@ export class UserService {
 				throw new Error('User creation failed - missing user or profile data');
 			}
 
-			console.log('✅ [UserService] User created successfully:', {
 				userId: response.data.user._id,
 				profileId: response.data.profile._id,
 			});
@@ -171,7 +168,6 @@ export class UserService {
 	}
 
 	static async getUserByFirebaseUID(firebaseUID: string): Promise<User | null> {
-		console.log('🔍 [UserService] Getting user by Firebase UID');
 		const response = await ApiService.get<{ user: User }>(
 			`/api/users/${firebaseUID}`,
 			2, // retries
@@ -180,14 +176,12 @@ export class UserService {
 
 		if (!response.success) {
 			if (response.error?.includes('404')) {
-				console.log('🔍 [UserService] User not found (404)');
 				return null;
 			}
 			console.error('🔍 [UserService] Failed to fetch user:', response.error);
 			throw new Error(response.error || 'Failed to fetch user');
 		}
 
-		console.log('🔍 [UserService] User fetched successfully');
 		return response.data?.user || null;
 	}
 

@@ -31,14 +31,12 @@ type Props = {
 	conversationContext: string;
 	onInsightPress: (insight: Insight) => void;
 	onAskAboutInsight: (insight: Insight) => void;
-	debugInfo: string;
 	streamingRef: React.MutableRefObject<{
 		messageId?: string | null;
 		sessionId?: string | null;
 	}>;
 	messagesCount: number;
 	lastProcessedMessage: string;
-	onTestStreaming: () => void;
 	showFallback: boolean;
 	fallbackData: {
 		spendPlan?: CachedSpendPlan | null;
@@ -67,11 +65,9 @@ export function AssistantListFooter({
 	conversationContext,
 	onInsightPress,
 	onAskAboutInsight,
-	debugInfo,
 	streamingRef,
 	messagesCount,
 	lastProcessedMessage,
-	onTestStreaming,
 	showFallback,
 	fallbackData,
 	onRetry,
@@ -106,37 +102,6 @@ export function AssistantListFooter({
 			)}
 
 			{hasStreamingId && <Row text="AI is responding..." color="#10b981" />}
-
-			{/* Debug Panel */}
-			{__DEV__ && (
-				<View style={styles.debugContainer}>
-					<Text style={styles.debugText}>
-						Debug: {debugInfo || 'No debug info'}
-					</Text>
-					<Text style={styles.debugText}>
-						Streaming: {isStreaming ? 'true' : 'false'}
-					</Text>
-					<Text style={styles.debugText}>
-						Streaming ID: {streamingRef.current.messageId || 'none'}
-					</Text>
-					<Text style={styles.debugText}>
-						Session ID: {streamingRef.current.sessionId || 'none'}
-					</Text>
-					<Text style={styles.debugText}>
-						Connected: {isStreaming ? 'true' : 'false'}
-					</Text>
-					<Text style={styles.debugText}>
-						Connecting: {isStreaming ? 'true' : 'false'}
-					</Text>
-					<Text style={styles.debugText}>Messages: {messagesCount}</Text>
-					<Text style={styles.debugText}>
-						Last processed: {lastProcessedMessage.substring(0, 30)}...
-					</Text>
-					<TouchableOpacity style={styles.testButton} onPress={onTestStreaming}>
-						<Text style={styles.testButtonText}>🧪 Test Streaming</Text>
-					</TouchableOpacity>
-				</View>
-			)}
 
 			{/* Missing Info Cards */}
 			{missingInfoState.isCollecting && missingInfoState.chips.length > 0 && (

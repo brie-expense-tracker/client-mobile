@@ -87,7 +87,6 @@ export class SimpleQALogger {
 			// Save to persistent storage
 			this.saveToStorage();
 
-			console.log('🔍 [SimpleQALogger] Logged metrics:', {
 				tookSimpleQALane: metricsWithTimestamp.tookSimpleQALane,
 				microSolverUsed: metricsWithTimestamp.microSolverUsed,
 				responseSource: metricsWithTimestamp.responseSource,
@@ -374,7 +373,6 @@ export class SimpleQALogger {
 		if (typeof localStorage !== 'undefined') {
 			localStorage.removeItem(this.storageKey);
 		}
-		console.log('🔍 [SimpleQALogger] Cleared all metrics');
 	}
 
 	/**

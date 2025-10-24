@@ -67,14 +67,12 @@ const EditGoalScreen: React.FC = () => {
 	// Load goal data when component mounts
 	useEffect(() => {
 		if (goalId && goals.length > 0) {
-			console.log('[EditGoalScreen] Looking for goal with ID:', goalId);
 			console.log(
 				'[EditGoalScreen] Available goals:',
 				goals.map((g) => ({ id: g.id, name: g.name }))
 			);
 			const foundGoal = goals.find((g) => g.id === goalId);
 			if (foundGoal) {
-				console.log('[EditGoalScreen] Found goal:', foundGoal);
 				setGoal(foundGoal);
 				setName(foundGoal.name || '');
 				setTarget(foundGoal.target?.toString() || '');
@@ -94,7 +92,6 @@ const EditGoalScreen: React.FC = () => {
 				);
 				setShowCustomTarget(!isPreset && targetStr !== '');
 			} else {
-				console.log('[EditGoalScreen] Goal not found with ID:', goalId);
 			}
 		}
 	}, [goalId, goals]);
@@ -158,7 +155,6 @@ const EditGoalScreen: React.FC = () => {
 			// Use _id if available, otherwise use id
 			const goalIdToUse = (goal as any)._id || goal.id;
 
-			console.log('[EditGoalScreen] Updating goal:', {
 				goalId: goalIdToUse,
 				originalGoalId: goal.id,
 				updates: {
@@ -208,9 +204,7 @@ const EditGoalScreen: React.FC = () => {
 					style: 'destructive',
 					onPress: async () => {
 						try {
-							console.log('🗑️ [EditGoal] Deleting goal:', goal.id);
 							await deleteGoal(goal.id);
-							console.log('✅ [EditGoal] Goal deleted successfully');
 							router.back();
 						} catch (error) {
 							console.error('❌ [EditGoal] Delete failed:', error);

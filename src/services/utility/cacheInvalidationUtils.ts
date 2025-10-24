@@ -299,7 +299,6 @@ export const getUserInvalidationEvents = (
  */
 export const clearInvalidationAnalytics = () => {
 	invalidationEvents.length = 0;
-	console.log('[CacheInvalidation] Analytics cleared');
 };
 
 /**

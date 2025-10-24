@@ -94,7 +94,6 @@ const AddBudgetScreen: React.FC = () => {
 
 		setLoading(true);
 		try {
-			console.log('💾 [AddBudget] Creating new budget...');
 			const newBudget = await addBudget({
 				name: name.trim(),
 				amount: amountValue,
@@ -107,7 +106,6 @@ const AddBudgetScreen: React.FC = () => {
 				rollover,
 			});
 
-			console.log('✅ [AddBudget] Budget created successfully:', newBudget);
 			console.log(
 				'🔙 [AddBudget] Navigating back - useFocusEffect will handle refetch'
 			);

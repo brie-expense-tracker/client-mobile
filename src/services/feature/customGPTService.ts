@@ -81,12 +81,9 @@ export class CustomGPTService {
 		this.performanceMetrics.totalRequests++;
 
 		try {
-			console.log('[CustomGPTService] Getting response for:', message);
-			console.log('[CustomGPTService] Session ID:', this.sessionId);
 
 			// Prepare financial context for the AI
 			const financialContext = this.prepareFinancialContext();
-			console.log('[CustomGPTService] Financial context prepared:', {
 				budgetCount: financialContext.budgets.length,
 				goalCount: financialContext.goals.length,
 				transactionCount: financialContext.recentTransactions.length,
@@ -100,7 +97,6 @@ export class CustomGPTService {
 				context: financialContext,
 			};
 
-			console.log('[CustomGPTService] Sending request to API:', {
 				endpoint: '/api/custom-gpt/chat',
 				messageLength: message.trim().length,
 				hasContext: !!financialContext,
@@ -111,7 +107,6 @@ export class CustomGPTService {
 				requestPayload
 			);
 
-			console.log('[CustomGPTService] API response received:', {
 				success: response.success,
 				hasData: !!response.data,
 				responseLength: response.data?.response?.length || 0,
@@ -135,7 +130,6 @@ export class CustomGPTService {
 					},
 				};
 
-				console.log('[CustomGPTService] Returning successful response:', {
 					responsePreview: result.response.substring(0, 100) + '...',
 					sessionId: result.sessionId,
 					timestamp: result.timestamp,
@@ -177,7 +171,6 @@ export class CustomGPTService {
 				error.message
 			);
 
-			console.log('[CustomGPTService] Error details:', {
 				message: error.message,
 				status: error.response?.status,
 				statusText: error.response?.statusText,
@@ -831,7 +824,6 @@ export class CustomGPTService {
 	 */
 	updateContext(newContext: FinancialContext): void {
 		this.context = newContext;
-		console.log('[CustomGPTService] Context updated');
 	}
 
 	/**
@@ -847,7 +839,6 @@ export class CustomGPTService {
 	createNewSession(): void {
 		this.sessionId = this.generateSessionId();
 		this.streamingService = new EnhancedStreamingService(this.sessionId);
-		console.log('[CustomGPTService] New session created:', this.sessionId);
 	}
 
 	/**

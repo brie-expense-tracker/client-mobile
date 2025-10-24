@@ -94,7 +94,6 @@ export class LocalMLService {
 	 */
 	async initialize(): Promise<void> {
 		try {
-			console.log('[LocalMLService] Starting local ML initialization...');
 
 			// Add timeout protection for storage operations
 			const storageTimeout = new Promise((_, reject) => {
@@ -105,7 +104,6 @@ export class LocalMLService {
 
 			await Promise.race([initPromise, storageTimeout]);
 
-			console.log('[LocalMLService] Local ML models initialized successfully');
 		} catch (error) {
 			console.error('[LocalMLService] Error initializing models:', error);
 			// Don't throw - allow service to continue with empty models
@@ -444,7 +442,6 @@ export class LocalMLService {
 				AsyncStorage.removeItem('category_patterns'),
 			]);
 
-			console.log('[LocalMLService] Model reset completed');
 		} catch (error) {
 			console.error('[LocalMLService] Error resetting model:', error);
 			throw error;
@@ -1018,7 +1015,6 @@ export class LocalMLService {
 
 	private async loadModelsFromStorage(): Promise<void> {
 		try {
-			console.log('[LocalMLService] Loading models from storage...');
 			const [vendorData, categoryData] = await Promise.all([
 				AsyncStorage.getItem('vendor_patterns'),
 				AsyncStorage.getItem('category_patterns'),
@@ -1037,7 +1033,6 @@ export class LocalMLService {
 					`[LocalMLService] Loaded vendor patterns for ${this.vendorPatterns.size} users`
 				);
 			} else {
-				console.log('[LocalMLService] No vendor patterns found');
 			}
 
 			if (categoryData) {
@@ -1047,7 +1042,6 @@ export class LocalMLService {
 					`[LocalMLService] Loaded ${this.categoryPatterns.size} category patterns`
 				);
 			} else {
-				console.log('[LocalMLService] No category patterns found');
 			}
 		} catch (error) {
 			console.error(

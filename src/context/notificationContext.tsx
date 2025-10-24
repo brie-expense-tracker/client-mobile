@@ -108,7 +108,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 			!force &&
 			now - lastUnreadCountRefresh.current < UNREAD_COUNT_THROTTLE_MS
 		) {
-			console.log('⏳ [NotificationContext] Throttling unread count refresh');
 			return;
 		}
 
@@ -191,7 +190,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 		async (page: number = 1, limit: number = 20) => {
 			// Prevent multiple simultaneous requests
 			if (loading) {
-				console.log('🔄 [Notifications] Request already in progress, skipping');
 				return;
 			}
 
@@ -250,7 +248,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 			setLoading(true);
 			setError(null);
 			const nextPage = currentPage + 1;
-			console.log(`📄 [Notifications] Loading page ${nextPage}`);
 			const response = await notificationService.getNotifications(nextPage, 20);
 			if (response) {
 				// Use safe array operations to prevent crashes
@@ -282,11 +279,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 	const refreshNotifications = useCallback(async () => {
 		// Prevent refresh if already loading
 		if (loading) {
-			console.log('🔄 [Notifications] Refresh blocked - already loading');
 			return;
 		}
 
-		console.log('🔄 [Notifications] Refreshing notifications');
 		setCurrentPage(1);
 		setHasMore(true);
 		await getNotifications(1, 20);

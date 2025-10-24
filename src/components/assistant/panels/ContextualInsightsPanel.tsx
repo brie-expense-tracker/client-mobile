@@ -39,7 +39,6 @@ export default function ContextualInsightsPanel({
 
 	// Debug: Log insights panel state changes
 	useEffect(() => {
-		console.log('🔧 [DEBUG] ContextualInsightsPanel state changed:', {
 			isAIInsightsEnabled,
 			hasProfile: !!profile,
 			aiInsightsEnabled: profile?.preferences?.aiInsights?.enabled,

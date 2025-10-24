@@ -59,7 +59,6 @@ export default function SuggestedPrompts({ onPick }: SuggestedPromptsProps) {
 					<TouchableOpacity
 						key={prompt.id}
 						onPress={() => {
-							console.log('🔍 [DEBUG] Prompt tapped:', prompt.text);
 							onPick(prompt.text);
 						}}
 						style={[

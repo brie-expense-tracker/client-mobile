@@ -62,7 +62,6 @@ export const skillRegistry = {
       return;
     }
     SKILLS.push(skill);
-    console.log(`[SkillRegistry] Registered skill: ${skill.id}`);
   },
 
   /**
@@ -73,7 +72,6 @@ export const skillRegistry = {
     if (index === -1) return false;
     
     SKILLS.splice(index, 1);
-    console.log(`[SkillRegistry] Unregistered skill: ${skillId}`);
     return true;
   }
 };

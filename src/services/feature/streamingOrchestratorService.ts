@@ -268,7 +268,6 @@ export class StreamingOrchestratorService {
 				'[StreamingOrchestratorService] Starting stream for:',
 				message
 			);
-			console.log('[StreamingOrchestratorService] Session ID:', this.sessionId);
 
 			const requestPayload: StreamingOrchestratorRequest = {
 				message: message.trim(),
@@ -433,11 +432,9 @@ export class StreamingOrchestratorService {
 
 			// Handle special events
 			eventSource.addEventListener('open', () => {
-				console.log('[StreamingOrchestratorService] Connection opened');
 				this.connecting = false;
 			});
 			eventSource.addEventListener('done', () => {
-				console.log('[StreamingOrchestratorService] Stream done');
 				this.cleanup();
 			});
 			eventSource.addEventListener('ping', () => {
@@ -462,7 +459,6 @@ export class StreamingOrchestratorService {
 			// Wait for completion
 			return new Promise<StreamingChunk[]>((resolve, reject) => {
 				const completeHandler = () => {
-					console.log('[StreamingOrchestratorService] Stream completed');
 					this.cleanup();
 					resolve(chunks);
 				};
@@ -635,11 +631,9 @@ export class StreamingOrchestratorService {
 
 			// Handle special events
 			eventSource.addEventListener('open', () => {
-				console.log('[StreamingOrchestratorService] Connection opened');
 				this.connecting = false;
 			});
 			eventSource.addEventListener('done', () => {
-				console.log('[StreamingOrchestratorService] Stream done');
 				this.cleanup();
 				callbacks.onDone?.();
 			});
@@ -689,7 +683,6 @@ export class StreamingOrchestratorService {
 			for (const chunk of chunks) {
 				switch (chunk.type) {
 					case 'start':
-						console.log('[StreamingOrchestratorService] Stream started');
 						break;
 
 					case 'chunk':
@@ -826,7 +819,6 @@ export class StreamingOrchestratorService {
 	 */
 	updateContext(newContext: FinancialContext): void {
 		this.context = newContext;
-		console.log('[StreamingOrchestratorService] Context updated');
 	}
 
 	/**
@@ -863,7 +855,6 @@ export class StreamingOrchestratorService {
 	 * Stop current streaming session
 	 */
 	stopStreaming(): void {
-		console.log('[StreamingOrchestratorService] Stopping streaming');
 		this.cleanup();
 	}
 

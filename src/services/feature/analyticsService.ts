@@ -201,7 +201,6 @@ export class AnalyticsService {
 		this.conversationLength++;
 
 		// Emit to console for development/debugging
-		console.log('📊 [Analytics] Chat Event:', {
 			intent: chatEvent.intent,
 			model: chatEvent.model,
 			tokens: `${chatEvent.tokensIn}→${chatEvent.tokensOut}`,
@@ -251,7 +250,6 @@ export class AnalyticsService {
 		}
 
 		// Log satisfaction event
-		console.log('📊 [Analytics] User Satisfaction:', {
 			satisfaction,
 			reason: reason?.tag,
 			description: reason?.description,
@@ -439,7 +437,6 @@ export class AnalyticsService {
 		// Check for error spike alerts
 		this.checkErrorSpikeAlert(error);
 
-		console.log('🚨 [Analytics] Error Event:', {
 			type: error.type,
 			message: error.message,
 			severity: error.severity,
@@ -486,7 +483,6 @@ export class AnalyticsService {
 		// Check for performance degradation alerts
 		this.checkPerformanceAlert(performanceMetrics);
 
-		console.log('⚡ [Analytics] Performance Metrics:', {
 			responseTime: metrics.responseTime,
 			modelTier: metrics.modelTier,
 			cost: metrics.totalCost,

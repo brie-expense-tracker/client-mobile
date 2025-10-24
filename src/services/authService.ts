@@ -32,11 +32,9 @@ export class AuthService {
 			const now = Date.now();
 			if (this.cachedToken && this.tokenExpiry > now + 60000) {
 				// 1 minute buffer
-				console.log('[AuthService] Using cached token');
 				return this.cachedToken;
 			}
 
-			console.log('[AuthService] Getting fresh Firebase ID token');
 
 			// Get fresh token from Firebase
 			const token = await user.getIdToken(true); // Force refresh
@@ -45,7 +43,6 @@ export class AuthService {
 			this.cachedToken = token;
 			this.tokenExpiry = now + 55 * 60 * 1000; // 55 minutes to be safe
 
-			console.log('[AuthService] Token obtained and cached');
 			return token;
 		} catch (error) {
 			console.error('[AuthService] Error getting auth token:', error);
@@ -76,7 +73,6 @@ export class AuthService {
 	clearToken(): void {
 		this.cachedToken = null;
 		this.tokenExpiry = 0;
-		console.log('[AuthService] Token cache cleared');
 	}
 
 	/**

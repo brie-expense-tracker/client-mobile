@@ -58,7 +58,6 @@ function upsert(state: State, msg: Message) {
 }
 
 export const messagesReducerV2 = (state = initial, action: any): State => {
-	console.log('[REDUCER_V2] Action:', action.type, {
 		id: 'id' in action ? action.id : undefined,
 	});
 
@@ -89,7 +88,6 @@ export const messagesReducerV2 = (state = initial, action: any): State => {
 		}
 		case 'APPEND_DELTA': {
 			const { id, text } = action as { id: string; text: string };
-			console.log('[APPEND_DELTA]', {
 				msgId: id,
 				len: text.length,
 				preview: text.slice(0, 30),
@@ -123,7 +121,6 @@ export const messagesReducerV2 = (state = initial, action: any): State => {
 
 			// Guard: check if message already finalized (idempotent)
 			if (state.byId[id] && !state.byId[id].isStreaming) {
-				console.log('[Reducer] FINALIZE already completed for id:', id);
 				return state;
 			}
 

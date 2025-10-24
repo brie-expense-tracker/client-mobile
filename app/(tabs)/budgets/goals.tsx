@@ -89,7 +89,6 @@ export default function GoalsScreen() {
 				);
 				refetch();
 			} else {
-				console.log('✅ [Goals] Screen focused, using cached data');
 			}
 		}, [refetch, hasLoaded])
 	);

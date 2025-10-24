@@ -32,12 +32,10 @@ export const OnboardingService = {
 	 */
 	hasSeenOnboarding: async (): Promise<boolean> => {
 		try {
-			console.log('🔍 [OnboardingService] Checking onboarding status...');
 			const response = await ApiService.get<{
 				user: { onboardingVersion: number };
 			}>('/api/users/me');
 
-			console.log('🔍 [OnboardingService] API response:', {
 				success: response.success,
 				hasData: !!response.data,
 				hasUser: !!response.data?.user,

@@ -41,7 +41,6 @@ export const webFnsForHYSA: WebFns = {
 
 	async fetchText(url: string): Promise<string> {
 		try {
-			console.log(`[HYSA WebFns] Fetching: ${url}`);
 
 			// Mock implementation - in production, use real fetch
 			if (url.includes('nerdwallet.com')) {

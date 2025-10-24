@@ -212,9 +212,6 @@ export function useAssistantStream({
 
 			const finalUrl = `${apiBaseUrl}/orchestrator/chat/stream?${params.toString()}`;
 
-			console.log('🌊 [Chat] SSE baseUrl from env:', baseUrl);
-			console.log('🌊 [Chat] Final API baseUrl:', apiBaseUrl);
-			console.log('🌊 [Chat] Final SSE URL:', finalUrl);
 
 			return finalUrl;
 		},
@@ -322,7 +319,6 @@ export function useAssistantStream({
 
 				// Build URL
 				const url = buildSseUrl(sessionId, message, firebaseUID || '');
-				console.log('🟦 [SSE] URL:', url);
 
 				// Session guard - verify URL contains correct sessionId
 				const urlSession = new URLSearchParams(url.split('?')[1] || '').get(
@@ -338,7 +334,6 @@ export function useAssistantStream({
 				let es: EventSource;
 				try {
 					es = new (global as any).EventSource(url);
-					console.log('🟦 [SSE] EventSource created successfully');
 				} catch (constructorError) {
 					console.error('❌ EventSource constructor failed:', constructorError);
 					throw new Error(
@@ -350,7 +345,6 @@ export function useAssistantStream({
 				connecting.current = true;
 
 				es.addEventListener('open', () => {
-					console.log('🟩 [SSE] open');
 					connecting.current = false;
 				});
 
@@ -358,8 +352,6 @@ export function useAssistantStream({
 				es.addEventListener('message', (ev: MessageEvent) => {
 					try {
 						const payload = JSON.parse(ev.data);
-						console.log('🟨 [SSE] message', payload?.type);
-						console.log('🟨 [SSE] message data length:', ev.data?.length || 0);
 
 						// Use the aiId from closure instead of reading from state
 						const id = aiId;
@@ -411,14 +403,11 @@ export function useAssistantStream({
 							);
 							dispatch({ type: 'APPLY_FINAL', id, payload: payload.data });
 						} else if (payload.type === 'meta') {
-							console.log('🟨 [SSE] meta event');
 							dispatch({ type: 'APPLY_META', id, meta: payload.data });
 							callbacks.onMeta?.(payload.data);
 						} else if (payload.type === 'trace') {
-							console.log('🟨 [SSE] trace event');
 							callbacks.onTrace?.(payload.data);
 						} else if (payload.type === 'done') {
-							console.log('🟨 [SSE] done event');
 							console.log(
 								'🟨 [SSE] done event - finalizing stream for message:',
 								id
@@ -450,7 +439,6 @@ export function useAssistantStream({
 							callbacks.onDone?.();
 						} else if (ev.data === '{}' || ev.data === '') {
 							// heartbeat → ignore
-							console.log('🟨 [SSE] heartbeat');
 						} else {
 							console.log(
 								'🟨 [SSE] Unknown payload type:',
@@ -721,7 +709,6 @@ I'm still here to help with your financial questions once the connection is rest
 	);
 
 	const stopStream = useCallback(() => {
-		console.log('🟥 [SSE] Manually stopping stream');
 
 		// Clear any pending retries
 		if (retryTimeoutRef.current) {

@@ -11,7 +11,6 @@ const fetchGoals = async (): Promise<Goal[]> => {
 
 	// Handle authentication errors gracefully
 	if (!response.success && response.error?.includes('User not authenticated')) {
-		console.log('🔒 [Goals] User not authenticated, returning empty array');
 		return [];
 	}
 
@@ -83,7 +82,6 @@ export function useGoals(options: { refreshOnFocus?: boolean } = {}) {
 	// Create wrapper functions for the API calls
 	const updateGoalDirect = useCallback(
 		async (id: string, updates: UpdateGoalData): Promise<Goal> => {
-			console.log('🎯 [useGoals] updateGoalDirect called with:');
 			console.log('  🆔 Goal ID:', id);
 			console.log('  📝 Updates:', updates);
 			console.log('  📝 Updates type:', typeof updates);
@@ -94,7 +92,6 @@ export function useGoals(options: { refreshOnFocus?: boolean } = {}) {
 				updates
 			);
 
-			console.log('🎯 [useGoals] updateGoalDirect response:');
 			console.log('  ✅ Success:', response.success);
 			console.log('  ❌ Error:', response.error);
 			console.log('  📦 Data:', response.data);
@@ -116,7 +113,6 @@ export function useGoals(options: { refreshOnFocus?: boolean } = {}) {
 				throw new Error('Failed to update goal: No data received');
 			}
 
-			console.log('🎯 [useGoals] Returning goal data:', responseData);
 			return responseData as Goal;
 		},
 		[]

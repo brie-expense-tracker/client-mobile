@@ -247,7 +247,6 @@ export class RecurringExpenseService {
 			console.log(
 				'⚠️ [RecurringExpenseService] POST succeeded but no data returned, fetching to resolve ID...'
 			);
-			console.log('🔍 [RecurringExpenseService] Response structure:', {
 				hasData: !!response.data,
 				dataKeys: response.data ? Object.keys(response.data) : [],
 				topLevelKeys: Object.keys(response),
@@ -587,11 +586,9 @@ export class RecurringExpenseService {
 			// Check cache first
 			const cached = this.paymentStatusCache.get(patternId);
 			if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
-				console.log(`🔍 Using cached payment status for ${patternId}`);
 				return cached.result;
 			}
 
-			console.log(`🔍 Checking payment status for ${patternId}`);
 			const response = await ApiService.get<{ isPaid: boolean | null }>(
 				`/api/recurring-expenses/${patternId}/paid`
 			);

@@ -82,7 +82,6 @@ export class EnhancedChatController {
 		this.performanceMetrics.totalRequests++;
 
 		try {
-			console.log(`[EnhancedChatController] Processing: "${utterance}"`);
 
 			// Validate input
 			if (!utterance?.trim()) {
@@ -159,7 +158,6 @@ export class EnhancedChatController {
 		);
 
 		// Log the processing result
-		console.log(`[EnhancedChatController] Hybrid AI result:`, {
 			skillId: result.metadata.skillId,
 			confidence: result.metadata.confidence,
 			reason: result.metadata.reason,
@@ -178,7 +176,6 @@ export class EnhancedChatController {
 		context: ChatContext,
 		error?: any
 	): Promise<ChatResponse> {
-		console.log('[EnhancedChatController] Using legacy fallback');
 
 		// Simple fallback response based on context
 		const hasBudgets = !!context.budgets?.length;

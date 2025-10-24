@@ -59,7 +59,6 @@ const RecurringExpensesScreen: React.FC = () => {
 				);
 				refetch();
 			} else {
-				console.log('✅ [RecurringExpenses] Screen focused, using cached data');
 			}
 		}, [refetch, hasLoaded])
 	);
@@ -120,7 +119,6 @@ const RecurringExpensesScreen: React.FC = () => {
 	);
 
 	const onRefresh = useCallback(async () => {
-		console.log('🔄 [RecurringExpenses] Pull-to-refresh triggered');
 		setRefreshing(true);
 		try {
 			// Clear cache before refetching to ensure fresh data
@@ -130,7 +128,6 @@ const RecurringExpensesScreen: React.FC = () => {
 				'🗑️ [RecurringExpenses] Cache cleared, fetching fresh data...'
 			);
 			await refetch();
-			console.log('✅ [RecurringExpenses] Refresh complete');
 		} catch (error) {
 			console.error('❌ [RecurringExpenses] Error refreshing:', error);
 			Alert.alert(

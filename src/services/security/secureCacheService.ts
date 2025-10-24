@@ -245,7 +245,6 @@ export class SecureCacheService {
 
 			await AsyncStorage.setItem(key, encryptedData);
 			await this.updateCacheStats('encrypted');
-			console.log(`[SecureCacheService] Encrypted data stored for key: ${key}`);
 		} catch (error) {
 			console.error(
 				`[SecureCacheService] Failed to store encrypted data for key ${key}:`,
@@ -520,7 +519,6 @@ export class SecureCacheService {
 							// Migrate to encrypted storage
 							const parsedData = JSON.parse(unencryptedData);
 							await this.setEncryptedItem(key, parsedData);
-							console.log(`[SecureCacheService] Migrated key: ${key}`);
 						}
 					}
 				} catch (error) {
@@ -531,7 +529,6 @@ export class SecureCacheService {
 				}
 			}
 
-			console.log('[SecureCacheService] Migration completed');
 		} catch (error) {
 			console.error('[SecureCacheService] Migration failed:', error);
 		}
@@ -749,7 +746,6 @@ export class SecureCacheService {
 	 */
 	static async rotateEncryptionKey(): Promise<void> {
 		try {
-			console.log('[SecureCacheService] Starting key rotation...');
 
 			// Generate new key
 			const newKey = CryptoJS.lib.WordArray.random(32).toString(
@@ -796,7 +792,6 @@ export class SecureCacheService {
 				await AsyncStorage.setItem(this.AES_KEY_STORAGE_KEY, newKey);
 			}
 
-			console.log('[SecureCacheService] Key rotation completed');
 		} catch (error) {
 			console.error('[SecureCacheService] Key rotation failed:', error);
 			throw error;

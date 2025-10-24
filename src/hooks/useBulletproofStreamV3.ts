@@ -206,7 +206,6 @@ export function useBulletproofStreamV3({
 			currentMessageId.current = messageId;
 			streamingRef.current.messageId = messageId;
 
-			console.log('🚀 [Stream] Starting:', {
 				messageId,
 				messageLength: message.length,
 				retryCount:
@@ -229,7 +228,6 @@ export function useBulletproofStreamV3({
 					throw new Error('No authenticated user found');
 				}
 
-				console.log('🔑 [Stream] Using Firebase UID for auth:', {
 					uid: firebaseUID.substring(0, 10) + '...',
 				});
 
@@ -242,13 +240,11 @@ export function useBulletproofStreamV3({
 					expand: options?.expand || false,
 				});
 
-				console.log('🔧 [Stream] Built URL with UID:', {
 					url: url.substring(0, 100) + '...',
 					hasUID: !!firebaseUID,
 					fullUrl: url,
 				});
 
-				console.log('🔗 [Stream] Connecting to server');
 
 				// Start health monitoring
 				startHealthMonitoring();
@@ -267,7 +263,6 @@ export function useBulletproofStreamV3({
 							isConnecting: false,
 						}));
 
-						console.log('📝 [Stream] Received delta:', {
 							textLength: text.length,
 							text: text.substring(0, 50) + '...',
 							messageId,
@@ -286,7 +281,6 @@ export function useBulletproofStreamV3({
 						const startTime = streamState.startTime || endTime;
 						const duration = endTime - startTime;
 
-						console.log('✅ [Stream] Completed:', {
 							messageId,
 							duration: `${duration}ms`,
 							chars: bufferedText.current.length,
@@ -363,7 +357,6 @@ export function useBulletproofStreamV3({
 							const nextRetryCount = streamState.retryCount + 1;
 							const delay = calculateRetryDelay(nextRetryCount - 1);
 
-							console.log('🔄 [Stream] Retrying:', {
 								attempt: `${nextRetryCount}/${retryConfig.maxRetries}`,
 								delay: `${delay}ms`,
 								reason: error.includes('network') ? 'network' : 'connection',
@@ -517,7 +510,6 @@ export function useBulletproofStreamV3({
 					const nextRetryCount = streamState.retryCount + 1;
 					const delay = calculateRetryDelay(nextRetryCount - 1);
 
-					console.log('🔄 [Stream] Retrying after error:', {
 						attempt: `${nextRetryCount}/${retryConfig.maxRetries}`,
 						delay: `${delay}ms`,
 						error: error.message || String(error),

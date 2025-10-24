@@ -278,10 +278,8 @@ const OnboardingScreen = () => {
 	}, [currentIndex]);
 
 	const handleSubmit = useCallback(async () => {
-		console.log('🚀 [ProfileSetup] handleSubmit called');
 
 		if (submitting) {
-			console.log('⚠️ [ProfileSetup] Already submitting, ignoring');
 			return;
 		}
 
@@ -299,8 +297,6 @@ const OnboardingScreen = () => {
 
 		// Check if form is valid
 		if (!stepValid) {
-			console.log('❌ [ProfileSetup] Form is not valid, aborting submission');
-			console.log('📋 [ProfileSetup] Current field values:', {
 				firstName: firstName.trim(),
 				firstNameLength: firstName.trim().length,
 				lastName: lastName.trim(),
@@ -316,7 +312,6 @@ const OnboardingScreen = () => {
 			return;
 		}
 
-		console.log('✅ [ProfileSetup] Form is valid, proceeding with submission');
 		setSubmitting(true);
 		try {
 			const monthlyIncomeNumber =
@@ -345,7 +340,6 @@ const OnboardingScreen = () => {
 				throw new Error('Last name must be at least 2 characters long');
 			}
 
-			console.log('📤 [ProfileSetup] Preparing profile data with:', {
 				firstName: trimmedFirstName,
 				firstNameLength: trimmedFirstName.length,
 				lastName: trimmedLastName,
@@ -453,9 +447,7 @@ const OnboardingScreen = () => {
 			};
 
 			// Update profile using profileContext
-			console.log('📡 [ProfileSetup] Calling updateProfile...');
 			await updateProfile(profileData as any);
-			console.log('✅ [ProfileSetup] Profile updated successfully');
 			await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 			router.push('/(onboarding)/notificationSetup');
 		} catch (error) {
