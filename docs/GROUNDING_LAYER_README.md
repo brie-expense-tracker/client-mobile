@@ -76,7 +76,7 @@ class GroundingLayerService {
 - **Fallback to AI** only when grounding confidence is low
 - **Cache management** with TTL and size limits
 
-### 4. FactPackDisplay Component (`app/(tabs)/assistant/components/FactPackDisplay.tsx`)
+### 4. FactPackDisplay Component (`app/(tabs)/chat/components/FactPackDisplay.tsx`)
 
 UI component that renders structured data directly:
 

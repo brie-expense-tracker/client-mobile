@@ -1,5 +1,5 @@
 // AI Insights Components
-export { default as AISuggestionsList } from '../../app/(tabs)/assistant/_components/AISuggestionsList';
+export { default as AISuggestionsList } from '../../app/(tabs)/chat/_components/AISuggestionsList';
 
 // Progress & UI Components
 export { default as LinearProgressBar } from '../../app/(tabs)/budgets/components/LinearProgressBar';

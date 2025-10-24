@@ -131,7 +131,7 @@ This document summarizes the accessibility and performance features implemented 
 - Accessibility improvements for budget management
 - Enhanced loading states
 
-### 4. Assistant Screen (`app/(tabs)/assistant/index.tsx`)
+### 4. Chat Screen (`app/(tabs)/chat/index.tsx`)
 
 - Skeleton loading for messages and insights
 - Accessibility support for AI interactions
@@ -212,7 +212,7 @@ This document summarizes the accessibility and performance features implemented 
 - [x] Performance optimizations
 - [x] Dashboard accessibility
 - [x] Budgets screen accessibility
-- [x] Assistant screen accessibility
+- [x] Chat screen accessibility
 - [x] Main layout accessibility
 - [x] Error handling improvements
 - [x] Loading state management

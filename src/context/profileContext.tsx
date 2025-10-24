@@ -723,7 +723,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 
 			if (response.success && response.data) {
 				// The optimistic update was correct, no need to update again
-				console.log('Assistant settings updated successfully');
+				console.log('Chat settings updated successfully');
 			} else {
 				// API call failed, revert to previous state
 				setProfile(previousProfile);

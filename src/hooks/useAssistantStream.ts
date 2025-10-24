@@ -212,9 +212,9 @@ export function useAssistantStream({
 
 			const finalUrl = `${apiBaseUrl}/orchestrator/chat/stream?${params.toString()}`;
 
-			console.log('🌊 [Assistant] SSE baseUrl from env:', baseUrl);
-			console.log('🌊 [Assistant] Final API baseUrl:', apiBaseUrl);
-			console.log('🌊 [Assistant] Final SSE URL:', finalUrl);
+			console.log('🌊 [Chat] SSE baseUrl from env:', baseUrl);
+			console.log('🌊 [Chat] Final API baseUrl:', apiBaseUrl);
+			console.log('🌊 [Chat] Final SSE URL:', finalUrl);
 
 			return finalUrl;
 		},
