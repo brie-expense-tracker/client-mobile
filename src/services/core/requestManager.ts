@@ -39,6 +39,7 @@ setInterval(() => {
 	});
 
 	if (clearedCount > 0) {
+		console.log(`🧹 [RequestManager] Cleared ${clearedCount} stale requests`);
 	}
 }, 2000); // Check every 2 seconds
 
@@ -176,6 +177,7 @@ async function processQueue(
 			// If we haven't exceeded max attempts, queue for retry
 			const backoff = backoffStates.get(key);
 			if (backoff && backoff.attemptCount <= MAX_RETRY_ATTEMPTS) {
+				console.log(`🔄 [RequestManager] Retrying ${key} after backoff`);
 				// Re-queue all requests for retry
 				setTimeout(() => processQueue(key, executor), 1000);
 				return;
@@ -279,6 +281,7 @@ export class RequestManager {
 							: ApiErrorType.SERVER_ERROR,
 						response.status
 					);
+					console.log(`❌ [RequestManager] Request failed: ${error.message}`);
 					throw error;
 				}
 
@@ -384,6 +387,7 @@ export class RequestManager {
 	 */
 	static clearAllBackoffs(): void {
 		backoffStates.clear();
+		console.log(`🧹 [RequestManager] Cleared all backoff states`);
 	}
 }
 

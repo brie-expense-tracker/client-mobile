@@ -237,6 +237,7 @@ export class ChaosTestingService {
 	 */
 	static async initialize(config?: Partial<ChaosTestConfig>): Promise<void> {
 		this.config = { ...this.DEFAULT_CONFIG, ...config };
+		console.log('[ChaosTestingService] Initialized with config:', this.config);
 	}
 
 	/**
@@ -798,8 +799,10 @@ export class ChaosTestingService {
 					break;
 				case 'email':
 					// TODO: Implement email notification
+					console.log(`[EMAIL] ${notification.message}`);
 					break;
 				default:
+					console.log(`[${channel.toUpperCase()}] ${notification.message}`);
 			}
 		}
 	}

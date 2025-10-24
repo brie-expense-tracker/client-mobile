@@ -58,6 +58,7 @@ export class SkillTester {
 	 */
 	registerTestSuite(suite: TestSuite): void {
 		this.testSuites.set(suite.name, suite);
+		console.log(`[SkillTester] Registered test suite: ${suite.name}`);
 	}
 
 	/**
@@ -72,6 +73,7 @@ export class SkillTester {
 		const startTime = Date.now();
 		const results: TestResult[] = [];
 
+		console.log(`[SkillTester] Running test suite: ${suite.name}`);
 
 		// Run beforeAll hook
 		if (suite.beforeAll) {

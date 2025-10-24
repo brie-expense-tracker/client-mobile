@@ -58,9 +58,11 @@ export function startSSE(
 	const es = new EventSource(url, { withCredentials: false });
 	activeRef.current = { key: streamKey, es };
 
+	console.log('🚀 [StreamManager] Starting new stream for key:', streamKey);
 
 	// Set up inactivity timer on stream open
 	es.addEventListener('open', () => {
+		console.log('🔗 [StreamManager] Connection opened for key:', streamKey);
 		resetInactivityTimer('open', streamKey);
 	});
 

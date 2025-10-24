@@ -62,6 +62,7 @@ export function messagesReducer(
 	state: Message[],
 	action: MessageAction
 ): Message[] {
+	console.log('[REDUCER] before:', {
 		len: state.length,
 		ids: state.map((m) => m.id),
 		action: action.type,
@@ -75,6 +76,7 @@ export function messagesReducer(
 				...action.msg,
 				timestamp: new Date(),
 			};
+			console.log('[REDUCER] Adding user message:', userMsg.id);
 			return [...state, userMsg];
 
 		case 'ADD_AI_PLACEHOLDER':
@@ -84,6 +86,7 @@ export function messagesReducer(
 				isStreaming: true,
 				streamingText: '',
 			};
+			console.log('[REDUCER] Adding AI placeholder:', aiMsg.id);
 			console.log(
 				'[REDUCER] Current state before adding:',
 				state.map((m) => ({ id: m.id, isUser: m.isUser }))
@@ -96,6 +99,7 @@ export function messagesReducer(
 			return newState;
 
 		case 'START_STREAM':
+			console.log('[REDUCER] Starting stream for message:', action.id);
 			return state.map((m) =>
 				m.id === action.id
 					? { ...m, isStreaming: true, streamingText: m.streamingText ?? '' }
@@ -116,6 +120,7 @@ export function messagesReducer(
 			);
 
 		case 'FINALIZE':
+			console.log('[REDUCER] Finalizing message:', action.id);
 			return state.map((m) =>
 				m.id === action.id
 					? {
@@ -157,9 +162,11 @@ export function messagesReducer(
 
 		case 'RESET_TO_WELCOME_IF_EMPTY':
 			// Safety valve: NEVER nuke to 1 unless truly empty
+			console.log('[REDUCER] Reset check - current length:', state.length);
 			return state.length === 0 ? state : state;
 
 		case 'APPLY_META':
+			console.log('[REDUCER] Applying meta for message:', action.id);
 			return state.map((m) =>
 				m.id === action.id
 					? { ...m, performance: { ...m.performance, ...action.meta } }
@@ -167,6 +174,7 @@ export function messagesReducer(
 			);
 
 		case 'APPLY_FINAL':
+			console.log('[REDUCER] Applying final for message:', action.id);
 			return state.map((m) =>
 				m.id === action.id
 					? {
@@ -179,6 +187,7 @@ export function messagesReducer(
 			);
 
 		case 'END_STREAM':
+			console.log('[REDUCER] Ending stream for message:', action.id);
 			return state.map((m) =>
 				m.id === action.id
 					? {
@@ -212,6 +221,7 @@ export function messagesReducer(
 			);
 
 		case 'CLEAR_STREAMING':
+			console.log('[REDUCER] Clearing streaming state');
 			console.log(
 				'[REDUCER] Current messages before clear:',
 				state.map((m) => ({

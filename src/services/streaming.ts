@@ -117,6 +117,7 @@ export function startSSE({
 					}
 				},
 				onDone: (full?: string) => {
+					console.log('✅ [SSE] Stream completed via stream manager', {
 						timestamp: new Date().toISOString(),
 						hasFull: !!full,
 					});
@@ -138,6 +139,7 @@ export function startSSE({
 
 			// Handle connection open
 			eventSource.addEventListener('open', () => {
+				console.log('🔗 [SSE] Connection established', {
 					url: url.substring(0, 100) + '...',
 					readyState: (eventSource as any).readyState,
 					timestamp: new Date().toISOString(),
@@ -152,6 +154,7 @@ export function startSSE({
 				resetInactivityTimer('meta');
 				try {
 					const data = JSON.parse(ev.data);
+					console.log('📦 [SSE] Meta event received:', data);
 					onMeta?.(data);
 				} catch (error) {
 					console.warn('⚠️ [SSE] Failed to parse meta event:', error);
@@ -194,6 +197,7 @@ export function startSSE({
 						lastSeq = data.seq;
 					}
 
+					console.log('📝 [SSE] Delta event received:', {
 						textLength: data.text?.length || 0,
 						text: data.text?.substring(0, 50) + '...',
 						seq: data.seq,
@@ -213,6 +217,7 @@ export function startSSE({
 
 			// Handle done event
 			eventSource.addEventListener('done', (ev: MessageEvent) => {
+				console.log('✅ [SSE] Stream completed', {
 					timestamp: new Date().toISOString(),
 					readyState: (eventSource as any).readyState,
 					rawData: ev.data,

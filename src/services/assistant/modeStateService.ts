@@ -405,6 +405,7 @@ class ModeStateService {
 			};
 			// In a real implementation, this would use AsyncStorage or similar
 			// For now, we'll just log it
+			console.log('[ModeState] State saved:', stateToSave);
 		} catch (error) {
 			console.error('[ModeState] Failed to save state:', error);
 		}
@@ -415,6 +416,7 @@ class ModeStateService {
 		try {
 			// In a real implementation, this would load from AsyncStorage
 			// For now, we'll just initialize with defaults
+			console.log('[ModeState] State loaded from storage');
 		} catch (error) {
 			console.error('[ModeState] Failed to load state:', error);
 		}

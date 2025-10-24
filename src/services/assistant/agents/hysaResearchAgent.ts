@@ -209,10 +209,12 @@ export const hysaResearchAgent = {
 		const checkedAt = new Date().toLocaleDateString();
 
 		if (cached && cached.length) {
+			console.log(`[HYSA Agent] Using cached results for: ${qKey}`);
 			const prefs = extractPreferences(query);
 			return toResponse(rank(cached, prefs), checkedAt, prefs);
 		}
 
+		console.log(`[HYSA Agent] Starting fresh research for: ${query}`);
 
 		try {
 			// 1) Search editorial roundups
@@ -223,6 +225,7 @@ export const hysaResearchAgent = {
 				.slice(0, 8);
 
 			if (editorialResults.length === 0) {
+				console.log('[HYSA Agent] No editorial results found, using fallback');
 				return this.getFallbackResponse();
 			}
 

@@ -146,6 +146,7 @@ export class FallbackService {
 				this.startAutoCleanup();
 			}
 
+			console.log('[FallbackService] Initialized successfully');
 		} catch (error) {
 			console.error('[FallbackService] Failed to initialize:', error);
 		}
@@ -201,6 +202,7 @@ export class FallbackService {
 			// Update statistics
 			await this.updateStatistics();
 
+			console.log('[FallbackService] Financial data cached successfully');
 		} catch (error) {
 			console.error('[FallbackService] Failed to cache financial data:', error);
 			throw error;
@@ -464,6 +466,7 @@ export class FallbackService {
 				SecureCacheService.removeEncryptedItem(this.CACHE_KEYS.LAST_SYNC),
 			]);
 
+			console.log('[FallbackService] Encrypted cache cleared successfully');
 		} catch (error) {
 			console.error(
 				'[FallbackService] Failed to clear encrypted cache:',
@@ -716,6 +719,7 @@ export class FallbackService {
 			this.cacheStats.lastCleanup = new Date().toISOString();
 			await this.updateStatistics();
 
+			console.log(`[FallbackService] Cleaned up ${cleanedItems} expired items`);
 		} catch (error) {
 			console.error('[FallbackService] Failed to perform cleanup:', error);
 		}
@@ -793,6 +797,7 @@ export class FallbackService {
 	static async batchCacheData(data: FallbackData): Promise<void> {
 		try {
 			await this.cacheFinancialData(data);
+			console.log('[FallbackService] Batch cache completed successfully');
 		} catch (error) {
 			console.error('[FallbackService] Batch cache failed:', error);
 			throw error;
@@ -806,6 +811,7 @@ export class FallbackService {
 		try {
 			// Try to generate fallback spend plan to warm cache
 			await this.generateFallbackSpendPlan();
+			console.log('[FallbackService] Cache warmed successfully');
 		} catch (error) {
 			console.error('[FallbackService] Cache warming failed:', error);
 		}

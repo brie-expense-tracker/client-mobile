@@ -72,9 +72,11 @@ export async function migrateLastSyncTimestamp(): Promise<void> {
  * Run all cache migrations
  */
 export async function runCacheMigrations(): Promise<void> {
+	console.log('[CacheMigration] Starting cache migrations...');
 
 	try {
 		await migrateLastSyncTimestamp();
+		console.log('[CacheMigration] All migrations completed successfully');
 	} catch (error) {
 		console.error('[CacheMigration] Some migrations failed:', error);
 	}

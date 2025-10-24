@@ -274,6 +274,7 @@ export class CascadeAnalyticsService {
 	) {
 		try {
 			// Log to console for development
+			console.log(`🔍 [Analytics] ${eventName}:`, data);
 
 			// Here you would integrate with your actual analytics service
 			// Examples:
@@ -298,6 +299,7 @@ export class CascadeAnalyticsService {
 	) {
 		// Simulate analytics API call
 		setTimeout(() => {
+			console.log(`📊 [Mock Analytics] Sent ${eventName} to analytics service`);
 		}, 100);
 	}
 

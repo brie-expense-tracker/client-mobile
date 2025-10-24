@@ -107,6 +107,7 @@ export default function NotificationPermissionScreen() {
 	};
 
 	const handleContinue = async () => {
+		console.log('🚀 [NotificationSetup] handleContinue called');
 		setLoading(true);
 		try {
 			// Only ask for OS permission when user explicitly continues
@@ -116,7 +117,9 @@ export default function NotificationPermissionScreen() {
 			await initialize();
 			// If initialize() completes without throwing, permissions were granted
 			const granted = true;
+			console.log('✅ [NotificationSetup] Permissions granted successfully');
 
+			console.log('💾 [NotificationSetup] Saving notification preferences...');
 			await updatePreferences({
 				notifications: {
 					enableNotifications: granted,
@@ -139,10 +142,14 @@ export default function NotificationPermissionScreen() {
 					},
 				},
 			});
+			console.log('✅ [NotificationSetup] Preferences saved successfully');
 
 			// Mark onboarding as complete
+			console.log('🎯 [NotificationSetup] Marking onboarding as complete...');
 			await markOnboardingComplete();
+			console.log('✅ [NotificationSetup] Onboarding marked as complete');
 
+			console.log('🎉 [NotificationSetup] Navigating to dashboard...');
 			router.replace('/(tabs)/dashboard');
 		} catch (error) {
 			console.error(
@@ -190,11 +197,13 @@ export default function NotificationPermissionScreen() {
 				]
 			);
 		} finally {
+			console.log('🏁 [NotificationSetup] Continue handler complete');
 			setLoading(false);
 		}
 	};
 
 	const handleSkip = async () => {
+		console.log('🚀 [NotificationSetup] handleSkip called');
 		setLoading(true);
 		try {
 			// Store preferences but with notifications disabled
@@ -223,10 +232,14 @@ export default function NotificationPermissionScreen() {
 					},
 				},
 			});
+			console.log('✅ [NotificationSetup] Preferences saved successfully');
 
 			// Mark onboarding as complete even when skipping
+			console.log('🎯 [NotificationSetup] Marking onboarding as complete...');
 			await markOnboardingComplete();
+			console.log('✅ [NotificationSetup] Onboarding marked as complete');
 
+			console.log('🎉 [NotificationSetup] Navigating to dashboard...');
 			router.replace('/(tabs)/dashboard');
 		} catch (error) {
 			console.error('❌ [NotificationSetup] Error in skip handler:', error);
@@ -255,6 +268,7 @@ export default function NotificationPermissionScreen() {
 
 			router.replace('/(tabs)/dashboard');
 		} finally {
+			console.log('🏁 [NotificationSetup] Skip handler complete');
 			setLoading(false);
 		}
 	};

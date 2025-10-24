@@ -172,6 +172,7 @@ export const CD_SKILL: Skill = {
       return null;
     }
 
+    console.log(`[CD Skill] Running research agent for: ${q}`);
     
     const data = await agent.run(q);
     if (!data || data.items.length === 0) {

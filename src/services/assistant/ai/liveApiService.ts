@@ -41,6 +41,7 @@ export class LiveApiService {
 				temperature: options?.temperature || 0.1,
 			};
 
+			console.log('[LiveApiService] Making LLM call:', {
 				model: requestPayload.model,
 				maxTokens: requestPayload.maxTokens,
 				temperature: requestPayload.temperature,
@@ -54,6 +55,7 @@ export class LiveApiService {
 			);
 
 			if (response.success && response.data) {
+				console.log('[LiveApiService] LLM call successful:', {
 					responseLength: response.data.response.length,
 					usage: response.data.usage,
 				});

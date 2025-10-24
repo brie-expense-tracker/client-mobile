@@ -398,6 +398,7 @@ export class MissingInfoService {
 	 */
 	clearCache(): void {
 		this.cache.clear();
+		console.log('[MissingInfoService] Cache cleared');
 	}
 
 	/**

@@ -15,6 +15,7 @@ TaskManager.defineTask(BG_PUSH_TASK, ({ data, error }) => {
 	}
 
 	// Handle background push notification
+	console.log('[BackgroundTask] Processing background push:', data);
 
 	return {
 		shouldShowBanner: true,
@@ -28,6 +29,7 @@ let didRegister = false;
 
 export async function ensureBgPushRegistered(): Promise<void> {
 	if (didRegister) {
+		console.log('[BackgroundTask] Already registered, skipping');
 		return;
 	}
 
@@ -57,7 +59,9 @@ export async function ensureBgPushRegistered(): Promise<void> {
 		const registered = await TaskManager.isTaskRegisteredAsync(BG_PUSH_TASK);
 		if (!registered) {
 			await Notifications.registerTaskAsync(BG_PUSH_TASK);
+			console.log('[BackgroundTask] Background task registered successfully');
 		} else {
+			console.log('[BackgroundTask] Background task already registered');
 		}
 		didRegister = true;
 	} catch (error) {

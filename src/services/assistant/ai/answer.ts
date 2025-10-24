@@ -59,6 +59,7 @@ export class CascadeOrchestrator {
 			}
 
 			// Step 1: Mini Writer
+			console.log('🔍 [Cascade] Step 1: Mini Writer');
 			const writer = await this.miniWriter.generateResponse(
 				args.userQuery,
 				args.factPack,
@@ -67,6 +68,7 @@ export class CascadeOrchestrator {
 			writerTokens = this.estimateTokens(writer.answer_text);
 
 			// Step 2: Guards (before critic)
+			console.log('🔍 [Cascade] Step 2: Running guards');
 			const guards = [
 				guardNumbers(writer, args.factPack),
 				guardTimeStamp(writer, args.factPack),
@@ -77,6 +79,7 @@ export class CascadeOrchestrator {
 			guardFailures = failed.flatMap((g) => g.failures);
 
 			if (guardFailures.length > 0) {
+				console.log('🔍 [Cascade] Guards failed:', guardFailures);
 			}
 
 			// Step 3: Mini Critic (only if writer didn't already request clarification)
@@ -92,6 +95,7 @@ export class CascadeOrchestrator {
 					recommend_escalation: false,
 				};
 			} else {
+				console.log('🔍 [Cascade] Step 3: Mini Critic');
 				critic = await this.miniCritic.reviewResponse(
 					writer,
 					args.factPack,
@@ -101,7 +105,9 @@ export class CascadeOrchestrator {
 			}
 
 			// Step 4: Decide
+			console.log('🔍 [Cascade] Step 4: Decision logic');
 			const decision = decide(writer, critic, args.factPack);
+			console.log('🔍 [Cascade] Decision:', decision);
 
 			// Step 5: Execute path
 			if (decision.path === 'return') {
@@ -123,6 +129,7 @@ export class CascadeOrchestrator {
 			}
 
 			// Escalate to Pro Improver
+			console.log('🔍 [Cascade] Step 5: Pro Improver escalation');
 			const improved = await this.proImprover.improveResponse(
 				writer,
 				critic,
@@ -180,6 +187,7 @@ export class CascadeOrchestrator {
 	private async handleHighStakesQuery(
 		args: AnswerWithCascadeArgs
 	): Promise<CascadeResult> {
+		console.log('🔍 [Cascade] Handling high-stakes query with Pro Improver');
 
 		// Create a minimal writer output for the improver
 		const minimalWriter: WriterOutput = {

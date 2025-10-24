@@ -56,6 +56,7 @@ class AnalyticsEmitter {
 			});
 
 			// Also log to console for development
+			console.log('📊 [Analytics] Event emitted:', fullEvent);
 		} catch (error) {
 			console.warn('Failed to emit analytics event:', error);
 
@@ -64,6 +65,7 @@ class AnalyticsEmitter {
 
 			// In development, also log to console for debugging
 			if (__DEV__) {
+				console.log('📊 [Analytics] Event stored for retry:', fullEvent);
 			}
 		}
 	}

@@ -39,8 +39,10 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
 			return;
 		}
 		try {
+			console.log('🔍 [OnboardingContext] Refreshing onboarding status...');
 			const onboardingSeen = await OnboardingService.hasSeenOnboarding();
 			const currentVersion = OnboardingService.getCurrentOnboardingVersion();
+			console.log('🔍 [OnboardingContext] Onboarding status result:', {
 				onboardingSeen,
 				currentVersion,
 			});

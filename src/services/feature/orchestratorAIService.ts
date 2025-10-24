@@ -173,6 +173,9 @@ export class OrchestratorAIService {
 			this.requestCount++;
 			this.lastRequestTime = new Date();
 
+			console.log('[OrchestratorAIService] Getting response for:', message);
+			console.log('[OrchestratorAIService] Session ID:', this.sessionId);
+			console.log('[OrchestratorAIService] Request count:', this.requestCount);
 
 			const requestPayload: OrchestratorRequest = {
 				message: message.trim(),
@@ -186,6 +189,7 @@ export class OrchestratorAIService {
 				},
 			};
 
+			console.log('[OrchestratorAIService] Sending request to orchestrator:', {
 				endpoint: '/api/orchestrator/chat',
 				messageLength: message.trim().length,
 				hasOptions: !!options,
@@ -198,6 +202,7 @@ export class OrchestratorAIService {
 			);
 			const endTime = Date.now();
 
+			console.log('[OrchestratorAIService] API response received:', {
 				success: response.success,
 				hasData: !!response.data,
 				responseLength: response.data?.response?.length || 0,
@@ -228,6 +233,7 @@ export class OrchestratorAIService {
 				// Log performance metrics
 				this.logPerformanceMetrics(result, endTime - startTime);
 
+				console.log('[OrchestratorAIService] Returning successful response:', {
 					responsePreview: result.response.substring(0, 100) + '...',
 					sessionId: result.sessionId,
 					timestamp: result.timestamp,
@@ -308,6 +314,7 @@ export class OrchestratorAIService {
 	): void {
 		const { performance, metadata } = response;
 
+		console.log('[OrchestratorAIService] Performance Metrics:', {
 			requestId: metadata.requestId,
 			totalLatency: performance.totalLatency,
 			clientLatency,
@@ -414,6 +421,7 @@ export class OrchestratorAIService {
 	 */
 	updateContext(newContext: FinancialContext): void {
 		this.context = newContext;
+		console.log('[OrchestratorAIService] Context updated');
 	}
 
 	/**
@@ -430,6 +438,7 @@ export class OrchestratorAIService {
 		this.sessionId = this.generateSessionId();
 		this.requestCount = 0;
 		this.lastRequestTime = null;
+		console.log('[OrchestratorAIService] New session created:', this.sessionId);
 	}
 
 	/**
@@ -455,6 +464,7 @@ export class OrchestratorAIService {
 			try {
 				const health = await this.getHealthStatus();
 				this.isHealthy = health.status === 'healthy';
+				console.log('[OrchestratorAIService] Health check:', {
 					status: health.status,
 					isHealthy: this.isHealthy,
 				});
@@ -500,6 +510,7 @@ export class OrchestratorAIService {
 		this.lastRequestTime = null;
 		this.isHealthy = true;
 		this.createNewSession();
+		console.log('[OrchestratorAIService] Service reset');
 	}
 
 	/**
@@ -507,5 +518,6 @@ export class OrchestratorAIService {
 	 */
 	destroy(): void {
 		this.stopHealthMonitoring();
+		console.log('[OrchestratorAIService] Service destroyed');
 	}
 }

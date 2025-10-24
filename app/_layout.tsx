@@ -101,6 +101,7 @@ function RootLayoutContent() {
 	// Debug logging helper
 	const logState = useCallback(
 		(label: string) => {
+			console.log(`🔎 [Layout][${label}]`, {
 				loading,
 				loadingTimeout,
 				firebaseUser: !!firebaseUser,
@@ -207,6 +208,7 @@ function RootLayoutContent() {
 				console.log(
 					'⚠️ [Layout] Loading timeout reached for null onboarding status'
 				);
+				console.log('🔍 [Layout] Debug state:', {
 					loading,
 					user: !!user,
 					hasSeenOnboarding,
@@ -329,6 +331,7 @@ function RootLayoutContent() {
 		(loading && !loadingTimeout) ||
 		(user && hasSeenOnboarding === null && !loadingTimeout)
 	) {
+		console.log('🧩 [Layout] Rendering: loading screen');
 		return (
 			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
 				<ActivityIndicator size="large" color="#007ACC" />
@@ -344,6 +347,7 @@ function RootLayoutContent() {
 
 	// If user is authenticated, always wrap all screens in ProfileProvider
 	if (firebaseUser && user) {
+		console.log('🧩 [Layout] Rendering: authenticated app');
 		try {
 			return (
 				<ProfileProvider>
@@ -406,6 +410,7 @@ function RootLayoutContent() {
 	}
 
 	// For unauthenticated or auth screens, just show the stack (no user-dependent providers)
+	console.log('🧩 [Layout] Rendering: unauthenticated stack');
 	return (
 		<GestureHandlerRootView style={{ flex: 1 }}>
 			<Stack
@@ -455,6 +460,7 @@ export default function RootLayout() {
 
 				// Log resolved feature flags for debugging
 				const flags = getResolvedFlags();
+				console.log('🔧 [Features] Resolved flags:', flags);
 
 				// Production safety check
 				if (process.env.NODE_ENV === 'production') {
