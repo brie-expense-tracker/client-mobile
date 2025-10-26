@@ -16,7 +16,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
 	OrchestratorAIService,
@@ -90,7 +89,6 @@ import { useComposerHeight } from './hooks/useComposerHeight';
 
 export default function ChatScreen() {
 	const router = useRouter();
-	const tabBarHeight = useBottomTabBarHeight();
 	const insets = useSafeAreaInsets();
 	const [composerH, onComposerLayout] = useComposerHeight(56);
 	const { profile } = useProfile();
@@ -123,7 +121,9 @@ export default function ChatScreen() {
 	// React instantly to assistant config changes from anywhere in the app
 	useEffect(() => {
 		const handler = ({ config: newConfig }: AssistantConfigChangedEvent) => {
-			console.log('🔧 [DEBUG] Chat config event received:', newConfig);
+			if (__DEV__) {
+				console.log('🔧 [DEBUG] Chat config event received:', newConfig);
+			}
 			setConfig(newConfig);
 
 			// Clear context when personalization is disabled
@@ -143,7 +143,11 @@ export default function ChatScreen() {
 	// Legacy support for AI insights events
 	useEffect(() => {
 		const handler = ({ enabled }: AIInsightsChangedEvent) => {
-			console.log('🔧 [DEBUG] Legacy AI insights event received:', { enabled });
+			if (__DEV__) {
+				console.log('🔧 [DEBUG] Legacy AI insights event received:', {
+					enabled,
+				});
+			}
 			// Convert to new config format
 			const newConfig = enabled
 				? { ...config, mode: 'personalized' as const }
@@ -159,13 +163,15 @@ export default function ChatScreen() {
 
 	// Debug: Log config changes
 	useEffect(() => {
-		console.log('🔧 [DEBUG] Chat config changed:', {
-			config,
-			hasProfile: !!profile,
-			isPersonalizationOn: isPersonalizationOn(config),
-			allowProactive: allowProactive(config),
-			timestamp: new Date().toISOString(),
-		});
+		if (__DEV__) {
+			console.log('🔧 [DEBUG] Chat config changed:', {
+				config,
+				hasProfile: !!profile,
+				isPersonalizationOn: isPersonalizationOn(config),
+				allowProactive: allowProactive(config),
+				timestamp: new Date().toISOString(),
+			});
+		}
 	}, [config, profile]);
 
 	// Initialize messages with reducer
@@ -269,15 +275,17 @@ export default function ChatScreen() {
 
 	// Debug: Log messages state changes
 	useEffect(() => {
-		console.log('🔍 [DEBUG] Messages state changed:', {
-			count: messages.length,
-			ids: messages.map((m) => ({
-				id: m.id,
-				isUser: m.isUser,
-				isStreaming: m.isStreaming,
-			})),
-			timestamp: new Date().toISOString(),
-		});
+		if (__DEV__) {
+			console.log('🔍 [DEBUG] Messages state changed:', {
+				count: messages.length,
+				ids: messages.map((m) => ({
+					id: m.id,
+					isUser: m.isUser,
+					isStreaming: m.isStreaming,
+				})),
+				timestamp: new Date().toISOString(),
+			});
+		}
 	}, [messages]);
 
 	// Load insights context (only if personalization is enabled)
@@ -300,10 +308,12 @@ export default function ChatScreen() {
 				filteredTransactions
 			);
 
-			console.log(
-				'[Chat] Loaded insights context and data with config:',
-				config
-			);
+			if (__DEV__) {
+				console.log(
+					'[Chat] Loaded insights context and data with config:',
+					config
+				);
+			}
 		} catch (error) {
 			console.error('[Chat] Failed to load insights context:', error);
 		}
@@ -375,16 +385,20 @@ export default function ChatScreen() {
 	// Proactively clear cached insights when the user turns the toggle OFF
 	useEffect(() => {
 		const personalizationEnabled = isPersonalizationOn(config);
-		console.log('🔧 [DEBUG] Config change effect triggered:', {
-			config,
-			personalizationEnabled,
-			willClearContext: !personalizationEnabled,
-		});
+		if (__DEV__) {
+			console.log('🔧 [DEBUG] Config change effect triggered:', {
+				config,
+				personalizationEnabled,
+				willClearContext: !personalizationEnabled,
+			});
+		}
 
 		if (!personalizationEnabled) {
-			console.log(
-				'🧹 [DEBUG] Clearing insights context and conversation context'
-			);
+			if (__DEV__) {
+				console.log(
+					'🧹 [DEBUG] Clearing insights context and conversation context'
+				);
+			}
 			insightsService.clearInsights(); // Wipe any lingering context/insights
 			setCurrentConversationContext(''); // Clear conversation-derived context
 		}
@@ -394,13 +408,17 @@ export default function ChatScreen() {
 	useEffect(() => {
 		const lastMessage = messages[messages.length - 1];
 		if (lastMessage && lastMessage.isStreaming) {
-			console.log('🔄 [Chat] Stream started for message:', lastMessage.id);
+			if (__DEV__) {
+				console.log('🔄 [Chat] Stream started for message:', lastMessage.id);
+			}
 		} else if (lastMessage && !lastMessage.isStreaming && lastMessage.text) {
-			console.log('✅ [Chat] Message completed:', {
-				id: lastMessage.id,
-				length: lastMessage.text.length,
-				isUser: lastMessage.isUser,
-			});
+			if (__DEV__) {
+				console.log('✅ [Chat] Message completed:', {
+					id: lastMessage.id,
+					length: lastMessage.text.length,
+					isUser: lastMessage.isUser,
+				});
+			}
 		}
 	}, [messages]);
 

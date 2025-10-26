@@ -1,8 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Platform } from 'react-native';
+import {
+	View,
+	Text,
+	StyleSheet,
+	ScrollView,
+	Platform,
+	TouchableOpacity,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { RectButton } from 'react-native-gesture-handler';
 
 import { WeeklyReflection } from '../../../src/services';
 import { ReflectionStatsCard } from './components/ReflectionStatsCard';
@@ -181,20 +187,20 @@ export default function ReflectionSuccessScreen({
 
 			{/* Footer Actions */}
 			<View style={styles.footer}>
-				<RectButton
+				<TouchableOpacity
 					style={[styles.secondaryBtn, { flex: 1, marginRight: 8 }]}
 					onPress={onEdit}
 					{...accessibilityProps.button}
 				>
 					<Text style={styles.secondaryBtnText}>Edit Reflection</Text>
-				</RectButton>
-				<RectButton
+				</TouchableOpacity>
+				<TouchableOpacity
 					style={[styles.primaryBtn, { flex: 1 }]}
 					onPress={onBack}
 					{...accessibilityProps.button}
 				>
 					<Text style={styles.primaryBtnText}>Back to Reflections</Text>
-				</RectButton>
+				</TouchableOpacity>
 			</View>
 		</SafeAreaView>
 	);
@@ -233,7 +239,7 @@ const styles = StyleSheet.create({
 	},
 
 	scrollView: { flex: 1 },
-	scrollContent: { padding: 16, paddingBottom: 24 },
+	scrollContent: { padding: 16, paddingBottom: 120 },
 
 	successCard: {
 		backgroundColor: '#fff',
@@ -354,6 +360,7 @@ const styles = StyleSheet.create({
 		shadowOpacity: 0.1,
 		shadowRadius: 8,
 		elevation: 5,
+		zIndex: 10,
 	},
 	primaryBtn: {
 		height: 48,

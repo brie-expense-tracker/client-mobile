@@ -9,4 +9,12 @@ config.resolver.sourceExts.push('cjs');
 // <-- this line is the key fix
 config.resolver.unstable_enablePackageExports = false;
 
+// Strip console statements in production builds
+if (!__DEV__) {
+    config.resolver.alias = {
+        ...config.resolver.alias,
+        'console': './src/utils/noop-console.js'
+    };
+}
+
 module.exports = config;

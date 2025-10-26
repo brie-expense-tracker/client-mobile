@@ -1,10 +1,11 @@
-import React, { PropsWithChildren } from 'react';
+import React, { PropsWithChildren, useMemo } from 'react';
 import {
 	View,
 	Text,
 	StyleSheet,
 	TouchableOpacity,
-	useColorScheme,
+	Dimensions,
+	Platform,
 } from 'react-native';
 import Modal from 'react-native-modal';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,7 +20,9 @@ type SlidingModalProps = PropsWithChildren<{
 	onAfterClose?: () => void; // runs after hide animation
 }>;
 
-export default function SlidingModal({
+const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get('window');
+
+function SlidingModalBase({
 	isVisible,
 	onClose,
 	title = 'Details',
@@ -29,8 +32,16 @@ export default function SlidingModal({
 	showHeader = true,
 	onAfterClose,
 }: SlidingModalProps) {
-	// Force light mode for consistent styling
-	const isDark = false;
+	// lock maxHeight to a NUMBER so layout doesn't churn during animation
+	const maxHeight = Math.round(
+		SCREEN_H * Math.min(Math.max(maxHeightPct, 0.3), 0.95)
+	);
+
+	// avoid re-creating style objects during the open/close animation
+	const containerStyle = useMemo(
+		() => [styles.container, { maxHeight }],
+		[maxHeight]
+	);
 
 	return (
 		<Modal
@@ -41,66 +52,61 @@ export default function SlidingModal({
 			swipeDirection="down"
 			propagateSwipe
 			style={styles.modal}
-			backdropOpacity={0.4}
+			backdropOpacity={0.35}
 			animationIn="slideInUp"
 			animationOut="slideOutDown"
-			animationInTiming={260}
-			animationOutTiming={220}
-			backdropTransitionInTiming={180}
-			backdropTransitionOutTiming={140}
+			animationInTiming={220}
+			animationOutTiming={200}
+			backdropTransitionInTiming={120}
+			backdropTransitionOutTiming={100}
+			// keep work on the native thread
 			useNativeDriver={false}
 			useNativeDriverForBackdrop={false}
+			// prevent a measure pass during animation on some Android devices
+			deviceWidth={SCREEN_W}
+			deviceHeight={SCREEN_H}
+			// improves perf on Android for big views
+			hardwareAccelerated
+			// reduce flashes while animating
 			hideModalContentWhileAnimating
 			statusBarTranslucent
 			onModalHide={onAfterClose}
 			accessibilityViewIsModal
 		>
-			<View
-				style={[
-					styles.container,
-					{
-						maxHeight: `${Math.round(maxHeightPct * 100)}%`,
-						backgroundColor: isDark ? '#121212' : '#FFFFFF',
-					},
-				]}
-			>
+			<View style={containerStyle}>
 				<View style={styles.dragHandle} />
 
 				{showHeader && (
 					<View style={styles.header}>
-						<View
-							style={[
-								styles.iconWrapper,
-								{ backgroundColor: isDark ? '#2A2A2A' : '#E7F5FF' },
-							]}
-						>
+						<View style={styles.iconWrapper}>
 							<Ionicons name={icon} size={20} color="#0095FF" />
 						</View>
-						<Text
-							style={[styles.title, { color: isDark ? '#FFF' : '#0F172A' }]}
-						>
-							{title}
-						</Text>
+						<Text style={styles.title}>{title}</Text>
 						<TouchableOpacity
 							onPress={onClose}
 							accessibilityRole="button"
 							accessibilityLabel="Close modal"
 							accessibilityHint="Closes this panel"
 						>
-							<Ionicons
-								name="close"
-								size={24}
-								color={isDark ? '#D1D5DB' : '#64748B'}
-							/>
+							<Ionicons name="close" size={24} color="#64748B" />
 						</TouchableOpacity>
 					</View>
 				)}
 
-				<View style={styles.content}>{children}</View>
+				{/* These flags push rendering to the GPU when possible */}
+				<View
+					style={styles.content}
+					renderToHardwareTextureAndroid
+					{...(Platform.OS === 'ios' ? { shouldRasterizeIOS: true } : {})}
+				>
+					{children}
+				</View>
 			</View>
 		</Modal>
 	);
 }
+
+export default React.memo(SlidingModalBase);
 
 const styles = StyleSheet.create({
 	modal: {
@@ -114,11 +120,8 @@ const styles = StyleSheet.create({
 		paddingTop: 8,
 		paddingHorizontal: 24,
 		paddingBottom: 48,
-		position: 'absolute',
-		left: 0,
-		right: 0,
-		bottom: 0,
-		overflow: 'hidden', // avoids shadow pop during slideOutDown
+		backgroundColor: '#FFFFFF',
+		overflow: 'hidden',
 	},
 	dragHandle: {
 		width: 40,
@@ -131,7 +134,7 @@ const styles = StyleSheet.create({
 	header: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		marginBottom: 24,
+		marginBottom: 16,
 	},
 	iconWrapper: {
 		width: 32,
@@ -140,7 +143,8 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 		marginRight: 12,
+		backgroundColor: '#E7F5FF',
 	},
-	title: { flex: 1, fontSize: 18, fontWeight: '600' },
+	title: { flex: 1, fontSize: 18, fontWeight: '600', color: '#0F172A' },
 	content: { flex: 1 },
 });

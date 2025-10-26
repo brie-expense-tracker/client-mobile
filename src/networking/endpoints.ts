@@ -22,12 +22,16 @@ export function buildSseUrl(input: {
 	if (input.expand) {
 		u.searchParams.set('expand', 'true');
 	}
-	console.log('🔧 [SSE] Built URL:', u.toString());
+	if (__DEV__) {
+		console.log('🔧 [SSE] Built URL:', u.toString());
+	}
 	return u.toString();
 }
 
 export function buildTestSseUrl() {
 	const u = new URL(`${API_BASE_URL}/api/stream/test`);
-	console.log('🧪 [Test] Built test URL:', u.toString());
+	if (__DEV__) {
+		console.log('🧪 [Test] Built test URL:', u.toString());
+	}
 	return u.toString();
 }

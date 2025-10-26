@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BorderlessButton, RectButton } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
 
 import { useWeeklyReflection } from '../../../src/hooks/useWeeklyReflection';
 import { WeeklyReflection } from '../../../src/services';
@@ -54,6 +55,7 @@ if (
  */
 
 export default function ReflectionWizard() {
+	const router = useRouter();
 	const {
 		currentReflection,
 		loading,
@@ -69,6 +71,7 @@ export default function ReflectionWizard() {
 	const [step, setStep] = useState(0); // 0..4
 	const [busy, setBusy] = useState(false);
 	const [showSuccess, setShowSuccess] = useState(false);
+	const [dismissedSuccess, setDismissedSuccess] = useState(false);
 	const [savedReflection, setSavedReflection] =
 		useState<WeeklyReflection | null>(null);
 	const [localWin, setLocalWin] = useState(
@@ -204,6 +207,7 @@ export default function ReflectionWizard() {
 			});
 
 			console.log('Save successful, received:', saved);
+			setDismissedSuccess(false); // Reset so the success screen shows
 			setSavedReflection(saved);
 			setShowSuccess(true);
 		} catch (error) {
@@ -218,12 +222,17 @@ export default function ReflectionWizard() {
 	}, [currentReflection, localWin, localNotes, saveReflection]);
 
 	const handleBackToWizard = useCallback(() => {
+		console.log('handleBackToWizard called');
+		setDismissedSuccess(true);
 		setShowSuccess(false);
 		setSavedReflection(null);
 		setStep(0);
-	}, []);
+		refreshReflection();
+	}, [refreshReflection]);
 
 	const handleEditReflection = useCallback(() => {
+		console.log('handleEditReflection called');
+		setDismissedSuccess(false); // Allow editing even if it was dismissed
 		setShowSuccess(false);
 		setSavedReflection(null);
 		setStep(1); // Go back to mood rating step
@@ -256,12 +265,22 @@ export default function ReflectionWizard() {
 	}
 
 	// Show success screen after saving OR if reflection is already completed for this week
+	// But don't show it if user has dismissed it
 	if (
-		(showSuccess && savedReflection) ||
-		(currentReflection?.completed && !showSuccess)
+		!dismissedSuccess &&
+		((showSuccess && savedReflection) ||
+			(currentReflection?.completed && !showSuccess && !savedReflection))
 	) {
 		const reflectionToShow = savedReflection || currentReflection;
 		console.log('Showing success screen with reflection:', reflectionToShow);
+		console.log(
+			'showSuccess:',
+			showSuccess,
+			'savedReflection:',
+			savedReflection,
+			'dismissedSuccess:',
+			dismissedSuccess
+		);
 		return (
 			<ReflectionSuccessScreen
 				reflection={reflectionToShow!}
