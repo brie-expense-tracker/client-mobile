@@ -101,19 +101,21 @@ function RootLayoutContent() {
 	// Debug logging helper
 	const logState = useCallback(
 		(label: string) => {
-			console.log(`🔎 [Layout][${label}]`, {
-				loading,
-				loadingTimeout,
-				firebaseUser: !!firebaseUser,
-				user: !!user,
-				hasSeenOnboarding,
-				segments: segments.join('/'),
-				inAuthGroup: segments[0] === '(auth)',
-				inTabsGroup: segments[0] === '(tabs)',
-				inOnboardingGroup: segments[0] === '(onboarding)',
-				inStackGroup: segments[0] === '(stack)',
-				DEV_MODE,
-			});
+			if (__DEV__) {
+				console.log(`🔎 [Layout][${label}]`, {
+					loading,
+					loadingTimeout,
+					firebaseUser: !!firebaseUser,
+					user: !!user,
+					hasSeenOnboarding,
+					segments: segments.join('/'),
+					inAuthGroup: segments[0] === '(auth)',
+					inTabsGroup: segments[0] === '(tabs)',
+					inOnboardingGroup: segments[0] === '(onboarding)',
+					inStackGroup: segments[0] === '(stack)',
+					DEV_MODE,
+				});
+			}
 		},
 		[loading, loadingTimeout, firebaseUser, user, hasSeenOnboarding, segments]
 	);
@@ -153,7 +155,9 @@ function RootLayoutContent() {
 	useEffect(() => {
 		const handleDeepLink = (url: string) => {
 			try {
-				console.log('Deep link received:', url);
+				if (__DEV__) {
+					console.log('Deep link received:', url);
+				}
 				// expo-router will handle the navigation automatically
 			} catch (error) {
 				console.warn('Failed to handle deep link:', error);

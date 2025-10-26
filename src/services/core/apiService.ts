@@ -3,7 +3,9 @@ import { getHMACService } from '../../utils/hmacSigning';
 import { RequestManager } from './requestManager';
 
 // API logging: Keep essential info but reduce noise
-console.log(`🌐 API: ${__DEV__ ? 'DEV' : 'PROD'} | Base: ${API_BASE_URL}`);
+if (__DEV__) {
+	console.log(`🌐 API: ${__DEV__ ? 'DEV' : 'PROD'} | Base: ${API_BASE_URL}`);
+}
 
 // ==========================================
 // Utilities
@@ -70,7 +72,9 @@ function getCachedRequest<T>(endpoint: string): T | null {
 		const isExpired = now - cached.timestamp > cached.ttl;
 
 		if (!isExpired) {
-			console.log(`💾 [ApiService] Cache hit for: ${endpoint}`);
+			if (__DEV__) {
+				console.log(`💾 [ApiService] Cache hit for: ${endpoint}`);
+			}
 			return cached.data as T;
 		} else {
 			requestCache.delete(cacheKey);
@@ -92,9 +96,11 @@ function cacheRequest(endpoint: string, data: any): void {
 		ttl,
 	});
 
-	console.log(
-		`💾 [ApiService] Cached response for: ${endpoint} (TTL: ${ttl}ms)`
-	);
+	if (__DEV__) {
+		console.log(
+			`💾 [ApiService] Cached response for: ${endpoint} (TTL: ${ttl}ms)`
+		);
+	}
 }
 
 // Check if request should be throttled
@@ -103,7 +109,9 @@ function shouldThrottleRequest(endpoint: string): boolean {
 	const lastRequest = requestThrottle.get(endpoint);
 
 	if (lastRequest && now - lastRequest < THROTTLE_DELAY) {
-		console.log(`⏳ [ApiService] Throttling request: ${endpoint}`);
+		if (__DEV__) {
+			console.log(`⏳ [ApiService] Throttling request: ${endpoint}`);
+		}
 		return true;
 	}
 
@@ -115,11 +123,13 @@ function shouldThrottleRequest(endpoint: string): boolean {
 function isRateLimited(endpoint: string): boolean {
 	const backoffUntil = rateLimitBackoff.get(endpoint);
 	if (backoffUntil && Date.now() < backoffUntil) {
-		console.log(
-			`🚫 [ApiService] Rate limited for: ${endpoint} (backoff until: ${new Date(
-				backoffUntil
-			).toISOString()})`
-		);
+		if (__DEV__) {
+			console.log(
+				`🚫 [ApiService] Rate limited for: ${endpoint} (backoff until: ${new Date(
+					backoffUntil
+				).toISOString()})`
+			);
+		}
 		return true;
 	}
 	return false;
@@ -132,15 +142,19 @@ function setRateLimitBackoff(
 ): void {
 	const backoffUntil = Date.now() + backoffMs;
 	rateLimitBackoff.set(endpoint, backoffUntil);
-	console.log(
-		`🚫 [ApiService] Rate limit backoff set for: ${endpoint} (${backoffMs}ms)`
-	);
+	if (__DEV__) {
+		console.log(
+			`🚫 [ApiService] Rate limit backoff set for: ${endpoint} (${backoffMs}ms)`
+		);
+	}
 }
 
 // Single-flight pattern to prevent duplicate requests
 async function singleflight<T>(key: string, fn: () => Promise<T>): Promise<T> {
 	if (inflight.has(key)) {
-		console.log(`🔄 [ApiService] Deduplicating request: ${key}`);
+		if (__DEV__) {
+			console.log(`🔄 [ApiService] Deduplicating request: ${key}`);
+		}
 		return inflight.get(key) as Promise<T>;
 	}
 
@@ -184,11 +198,13 @@ async function retryWithBackoff<T>(
 			// Only retry on network errors or 5xx errors
 			if (attempt < maxRetries) {
 				const delay = 250 * Math.pow(2, attempt) + Math.random() * 200;
-				console.log(
-					`⏳ [ApiService] Retrying in ${delay}ms (attempt ${attempt + 1}/${
-						maxRetries + 1
-					})`
-				);
+				if (__DEV__) {
+					console.log(
+						`⏳ [ApiService] Retrying in ${delay}ms (attempt ${attempt + 1}/${
+							maxRetries + 1
+						})`
+					);
+				}
 				await new Promise((resolve) => setTimeout(resolve, delay));
 				continue;
 			}
@@ -283,10 +299,12 @@ export class ApiService {
 		try {
 			const hmacService = getHMACService();
 
-			console.log('🔐 [ApiService] HMAC signing process starting...');
-			console.log('🔐 [ApiService] Has body:', hasBody);
-			console.log('🔐 [ApiService] Original body:', body);
-			console.log('🔐 [ApiService] Body type:', typeof body);
+			if (__DEV__) {
+				console.log('🔐 [ApiService] HMAC signing process starting...');
+				console.log('🔐 [ApiService] Has body:', hasBody);
+				console.log('🔐 [ApiService] Original body:', body);
+				console.log('🔐 [ApiService] Body type:', typeof body);
+			}
 
 			// For bodyless requests, bodyString will be empty string for signing
 			// but we return null to indicate no body should be sent in fetch
@@ -296,9 +314,11 @@ export class ApiService {
 					: stableStringify(body)
 				: null;
 
-			console.log('🔐 [ApiService] HMAC Debug - Body string:', bodyString);
-			console.log('🔐 [ApiService] HMAC Debug - Method:', method);
-			console.log('🔐 [ApiService] HMAC Debug - Endpoint:', endpoint);
+			if (__DEV__) {
+				console.log('🔐 [ApiService] HMAC Debug - Body string:', bodyString);
+				console.log('🔐 [ApiService] HMAC Debug - Method:', method);
+				console.log('🔐 [ApiService] HMAC Debug - Endpoint:', endpoint);
+			}
 
 			const signedHeaders = hmacService.signRequestHeaders(
 				body,
@@ -307,20 +327,26 @@ export class ApiService {
 				headers
 			);
 
-			console.log('🔐 [ApiService] HMAC signing completed for:', endpoint);
-			console.log(
-				'🔐 [ApiService] Final signed headers keys:',
-				Object.keys(signedHeaders)
-			);
-			console.log(
-				'🔐 [ApiService] Will send body:',
-				bodyString === null ? 'NO BODY' : `"${bodyString.substring(0, 100)}..."`
-			);
+			if (__DEV__) {
+				console.log('🔐 [ApiService] HMAC signing completed for:', endpoint);
+				console.log(
+					'🔐 [ApiService] Final signed headers keys:',
+					Object.keys(signedHeaders)
+				);
+				console.log(
+					'🔐 [ApiService] Will send body:',
+					bodyString === null
+						? 'NO BODY'
+						: `"${bodyString.substring(0, 100)}..."`
+				);
+			}
 
 			return { headers: signedHeaders, bodyString };
 		} catch (error) {
-			console.error('❌ [ApiService] Failed to add HMAC signature:', error);
-			console.error('❌ [ApiService] Error details:', error);
+			if (__DEV__) {
+				console.error('❌ [ApiService] Failed to add HMAC signature:', error);
+				console.error('❌ [ApiService] Error details:', error);
+			}
 			// Continue without HMAC signature - let the server handle the error
 			return {
 				headers,
@@ -447,19 +473,23 @@ export class ApiService {
 
 			const firebaseUID = currentUser.uid;
 
-			console.log(
-				'🔍 [DEBUG] Authenticated Firebase UID:',
-				firebaseUID ? `${firebaseUID.substring(0, 8)}...` : 'null'
-			);
+			if (__DEV__) {
+				console.log(
+					'🔍 [DEBUG] Authenticated Firebase UID:',
+					firebaseUID ? `${firebaseUID.substring(0, 8)}...` : 'null'
+				);
+			}
 
 			const headers = {
 				'Content-Type': 'application/json',
 				'x-firebase-uid': firebaseUID,
 			};
 
-			console.log('🔍 [DEBUG] API Headers prepared:', {
-				'x-firebase-uid': `${firebaseUID.substring(0, 8)}...`,
-			});
+			if (__DEV__) {
+				console.log('🔍 [DEBUG] API Headers prepared:', {
+					'x-firebase-uid': `${firebaseUID.substring(0, 8)}...`,
+				});
+			}
 			return headers;
 		} catch (error) {
 			// Re-throw auth errors with a flag so callers can handle them appropriately
@@ -510,13 +540,17 @@ export class ApiService {
 			const url = `${API_BASE_URL}${endpoint}`;
 
 			// Debug logging for URL construction
-			console.log('🔧 [DEBUG] URL Construction:');
-			console.log('🔧 [DEBUG] API_BASE_URL:', API_BASE_URL);
-			console.log('🔧 [DEBUG] endpoint:', endpoint);
-			console.log('🔧 [DEBUG] final URL:', url);
+			if (__DEV__) {
+				console.log('🔧 [DEBUG] URL Construction:');
+				console.log('🔧 [DEBUG] API_BASE_URL:', API_BASE_URL);
+				console.log('🔧 [DEBUG] endpoint:', endpoint);
+				console.log('🔧 [DEBUG] final URL:', url);
+			}
 
 			// API logging: Keep essential request info
-			console.log(`📡 GET: ${endpoint}`);
+			if (__DEV__) {
+				console.log(`📡 GET: ${endpoint}`);
+			}
 
 			// Use RequestManager for intelligent request handling
 			const data = await RequestManager.request<T>('GET', url, {
@@ -535,7 +569,9 @@ export class ApiService {
 			}
 
 			// Demo logging: Keep essential success info
-			console.log(`✅ GET: ${endpoint} (200)`);
+			if (__DEV__) {
+				console.log(`✅ GET: ${endpoint} (200)`);
+			}
 
 			return result;
 		} catch (error: any) {
@@ -563,13 +599,15 @@ export class ApiService {
 
 		return singleflight(requestKey, async () => {
 			return retryWithBackoff(async () => {
-				console.log('🔍 [ApiService] POST request details:', {
-					endpoint,
-					dataKeys: Object.keys(body),
-					firebaseUID: body.firebaseUID
-						? `${body.firebaseUID.substring(0, 8)}...`
-						: 'not provided',
-				});
+				if (__DEV__) {
+					console.log('🔍 [ApiService] POST request details:', {
+						endpoint,
+						dataKeys: Object.keys(body),
+						firebaseUID: body.firebaseUID
+							? `${body.firebaseUID.substring(0, 8)}...`
+							: 'not provided',
+					});
+				}
 
 				let headers: Record<string, string>;
 				try {
@@ -597,9 +635,11 @@ export class ApiService {
 				} catch (authError: any) {
 					// Handle authentication errors gracefully
 					if (authError.isAuthError) {
-						console.log(
-							'🔒 [API] User not authenticated, skipping POST request'
-						);
+						if (__DEV__) {
+							console.log(
+								'🔒 [API] User not authenticated, skipping POST request'
+							);
+						}
 						return {
 							success: false,
 							error: 'User not authenticated',
@@ -619,14 +659,16 @@ export class ApiService {
 
 				const url = `${API_BASE_URL}${endpoint}`;
 
-				console.log('🔍 [ApiService] POST request details:', {
-					url,
-					endpoint,
-					headers: {
-						'x-firebase-uid':
-							signedHeaders['x-firebase-uid']?.substring(0, 8) + '...',
-					},
-				});
+				if (__DEV__) {
+					console.log('🔍 [ApiService] POST request details:', {
+						url,
+						endpoint,
+						headers: {
+							'x-firebase-uid':
+								signedHeaders['x-firebase-uid']?.substring(0, 8) + '...',
+						},
+					});
+				}
 
 				const response = await fetch(url, {
 					method: 'POST',
@@ -634,12 +676,14 @@ export class ApiService {
 					body: bodyString,
 				});
 
-				console.log('🔍 [ApiService] POST response received:', {
-					status: response.status,
-					statusText: response.statusText,
-					ok: response.ok,
-					url: response.url,
-				});
+				if (__DEV__) {
+					console.log('🔍 [ApiService] POST response received:', {
+						status: response.status,
+						statusText: response.statusText,
+						ok: response.ok,
+						url: response.url,
+					});
+				}
 
 				// Check if response is JSON before parsing
 				const contentType = response.headers.get('content-type');
@@ -648,24 +692,33 @@ export class ApiService {
 				if (contentType && contentType.includes('application/json')) {
 					try {
 						data = await response.json();
-						console.log('🔍 [ApiService] JSON response parsed successfully:', {
-							success: data.success,
-							message: data.message,
-							hasData: !!data.data,
-							dataKeys: data.data ? Object.keys(data.data) : [],
-						});
+						if (__DEV__) {
+							console.log(
+								'🔍 [ApiService] JSON response parsed successfully:',
+								{
+									success: data.success,
+									message: data.message,
+									hasData: !!data.data,
+									dataKeys: data.data ? Object.keys(data.data) : [],
+								}
+							);
+						}
 
 						// Log full debug data if present (HMAC debugging)
 						if (data.debug) {
-							console.log('🐛 [ApiService] Server Debug Info:', data.debug);
+							if (__DEV__) {
+								console.log('🐛 [ApiService] Server Debug Info:', data.debug);
+							}
 						}
 
 						// Log full error response for debugging
 						if (!response.ok) {
-							console.log(
-								'🔍 [ApiService] Full error response:',
-								JSON.stringify(data, null, 2)
-							);
+							if (__DEV__) {
+								console.log(
+									'🔍 [ApiService] Full error response:',
+									JSON.stringify(data, null, 2)
+								);
+							}
 						}
 					} catch (parseError) {
 						console.error('❌ [ApiService] JSON parse error:', parseError);
@@ -735,7 +788,9 @@ export class ApiService {
 				}
 
 				// API logging: Success response
-				console.log(`✅ [ApiService] POST: ${endpoint} (${response.status})`);
+				if (__DEV__) {
+					console.log(`✅ [ApiService] POST: ${endpoint} (${response.status})`);
+				}
 
 				// Clear cache by prefix after successful POST (resource created)
 				this.clearCacheByPrefix(endpoint);

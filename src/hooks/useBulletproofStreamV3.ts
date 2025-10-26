@@ -176,13 +176,15 @@ export function useBulletproofStreamV3({
 		async (
 			message: string,
 			callbacks: StreamingCallbacks,
-			options?: { messageId?: string; retryCount?: number }
+			options?: { messageId?: string; retryCount?: number; expand?: boolean }
 		) => {
 			// Prevent duplicate streams
 			if (streamState.isStreaming) {
-				console.warn(
-					'[BulletproofStream] Already streaming, ignoring duplicate'
-				);
+				if (__DEV__) {
+					console.warn(
+						'[BulletproofStream] Already streaming, ignoring duplicate'
+					);
+				}
 				return;
 			}
 
@@ -206,15 +208,17 @@ export function useBulletproofStreamV3({
 			currentMessageId.current = messageId;
 			streamingRef.current.messageId = messageId;
 
-			console.log('🚀 [Stream] Starting:', {
-				messageId,
-				messageLength: message.length,
-				retryCount:
-					retryCount > 0
-						? `${retryCount}/${retryConfig.maxRetries}`
-						: 'initial',
-				message: message.substring(0, 100) + '...',
-			});
+			if (__DEV__) {
+				console.log('🚀 [Stream] Starting:', {
+					messageId,
+					messageLength: message.length,
+					retryCount:
+						retryCount > 0
+							? `${retryCount}/${retryConfig.maxRetries}`
+							: 'initial',
+					message: message.substring(0, 100) + '...',
+				});
+			}
 
 			// Notify about retry if applicable
 			if (retryCount > 0) {
@@ -229,9 +233,11 @@ export function useBulletproofStreamV3({
 					throw new Error('No authenticated user found');
 				}
 
-				console.log('🔑 [Stream] Using Firebase UID for auth:', {
-					uid: firebaseUID.substring(0, 10) + '...',
-				});
+				if (__DEV__) {
+					console.log('🔑 [Stream] Using Firebase UID for auth:', {
+						uid: firebaseUID.substring(0, 10) + '...',
+					});
+				}
 
 				// Build URL using the centralized buildSseUrl function
 				const url = buildSseUrl({

@@ -29,9 +29,11 @@ setInterval(() => {
 	inflightRequests.forEach((state, key) => {
 		// Clear any request older than 5 seconds
 		if (now - state.timestamp > 5000) {
-			console.log(
-				`🧹 [RequestManager] Clearing stale request: ${key.substring(0, 100)}`
-			);
+			if (__DEV__) {
+				console.log(
+					`🧹 [RequestManager] Clearing stale request: ${key.substring(0, 100)}`
+				);
+			}
 			state.abortController.abort();
 			inflightRequests.delete(key);
 			clearedCount++;
@@ -39,7 +41,9 @@ setInterval(() => {
 	});
 
 	if (clearedCount > 0) {
-		console.log(`🧹 [RequestManager] Cleared ${clearedCount} stale requests`);
+		if (__DEV__) {
+			console.log(`🧹 [RequestManager] Cleared ${clearedCount} stale requests`);
+		}
 	}
 }, 2000); // Check every 2 seconds
 
@@ -96,9 +100,11 @@ function setBackoff(key: string, error?: string): void {
 		lastError: error,
 	});
 
-	console.log(
-		`🚫 [RequestManager] Backoff set for ${key}: ${delay}ms (attempt ${attemptCount})`
-	);
+	if (__DEV__) {
+		console.log(
+			`🚫 [RequestManager] Backoff set for ${key}: ${delay}ms (attempt ${attemptCount})`
+		);
+	}
 }
 
 /**
@@ -143,9 +149,11 @@ async function processQueue(
 			if (backoff) {
 				const waitTime = backoff.until - Date.now();
 				if (waitTime > 0) {
-					console.log(
-						`⏳ [RequestManager] Waiting ${waitTime}ms for backoff to expire`
-					);
+					if (__DEV__) {
+						console.log(
+							`⏳ [RequestManager] Waiting ${waitTime}ms for backoff to expire`
+						);
+					}
 					await sleep(waitTime);
 				}
 			}
@@ -162,9 +170,11 @@ async function processQueue(
 	} catch (error: any) {
 		// Don't retry on 4xx client errors (except 429)
 		if (error.status >= 400 && error.status < 500 && error.status !== 429) {
-			console.log(
-				`❌ [RequestManager] Client error ${error.status}, not retrying`
-			);
+			if (__DEV__) {
+				console.log(
+					`❌ [RequestManager] Client error ${error.status}, not retrying`
+				);
+			}
 			// Reject all queued requests with the error
 			queue.forEach(({ reject }) => reject(error));
 			return;
@@ -177,7 +187,9 @@ async function processQueue(
 			// If we haven't exceeded max attempts, queue for retry
 			const backoff = backoffStates.get(key);
 			if (backoff && backoff.attemptCount <= MAX_RETRY_ATTEMPTS) {
-				console.log(`🔄 [RequestManager] Retrying ${key} after backoff`);
+				if (__DEV__) {
+					console.log(`🔄 [RequestManager] Retrying ${key} after backoff`);
+				}
 				// Re-queue all requests for retry
 				setTimeout(() => processQueue(key, executor), 1000);
 				return;
@@ -212,18 +224,22 @@ export class RequestManager {
 		const existing = inflightRequests.get(key);
 		if (existing && now - existing.timestamp < 3000) {
 			// 3 second timeout for deduplication
-			console.log(
-				`🔄 [RequestManager] Deduplicating request: ${key.substring(0, 80)}`
-			);
+			if (__DEV__) {
+				console.log(
+					`🔄 [RequestManager] Deduplicating request: ${key.substring(0, 80)}`
+				);
+			}
 			return existing.promise;
 		} else if (existing) {
 			// Timeout exceeded - abort the old request and create new one
-			console.log(
-				`⏰ [RequestManager] Dedup timeout exceeded, creating new request: ${key.substring(
-					0,
-					80
-				)}`
-			);
+			if (__DEV__) {
+				console.log(
+					`⏰ [RequestManager] Dedup timeout exceeded, creating new request: ${key.substring(
+						0,
+						80
+					)}`
+				);
+			}
 			existing.abortController.abort();
 			inflightRequests.delete(key);
 			// Don't return - continue to create a new request
@@ -232,12 +248,14 @@ export class RequestManager {
 		// Create abort controller for this request with timeout
 		const abortController = new AbortController();
 		const timeoutId = setTimeout(() => {
-			console.log(
-				`⏰ [RequestManager] Request timeout after 3s, aborting: ${key.substring(
-					0,
-					80
-				)}`
-			);
+			if (__DEV__) {
+				console.log(
+					`⏰ [RequestManager] Request timeout after 3s, aborting: ${key.substring(
+						0,
+						80
+					)}`
+				);
+			}
 			abortController.abort();
 			inflightRequests.delete(key);
 		}, 3000); // 3 second timeout (fast fail for UX)
@@ -245,9 +263,11 @@ export class RequestManager {
 		// Create the request executor
 		const executor = async (): Promise<T> => {
 			try {
-				console.log(
-					`🚀 [RequestManager] Starting fetch for: ${key.substring(0, 100)}`
-				);
+				if (__DEV__) {
+					console.log(
+						`🚀 [RequestManager] Starting fetch for: ${key.substring(0, 100)}`
+					);
+				}
 				const response = await fetch(url, {
 					...options,
 					method,
@@ -257,11 +277,13 @@ export class RequestManager {
 						...options.headers,
 					},
 				});
-				console.log(
-					`📥 [RequestManager] Received response: ${
-						response.status
-					} for ${key.substring(0, 100)}`
-				);
+				if (__DEV__) {
+					console.log(
+						`📥 [RequestManager] Received response: ${
+							response.status
+						} for ${key.substring(0, 100)}`
+					);
+				}
 
 				if (!response.ok) {
 					let errorMessage = response.statusText;
@@ -281,21 +303,27 @@ export class RequestManager {
 							: ApiErrorType.SERVER_ERROR,
 						response.status
 					);
-					console.log(`❌ [RequestManager] Request failed: ${error.message}`);
+					if (__DEV__) {
+						console.log(`❌ [RequestManager] Request failed: ${error.message}`);
+					}
 					throw error;
 				}
 
 				const data = await response.json();
-				console.log(
-					`✅ [RequestManager] Request succeeded for ${key.substring(0, 100)}`
-				);
+				if (__DEV__) {
+					console.log(
+						`✅ [RequestManager] Request succeeded for ${key.substring(0, 100)}`
+					);
+				}
 				clearTimeout(timeoutId);
 				return data;
 			} catch (error: any) {
 				clearTimeout(timeoutId);
-				console.log(
-					`💥 [RequestManager] Request error: ${error.name} - ${error.message}`
-				);
+				if (__DEV__) {
+					console.log(
+						`💥 [RequestManager] Request error: ${error.name} - ${error.message}`
+					);
+				}
 				// Handle abort errors specifically
 				if (error.name === 'AbortError') {
 					const timeoutError = new ApiError(
@@ -308,9 +336,11 @@ export class RequestManager {
 				throw error;
 			} finally {
 				// Clean up inflight request
-				console.log(
-					`🧹 [RequestManager] Cleaning up request: ${key.substring(0, 100)}`
-				);
+				if (__DEV__) {
+					console.log(
+						`🧹 [RequestManager] Cleaning up request: ${key.substring(0, 100)}`
+					);
+				}
 				inflightRequests.delete(key);
 			}
 		};
@@ -330,9 +360,11 @@ export class RequestManager {
 	 * Cancel all inflight requests
 	 */
 	static cancelAllRequests(): void {
-		console.log(
-			`🚫 [RequestManager] Cancelling ${inflightRequests.size} inflight requests`
-		);
+		if (__DEV__) {
+			console.log(
+				`🚫 [RequestManager] Cancelling ${inflightRequests.size} inflight requests`
+			);
+		}
 
 		inflightRequests.forEach(({ abortController }) => {
 			abortController.abort();
@@ -358,9 +390,11 @@ export class RequestManager {
 		});
 
 		if (cancelledCount > 0) {
-			console.log(
-				`🚫 [RequestManager] Cancelled ${cancelledCount} requests matching: ${pattern}`
-			);
+			if (__DEV__) {
+				console.log(
+					`🚫 [RequestManager] Cancelled ${cancelledCount} requests matching: ${pattern}`
+				);
+			}
 		}
 	}
 
@@ -387,7 +421,9 @@ export class RequestManager {
 	 */
 	static clearAllBackoffs(): void {
 		backoffStates.clear();
-		console.log(`🧹 [RequestManager] Cleared all backoff states`);
+		if (__DEV__) {
+			console.log(`🧹 [RequestManager] Cleared all backoff states`);
+		}
 	}
 }
 

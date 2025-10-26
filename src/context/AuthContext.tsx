@@ -87,7 +87,9 @@ export const AuthContext = createContext<AuthContextType | undefined>(
 const UID_KEY = 'firebaseUID';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-	console.log('🚨 [DEBUG] AuthProvider render - component re-rendering');
+	if (__DEV__) {
+		console.log('🚨 [DEBUG] AuthProvider render - component re-rendering');
+	}
 
 	const [firebaseUser, setFirebaseUser] =
 		useState<FirebaseAuthTypes.User | null>(null);
@@ -107,14 +109,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 	// Enhanced auth state
 	const authState: AuthState = useMemo(() => {
-		console.log('🚨 [DEBUG] authState useMemo recalculating with:', {
-			user: !!user,
-			loading,
-			profile: !!profile,
-			firebaseUser: !!firebaseUser,
-			lastActivity,
-			sessionTimeout,
-		});
+		if (__DEV__) {
+			console.log('🚨 [DEBUG] authState useMemo recalculating with:', {
+				user: !!user,
+				loading,
+				profile: !!profile,
+				firebaseUser: !!firebaseUser,
+				lastActivity,
+				sessionTimeout,
+			});
+		}
 		return {
 			isAuthenticated: !!firebaseUser,
 			isLoading: loading,
@@ -128,16 +132,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 	// Subscribe to auth state once
 	useEffect(() => {
-		console.log('🚨 [DEBUG] Auth useEffect triggered - setting up listeners');
-		console.log('🚨 [DEBUG] Current state values:', {
-			loading,
-			user: !!user,
-			profile: !!profile,
-			firebaseUser: !!firebaseUser,
-			processingTimeoutRef: processingTimeoutRef.current,
-			lastProcessedUIDRef: lastProcessedUIDRef.current,
-			isManualLoginRef: isManualLoginRef.current,
-		});
+		if (__DEV__) {
+			console.log('🚨 [DEBUG] Auth useEffect triggered - setting up listeners');
+			console.log('🚨 [DEBUG] Current state values:', {
+				loading,
+				user: !!user,
+				profile: !!profile,
+				firebaseUser: !!firebaseUser,
+				processingTimeoutRef: processingTimeoutRef.current,
+				lastProcessedUIDRef: lastProcessedUIDRef.current,
+				isManualLoginRef: isManualLoginRef.current,
+				isGoogleSignInCancelledRef: isGoogleSignInCancelledRef.current,
+			});
+		}
 		setLoading(true);
 
 		// Configure Google Sign-In
@@ -145,27 +152,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 		// Define ensureUserExists inside useEffect to avoid dependency issues
 		const ensureUserExistsLocal = async (fbUser: FirebaseAuthTypes.User) => {
-			console.log('🟠 [AUTH-STATE] ===== ensureUserExistsLocal called =====');
-			console.log(
-				'🟠 [AUTH-STATE] Firebase UID:',
-				fbUser.uid.substring(0, 12) + '...'
-			);
+			if (__DEV__) {
+				console.log('🟠 [AUTH-STATE] ===== ensureUserExistsLocal called =====');
+				console.log(
+					'🟠 [AUTH-STATE] Firebase UID:',
+					fbUser.uid.substring(0, 12) + '...'
+				);
+			}
 			try {
 				// First, try to get existing user
-				console.log(
-					'🟠 [AUTH-STATE] Step 1: Checking if MongoDB user exists...'
-				);
+				if (__DEV__) {
+					console.log(
+						'🟠 [AUTH-STATE] Step 1: Checking if MongoDB user exists...'
+					);
+				}
 				let mongoUser = await UserService.getUserByFirebaseUID(fbUser.uid);
 
 				if (!mongoUser) {
 					// User doesn't exist, create them using the ensure endpoint
-					console.log(
-						'🟡 [AUTH-STATE] MongoDB user NOT FOUND, attempting to create...'
-					);
+					if (__DEV__) {
+						console.log(
+							'🟡 [AUTH-STATE] MongoDB user NOT FOUND, attempting to create...'
+						);
+					}
 
 					try {
 						// Use the ensure endpoint to create the user
-						console.log('🟡 [AUTH-STATE] Calling /users/ensure endpoint...');
+						if (__DEV__) {
+							console.log('🟡 [AUTH-STATE] Calling /users/ensure endpoint...');
+						}
 						const response = await ApiService.post<{
 							user: User;
 							profile: Profile;
@@ -180,22 +195,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 							if (response.data.profile) {
 								setProfile(response.data.profile);
 							}
-							console.log(
-								'🟢 [AUTH-STATE] ✅ User created via /users/ensure endpoint!'
-							);
+							if (__DEV__) {
+								console.log(
+									'🟢 [AUTH-STATE] ✅ User created via /users/ensure endpoint!'
+								);
+							}
 						} else {
 							throw new Error(
 								response.error || 'Failed to create user via ensure endpoint'
 							);
 						}
 					} catch (ensureError) {
-						console.error(
-							'🔴 [AUTH-STATE] ❌ /users/ensure failed:',
-							ensureError
-						);
+						if (__DEV__) {
+							console.error(
+								'🔴 [AUTH-STATE] ❌ /users/ensure failed:',
+								ensureError
+							);
+						}
 
 						// Fallback to createUser method
-						console.log('🟡 [AUTH-STATE] Trying createUser fallback...');
+						if (__DEV__) {
+							console.log('🟡 [AUTH-STATE] Trying createUser fallback...');
+						}
 						const createResponse = await UserService.createUser({
 							firebaseUID: fbUser.uid,
 							email: fbUser.email!,
@@ -204,46 +225,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 						mongoUser = createResponse.user;
 						setProfile(createResponse.profile);
-						console.log(
-							'🟢 [AUTH-STATE] ✅ User created via createUser fallback!'
-						);
+						if (__DEV__) {
+							console.log(
+								'🟢 [AUTH-STATE] ✅ User created via createUser fallback!'
+							);
+						}
 					}
 				} else {
-					console.log(
-						'🟢 [AUTH-STATE] ✅ MongoDB user EXISTS! ID:',
-						mongoUser._id
-					);
+					if (__DEV__) {
+						console.log(
+							'🟢 [AUTH-STATE] ✅ MongoDB user EXISTS! ID:',
+							mongoUser._id
+						);
+					}
 				}
 
 				// Set the user in state
-				console.log('🟠 [AUTH-STATE] Step 2: Setting user in state...');
+				if (__DEV__) {
+					console.log('🟠 [AUTH-STATE] Step 2: Setting user in state...');
+				}
 				setUser(mongoUser);
 
 				// Always try to fetch profile for existing users (don't depend on profile state)
 				if (mongoUser) {
 					try {
-						console.log('🟠 [AUTH-STATE] Step 3: Fetching profile...');
+						if (__DEV__) {
+							console.log('🟠 [AUTH-STATE] Step 3: Fetching profile...');
+						}
 						const profileResponse = await UserService.getProfileByUserId(
 							mongoUser._id
 						);
 						if (profileResponse) {
-							console.log(
-								'🟢 [AUTH-STATE] ✅ Profile loaded!',
-								profileResponse._id
-							);
+							if (__DEV__) {
+								console.log(
+									'🟢 [AUTH-STATE] ✅ Profile loaded!',
+									profileResponse._id
+								);
+							}
 							setProfile(profileResponse);
 						} else {
-							console.log('🟡 [AUTH-STATE] No profile found for user');
+							if (__DEV__) {
+								console.log('🟡 [AUTH-STATE] No profile found for user');
+							}
 						}
 					} catch (profileError) {
-						console.log('🟡 [AUTH-STATE] Profile fetch failed:', profileError);
+						if (__DEV__) {
+							console.log(
+								'🟡 [AUTH-STATE] Profile fetch failed:',
+								profileError
+							);
+						}
 					}
 				}
-				console.log(
-					'🟢 [AUTH-STATE] ===== ensureUserExistsLocal completed successfully ====='
-				);
+				if (__DEV__) {
+					console.log(
+						'🟢 [AUTH-STATE] ===== ensureUserExistsLocal completed successfully ====='
+					);
+				}
 			} catch (e: any) {
-				console.log('🟡 [AUTH-STATE] Could not verify user with server');
+				if (__DEV__) {
+					console.log('🟡 [AUTH-STATE] Could not verify user with server');
+				}
 
 				// Network timeouts and auth errors should be treated gracefully
 				// Sign out to avoid orphaned Firebase accounts
@@ -257,9 +299,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 					e?.response?.status === 404 ||
 					e?.response?.status === 408
 				) {
-					console.log(
-						'🟡 [AUTH-STATE] Network/timeout - signing out to prevent orphaned account'
-					);
+					if (__DEV__) {
+						console.log(
+							'🟡 [AUTH-STATE] Network/timeout - signing out to prevent orphaned account'
+						);
+					}
 
 					// Sign out of Firebase to clear orphaned state
 					try {
@@ -267,16 +311,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 						setFirebaseUser(null);
 						setUser(null);
 						setProfile(null);
-						console.log('🟡 [AUTH-STATE] Signed out successfully');
+						if (__DEV__) {
+							console.log('🟡 [AUTH-STATE] Signed out successfully');
+						}
 					} catch (signOutError) {
-						console.warn('🟡 [AUTH-STATE] Failed to sign out:', signOutError);
+						if (__DEV__) {
+							console.warn('🟡 [AUTH-STATE] Failed to sign out:', signOutError);
+						}
 					}
 
 					return;
 				}
 
 				// Only log truly unexpected errors
-				console.error('🔴 [AUTH-STATE] Unexpected error:', e?.message);
+				if (__DEV__) {
+					console.error('🔴 [AUTH-STATE] Unexpected error:', e?.message);
+				}
 				setError({
 					code: 'USER_CREATION_ERROR',
 					message: 'Failed to create or fetch user from database',
@@ -290,10 +340,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		const hydrateFromFirebaseLocal = async (
 			fbUser: FirebaseAuthTypes.User | null
 		) => {
-			console.log(
-				'🚨 [DEBUG] hydrateFromFirebaseLocal called with:',
-				fbUser ? `UID: ${fbUser.uid.substring(0, 8)}...` : 'null'
-			);
+			if (__DEV__) {
+				console.log(
+					'🚨 [DEBUG] hydrateFromFirebaseLocal called with:',
+					fbUser ? `UID: ${fbUser.uid.substring(0, 8)}...` : 'null'
+				);
+			}
 			try {
 				if (fbUser) {
 					// Persist UID for other parts of the app that expect it

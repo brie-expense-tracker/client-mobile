@@ -22,19 +22,20 @@ import { useForm, Controller } from 'react-hook-form';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Calendar } from 'react-native-calendars';
 import { TransactionContext } from '../../../src/context/transactionContext';
 import { useGoal, Goal } from '../../../src/context/goalContext';
 import { useBudget, Budget } from '../../../src/context/budgetContext';
 import { navigateToGoalsWithModal } from '../../../src/utils/navigationUtils';
 import { FooterBar } from '../../../src/ui';
 import { DateField } from '../../../src/components/DateField';
-import SlidingModal from '../../../src/components/SlidingModal';
+import BottomSheet from '../../../src/components/BottomSheet';
 
 // =============================================================
 // Design tokens (modern blue accent)
 // =============================================================
 const palette = {
-	bg: '#F6F9F5',
+	bg: '#FFFFFF',
 	surface: '#FFFFFF',
 	text: '#0F172A',
 	sub: '#64748B',
@@ -49,7 +50,7 @@ const palette = {
 type Frequency = 'None' | 'Daily' | 'Weekly' | 'Monthly';
 
 interface TransactionFormData {
-	type?: 'income' | 'expense' | 'transfer';
+	type?: 'income' | 'expense';
 	description: string;
 	amount: string; // user‑friendly
 	goals?: Goal[];
@@ -80,7 +81,9 @@ const sanitizeCurrency = (value: string): string => {
 	const decimals = rest.join('');
 	const two = decimals.slice(0, 2);
 	const normalizedInt = int.replace(/^0+(?=\d)/, '') || '0';
-	return rest.length > 0 ? `${normalizedInt}.${two}` : normalizedInt;
+	const result = rest.length > 0 ? `${normalizedInt}.${two}` : normalizedInt;
+
+	return result;
 };
 
 const prettyCurrency = (value: string): string => {
@@ -95,15 +98,13 @@ const prettyCurrency = (value: string): string => {
 export default function TransactionScreenProModern() {
 	const router = useRouter();
 	const params = useLocalSearchParams<{
-		mode?: 'income' | 'expense' | 'transfer';
+		mode?: 'income' | 'expense';
 	}>();
 	const amountRef = useRef<TextInput>(null);
 	const descRef = useRef<TextInput>(null);
 
-	const [mode, setMode] = useState<'income' | 'expense' | 'transfer'>(
-		params.mode === 'expense' || params.mode === 'transfer'
-			? params.mode
-			: 'expense' // default to Expense like the mock
+	const [mode, setMode] = useState<'income' | 'expense'>(
+		params.mode === 'expense' ? 'expense' : 'expense' // default to Expense
 	);
 	const [selectedGoals, setSelectedGoals] = useState<Goal[]>([]);
 	const [selectedBudgets, setSelectedBudgets] = useState<Budget[]>([]);
@@ -115,6 +116,23 @@ export default function TransactionScreenProModern() {
 	const { addTransaction } = useContext(TransactionContext);
 	const { goals, isLoading: goalsLoading } = useGoal();
 	const { budgets, isLoading: budgetsLoading } = useBudget();
+
+	// Debug logging for goals and budgets
+	useEffect(() => {
+		console.log('🎯 [TransactionScreen] Goals data:', {
+			count: goals?.length || 0,
+			goals: goals,
+			isLoading: goalsLoading,
+		});
+	}, [goals, goalsLoading]);
+
+	useEffect(() => {
+		console.log('💰 [TransactionScreen] Budgets data:', {
+			count: budgets?.length || 0,
+			budgets: budgets,
+			isLoading: budgetsLoading,
+		});
+	}, [budgets, budgetsLoading]);
 
 	const ready = mode === 'income' ? !goalsLoading : !budgetsLoading;
 
@@ -175,6 +193,12 @@ export default function TransactionScreenProModern() {
 	const onChangeAmount = useCallback(
 		(text: string) => {
 			const sanitized = sanitizeCurrency(text);
+			// Check if the number exceeds the limit
+			const num = Number(sanitized);
+			if (num > 999999.99) {
+				// Don't update if it exceeds the limit
+				return;
+			}
 			setValue('amount', sanitized, { shouldValidate: true });
 		},
 		[setValue]
@@ -228,13 +252,9 @@ export default function TransactionScreenProModern() {
 
 			const payload: any = {
 				description: data.description.trim(),
-				amount: isIncome
-					? Math.abs(amt)
-					: isExpense
-					? -Math.abs(amt)
-					: Math.abs(amt),
+				amount: isIncome ? Math.abs(amt) : -Math.abs(amt),
 				date: data.date,
-				type: isIncome ? 'income' : isExpense ? 'expense' : 'transfer',
+				type: isIncome ? 'income' : 'expense',
 				recurring: data.recurring,
 			};
 
@@ -258,9 +278,7 @@ export default function TransactionScreenProModern() {
 
 			Alert.alert(
 				'Success',
-				`${
-					isIncome ? 'Income' : isExpense ? 'Expense' : 'Transfer'
-				} saved successfully!`,
+				`${isIncome ? 'Income' : 'Expense'} saved successfully!`,
 				[
 					{
 						text: 'OK',
@@ -374,6 +392,7 @@ export default function TransactionScreenProModern() {
 								}}
 								returnKeyType="next"
 								accessibilityLabel="Amount"
+								maxLength={9}
 							/>
 						)}
 					/>
@@ -386,7 +405,7 @@ export default function TransactionScreenProModern() {
 
 			{/* Segmented control */}
 			<View style={styles.segmented}>
-				{(['expense', 'income', 'transfer'] as const).map((m) => {
+				{(['expense', 'income'] as const).map((m) => {
 					const active = mode === m;
 					const label = m.charAt(0).toUpperCase() + m.slice(1);
 					return (
@@ -415,7 +434,7 @@ export default function TransactionScreenProModern() {
 				<View style={styles.cardList}>
 					<Row
 						icon={mode === 'expense' ? 'scale-outline' : 'trophy-outline'}
-						label={mode === 'expense' ? 'Category' : 'Deposit to Goal'}
+						label={mode === 'expense' ? 'Budget' : 'Goal'}
 						right={
 							mode === 'expense' ? (
 								selectedBudgets[0]?.name ? (
@@ -439,7 +458,7 @@ export default function TransactionScreenProModern() {
 							}
 						}}
 						accessibilityLabel={
-							mode === 'expense' ? 'Select Category' : 'Select Goal'
+							mode === 'expense' ? 'Select Budget' : 'Select Goal'
 						}
 					/>
 
@@ -586,12 +605,41 @@ export default function TransactionScreenProModern() {
 			</FooterBar>
 
 			{/* Picker Modal */}
-			<SlidingModal
-				isVisible={pickerOpen !== null}
+			<BottomSheet
+				isOpen={pickerOpen !== null}
 				onClose={() => setPickerOpen(null)}
-				title={pickerOpen === 'goal' ? 'Select Goal' : 'Select Category'}
-				icon={pickerOpen === 'goal' ? 'trophy-outline' : 'wallet-outline'}
-				maxHeightPct={0.6}
+				snapPoints={[0.6, 0.4]}
+				initialSnapIndex={0}
+				header={
+					<View
+						style={{
+							flexDirection: 'row',
+							alignItems: 'center',
+							paddingHorizontal: 16,
+							paddingBottom: 8,
+						}}
+					>
+						<Ionicons
+							name={pickerOpen === 'goal' ? 'trophy-outline' : 'wallet-outline'}
+							size={20}
+							color="#0095FF"
+							style={{ marginRight: 12 }}
+						/>
+						<Text
+							style={{
+								flex: 1,
+								fontSize: 18,
+								fontWeight: '600',
+								color: '#0F172A',
+							}}
+						>
+							{pickerOpen === 'goal' ? 'Select Goal' : 'Select Budget'}
+						</Text>
+						<TouchableOpacity onPress={() => setPickerOpen(null)}>
+							<Ionicons name="close" size={24} color="#64748B" />
+						</TouchableOpacity>
+					</View>
+				}
 			>
 				<FlatList
 					data={(pickerOpen === 'goal' ? goals : budgets) as (Goal | Budget)[]}
@@ -600,6 +648,23 @@ export default function TransactionScreenProModern() {
 					windowSize={6}
 					maxToRenderPerBatch={12}
 					getItemLayout={(_, i) => ({ length: 48, offset: 48 * i, index: i })}
+					ListEmptyComponent={() => {
+						const data = pickerOpen === 'goal' ? goals : budgets;
+						console.log('📋 [TransactionScreen] Picker Empty:', {
+							type: pickerOpen,
+							dataLength: data?.length || 0,
+							data: data,
+						});
+						return (
+							<View style={{ paddingVertical: 16 }}>
+								<Text style={{ color: palette.sub }}>
+									{pickerOpen === 'goal'
+										? 'No goals yet. Create one from Goals.'
+										: 'No budgets yet. Create one from Budgets.'}
+								</Text>
+							</View>
+						);
+					}}
 					renderItem={({ item }) => (
 						<TouchableOpacity
 							style={{
@@ -630,43 +695,154 @@ export default function TransactionScreenProModern() {
 							</Text>
 						</TouchableOpacity>
 					)}
-					ListEmptyComponent={() => (
-						<View style={{ paddingVertical: 16 }}>
-							<Text style={{ color: palette.sub }}>
-								{pickerOpen === 'goal'
-									? 'No goals yet. Create one from Goals.'
-									: 'No budgets yet. Create one from Budgets.'}
-							</Text>
-						</View>
-					)}
 				/>
-			</SlidingModal>
+			</BottomSheet>
 
 			{/* Date Picker Modal */}
-			<SlidingModal
-				isVisible={datePickerOpen}
+			<BottomSheet
+				isOpen={datePickerOpen}
 				onClose={() => setDatePickerOpen(false)}
-				title="Select Date"
-				icon="calendar-outline"
-				maxHeightPct={0.5}
+				snapPoints={[0.7, 0.5]}
+				initialSnapIndex={0}
+				header={
+					<View
+						style={{
+							flexDirection: 'row',
+							alignItems: 'center',
+							paddingHorizontal: 16,
+							paddingBottom: 8,
+						}}
+					>
+						<Ionicons
+							name="calendar-outline"
+							size={20}
+							color="#0095FF"
+							style={{ marginRight: 12 }}
+						/>
+						<Text
+							style={{
+								flex: 1,
+								fontSize: 18,
+								fontWeight: '600',
+								color: '#0F172A',
+							}}
+						>
+							Select Date
+						</Text>
+						<TouchableOpacity onPress={() => setDatePickerOpen(false)}>
+							<Ionicons name="close" size={24} color="#64748B" />
+						</TouchableOpacity>
+					</View>
+				}
 			>
-				<DateField
-					value={selectedDate}
-					onChange={(date) => {
-						setValue('date', date, { shouldValidate: false });
+				{/* Quick actions */}
+				<View
+					style={{
+						flexDirection: 'row',
+						gap: 12,
+						paddingHorizontal: 16,
+						paddingBottom: 12,
+					}}
+				>
+					<TouchableOpacity
+						style={{
+							flex: 1,
+							paddingVertical: 10,
+							borderRadius: 8,
+							borderWidth: 1,
+							borderColor: palette.line,
+							alignItems: 'center',
+						}}
+						onPress={() => {
+							setValue('date', getLocalIsoDate(), { shouldValidate: false });
+							setDatePickerOpen(false);
+						}}
+					>
+						<Text style={{ color: palette.text, fontWeight: '600' }}>
+							Today
+						</Text>
+					</TouchableOpacity>
+				</View>
+
+				{/* Calendar */}
+				<Calendar
+					onDayPress={(day) => {
+						setValue('date', day.dateString, { shouldValidate: false });
 						setDatePickerOpen(false);
 					}}
-					showQuickActions
+					markedDates={{
+						[selectedDate]: {
+							selected: true,
+							selectedColor: palette.accent,
+							selectedTextColor: '#fff',
+						},
+					}}
+					firstDay={0}
+					enableSwipeMonths
+					renderArrow={(direction) => (
+						<Ionicons
+							name={direction === 'left' ? 'chevron-back' : 'chevron-forward'}
+							size={18}
+							color={palette.text}
+						/>
+					)}
+					theme={{
+						backgroundColor: '#fff',
+						calendarBackground: '#fff',
+						textSectionTitleColor: palette.sub,
+						selectedDayBackgroundColor: palette.accent,
+						selectedDayTextColor: '#fff',
+						todayTextColor: palette.accent,
+						dayTextColor: palette.text,
+						textDisabledColor: '#d1d5db',
+						monthTextColor: palette.text,
+						arrowColor: palette.text,
+						textDayFontWeight: '500',
+						textMonthFontWeight: '700',
+						textDayHeaderFontWeight: '600',
+						textDayFontSize: 14,
+						textMonthFontSize: 16,
+						textDayHeaderFontSize: 12,
+					}}
 				/>
-			</SlidingModal>
+			</BottomSheet>
 
 			{/* Recurring Modal */}
-			<SlidingModal
-				isVisible={recurringOpen}
+			<BottomSheet
+				isOpen={recurringOpen}
 				onClose={() => setRecurringOpen(false)}
-				title="Recurring Transaction"
-				icon="repeat-outline"
-				maxHeightPct={0.6}
+				snapPoints={[0.6, 0.4]}
+				initialSnapIndex={0}
+				header={
+					<View
+						style={{
+							flexDirection: 'row',
+							alignItems: 'center',
+							paddingHorizontal: 16,
+							paddingBottom: 8,
+						}}
+					>
+						<Ionicons
+							name="repeat-outline"
+							size={20}
+							color="#0095FF"
+							style={{ marginRight: 12 }}
+						/>
+						<Text
+							style={{
+								flex: 1,
+								fontSize: 18,
+								fontWeight: '600',
+								color: '#0F172A',
+							}}
+						>
+							Recurring Transaction
+						</Text>
+						<TouchableOpacity onPress={() => setRecurringOpen(false)}>
+							<Ionicons name="close" size={24} color="#64748B" />
+						</TouchableOpacity>
+					</View>
+				}
 			>
 				<View>
 					{(['None', 'Daily', 'Weekly', 'Monthly'] as Frequency[]).map(
@@ -700,7 +876,7 @@ export default function TransactionScreenProModern() {
 						)
 					)}
 				</View>
-			</SlidingModal>
+			</BottomSheet>
 
 			{!ready && (
 				<View style={styles.loadingOverlay}>
@@ -743,22 +919,29 @@ const styles = StyleSheet.create({
 		shadowOpacity: 0.06,
 		elevation: 2, // Android shadow
 	},
-	amountRow: { flexDirection: 'row', alignItems: 'center' },
+	amountRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
 	dollar: {
 		fontSize: 28,
-		fontWeight: '800',
+		fontWeight: '400',
 		color: palette.accent,
-		marginRight: 8,
+		marginRight: 6,
+		marginTop: 10,
 	},
 	amountInput: {
-		flex: 1,
-		fontSize: 54,
-		fontWeight: '600',
+		flexShrink: 1,
+		fontSize: 60,
+		fontWeight: '500',
 		color: palette.text,
+		textAlign: 'left',
+		minWidth: 100,
 	},
 	amountUnderline: {
 		marginTop: 6,
-		height: 3,
+		height: 2,
 		backgroundColor: palette.accent,
 		borderRadius: 999,
 	},
