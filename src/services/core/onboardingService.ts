@@ -1,4 +1,5 @@
 import { ApiService } from './apiService';
+import { isDevMode } from '../../config/environment';
 
 // Current onboarding version - should match server config
 const CURRENT_ONBOARDING_VERSION = 1;
@@ -18,9 +19,11 @@ export const OnboardingService = {
 				throw new Error(response.error || 'Failed to mark onboarding complete');
 			}
 
-			console.log(
-				`✅ Onboarding complete (v${response.data?.onboardingVersion})`
-			);
+			if (isDevMode) {
+				console.log(
+					`✅ Onboarding complete (v${response.data?.onboardingVersion})`
+				);
+			}
 		} catch (error) {
 			console.error('❌ Error marking onboarding complete:', error);
 			throw error;
@@ -32,18 +35,22 @@ export const OnboardingService = {
 	 */
 	hasSeenOnboarding: async (): Promise<boolean> => {
 		try {
-			console.log('🔍 [OnboardingService] Checking onboarding status...');
+			if (isDevMode) {
+				console.log('🔍 [OnboardingService] Checking onboarding status...');
+			}
 			const response = await ApiService.get<{
 				user: { onboardingVersion: number };
 			}>('/api/users/me');
 
-			console.log('🔍 [OnboardingService] API response:', {
-				success: response.success,
-				hasData: !!response.data,
-				hasUser: !!response.data?.user,
-				onboardingVersion: response.data?.user?.onboardingVersion,
-				error: response.error,
-			});
+			if (isDevMode) {
+				console.log('🔍 [OnboardingService] API response:', {
+					success: response.success,
+					hasData: !!response.data,
+					hasUser: !!response.data?.user,
+					onboardingVersion: response.data?.user?.onboardingVersion,
+					error: response.error,
+				});
+			}
 
 			if (!response.success || !response.data?.user) {
 				console.error('❌ Failed to fetch user data for onboarding check:', {
@@ -61,11 +68,13 @@ export const OnboardingService = {
 			const hasSeenCurrentVersion =
 				userOnboardingVersion >= CURRENT_ONBOARDING_VERSION;
 
-			console.log(
-				`👤 Onboarding: v${userOnboardingVersion}/${CURRENT_ONBOARDING_VERSION} (${
-					hasSeenCurrentVersion ? 'Seen' : 'New'
-				})`
-			);
+			if (isDevMode) {
+				console.log(
+					`👤 Onboarding: v${userOnboardingVersion}/${CURRENT_ONBOARDING_VERSION} (${
+						hasSeenCurrentVersion ? 'Seen' : 'New'
+					})`
+				);
+			}
 
 			return hasSeenCurrentVersion;
 		} catch (error) {

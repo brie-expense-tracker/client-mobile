@@ -3,9 +3,15 @@ import * as Device from 'expo-device';
 
 // Environment configuration with proper URL resolution
 export const ENV = {
-	// Environment
+	// NODE_ENV is automatically set by Expo/React Native build system
+	// - 'development' when running `expo start` or `npm start`
+	// - 'production' when building for production
+	// This CANNOT be changed via .env - it's controlled by the build system
 	NODE_ENV: process.env.NODE_ENV || 'development',
-	EXPO_PUBLIC_ENV: process.env.EXPO_PUBLIC_ENV || 'dev',
+
+	// EXPO_PUBLIC_ENV controls which backend/environment to use
+	// Set this in your .env file: 'development', 'staging', or 'production'
+	EXPO_PUBLIC_ENV: process.env.EXPO_PUBLIC_ENV || 'development',
 
 	// API Configuration
 	API_BASE_PATH: process.env.EXPO_PUBLIC_API_BASE_PATH || '/api',
@@ -32,7 +38,8 @@ function isSimulator(): boolean {
 
 // URL resolution logic - now uses single EXPO_PUBLIC_API_URL
 export function resolveApiBaseUrl(): string {
-	if (__DEV__) {
+	// Only log in dev mode
+	if (isDevMode) {
 		console.log('🔧 [Environment] Using API URL:', ENV.API_URL);
 	}
 	return ENV.API_URL;
@@ -49,17 +56,46 @@ export function getApiBaseUrl(): string {
 	return resolveApiBaseUrl();
 }
 
-// Environment checks
+// Single source of truth for development mode
+// This controls whether debug logging, dev tools, and development features are enabled
+// Can be toggled independently of NODE_ENV for testing
+export const DEV_MODE = process.env.EXPO_PUBLIC_DEV_MODE === 'true';
+
+// ==========================================
+// Environment Checks
+// ==========================================
+
+// NODE_ENV: Controlled by build system (expo/npm)
+// - Automatically 'development' when you run `expo start`
+// - Automatically 'production' when you build the app
+// - Don't try to change this via .env - it won't work!
 export const isDevelopment = ENV.NODE_ENV === 'development';
 export const isProduction = ENV.NODE_ENV === 'production';
 export const isTest = ENV.NODE_ENV === 'test';
-export const isDev = ENV.EXPO_PUBLIC_ENV === 'dev';
 
-// Debug logging - only in development
-if (__DEV__) {
+// EXPO_PUBLIC_ENV: Controlled by YOU via .env
+// - Use this to choose which backend to connect to
+// - 'development' = local/staging API
+// - 'staging' = staging API
+// - 'production' = production API
+export const isDev =
+	ENV.EXPO_PUBLIC_ENV !== 'production' && ENV.EXPO_PUBLIC_ENV !== 'prod';
+
+// DEV_MODE: Also controlled by YOU via .env
+// - Set EXPO_PUBLIC_DEV_MODE=true to enable debug features
+// - Set EXPO_PUBLIC_DEV_MODE=false to disable (default)
+
+// Development mode = running from expo start + DEV_MODE enabled
+// This controls DevHud, debug logs, and dev-only features
+export const isDevMode = isDevelopment && DEV_MODE;
+
+// Debug logging - only when dev mode is enabled
+if (isDevMode) {
 	console.log('🔧 [Environment] Configuration loaded:');
 	console.log('🔧 [Environment] NODE_ENV:', ENV.NODE_ENV);
 	console.log('🔧 [Environment] EXPO_PUBLIC_ENV:', ENV.EXPO_PUBLIC_ENV);
+	console.log('🔧 [Environment] DEV_MODE:', DEV_MODE);
+	console.log('🔧 [Environment] isDevMode:', isDevMode);
 	console.log('🔧 [Environment] Platform:', Platform.OS);
 	console.log('🔧 [Environment] Is Device:', Device.isDevice);
 	console.log('🔧 [Environment] Is Simulator:', isSimulator());

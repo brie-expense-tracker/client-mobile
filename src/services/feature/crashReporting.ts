@@ -4,6 +4,7 @@
 import { TELEMETRY_CONFIG } from '../../config/telemetry';
 import { scrubError, scrubAnalyticsEvent } from '../../utils/piiScrubbing';
 import { featureFlags } from './featureFlags';
+import { isDevMode } from '../../config/environment';
 
 export interface CrashReportingOptions {
 	enableSentry?: boolean;
@@ -53,7 +54,9 @@ export class CrashReportingService {
 		try {
 			// Check if crash reporting is enabled via feature flags
 			if (!featureFlags.isCrashReportingEnabled()) {
-				console.log('🚨 [CrashReporting] Disabled by feature flag');
+				if (isDevMode) {
+					console.log('🚨 [CrashReporting] Disabled by feature flag');
+				}
 				this.isInitialized = true;
 				return;
 			}
@@ -69,7 +72,9 @@ export class CrashReportingService {
 			}
 
 			this.isInitialized = true;
-			console.log('🚨 [CrashReporting] Service initialized');
+			if (isDevMode) {
+				console.log('🚨 [CrashReporting] Service initialized');
+			}
 		} catch (error) {
 			console.warn('🚨 [CrashReporting] Failed to initialize:', error);
 			this.isInitialized = true;
@@ -126,7 +131,9 @@ export class CrashReportingService {
 			});
 
 			this.sentry = Sentry;
-			console.log('🚨 [CrashReporting] Sentry initialized');
+			if (isDevMode) {
+				console.log('🚨 [CrashReporting] Sentry initialized');
+			}
 		} catch (error) {
 			console.warn('🚨 [CrashReporting] Failed to initialize Sentry:', error);
 		}
@@ -202,7 +209,9 @@ export class CrashReportingService {
 			}
 
 			this.crashlytics = getCrashlytics;
-			console.log('🚨 [CrashReporting] Crashlytics initialized');
+			if (isDevMode) {
+				console.log('🚨 [CrashReporting] Crashlytics initialized');
+			}
 		} catch (error) {
 			console.warn(
 				'🚨 [CrashReporting] Failed to initialize Crashlytics:',
@@ -367,7 +376,9 @@ export class CrashReportingService {
 				}
 			}
 
-			console.log(`🚨 [CrashReporting] User consent set to: ${consent}`);
+			if (isDevMode) {
+				console.log(`🚨 [CrashReporting] User consent set to: ${consent}`);
+			}
 		} catch (error) {
 			console.warn('🚨 [CrashReporting] Failed to set user consent:', error);
 		}

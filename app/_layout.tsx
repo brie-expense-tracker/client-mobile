@@ -45,8 +45,8 @@ import { ensureBgPushRegistered } from '../src/services/notifications/background
 // Import app initialization hook
 import { useAppInit } from '../src/hooks/useAppInit';
 
-// Development mode toggle - set to true to allow onboarding access after completion
-const DEV_MODE = true; // Enable dev mode for testing onboarding
+// Import dev mode from environment config (single source of truth)
+import { DEV_MODE, isDevMode } from '../src/config/environment';
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -101,7 +101,7 @@ function RootLayoutContent() {
 	// Debug logging helper
 	const logState = useCallback(
 		(label: string) => {
-			if (__DEV__) {
+			if (isDevMode) {
 				console.log(`🔎 [Layout][${label}]`, {
 					loading,
 					loadingTimeout,
@@ -114,6 +114,7 @@ function RootLayoutContent() {
 					inOnboardingGroup: segments[0] === '(onboarding)',
 					inStackGroup: segments[0] === '(stack)',
 					DEV_MODE,
+					isDevMode,
 				});
 			}
 		},
@@ -155,7 +156,7 @@ function RootLayoutContent() {
 	useEffect(() => {
 		const handleDeepLink = (url: string) => {
 			try {
-				if (__DEV__) {
+				if (isDevMode) {
 					console.log('Deep link received:', url);
 				}
 				// expo-router will handle the navigation automatically
@@ -209,15 +210,17 @@ function RootLayoutContent() {
 		if (user && hasSeenOnboarding === null && !loading) {
 			// Set a timeout to prevent infinite loading when onboarding status won't load
 			const timeout = setTimeout(() => {
-				console.log(
-					'⚠️ [Layout] Loading timeout reached for null onboarding status'
-				);
-				console.log('🔍 [Layout] Debug state:', {
-					loading,
-					user: !!user,
-					hasSeenOnboarding,
-					loadingTimeout,
-				});
+				if (isDevMode) {
+					console.log(
+						'⚠️ [Layout] Loading timeout reached for null onboarding status'
+					);
+					console.log('🔍 [Layout] Debug state:', {
+						loading,
+						user: !!user,
+						hasSeenOnboarding,
+						loadingTimeout,
+					});
+				}
 				setLoadingTimeout(true);
 			}, 10000); // Increased to 10 seconds to give more time for status to load
 
@@ -244,7 +247,7 @@ function RootLayoutContent() {
 			const inStackGroup = segments[0] === '(stack)';
 			if (firebaseUser && user) {
 				// In dev mode, allow access to onboarding even if completed
-				if (DEV_MODE && inOnboardingGroup) {
+				if (isDevMode && inOnboardingGroup) {
 					// Allow staying on onboarding screens in dev mode
 					return;
 				}
@@ -256,9 +259,11 @@ function RootLayoutContent() {
 
 				if (needsOnboarding && !inOnboardingGroup) {
 					logState('nav-effect:redirecting-to-onboarding');
-					console.log(
-						'🧭 [Layout] User needs onboarding, redirecting to profile setup'
-					);
+					if (isDevMode) {
+						console.log(
+							'🧭 [Layout] User needs onboarding, redirecting to profile setup'
+						);
+					}
 					try {
 						router.replace('/(onboarding)/profileSetup');
 					} catch (error) {
@@ -272,9 +277,11 @@ function RootLayoutContent() {
 				) {
 					// Only redirect to dashboard if onboarding is confirmed complete
 					logState('nav-effect:redirecting-to-dashboard');
-					console.log(
-						'🧭 [Layout] User completed onboarding, redirecting to dashboard'
-					);
+					if (isDevMode) {
+						console.log(
+							'🧭 [Layout] User completed onboarding, redirecting to dashboard'
+						);
+					}
 					try {
 						router.replace('/(tabs)/dashboard');
 					} catch (error) {
@@ -289,9 +296,11 @@ function RootLayoutContent() {
 				) {
 					// Timeout reached and status still null - assume completed for now to unblock
 					logState('nav-effect:timeout-redirect');
-					console.log(
-						'🧭 [Layout] Timeout reached with null onboarding status, redirecting to dashboard'
-					);
+					if (isDevMode) {
+						console.log(
+							'🧭 [Layout] Timeout reached with null onboarding status, redirecting to dashboard'
+						);
+					}
 					try {
 						router.replace('/(tabs)/dashboard');
 					} catch (error) {
@@ -335,7 +344,9 @@ function RootLayoutContent() {
 		(loading && !loadingTimeout) ||
 		(user && hasSeenOnboarding === null && !loadingTimeout)
 	) {
-		console.log('🧩 [Layout] Rendering: loading screen');
+		if (isDevMode) {
+			console.log('🧩 [Layout] Rendering: loading screen');
+		}
 		return (
 			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
 				<ActivityIndicator size="large" color="#007ACC" />
@@ -351,11 +362,13 @@ function RootLayoutContent() {
 
 	// If user is authenticated, always wrap all screens in ProfileProvider
 	if (firebaseUser && user) {
-		console.log('🧩 [Layout] Rendering: authenticated app');
+		if (isDevMode) {
+			console.log('🧩 [Layout] Rendering: authenticated app');
+		}
 		try {
 			return (
 				<ProfileProvider>
-					{DEV_MODE && (
+					{isDevMode && (
 						<View style={styles.devIndicator}>
 							<Text style={styles.devText}>DEV MODE</Text>
 						</View>
@@ -414,7 +427,9 @@ function RootLayoutContent() {
 	}
 
 	// For unauthenticated or auth screens, just show the stack (no user-dependent providers)
-	console.log('🧩 [Layout] Rendering: unauthenticated stack');
+	if (isDevMode) {
+		console.log('🧩 [Layout] Rendering: unauthenticated stack');
+	}
 	return (
 		<GestureHandlerRootView style={{ flex: 1 }}>
 			<Stack
@@ -464,7 +479,9 @@ export default function RootLayout() {
 
 				// Log resolved feature flags for debugging
 				const flags = getResolvedFlags();
-				console.log('🔧 [Features] Resolved flags:', flags);
+				if (isDevMode) {
+					console.log('🔧 [Features] Resolved flags:', flags);
+				}
 
 				// Production safety check
 				if (process.env.NODE_ENV === 'production') {
@@ -477,8 +494,10 @@ export default function RootLayout() {
 				// Verify Firebase configuration
 				try {
 					const app = getApp();
-					console.log('✅ Firebase initialized successfully:', app.name);
-					console.log('Firebase project ID:', app.options.projectId);
+					if (isDevMode) {
+						console.log('✅ Firebase initialized successfully:', app.name);
+						console.log('Firebase project ID:', app.options.projectId);
+					}
 				} catch (firebaseError) {
 					console.error('❌ Firebase initialization failed:', firebaseError);
 				}

@@ -26,7 +26,7 @@ export default function AboutScreen() {
 			<View style={styles.heroSection}>
 				<View style={styles.appInfoSection}>
 					<Image
-						source={require('../../../../src/assets/images/brie-logos.png')}
+						source={require('../../../../src/assets/logos/brie-logo.png')}
 						style={styles.appIcon}
 						contentFit="contain"
 					/>
@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 	},
 
-	appIcon: {
+	 appIcon: {
 		width: 120,
 		height: 70,
 		borderRadius: 16,

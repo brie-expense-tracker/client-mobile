@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import { featureFlags } from '../services/feature/featureFlags';
 import { crashReporting } from '../services/feature/crashReporting';
 import { runCacheMigrations } from '../services/security/cacheMigration';
+import { isDevMode } from '../config/environment';
 
 export function useAppInit() {
 	const didInit = useRef(false);
@@ -13,12 +14,16 @@ export function useAppInit() {
 
 		const initializeTelemetry = async () => {
 			try {
-				console.log('🚀 [Telemetry] Initializing services...');
+				if (isDevMode) {
+					console.log('🚀 [Telemetry] Initializing services...');
+				}
 
 				// Run cache migrations first
 				try {
 					await runCacheMigrations();
-					console.log('🔄 [CacheMigration] Migrations completed');
+					if (isDevMode) {
+						console.log('🔄 [CacheMigration] Migrations completed');
+					}
 				} catch (error) {
 					console.warn('🔄 [CacheMigration] Failed to run migrations:', error);
 				}
@@ -26,7 +31,9 @@ export function useAppInit() {
 				// Initialize feature flags first
 				try {
 					await featureFlags.initialize();
-					console.log('🚩 [FeatureFlags] Initialized');
+					if (isDevMode) {
+						console.log('🚩 [FeatureFlags] Initialized');
+					}
 				} catch (error) {
 					console.warn('🚩 [FeatureFlags] Failed to initialize:', error);
 				}
@@ -34,7 +41,9 @@ export function useAppInit() {
 				// Initialize crash reporting
 				try {
 					await crashReporting.initialize();
-					console.log('🚨 [CrashReporting] Initialized');
+					if (isDevMode) {
+						console.log('🚨 [CrashReporting] Initialized');
+					}
 				} catch (error) {
 					console.warn('🚨 [CrashReporting] Failed to initialize:', error);
 				}
@@ -50,10 +59,12 @@ export function useAppInit() {
 				}
 
 				// Initialize analytics
-				console.log('📊 [Analytics] Initialized');
+				if (isDevMode) {
+					console.log('📊 [Analytics] Initialized');
+				}
 
 				// Test crash reporting in development
-				if (__DEV__) {
+				if (isDevMode) {
 					try {
 						crashReporting.testCrashReporting();
 						crashReporting.testCrashlytics();
@@ -65,7 +76,9 @@ export function useAppInit() {
 					}
 				}
 
-				console.log('🚀 [Telemetry] All services initialized successfully');
+				if (isDevMode) {
+					console.log('🚀 [Telemetry] All services initialized successfully');
+				}
 			} catch (error) {
 				console.warn(
 					'🚀 [Telemetry] Failed to initialize some services:',

@@ -7,6 +7,7 @@ import {
 	normalizeNotificationsResponse,
 	normalizeUnreadCountResponse,
 } from '../notifications/normalizer';
+import { isDevMode } from '../../config/environment';
 
 export interface NotificationData {
 	id?: string;
@@ -87,7 +88,9 @@ class NotificationService {
 		try {
 			// Check if running on a physical device
 			if (!Device.isDevice) {
-				console.log('⚠️ Notifications require a physical device');
+				if (isDevMode) {
+					console.log('⚠️ Notifications require a physical device');
+				}
 				return null;
 			}
 
@@ -102,7 +105,9 @@ class NotificationService {
 			}
 
 			if (finalStatus !== 'granted') {
-				console.log('❌ Notification permissions not granted');
+				if (isDevMode) {
+					console.log('❌ Notification permissions not granted');
+				}
 				return null;
 			}
 
@@ -124,7 +129,9 @@ class NotificationService {
 			});
 
 			this.expoPushToken = tokenData.data;
-			console.log('✅ Push token obtained:', this.expoPushToken);
+			if (isDevMode) {
+				console.log('✅ Push token obtained:', this.expoPushToken);
+			}
 
 			// Update the token on the backend
 			if (this.expoPushToken) {
@@ -325,7 +332,9 @@ class NotificationService {
 				]);
 			}
 
-			console.log('✅ Notification channels and categories set up');
+			if (isDevMode) {
+				console.log('✅ Notification channels and categories set up');
+			}
 		} catch (error) {
 			console.error('❌ Error setting up notification channels:', error);
 		}
@@ -344,7 +353,9 @@ class NotificationService {
 			});
 
 			if (response.success) {
-				console.log('✅ Push token updated on backend');
+				if (isDevMode) {
+					console.log('✅ Push token updated on backend');
+				}
 				return true;
 			} else {
 				// Handle authentication errors gracefully
@@ -972,7 +983,9 @@ class NotificationService {
 				}
 			});
 
-			console.log('✅ Notification listeners set up');
+			if (isDevMode) {
+				console.log('✅ Notification listeners set up');
+			}
 		} catch (error) {
 			console.error('❌ Error setting up notification listeners:', error);
 		}

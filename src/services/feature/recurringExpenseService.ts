@@ -1,4 +1,5 @@
 import { ApiService } from '../core/apiService';
+import { isDevMode } from '../../config/environment';
 
 export interface RecurringPattern {
 	patternId: string;
@@ -73,14 +74,18 @@ export class RecurringExpenseService {
 		signal?: AbortSignal;
 	}): Promise<RecurringExpense[]> {
 		try {
-			console.log('🔄 Fetching recurring expenses...');
+			if (isDevMode) {
+				console.log('🔄 Fetching recurring expenses...');
+			}
 			const response = await ApiService.get<{
 				recurringExpenses: RecurringExpense[];
 			}>('/api/recurring-expenses', { signal: opts?.signal });
 
 			if (response.success && response.data) {
 				const expenses = response.data.recurringExpenses || [];
-				console.log(`✅ Found ${expenses.length} recurring expenses`);
+				if (isDevMode) {
+					console.log(`✅ Found ${expenses.length} recurring expenses`);
+				}
 				return expenses;
 			}
 
@@ -201,13 +206,15 @@ export class RecurringExpenseService {
 				((response as any).data as RecurringExpense);
 
 			if (response.success && recurringExpense) {
-				console.log(
-					`✅ [RecurringExpenseService] Server returned created item: ${
-						recurringExpense.patternId ||
-						(recurringExpense as any).id ||
-						(recurringExpense as any)._id
-					}`
-				);
+				if (isDevMode) {
+					console.log(
+						`✅ [RecurringExpenseService] Server returned created item: ${
+							recurringExpense.patternId ||
+							(recurringExpense as any).id ||
+							(recurringExpense as any)._id
+						}`
+					);
+				}
 
 				// WORKAROUND: Backend might not return appearance fields immediately after deploy
 				// Merge them from the request data if missing from response
@@ -244,14 +251,16 @@ export class RecurringExpenseService {
 			}
 
 			// Fallback: server didn't return the created item → refetch & match
-			console.log(
-				'⚠️ [RecurringExpenseService] POST succeeded but no data returned, fetching to resolve ID...'
-			);
-			console.log('🔍 [RecurringExpenseService] Response structure:', {
-				hasData: !!response.data,
-				dataKeys: response.data ? Object.keys(response.data) : [],
-				topLevelKeys: Object.keys(response),
-			});
+			if (isDevMode) {
+				console.log(
+					'⚠️ [RecurringExpenseService] POST succeeded but no data returned, fetching to resolve ID...'
+				);
+				console.log('🔍 [RecurringExpenseService] Response structure:', {
+					hasData: !!response.data,
+					dataKeys: response.data ? Object.keys(response.data) : [],
+					topLevelKeys: Object.keys(response),
+				});
+			}
 
 			ApiService.clearCacheByPrefix('/api/recurring-expenses');
 
@@ -259,19 +268,21 @@ export class RecurringExpenseService {
 			await new Promise((resolve) => setTimeout(resolve, 500));
 
 			const all = await this.getRecurringExpenses();
-			console.log(
-				`🔍 [RecurringExpenseService] Matching: ${data.vendor} / $${data.amount} / ${data.frequency} / ${data.nextExpectedDate}`
-			);
-			console.log(
-				`🔍 [RecurringExpenseService] Candidates (${all.length}):`,
-				all.map((e) => ({
-					vendor: e.vendor,
-					amount: e.amount,
-					frequency: e.frequency,
-					date: e.nextExpectedDate?.slice(0, 10),
-					id: e.patternId || (e as any).id || (e as any)._id,
-				}))
-			);
+			if (isDevMode) {
+				console.log(
+					`🔍 [RecurringExpenseService] Matching: ${data.vendor} / $${data.amount} / ${data.frequency} / ${data.nextExpectedDate}`
+				);
+				console.log(
+					`🔍 [RecurringExpenseService] Candidates (${all.length}):`,
+					all.map((e) => ({
+						vendor: e.vendor,
+						amount: e.amount,
+						frequency: e.frequency,
+						date: e.nextExpectedDate?.slice(0, 10),
+						id: e.patternId || (e as any).id || (e as any)._id,
+					}))
+				);
+			}
 
 			const created = all.find(
 				(e) =>
@@ -286,9 +297,11 @@ export class RecurringExpenseService {
 			if (created) {
 				const resolvedId =
 					created.patternId || (created as any).id || (created as any)._id;
-				console.log(
-					`✅ [RecurringExpenseService] Resolved created item: ${resolvedId}`
-				);
+				if (isDevMode) {
+					console.log(
+						`✅ [RecurringExpenseService] Resolved created item: ${resolvedId}`
+					);
+				}
 				return created;
 			}
 
