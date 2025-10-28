@@ -1,4 +1,5 @@
 import { ApiService } from './apiService';
+import { isDevMode } from '../../config/environment';
 
 // API_BASE_URL is now handled by ApiService
 
@@ -105,28 +106,34 @@ export class UserService {
 	static async createUser(
 		userData: CreateUserRequest
 	): Promise<CreateUserResponse> {
-		console.log('🔍 [UserService] Creating user with data:', {
-			firebaseUID: userData.firebaseUID.substring(0, 8) + '...',
-			email: userData.email,
-			name: userData.name || 'not provided',
-		});
+		if (isDevMode) {
+			console.log('🔍 [UserService] Creating user with data:', {
+				firebaseUID: userData.firebaseUID.substring(0, 8) + '...',
+				email: userData.email,
+				name: userData.name || 'not provided',
+			});
+		}
 
 		try {
-			console.log(
-				'🔍 [UserService] Making POST request to /api/users endpoint'
-			);
+			if (isDevMode) {
+				console.log(
+					'🔍 [UserService] Making POST request to /api/users endpoint'
+				);
+			}
 			const response = await ApiService.post<CreateUserResponse>(
 				'/api/users',
 				userData
 			);
 
-			console.log('🔍 [UserService] API response received:', {
-				success: response.success,
-				status: response.status,
-				error: response.error,
-				hasUser: !!response.data?.user,
-				hasProfile: !!response.data?.profile,
-			});
+			if (isDevMode) {
+				console.log('🔍 [UserService] API response received:', {
+					success: response.success,
+					status: response.status,
+					error: response.error,
+					hasUser: !!response.data?.user,
+					hasProfile: !!response.data?.profile,
+				});
+			}
 
 			// Check if the response indicates success and has the required data
 			// Handle both new user creation and existing user update scenarios
@@ -158,10 +165,12 @@ export class UserService {
 				throw new Error('User creation failed - missing user or profile data');
 			}
 
-			console.log('✅ [UserService] User created successfully:', {
-				userId: response.data.user._id,
-				profileId: response.data.profile._id,
-			});
+			if (isDevMode) {
+				console.log('✅ [UserService] User created successfully:', {
+					userId: response.data.user._id,
+					profileId: response.data.profile._id,
+				});
+			}
 
 			return response.data;
 		} catch (error) {
@@ -171,7 +180,9 @@ export class UserService {
 	}
 
 	static async getUserByFirebaseUID(firebaseUID: string): Promise<User | null> {
-		console.log('🔍 [UserService] Getting user by Firebase UID');
+		if (isDevMode) {
+			console.log('🔍 [UserService] Getting user by Firebase UID');
+		}
 		const response = await ApiService.get<{ user: User }>(
 			`/api/users/${firebaseUID}`,
 			2, // retries
@@ -180,14 +191,18 @@ export class UserService {
 
 		if (!response.success) {
 			if (response.error?.includes('404')) {
-				console.log('🔍 [UserService] User not found (404)');
+				if (isDevMode) {
+					console.log('🔍 [UserService] User not found (404)');
+				}
 				return null;
 			}
 			console.error('🔍 [UserService] Failed to fetch user:', response.error);
 			throw new Error(response.error || 'Failed to fetch user');
 		}
 
-		console.log('🔍 [UserService] User fetched successfully');
+		if (isDevMode) {
+			console.log('🔍 [UserService] User fetched successfully');
+		}
 		return response.data?.user || null;
 	}
 

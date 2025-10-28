@@ -7,44 +7,21 @@ import {
 	Animated,
 } from 'react-native';
 import {
-	getEffectiveFeatureFlags,
-	assertProductionSafety,
-} from '../../../../src/config/featureFlags';
-import {
 	modeStateService,
 	ModeState,
 } from '../../../../src/services/assistant/modeStateService';
-
-// Safely import expo-updates with fallback
-let Updates: any = null;
-try {
-	// Use dynamic import for better compatibility
-	// eslint-disable-next-line @typescript-eslint/no-require-imports
-	Updates = require('expo-updates');
-} catch {
-	if (__DEV__) {
-		console.log('expo-updates not available in development');
-	} else {
-		console.warn('expo-updates not available');
-	}
-}
+import { isDevMode } from '../../../../src/config/environment';
 
 interface DevHudProps {
 	// Optional modeState prop for backward compatibility
 	modeState?: ModeState;
 }
 
-// Gating logic as recommended
+// Gating logic - ONLY show when dev mode is enabled
+// Using isDevMode from environment.ts as single source of truth
 function shouldShowHud(): boolean {
-	const isDev = __DEV__;
-	const isInternalChannel =
-		Updates?.channel && Updates.channel !== 'production';
-	const featureFlags = getEffectiveFeatureFlags();
-
-	// Allow HUD if:
-	// 1. In development mode, OR
-	// 2. On internal channel (dev/staging) with devHud feature flag enabled
-	return isDev || (isInternalChannel && featureFlags.devHud);
+	// isDevMode requires both: NODE_ENV === 'development' AND DEV_MODE === true
+	return isDevMode;
 }
 
 export default function DevHud({ modeState: propModeState }: DevHudProps) {
@@ -54,11 +31,6 @@ export default function DevHud({ modeState: propModeState }: DevHudProps) {
 		propModeState || modeStateService.getState()
 	);
 	const fadeAnim = useState(new Animated.Value(0))[0];
-
-	// Production safety check
-	useEffect(() => {
-		assertProductionSafety();
-	}, []);
 
 	// Subscribe to mode state changes if no prop is provided
 	useEffect(() => {
@@ -92,7 +64,7 @@ export default function DevHud({ modeState: propModeState }: DevHudProps) {
 		}).start();
 	}, [isVisible, fadeAnim]);
 
-	// Don't render if gating logic says no
+	// Don't render if not in development mode
 	if (!shouldShowHud()) {
 		return null;
 	}
@@ -134,11 +106,9 @@ export default function DevHud({ modeState: propModeState }: DevHudProps) {
 								` (${modeState.history[modeState.history.length - 1].reason})`}
 						</Text>
 					)}
+					<Text style={styles.debugText}>Channel: production</Text>
 					<Text style={styles.debugText}>
-						Channel: {Updates?.channel || 'unknown'}
-					</Text>
-					<Text style={styles.debugText}>
-						Environment: {__DEV__ ? 'development' : 'production'}
+						Environment: {isDevMode ? 'dev-mode' : 'production'}
 					</Text>
 					{!propModeState && (
 						<>

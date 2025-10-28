@@ -78,4 +78,11 @@ export const API_CONFIG = {
 };
 
 // Re-export environment settings for convenience
-export { isDevelopment, isProduction, isTest, isDev } from './environment';
+export {
+	isDevelopment,
+	isProduction,
+	isTest,
+	isDev,
+	isDevMode,
+	DEV_MODE,
+} from './environment';

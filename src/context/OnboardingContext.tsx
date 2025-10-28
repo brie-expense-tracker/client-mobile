@@ -7,6 +7,7 @@ import React, {
 } from 'react';
 import { OnboardingService } from '../services';
 import useAuth from './AuthContext'; // Import useAuth
+import { isDevMode } from '../config/environment';
 
 interface OnboardingContextType {
 	hasSeenOnboarding: boolean | null;
@@ -39,13 +40,17 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
 			return;
 		}
 		try {
-			console.log('🔍 [OnboardingContext] Refreshing onboarding status...');
+			if (isDevMode) {
+				console.log('🔍 [OnboardingContext] Refreshing onboarding status...');
+			}
 			const onboardingSeen = await OnboardingService.hasSeenOnboarding();
 			const currentVersion = OnboardingService.getCurrentOnboardingVersion();
-			console.log('🔍 [OnboardingContext] Onboarding status result:', {
-				onboardingSeen,
-				currentVersion,
-			});
+			if (isDevMode) {
+				console.log('🔍 [OnboardingContext] Onboarding status result:', {
+					onboardingSeen,
+					currentVersion,
+				});
+			}
 			setHasSeenOnboarding(onboardingSeen);
 			setOnboardingVersion(currentVersion);
 		} catch (error) {

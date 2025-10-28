@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isDevMode } from './environment';
 
 type FlagKey =
 	| 'aiInsights'
@@ -14,7 +15,7 @@ const envDefaults: Record<FlagKey, boolean> = {
 };
 
 // Debug environment variables at module load time
-if (__DEV__) {
+if (isDevMode) {
 	console.log('🔧 [Features] Environment variables at module load:', {
 		EXPO_PUBLIC_AI_INSIGHTS: process.env.EXPO_PUBLIC_AI_INSIGHTS,
 		EXPO_PUBLIC_AI_INSIGHTS_PREVIEW:
@@ -24,7 +25,7 @@ if (__DEV__) {
 	});
 }
 
-if (__DEV__) {
+if (isDevMode) {
 	console.log('🔧 [Features] Environment defaults computed:', envDefaults);
 }
 
@@ -41,7 +42,7 @@ export const Features = new Proxy({} as Record<FlagKey, boolean>, {
 
 		// Debug logging for AI Insights specifically
 		if (key === 'aiInsights') {
-			if (__DEV__) {
+			if (isDevMode) {
 				console.log('🔧 [Features] AI Insights resolution:', {
 					key,
 					local: local[key],
@@ -61,7 +62,7 @@ export async function loadLocalOverrides() {
 	try {
 		const raw = await AsyncStorage.getItem('@flags');
 		local = raw ? JSON.parse(raw) : {};
-		if (__DEV__) {
+		if (isDevMode) {
 			console.log('🔧 [Features] Loaded local overrides:', local);
 			console.log('🔧 [Features] Raw AsyncStorage value:', raw);
 			console.log('🔧 [Features] Environment defaults:', envDefaults);
@@ -79,7 +80,7 @@ export async function setLocalOverride<K extends FlagKey>(
 	local[key] = val;
 	try {
 		await AsyncStorage.setItem('@flags', JSON.stringify(local));
-		if (__DEV__) {
+		if (isDevMode) {
 			console.log(`🔧 [Features] Set local override: ${key} = ${val}`);
 		}
 	} catch (error) {
@@ -89,7 +90,7 @@ export async function setLocalOverride<K extends FlagKey>(
 
 export function setRemoteFlags(f: Partial<Record<FlagKey, boolean>>) {
 	remote = { ...remote, ...f };
-	if (__DEV__) {
+	if (isDevMode) {
 		console.log('🔧 [Features] Set remote flags:', remote);
 	}
 }
@@ -106,7 +107,7 @@ export function getResolvedFlags(): Record<FlagKey, boolean> {
 export function clearLocalOverrides() {
 	local = {};
 	AsyncStorage.removeItem('@flags').catch(console.warn);
-	if (__DEV__) {
+	if (isDevMode) {
 		console.log('🔧 [Features] Cleared local overrides');
 	}
 }
@@ -122,7 +123,7 @@ export function guardFeature<K extends FlagKey>(
 	callback: () => any
 ): any {
 	if (!Features[key]) {
-		if (__DEV__) {
+		if (isDevMode) {
 			console.log(`🚫 [Features] ${key} disabled, skipping operation`);
 		}
 		return null;
@@ -132,7 +133,7 @@ export function guardFeature<K extends FlagKey>(
 
 // Debug function to test feature flag resolution
 export function debugFeatureFlags() {
-	if (__DEV__) {
+	if (isDevMode) {
 		console.log('🔧 [Features] === DEBUG FEATURE FLAGS ===');
 		console.log('🔧 [Features] Environment variables:', {
 			EXPO_PUBLIC_AI_INSIGHTS: process.env.EXPO_PUBLIC_AI_INSIGHTS,

@@ -14,6 +14,7 @@ import {
 	NotificationConsent,
 } from '../services';
 import useAuth from './AuthContext';
+import { isDevMode } from '../config/environment';
 
 interface NotificationFilter {
 	type?: NotificationData['type'];
@@ -191,7 +192,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 		async (page: number = 1, limit: number = 20) => {
 			// Prevent multiple simultaneous requests
 			if (loading) {
-				console.log('🔄 [Notifications] Request already in progress, skipping');
+				if (isDevMode) {
+					console.log(
+						'🔄 [Notifications] Request already in progress, skipping'
+					);
+				}
 				return;
 			}
 
@@ -208,16 +213,20 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 					setNotifications(response.notifications || []);
 					setCurrentPage(page);
 					setHasMore(notificationCount === limit);
-					console.log(
-						`✅ [Notifications] Loaded ${notificationCount} notifications for page ${page}`
-					);
+					if (isDevMode) {
+						console.log(
+							`✅ [Notifications] Loaded ${notificationCount} notifications for page ${page}`
+						);
+					}
 				}
 			} catch (err: any) {
 				// Don't log errors for missing user account - this is expected after account deletion
 				if (err?.message?.includes('User account not found')) {
-					console.log(
-						'ℹ️ [Notifications] User account not found, skipping notifications fetch'
-					);
+					if (isDevMode) {
+						console.log(
+							'ℹ️ [Notifications] User account not found, skipping notifications fetch'
+						);
+					}
 					setNotifications([]);
 					setHasMore(false);
 				} else {
@@ -237,12 +246,14 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 
 	const loadMoreNotifications = useCallback(async () => {
 		if (!hasMore || loading) {
-			console.log(
-				'🔄 [Notifications] Load more blocked - hasMore:',
-				hasMore,
-				'loading:',
-				loading
-			);
+			if (isDevMode) {
+				console.log(
+					'🔄 [Notifications] Load more blocked - hasMore:',
+					hasMore,
+					'loading:',
+					loading
+				);
+			}
 			return;
 		}
 
@@ -250,7 +261,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 			setLoading(true);
 			setError(null);
 			const nextPage = currentPage + 1;
-			console.log(`📄 [Notifications] Loading page ${nextPage}`);
+			if (isDevMode) {
+				console.log(`📄 [Notifications] Loading page ${nextPage}`);
+			}
 			const response = await notificationService.getNotifications(nextPage, 20);
 			if (response) {
 				// Use safe array operations to prevent crashes
@@ -260,9 +273,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 				setNotifications((prev) => [...prev, ...newNotifications]);
 				setCurrentPage(nextPage);
 				setHasMore(newNotificationCount === 20);
-				console.log(
-					`✅ [Notifications] Loaded ${newNotificationCount} more notifications`
-				);
+				if (isDevMode) {
+					console.log(
+						`✅ [Notifications] Loaded ${newNotificationCount} more notifications`
+					);
+				}
 			}
 		} catch (err) {
 			console.error(
@@ -282,11 +297,15 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 	const refreshNotifications = useCallback(async () => {
 		// Prevent refresh if already loading
 		if (loading) {
-			console.log('🔄 [Notifications] Refresh blocked - already loading');
+			if (isDevMode) {
+				console.log('🔄 [Notifications] Refresh blocked - already loading');
+			}
 			return;
 		}
 
-		console.log('🔄 [Notifications] Refreshing notifications');
+		if (isDevMode) {
+			console.log('🔄 [Notifications] Refreshing notifications');
+		}
 		setCurrentPage(1);
 		setHasMore(true);
 		await getNotifications(1, 20);
@@ -436,15 +455,19 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 			user._id !== 'temp' &&
 			!hasInitializedRef.current
 		) {
-			console.log(
-				'🔔 [Notifications] User authenticated, initializing notifications'
-			);
+			if (isDevMode) {
+				console.log(
+					'🔔 [Notifications] User authenticated, initializing notifications'
+				);
+			}
 			hasInitializedRef.current = true;
 			initialize();
 		} else if (user && user._id === 'temp') {
-			console.log(
-				'ℹ️ [Notifications] Waiting for MongoDB user creation before initializing'
-			);
+			if (isDevMode) {
+				console.log(
+					'ℹ️ [Notifications] Waiting for MongoDB user creation before initializing'
+				);
+			}
 		}
 
 		return () => {

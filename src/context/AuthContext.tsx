@@ -17,6 +17,7 @@ import { ApiService } from '../services/core/apiService';
 import { authService } from '../services/authService';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { configureGoogleSignIn } from '../config/googleSignIn';
+import { isDevMode } from '../config/environment';
 
 // Error types for better error handling
 export interface AuthError {
@@ -87,7 +88,7 @@ export const AuthContext = createContext<AuthContextType | undefined>(
 const UID_KEY = 'firebaseUID';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-	if (__DEV__) {
+	if (isDevMode) {
 		console.log('🚨 [DEBUG] AuthProvider render - component re-rendering');
 	}
 
@@ -109,7 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 	// Enhanced auth state
 	const authState: AuthState = useMemo(() => {
-		if (__DEV__) {
+		if (isDevMode) {
 			console.log('🚨 [DEBUG] authState useMemo recalculating with:', {
 				user: !!user,
 				loading,
@@ -132,7 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 	// Subscribe to auth state once
 	useEffect(() => {
-		if (__DEV__) {
+		if (isDevMode) {
 			console.log('🚨 [DEBUG] Auth useEffect triggered - setting up listeners');
 			console.log('🚨 [DEBUG] Current state values:', {
 				loading,
@@ -152,7 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 		// Define ensureUserExists inside useEffect to avoid dependency issues
 		const ensureUserExistsLocal = async (fbUser: FirebaseAuthTypes.User) => {
-			if (__DEV__) {
+			if (isDevMode) {
 				console.log('🟠 [AUTH-STATE] ===== ensureUserExistsLocal called =====');
 				console.log(
 					'🟠 [AUTH-STATE] Firebase UID:',
@@ -161,7 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			}
 			try {
 				// First, try to get existing user
-				if (__DEV__) {
+				if (isDevMode) {
 					console.log(
 						'🟠 [AUTH-STATE] Step 1: Checking if MongoDB user exists...'
 					);
@@ -170,7 +171,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 				if (!mongoUser) {
 					// User doesn't exist, create them using the ensure endpoint
-					if (__DEV__) {
+					if (isDevMode) {
 						console.log(
 							'🟡 [AUTH-STATE] MongoDB user NOT FOUND, attempting to create...'
 						);
@@ -178,7 +179,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 					try {
 						// Use the ensure endpoint to create the user
-						if (__DEV__) {
+						if (isDevMode) {
 							console.log('🟡 [AUTH-STATE] Calling /users/ensure endpoint...');
 						}
 						const response = await ApiService.post<{
@@ -195,7 +196,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 							if (response.data.profile) {
 								setProfile(response.data.profile);
 							}
-							if (__DEV__) {
+							if (isDevMode) {
 								console.log(
 									'🟢 [AUTH-STATE] ✅ User created via /users/ensure endpoint!'
 								);
@@ -206,7 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 							);
 						}
 					} catch (ensureError) {
-						if (__DEV__) {
+						if (isDevMode) {
 							console.error(
 								'🔴 [AUTH-STATE] ❌ /users/ensure failed:',
 								ensureError
@@ -214,7 +215,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 						}
 
 						// Fallback to createUser method
-						if (__DEV__) {
+						if (isDevMode) {
 							console.log('🟡 [AUTH-STATE] Trying createUser fallback...');
 						}
 						const createResponse = await UserService.createUser({
@@ -225,14 +226,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 						mongoUser = createResponse.user;
 						setProfile(createResponse.profile);
-						if (__DEV__) {
+						if (isDevMode) {
 							console.log(
 								'🟢 [AUTH-STATE] ✅ User created via createUser fallback!'
 							);
 						}
 					}
 				} else {
-					if (__DEV__) {
+					if (isDevMode) {
 						console.log(
 							'🟢 [AUTH-STATE] ✅ MongoDB user EXISTS! ID:',
 							mongoUser._id
@@ -241,7 +242,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				}
 
 				// Set the user in state
-				if (__DEV__) {
+				if (isDevMode) {
 					console.log('🟠 [AUTH-STATE] Step 2: Setting user in state...');
 				}
 				setUser(mongoUser);
@@ -249,14 +250,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				// Always try to fetch profile for existing users (don't depend on profile state)
 				if (mongoUser) {
 					try {
-						if (__DEV__) {
+						if (isDevMode) {
 							console.log('🟠 [AUTH-STATE] Step 3: Fetching profile...');
 						}
 						const profileResponse = await UserService.getProfileByUserId(
 							mongoUser._id
 						);
 						if (profileResponse) {
-							if (__DEV__) {
+							if (isDevMode) {
 								console.log(
 									'🟢 [AUTH-STATE] ✅ Profile loaded!',
 									profileResponse._id
@@ -264,12 +265,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 							}
 							setProfile(profileResponse);
 						} else {
-							if (__DEV__) {
+							if (isDevMode) {
 								console.log('🟡 [AUTH-STATE] No profile found for user');
 							}
 						}
 					} catch (profileError) {
-						if (__DEV__) {
+						if (isDevMode) {
 							console.log(
 								'🟡 [AUTH-STATE] Profile fetch failed:',
 								profileError
@@ -277,13 +278,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 						}
 					}
 				}
-				if (__DEV__) {
+				if (isDevMode) {
 					console.log(
 						'🟢 [AUTH-STATE] ===== ensureUserExistsLocal completed successfully ====='
 					);
 				}
 			} catch (e: any) {
-				if (__DEV__) {
+				if (isDevMode) {
 					console.log('🟡 [AUTH-STATE] Could not verify user with server');
 				}
 
@@ -299,7 +300,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 					e?.response?.status === 404 ||
 					e?.response?.status === 408
 				) {
-					if (__DEV__) {
+					if (isDevMode) {
 						console.log(
 							'🟡 [AUTH-STATE] Network/timeout - signing out to prevent orphaned account'
 						);
@@ -311,11 +312,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 						setFirebaseUser(null);
 						setUser(null);
 						setProfile(null);
-						if (__DEV__) {
+						if (isDevMode) {
 							console.log('🟡 [AUTH-STATE] Signed out successfully');
 						}
 					} catch (signOutError) {
-						if (__DEV__) {
+						if (isDevMode) {
 							console.warn('🟡 [AUTH-STATE] Failed to sign out:', signOutError);
 						}
 					}
@@ -324,7 +325,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				}
 
 				// Only log truly unexpected errors
-				if (__DEV__) {
+				if (isDevMode) {
 					console.error('🔴 [AUTH-STATE] Unexpected error:', e?.message);
 				}
 				setError({
@@ -340,7 +341,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		const hydrateFromFirebaseLocal = async (
 			fbUser: FirebaseAuthTypes.User | null
 		) => {
-			if (__DEV__) {
+			if (isDevMode) {
 				console.log(
 					'🚨 [DEBUG] hydrateFromFirebaseLocal called with:',
 					fbUser ? `UID: ${fbUser.uid.substring(0, 8)}...` : 'null'
@@ -372,15 +373,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		};
 
 		const unsubAuth = auth().onAuthStateChanged(async (fbUser) => {
-			console.log(
-				'🔍 [DEBUG] Firebase auth state changed:',
-				fbUser ? `UID: ${fbUser.uid.substring(0, 8)}...` : 'null'
-			);
-			console.log('🔍 [DEBUG] Current refs before processing:', {
-				processingTimeoutRef: processingTimeoutRef.current,
-				lastProcessedUIDRef: lastProcessedUIDRef.current,
-				isManualLoginRef: isManualLoginRef.current,
-			});
+			if (isDevMode) {
+				console.log(
+					'🔍 [DEBUG] Firebase auth state changed:',
+					fbUser ? `UID: ${fbUser.uid.substring(0, 8)}...` : 'null'
+				);
+				console.log('🔍 [DEBUG] Current refs before processing:', {
+					processingTimeoutRef: processingTimeoutRef.current,
+					lastProcessedUIDRef: lastProcessedUIDRef.current,
+					isManualLoginRef: isManualLoginRef.current,
+				});
+			}
 
 			// Skip processing if we're handling manual login, reauthentication, or cancelled Google Sign-In
 			if (
@@ -388,41 +391,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				isReauthInProgressRef.current ||
 				isGoogleSignInCancelledRef.current
 			) {
-				console.log(
-					'🔍 [DEBUG] Manual login, reauthentication, or cancelled Google Sign-In in progress, skipping auth state change processing'
-				);
+				if (isDevMode) {
+					console.log(
+						'🔍 [DEBUG] Manual login, reauthentication, or cancelled Google Sign-In in progress, skipping auth state change processing'
+					);
+				}
 				return;
 			}
 
 			// Prevent duplicate processing of the same user
 			if (fbUser && lastProcessedUIDRef.current === fbUser.uid) {
-				console.log(
-					'🔍 [DEBUG] Same UID already processed, skipping duplicate MongoDB fetch'
-				);
+				if (isDevMode) {
+					console.log(
+						'🔍 [DEBUG] Same UID already processed, skipping duplicate MongoDB fetch'
+					);
+				}
 				return;
 			}
 
 			// Prevent rapid successive calls
 			if (processingTimeoutRef.current) {
-				console.log(
-					'🔍 [DEBUG] Processing timeout active, skipping rapid call'
-				);
+				if (isDevMode) {
+					console.log(
+						'🔍 [DEBUG] Processing timeout active, skipping rapid call'
+					);
+				}
 				return;
 			}
 
-			console.log(
-				'🔍 [DEBUG] Processing auth state change - calling setFirebaseUser'
-			);
+			if (isDevMode) {
+				console.log(
+					'🔍 [DEBUG] Processing auth state change - calling setFirebaseUser'
+				);
+			}
 			setFirebaseUser(fbUser);
 
 			// Skip orphaned account cleanup - let the Google sign-in flows handle this
 			// The cleanup was too aggressive and interfered with the signup flow
-			console.log('🔍 [DEBUG] Calling hydrateFromFirebaseLocal');
+			if (isDevMode) {
+				console.log('🔍 [DEBUG] Calling hydrateFromFirebaseLocal');
+			}
 
 			// Add timeout protection to prevent infinite loading
 			const timeoutPromise = new Promise<void>((resolve) => {
 				setTimeout(() => {
-					console.log('⏰ [DEBUG] hydrateFromFirebaseLocal timeout reached');
+					if (isDevMode) {
+						console.log('⏰ [DEBUG] hydrateFromFirebaseLocal timeout reached');
+					}
 					resolve();
 				}, 5000); // 5 second timeout (fast fail for better UX)
 			});
@@ -430,24 +445,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			try {
 				await Promise.race([hydrateFromFirebaseLocal(fbUser), timeoutPromise]);
 			} catch (error) {
-				console.error('🔴 [DEBUG] Error in hydrateFromFirebaseLocal:', error);
+				if (isDevMode) {
+					console.error('🔴 [DEBUG] Error in hydrateFromFirebaseLocal:', error);
+				}
 				// Don't throw - we still want to set loading to false
 			}
 
 			// Mark this UID as processed
 			if (fbUser) {
-				console.log(
-					'🔍 [DEBUG] Setting lastProcessedUIDRef and processing timeout'
-				);
+				if (isDevMode) {
+					console.log(
+						'🔍 [DEBUG] Setting lastProcessedUIDRef and processing timeout'
+					);
+				}
 				lastProcessedUIDRef.current = fbUser.uid;
 				// Set a timeout to prevent rapid successive calls
 				const timeout = setTimeout(() => {
-					console.log('🔍 [DEBUG] Processing timeout cleared');
+					if (isDevMode) {
+						console.log('🔍 [DEBUG] Processing timeout cleared');
+					}
 					processingTimeoutRef.current = null;
 				}, 1000);
 				processingTimeoutRef.current = timeout;
 			} else {
-				console.log('🔍 [DEBUG] Clearing refs for logout');
+				if (isDevMode) {
+					console.log('🔍 [DEBUG] Clearing refs for logout');
+				}
 				lastProcessedUIDRef.current = null;
 				if (processingTimeoutRef.current) {
 					clearTimeout(processingTimeoutRef.current);
@@ -457,7 +480,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				authService.clearToken();
 			}
 
-			console.log('🔍 [DEBUG] Setting loading to false');
+			if (isDevMode) {
+				console.log('🔍 [DEBUG] Setting loading to false');
+			}
 			setLoading(false);
 		});
 
@@ -468,15 +493,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			try {
 				// Only refresh token, don't trigger user processing
 				await fbUser.getIdToken(true); // force refresh
-				console.log('🔑 [DEBUG] ID token refreshed');
+				if (isDevMode) {
+					console.log('🔑 [DEBUG] ID token refreshed');
+				}
 			} catch (err) {
-				console.error('🔑 [DEBUG] Failed to refresh ID token:', err);
+				if (isDevMode) {
+					console.error('🔑 [DEBUG] Failed to refresh ID token:', err);
+				}
 				Sentry.captureException(err);
 			}
 		});
 
 		return () => {
-			console.log('🚨 [DEBUG] Auth useEffect cleanup - removing listeners');
+			if (isDevMode) {
+				console.log('🚨 [DEBUG] Auth useEffect cleanup - removing listeners');
+			}
 			unsubAuth();
 			unsubToken();
 			if (processingTimeoutRef.current) {
@@ -488,7 +519,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 	// Refresh user data function
 	const refreshUserData = useCallback(async (): Promise<void> => {
-		console.log('🚨 [DEBUG] refreshUserData called');
+		if (isDevMode) {
+			console.log('🚨 [DEBUG] refreshUserData called');
+		}
 		const currentFirebaseUser = auth().currentUser;
 		if (!currentFirebaseUser) return;
 
@@ -497,7 +530,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				currentFirebaseUser.uid
 			);
 			if (mongoUser) {
-				console.log('🚨 [DEBUG] refreshUserData setting user and profile');
+				if (isDevMode) {
+					console.log('🚨 [DEBUG] refreshUserData setting user and profile');
+				}
 				setUser(mongoUser);
 				const userProfile = await UserService.getProfileByUserId(mongoUser._id);
 				setProfile(userProfile);
@@ -522,19 +557,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 	// Foreground refresh via AppState (RN-friendly replacement for any `document` visibility logic)
 	useEffect(() => {
-		console.log(
-			'🚨 [DEBUG] AppState useEffect triggered with refreshUserData dependency'
-		);
+		if (isDevMode) {
+			console.log(
+				'🚨 [DEBUG] AppState useEffect triggered with refreshUserData dependency'
+			);
+		}
 		let lastRefreshTime = 0;
 		const REFRESH_COOLDOWN = 60000; // Only refresh once per minute
 
 		const onChange = async (nextState: AppStateStatus) => {
-			console.log(
-				'🚨 [DEBUG] AppState changed from',
-				appState.current,
-				'to',
-				nextState
-			);
+			if (isDevMode) {
+				console.log(
+					'🚨 [DEBUG] AppState changed from',
+					appState.current,
+					'to',
+					nextState
+				);
+			}
 			const prev = appState.current;
 			appState.current = nextState;
 			if (prev.match(/inactive|background/) && nextState === 'active') {
@@ -542,13 +581,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				const timeSinceLastRefresh = now - lastRefreshTime;
 
 				if (timeSinceLastRefresh < REFRESH_COOLDOWN) {
-					console.log(
-						`⏭️ [DEBUG] Skipping refresh, last refresh was ${timeSinceLastRefresh}ms ago`
-					);
+					if (isDevMode) {
+						console.log(
+							`⏭️ [DEBUG] Skipping refresh, last refresh was ${timeSinceLastRefresh}ms ago`
+						);
+					}
 					return;
 				}
 
-				console.log('🚨 [DEBUG] App became active, refreshing user data');
+				if (isDevMode) {
+					console.log('🚨 [DEBUG] App became active, refreshing user data');
+				}
 				lastRefreshTime = now;
 				try {
 					const fbUser = auth().currentUser;
@@ -565,7 +608,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 		const sub = AppState.addEventListener('change', onChange);
 		return () => {
-			console.log('🚨 [DEBUG] AppState useEffect cleanup');
+			if (isDevMode) {
+				console.log('🚨 [DEBUG] AppState useEffect cleanup');
+			}
 			sub.remove();
 		};
 	}, []);
@@ -612,7 +657,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		// Add timeout protection
 		const timeoutPromise = new Promise<never>((_, reject) => {
 			setTimeout(() => {
-				console.log('⏰ [DEBUG] Login timeout after 5s');
+				if (isDevMode) {
+					console.log('⏰ [DEBUG] Login timeout after 5s');
+				}
 				reject(new Error('Login timeout'));
 			}, 5000);
 		});
@@ -621,7 +668,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			// Set manual login flag to prevent auth state change interference
 			isManualLoginRef.current = true;
 
-			console.log('🔍 [DEBUG] Login attempt: Regular user');
+			if (isDevMode) {
+				console.log('🔍 [DEBUG] Login attempt: Regular user');
+			}
 
 			// Race the login operation against timeout
 			await Promise.race([
@@ -632,11 +681,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 					// Check if user exists in MongoDB
 					let mongoUser;
 					try {
-						console.log('🔍 [DEBUG] Checking if MongoDB user exists...');
+						if (isDevMode) {
+							console.log('🔍 [DEBUG] Checking if MongoDB user exists...');
+						}
 						mongoUser = await UserService.getUserByFirebaseUID(
 							firebaseUser.uid
 						);
-						console.log('🔍 [DEBUG] MongoDB user found!');
+						if (isDevMode) {
+							console.log('🔍 [DEBUG] MongoDB user found!');
+						}
 					} catch (error: any) {
 						// If user doesn't exist (404), that's okay - we'll create them
 						if (
@@ -647,9 +700,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 							error?.response?.status === 404 ||
 							error?.response?.status === 408
 						) {
-							console.log(
-								'🔍 [DEBUG] MongoDB user does not exist or timeout - will create'
-							);
+							if (isDevMode) {
+								console.log(
+									'🔍 [DEBUG] MongoDB user does not exist or timeout - will create'
+								);
+							}
 							mongoUser = null;
 						} else {
 							// Unexpected error - re-throw it
@@ -659,7 +714,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 					if (!mongoUser) {
 						// User doesn't exist in MongoDB, create them
-						console.log('🔍 [DEBUG] Creating new user in MongoDB...');
+						if (isDevMode) {
+							console.log('🔍 [DEBUG] Creating new user in MongoDB...');
+						}
 						const userData = {
 							firebaseUID: firebaseUser.uid,
 							email: firebaseUser.email!,
@@ -670,10 +727,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 						mongoUser = response.user;
 						setUser(mongoUser);
 						setProfile(response.profile);
-						console.log('✅ [DEBUG] New user created in MongoDB');
+						if (isDevMode) {
+							console.log('✅ [DEBUG] New user created in MongoDB');
+						}
 					} else {
 						// User exists, fetch their profile
-						console.log('🔍 [DEBUG] Existing user found in MongoDB');
+						if (isDevMode) {
+							console.log('🔍 [DEBUG] Existing user found in MongoDB');
+						}
 						setUser(mongoUser);
 						const userProfile = await UserService.getProfileByUserId(
 							mongoUser._id
@@ -683,9 +744,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 					// Set loading to false to trigger navigation logic
 					setLoading(false);
-					console.log(
-						'✅ Firebase login successful, UID stored, MongoDB user ready'
-					);
+					if (isDevMode) {
+						console.log(
+							'✅ Firebase login successful, UID stored, MongoDB user ready'
+						);
+					}
 				})(),
 				timeoutPromise,
 			]);
@@ -696,7 +759,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				error?.message?.includes('timeout') ||
 				error?.message?.includes('Aborted')
 			) {
-				console.log('🟡 [DEBUG] Login timeout - will retry on next app open');
+				if (isDevMode) {
+					console.log('🟡 [DEBUG] Login timeout - will retry on next app open');
+				}
 				setLoading(false);
 				// Don't throw for timeout - just let the user try again
 				return;
@@ -723,9 +788,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			});
 
 			// Re-throw the error so the caller knows login failed
-			console.log(
-				'⚠️ [DEBUG] MongoDB operations failed - throwing error to caller'
-			);
+			if (isDevMode) {
+				console.log(
+					'⚠️ [DEBUG] MongoDB operations failed - throwing error to caller'
+				);
+			}
 			throw error;
 		} finally {
 			// Reset manual login flag
@@ -758,10 +825,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 	const sendPasswordResetEmailToUser = useCallback(async (email: string) => {
 		try {
-			console.log('🔍 Starting password reset process...');
-			console.log('📧 Email:', email);
-			console.log('🔥 Firebase Auth instance:', auth());
-			console.log('🔥 Firebase Auth current user:', auth().currentUser);
+			if (isDevMode) {
+				console.log('🔍 Starting password reset process...');
+				console.log('📧 Email:', email);
+				console.log('🔥 Firebase Auth instance:', auth());
+				console.log('🔥 Firebase Auth current user:', auth().currentUser);
+			}
 
 			// Check if Firebase is properly initialized
 			const authInstance = auth();
@@ -859,9 +928,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				if (firebaseUser && error.code !== 'auth/email-already-in-use') {
 					try {
 						await firebaseUser.delete();
-						console.log(
-							'Cleaned up Firebase user after MongoDB creation failure'
-						);
+						if (isDevMode) {
+							console.log(
+								'Cleaned up Firebase user after MongoDB creation failure'
+							);
+						}
 					} catch (deleteError) {
 						console.error(
 							'Error deleting Firebase user during cleanup:',
@@ -884,36 +955,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	// Google Sign-In methods
 	const signInWithGoogle = useCallback(async () => {
 		try {
-			console.log('🔵 [SIGN-IN] ===== Starting Google Sign-In flow =====');
+			if (isDevMode) {
+				console.log('🔵 [SIGN-IN] ===== Starting Google Sign-In flow =====');
+			}
 			setLoading(true);
 			setError(null);
 			isGoogleSignInCancelledRef.current = false;
 
 			// Check if your device supports Google Play
-			console.log('🔵 [SIGN-IN] Step 1: Checking Google Play Services...');
+			if (isDevMode) {
+				console.log('🔵 [SIGN-IN] Step 1: Checking Google Play Services...');
+			}
 			await GoogleSignin.hasPlayServices({
 				showPlayServicesUpdateDialog: true,
 			});
-			console.log('🔵 [SIGN-IN] Google Play Services OK');
+			if (isDevMode) {
+				console.log('🔵 [SIGN-IN] Google Play Services OK');
+			}
 
 			// Get the users ID token
-			console.log('🔵 [SIGN-IN] Step 2: Getting Google ID token...');
+			if (isDevMode) {
+				console.log('🔵 [SIGN-IN] Step 2: Getting Google ID token...');
+			}
 			const signInResult = await GoogleSignin.signIn();
 			let idToken: string | undefined;
-			console.log('🔵 [SIGN-IN] Sign-in result type:', signInResult.type);
+			if (isDevMode) {
+				console.log('🔵 [SIGN-IN] Sign-in result type:', signInResult.type);
+			}
 
 			if (signInResult.type === 'success' && signInResult.data) {
 				idToken = signInResult.data.idToken || undefined;
-				console.log('🔵 [SIGN-IN] Got ID token from success data');
+				if (isDevMode) {
+					console.log('🔵 [SIGN-IN] Got ID token from success data');
+				}
 			} else if (signInResult.type === 'cancelled') {
-				console.log('🔵 [SIGN-IN] ❌ User cancelled sign-in');
+				if (isDevMode) {
+					console.log('🔵 [SIGN-IN] ❌ User cancelled sign-in');
+				}
 				isGoogleSignInCancelledRef.current = true;
 				setLoading(false);
 				return; // Exit silently without showing error
 			} else {
 				// Handle other response types
 				idToken = (signInResult as any).idToken || undefined;
-				console.log('🔵 [SIGN-IN] Got ID token from direct access');
+				if (isDevMode) {
+					console.log('🔵 [SIGN-IN] Got ID token from direct access');
+				}
 			}
 
 			if (!idToken) {
@@ -928,55 +1015,77 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			}
 
 			// Create a Google credential with the token
-			console.log('🔵 [SIGN-IN] Step 3: Creating Firebase credential...');
+			if (isDevMode) {
+				console.log('🔵 [SIGN-IN] Step 3: Creating Firebase credential...');
+			}
 			const googleCredential = auth.GoogleAuthProvider.credential(idToken);
 
 			// Sign-in the user with the credential
-			console.log('🔵 [SIGN-IN] Step 4: Signing in with Firebase...');
+			if (isDevMode) {
+				console.log('🔵 [SIGN-IN] Step 4: Signing in with Firebase...');
+			}
 			const userCredential = await auth().signInWithCredential(
 				googleCredential
 			);
 			const firebaseUser = userCredential.user;
 
-			console.log(
-				'🟢 [SIGN-IN] Firebase auth successful! UID:',
-				firebaseUser.uid.substring(0, 12) + '...'
-			);
-			console.log('🔵 [SIGN-IN] Step 5: Checking if MongoDB user exists...');
+			if (isDevMode) {
+				console.log(
+					'🟢 [SIGN-IN] Firebase auth successful! UID:',
+					firebaseUser.uid.substring(0, 12) + '...'
+				);
+				console.log('🔵 [SIGN-IN] Step 5: Checking if MongoDB user exists...');
+			}
 
 			// Check if MongoDB user exists (regardless of Firebase's isNewUser flag)
 			try {
-				console.log('🔵 [SIGN-IN] Calling UserService.getUserByFirebaseUID...');
+				if (isDevMode) {
+					console.log(
+						'🔵 [SIGN-IN] Calling UserService.getUserByFirebaseUID...'
+					);
+				}
 				const existingMongoUser = await UserService.getUserByFirebaseUID(
 					firebaseUser.uid
 				);
 
 				if (existingMongoUser) {
 					// User exists in both Firebase and MongoDB - proceed with login
-					console.log(
-						'🟢 [SIGN-IN] ✅ MongoDB user EXISTS! ID:',
-						existingMongoUser._id
-					);
-					console.log('🔵 [SIGN-IN] Step 6: Calling login() function...');
+					if (isDevMode) {
+						console.log(
+							'🟢 [SIGN-IN] ✅ MongoDB user EXISTS! ID:',
+							existingMongoUser._id
+						);
+						console.log('🔵 [SIGN-IN] Step 6: Calling login() function...');
+					}
 					await login(firebaseUser);
-					console.log('🟢 [SIGN-IN] ✅ Login completed successfully!');
+					if (isDevMode) {
+						console.log('🟢 [SIGN-IN] ✅ Login completed successfully!');
+					}
 					return;
 				}
-				console.log('🟡 [SIGN-IN] MongoDB query returned but no user found');
+				if (isDevMode) {
+					console.log('🟡 [SIGN-IN] MongoDB query returned but no user found');
+				}
 			} catch (error: any) {
 				// User doesn't exist in MongoDB - this is okay, we'll create it
-				console.log('🟡 [SIGN-IN] ⚠️ MongoDB user NOT FOUND:', error.message);
-				console.log('🟡 [SIGN-IN] Error code:', error.code);
+				if (isDevMode) {
+					console.log('🟡 [SIGN-IN] ⚠️ MongoDB user NOT FOUND:', error.message);
+					console.log('🟡 [SIGN-IN] Error code:', error.code);
+				}
 			}
 
 			// No MongoDB user exists - ask user if they want to create an account
-			console.log(
-				'🟡 [SIGN-IN] Step 7: No MongoDB user - showing confirmation prompt...'
-			);
+			if (isDevMode) {
+				console.log(
+					'🟡 [SIGN-IN] Step 7: No MongoDB user - showing confirmation prompt...'
+				);
+			}
 
 			// Show confirmation prompt
 			return new Promise<void>((resolve, reject) => {
-				console.log('🟡 [SIGN-IN] Showing Alert dialog...');
+				if (isDevMode) {
+					console.log('🟡 [SIGN-IN] Showing Alert dialog...');
+				}
 				Alert.alert(
 					'Create Account?',
 					`No account found for ${
@@ -987,17 +1096,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 							text: 'Cancel',
 							style: 'cancel',
 							onPress: async () => {
-								console.log('🔴 [SIGN-IN] ❌ User CANCELLED account creation');
+								if (isDevMode) {
+									console.log(
+										'🔴 [SIGN-IN] ❌ User CANCELLED account creation'
+									);
+								}
 								// Delete the Firebase user since they don't want to create an account
 								try {
-									console.log('🔴 [SIGN-IN] Deleting Firebase user...');
+									if (isDevMode) {
+										console.log('🔴 [SIGN-IN] Deleting Firebase user...');
+									}
 									await firebaseUser.delete();
-									console.log('🔴 [SIGN-IN] Firebase user deleted');
+									if (isDevMode) {
+										console.log('🔴 [SIGN-IN] Firebase user deleted');
+									}
 								} catch (err) {
-									console.warn(
-										'🔴 [SIGN-IN] Failed to delete Firebase user:',
-										err
-									);
+									if (isDevMode) {
+										console.warn(
+											'🔴 [SIGN-IN] Failed to delete Firebase user:',
+											err
+										);
+									}
 								}
 								setLoading(false);
 								reject(new Error('Account creation cancelled'));
@@ -1006,32 +1125,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 						{
 							text: 'Create Account',
 							onPress: async () => {
-								console.log('🟢 [SIGN-IN] ✅ User CONFIRMED account creation!');
+								if (isDevMode) {
+									console.log(
+										'🟢 [SIGN-IN] ✅ User CONFIRMED account creation!'
+									);
+								}
 								try {
 									// Keep the Firebase user and create MongoDB user through login function
-									console.log(
-										'🟢 [SIGN-IN] Calling login() to create MongoDB user...'
-									);
+									if (isDevMode) {
+										console.log(
+											'🟢 [SIGN-IN] Calling login() to create MongoDB user...'
+										);
+									}
 									await login(firebaseUser);
-									console.log(
-										'🟢 [SIGN-IN] ✅ Login completed! Account creation successful!'
-									);
+									if (isDevMode) {
+										console.log(
+											'🟢 [SIGN-IN] ✅ Login completed! Account creation successful!'
+										);
+									}
 									resolve();
 								} catch (err) {
 									console.error(
 										'🔴 [SIGN-IN] ❌ Fatal error during login():',
 										err
 									);
-									console.error(
-										'🔴 [SIGN-IN] Error details:',
-										JSON.stringify(err)
-									);
+									if (isDevMode) {
+										console.error(
+											'🔴 [SIGN-IN] Error details:',
+											JSON.stringify(err)
+										);
+									}
 									// Delete Firebase user since account creation failed
 									try {
 										await firebaseUser.delete();
-										console.log(
-											'🔴 [SIGN-IN] Cleaned up Firebase user after failed creation'
-										);
+										if (isDevMode) {
+											console.log(
+												'🔴 [SIGN-IN] Cleaned up Firebase user after failed creation'
+											);
+										}
 									} catch (deleteErr) {
 										console.error(
 											'🔴 [SIGN-IN] Failed to clean up Firebase user:',
@@ -1049,15 +1180,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			});
 		} catch (error: any) {
 			console.error('🔴 [SIGN-IN] ❌ ERROR in signInWithGoogle:', error);
-			console.error('🔴 [SIGN-IN] Error code:', error.code);
-			console.error('🔴 [SIGN-IN] Error message:', error.message);
+			if (isDevMode) {
+				console.error('🔴 [SIGN-IN] Error code:', error.code);
+				console.error('🔴 [SIGN-IN] Error message:', error.message);
+			}
 
 			// Handle user cancellation gracefully
 			if (
 				error.code === 'auth/internal-error' &&
 				error.message?.includes('cancelled')
 			) {
-				console.log('Google Sign-In cancelled by user');
+				if (isDevMode) {
+					console.log('Google Sign-In cancelled by user');
+				}
 				isGoogleSignInCancelledRef.current = true;
 				setLoading(false);
 				return; // Exit silently without showing error
@@ -1065,7 +1200,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 			// Handle account creation cancellation gracefully
 			if (error.message?.includes('Account creation cancelled')) {
-				console.log('User declined account creation');
+				if (isDevMode) {
+					console.log('User declined account creation');
+				}
 				setLoading(false);
 				return; // Exit silently without showing error
 			}
@@ -1598,25 +1735,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 	// Session timeout effect
 	useEffect(() => {
-		console.log(
-			'🚨 [DEBUG] Session timeout useEffect triggered with dependencies:',
-			{
-				firebaseUser: !!firebaseUser,
-				lastActivity,
-				sessionTimeout,
-			}
-		);
+		if (isDevMode) {
+			console.log(
+				'🚨 [DEBUG] Session timeout useEffect triggered with dependencies:',
+				{
+					firebaseUser: !!firebaseUser,
+					lastActivity,
+					sessionTimeout,
+				}
+			);
+		}
 		if (!firebaseUser) return;
 
 		const interval = setInterval(() => {
 			if (!checkSessionValidity()) {
-				console.log('Session expired, logging out...');
+				if (isDevMode) {
+					console.log('Session expired, logging out...');
+				}
 				logout();
 			}
 		}, 60000); // Check every minute
 
 		return () => {
-			console.log('🚨 [DEBUG] Session timeout useEffect cleanup');
+			if (isDevMode) {
+				console.log('🚨 [DEBUG] Session timeout useEffect cleanup');
+			}
 			clearInterval(interval);
 		};
 	}, [

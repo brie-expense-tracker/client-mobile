@@ -6,6 +6,7 @@ import {
 	FEATURE_FLAG_KEYS,
 	DEFAULT_FEATURE_FLAGS,
 } from '../../config/telemetry';
+import { isDevMode } from '../../config/environment';
 
 export interface FeatureFlag {
 	key: string;
@@ -81,7 +82,9 @@ export class FeatureFlagsService {
 			}
 
 			this.isInitialized = true;
-			console.log('🚩 [FeatureFlags] Service initialized');
+			if (isDevMode) {
+				console.log('🚩 [FeatureFlags] Service initialized');
+			}
 		} catch (error) {
 			console.warn(
 				'🚩 [FeatureFlags] Failed to initialize service, using defaults:',
@@ -157,7 +160,9 @@ export class FeatureFlagsService {
 				);
 			}
 
-			console.log('🚩 [FeatureFlags] Remote config initialized');
+			if (isDevMode) {
+				console.log('🚩 [FeatureFlags] Remote config initialized');
+			}
 		} catch (error) {
 			console.warn(
 				'🚩 [FeatureFlags] Failed to initialize remote config, using defaults:',
@@ -418,7 +423,9 @@ export class FeatureFlagsService {
 				source: 'local',
 			});
 
-			console.log(`🚩 [FeatureFlags] Local override set: ${key} = ${value}`);
+			if (isDevMode) {
+				console.log(`🚩 [FeatureFlags] Local override set: ${key} = ${value}`);
+			}
 		} catch (error) {
 			console.warn(
 				`🚩 [FeatureFlags] Failed to set local override for ${key}:`,
@@ -442,7 +449,9 @@ export class FeatureFlagsService {
 			const flag = this.flags.get(key);
 			if (flag?.source === 'local') {
 				this.flags.delete(key);
-				console.log(`🚩 [FeatureFlags] Local override removed: ${key}`);
+				if (isDevMode) {
+					console.log(`🚩 [FeatureFlags] Local override removed: ${key}`);
+				}
 			}
 		} catch (error) {
 			console.warn(
@@ -498,7 +507,9 @@ export class FeatureFlagsService {
 			}
 
 			this.lastFetchTime = Date.now();
-			console.log('🚩 [FeatureFlags] Refreshed from remote config');
+			if (isDevMode) {
+				console.log('🚩 [FeatureFlags] Refreshed from remote config');
+			}
 		} catch (error) {
 			console.warn('🚩 [FeatureFlags] Failed to refresh:', error);
 		}

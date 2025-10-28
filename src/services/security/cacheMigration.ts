@@ -1,5 +1,6 @@
 // cacheMigration.ts - One-time migration for cache format changes
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isDevMode } from '../../config/environment';
 
 /**
  * Migrate last_sync_timestamp from raw number/string to normalized object format
@@ -10,9 +11,11 @@ export async function migrateLastSyncTimestamp(): Promise<void> {
 		const rawValue = await AsyncStorage.getItem(key);
 
 		if (!rawValue) {
-			console.log(
-				'[CacheMigration] No last_sync_timestamp found, skipping migration'
-			);
+			if (isDevMode) {
+				console.log(
+					'[CacheMigration] No last_sync_timestamp found, skipping migration'
+				);
+			}
 			return;
 		}
 
@@ -20,9 +23,11 @@ export async function migrateLastSyncTimestamp(): Promise<void> {
 		try {
 			const parsed = JSON.parse(rawValue);
 			if (parsed && typeof parsed === 'object' && 'ts' in parsed) {
-				console.log(
-					'[CacheMigration] last_sync_timestamp already in new format, skipping migration'
-				);
+				if (isDevMode) {
+					console.log(
+						'[CacheMigration] last_sync_timestamp already in new format, skipping migration'
+					);
+				}
 				return;
 			}
 		} catch {
@@ -51,14 +56,16 @@ export async function migrateLastSyncTimestamp(): Promise<void> {
 		const newValue = JSON.stringify({ ts: timestamp });
 		await AsyncStorage.setItem(key, newValue);
 
-		console.log(
-			'[CacheMigration] Successfully migrated last_sync_timestamp to new format:',
-			{
-				oldValue: rawValue,
-				newValue,
-				timestamp: new Date(timestamp).toISOString(),
-			}
-		);
+		if (isDevMode) {
+			console.log(
+				'[CacheMigration] Successfully migrated last_sync_timestamp to new format:',
+				{
+					oldValue: rawValue,
+					newValue,
+					timestamp: new Date(timestamp).toISOString(),
+				}
+			);
+		}
 	} catch (error) {
 		console.error(
 			'[CacheMigration] Failed to migrate last_sync_timestamp:',
@@ -72,11 +79,15 @@ export async function migrateLastSyncTimestamp(): Promise<void> {
  * Run all cache migrations
  */
 export async function runCacheMigrations(): Promise<void> {
-	console.log('[CacheMigration] Starting cache migrations...');
+	if (isDevMode) {
+		console.log('[CacheMigration] Starting cache migrations...');
+	}
 
 	try {
 		await migrateLastSyncTimestamp();
-		console.log('[CacheMigration] All migrations completed successfully');
+		if (isDevMode) {
+			console.log('[CacheMigration] All migrations completed successfully');
+		}
 	} catch (error) {
 		console.error('[CacheMigration] Some migrations failed:', error);
 	}

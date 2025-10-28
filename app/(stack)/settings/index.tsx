@@ -18,6 +18,9 @@ import {
 	debugFeatureFlags,
 } from '../../../src/config/features';
 
+// Development mode toggle - controls visibility of debug/testing features
+const SHOW_DEBUG_SECTION = false;
+
 /* --------------------------------- UI --------------------------------- */
 
 type Item = {
@@ -224,22 +227,8 @@ export default function SettingsScreen() {
 			contentContainerStyle={styles.scrollContent}
 			showsVerticalScrollIndicator={false}
 		>
-			{/* Debug / Testing (kept simple and white) - Only show in development */}
-			{__DEV__ && (
-				<View>
-					<Text
-						style={{
-							color: 'red',
-							fontSize: 16,
-							fontWeight: 'bold',
-							padding: 10,
-						}}
-					>
-						DEBUG MODE: __DEV__ = {__DEV__ ? 'true' : 'false'}
-					</Text>
-				</View>
-			)}
-			{__DEV__ && (
+			{/* Debug / Testing (kept simple and white) - Only show when enabled */}
+			{__DEV__ && SHOW_DEBUG_SECTION && (
 				<View style={[styles.section, { backgroundColor: colors.bg }]}>
 					<Text style={[styles.sectionTitle, { color: colors.text }]}>
 						Debug & Testing

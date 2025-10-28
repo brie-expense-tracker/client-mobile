@@ -1,10 +1,11 @@
 import { API_BASE_URL, API_CONFIG } from '../../config/api';
 import { getHMACService } from '../../utils/hmacSigning';
 import { RequestManager } from './requestManager';
+import { isDevMode } from '../../config/environment';
 
 // API logging: Keep essential info but reduce noise
-if (__DEV__) {
-	console.log(`🌐 API: ${__DEV__ ? 'DEV' : 'PROD'} | Base: ${API_BASE_URL}`);
+if (isDevMode) {
+	console.log(`🌐 API: ${isDevMode ? 'DEV' : 'PROD'} | Base: ${API_BASE_URL}`);
 }
 
 // ==========================================
@@ -72,7 +73,7 @@ function getCachedRequest<T>(endpoint: string): T | null {
 		const isExpired = now - cached.timestamp > cached.ttl;
 
 		if (!isExpired) {
-			if (__DEV__) {
+			if (isDevMode) {
 				console.log(`💾 [ApiService] Cache hit for: ${endpoint}`);
 			}
 			return cached.data as T;
@@ -96,7 +97,7 @@ function cacheRequest(endpoint: string, data: any): void {
 		ttl,
 	});
 
-	if (__DEV__) {
+	if (isDevMode) {
 		console.log(
 			`💾 [ApiService] Cached response for: ${endpoint} (TTL: ${ttl}ms)`
 		);
@@ -109,7 +110,7 @@ function shouldThrottleRequest(endpoint: string): boolean {
 	const lastRequest = requestThrottle.get(endpoint);
 
 	if (lastRequest && now - lastRequest < THROTTLE_DELAY) {
-		if (__DEV__) {
+		if (isDevMode) {
 			console.log(`⏳ [ApiService] Throttling request: ${endpoint}`);
 		}
 		return true;
@@ -123,7 +124,7 @@ function shouldThrottleRequest(endpoint: string): boolean {
 function isRateLimited(endpoint: string): boolean {
 	const backoffUntil = rateLimitBackoff.get(endpoint);
 	if (backoffUntil && Date.now() < backoffUntil) {
-		if (__DEV__) {
+		if (isDevMode) {
 			console.log(
 				`🚫 [ApiService] Rate limited for: ${endpoint} (backoff until: ${new Date(
 					backoffUntil
@@ -142,7 +143,7 @@ function setRateLimitBackoff(
 ): void {
 	const backoffUntil = Date.now() + backoffMs;
 	rateLimitBackoff.set(endpoint, backoffUntil);
-	if (__DEV__) {
+	if (isDevMode) {
 		console.log(
 			`🚫 [ApiService] Rate limit backoff set for: ${endpoint} (${backoffMs}ms)`
 		);
@@ -152,7 +153,7 @@ function setRateLimitBackoff(
 // Single-flight pattern to prevent duplicate requests
 async function singleflight<T>(key: string, fn: () => Promise<T>): Promise<T> {
 	if (inflight.has(key)) {
-		if (__DEV__) {
+		if (isDevMode) {
 			console.log(`🔄 [ApiService] Deduplicating request: ${key}`);
 		}
 		return inflight.get(key) as Promise<T>;
@@ -198,7 +199,7 @@ async function retryWithBackoff<T>(
 			// Only retry on network errors or 5xx errors
 			if (attempt < maxRetries) {
 				const delay = 250 * Math.pow(2, attempt) + Math.random() * 200;
-				if (__DEV__) {
+				if (isDevMode) {
 					console.log(
 						`⏳ [ApiService] Retrying in ${delay}ms (attempt ${attempt + 1}/${
 							maxRetries + 1
@@ -299,7 +300,7 @@ export class ApiService {
 		try {
 			const hmacService = getHMACService();
 
-			if (__DEV__) {
+			if (isDevMode) {
 				console.log('🔐 [ApiService] HMAC signing process starting...');
 				console.log('🔐 [ApiService] Has body:', hasBody);
 				console.log('🔐 [ApiService] Original body:', body);
@@ -314,7 +315,7 @@ export class ApiService {
 					: stableStringify(body)
 				: null;
 
-			if (__DEV__) {
+			if (isDevMode) {
 				console.log('🔐 [ApiService] HMAC Debug - Body string:', bodyString);
 				console.log('🔐 [ApiService] HMAC Debug - Method:', method);
 				console.log('🔐 [ApiService] HMAC Debug - Endpoint:', endpoint);
@@ -327,7 +328,7 @@ export class ApiService {
 				headers
 			);
 
-			if (__DEV__) {
+			if (isDevMode) {
 				console.log('🔐 [ApiService] HMAC signing completed for:', endpoint);
 				console.log(
 					'🔐 [ApiService] Final signed headers keys:',
@@ -343,7 +344,7 @@ export class ApiService {
 
 			return { headers: signedHeaders, bodyString };
 		} catch (error) {
-			if (__DEV__) {
+			if (isDevMode) {
 				console.error('❌ [ApiService] Failed to add HMAC signature:', error);
 				console.error('❌ [ApiService] Error details:', error);
 			}
@@ -473,7 +474,7 @@ export class ApiService {
 
 			const firebaseUID = currentUser.uid;
 
-			if (__DEV__) {
+			if (isDevMode) {
 				console.log(
 					'🔍 [DEBUG] Authenticated Firebase UID:',
 					firebaseUID ? `${firebaseUID.substring(0, 8)}...` : 'null'
@@ -485,7 +486,7 @@ export class ApiService {
 				'x-firebase-uid': firebaseUID,
 			};
 
-			if (__DEV__) {
+			if (isDevMode) {
 				console.log('🔍 [DEBUG] API Headers prepared:', {
 					'x-firebase-uid': `${firebaseUID.substring(0, 8)}...`,
 				});
@@ -540,7 +541,7 @@ export class ApiService {
 			const url = `${API_BASE_URL}${endpoint}`;
 
 			// Debug logging for URL construction
-			if (__DEV__) {
+			if (isDevMode) {
 				console.log('🔧 [DEBUG] URL Construction:');
 				console.log('🔧 [DEBUG] API_BASE_URL:', API_BASE_URL);
 				console.log('🔧 [DEBUG] endpoint:', endpoint);
@@ -548,7 +549,7 @@ export class ApiService {
 			}
 
 			// API logging: Keep essential request info
-			if (__DEV__) {
+			if (isDevMode) {
 				console.log(`📡 GET: ${endpoint}`);
 			}
 
@@ -569,7 +570,7 @@ export class ApiService {
 			}
 
 			// Demo logging: Keep essential success info
-			if (__DEV__) {
+			if (isDevMode) {
 				console.log(`✅ GET: ${endpoint} (200)`);
 			}
 
@@ -599,7 +600,7 @@ export class ApiService {
 
 		return singleflight(requestKey, async () => {
 			return retryWithBackoff(async () => {
-				if (__DEV__) {
+				if (isDevMode) {
 					console.log('🔍 [ApiService] POST request details:', {
 						endpoint,
 						dataKeys: Object.keys(body),
@@ -635,7 +636,7 @@ export class ApiService {
 				} catch (authError: any) {
 					// Handle authentication errors gracefully
 					if (authError.isAuthError) {
-						if (__DEV__) {
+						if (isDevMode) {
 							console.log(
 								'🔒 [API] User not authenticated, skipping POST request'
 							);
@@ -659,7 +660,7 @@ export class ApiService {
 
 				const url = `${API_BASE_URL}${endpoint}`;
 
-				if (__DEV__) {
+				if (isDevMode) {
 					console.log('🔍 [ApiService] POST request details:', {
 						url,
 						endpoint,
@@ -676,7 +677,7 @@ export class ApiService {
 					body: bodyString,
 				});
 
-				if (__DEV__) {
+				if (isDevMode) {
 					console.log('🔍 [ApiService] POST response received:', {
 						status: response.status,
 						statusText: response.statusText,
@@ -692,7 +693,7 @@ export class ApiService {
 				if (contentType && contentType.includes('application/json')) {
 					try {
 						data = await response.json();
-						if (__DEV__) {
+						if (isDevMode) {
 							console.log(
 								'🔍 [ApiService] JSON response parsed successfully:',
 								{
@@ -706,14 +707,14 @@ export class ApiService {
 
 						// Log full debug data if present (HMAC debugging)
 						if (data.debug) {
-							if (__DEV__) {
+							if (isDevMode) {
 								console.log('🐛 [ApiService] Server Debug Info:', data.debug);
 							}
 						}
 
 						// Log full error response for debugging
 						if (!response.ok) {
-							if (__DEV__) {
+							if (isDevMode) {
 								console.log(
 									'🔍 [ApiService] Full error response:',
 									JSON.stringify(data, null, 2)
@@ -788,7 +789,7 @@ export class ApiService {
 				}
 
 				// API logging: Success response
-				if (__DEV__) {
+				if (isDevMode) {
 					console.log(`✅ [ApiService] POST: ${endpoint} (${response.status})`);
 				}
 
@@ -848,25 +849,27 @@ export class ApiService {
 			const url = `${API_BASE_URL}${endpoint}`;
 
 			// Comprehensive request debugging
-			console.log(`📝 PUT: ${endpoint}`);
-			console.log('📝 [PUT] Complete request details:');
-			console.log('  🌐 URL:', url);
-			console.log('  🔧 Method: PUT');
-			console.log('  📋 Headers:');
-			Object.entries(signedHeaders).forEach(([key, value]) => {
-				if (
-					key.toLowerCase().includes('signature') ||
-					key.toLowerCase().includes('authorization')
-				) {
-					console.log(`    ${key}: ${value.substring(0, 20)}...`);
-				} else if (key === 'x-hmac-signature') {
-					console.log(`    ${key}: ${value.substring(0, 30)}...`);
-				} else {
-					console.log(`    ${key}: ${value}`);
-				}
-			});
-			console.log('  📦 Body string:', bodyString);
-			console.log('  📦 Body string length:', bodyString.length);
+			if (isDevMode) {
+				console.log(`📝 PUT: ${endpoint}`);
+				console.log('📝 [PUT] Complete request details:');
+				console.log('  🌐 URL:', url);
+				console.log('  🔧 Method: PUT');
+				console.log('  📋 Headers:');
+				Object.entries(signedHeaders).forEach(([key, value]) => {
+					if (
+						key.toLowerCase().includes('signature') ||
+						key.toLowerCase().includes('authorization')
+					) {
+						console.log(`    ${key}: ${value.substring(0, 20)}...`);
+					} else if (key === 'x-hmac-signature') {
+						console.log(`    ${key}: ${value.substring(0, 30)}...`);
+					} else {
+						console.log(`    ${key}: ${value}`);
+					}
+				});
+				console.log('  📦 Body string:', bodyString);
+				console.log('  📦 Body string length:', bodyString.length);
+			}
 
 			const response = await fetch(url, {
 				method: 'PUT',
@@ -874,26 +877,32 @@ export class ApiService {
 				body: bodyString,
 			});
 
-			console.log('📝 [PUT] Response received:');
-			console.log('  📊 Status:', response.status);
-			console.log('  📊 Status Text:', response.statusText);
-			console.log('  ✅ OK:', response.ok);
-			console.log('  🌐 Response URL:', response.url);
+			if (isDevMode) {
+				console.log('📝 [PUT] Response received:');
+				console.log('  📊 Status:', response.status);
+				console.log('  📊 Status Text:', response.statusText);
+				console.log('  ✅ OK:', response.ok);
+				console.log('  🌐 Response URL:', response.url);
+			}
 
 			// Check if response is JSON before parsing
 			const contentType = response.headers.get('content-type');
 			let data: any;
 
-			console.log('📝 [PUT] Response content type:', contentType);
-			console.log('📝 [PUT] Response headers:');
-			response.headers.forEach((value, key) => {
-				console.log(`  ${key}: ${value}`);
-			});
+			if (isDevMode) {
+				console.log('📝 [PUT] Response content type:', contentType);
+				console.log('📝 [PUT] Response headers:');
+				response.headers.forEach((value, key) => {
+					console.log(`  ${key}: ${value}`);
+				});
+			}
 
 			if (contentType && contentType.includes('application/json')) {
 				try {
 					data = await response.json();
-					console.log('📝 [PUT] JSON response data:', data);
+					if (isDevMode) {
+						console.log('📝 [PUT] JSON response data:', data);
+					}
 				} catch (parseError) {
 					console.error('❌ [PUT] JSON parse error:', parseError);
 					const textResponse = await response.text();
@@ -907,7 +916,9 @@ export class ApiService {
 			} else {
 				// Handle non-JSON responses
 				const textResponse = await response.text();
-				console.log('📝 [PUT] Non-JSON response:', textResponse);
+				if (isDevMode) {
+					console.log('📝 [PUT] Non-JSON response:', textResponse);
+				}
 
 				if (!response.ok) {
 					console.error('❌ [PUT] Non-JSON error response:', {
@@ -930,10 +941,12 @@ export class ApiService {
 			}
 
 			if (!response.ok) {
-				console.error('❌ [PUT] Request failed:');
-				console.error('  📊 Status:', response.status);
-				console.error('  📊 Status Text:', response.statusText);
-				console.error('  📦 Response Data:', data);
+				if (isDevMode) {
+					console.error('❌ [PUT] Request failed:');
+					console.error('  📊 Status:', response.status);
+					console.error('  📊 Status Text:', response.statusText);
+					console.error('  📦 Response Data:', data);
+				}
 
 				return {
 					success: false,
@@ -948,8 +961,10 @@ export class ApiService {
 			}
 
 			// API logging: Success response
-			console.log(`✅ [PUT] Success: ${endpoint} (${response.status})`);
-			console.log('✅ [PUT] Response data:', data);
+			if (isDevMode) {
+				console.log(`✅ [PUT] Success: ${endpoint} (${response.status})`);
+				console.log('✅ [PUT] Response data:', data);
+			}
 
 			// Clear cache by prefix to handle all variants
 			const baseEndpoint = endpoint.replace(/\/[^/]+$/, '');
@@ -1406,10 +1421,14 @@ export class ApiService {
 	static clearCache(endpoint?: string): void {
 		if (endpoint) {
 			requestCache.delete(endpoint);
-			console.log(`🗑️ [ApiService] Cache cleared for: ${endpoint}`);
+			if (isDevMode) {
+				console.log(`🗑️ [ApiService] Cache cleared for: ${endpoint}`);
+			}
 		} else {
 			requestCache.clear();
-			console.log(`🗑️ [ApiService] All cache cleared`);
+			if (isDevMode) {
+				console.log(`🗑️ [ApiService] All cache cleared`);
+			}
 		}
 	}
 
@@ -1473,9 +1492,11 @@ export class ApiService {
 			}
 		}
 
-		console.log(
-			`🗑️ [ApiService] Cleared ${clearedCacheCount} cache + ${clearedInflightCount} inflight with prefix: ${normalizedPrefix}`
-		);
+		if (isDevMode) {
+			console.log(
+				`🗑️ [ApiService] Cleared ${clearedCacheCount} cache + ${clearedInflightCount} inflight with prefix: ${normalizedPrefix}`
+			);
+		}
 	}
 
 	/**
@@ -1484,10 +1505,14 @@ export class ApiService {
 	static clearRateLimit(endpoint?: string): void {
 		if (endpoint) {
 			rateLimitBackoff.delete(endpoint);
-			console.log(`🚫 [ApiService] Rate limit cleared for: ${endpoint}`);
+			if (isDevMode) {
+				console.log(`🚫 [ApiService] Rate limit cleared for: ${endpoint}`);
+			}
 		} else {
 			rateLimitBackoff.clear();
-			console.log(`🚫 [ApiService] All rate limits cleared`);
+			if (isDevMode) {
+				console.log(`🚫 [ApiService] All rate limits cleared`);
+			}
 		}
 	}
 
