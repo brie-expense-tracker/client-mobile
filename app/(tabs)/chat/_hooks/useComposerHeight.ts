@@ -14,3 +14,6 @@ export function useComposerHeight(
 	);
 	return [h, onLayout];
 }
+
+// Default export to silence Expo Router warning (not used as route)
+export default useComposerHeight;

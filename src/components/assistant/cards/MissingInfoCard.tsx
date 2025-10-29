@@ -15,6 +15,9 @@ import {
 	missingInfoService,
 	MissingInfoState,
 } from '../../../services/feature/missingInfoService';
+import { createLogger } from '../../../utils/sublogger';
+
+const missingInfoCardLog = createLogger('MissingInfoCard');
 
 export interface MissingInfoChip {
 	id: string;
@@ -114,7 +117,7 @@ function MissingInfoCard({
 			setInputValue('');
 		} else {
 			// Handle validation error
-			console.error('Validation error:', result.error);
+			missingInfoCardLog.error('Validation error', { error: result.error });
 		}
 	};
 

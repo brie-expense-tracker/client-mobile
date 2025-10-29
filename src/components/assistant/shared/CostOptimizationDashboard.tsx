@@ -12,6 +12,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import CostWarningChip from './CostWarningChip';
 import { logChat } from '../../../services/feature/analyticsService';
+import { createLogger } from '../../../utils/sublogger';
+
+const costDashboardLog = createLogger('CostOptimizationDashboard');
 
 interface CostOptimizationData {
 	totalSavings: number;
@@ -150,7 +153,7 @@ export default function CostOptimizationDashboard() {
 
 			return mockData;
 		} catch (error) {
-			console.error('Error fetching cost optimization data:', error);
+			costDashboardLog.error('Error fetching cost optimization data', error);
 			throw new Error('Failed to load cost optimization data');
 		}
 	};
@@ -179,7 +182,7 @@ export default function CostOptimizationDashboard() {
 				hasFinancialData: true,
 			});
 		} catch (error) {
-			console.error('Error loading cost optimization data:', error);
+			costDashboardLog.error('Error loading cost optimization data', error);
 			setError(error instanceof Error ? error.message : 'Failed to load data');
 		} finally {
 			setLoading(false);
@@ -401,7 +404,7 @@ export default function CostOptimizationDashboard() {
 							severity={warning.severity}
 							onDismiss={() => {
 								// TODO: Dismiss warning
-								console.log('Dismiss warning:', index);
+								costDashboardLog.debug('Dismiss warning', { index });
 							}}
 						/>
 					))}

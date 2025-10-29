@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { logger } from '../../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -92,7 +93,7 @@ const NotificationItem = ({
 		try {
 			Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 		} catch {
-			console.log('Haptic feedback not available');
+			logger.debug('Haptic feedback not available');
 		}
 	};
 
@@ -162,7 +163,7 @@ const NotificationItem = ({
 			const entityId = data?.entityId;
 			const route = data?.route;
 
-			console.log('🧭 Navigating based on notification tap:', {
+			logger.debug('🧭 Navigating based on notification tap:', {
 				type,
 				entityId,
 				route,
@@ -215,7 +216,7 @@ const NotificationItem = ({
 					break;
 			}
 		} catch (error) {
-			console.error('❌ Error handling notification navigation:', error);
+			logger.error('❌ Error handling notification navigation:', error);
 		}
 	};
 

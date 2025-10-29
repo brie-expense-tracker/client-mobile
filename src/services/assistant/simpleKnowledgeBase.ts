@@ -1,3 +1,4 @@
+import { logger } from '../../../utils/logger';
 // Simple Knowledge Base for financial basics and app how-tos
 // Light RAG implementation with curated Q&As for instant answers
 
@@ -181,7 +182,7 @@ export class SimpleKnowledgeBase {
 
 			return sortedResults;
 		} catch (error) {
-			console.error('Error in SimpleKnowledgeBase.search:', error);
+			logger.error('Error in SimpleKnowledgeBase.search:', error);
 			// Return empty results instead of throwing to maintain stability
 			return [];
 		}

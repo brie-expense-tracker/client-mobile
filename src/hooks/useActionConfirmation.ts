@@ -1,6 +1,9 @@
 import { useState, useCallback } from 'react';
 import { Alert } from 'react-native';
 import { ResilientApiService } from '../services/resilience/resilientApiService';
+import { createLogger } from '../utils/sublogger';
+
+const actionConfirmationLog = createLogger('useActionConfirmation');
 
 interface ActionConfirmationData {
 	confirmationToken: string;
@@ -83,7 +86,7 @@ export const useActionConfirmation = (): UseActionConfirmationReturn => {
 					onError?.(response);
 				}
 			} catch (error) {
-				console.error('Error executing action:', error);
+				actionConfirmationLog.error('Error executing action', error);
 				onError?.(error);
 			} finally {
 				setIsExecuting(false);
@@ -116,7 +119,7 @@ export const useActionConfirmation = (): UseActionConfirmationReturn => {
 					onError?.(response);
 				}
 			} catch (error) {
-				console.error('Error confirming action:', error);
+				actionConfirmationLog.error('Error confirming action', error);
 				onError?.(error);
 			} finally {
 				setIsExecuting(false);
@@ -142,7 +145,7 @@ export const useActionConfirmation = (): UseActionConfirmationReturn => {
 				Alert.alert('Error', 'Failed to cancel action. Please try again.');
 			}
 		} catch (error) {
-			console.error('Error cancelling action:', error);
+			actionConfirmationLog.error('Error cancelling action', error);
 			Alert.alert('Error', 'Failed to cancel action. Please try again.');
 		}
 	}, [confirmationData, hideConfirmation]);

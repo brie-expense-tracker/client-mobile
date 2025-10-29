@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PendingAction } from '../../../../src/types/assistant';
+import { logger } from '../../../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -11,7 +11,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import IntelligentActions from './IntelligentActions';
+import IntelligentActions, {
+	IntelligentAction,
+	ActionExecutionResult,
+} from './IntelligentActions';
 // Note: intelligentActionService was removed during reorganization
 // This component may need to be updated to use alternative services
 
@@ -153,8 +156,11 @@ const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
 		setSelectedSuggestion(null);
 	};
 
-	const handleActionExecuted = (action: PendingAction, result: any) => {
-		console.log('Smart action executed:', action, result);
+	const handleActionExecuted = (
+		action: IntelligentAction,
+		result: ActionExecutionResult
+	) => {
+		logger.debug('Smart action executed:', action, result);
 
 		// Don't show success message here - let parent components handle it
 		// if (result.success) {
@@ -326,11 +332,11 @@ const AISuggestionsList: React.FC<AISuggestionsListProps> = ({
 					<TouchableOpacity
 						style={styles.exploreButton}
 						onPress={() => {
-							console.log(
+							logger.debug(
 								'🎯 AISuggestionsList: Explore More pressed for insight:',
 								insight
 							);
-							console.log(
+							logger.debug(
 								'🎯 AISuggestionsList: Calling onInsightPress with insight:',
 								insight
 							);

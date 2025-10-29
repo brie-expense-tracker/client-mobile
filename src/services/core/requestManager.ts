@@ -1,5 +1,8 @@
-import { ApiError, ApiErrorType } from './apiService';
-import { isDevMode } from '../../config/environment';
+import { ApiError, ApiErrorType } from './apiTypes';
+import { httpFetchWithRefresh } from './httpClient';
+import { createLogger } from '../../utils/sublogger';
+
+const reqLog = createLogger('RequestManager');
 
 // Request state management
 interface RequestState {
@@ -19,7 +22,7 @@ const inflightRequests = new Map<string, RequestState>();
 const backoffStates = new Map<string, BackoffState>();
 const requestQueue = new Map<
 	string,
-	Array<{ resolve: Function; reject: Function }>
+	{ resolve: Function; reject: Function }[]
 >();
 
 // Clear stale requests periodically
@@ -30,11 +33,7 @@ setInterval(() => {
 	inflightRequests.forEach((state, key) => {
 		// Clear any request older than 5 seconds
 		if (now - state.timestamp > 5000) {
-			if (isDevMode) {
-				console.log(
-					`🧹 [RequestManager] Clearing stale request: ${key.substring(0, 100)}`
-				);
-			}
+			reqLog.debug('Clearing stale request', { key: key.substring(0, 100) });
 			state.abortController.abort();
 			inflightRequests.delete(key);
 			clearedCount++;
@@ -42,9 +41,7 @@ setInterval(() => {
 	});
 
 	if (clearedCount > 0) {
-		if (isDevMode) {
-			console.log(`🧹 [RequestManager] Cleared ${clearedCount} stale requests`);
-		}
+		reqLog.debug('Cleared stale requests', { count: clearedCount });
 	}
 }, 2000); // Check every 2 seconds
 
@@ -101,11 +98,11 @@ function setBackoff(key: string, error?: string): void {
 		lastError: error,
 	});
 
-	if (isDevMode) {
-		console.log(
-			`🚫 [RequestManager] Backoff set for ${key}: ${delay}ms (attempt ${attemptCount})`
-		);
-	}
+	reqLog.info('Backoff set', {
+		key: key.substring(0, 100),
+		delay,
+		attemptCount,
+	});
 }
 
 /**
@@ -150,11 +147,7 @@ async function processQueue(
 			if (backoff) {
 				const waitTime = backoff.until - Date.now();
 				if (waitTime > 0) {
-					if (isDevMode) {
-						console.log(
-							`⏳ [RequestManager] Waiting ${waitTime}ms for backoff to expire`
-						);
-					}
+					reqLog.debug('Waiting for backoff to expire', { waitTime });
 					await sleep(waitTime);
 				}
 			}
@@ -171,11 +164,7 @@ async function processQueue(
 	} catch (error: any) {
 		// Don't retry on 4xx client errors (except 429)
 		if (error.status >= 400 && error.status < 500 && error.status !== 429) {
-			if (isDevMode) {
-				console.log(
-					`❌ [RequestManager] Client error ${error.status}, not retrying`
-				);
-			}
+			reqLog.warn('Client error, not retrying', { status: error.status });
 			// Reject all queued requests with the error
 			queue.forEach(({ reject }) => reject(error));
 			return;
@@ -188,9 +177,7 @@ async function processQueue(
 			// If we haven't exceeded max attempts, queue for retry
 			const backoff = backoffStates.get(key);
 			if (backoff && backoff.attemptCount <= MAX_RETRY_ATTEMPTS) {
-				if (isDevMode) {
-					console.log(`🔄 [RequestManager] Retrying ${key} after backoff`);
-				}
+				reqLog.info('Retrying after backoff', { key: key.substring(0, 100) });
 				// Re-queue all requests for retry
 				setTimeout(() => processQueue(key, executor), 1000);
 				return;
@@ -225,22 +212,13 @@ export class RequestManager {
 		const existing = inflightRequests.get(key);
 		if (existing && now - existing.timestamp < 3000) {
 			// 3 second timeout for deduplication
-			if (isDevMode) {
-				console.log(
-					`🔄 [RequestManager] Deduplicating request: ${key.substring(0, 80)}`
-				);
-			}
+			reqLog.debug('Deduplicating request', { key: key.substring(0, 80) });
 			return existing.promise;
 		} else if (existing) {
 			// Timeout exceeded - abort the old request and create new one
-			if (isDevMode) {
-				console.log(
-					`⏰ [RequestManager] Dedup timeout exceeded, creating new request: ${key.substring(
-						0,
-						80
-					)}`
-				);
-			}
+			reqLog.info('Dedup timeout exceeded, creating new request', {
+				key: key.substring(0, 80),
+			});
 			existing.abortController.abort();
 			inflightRequests.delete(key);
 			// Don't return - continue to create a new request
@@ -249,14 +227,9 @@ export class RequestManager {
 		// Create abort controller for this request with timeout
 		const abortController = new AbortController();
 		const timeoutId = setTimeout(() => {
-			if (isDevMode) {
-				console.log(
-					`⏰ [RequestManager] Request timeout after 3s, aborting: ${key.substring(
-						0,
-						80
-					)}`
-				);
-			}
+			reqLog.warn('Request timeout after 3s, aborting', {
+				key: key.substring(0, 80),
+			});
 			abortController.abort();
 			inflightRequests.delete(key);
 		}, 3000); // 3 second timeout (fast fail for UX)
@@ -264,12 +237,10 @@ export class RequestManager {
 		// Create the request executor
 		const executor = async (): Promise<T> => {
 			try {
-				if (isDevMode) {
-					console.log(
-						`🚀 [RequestManager] Starting fetch for: ${key.substring(0, 100)}`
-					);
-				}
-				const response = await fetch(url, {
+				reqLog.debug('Starting fetch', { key: key.substring(0, 100) });
+
+				// Use httpClient for auth-aware fetching with 401 retry
+				const response = await httpFetchWithRefresh(url, {
 					...options,
 					method,
 					signal: abortController.signal,
@@ -278,13 +249,10 @@ export class RequestManager {
 						...options.headers,
 					},
 				});
-				if (isDevMode) {
-					console.log(
-						`📥 [RequestManager] Received response: ${
-							response.status
-						} for ${key.substring(0, 100)}`
-					);
-				}
+				reqLog.debug('Received response', {
+					status: response.status,
+					key: key.substring(0, 100),
+				});
 
 				if (!response.ok) {
 					let errorMessage = response.statusText;
@@ -304,27 +272,20 @@ export class RequestManager {
 							: ApiErrorType.SERVER_ERROR,
 						response.status
 					);
-					if (isDevMode) {
-						console.log(`❌ [RequestManager] Request failed: ${error.message}`);
-					}
+					reqLog.warn('Request failed', { message: error.message });
 					throw error;
 				}
 
 				const data = await response.json();
-				if (isDevMode) {
-					console.log(
-						`✅ [RequestManager] Request succeeded for ${key.substring(0, 100)}`
-					);
-				}
+				reqLog.debug('Request succeeded', { key: key.substring(0, 100) });
 				clearTimeout(timeoutId);
 				return data;
 			} catch (error: any) {
 				clearTimeout(timeoutId);
-				if (isDevMode) {
-					console.log(
-						`💥 [RequestManager] Request error: ${error.name} - ${error.message}`
-					);
-				}
+				reqLog.error('Request error', {
+					name: error.name,
+					message: error.message,
+				});
 				// Handle abort errors specifically
 				if (error.name === 'AbortError') {
 					const timeoutError = new ApiError(
@@ -337,11 +298,7 @@ export class RequestManager {
 				throw error;
 			} finally {
 				// Clean up inflight request
-				if (isDevMode) {
-					console.log(
-						`🧹 [RequestManager] Cleaning up request: ${key.substring(0, 100)}`
-					);
-				}
+				reqLog.debug('Cleaning up request', { key: key.substring(0, 100) });
 				inflightRequests.delete(key);
 			}
 		};
@@ -361,18 +318,14 @@ export class RequestManager {
 	 * Cancel all inflight requests
 	 */
 	static cancelAllRequests(): void {
-		if (isDevMode) {
-			console.log(
-				`🚫 [RequestManager] Cancelling ${inflightRequests.size} inflight requests`
-			);
-		}
-
+		const count = inflightRequests.size;
 		inflightRequests.forEach(({ abortController }) => {
 			abortController.abort();
 		});
 
 		inflightRequests.clear();
 		requestQueue.clear();
+		reqLog.info('Cancelled all requests', { count });
 	}
 
 	/**
@@ -391,11 +344,10 @@ export class RequestManager {
 		});
 
 		if (cancelledCount > 0) {
-			if (isDevMode) {
-				console.log(
-					`🚫 [RequestManager] Cancelled ${cancelledCount} requests matching: ${pattern}`
-				);
-			}
+			reqLog.info('Cancelled requests matching pattern', {
+				count: cancelledCount,
+				pattern,
+			});
 		}
 	}
 
@@ -422,9 +374,7 @@ export class RequestManager {
 	 */
 	static clearAllBackoffs(): void {
 		backoffStates.clear();
-		if (isDevMode) {
-			console.log(`🧹 [RequestManager] Cleared all backoff states`);
-		}
+		reqLog.info('Cleared all backoff states');
 	}
 }
 

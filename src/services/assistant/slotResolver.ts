@@ -2,6 +2,8 @@
 // The secret sauce for high coverage - resolves missing parameters before asking questions
 
 import { ChatContext } from '../../services/feature/chatController';
+import { logger } from '../../../utils/logger';
+
 
 // Type definitions for better type safety
 export interface Account {
@@ -660,7 +662,7 @@ export class SlotResolver {
 						suggestions.goal_id = this.goalResolver.getSuggestions();
 						break;
 					default:
-						console.warn(`Unknown slot type: ${slotName}`);
+						logger.warn(`Unknown slot type: ${slotName}`);
 						missing.push(slotName);
 						continue;
 				}
@@ -671,7 +673,7 @@ export class SlotResolver {
 					missing.push(slotName);
 				}
 			} catch (error) {
-				console.error(`Error resolving slot ${slotName}:`, error);
+				logger.error(`Error resolving slot ${slotName}:`, error);
 				missing.push(slotName);
 			}
 		}

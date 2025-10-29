@@ -2,6 +2,7 @@
 // Tests ~200 real user questions against expected outcomes
 
 import { goldenSetRunner, GoldenTestCase } from '../goldenSet';
+import { logger } from '../../../../utils/logger';
 
 // Load test cases from golden set
 const golden: GoldenTestCase[] = require('../golden.json');
@@ -76,7 +77,7 @@ describe('Golden AI Cascade', () => {
 		// Response times should be reasonable
 		expect(summary.averageResponseTime).toBeLessThan(5000);
 
-		console.log('Golden Set Test Summary:', summary);
+		logger.info('Golden Set Test Summary:', summary);
 	});
 
 	// Test individual components

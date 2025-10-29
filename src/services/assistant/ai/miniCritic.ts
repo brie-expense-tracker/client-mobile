@@ -3,6 +3,8 @@
 import { WriterOutput, CriticReport } from './types';
 import { FactPack } from '../factPack';
 import { LiveApiService } from './liveApiService';
+import { logger } from '../../../../utils/logger';
+
 
 export interface MiniCriticConfig {
 	maxTokens: number;
@@ -46,7 +48,7 @@ export class MiniCritic {
 
 			return criticReport;
 		} catch (error) {
-			console.error('MiniCritic failed:', error);
+			logger.error('MiniCritic failed:', error);
 
 			// Return a conservative critic report that recommends escalation
 			return this.createFallbackReport(writerOutput, userQuery);
@@ -143,7 +145,7 @@ Return your analysis as JSON.`;
 				recommend_escalation: parsed.recommend_escalation || false,
 			};
 		} catch (error) {
-			console.error('Failed to parse critic response:', error);
+			logger.error('Failed to parse critic response:', error);
 			throw new Error('Invalid JSON response from critic');
 		}
 	}

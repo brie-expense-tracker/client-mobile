@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Alert, ScrollView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { useGoal, Goal, getGoalId } from '../../../src/context/goalContext';
+import { useGoal, Goal } from '../../../src/context/goalContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import QuickAddTransaction from './components/QuickAddTransaction';
 import GoalsSummaryCard from './components/GoalsSummaryCard';
@@ -11,10 +11,13 @@ import {
 	Card,
 	Section,
 	LoadingState,
-	ErrorState,
 	EmptyState,
 	SegmentedControl,
 } from '../../../src/ui';
+import { isDevMode } from '../../../src/config/environment';
+import { createLogger } from '../../../src/utils/sublogger';
+
+const goalsScreenLog = createLogger('GoalsScreen');
 
 // ==========================================
 // Main Component
@@ -37,9 +40,6 @@ export default function GoalsScreen() {
 	const [showQuickAddModal, setShowQuickAddModal] = useState(false);
 	const [selectedGoalForTransaction, setSelectedGoalForTransaction] =
 		useState<Goal | null>(null);
-	const [sortBy, setSortBy] = useState<
-		'name' | 'deadline' | 'progress' | 'target' | 'created'
-	>('deadline');
 	const [filterBy, setFilterBy] = useState<
 		'all' | 'active' | 'completed' | 'overdue'
 	>('all');
@@ -84,12 +84,16 @@ export default function GoalsScreen() {
 	useFocusEffect(
 		useCallback(() => {
 			if (!hasLoaded) {
-				console.log(
-					'🔄 [Goals] Screen focused, no data loaded yet - fetching...'
-				);
+				if (isDevMode) {
+					goalsScreenLog.debug(
+						'🔄 [Goals] Screen focused, no data loaded yet - fetching...'
+					);
+				}
 				refetch();
 			} else {
-				console.log('✅ [Goals] Screen focused, using cached data');
+				if (isDevMode) {
+					goalsScreenLog.debug('Screen focused, using cached data');
+				}
 			}
 		}, [refetch, hasLoaded])
 	);
@@ -101,7 +105,9 @@ export default function GoalsScreen() {
 		try {
 			await deleteGoal(goalId);
 		} catch (error) {
-			console.error('❌ [Goals] Error deleting goal:', error);
+			if (isDevMode) {
+				goalsScreenLog.error('Error deleting goal', error);
+			}
 			const errorMsg =
 				error instanceof Error ? error.message : 'Failed to delete goal';
 			Alert.alert('Delete Failed', errorMsg);
@@ -197,8 +203,6 @@ export default function GoalsScreen() {
 							scrollEnabled={false}
 							goals={goals}
 							filterBy={filterBy}
-							sortBy={sortBy}
-							onSortChange={setSortBy}
 							onPressMenu={(id: string) => {
 								const g = goals.find((gg) => gg.id === id);
 								if (!g) return;

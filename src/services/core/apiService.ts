@@ -1,12 +1,20 @@
 import { API_BASE_URL, API_CONFIG } from '../../config/api';
 import { getHMACService } from '../../utils/hmacSigning';
 import { RequestManager } from './requestManager';
-import { isDevMode } from '../../config/environment';
+import { getApp } from '@react-native-firebase/app';
+import { getAuth, getIdToken } from '@react-native-firebase/auth';
+import { getAuthHeaders as getHttpAuthHeaders } from './httpClient';
+import { ApiError, ApiErrorType } from './apiTypes';
+import { createLogger } from '../../utils/sublogger';
+
+// Re-export for backward compatibility
+export { ApiError, ApiErrorType };
+
+// Namespaced logger for API service
+const apiLog = createLogger('API');
 
 // API logging: Keep essential info but reduce noise
-if (isDevMode) {
-	console.log(`🌐 API: ${isDevMode ? 'DEV' : 'PROD'} | Base: ${API_BASE_URL}`);
-}
+apiLog.info(`API base URL: ${API_BASE_URL}`);
 
 // ==========================================
 // Utilities
@@ -73,9 +81,7 @@ function getCachedRequest<T>(endpoint: string): T | null {
 		const isExpired = now - cached.timestamp > cached.ttl;
 
 		if (!isExpired) {
-			if (isDevMode) {
-				console.log(`💾 [ApiService] Cache hit for: ${endpoint}`);
-			}
+			apiLog.debug('Cache hit', { endpoint });
 			return cached.data as T;
 		} else {
 			requestCache.delete(cacheKey);
@@ -97,11 +103,7 @@ function cacheRequest(endpoint: string, data: any): void {
 		ttl,
 	});
 
-	if (isDevMode) {
-		console.log(
-			`💾 [ApiService] Cached response for: ${endpoint} (TTL: ${ttl}ms)`
-		);
-	}
+	apiLog.debug('Cached response', { endpoint, ttl });
 }
 
 // Check if request should be throttled
@@ -110,9 +112,7 @@ function shouldThrottleRequest(endpoint: string): boolean {
 	const lastRequest = requestThrottle.get(endpoint);
 
 	if (lastRequest && now - lastRequest < THROTTLE_DELAY) {
-		if (isDevMode) {
-			console.log(`⏳ [ApiService] Throttling request: ${endpoint}`);
-		}
+		apiLog.debug('Throttling request', { endpoint });
 		return true;
 	}
 
@@ -124,13 +124,10 @@ function shouldThrottleRequest(endpoint: string): boolean {
 function isRateLimited(endpoint: string): boolean {
 	const backoffUntil = rateLimitBackoff.get(endpoint);
 	if (backoffUntil && Date.now() < backoffUntil) {
-		if (isDevMode) {
-			console.log(
-				`🚫 [ApiService] Rate limited for: ${endpoint} (backoff until: ${new Date(
-					backoffUntil
-				).toISOString()})`
-			);
-		}
+		apiLog.warn('Rate limited', {
+			endpoint,
+			backoffUntil: new Date(backoffUntil).toISOString(),
+		});
 		return true;
 	}
 	return false;
@@ -143,19 +140,13 @@ function setRateLimitBackoff(
 ): void {
 	const backoffUntil = Date.now() + backoffMs;
 	rateLimitBackoff.set(endpoint, backoffUntil);
-	if (isDevMode) {
-		console.log(
-			`🚫 [ApiService] Rate limit backoff set for: ${endpoint} (${backoffMs}ms)`
-		);
-	}
+	apiLog.warn('Rate limit backoff set', { endpoint, backoffMs });
 }
 
 // Single-flight pattern to prevent duplicate requests
 async function singleflight<T>(key: string, fn: () => Promise<T>): Promise<T> {
 	if (inflight.has(key)) {
-		if (isDevMode) {
-			console.log(`🔄 [ApiService] Deduplicating request: ${key}`);
-		}
+		apiLog.debug('Deduplicating request', { key: key.substring(0, 100) });
 		return inflight.get(key) as Promise<T>;
 	}
 
@@ -199,13 +190,11 @@ async function retryWithBackoff<T>(
 			// Only retry on network errors or 5xx errors
 			if (attempt < maxRetries) {
 				const delay = 250 * Math.pow(2, attempt) + Math.random() * 200;
-				if (isDevMode) {
-					console.log(
-						`⏳ [ApiService] Retrying in ${delay}ms (attempt ${attempt + 1}/${
-							maxRetries + 1
-						})`
-					);
-				}
+				apiLog.info('Retrying request', {
+					delay,
+					attempt: attempt + 1,
+					maxAttempts: maxRetries + 1,
+				});
 				await new Promise((resolve) => setTimeout(resolve, delay));
 				continue;
 			}
@@ -222,6 +211,7 @@ export interface ApiResponse<T = any> {
 	message?: string;
 	status?: number;
 	statusText?: string;
+	rawResponse?: string;
 	usage?: {
 		estimatedTokens: number;
 		remainingTokens: number;
@@ -229,28 +219,7 @@ export interface ApiResponse<T = any> {
 	};
 }
 
-export enum ApiErrorType {
-	NETWORK_ERROR = 'NETWORK_ERROR',
-	AUTHENTICATION_ERROR = 'AUTHENTICATION_ERROR',
-	RATE_LIMIT_ERROR = 'RATE_LIMIT_ERROR',
-	VALIDATION_ERROR = 'VALIDATION_ERROR',
-	SERVER_ERROR = 'SERVER_ERROR',
-	TIMEOUT_ERROR = 'TIMEOUT_ERROR',
-	OFFLINE_ERROR = 'OFFLINE_ERROR',
-	UNKNOWN_ERROR = 'UNKNOWN_ERROR',
-}
-
-export class ApiError extends Error {
-	constructor(
-		message: string,
-		public type: ApiErrorType,
-		public status?: number,
-		public response?: any
-	) {
-		super(message);
-		this.name = 'ApiError';
-	}
-}
+// ApiError and ApiErrorType are now imported from ./apiTypes above
 
 export class ApiService {
 	private static isOnline(): boolean {
@@ -300,12 +269,10 @@ export class ApiService {
 		try {
 			const hmacService = getHMACService();
 
-			if (isDevMode) {
-				console.log('🔐 [ApiService] HMAC signing process starting...');
-				console.log('🔐 [ApiService] Has body:', hasBody);
-				console.log('🔐 [ApiService] Original body:', body);
-				console.log('🔐 [ApiService] Body type:', typeof body);
-			}
+			apiLog.debugLazy(() => [
+				'HMAC signing process starting',
+				{ hasBody, bodyType: typeof body, endpoint, method },
+			]);
 
 			// For bodyless requests, bodyString will be empty string for signing
 			// but we return null to indicate no body should be sent in fetch
@@ -315,11 +282,16 @@ export class ApiService {
 					: stableStringify(body)
 				: null;
 
-			if (isDevMode) {
-				console.log('🔐 [ApiService] HMAC Debug - Body string:', bodyString);
-				console.log('🔐 [ApiService] HMAC Debug - Method:', method);
-				console.log('🔐 [ApiService] HMAC Debug - Endpoint:', endpoint);
-			}
+			apiLog.debugLazy(() => [
+				'HMAC debug info',
+				{
+					bodyString: bodyString
+						? bodyString.substring(0, 100) + '...'
+						: 'NO BODY',
+					method,
+					endpoint,
+				},
+			]);
 
 			const signedHeaders = hmacService.signRequestHeaders(
 				body,
@@ -328,26 +300,14 @@ export class ApiService {
 				headers
 			);
 
-			if (isDevMode) {
-				console.log('🔐 [ApiService] HMAC signing completed for:', endpoint);
-				console.log(
-					'🔐 [ApiService] Final signed headers keys:',
-					Object.keys(signedHeaders)
-				);
-				console.log(
-					'🔐 [ApiService] Will send body:',
-					bodyString === null
-						? 'NO BODY'
-						: `"${bodyString.substring(0, 100)}..."`
-				);
-			}
+			apiLog.debug('HMAC signing completed', {
+				endpoint,
+				headerKeys: Object.keys(signedHeaders),
+			});
 
 			return { headers: signedHeaders, bodyString };
 		} catch (error) {
-			if (isDevMode) {
-				console.error('❌ [ApiService] Failed to add HMAC signature:', error);
-				console.error('❌ [ApiService] Error details:', error);
-			}
+			apiLog.error('Failed to add HMAC signature', error);
 			// Continue without HMAC signature - let the server handle the error
 			return {
 				headers,
@@ -458,13 +418,10 @@ export class ApiService {
 
 	private static async getAuthHeaders(): Promise<Record<string, string>> {
 		try {
-			// Import Firebase auth to check if user is actually authenticated
-			const auth = (await import('@react-native-firebase/auth')).default;
-			const currentUser = auth().currentUser;
+			const headers = await getHttpAuthHeaders();
 
-			// Check if there's an authenticated Firebase user
-			if (!currentUser) {
-				// Return a more graceful error that can be handled by callers
+			// Check if headers have x-firebase-uid (user is authenticated)
+			if (!headers['x-firebase-uid']) {
 				const error = new Error(
 					'User not authenticated - no Firebase user found'
 				);
@@ -472,32 +429,13 @@ export class ApiService {
 				throw error;
 			}
 
-			const firebaseUID = currentUser.uid;
-
-			if (isDevMode) {
-				console.log(
-					'🔍 [DEBUG] Authenticated Firebase UID:',
-					firebaseUID ? `${firebaseUID.substring(0, 8)}...` : 'null'
-				);
-			}
-
-			const headers = {
-				'Content-Type': 'application/json',
-				'x-firebase-uid': firebaseUID,
-			};
-
-			if (isDevMode) {
-				console.log('🔍 [DEBUG] API Headers prepared:', {
-					'x-firebase-uid': `${firebaseUID.substring(0, 8)}...`,
-				});
-			}
 			return headers;
 		} catch (error) {
 			// Re-throw auth errors with a flag so callers can handle them appropriately
 			if ((error as any).isAuthError) {
 				throw error;
 			}
-			console.error('❌ API: Error getting auth headers:', error);
+			apiLog.error('Error getting auth headers', error);
 			throw error;
 		}
 	}
@@ -528,7 +466,7 @@ export class ApiService {
 			} catch (authError: any) {
 				// Handle authentication errors gracefully
 				if (authError.isAuthError) {
-					console.log('🔒 [API] User not authenticated, skipping request');
+					apiLog.warn('User not authenticated, skipping GET request');
 					return {
 						success: false,
 						error: 'User not authenticated',
@@ -541,17 +479,13 @@ export class ApiService {
 			const url = `${API_BASE_URL}${endpoint}`;
 
 			// Debug logging for URL construction
-			if (isDevMode) {
-				console.log('🔧 [DEBUG] URL Construction:');
-				console.log('🔧 [DEBUG] API_BASE_URL:', API_BASE_URL);
-				console.log('🔧 [DEBUG] endpoint:', endpoint);
-				console.log('🔧 [DEBUG] final URL:', url);
-			}
+			apiLog.debugLazy(() => [
+				'URL construction',
+				{ apiBaseUrl: API_BASE_URL, endpoint, finalUrl: url },
+			]);
 
 			// API logging: Keep essential request info
-			if (isDevMode) {
-				console.log(`📡 GET: ${endpoint}`);
-			}
+			apiLog.debug(`GET: ${endpoint}`);
 
 			// Use RequestManager for intelligent request handling
 			const data = await RequestManager.request<T>('GET', url, {
@@ -570,9 +504,7 @@ export class ApiService {
 			}
 
 			// Demo logging: Keep essential success info
-			if (isDevMode) {
-				console.log(`✅ GET: ${endpoint} (200)`);
-			}
+			apiLog.info(`GET: ${endpoint} (200)`);
 
 			return result;
 		} catch (error: any) {
@@ -600,15 +532,13 @@ export class ApiService {
 
 		return singleflight(requestKey, async () => {
 			return retryWithBackoff(async () => {
-				if (isDevMode) {
-					console.log('🔍 [ApiService] POST request details:', {
-						endpoint,
-						dataKeys: Object.keys(body),
-						firebaseUID: body.firebaseUID
-							? `${body.firebaseUID.substring(0, 8)}...`
-							: 'not provided',
-					});
-				}
+				apiLog.debug('POST request details', {
+					endpoint,
+					dataKeys: Object.keys(body),
+					firebaseUID: body.firebaseUID
+						? `${body.firebaseUID.substring(0, 8)}...`
+						: 'not provided',
+				});
 
 				let headers: Record<string, string>;
 				try {
@@ -616,31 +546,22 @@ export class ApiService {
 
 					// Add Firebase ID token for write operations
 					if (this.requiresHMACSigning(endpoint)) {
-						const auth = (await import('@react-native-firebase/auth')).default;
-						const currentUser = auth().currentUser;
+						const authInstance = getAuth(getApp());
+						const currentUser = authInstance.currentUser;
 						if (currentUser) {
 							try {
-								const idToken = await currentUser.getIdToken();
+								const idToken = await getIdToken(currentUser);
 								headers['Authorization'] = `Bearer ${idToken}`;
-								console.log(
-									'🔐 [ApiService] Added Firebase ID token for write operation'
-								);
+								apiLog.debug('Added Firebase ID token for write operation');
 							} catch (tokenError) {
-								console.warn(
-									'⚠️ [ApiService] Failed to get Firebase ID token:',
-									tokenError
-								);
+								apiLog.warn('Failed to get Firebase ID token', tokenError);
 							}
 						}
 					}
 				} catch (authError: any) {
 					// Handle authentication errors gracefully
 					if (authError.isAuthError) {
-						if (isDevMode) {
-							console.log(
-								'🔒 [API] User not authenticated, skipping POST request'
-							);
-						}
+						apiLog.warn('User not authenticated, skipping POST request');
 						return {
 							success: false,
 							error: 'User not authenticated',
@@ -660,16 +581,17 @@ export class ApiService {
 
 				const url = `${API_BASE_URL}${endpoint}`;
 
-				if (isDevMode) {
-					console.log('🔍 [ApiService] POST request details:', {
+				apiLog.debugLazy(() => [
+					'POST request details',
+					{
 						url,
 						endpoint,
 						headers: {
 							'x-firebase-uid':
 								signedHeaders['x-firebase-uid']?.substring(0, 8) + '...',
 						},
-					});
-				}
+					},
+				]);
 
 				const response = await fetch(url, {
 					method: 'POST',
@@ -677,14 +599,12 @@ export class ApiService {
 					body: bodyString,
 				});
 
-				if (isDevMode) {
-					console.log('🔍 [ApiService] POST response received:', {
-						status: response.status,
-						statusText: response.statusText,
-						ok: response.ok,
-						url: response.url,
-					});
-				}
+				apiLog.debug('POST response received', {
+					status: response.status,
+					statusText: response.statusText,
+					ok: response.ok,
+					url: response.url,
+				});
 
 				// Check if response is JSON before parsing
 				const contentType = response.headers.get('content-type');
@@ -693,36 +613,27 @@ export class ApiService {
 				if (contentType && contentType.includes('application/json')) {
 					try {
 						data = await response.json();
-						if (isDevMode) {
-							console.log(
-								'🔍 [ApiService] JSON response parsed successfully:',
-								{
-									success: data.success,
-									message: data.message,
-									hasData: !!data.data,
-									dataKeys: data.data ? Object.keys(data.data) : [],
-								}
-							);
-						}
+						apiLog.debug('JSON response parsed successfully', {
+							success: data.success,
+							message: data.message,
+							hasData: !!data.data,
+							dataKeys: data.data ? Object.keys(data.data) : [],
+						});
 
 						// Log full debug data if present (HMAC debugging)
 						if (data.debug) {
-							if (isDevMode) {
-								console.log('🐛 [ApiService] Server Debug Info:', data.debug);
-							}
+							apiLog.debug('Server debug info', { debug: data.debug });
 						}
 
 						// Log full error response for debugging
 						if (!response.ok) {
-							if (isDevMode) {
-								console.log(
-									'🔍 [ApiService] Full error response:',
-									JSON.stringify(data, null, 2)
-								);
-							}
+							apiLog.debugLazy(() => [
+								'Full error response',
+								JSON.stringify(data, null, 2),
+							]);
 						}
 					} catch (parseError) {
-						console.error('❌ [ApiService] JSON parse error:', parseError);
+						apiLog.error('JSON parse error', parseError);
 						return {
 							success: false,
 							error: 'Invalid JSON response from server',
@@ -731,7 +642,7 @@ export class ApiService {
 				} else {
 					// Handle non-JSON responses (like HTML 404 pages)
 					const textResponse = await response.text();
-					console.error('⚠️ [ApiService] Non-JSON response:', {
+					apiLog.warn('Non-JSON response', {
 						contentType,
 						status: response.status,
 						responsePreview: textResponse.substring(0, 200),
@@ -758,7 +669,7 @@ export class ApiService {
 						throw error;
 					}
 
-					console.error('❌ [ApiService] HTTP error response:', {
+					apiLog.error('HTTP error response', {
 						status: response.status,
 						statusText: response.statusText,
 						error: data.error,
@@ -775,7 +686,7 @@ export class ApiService {
 					const message =
 						data.message || data.data?.message || data.data?.response;
 					if (!message || typeof message !== 'string' || !message.trim()) {
-						console.error('❌ [ApiService] Empty message from orchestrator:', {
+						apiLog.error('Empty message from orchestrator', {
 							endpoint,
 							success: data.success,
 							message: message,
@@ -789,9 +700,7 @@ export class ApiService {
 				}
 
 				// API logging: Success response
-				if (isDevMode) {
-					console.log(`✅ [ApiService] POST: ${endpoint} (${response.status})`);
-				}
+				apiLog.info(`POST: ${endpoint} (${response.status})`);
 
 				// Clear cache by prefix after successful POST (resource created)
 				this.clearCacheByPrefix(endpoint);
@@ -813,27 +722,22 @@ export class ApiService {
 
 				// Add Firebase ID token for write operations
 				if (this.requiresHMACSigning(endpoint)) {
-					const auth = (await import('@react-native-firebase/auth')).default;
-					const currentUser = auth().currentUser;
+					const authInstance = getAuth(getApp());
+					const currentUser = authInstance.currentUser;
 					if (currentUser) {
 						try {
-							const idToken = await currentUser.getIdToken();
+							const idToken = await getIdToken(currentUser);
 							headers['Authorization'] = `Bearer ${idToken}`;
-							console.log(
-								'🔐 [ApiService] Added Firebase ID token for write operation'
-							);
+							apiLog.debug('Added Firebase ID token for write operation');
 						} catch (tokenError) {
-							console.warn(
-								'⚠️ [ApiService] Failed to get Firebase ID token:',
-								tokenError
-							);
+							apiLog.warn('Failed to get Firebase ID token', tokenError);
 						}
 					}
 				}
 			} catch (authError: any) {
 				// Handle authentication errors gracefully
 				if (authError.isAuthError) {
-					console.log('🔒 [API] User not authenticated, skipping PUT request');
+					apiLog.warn('User not authenticated, skipping PUT request');
 					return {
 						success: false,
 						error: 'User not authenticated',
@@ -849,27 +753,34 @@ export class ApiService {
 			const url = `${API_BASE_URL}${endpoint}`;
 
 			// Comprehensive request debugging
-			if (isDevMode) {
-				console.log(`📝 PUT: ${endpoint}`);
-				console.log('📝 [PUT] Complete request details:');
-				console.log('  🌐 URL:', url);
-				console.log('  🔧 Method: PUT');
-				console.log('  📋 Headers:');
-				Object.entries(signedHeaders).forEach(([key, value]) => {
-					if (
-						key.toLowerCase().includes('signature') ||
-						key.toLowerCase().includes('authorization')
-					) {
-						console.log(`    ${key}: ${value.substring(0, 20)}...`);
-					} else if (key === 'x-hmac-signature') {
-						console.log(`    ${key}: ${value.substring(0, 30)}...`);
-					} else {
-						console.log(`    ${key}: ${value}`);
-					}
-				});
-				console.log('  📦 Body string:', bodyString);
-				console.log('  📦 Body string length:', bodyString.length);
-			}
+			apiLog.debugLazy(() => {
+				const headerSummary = Object.entries(signedHeaders).reduce(
+					(acc, [key, value]) => {
+						if (
+							key.toLowerCase().includes('signature') ||
+							key.toLowerCase().includes('authorization')
+						) {
+							acc[key] = value.substring(0, 20) + '...';
+						} else if (key === 'x-hmac-signature') {
+							acc[key] = value.substring(0, 30) + '...';
+						} else {
+							acc[key] = value;
+						}
+						return acc;
+					},
+					{} as Record<string, string>
+				);
+				return [
+					'PUT request details',
+					{
+						endpoint,
+						url,
+						method: 'PUT',
+						headers: headerSummary,
+						bodyStringLength: bodyString?.length ?? 0,
+					},
+				];
+			});
 
 			const response = await fetch(url, {
 				method: 'PUT',
@@ -877,51 +788,46 @@ export class ApiService {
 				body: bodyString,
 			});
 
-			if (isDevMode) {
-				console.log('📝 [PUT] Response received:');
-				console.log('  📊 Status:', response.status);
-				console.log('  📊 Status Text:', response.statusText);
-				console.log('  ✅ OK:', response.ok);
-				console.log('  🌐 Response URL:', response.url);
-			}
+			apiLog.debug('PUT response received', {
+				status: response.status,
+				statusText: response.statusText,
+				ok: response.ok,
+				url: response.url,
+			});
 
 			// Check if response is JSON before parsing
 			const contentType = response.headers.get('content-type');
 			let data: any;
 
-			if (isDevMode) {
-				console.log('📝 [PUT] Response content type:', contentType);
-				console.log('📝 [PUT] Response headers:');
+			apiLog.debugLazy(() => {
+				const headers: Record<string, string> = {};
 				response.headers.forEach((value, key) => {
-					console.log(`  ${key}: ${value}`);
+					headers[key] = value;
 				});
-			}
+				return ['PUT response headers', { contentType, headers }];
+			});
 
 			if (contentType && contentType.includes('application/json')) {
 				try {
 					data = await response.json();
-					if (isDevMode) {
-						console.log('📝 [PUT] JSON response data:', data);
-					}
+					apiLog.debug('📝 [PUT] JSON response data:', data);
 				} catch (parseError) {
-					console.error('❌ [PUT] JSON parse error:', parseError);
+					apiLog.error('PUT JSON parse error', parseError);
 					const textResponse = await response.text();
-					console.error('❌ [PUT] Raw response text:', textResponse);
+					apiLog.error('PUT raw response text', { text: textResponse });
 					return {
 						success: false,
 						error: 'Invalid JSON response from server',
 						rawResponse: textResponse,
-					};
+					} as ApiResponse<T>;
 				}
 			} else {
 				// Handle non-JSON responses
 				const textResponse = await response.text();
-				if (isDevMode) {
-					console.log('📝 [PUT] Non-JSON response:', textResponse);
-				}
+				apiLog.debug('📝 [PUT] Non-JSON response:', textResponse);
 
 				if (!response.ok) {
-					console.error('❌ [PUT] Non-JSON error response:', {
+					apiLog.error('PUT non-JSON error response', {
 						status: response.status,
 						statusText: response.statusText,
 						text: textResponse,
@@ -930,23 +836,22 @@ export class ApiService {
 						success: false,
 						error: `HTTP error! status: ${response.status}`,
 						rawResponse: textResponse,
-					};
+					} as ApiResponse<T>;
 				}
 
 				return {
 					success: false,
 					error: 'Server returned non-JSON response',
 					rawResponse: textResponse,
-				};
+				} as ApiResponse<T>;
 			}
 
 			if (!response.ok) {
-				if (isDevMode) {
-					console.error('❌ [PUT] Request failed:');
-					console.error('  📊 Status:', response.status);
-					console.error('  📊 Status Text:', response.statusText);
-					console.error('  📦 Response Data:', data);
-				}
+				apiLog.error('PUT request failed', {
+					status: response.status,
+					statusText: response.statusText,
+					responseData: data,
+				});
 
 				return {
 					success: false,
@@ -961,10 +866,7 @@ export class ApiService {
 			}
 
 			// API logging: Success response
-			if (isDevMode) {
-				console.log(`✅ [PUT] Success: ${endpoint} (${response.status})`);
-				console.log('✅ [PUT] Response data:', data);
-			}
+			apiLog.info(`PUT success: ${endpoint} (${response.status})`, { data });
 
 			// Clear cache by prefix to handle all variants
 			const baseEndpoint = endpoint.replace(/\/[^/]+$/, '');
@@ -977,7 +879,7 @@ export class ApiService {
 
 			return { success: true, data };
 		} catch (error) {
-			console.error('❌ API PUT error:', error);
+			apiLog.error('API PUT error', error);
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : 'Unknown error',
@@ -993,9 +895,7 @@ export class ApiService {
 			} catch (authError: any) {
 				// Handle authentication errors gracefully
 				if (authError.isAuthError) {
-					console.log(
-						'🔒 [API] User not authenticated, skipping PATCH request'
-					);
+					apiLog.warn('User not authenticated, skipping PATCH request');
 					return {
 						success: false,
 						error: 'User not authenticated',
@@ -1007,7 +907,7 @@ export class ApiService {
 			const url = `${API_BASE_URL}${endpoint}`;
 
 			// API logging: Keep essential request info
-			console.log(`🔧 PATCH: ${endpoint}`);
+			apiLog.debug(`PATCH: ${endpoint}`);
 
 			const response = await fetch(url, {
 				method: 'PATCH',
@@ -1023,7 +923,7 @@ export class ApiService {
 				try {
 					data = await response.json();
 				} catch (parseError) {
-					console.error('❌ API: JSON parse error:', parseError);
+					apiLog.error('PATCH JSON parse error', parseError);
 					return {
 						success: false,
 						error: 'Invalid JSON response from server',
@@ -1032,10 +932,9 @@ export class ApiService {
 			} else {
 				// Handle non-JSON responses
 				const textResponse = await response.text();
-				console.log(
-					'⚠️ API: Non-JSON response:',
-					textResponse.substring(0, 100)
-				);
+				apiLog.warn('PATCH non-JSON response', {
+					preview: textResponse.substring(0, 100),
+				});
 
 				if (!response.ok) {
 					return {
@@ -1058,7 +957,7 @@ export class ApiService {
 			}
 
 			// API logging: Success response
-			console.log(`✅ PATCH: ${endpoint} (${response.status})`);
+			apiLog.info(`PATCH: ${endpoint} (${response.status})`);
 
 			// Clear cache by prefix to handle all variants
 			const baseEndpoint = endpoint.replace(/\/[^/]+$/, '');
@@ -1071,7 +970,7 @@ export class ApiService {
 
 			return { success: true, data };
 		} catch (error) {
-			console.error('❌ API PATCH error:', error);
+			apiLog.error('API PATCH error', error);
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : 'Unknown error',
@@ -1087,29 +986,22 @@ export class ApiService {
 
 				// Add Firebase ID token for write operations
 				if (this.requiresHMACSigning(endpoint)) {
-					const auth = (await import('@react-native-firebase/auth')).default;
-					const currentUser = auth().currentUser;
+					const authInstance = getAuth(getApp());
+					const currentUser = authInstance.currentUser;
 					if (currentUser) {
 						try {
-							const idToken = await currentUser.getIdToken();
+							const idToken = await getIdToken(currentUser);
 							headers['Authorization'] = `Bearer ${idToken}`;
-							console.log(
-								'🔐 [ApiService] Added Firebase ID token for write operation'
-							);
+							apiLog.debug('Added Firebase ID token for write operation');
 						} catch (tokenError) {
-							console.warn(
-								'⚠️ [ApiService] Failed to get Firebase ID token:',
-								tokenError
-							);
+							apiLog.warn('Failed to get Firebase ID token', tokenError);
 						}
 					}
 				}
 			} catch (authError: any) {
 				// Handle authentication errors gracefully
 				if (authError.isAuthError) {
-					console.log(
-						'🔒 [API] User not authenticated, skipping DELETE request'
-					);
+					apiLog.warn('User not authenticated, skipping DELETE request');
 					return {
 						success: false,
 						error: 'User not authenticated',
@@ -1141,12 +1033,11 @@ export class ApiService {
 			};
 
 			// API logging: Request details
-			console.log(`🗑️ [ApiService] Sending DELETE to ${url}`);
-			console.log(`🔑 [ApiService] DELETE has body:`, hasBody);
-			console.log(
-				`🔑 [ApiService] DELETE headers:`,
-				Object.keys(requestHeaders)
-			);
+			apiLog.debug('Sending DELETE request', {
+				url,
+				hasBody,
+				headerKeys: Object.keys(requestHeaders),
+			});
 
 			let response: Response;
 			try {
@@ -1160,28 +1051,27 @@ export class ApiService {
 				// DELETE typically has no body, so this will be skipped
 				if (hasBody && bodyString) {
 					fetchOptions.body = bodyString;
-					console.log(
-						`🔑 [ApiService] Including body in DELETE:`,
-						bodyString.substring(0, 100)
-					);
+					apiLog.debug('Including body in DELETE', {
+						bodyPreview: bodyString.substring(0, 100),
+					});
 				} else {
-					console.log(`🔑 [ApiService] DELETE is bodyless (Content-Length: 0)`);
+					apiLog.debug('DELETE is bodyless (Content-Length: 0)');
 				}
 
 				response = await fetch(url, fetchOptions);
 			} catch (networkError) {
-				console.error('❌ [ApiService] DELETE network error:', networkError);
+				apiLog.error('❌ [ApiService] DELETE network error:', networkError);
 				throw networkError;
 			}
 
 			// CRITICAL: Log response immediately
-			console.log(
+			apiLog.debug(
 				`📥 [ApiService] DELETE response: ${response.status} ${response.statusText}`
 			);
 
 			// Handle 204 No Content (successful delete with no body)
 			if (response.status === 204) {
-				console.log(`✅ [ApiService] DELETE successful (204 No Content)`);
+				apiLog.info('DELETE successful (204 No Content)');
 				// Skip to cache clearing
 				const baseEndpoint = endpoint.replace(/\/[^/]+$/, '');
 				this.clearCacheByPrefix(baseEndpoint);
@@ -1199,7 +1089,7 @@ export class ApiService {
 				try {
 					data = await response.json();
 				} catch (parseError) {
-					console.error('❌ [ApiService] DELETE JSON parse error:', parseError);
+					apiLog.error('❌ [ApiService] DELETE JSON parse error:', parseError);
 					return {
 						success: false,
 						error: 'Invalid JSON response from server',
@@ -1208,17 +1098,15 @@ export class ApiService {
 			} else {
 				// Handle non-JSON responses (but not 204, already handled above)
 				const textResponse = await response.text();
-				console.log(
-					`⚠️ [ApiService] DELETE non-JSON response: ${textResponse.substring(
-						0,
-						100
-					)}`
-				);
+				apiLog.debug('DELETE non-JSON response', {
+					preview: textResponse.substring(0, 100),
+				});
 
 				if (!response.ok) {
-					console.error(
-						`❌ [ApiService] DELETE failed (${response.status}): ${textResponse}`
-					);
+					apiLog.error('DELETE failed', {
+						status: response.status,
+						responseText: textResponse,
+					});
 					return {
 						success: false,
 						error: `HTTP ${response.status}: ${
@@ -1233,29 +1121,17 @@ export class ApiService {
 
 			if (!response.ok) {
 				const errorMsg = data.error || `HTTP error! status: ${response.status}`;
-				console.error(
-					`❌ [ApiService] DELETE failed (${response.status}): ${errorMsg}`
-				);
-
-				// Log response headers for debugging
-				console.error('❌ [ApiService] DELETE failed - Response headers:', {
-					'content-type': response.headers.get('content-type'),
-					'content-length': response.headers.get('content-length'),
+				apiLog.error('DELETE failed', {
+					status: response.status,
+					error: errorMsg,
+					headers: {
+						'content-type': response.headers.get('content-type'),
+						'content-length': response.headers.get('content-length'),
+					},
+					responseData: data,
+					serverDebug: data?.debug,
+					serverStack: data?.stack,
 				});
-
-				// Log full server response for debugging
-				console.error(
-					`🔍 [ApiService] DELETE failed - Full server response:`,
-					data
-				);
-
-				// Log server debug info if available
-				if (data?.debug) {
-					console.error(`🔍 [ApiService] Server debug info:`, data.debug);
-				}
-				if (data?.stack) {
-					console.error(`🔍 [ApiService] Server stack trace:`, data.stack);
-				}
 
 				return {
 					success: false,
@@ -1264,14 +1140,11 @@ export class ApiService {
 			}
 
 			// API logging: Success response
-			console.log(`✅ [ApiService] DELETE successful (${response.status})`);
-			console.log(`🔍 [DELETE] About to clear cache for endpoint: ${endpoint}`);
+			apiLog.info(`DELETE successful (${response.status})`, { endpoint });
 
 			// Clear cache by prefix to handle all variants
 			const baseEndpoint = endpoint.replace(/\/[^/]+$/, '');
-			console.log(
-				`🔍 [DELETE] Base endpoint: ${baseEndpoint}, Original: ${endpoint}`
-			);
+			apiLog.debug('DELETE cache clearing', { baseEndpoint, endpoint });
 
 			// Clear all caches starting with the base endpoint (e.g., /api/budgets, /api/budgets/123, etc.)
 			this.clearCacheByPrefix(baseEndpoint);
@@ -1283,7 +1156,7 @@ export class ApiService {
 
 			return { success: true, data };
 		} catch (error) {
-			console.error('❌ API DELETE error:', error);
+			apiLog.error('API DELETE error', error);
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : 'Unknown error',
@@ -1296,12 +1169,11 @@ export class ApiService {
 	 */
 	static async testConnection(): Promise<boolean> {
 		try {
-			console.log('🔍 [DEBUG] Testing server connectivity...');
-			console.log('🔧 [DEBUG] testConnection - API_BASE_URL:', API_BASE_URL);
+			apiLog.debug('Testing server connectivity', { apiBaseUrl: API_BASE_URL });
 
 			// Use a simple ping endpoint or just test if the server is reachable
 			const url = `${API_BASE_URL}/api/budgets`;
-			console.log('🔧 [DEBUG] testConnection - final URL:', url);
+			apiLog.debug('testConnection - final URL', { url });
 
 			// Get auth headers to include Firebase UID
 			const headers = await this.getAuthHeaders();
@@ -1312,18 +1184,17 @@ export class ApiService {
 			});
 
 			if (response.ok) {
-				console.log('✅ [DEBUG] Server connectivity test successful');
+				apiLog.debug('Server connectivity test successful');
 				return true;
 			} else {
-				console.error(
-					'❌ [DEBUG] Server connectivity test failed:',
-					response.status,
-					response.statusText
-				);
+				apiLog.warn('Server connectivity test failed', {
+					status: response.status,
+					statusText: response.statusText,
+				});
 				return false;
 			}
 		} catch (error) {
-			console.error('❌ [DEBUG] Server connectivity test error:', error);
+			apiLog.error('Server connectivity test error', error);
 			return false;
 		}
 	}
@@ -1333,12 +1204,12 @@ export class ApiService {
 	 */
 	static async testAuthentication(): Promise<boolean> {
 		try {
-			console.log('🔍 [DEBUG] Testing authentication...');
+			apiLog.debug('Testing authentication');
 			const response = await this.get('/api/profiles/me');
-			console.log('✅ [DEBUG] Authentication test result:', response);
+			apiLog.debug('Authentication test result', { success: response.success });
 			return response.success;
 		} catch (error) {
-			console.error('❌ [DEBUG] Authentication test error:', error);
+			apiLog.error('Authentication test error', error);
 			return false;
 		}
 	}
@@ -1421,14 +1292,10 @@ export class ApiService {
 	static clearCache(endpoint?: string): void {
 		if (endpoint) {
 			requestCache.delete(endpoint);
-			if (isDevMode) {
-				console.log(`🗑️ [ApiService] Cache cleared for: ${endpoint}`);
-			}
+			apiLog.debug(`🗑️ [ApiService] Cache cleared for: ${endpoint}`);
 		} else {
 			requestCache.clear();
-			if (isDevMode) {
-				console.log(`🗑️ [ApiService] All cache cleared`);
-			}
+			apiLog.debug(`🗑️ [ApiService] All cache cleared`);
 		}
 	}
 
@@ -1485,18 +1352,14 @@ export class ApiService {
 				) {
 					inflight.delete(key);
 					clearedInflightCount++;
-					console.log(
-						`🧹 [ApiService] Cleared inflight: ${key.substring(0, 60)}...`
-					);
+					apiLog.debug('Cleared inflight', { key: key.substring(0, 60) });
 				}
 			}
 		}
 
-		if (isDevMode) {
-			console.log(
-				`🗑️ [ApiService] Cleared ${clearedCacheCount} cache + ${clearedInflightCount} inflight with prefix: ${normalizedPrefix}`
-			);
-		}
+		apiLog.debug(
+			`🗑️ [ApiService] Cleared ${clearedCacheCount} cache + ${clearedInflightCount} inflight with prefix: ${normalizedPrefix}`
+		);
 	}
 
 	/**
@@ -1505,14 +1368,10 @@ export class ApiService {
 	static clearRateLimit(endpoint?: string): void {
 		if (endpoint) {
 			rateLimitBackoff.delete(endpoint);
-			if (isDevMode) {
-				console.log(`🚫 [ApiService] Rate limit cleared for: ${endpoint}`);
-			}
+			apiLog.debug(`🚫 [ApiService] Rate limit cleared for: ${endpoint}`);
 		} else {
 			rateLimitBackoff.clear();
-			if (isDevMode) {
-				console.log(`🚫 [ApiService] All rate limits cleared`);
-			}
+			apiLog.debug(`🚫 [ApiService] All rate limits cleared`);
 		}
 	}
 
@@ -1522,7 +1381,7 @@ export class ApiService {
 	static resetRateLimits(): void {
 		rateLimitBackoff.clear();
 		requestThrottle.clear();
-		console.log(`🚫 [ApiService] All rate limits and throttles reset`);
+		apiLog.debug(`🚫 [ApiService] All rate limits and throttles reset`);
 	}
 
 	/**

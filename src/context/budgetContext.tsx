@@ -8,6 +8,9 @@ import React, {
 } from 'react';
 import { ApiService } from '../services';
 import { setCacheInvalidationFlags } from '../services/utility/cacheInvalidationUtils';
+import { createLogger } from '../utils/sublogger';
+
+const budgetContextLog = createLogger('BudgetContext');
 
 // ==========================================
 // Utilities
@@ -260,7 +263,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 		// Cancel any in-flight request
 		if (abortControllerRef.current) {
 			abortControllerRef.current.abort();
-			console.log('🛑 [BudgetContext] Aborted previous fetch');
+			budgetContextLog.debug('Aborted previous fetch');
 		}
 
 		// Create new abort controller for this fetch
@@ -301,17 +304,17 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 				setBudgets(() => formatted);
 				setHasLoaded(true); // Mark as loaded
 			} else {
-				console.warn('[Budgets] Unexpected response:', response);
+				budgetContextLog.warn('Unexpected response', { response });
 				setBudgets(() => []);
 				setHasLoaded(true); // Mark as loaded even if empty
 			}
 		} catch (err: any) {
 			// Ignore abort errors (expected when a new fetch cancels the old one)
 			if (err?.name === 'AbortError') {
-				console.log('🛑 [BudgetContext] Fetch aborted (new fetch started)');
+				budgetContextLog.debug('Fetch aborted (new fetch started)');
 				return;
 			}
-			console.warn('[Budgets] Failed to fetch budgets, using empty array', err);
+			budgetContextLog.warn('Failed to fetch budgets, using empty array', err);
 			setBudgets(() => []);
 			setHasLoaded(true); // Mark as loaded even on error
 		} finally {
@@ -331,13 +334,13 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 			if (response.success) {
 				// Budget alerts checked successfully
 			} else {
-				console.warn(
+				budgetContextLog.warn(
 					'[Budgets] Failed to check budget alerts:',
 					response.error
 				);
 			}
 		} catch (error) {
-			console.error('[Budgets] Error checking budget alerts:', error);
+			budgetContextLog.error('Error checking budget alerts', error);
 		}
 	}, []);
 
@@ -355,19 +358,24 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 		// Optimistically add to UI
 		setBudgets((prev) => {
 			const updated = [newBudget, ...prev];
-			console.log('Updated budgets state (optimistic):', updated);
+			budgetContextLog.debug('Updated budgets state (optimistic)', {
+				count: updated.length,
+			});
 			return updated;
 		});
 
 		try {
 			const response = await ApiService.post<any>('/api/budgets', budgetData);
-			console.log('API response:', response);
+			budgetContextLog.debug('API response', { success: response.success });
 
 			// Handle the response format properly
 			const actualData = response.data?.data || response.data;
 			const actualSuccess = response.success;
 
-			console.log('Processed response:', { actualSuccess, actualData });
+			budgetContextLog.debug('Processed response', {
+				actualSuccess,
+				hasData: !!actualData,
+			});
 
 			if (actualSuccess && actualData) {
 				// Update with the real ID from the server
@@ -393,35 +401,34 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 					spentPercentage: actualData.spentPercentage || 0,
 				};
 
-				console.log('Server budget created:', serverBudget);
+				budgetContextLog.debug('Server budget created', {
+					id: serverBudget.id,
+				});
 
 				// Replace the temporary budget with the real one
 				setBudgets((prev) => {
 					// Check if temp budget still exists (might have been removed by another operation)
 					const hasTempBudget = prev.some((b) => b.id === tempId);
 					if (!hasTempBudget) {
-						console.warn(
+						budgetContextLog.warn(
 							'⚠️ [BudgetContext] Temp budget already removed, adding server budget'
 						);
 						return [serverBudget, ...prev];
 					}
 
 					const updated = prev.map((b) => (b.id === tempId ? serverBudget : b));
-					console.log(
-						'✅ [BudgetContext] Replaced temp budget with server budget:',
-						{
-							tempId,
-							realId: serverBudget.id,
-							count: updated.length,
-						}
-					);
+					budgetContextLog.info('Replaced temp budget with server budget', {
+						tempId,
+						realId: serverBudget.id,
+						count: updated.length,
+					});
 					return updated;
 				});
 
 				// Invalidate relevant cache entries
 				setCacheInvalidationFlags.onBudgetChange();
 				ApiService.clearCacheByPrefix('/api/budgets');
-				console.log('🗑️ [BudgetContext] Cache cleared after budget creation');
+				budgetContextLog.debug('Cache cleared after budget creation');
 
 				return serverBudget;
 			} else {
@@ -432,10 +439,12 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 			// Remove the optimistic budget on error
 			setBudgets((prev) => {
 				const updated = prev.filter((b) => b.id !== tempId);
-				console.log('Removed optimistic budget on error:', updated);
+				budgetContextLog.debug('Removed optimistic budget on error', {
+					count: updated.length,
+				});
 				return updated;
 			});
-			console.error('Error adding budget:', error);
+			budgetContextLog.error('Error adding budget', error);
 			throw error;
 		}
 	}, []);
@@ -485,14 +494,14 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 					// Invalidate relevant cache entries
 					setCacheInvalidationFlags.onBudgetChange();
 					ApiService.clearCacheByPrefix('/api/budgets');
-					console.log('🗑️ [BudgetContext] Cache cleared after budget creation');
+					budgetContextLog.debug('Cache cleared after budget creation');
 
 					return updatedBudget;
 				} else {
 					throw new Error(response.error || 'Failed to update budget');
 				}
 			} catch (error) {
-				console.error('Failed to update budget:', error);
+				budgetContextLog.error('Failed to update budget', error);
 				throw error;
 			}
 		},
@@ -501,7 +510,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 
 	const deleteBudget = useCallback(
 		async (id: string) => {
-			console.log('🗑️ [BudgetContext] Deleting budget:', id);
+			budgetContextLog.debug('Deleting budget', { id });
 
 			// Save previous state for rollback
 			let previousBudgets: Budget[] = [];
@@ -512,7 +521,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 			});
 
 			try {
-				console.log('🗑️ [BudgetContext] Calling API delete...');
+				budgetContextLog.debug('Calling API delete');
 				const result = await ApiService.delete(`/api/budgets/${id}`);
 
 				if (!result.success) {
@@ -521,7 +530,7 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 					const errorCode = errorData?.error || 'Unknown';
 					const errorMessage = result.error || 'Delete failed';
 
-					console.error('❌ [BudgetContext] Server error:', {
+					budgetContextLog.error('Server error', {
 						code: errorCode,
 						message: errorMessage,
 						data: errorData,
@@ -541,13 +550,13 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 					}
 				}
 
-				console.log('✅ [BudgetContext] Delete successful, clearing cache...');
+				budgetContextLog.info('Delete successful, clearing cache');
 				// Invalidate relevant cache entries
 				setCacheInvalidationFlags.onBudgetChange();
 				ApiService.clearCacheByPrefix('/api/budgets');
-				console.log('🗑️ [BudgetContext] Cache cleared after budget deletion');
+				budgetContextLog.debug('Cache cleared after budget deletion');
 			} catch (err) {
-				console.error('❌ [BudgetContext] Delete failed, rolling back:', err);
+				budgetContextLog.error('Delete failed, rolling back', err);
 				// Rollback to previous state
 				setBudgets(previousBudgets);
 
@@ -560,8 +569,11 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 
 	const updateBudgetSpent = useCallback(
 		async (budgetId: string, amount: number) => {
-			console.log('[Budgets] updateBudgetSpent called:', { budgetId, amount });
-			console.log('[Budgets] Current budgets before update:', budgets);
+			budgetContextLog.debug('updateBudgetSpent called', {
+				budgetId,
+				amount,
+				budgetCount: budgets.length,
+			});
 
 			try {
 				const response = await ApiService.post<any>(
@@ -572,15 +584,17 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 					}
 				);
 
-				console.log('[Budgets] updateBudgetSpent API response:', response);
+				budgetContextLog.debug('updateBudgetSpent API response', {
+					success: response.success,
+				});
 
 				// Handle the response format properly
 				const actualData = response.data?.data || response.data;
 				const actualSuccess = response.success;
 
-				console.log('[Budgets] Processed response:', {
+				budgetContextLog.debug('Processed response', {
 					actualSuccess,
-					actualData,
+					hasData: !!actualData,
 				});
 
 				if (actualSuccess && actualData) {
@@ -606,28 +620,34 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 						spentPercentage: actualData.spentPercentage || 0,
 					};
 
-					console.log('[Budgets] Updated budget object:', updatedBudget);
+					budgetContextLog.debug('Updated budget object', {
+						id: updatedBudget.id,
+					});
 
 					setBudgets((prev) => {
 						const updated = prev.map((b) =>
 							b.id === updatedBudget.id ? updatedBudget : b
 						);
-						console.log('[Budgets] Budgets state after update:', updated);
+						budgetContextLog.debug('Budgets state after update', {
+							count: updated.length,
+						});
 						return updated;
 					});
 
 					// Invalidate relevant cache entries
 					setCacheInvalidationFlags.onBudgetChange();
 					ApiService.clearCacheByPrefix('/api/budgets');
-					console.log('🗑️ [BudgetContext] Cache cleared after budget creation');
+					budgetContextLog.debug('Cache cleared after budget creation');
 
 					return updatedBudget;
 				} else {
-					console.error('[Budgets] API response indicates failure:', response);
+					budgetContextLog.error('API response indicates failure', {
+						response,
+					});
 					throw new Error(response.error || 'Failed to update budget spent');
 				}
 			} catch (error) {
-				console.error('Failed to update budget spent:', error);
+				budgetContextLog.error('Failed to update budget spent', error);
 				throw error;
 			}
 		},

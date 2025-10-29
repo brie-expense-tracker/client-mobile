@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ApiService } from '../services';
+import { createLogger } from '../utils/sublogger';
+
+const actionsLog = createLogger('useActions');
 
 interface Action {
 	id: string;
@@ -51,7 +54,7 @@ export default function useActions() {
 				setActions([]);
 			}
 		} catch (error) {
-			console.error('Failed to fetch actions:', error);
+			actionsLog.error('Failed to fetch actions', error);
 			setActions([]);
 		} finally {
 			setLoading(false);
@@ -79,7 +82,7 @@ export default function useActions() {
 				);
 			}
 		} catch (error) {
-			console.error('Failed to complete action:', error);
+			actionsLog.error('Failed to complete action', error);
 		}
 	}, []);
 
@@ -99,7 +102,7 @@ export default function useActions() {
 				setActions((prev) => prev.filter((a) => a.id !== action.id));
 			}
 		} catch (error) {
-			console.error('Failed to defer action:', error);
+			actionsLog.error('Failed to defer action', error);
 		}
 	}, []);
 
@@ -134,7 +137,7 @@ export default function useActions() {
 				return newActions;
 			}
 		} catch (error) {
-			console.error('Failed to generate actions from insight:', error);
+			actionsLog.error('Failed to generate actions from insight', error);
 		}
 		return [];
 	}, []);

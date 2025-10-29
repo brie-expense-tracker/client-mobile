@@ -16,9 +16,13 @@ import {
 	RecurringExpense,
 } from '../../../../src/services';
 import { useRecurringExpense } from '../../../../src/context/recurringExpenseContext';
+import { createLogger } from '../../../../src/utils/sublogger';
+
+const recurringExpensesListLog = createLogger('RecurringExpensesList');
 import { FilterContext } from '../../../../src/context/filterContext';
 import RecurringExpenseCard from './RecurringExpenseCard';
 import { resolveRecurringExpenseAppearance } from '../../../../src/utils/recurringExpenseAppearance';
+import { isDevMode } from '../../../../src/config/environment';
 
 interface RecurringExpensesListProps {
 	title?: string;
@@ -58,13 +62,20 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 				);
 				return daysUntilDue <= 7;
 			});
-			console.log(
-				'[RecurringExpensesList] Filtered upcoming expenses:',
-				upcoming
-			);
+			if (isDevMode) {
+				recurringExpensesListLog.debug(
+					'[RecurringExpensesList] Filtered upcoming expenses:',
+					upcoming
+				);
+			}
 			setExpenses(upcoming);
 		} else {
-			console.log('[RecurringExpensesList] Setting all expenses:', allExpenses);
+			if (isDevMode) {
+				recurringExpensesListLog.debug(
+					'[RecurringExpensesList] Setting all expenses:',
+					allExpenses
+				);
+			}
 			setExpenses(allExpenses);
 		}
 	}, [allExpenses, showUpcomingOnly]);
@@ -83,9 +94,11 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 					.filter((id) => id && objectIdRe.test(id));
 
 				if (patternIds.length === 0) {
-					console.log(
-						'⚠️ [RecurringExpensesList] No valid ObjectIds to check payment status'
-					);
+					if (isDevMode) {
+						recurringExpensesListLog.debug(
+							'⚠️ [RecurringExpensesList] No valid ObjectIds to check payment status'
+						);
+					}
 					setPaymentStatuses({});
 					return;
 				}
@@ -95,7 +108,10 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 				);
 				setPaymentStatuses(statuses);
 			} catch (error) {
-				console.error('Error checking payment statuses:', error);
+				recurringExpensesListLog.error(
+					'Error checking payment statuses',
+					error
+				);
 			}
 		};
 
@@ -160,7 +176,10 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 				{ text: 'OK' },
 			]);
 		} catch (error) {
-			console.error('Error marking as paid:', error);
+			recurringExpensesListLog.error(
+				'Error marking recurring expense as paid',
+				error
+			);
 			Alert.alert(
 				'Error',
 				'Failed to mark expense as paid. Please try again.',
@@ -179,7 +198,7 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 		try {
 			await refetch();
 		} catch (error) {
-			console.error('Error refreshing expenses:', error);
+			recurringExpensesListLog.error('Error refreshing expenses', error);
 			Alert.alert('Error', 'Failed to refresh expenses. Please try again.', [
 				{ text: 'OK' },
 			]);

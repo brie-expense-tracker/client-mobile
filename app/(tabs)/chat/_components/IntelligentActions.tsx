@@ -9,13 +9,14 @@ import {
 	ScrollView,
 	ActivityIndicator,
 } from 'react-native';
+import { logger } from '../../../../src/utils/logger';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 // Note: IntelligentActionService was removed as it was a stub implementation
 // This component now provides basic action suggestions without backend integration
 
 // Local type definitions (previously from the deleted service)
-interface IntelligentAction {
+export interface IntelligentAction {
 	id: string;
 	type:
 		| 'create_budget'
@@ -31,7 +32,7 @@ interface IntelligentAction {
 	parameters?: Record<string, any>;
 }
 
-interface ActionExecutionResult {
+export interface ActionExecutionResult {
 	success: boolean;
 	message: string;
 	data?: any;
@@ -144,7 +145,7 @@ export default function IntelligentActions({
 			await refreshDetectionActions();
 			setRetryCount(0); // Reset retry count on successful refresh
 		} catch (error) {
-			console.error('Error during global refresh:', error);
+			logger.error('Error during global refresh:', error);
 			const errorMessage =
 				error instanceof Error ? error.message : 'Failed to refresh actions';
 			setError(errorMessage);
@@ -176,8 +177,8 @@ export default function IntelligentActions({
 			// Generate basic actions based on insight type (no backend integration)
 			const userActions: IntelligentAction[] = [];
 
-			console.log('User actions from MongoDB:', userActions);
-			console.log('User actions length:', userActions.length);
+			logger.debug('User actions from MongoDB:', userActions);
+			logger.debug('User actions length:', userActions.length);
 
 			// Ensure userActions is an array
 			const safeUserActions = Array.isArray(userActions) ? userActions : [];
@@ -198,9 +199,9 @@ export default function IntelligentActions({
 			if (relevantActions.length === 0) {
 				const generatedActions = generateBasicActions(insight);
 
-				console.log('Generated actions:', generatedActions);
-				console.log('Generated actions type:', typeof generatedActions);
-				console.log('Is array:', Array.isArray(generatedActions));
+				logger.debug('Generated actions:', generatedActions);
+				logger.debug('Generated actions type:', typeof generatedActions);
+				logger.debug('Is array:', Array.isArray(generatedActions));
 
 				// Ensure generatedActions is an array
 				const safeGeneratedActions = Array.isArray(generatedActions)
@@ -219,14 +220,14 @@ export default function IntelligentActions({
 					allActions = [...safeGeneratedActions, ...detectionActions];
 				}
 
-				console.log('All actions:', allActions);
-				console.log('All actions length:', allActions.length);
+				logger.debug('All actions:', allActions);
+				logger.debug('All actions length:', allActions.length);
 
 				// Check completion status for detection actions
 				const actionsWithStatus = allActions; // No backend integration, use as-is
 
-				console.log('Actions with status:', actionsWithStatus);
-				console.log('Actions with status length:', actionsWithStatus.length);
+				logger.debug('Actions with status:', actionsWithStatus);
+				logger.debug('Actions with status length:', actionsWithStatus.length);
 
 				// Ensure actionsWithStatus is an array
 				const safeActionsWithStatus = Array.isArray(actionsWithStatus)
@@ -245,7 +246,7 @@ export default function IntelligentActions({
 				setActions(safeActionsWithStatus);
 			}
 		} catch (error) {
-			console.error('Error analyzing insight:', error);
+			logger.error('Error analyzing insight:', error);
 			const errorMessage =
 				error instanceof Error ? error.message : 'Failed to load actions';
 			setError(errorMessage);
@@ -498,12 +499,12 @@ export default function IntelligentActions({
 			if (safeUpdatedActions.length > 0) {
 				setActions(safeUpdatedActions);
 			} else {
-				console.warn(
+				logger.warn(
 					'No valid actions returned from refresh, keeping current actions'
 				);
 			}
 		} catch (error) {
-			console.error('Error refreshing detection actions:', error);
+			logger.error('Error refreshing detection actions:', error);
 			// Don't update state on error, keep current actions
 		} finally {
 			setRefreshing(false);
@@ -559,7 +560,7 @@ export default function IntelligentActions({
 					handleIntelligentNavigation(action);
 				}
 			} catch (error) {
-				console.error('Error checking detection action:', error);
+				logger.error('Error checking detection action:', error);
 				Alert.alert(
 					'Error',
 					'Failed to check action status. Please try again.'
@@ -728,7 +729,7 @@ export default function IntelligentActions({
 				);
 			}
 		} catch (error) {
-			console.error('Error refreshing action status:', error);
+			logger.error('Error refreshing action status:', error);
 			Alert.alert('Error', 'Failed to check action status. Please try again.');
 		} finally {
 			setRefreshing(false);
@@ -794,7 +795,7 @@ export default function IntelligentActions({
 				}, 100);
 			}
 		} catch (error) {
-			console.error('Error executing action:', error);
+			logger.error('Error executing action:', error);
 			Alert.alert('Error', 'Failed to execute action. Please try again.');
 		} finally {
 			setExecutingAction(null);

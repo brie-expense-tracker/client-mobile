@@ -2,6 +2,8 @@
 // Implements: Writer → Checker → (optional) Improver with rule-validators
 
 import { FactPack } from './factPack';
+import { logger } from '../../../utils/logger';
+
 
 export interface RuleValidationResult {
 	passed: boolean;
@@ -84,7 +86,7 @@ export class EnhancedCriticService {
 		query: string,
 		context: any
 	): Promise<CriticValidation> {
-		console.log(
+		logger.debug(
 			'🔍 [EnhancedCritic] Starting cascade validation for:',
 			message.substring(0, 100)
 		);
@@ -346,7 +348,7 @@ export class EnhancedCriticService {
 				const factPackTotal =
 					this.factPack.budgets?.reduce((sum, b) => sum + b.limit, 0) || 0;
 				if (Math.abs(mentionedTotal - factPackTotal) > 0.01) {
-					console.log('🔍 [EnhancedCritic] Budget total mismatch:', {
+					logger.debug('🔍 [EnhancedCritic] Budget total mismatch:', {
 						mentioned: mentionedTotal,
 						factPack: factPackTotal,
 					});
@@ -359,7 +361,7 @@ export class EnhancedCriticService {
 				const factPackTotal =
 					this.factPack.goals?.reduce((sum, g) => sum + g.targetAmount, 0) || 0;
 				if (Math.abs(mentionedTotal - factPackTotal) > 0.01) {
-					console.log('🔍 [EnhancedCritic] Goal total mismatch:', {
+					logger.debug('🔍 [EnhancedCritic] Goal total mismatch:', {
 						mentioned: mentionedTotal,
 						factPack: factPackTotal,
 					});
@@ -409,7 +411,7 @@ export class EnhancedCriticService {
 			const totalRemaining =
 				this.factPack.budgets?.reduce((sum, b) => sum + b.remaining, 0) || 0;
 			if (suggestedSpending > totalRemaining) {
-				console.log('🔍 [EnhancedCritic] Budget limit exceeded:', {
+				logger.debug('🔍 [EnhancedCritic] Budget limit exceeded:', {
 					suggested: suggestedSpending,
 					remaining: totalRemaining,
 				});
@@ -468,7 +470,7 @@ export class EnhancedCriticService {
 
 		// Debug logging to see what's being detected
 		if (matches.length > 0) {
-			console.log(
+			logger.debug(
 				'🔍 [EnhancedCritic] Ambiguity detected:',
 				matches.map((m) => m.source)
 			);
@@ -505,7 +507,7 @@ export class EnhancedCriticService {
 
 		// Debug logging to see what's being detected
 		if (matches.length > 0) {
-			console.log(
+			logger.debug(
 				'🔍 [EnhancedCritic] Hallucination detected:',
 				matches.map((m) => m.source)
 			);

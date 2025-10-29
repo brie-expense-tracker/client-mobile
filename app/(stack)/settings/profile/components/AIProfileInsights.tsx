@@ -1,20 +1,11 @@
+import { logger } from '../../../../../src/utils/logger';
 import React, {
 	useState,
-	useEffect,
 	useCallback,
 	useMemo,
 	useContext,
+	useEffect,
 } from 'react';
-import {
-	View,
-	Text,
-	StyleSheet,
-	TouchableOpacity,
-	ScrollView,
-	ActivityIndicator,
-	RefreshControl,
-	TextInput,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useBudget } from '../../../../../src/context/budgetContext';
@@ -22,6 +13,16 @@ import { useGoal } from '../../../../../src/context/goalContext';
 import { TransactionContext } from '../../../../../src/context/transactionContext';
 import { useRecurringExpense } from '../../../../../src/context/recurringExpenseContext';
 import { useTheme } from '../../../../../src/context/ThemeContext';
+import {
+	View,
+	Text,
+	StyleSheet,
+	TouchableOpacity,
+	ActivityIndicator,
+	TextInput,
+	ScrollView,
+	RefreshControl,
+} from 'react-native';
 
 interface Profile {
 	monthlyIncome?: number;
@@ -470,7 +471,7 @@ export default function AIProfileInsights({
 				amount: profile.debt || 0,
 			},
 		};
-	}, [transactions, budgets, goals, profile, recurringExpenses]);
+	}, [transactions, budgets, goals, profile]);
 
 	const loadDismissedInsights = useCallback(async () => {
 		try {
@@ -479,7 +480,7 @@ export default function AIProfileInsights({
 				setDismissedInsights(new Set(JSON.parse(dismissed)));
 			}
 		} catch (error) {
-			console.log('Error loading dismissed insights:', error);
+			logger.debug('Error loading dismissed insights:', error);
 		}
 	}, []);
 
@@ -490,7 +491,7 @@ export default function AIProfileInsights({
 				JSON.stringify([...dismissed])
 			);
 		} catch (error) {
-			console.log('Error saving dismissed insights:', error);
+			logger.debug('Error saving dismissed insights:', error);
 		}
 	}, []);
 
@@ -1202,7 +1203,7 @@ export default function AIProfileInsights({
 				});
 			setInsights(filteredInsights);
 		} catch (error) {
-			console.error('Error generating insights:', error);
+			logger.error('Error generating insights:', error);
 			const errorMessage =
 				error instanceof Error
 					? `Failed to generate insights: ${error.message}`
@@ -1219,6 +1220,7 @@ export default function AIProfileInsights({
 		budgets,
 		goals,
 		retryCount,
+		recurringExpenses,
 	]);
 
 	const handleRetry = useCallback(() => {
@@ -1319,7 +1321,7 @@ export default function AIProfileInsights({
 				setLastProfileUpdate(new Date(lastUpdate));
 			}
 		} catch (error) {
-			console.log('Error checking profile updates:', error);
+			logger.debug('Error checking profile updates:', error);
 		}
 	};
 
@@ -1355,9 +1357,9 @@ export default function AIProfileInsights({
 					'aiProfileContext',
 					JSON.stringify(aiContext)
 				);
-				console.log('AI context updated:', aiContext);
+				logger.debug('AI context updated:', aiContext);
 			} catch (error) {
-				console.log('Error updating AI context:', error);
+				logger.debug('Error updating AI context:', error);
 			}
 
 			onAction(insight.action);

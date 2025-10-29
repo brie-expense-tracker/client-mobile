@@ -1,6 +1,8 @@
 import { ApiService } from '../core/apiService';
 import { Budget, Goal, Transaction } from '../../types';
 import {
+import { logger } from '../../../utils/logger';
+
 	EnhancedStreamingService,
 	StreamingCallbacks,
 } from './enhancedStreamingService';
@@ -81,12 +83,12 @@ export class CustomGPTService {
 		this.performanceMetrics.totalRequests++;
 
 		try {
-			console.log('[CustomGPTService] Getting response for:', message);
-			console.log('[CustomGPTService] Session ID:', this.sessionId);
+			logger.debug('[CustomGPTService] Getting response for:', message);
+			logger.debug('[CustomGPTService] Session ID:', this.sessionId);
 
 			// Prepare financial context for the AI
 			const financialContext = this.prepareFinancialContext();
-			console.log('[CustomGPTService] Financial context prepared:', {
+			logger.debug('[CustomGPTService] Financial context prepared:', {
 				budgetCount: financialContext.budgets.length,
 				goalCount: financialContext.goals.length,
 				transactionCount: financialContext.recentTransactions.length,
@@ -100,7 +102,7 @@ export class CustomGPTService {
 				context: financialContext,
 			};
 
-			console.log('[CustomGPTService] Sending request to API:', {
+			logger.debug('[CustomGPTService] Sending request to API:', {
 				endpoint: '/api/custom-gpt/chat',
 				messageLength: message.trim().length,
 				hasContext: !!financialContext,
@@ -111,7 +113,7 @@ export class CustomGPTService {
 				requestPayload
 			);
 
-			console.log('[CustomGPTService] API response received:', {
+			logger.debug('[CustomGPTService] API response received:', {
 				success: response.success,
 				hasData: !!response.data,
 				responseLength: response.data?.response?.length || 0,
@@ -135,7 +137,7 @@ export class CustomGPTService {
 					},
 				};
 
-				console.log('[CustomGPTService] Returning successful response:', {
+				logger.debug('[CustomGPTService] Returning successful response:', {
 					responsePreview: result.response.substring(0, 100) + '...',
 					sessionId: result.sessionId,
 					timestamp: result.timestamp,
@@ -146,7 +148,7 @@ export class CustomGPTService {
 			}
 
 			// If the response is not successful, fall back to fallback response
-			console.log(
+			logger.debug(
 				'[CustomGPTService] API response not successful, using fallback'
 			);
 			this.performanceMetrics.fallbackRequests++;
@@ -154,7 +156,7 @@ export class CustomGPTService {
 			this.updateResponseTime(responseTime);
 
 			const fallbackResponse = this.getFallbackResponse(message);
-			console.log(
+			logger.debug(
 				'[CustomGPTService] Fallback response:',
 				fallbackResponse.substring(0, 100) + '...'
 			);
@@ -172,12 +174,12 @@ export class CustomGPTService {
 			};
 		} catch (error: any) {
 			// Log the error for debugging but don't throw it
-			console.log(
+			logger.debug(
 				'[CustomGPTService] API call failed, using fallback response:',
 				error.message
 			);
 
-			console.log('[CustomGPTService] Error details:', {
+			logger.debug('[CustomGPTService] Error details:', {
 				message: error.message,
 				status: error.response?.status,
 				statusText: error.response?.statusText,
@@ -192,7 +194,7 @@ export class CustomGPTService {
 
 			// Check if it's a rate limit error - only re-throw these for paywall handling
 			if (error.response?.status === 429) {
-				console.log(
+				logger.debug(
 					'[CustomGPTService] Rate limit error, re-throwing for paywall handling'
 				);
 				throw error; // Re-throw for paywall handling
@@ -204,7 +206,7 @@ export class CustomGPTService {
 			this.updateResponseTime(responseTime);
 
 			const fallbackResponse = this.getFallbackResponse(message);
-			console.log(
+			logger.debug(
 				'[CustomGPTService] Using fallback due to error:',
 				fallbackResponse.substring(0, 100) + '...'
 			);
@@ -754,7 +756,7 @@ export class CustomGPTService {
 		this.performanceMetrics.streamingRequests++;
 
 		try {
-			console.log(
+			logger.debug(
 				'[CustomGPTService] Getting streaming response for:',
 				message
 			);
@@ -762,7 +764,7 @@ export class CustomGPTService {
 			// Use streaming service for real-time responses
 			await this.streamingService.startStream(message, callbacks);
 		} catch (error) {
-			console.error('[CustomGPTService] Streaming error:', error);
+			logger.error('[CustomGPTService] Streaming error:', error);
 			this.performanceMetrics.failedRequests++;
 			this.performanceMetrics.lastError =
 				error instanceof Error ? error.message : String(error);
@@ -831,7 +833,7 @@ export class CustomGPTService {
 	 */
 	updateContext(newContext: FinancialContext): void {
 		this.context = newContext;
-		console.log('[CustomGPTService] Context updated');
+		logger.debug('[CustomGPTService] Context updated');
 	}
 
 	/**
@@ -847,7 +849,7 @@ export class CustomGPTService {
 	createNewSession(): void {
 		this.sessionId = this.generateSessionId();
 		this.streamingService = new EnhancedStreamingService(this.sessionId);
-		console.log('[CustomGPTService] New session created:', this.sessionId);
+		logger.debug('[CustomGPTService] New session created:', this.sessionId);
 	}
 
 	/**
@@ -860,7 +862,7 @@ export class CustomGPTService {
 			});
 			return response.success;
 		} catch (error) {
-			console.error('[CustomGPTService] Upgrade failed:', error);
+			logger.error('[CustomGPTService] Upgrade failed:', error);
 			throw error;
 		}
 	}

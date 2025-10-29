@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { logger } from '../../../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -9,10 +10,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { RecurringExpenseService } from '../../../../src/services';
-import {
-	useRecurringExpense,
-	TransformedRecurringExpense,
-} from '../../../../src/context/recurringExpenseContext';
+import { useRecurringExpense } from '../../../../src/context/recurringExpenseContext';
+import { TransformedRecurringExpense } from '../../../../src/hooks/useRecurringExpenses';
 
 interface RecurringExpensesSummaryWidgetProps {
 	title?: string;
@@ -29,7 +28,7 @@ const RecurringExpensesSummaryWidget: React.FC<
 	onExpensePress,
 	showViewAllButton = true,
 }) => {
-	const { expenses, isLoading: loading, summaryStats } = useRecurringExpense();
+	const { expenses, isLoading: loading } = useRecurringExpense();
 
 	// State for payment status
 	const [expensesWithPaymentStatus, setExpensesWithPaymentStatus] = useState<
@@ -43,6 +42,22 @@ const RecurringExpensesSummaryWidget: React.FC<
 
 	// Cast expenses to the transformed type since the hook returns transformed data
 	const transformedExpenses = expenses as TransformedRecurringExpense[];
+
+	// Calculate summary stats locally
+	const summaryStats = useMemo(() => {
+		const totalAmount = transformedExpenses.reduce(
+			(sum, expense) => sum + expense.amount,
+			0
+		);
+		const overdueCount = transformedExpenses.filter(
+			(expense) => expense.isOverdue
+		).length;
+
+		return {
+			totalAmount,
+			overdueCount,
+		};
+	}, [transformedExpenses]);
 
 	// Check payment status for all expenses
 	useEffect(() => {
@@ -60,7 +75,7 @@ const RecurringExpensesSummaryWidget: React.FC<
 					.filter((id) => id && objectIdRe.test(id));
 
 				if (patternIds.length === 0) {
-					console.log(
+					logger.debug(
 						'⚠️ [RecurringExpensesSummaryWidget] No valid ObjectIds to check payment status'
 					);
 					setExpensesWithPaymentStatus(
@@ -105,7 +120,8 @@ const RecurringExpensesSummaryWidget: React.FC<
 							nextDueDate,
 						};
 					} catch (error) {
-						console.error(
+						const expenseId = expense.patternId || (expense as any).id;
+						logger.error(
 							`Error checking payment status for ${expenseId}:`,
 							error
 						);
@@ -121,7 +137,7 @@ const RecurringExpensesSummaryWidget: React.FC<
 				setExpensesWithPaymentStatus(expensesWithStatus);
 				setRetryCount(0); // Reset retry count on success
 			} catch (error) {
-				console.error('Error checking payment status:', error);
+				logger.error('Error checking payment status:', error);
 				setPaymentStatusError('Failed to check payment status');
 				setExpensesWithPaymentStatus(
 					transformedExpenses.map((expense) => ({
@@ -169,7 +185,7 @@ const RecurringExpensesSummaryWidget: React.FC<
 	};
 
 	// Debug: Log the current status
-	console.log(
+	logger.debug(
 		`🔄 Recurring: ${transformedExpenses.length} expenses, ${expensesWithPaymentStatus.length} with status`
 	);
 
@@ -186,7 +202,9 @@ const RecurringExpensesSummaryWidget: React.FC<
 				router.push(
 					`/(tabs)/transaction/expense?description=${encodeURIComponent(
 						expense.vendor
-					)}&amount=${expense.amount}&recurringExpenseId=${expense.patternId}`
+					)}&amount=${expense.amount}&recurringExpenseId=${
+						expense.patternId
+					}` as any
 				);
 			} else {
 				// If not due soon, show expense details

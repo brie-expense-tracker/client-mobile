@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { sharedStyles } from '../../../../src/components/assistant/shared/sharedStyles';
+import { logger } from '../../../../src/utils/logger';
 
 interface SuggestedPromptsProps {
 	onPick: (prompt: string) => void;
@@ -33,7 +34,7 @@ export default function SuggestedPrompts({ onPick }: SuggestedPromptsProps) {
 				];
 				setSuggestions(staticSuggestions);
 			} catch (error) {
-				console.log(
+				logger.debug(
 					'[AI Assistant] Could not load contextual suggestions:',
 					error
 				);
@@ -59,7 +60,7 @@ export default function SuggestedPrompts({ onPick }: SuggestedPromptsProps) {
 					<TouchableOpacity
 						key={prompt.id}
 						onPress={() => {
-							console.log('🔍 [DEBUG] Prompt tapped:', prompt.text);
+							logger.debug('🔍 [DEBUG] Prompt tapped:', prompt.text);
 							onPick(prompt.text);
 						}}
 						style={[

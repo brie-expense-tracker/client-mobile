@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
+import { logger } from '../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -278,10 +279,10 @@ const OnboardingScreen = () => {
 	}, [currentIndex]);
 
 	const handleSubmit = useCallback(async () => {
-		console.log('🚀 [ProfileSetup] handleSubmit called');
+		logger.debug('🚀 [ProfileSetup] handleSubmit called');
 
 		if (submitting) {
-			console.log('⚠️ [ProfileSetup] Already submitting, ignoring');
+			logger.debug('⚠️ [ProfileSetup] Already submitting, ignoring');
 			return;
 		}
 
@@ -299,8 +300,8 @@ const OnboardingScreen = () => {
 
 		// Check if form is valid
 		if (!stepValid) {
-			console.log('❌ [ProfileSetup] Form is not valid, aborting submission');
-			console.log('📋 [ProfileSetup] Current field values:', {
+			logger.debug('❌ [ProfileSetup] Form is not valid, aborting submission');
+			logger.debug('📋 [ProfileSetup] Current field values:', {
 				firstName: firstName.trim(),
 				firstNameLength: firstName.trim().length,
 				lastName: lastName.trim(),
@@ -316,7 +317,7 @@ const OnboardingScreen = () => {
 			return;
 		}
 
-		console.log('✅ [ProfileSetup] Form is valid, proceeding with submission');
+		logger.debug('✅ [ProfileSetup] Form is valid, proceeding with submission');
 		setSubmitting(true);
 		try {
 			const monthlyIncomeNumber =
@@ -345,7 +346,7 @@ const OnboardingScreen = () => {
 				throw new Error('Last name must be at least 2 characters long');
 			}
 
-			console.log('📤 [ProfileSetup] Preparing profile data with:', {
+			logger.debug('📤 [ProfileSetup] Preparing profile data with:', {
 				firstName: trimmedFirstName,
 				firstNameLength: trimmedFirstName.length,
 				lastName: trimmedLastName,
@@ -453,24 +454,24 @@ const OnboardingScreen = () => {
 			};
 
 			// Update profile using profileContext
-			console.log('📡 [ProfileSetup] Calling updateProfile...');
+			logger.debug('📡 [ProfileSetup] Calling updateProfile...');
 			await updateProfile(profileData as any);
-			console.log('✅ [ProfileSetup] Profile updated successfully');
+			logger.debug('✅ [ProfileSetup] Profile updated successfully');
 			await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 			router.push('/(onboarding)/notificationSetup');
 		} catch (error) {
-			console.error('❌ [ProfileSetup] Error submitting profile:', error);
+			logger.error('❌ [ProfileSetup] Error submitting profile:', error);
 
 			// Extract error message
 			let errorMessage = 'Unknown error occurred';
 			if (error instanceof Error) {
 				errorMessage = error.message;
-				console.error('❌ [ProfileSetup] Error message:', errorMessage);
-				console.error('❌ [ProfileSetup] Error stack:', error.stack);
+				logger.error('❌ [ProfileSetup] Error message:', errorMessage);
+				logger.error('❌ [ProfileSetup] Error stack:', error.stack);
 			}
 
 			// Log the data that failed to submit
-			console.error(
+			logger.error(
 				'📋 [ProfileSetup] Failed data:',
 				JSON.stringify(
 					{
@@ -494,7 +495,7 @@ const OnboardingScreen = () => {
 				errorMessage.includes('First name') ||
 				errorMessage.includes('Last name')
 			) {
-				console.error(
+				logger.error(
 					'⚠️ [ProfileSetup] Validation error, staying on current screen'
 				);
 				// Don't navigate away on validation errors (Alert already shown above)
@@ -509,13 +510,13 @@ const OnboardingScreen = () => {
 			);
 
 			// For other errors, try to continue to notification setup
-			console.log(
+			logger.debug(
 				'⚠️ [ProfileSetup] Non-validation error, attempting to continue...'
 			);
 			try {
 				router.push('/(onboarding)/notificationSetup');
 			} catch (onboardingError) {
-				console.error(
+				logger.error(
 					'❌ [ProfileSetup] Error navigating to notification setup:',
 					onboardingError
 				);
@@ -523,7 +524,7 @@ const OnboardingScreen = () => {
 				router.replace('/(tabs)/dashboard');
 			}
 		} finally {
-			console.log(
+			logger.debug(
 				'🏁 [ProfileSetup] Submission complete, resetting submitting flag'
 			);
 			setSubmitting(false);
@@ -548,7 +549,7 @@ const OnboardingScreen = () => {
 		try {
 			router.push('/(onboarding)/notificationSetup');
 		} catch (error) {
-			console.error('Error navigating to notification setup:', error);
+			logger.error('Error navigating to notification setup:', error);
 			router.replace('/(tabs)/dashboard');
 		}
 	}, []);

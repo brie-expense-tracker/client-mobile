@@ -1,5 +1,7 @@
 import { ApiService } from '../core/apiService';
 import { SecureCacheService } from '../security/secureCacheService';
+import { logger } from '../../../utils/logger';
+
 
 // Dynamic import fallback for AsyncStorage to handle potential bundler issues
 let AsyncStorage: any = null;
@@ -11,13 +13,13 @@ try {
 			AsyncStorage = module.default;
 		})
 		.catch((error) => {
-			console.warn(
+			logger.warn(
 				'Failed to import AsyncStorage, token tracking will be disabled:',
 				error
 			);
 		});
 } catch (error) {
-	console.warn(
+	logger.warn(
 		'Failed to import AsyncStorage, token tracking will be disabled:',
 		error
 	);
@@ -92,7 +94,7 @@ class TokenUsageService {
 		try {
 			// Test AsyncStorage availability
 			if (typeof AsyncStorage === 'undefined') {
-				console.warn('AsyncStorage not available during conversation start');
+				logger.warn('AsyncStorage not available during conversation start');
 			}
 
 			this.currentConversationId = `conv_${Date.now()}_${Math.random()
@@ -101,7 +103,7 @@ class TokenUsageService {
 			this.conversationTokens = 0;
 			return this.currentConversationId;
 		} catch (error) {
-			console.warn('Failed to start conversation tracking:', error);
+			logger.warn('Failed to start conversation tracking:', error);
 			// Generate a fallback conversation ID
 			this.currentConversationId = `conv_fallback_${Date.now()}`;
 			this.conversationTokens = 0;
@@ -118,7 +120,7 @@ class TokenUsageService {
 	): Promise<void> {
 		// Skip tracking if AsyncStorage is not available
 		if (!AsyncStorage) {
-			console.log('AsyncStorage not available, skipping token tracking');
+			logger.debug('AsyncStorage not available, skipping token tracking');
 			return;
 		}
 
@@ -142,7 +144,7 @@ class TokenUsageService {
 				estimatedCost: this.calculateCost(tokens, modelUsed),
 			});
 		} catch (error) {
-			console.warn(
+			logger.warn(
 				'Token tracking failed, continuing without tracking:',
 				error
 			);
@@ -165,7 +167,7 @@ class TokenUsageService {
 	): Promise<void> {
 		// Skip tracking if AsyncStorage is not available
 		if (!AsyncStorage) {
-			console.log(
+			logger.debug(
 				'AsyncStorage not available, skipping AI response token tracking'
 			);
 			return;
@@ -195,7 +197,7 @@ class TokenUsageService {
 				apiEndpoint: options?.apiEndpoint,
 			});
 		} catch (error) {
-			console.warn(
+			logger.warn(
 				'AI response token tracking failed, continuing without tracking:',
 				error
 			);
@@ -239,7 +241,7 @@ class TokenUsageService {
 			const response = await ApiService.get('/api/token-usage/summary');
 			return response.data as UsageSummary;
 		} catch (error) {
-			console.error('Error fetching token usage summary:', error);
+			logger.error('Error fetching token usage summary:', error);
 			// Return default summary if API endpoint doesn't exist yet
 			return this.getDefaultUsageSummary();
 		}
@@ -255,7 +257,7 @@ class TokenUsageService {
 			);
 			return response.data as TokenUsage[];
 		} catch (error) {
-			console.error('Error fetching detailed token usage:', error);
+			logger.error('Error fetching detailed token usage:', error);
 			// Return empty array if API endpoint doesn't exist yet
 			return [];
 		}
@@ -274,13 +276,13 @@ class TokenUsageService {
 				await ApiService.post('/api/token-usage/record', usage);
 			} catch (apiError) {
 				// Backend endpoint might not be implemented yet, just log it
-				console.log(
+				logger.debug(
 					'Token usage API endpoint not available yet, storing locally only:',
 					apiError instanceof Error ? apiError.message : 'Unknown error'
 				);
 			}
 		} catch (error) {
-			console.error('Error recording token usage:', error);
+			logger.error('Error recording token usage:', error);
 			// Keep local storage for retry later
 		}
 	}
@@ -292,7 +294,7 @@ class TokenUsageService {
 		try {
 			// Check if SecureCacheService is available
 			if (!SecureCacheService.isServiceAvailable()) {
-				console.warn(
+				logger.warn(
 					'Encryption service not available, skipping local storage'
 				);
 				return;
@@ -301,7 +303,7 @@ class TokenUsageService {
 			const key = `token_usage_${Date.now()}`;
 			await SecureCacheService.setEncryptedItem(key, usage);
 		} catch (error) {
-			console.error('Error storing encrypted local token usage:', error);
+			logger.error('Error storing encrypted local token usage:', error);
 			// Don't throw - this is not critical for the app to function
 		}
 	}
@@ -441,7 +443,7 @@ class TokenUsageService {
 		try {
 			// Check if AsyncStorage is available
 			if (typeof AsyncStorage === 'undefined') {
-				console.warn('AsyncStorage not available, using fallback user ID');
+				logger.warn('AsyncStorage not available, using fallback user ID');
 				return 'user_' + Date.now();
 			}
 
@@ -454,7 +456,7 @@ class TokenUsageService {
 			// Fallback to timestamp-based ID
 			return 'user_' + Date.now();
 		} catch (error) {
-			console.error('Error getting user ID:', error);
+			logger.error('Error getting user ID:', error);
 			return 'user_' + Date.now();
 		}
 	}
@@ -486,9 +488,9 @@ class TokenUsageService {
 		try {
 			// Implementation would depend on your storage solution
 			// This is a placeholder for the sync logic
-			console.log('Syncing offline token usage data...');
+			logger.debug('Syncing offline token usage data...');
 		} catch (error) {
-			console.error('Error syncing offline usage:', error);
+			logger.error('Error syncing offline usage:', error);
 		}
 	}
 
@@ -534,7 +536,7 @@ class TokenUsageService {
 				projectedMonthlyCost: number;
 			};
 		} catch (error) {
-			console.error('Error fetching cost analysis:', error);
+			logger.error('Error fetching cost analysis:', error);
 			return this.getDefaultCostAnalysis(period);
 		}
 	}
@@ -547,9 +549,9 @@ class TokenUsageService {
 			if (!AsyncStorage) return;
 
 			await AsyncStorage.setItem('token_budget_limit', monthlyLimit.toString());
-			console.log(`Budget limit set to $${monthlyLimit} per month`);
+			logger.debug(`Budget limit set to $${monthlyLimit} per month`);
 		} catch (error) {
-			console.error('Error setting budget limit:', error);
+			logger.error('Error setting budget limit:', error);
 		}
 	}
 
@@ -606,7 +608,7 @@ class TokenUsageService {
 				status,
 			};
 		} catch (error) {
-			console.error('Error getting budget status:', error);
+			logger.error('Error getting budget status:', error);
 			return {
 				monthlyLimit: 0,
 				currentSpent: 0,
@@ -651,7 +653,7 @@ class TokenUsageService {
 				totalPotentialSavings: number;
 			};
 		} catch (error) {
-			console.error('Error fetching optimization recommendations:', error);
+			logger.error('Error fetching optimization recommendations:', error);
 			return {
 				recommendations: [],
 				totalPotentialSavings: 0,
@@ -689,7 +691,7 @@ class TokenUsageService {
 			const response = await ApiService.get('/api/token-usage/current-month');
 			return response.data as { totalCost: number; totalTokens: number };
 		} catch (error) {
-			console.error('Error fetching current month usage:', error);
+			logger.error('Error fetching current month usage:', error);
 			return { totalCost: 0, totalTokens: 0 };
 		}
 	}
@@ -704,7 +706,7 @@ class TokenUsageService {
 			const limit = await AsyncStorage.getItem('token_budget_limit');
 			return limit ? parseFloat(limit) : 100;
 		} catch (error) {
-			console.error('Error getting budget limit:', error);
+			logger.error('Error getting budget limit:', error);
 			return 100;
 		}
 	}
@@ -731,7 +733,7 @@ class TokenUsageService {
 	public async checkAsyncStorageAvailability(): Promise<boolean> {
 		try {
 			if (typeof AsyncStorage === 'undefined') {
-				console.warn('AsyncStorage is undefined');
+				logger.warn('AsyncStorage is undefined');
 				return false;
 			}
 
@@ -744,11 +746,11 @@ class TokenUsageService {
 			await AsyncStorage.removeItem(testKey);
 
 			const isWorking = retrievedValue === testValue;
-			console.log('AsyncStorage test result:', isWorking ? 'PASSED' : 'FAILED');
+			logger.debug('AsyncStorage test result:', isWorking ? 'PASSED' : 'FAILED');
 
 			return isWorking;
 		} catch (error) {
-			console.error('AsyncStorage diagnostic failed:', error);
+			logger.error('AsyncStorage diagnostic failed:', error);
 			return false;
 		}
 	}

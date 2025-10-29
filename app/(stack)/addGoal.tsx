@@ -9,6 +9,7 @@ import {
 	Text,
 	TouchableOpacity,
 } from 'react-native';
+import { logger } from '../../src/utils/logger';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useGoal } from '../../src/context/goalContext';
@@ -121,7 +122,7 @@ const AddGoalScreen: React.FC = () => {
 				},
 			]);
 		} catch (error) {
-			console.error('[AddGoalScreen] Error saving:', error);
+			logger.error('[AddGoalScreen] Error saving:', error);
 			Alert.alert('Error', 'Failed to save goal. Please try again.');
 		} finally {
 			setLoading(false);

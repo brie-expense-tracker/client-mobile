@@ -2,6 +2,8 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import { logger } from '../../utils/logger';
+
 
 export async function registerForPushNotificationsAsync() {
 	if (Platform.OS === 'android') {
@@ -38,7 +40,7 @@ export async function registerForPushNotificationsAsync() {
 					projectId,
 				})
 			).data;
-			console.log(pushTokenString);
+			logger.debug(pushTokenString);
 			return pushTokenString;
 		} catch (e: unknown) {
 			throw new Error(`${e}`);

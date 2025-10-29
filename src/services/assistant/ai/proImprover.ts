@@ -3,6 +3,8 @@
 import { WriterOutput, CriticReport } from './types';
 import { FactPack } from '../factPack';
 import { LiveApiService } from './liveApiService';
+import { logger } from '../../../../utils/logger';
+
 
 export interface ProImproverConfig {
 	maxTokens: number;
@@ -52,7 +54,7 @@ export class ProImprover {
 
 			return improvedOutput;
 		} catch (error) {
-			console.error('ProImprover failed:', error);
+			logger.error('ProImprover failed:', error);
 
 			// Return the original output with a safety note
 			return this.createFallbackOutput(writerOutput, criticReport);
@@ -165,7 +167,7 @@ Return the improved WRITER_OUTPUT as JSON.`;
 				uncertainty_notes: parsed.uncertainty_notes || [],
 			};
 		} catch (error) {
-			console.error('Failed to parse improved response:', error);
+			logger.error('Failed to parse improved response:', error);
 			throw new Error('Invalid JSON response from improver');
 		}
 	}

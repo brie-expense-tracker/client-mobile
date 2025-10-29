@@ -1,3 +1,4 @@
+import { logger } from '../../../../utils/logger';
 // ai/analytics.ts - Analytics you should log for monitoring and optimization
 
 export interface CascadeAnalytics {
@@ -274,7 +275,7 @@ export class CascadeAnalyticsService {
 	) {
 		try {
 			// Log to console for development
-			console.log(`🔍 [Analytics] ${eventName}:`, data);
+			logger.debug(`🔍 [Analytics] ${eventName}:`, data);
 
 			// Here you would integrate with your actual analytics service
 			// Examples:
@@ -286,7 +287,7 @@ export class CascadeAnalyticsService {
 			// For now, we'll use a mock analytics call
 			this.mockAnalyticsCall(eventName, data);
 		} catch (error) {
-			console.warn('Failed to log analytics event:', error);
+			logger.warn('Failed to log analytics event:', error);
 		}
 	}
 
@@ -299,7 +300,7 @@ export class CascadeAnalyticsService {
 	) {
 		// Simulate analytics API call
 		setTimeout(() => {
-			console.log(`📊 [Mock Analytics] Sent ${eventName} to analytics service`);
+			logger.debug(`📊 [Mock Analytics] Sent ${eventName} to analytics service`);
 		}, 100);
 	}
 
@@ -314,7 +315,7 @@ export class CascadeAnalyticsService {
 				JSON.stringify(analyticsData)
 			);
 		} catch (error) {
-			console.warn('Failed to persist analytics:', error);
+			logger.warn('Failed to persist analytics:', error);
 		}
 	}
 
@@ -330,7 +331,7 @@ export class CascadeAnalyticsService {
 				return true;
 			}
 		} catch (error) {
-			console.warn('Failed to load analytics:', error);
+			logger.warn('Failed to load analytics:', error);
 		}
 		return false;
 	}

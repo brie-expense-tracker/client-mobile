@@ -11,6 +11,10 @@ import { ApiService } from '../services';
 import { useBudget } from './budgetContext';
 import { useGoal } from './goalContext';
 import { setCacheInvalidationFlags } from '../services/utility/cacheInvalidationUtils';
+import { createLogger } from '../utils/sublogger';
+
+const transactionContextLog = createLogger('TransactionContext');
+
 // Transaction interface defined inline since we removed the mock data file
 export interface Transaction {
 	id: string;
@@ -153,8 +157,8 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 				setHasLoaded(true); // Mark as loaded even if empty
 			}
 		} catch (err) {
-			console.warn(
-				'[Transactions] Failed to fetch transactions, using empty array',
+			transactionContextLog.warn(
+				'Failed to fetch transactions, using empty array',
 				err
 			);
 			setTransactions([]);
@@ -168,8 +172,8 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 	const updateBudgetsAndGoals = useCallback(
 		async (transaction: Transaction) => {
 			try {
-				console.log(
-					'[TransactionContext] updateBudgetsAndGoals called with transaction:',
+				transactionContextLog.debug(
+					'updateBudgetsAndGoals called with transaction',
 					{
 						id: transaction.id,
 						target: transaction.target,
@@ -184,27 +188,27 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 					if (transaction.targetModel === 'Budget') {
 						// Backend now handles budget updates automatically when creating transactions
 						// So we just need to refresh the budgets to get the latest data
-						console.log(
-							`[TransactionContext] Backend handled budget update for ${transaction.target}, refreshing budgets...`
+						transactionContextLog.debug(
+							`Backend handled budget update for ${transaction.target}, refreshing budgets...`
 						);
 						await refetchBudgetsRef.current();
-						console.log('[TransactionContext] Budgets refreshed successfully');
+						transactionContextLog.debug('Budgets refreshed successfully');
 					} else if (transaction.targetModel === 'Goal') {
 						// Backend now handles goal updates automatically when creating transactions
 						// So we just need to refresh the goals to get the latest data
-						console.log(
-							`[TransactionContext] Backend handled goal update for ${transaction.target}, refreshing goals...`
+						transactionContextLog.debug(
+							`Backend handled goal update for ${transaction.target}, refreshing goals...`
 						);
 						await refetchGoalsRef.current();
-						console.log('[TransactionContext] Goals refreshed successfully');
+						transactionContextLog.debug('Goals refreshed successfully');
 					}
 				} else {
-					console.log(
+					transactionContextLog.debug(
 						'Transaction has no specific target, skipping budget/goal updates'
 					);
 				}
 			} catch (error) {
-				console.error('Error updating budgets and goals:', error);
+				transactionContextLog.error('Error updating budgets and goals', error);
 			}
 		},
 		[] // No dependencies needed since we use refs
@@ -362,7 +366,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 				// Invalidate relevant cache entries
 				setCacheInvalidationFlags.onNewTransaction();
 			} catch (err) {
-				console.warn('Delete failed, refetching', err);
+				transactionContextLog.warn('Delete failed, refetching', err);
 				// Rollback or just refetch
 				await refetch();
 			}
@@ -419,7 +423,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 					let targetId = transactionData.target; // Use update data as fallback
 					let targetModel = transactionData.targetModel; // Use update data as fallback
 
-					console.log('[TransactionContext] Processing server response:', {
+					transactionContextLog.debug('Processing server response', {
 						hasTarget: !!response.data.target,
 						targetType: typeof response.data.target,
 						targetValue: response.data.target,
@@ -429,7 +433,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 					});
 
 					if (response.data.target) {
-						console.log('[TransactionContext] Target object details:', {
+						transactionContextLog.debug('Target object details', {
 							hasId: !!response.data.target._id,
 							idValue: response.data.target._id,
 							targetKeys: Object.keys(response.data.target),
@@ -440,8 +444,8 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 							targetId = response.data.target._id;
 							targetModel =
 								response.data.targetModel || transactionData.targetModel;
-							console.log(
-								'[TransactionContext] Extracted target from populated object:',
+							transactionContextLog.debug(
+								'Extracted target from populated object',
 								{ targetId, targetModel }
 							);
 						} else if (typeof response.data.target === 'string') {
@@ -449,10 +453,10 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 							targetId = response.data.target;
 							targetModel =
 								response.data.targetModel || transactionData.targetModel;
-							console.log(
-								'[TransactionContext] Extracted target from ID string:',
-								{ targetId, targetModel }
-							);
+							transactionContextLog.debug('Extracted target from ID string', {
+								targetId,
+								targetModel,
+							});
 						} else {
 							// If target is an object but doesn't have _id, try to find an id field
 							const targetKeys = Object.keys(response.data.target);
@@ -463,22 +467,22 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 								targetId = response.data.target[idKey];
 								targetModel =
 									response.data.targetModel || transactionData.targetModel;
-								console.log(
-									'[TransactionContext] Extracted target from object with id field:',
+								transactionContextLog.debug(
+									'Extracted target from object with id field',
 									{ targetId, targetModel, idKey }
 								);
 							}
 						}
 					} else {
-						console.log('[TransactionContext] No target in response');
+						transactionContextLog.debug('No target in response');
 					}
 
 					// Fallback: if we still don't have target data, try to get it from the original transactionData
 					if (!targetId && transactionData.target) {
 						targetId = transactionData.target;
 						targetModel = transactionData.targetModel;
-						console.log(
-							'[TransactionContext] Using target data from transactionData:',
+						transactionContextLog.debug(
+							'Using target data from transactionData',
 							{ targetId, targetModel }
 						);
 					}
@@ -491,8 +495,8 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 					) {
 						targetId = transactionData.target;
 						targetModel = response.data.targetModel;
-						console.log(
-							'[TransactionContext] Using target data from transactionData with targetModel from response:',
+						transactionContextLog.debug(
+							'Using target data from transactionData with targetModel from response',
 							{ targetId, targetModel }
 						);
 					}
@@ -512,17 +516,14 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 							new Date().toISOString(),
 					};
 
-					console.log(
-						'[TransactionContext] Updated transaction with target data:',
-						{
-							targetId,
-							targetModel,
-							fullResponse: response.data,
-						}
-					);
+					transactionContextLog.debug('Updated transaction with target data', {
+						targetId,
+						targetModel,
+						fullResponse: response.data,
+					});
 
-					console.log(
-						'[TransactionContext] Final updatedTransaction:',
+					transactionContextLog.debug(
+						'Final updatedTransaction',
 						updatedTransaction
 					);
 
@@ -542,7 +543,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 					throw new Error('Failed to update transaction');
 				}
 			} catch (error) {
-				console.error('Error in updateTransaction:', error);
+				transactionContextLog.error('Error in updateTransaction', error);
 
 				// Rollback to original transaction state on error
 				if (originalTransaction) {

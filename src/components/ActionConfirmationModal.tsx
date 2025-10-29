@@ -10,6 +10,9 @@ import {
 	ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { createLogger } from '../utils/sublogger';
+
+const actionConfirmationModalLog = createLogger('ActionConfirmationModal');
 
 interface ActionConfirmationModalProps {
 	visible: boolean;
@@ -60,7 +63,7 @@ export const ActionConfirmationModal: React.FC<
 				confirmationData.idempotencyKey
 			);
 		} catch (error) {
-			console.error('Confirmation failed:', error);
+			actionConfirmationModalLog.error('Confirmation failed', error);
 		} finally {
 			setIsConfirming(false);
 		}

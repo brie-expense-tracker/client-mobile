@@ -1,5 +1,6 @@
 import { signRequestHeaders } from './hmacSigning';
 import { getApiBaseUrl } from '../config/environment';
+import { logger } from '../utils/logger';
 
 export interface SignedApiRequestOptions {
 	method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
@@ -90,7 +91,7 @@ export class SignedApiClient {
 				data: responseData.data || responseData,
 			};
 		} catch (error) {
-			console.error('API request failed:', error);
+			logger.error('API request failed:', error);
 			return {
 				success: false,
 				error: 'Network error',

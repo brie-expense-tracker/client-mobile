@@ -2,6 +2,8 @@
 // Pluggable web functions (inject real search/fetch/extract)
 
 import { WebFns } from '../../types';
+import { logger } from '../../../../../../utils/logger';
+
 
 // Mock implementation for development
 // In production, replace with real search API (Bing, SerpAPI, Tavily, etc.)
@@ -10,7 +12,7 @@ export const webFnsForHYSA: WebFns = {
 		query: string,
 		recencyDays = 30
 	): Promise<{ title: string; url: string }[]> {
-		console.log(
+		logger.debug(
 			`[HYSA WebFns] Mock search for: ${query} (${recencyDays} days)`
 		);
 
@@ -41,7 +43,7 @@ export const webFnsForHYSA: WebFns = {
 
 	async fetchText(url: string): Promise<string> {
 		try {
-			console.log(`[HYSA WebFns] Fetching: ${url}`);
+			logger.debug(`[HYSA WebFns] Fetching: ${url}`);
 
 			// Mock implementation - in production, use real fetch
 			if (url.includes('nerdwallet.com')) {
@@ -88,7 +90,7 @@ export const webFnsForHYSA: WebFns = {
         </html>
       `;
 		} catch (error) {
-			console.warn(`[HYSA WebFns] Failed to fetch ${url}:`, error);
+			logger.warn(`[HYSA WebFns] Failed to fetch ${url}:`, error);
 			throw error;
 		}
 	},

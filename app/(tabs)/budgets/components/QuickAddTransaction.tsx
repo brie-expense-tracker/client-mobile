@@ -15,6 +15,10 @@ import { BorderlessButton, RectButton } from 'react-native-gesture-handler';
 import RNModal from 'react-native-modal';
 import { TransactionContext } from '../../../../src/context/transactionContext';
 import { DateField } from '../../../../src/components/DateField';
+import { isDevMode } from '../../../../src/config/environment';
+import { createLogger } from '../../../../src/utils/sublogger';
+
+const quickAddTransactionLog = createLogger('QuickAddTransaction');
 // Transaction interface defined inline since we removed the mock data file
 interface Transaction {
 	id: string;
@@ -152,10 +156,12 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 				targetModel: 'Goal',
 			};
 
-			console.log(
-				'[QuickAddTransaction] Creating transaction:',
-				transactionData
-			);
+			if (isDevMode) {
+				quickAddTransactionLog.debug(
+					'[QuickAddTransaction] Creating transaction:',
+					transactionData
+				);
+			}
 
 			await addTransaction(transactionData);
 
@@ -170,7 +176,7 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 
 			Alert.alert('Success', 'Transaction added successfully!');
 		} catch (error) {
-			console.error('Error adding transaction:', error);
+			quickAddTransactionLog.error('Error adding transaction', error);
 			Alert.alert('Error', 'Failed to add transaction. Please try again.');
 		} finally {
 			setIsLoading(false);

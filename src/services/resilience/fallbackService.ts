@@ -7,6 +7,7 @@
  */
 
 import { SecureCacheService } from '../security/secureCacheService';
+import { logger } from '../../utils/logger';
 
 export interface CachedSpendPlan {
 	id: string;
@@ -146,9 +147,9 @@ export class FallbackService {
 				this.startAutoCleanup();
 			}
 
-			console.log('[FallbackService] Initialized successfully');
+			logger.debug('[FallbackService] Initialized successfully');
 		} catch (error) {
-			console.error('[FallbackService] Failed to initialize:', error);
+			logger.error('[FallbackService] Failed to initialize:', error);
 		}
 	}
 
@@ -202,9 +203,9 @@ export class FallbackService {
 			// Update statistics
 			await this.updateStatistics();
 
-			console.log('[FallbackService] Financial data cached successfully');
+			logger.debug('[FallbackService] Financial data cached successfully');
 		} catch (error) {
-			console.error('[FallbackService] Failed to cache financial data:', error);
+			logger.error('[FallbackService] Failed to cache financial data:', error);
 			throw error;
 		}
 	}
@@ -237,7 +238,7 @@ export class FallbackService {
 
 			return validPlans;
 		} catch (error) {
-			console.error(
+			logger.error(
 				'[FallbackService] Failed to get cached spend plans:',
 				error
 			);
@@ -268,7 +269,7 @@ export class FallbackService {
 
 			return validBudgets;
 		} catch (error) {
-			console.error('[FallbackService] Failed to get cached budgets:', error);
+			logger.error('[FallbackService] Failed to get cached budgets:', error);
 			return [];
 		}
 	}
@@ -296,7 +297,7 @@ export class FallbackService {
 
 			return validGoals;
 		} catch (error) {
-			console.error('[FallbackService] Failed to get cached goals:', error);
+			logger.error('[FallbackService] Failed to get cached goals:', error);
 			return [];
 		}
 	}
@@ -324,7 +325,7 @@ export class FallbackService {
 
 			return validTransactions;
 		} catch (error) {
-			console.error(
+			logger.error(
 				'[FallbackService] Failed to get cached transactions:',
 				error
 			);
@@ -400,7 +401,7 @@ export class FallbackService {
 
 			return spendPlan;
 		} catch (error) {
-			console.error(
+			logger.error(
 				'[FallbackService] Failed to generate fallback spend plan:',
 				error
 			);
@@ -429,7 +430,7 @@ export class FallbackService {
 
 			return new Date(timestamp);
 		} catch (error) {
-			console.error('[FallbackService] Failed to get last sync time:', error);
+			logger.error('[FallbackService] Failed to get last sync time:', error);
 			return null;
 		}
 	}
@@ -448,7 +449,7 @@ export class FallbackService {
 
 			return expiry > now;
 		} catch (error) {
-			console.error('[FallbackService] Failed to check data validity:', error);
+			logger.error('[FallbackService] Failed to check data validity:', error);
 			return false;
 		}
 	}
@@ -466,12 +467,9 @@ export class FallbackService {
 				SecureCacheService.removeEncryptedItem(this.CACHE_KEYS.LAST_SYNC),
 			]);
 
-			console.log('[FallbackService] Encrypted cache cleared successfully');
+			logger.debug('[FallbackService] Encrypted cache cleared successfully');
 		} catch (error) {
-			console.error(
-				'[FallbackService] Failed to clear encrypted cache:',
-				error
-			);
+			logger.error('[FallbackService] Failed to clear encrypted cache:', error);
 		}
 	}
 
@@ -719,9 +717,11 @@ export class FallbackService {
 			this.cacheStats.lastCleanup = new Date().toISOString();
 			await this.updateStatistics();
 
-			console.log(`[FallbackService] Cleaned up ${cleanedItems} expired items`);
+			logger.debug(
+				`[FallbackService] Cleaned up ${cleanedItems} expired items`
+			);
 		} catch (error) {
-			console.error('[FallbackService] Failed to perform cleanup:', error);
+			logger.error('[FallbackService] Failed to perform cleanup:', error);
 		}
 	}
 
@@ -777,7 +777,7 @@ export class FallbackService {
 				this.cacheStats
 			);
 		} catch (error) {
-			console.error('[FallbackService] Failed to update statistics:', error);
+			logger.error('[FallbackService] Failed to update statistics:', error);
 		}
 	}
 
@@ -797,9 +797,9 @@ export class FallbackService {
 	static async batchCacheData(data: FallbackData): Promise<void> {
 		try {
 			await this.cacheFinancialData(data);
-			console.log('[FallbackService] Batch cache completed successfully');
+			logger.debug('[FallbackService] Batch cache completed successfully');
 		} catch (error) {
-			console.error('[FallbackService] Batch cache failed:', error);
+			logger.error('[FallbackService] Batch cache failed:', error);
 			throw error;
 		}
 	}
@@ -811,9 +811,9 @@ export class FallbackService {
 		try {
 			// Try to generate fallback spend plan to warm cache
 			await this.generateFallbackSpendPlan();
-			console.log('[FallbackService] Cache warmed successfully');
+			logger.debug('[FallbackService] Cache warmed successfully');
 		} catch (error) {
-			console.error('[FallbackService] Cache warming failed:', error);
+			logger.error('[FallbackService] Cache warming failed:', error);
 		}
 	}
 

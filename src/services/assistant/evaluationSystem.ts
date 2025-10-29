@@ -4,6 +4,8 @@
 import { ChatResponse } from './responseSchema';
 import { FinancialSkillId } from './skills/comprehensiveSkillRegistry';
 import { RouteDecision, hierarchicalRouter } from './hierarchicalRouter';
+import { logger } from '../../../utils/logger';
+
 
 // Context type for evaluation system
 type ChatContext = any;
@@ -1297,7 +1299,7 @@ export class EvaluationSystem {
 				);
 				isCorrect = routeDecision.skillId === entry.expectedIntent;
 			} catch (error) {
-				console.error(
+				logger.error(
 					`[EvaluationSystem] Error evaluating entry ${entry.id}:`,
 					error
 				);
@@ -1375,7 +1377,7 @@ export class EvaluationSystem {
 					stepSuccessful =
 						routeDecision.type === 'SKILL' && routeDecision.confidence > 0.5;
 				} catch (error) {
-					console.error(
+					logger.error(
 						`[EvaluationSystem] Error in journey step ${i}:`,
 						error
 					);

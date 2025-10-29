@@ -1,5 +1,7 @@
 import { ApiService } from './apiService';
-import { isDevMode } from '../../config/environment';
+import { createLogger } from '../../utils/sublogger';
+
+const onboardingLog = createLogger('OnboardingService');
 
 // Current onboarding version - should match server config
 const CURRENT_ONBOARDING_VERSION = 1;
@@ -19,13 +21,11 @@ export const OnboardingService = {
 				throw new Error(response.error || 'Failed to mark onboarding complete');
 			}
 
-			if (isDevMode) {
-				console.log(
-					`✅ Onboarding complete (v${response.data?.onboardingVersion})`
-				);
-			}
+			onboardingLog.info('Onboarding complete', {
+				version: response.data?.onboardingVersion,
+			});
 		} catch (error) {
-			console.error('❌ Error marking onboarding complete:', error);
+			onboardingLog.error('Error marking onboarding complete', error);
 			throw error;
 		}
 	},
@@ -35,25 +35,21 @@ export const OnboardingService = {
 	 */
 	hasSeenOnboarding: async (): Promise<boolean> => {
 		try {
-			if (isDevMode) {
-				console.log('🔍 [OnboardingService] Checking onboarding status...');
-			}
+			onboardingLog.debug('Checking onboarding status');
 			const response = await ApiService.get<{
 				user: { onboardingVersion: number };
 			}>('/api/users/me');
 
-			if (isDevMode) {
-				console.log('🔍 [OnboardingService] API response:', {
-					success: response.success,
-					hasData: !!response.data,
-					hasUser: !!response.data?.user,
-					onboardingVersion: response.data?.user?.onboardingVersion,
-					error: response.error,
-				});
-			}
+			onboardingLog.debug('API response', {
+				success: response.success,
+				hasData: !!response.data,
+				hasUser: !!response.data?.user,
+				onboardingVersion: response.data?.user?.onboardingVersion,
+				error: response.error,
+			});
 
 			if (!response.success || !response.data?.user) {
-				console.error('❌ Failed to fetch user data for onboarding check:', {
+				onboardingLog.error('Failed to fetch user data for onboarding check', {
 					success: response.success,
 					error: response.error,
 					hasData: !!response.data,
@@ -68,17 +64,15 @@ export const OnboardingService = {
 			const hasSeenCurrentVersion =
 				userOnboardingVersion >= CURRENT_ONBOARDING_VERSION;
 
-			if (isDevMode) {
-				console.log(
-					`👤 Onboarding: v${userOnboardingVersion}/${CURRENT_ONBOARDING_VERSION} (${
-						hasSeenCurrentVersion ? 'Seen' : 'New'
-					})`
-				);
-			}
+			onboardingLog.debug('Onboarding status', {
+				userVersion: userOnboardingVersion,
+				currentVersion: CURRENT_ONBOARDING_VERSION,
+				hasSeen: hasSeenCurrentVersion,
+			});
 
 			return hasSeenCurrentVersion;
 		} catch (error) {
-			console.error('❌ Error checking onboarding status:', error);
+			onboardingLog.error('Error checking onboarding status', error);
 			// Return true as fallback to prevent infinite loading
 			// This assumes the user has completed onboarding if we can't determine status
 			return true;
@@ -99,11 +93,11 @@ export const OnboardingService = {
 	resetOnboardingStatus: async (): Promise<void> => {
 		try {
 			// This would need a server endpoint to reset onboarding version to 0
-			console.warn(
+			onboardingLog.warn(
 				'Reset onboarding status not implemented - requires server endpoint'
 			);
 		} catch (error) {
-			console.error('Error resetting onboarding status:', error);
+			onboardingLog.error('Error resetting onboarding status', error);
 			throw error;
 		}
 	},

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { logger } from '../../../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -54,7 +55,7 @@ const NotificationSettingsScreen: React.FC = () => {
 
 			await updateNotificationSettings(newSettings);
 		} catch (error) {
-			console.error('Error updating notification settings:', error);
+			logger.error('Error updating notification settings:', error);
 
 			// Revert on error
 			setSettings(settings);

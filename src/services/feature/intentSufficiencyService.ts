@@ -4,6 +4,7 @@
  */
 
 import { MissingInfoChip } from '../../components/assistant/cards/MissingInfoCard';
+import { logger } from '../../utils/logger';
 
 export type Intent =
 	| 'GET_SPENDING_PLAN'
@@ -71,7 +72,7 @@ export async function evaluateAnswerability(
 		);
 
 		if (!dataReady) {
-			console.warn(
+			logger.warn(
 				'Data not ready within timeout, proceeding with available data'
 			);
 		}
@@ -97,7 +98,7 @@ export async function evaluateAnswerability(
 		};
 	} catch (e: any) {
 		// Never throw - allow the chat to continue
-		console.error('evaluateAnswerability error', e);
+		logger.error('evaluateAnswerability error', e);
 		return {
 			sufficient: true,
 			missing: [],

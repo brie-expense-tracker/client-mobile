@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { logger } from '../../../../src/utils/logger';
 import {
 	SafeAreaView,
 	View,
@@ -45,7 +46,7 @@ export default function LoginHistoryScreen() {
 			setLoginHistory([]);
 			setLoading(false);
 		} catch (error) {
-			console.error('Error fetching login history:', error);
+			logger.error('Error fetching login history:', error);
 			setLoading(false);
 		}
 	};

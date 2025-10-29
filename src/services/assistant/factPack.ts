@@ -1,3 +1,4 @@
+import { logger } from '../../../utils/logger';
 // FactPack Schema - Structured data layer to prevent AI hallucinations
 // Provides deterministic, verifiable facts instead of prose descriptions
 
@@ -328,7 +329,7 @@ export class FactPackBuilder {
 		// Validate before returning
 		const validation = FactPackCalculator.validateFactPack(result);
 		if (!validation.isValid) {
-			console.warn('FactPack validation failed:', validation.errors);
+			logger.warn('FactPack validation failed:', validation.errors);
 		}
 
 		return result;

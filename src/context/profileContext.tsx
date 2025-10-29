@@ -17,6 +17,9 @@ import {
 	AIInsightsChangedEvent,
 	AssistantConfigChangedEvent,
 } from '../lib/eventBus';
+import { createLogger } from '../utils/sublogger';
+
+const profileContextLog = createLogger('ProfileContext');
 
 interface ProfilePreferences {
 	adviceFrequency: string;
@@ -277,7 +280,7 @@ const saveToCache = async (profile: Profile): Promise<void> => {
 		await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(profile));
 		await AsyncStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
 	} catch (error) {
-		console.warn('Failed to save profile to cache:', error);
+		profileContextLog.warn('Failed to save profile to cache', error);
 	}
 };
 
@@ -301,7 +304,7 @@ const loadFromCache = async (): Promise<Profile | null> => {
 
 		return JSON.parse(cachedProfile);
 	} catch (error) {
-		console.warn('Failed to load profile from cache:', error);
+		profileContextLog.warn('Failed to load profile from cache', error);
 		return null;
 	}
 };
@@ -313,7 +316,7 @@ const clearCache = async (): Promise<void> => {
 			AsyncStorage.removeItem(CACHE_TIMESTAMP_KEY),
 		]);
 	} catch (error) {
-		console.warn('Failed to clear profile cache:', error);
+		profileContextLog.warn('Failed to clear profile cache', error);
 	}
 };
 
@@ -377,12 +380,14 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 				setError(response.error || 'Failed to fetch profile');
 			}
 		} catch (err) {
-			console.error('ProfileProvider: Error fetching profile:', err);
+			profileContextLog.error('Error fetching profile', err);
 
 			// If we have cached data, use it and mark as offline
 			if (profile) {
 				setIsOffline(true);
-				console.log('Using cached profile data due to network error');
+				profileContextLog.warn(
+					'Using cached profile data due to network error'
+				);
 			} else {
 				setError(
 					err instanceof Error ? err.message : 'Failed to fetch profile'
@@ -487,22 +492,22 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 			}>('/profiles', defaultProfile);
 
 			if (response.success && response.data) {
-				console.log(
-					'ProfileProvider: Default profile created successfully:',
+				profileContextLog.debug(
+					'Default profile created successfully',
 					response.data
 				);
 				// The createProfile endpoint returns { profileId, profile }
 				const profileData = response.data.profile || response.data;
 				setProfile(profileData);
 			} else {
-				console.error(
-					'ProfileProvider: Failed to create default profile:',
+				profileContextLog.error(
+					'Failed to create default profile',
 					response.error
 				);
 				setError('Failed to create profile');
 			}
 		} catch (err) {
-			console.error('ProfileProvider: Error creating default profile:', err);
+			profileContextLog.error('Error creating default profile', err);
 			setError('Failed to create profile');
 		}
 	};
@@ -546,7 +551,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 
 				if (response.success && response.data) {
 					// The optimistic update was correct, no need to update again
-					console.log('Profile updated successfully');
+					profileContextLog.debug('Profile updated successfully');
 					setLastSyncTime(Date.now());
 					setIsOffline(false);
 
@@ -561,7 +566,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 					throw new Error(response.error || 'Failed to update profile');
 				}
 			} catch (err) {
-				console.error('Error updating profile:', err);
+				profileContextLog.error('Error updating profile', err);
 				// Revert to previous state on error
 				setProfile(previousProfile);
 				setError(
@@ -630,7 +635,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 
 				if (response.success && response.data) {
 					// The optimistic update was correct, no need to update again
-					console.log('Preferences updated successfully');
+					profileContextLog.debug('Preferences updated successfully');
 				} else {
 					// API call failed, revert to previous state
 					startTransition(() => setProfile(previousProfile));
@@ -654,7 +659,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 					throw new Error(response.error || 'Failed to update preferences');
 				}
 			} catch (err) {
-				console.error('Error updating preferences:', err);
+				profileContextLog.error('Error updating preferences', err);
 				// Revert to previous state on error
 				startTransition(() => setProfile(previousProfile));
 
@@ -723,7 +728,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 
 			if (response.success && response.data) {
 				// The optimistic update was correct, no need to update again
-				console.log('Chat settings updated successfully');
+				profileContextLog.debug('Chat settings updated successfully');
 			} else {
 				// API call failed, revert to previous state
 				setProfile(previousProfile);
@@ -737,7 +742,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 				);
 			}
 		} catch (err) {
-			console.error('Error updating assistant settings:', err);
+			profileContextLog.error('Error updating assistant settings', err);
 			// Revert to previous state on error
 			setProfile(previousProfile);
 			if (previousProfile?.preferences?.assistant) {
@@ -789,7 +794,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 
 			if (response.success && response.data) {
 				// The optimistic update was correct, no need to update again
-				console.log('Notification settings updated successfully');
+				profileContextLog.debug('Notification settings updated successfully');
 			} else {
 				// API call failed, revert to previous state
 				setProfile(previousProfile);
@@ -798,7 +803,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 				);
 			}
 		} catch (err) {
-			console.error('Error updating notification settings:', err);
+			profileContextLog.error('Error updating notification settings', err);
 			// Revert to previous state on error
 			setProfile(previousProfile);
 			setError(
@@ -823,7 +828,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 		// Optimistically update the profile state immediately
 		setProfile((prev) => {
 			if (!prev) {
-				console.warn('Profile not loaded, cannot update local state');
+				profileContextLog.warn('Profile not loaded, cannot update local state');
 				return null;
 			}
 
@@ -842,25 +847,28 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 		try {
 			setError(null);
 
-			console.log('Updating budget settings with:', settings);
+			profileContextLog.debug('Updating budget settings', settings);
 
 			const response = await ApiService.put<
 				ProfilePreferences['budgetSettings']
 			>('/profiles/budget-settings', settings);
 
-			console.log('Budget settings update response:', response);
+			profileContextLog.debug('Budget settings update response', response);
 
 			if (response.success && response.data) {
 				// The optimistic update was correct, no need to update again
-				console.log('Budget settings updated successfully');
+				profileContextLog.debug('Budget settings updated successfully');
 			} else {
 				// API call failed, revert to previous state
 				setProfile(previousProfile);
-				console.error('Budget settings update failed:', response.error);
+				profileContextLog.error(
+					'Budget settings update failed',
+					response.error
+				);
 				throw new Error(response.error || 'Failed to update budget settings');
 			}
 		} catch (err) {
-			console.error('Error updating budget settings:', err);
+			profileContextLog.error('Error updating budget settings', err);
 			// Revert to previous state on error
 			setProfile(previousProfile);
 			const errorMessage =
@@ -906,14 +914,14 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 
 			if (response.success && response.data) {
 				// The optimistic update was correct, no need to update again
-				console.log('Goal settings updated successfully');
+				profileContextLog.debug('Goal settings updated successfully');
 			} else {
 				// API call failed, revert to previous state
 				setProfile(previousProfile);
 				throw new Error(response.error || 'Failed to update goal settings');
 			}
 		} catch (err) {
-			console.error('Error updating goal settings:', err);
+			profileContextLog.error('Error updating goal settings', err);
 			// Revert to previous state on error
 			setProfile(previousProfile);
 			setError(
@@ -938,7 +946,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 			try {
 				await fetchProfile();
 			} catch (error) {
-				console.warn('Failed to sync profile:', error);
+				profileContextLog.warn('Failed to sync profile', error);
 			}
 		}
 	}, [isOffline, user, firebaseUser]);
@@ -946,6 +954,26 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 	const fetchIncomeEstimate = useCallback(async () => {
 		if (!user || !firebaseUser) {
 			setIncomeEstimate(null);
+			return;
+		}
+
+		// Ensure Firebase token is ready before making request
+		try {
+			const { getAuth, getIdToken } = await import(
+				'@react-native-firebase/auth'
+			);
+			const { getApp } = await import('@react-native-firebase/app');
+			const auth = getAuth(getApp());
+			const currentUser = auth.currentUser;
+
+			if (!currentUser) {
+				return; // User not authenticated
+			}
+
+			// Try to get token (this will wait for token if not ready)
+			await getIdToken(currentUser, false);
+		} catch (tokenError) {
+			// If we can't get token, skip the request (will retry later)
 			return;
 		}
 
@@ -959,13 +987,33 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 				setIncomeEstimate(estimateData);
 			}
 		} catch (err) {
-			console.warn('Error fetching income estimate:', err);
+			profileContextLog.warn('Error fetching income estimate', err);
 		}
 	}, [user, firebaseUser]);
 
 	const fetchIncomeComparison = useCallback(async () => {
 		if (!user || !firebaseUser) {
 			setIncomeComparison(null);
+			return;
+		}
+
+		// Ensure Firebase token is ready before making request
+		try {
+			const { getAuth, getIdToken } = await import(
+				'@react-native-firebase/auth'
+			);
+			const { getApp } = await import('@react-native-firebase/app');
+			const auth = getAuth(getApp());
+			const currentUser = auth.currentUser;
+
+			if (!currentUser) {
+				return; // User not authenticated
+			}
+
+			// Try to get token (this will wait for token if not ready)
+			await getIdToken(currentUser, false);
+		} catch (tokenError) {
+			// If we can't get token, skip the request (will retry later)
 			return;
 		}
 
@@ -979,13 +1027,13 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 				setIncomeComparison(comparisonData);
 			}
 		} catch (err) {
-			console.warn('Error fetching income comparison:', err);
+			profileContextLog.warn('Error fetching income comparison', err);
 		}
 	}, [user, firebaseUser]);
 
 	// Fetch profile when user changes (only listen to user, not firebaseUser)
 	useEffect(() => {
-		// console.log('ProfileProvider: User changed:', {
+		// logger.debug('ProfileProvider: User changed:', {
 		// 	user: !!user,
 		// 	userId: user?._id,
 		// });

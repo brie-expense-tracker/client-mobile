@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { logger } from '../../../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -126,7 +127,7 @@ export default function AIInsightsSettings() {
 
 				Alert.alert('Success', `AI insights updated to ${presetConfig.name}`);
 			} catch (error) {
-				console.error('Error updating AI insights:', error);
+				logger.error('Error updating AI insights:', error);
 				Alert.alert('Error', 'Failed to update AI insights. Please try again.');
 			}
 		});
@@ -152,7 +153,7 @@ export default function AIInsightsSettings() {
 					},
 				});
 			} catch (error) {
-				console.error('Error toggling AI insights:', error);
+				logger.error('Error toggling AI insights:', error);
 				// ProfileContext will handle rollback automatically
 			}
 		});

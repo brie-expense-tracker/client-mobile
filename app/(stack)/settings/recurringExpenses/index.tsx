@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { logger } from '../../../../src/utils/logger';
 import {
 	SafeAreaView,
 	ScrollView,
@@ -39,7 +40,7 @@ export default function RecurringExpensesSettingsScreen() {
 			// TODO: Implement updateRecurringExpensesSettings when available in profile context
 			Alert.alert('Success', 'Recurring expenses settings saved successfully');
 		} catch (error) {
-			console.error('Error saving recurring expenses settings:', error);
+			logger.error('Error saving recurring expenses settings:', error);
 			Alert.alert('Error', 'Failed to save settings');
 		} finally {
 			setSaving(false);

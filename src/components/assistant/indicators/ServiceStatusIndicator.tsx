@@ -19,6 +19,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { ResilientApiService } from '../../../services/resilience/resilientApiService';
 import { CircuitBreakerStats } from '../../../services/resilience/circuitBreaker';
+import { createLogger } from '../../../utils/sublogger';
+
+const serviceStatusIndicatorLog = createLogger('ServiceStatusIndicator');
 
 interface ServiceStatusIndicatorProps {
 	onRetry?: () => void;
@@ -78,7 +81,7 @@ export default function ServiceStatusIndicator({
 
 			setServices(serviceList);
 		} catch (error) {
-			console.error('[ServiceStatusIndicator] Failed to update status:', error);
+			serviceStatusIndicatorLog.error('Failed to update status', error);
 			// Set services to show error state
 			setServices([]);
 		} finally {

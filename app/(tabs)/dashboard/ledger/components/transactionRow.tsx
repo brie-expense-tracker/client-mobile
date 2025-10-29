@@ -3,6 +3,7 @@ import React, { useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { logger } from '../../../../../src/utils/logger';
 import Animated, {
 	useSharedValue,
 	useAnimatedStyle,
@@ -605,7 +606,7 @@ export const TransactionRow = React.memo(
 
 		// Debug logging for transaction updates
 		if (!shouldUpdate) {
-			console.log('[TransactionRow] Re-rendering due to changes:', {
+			logger.debug('[TransactionRow] Re-rendering due to changes:', {
 				id: prevProps.item.id,
 				prevDescription: prevProps.item.description,
 				nextDescription: nextProps.item.description,

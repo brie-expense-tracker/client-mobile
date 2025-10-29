@@ -1,4 +1,6 @@
 import {
+import { logger } from '../../../utils/logger';
+
 	getRecommendedMode,
 	canTransitionFrom,
 	getTransitionReason,
@@ -119,7 +121,7 @@ export function transition(
 	};
 
 	// Log transition for analytics
-	console.log('🔍 [ModeMachine] Transition:', {
+	logger.debug('🔍 [ModeMachine] Transition:', {
 		from: currentMode,
 		to: newMode,
 		reason,

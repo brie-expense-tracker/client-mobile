@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { sharedStyles } from '../../../../src/components/assistant/shared/sharedStyles';
+import { logger } from '../../../../src/utils/logger';
 
 interface WelcomeSuggestionsProps {
 	onPick: (prompt: string) => void;
@@ -42,7 +43,7 @@ export default function WelcomeSuggestions({
 					<TouchableOpacity
 						key={suggestion.id}
 						onPress={() => {
-							console.log(
+							logger.debug(
 								'🔍 [DEBUG] Welcome suggestion tapped:',
 								suggestion.text
 							);

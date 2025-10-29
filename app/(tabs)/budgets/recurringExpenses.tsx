@@ -15,6 +15,10 @@ import {
 	EmptyState,
 	SegmentedControl,
 } from '../../../src/ui';
+import { isDevMode } from '../../../src/config/environment';
+import { createLogger } from '../../../src/utils/sublogger';
+
+const recurringExpensesScreenLog = createLogger('RecurringExpensesScreen');
 
 // ==========================================
 // Types
@@ -54,12 +58,18 @@ const RecurringExpensesScreen: React.FC = () => {
 	useFocusEffect(
 		useCallback(() => {
 			if (!hasLoaded) {
-				console.log(
-					'🔄 [RecurringExpenses] Screen focused, no data loaded yet - fetching...'
-				);
+				if (isDevMode) {
+					recurringExpensesScreenLog.debug(
+						'🔄 [RecurringExpenses] Screen focused, no data loaded yet - fetching...'
+					);
+				}
 				refetch();
 			} else {
-				console.log('✅ [RecurringExpenses] Screen focused, using cached data');
+				if (isDevMode) {
+					recurringExpensesScreenLog.debug(
+						'✅ [RecurringExpenses] Screen focused, using cached data'
+					);
+				}
 			}
 		}, [refetch, hasLoaded])
 	);
@@ -72,10 +82,12 @@ const RecurringExpensesScreen: React.FC = () => {
 		return expenses.filter((expense) => {
 			// Safety check: ensure expense has required fields
 			if (!expense || !expense.nextExpectedDate) {
-				console.warn(
-					'⚠️ [RecurringExpenses] Skipping invalid expense in overdueExpenses:',
-					expense
-				);
+				if (isDevMode) {
+					recurringExpensesScreenLog.warn(
+						'⚠️ [RecurringExpenses] Skipping invalid expense in overdueExpenses:',
+						expense
+					);
+				}
 				return false;
 			}
 			const daysUntilDue = RecurringExpenseService.getDaysUntilNext(
@@ -89,10 +101,12 @@ const RecurringExpensesScreen: React.FC = () => {
 		return expenses.filter((expense) => {
 			// Safety check: ensure expense has required fields
 			if (!expense || !expense.nextExpectedDate) {
-				console.warn(
-					'⚠️ [RecurringExpenses] Skipping invalid expense in dueThisWeekExpenses:',
-					expense
-				);
+				if (isDevMode) {
+					recurringExpensesScreenLog.warn(
+						'⚠️ [RecurringExpenses] Skipping invalid expense in dueThisWeekExpenses:',
+						expense
+					);
+				}
 				return false;
 			}
 			const daysUntilDue = RecurringExpenseService.getDaysUntilNext(
@@ -120,19 +134,25 @@ const RecurringExpensesScreen: React.FC = () => {
 	);
 
 	const onRefresh = useCallback(async () => {
-		console.log('🔄 [RecurringExpenses] Pull-to-refresh triggered');
+		if (isDevMode) {
+			recurringExpensesScreenLog.debug('Pull-to-refresh triggered');
+		}
 		setRefreshing(true);
 		try {
 			// Clear cache before refetching to ensure fresh data
 			const { ApiService } = await import('../../../src/services');
 			ApiService.clearCacheByPrefix('/api/recurring-expenses');
-			console.log(
-				'🗑️ [RecurringExpenses] Cache cleared, fetching fresh data...'
-			);
+			if (isDevMode) {
+				recurringExpensesScreenLog.debug('Cache cleared, fetching fresh data');
+			}
 			await refetch();
-			console.log('✅ [RecurringExpenses] Refresh complete');
+			if (isDevMode) {
+				recurringExpensesScreenLog.debug('Refresh complete');
+			}
 		} catch (error) {
-			console.error('❌ [RecurringExpenses] Error refreshing:', error);
+			if (isDevMode) {
+				recurringExpensesScreenLog.error('Error refreshing', error);
+			}
 			Alert.alert(
 				'Error',
 				'Failed to refresh recurring expenses. Please try again.'
@@ -184,7 +204,9 @@ const RecurringExpensesScreen: React.FC = () => {
 		try {
 			await deleteRecurringExpense(patternId);
 		} catch (error) {
-			console.error('❌ [RecurringExpenses] Error deleting expense:', error);
+			if (isDevMode) {
+				recurringExpensesScreenLog.error('Error deleting expense', error);
+			}
 			const errorMsg =
 				error instanceof Error
 					? error.message
