@@ -13,6 +13,7 @@ import { Link, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import useAuth from '../../src/context/AuthContext';
 import { BorderlessButton, RectButton } from 'react-native-gesture-handler';
+import { logger } from '../../src/utils/logger';
 
 export default function ForgotPasswordScreen() {
 	const [email, setEmail] = useState('');
@@ -62,7 +63,7 @@ export default function ForgotPasswordScreen() {
 				]
 			);
 		} catch (error: any) {
-			console.error('Password reset error:', error);
+			logger.error('Password reset error', error);
 
 			let errorMessage = 'Could not send reset email. Please try again.';
 			if (error.code === 'auth/user-not-found') {

@@ -8,6 +8,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useActionConfirmation } from '../hooks/useActionConfirmation';
 import { ActionConfirmationModal } from './ActionConfirmationModal';
+import { createLogger } from '../utils/sublogger';
+
+const actionButtonLog = createLogger('ActionButton');
 
 interface ActionButtonProps {
 	actionType:
@@ -61,7 +64,7 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
 		try {
 			await executeAction(actionType, parameters, onSuccess, onError);
 		} catch (error) {
-			console.error('ActionButton: Error executing action:', error);
+			actionButtonLog.error('Error executing action', error);
 			onError?.(error);
 		}
 	};

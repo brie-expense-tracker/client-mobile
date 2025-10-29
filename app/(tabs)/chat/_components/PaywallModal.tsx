@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { logger } from '../../../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -112,7 +113,7 @@ const PaywallModal: React.FC<PaywallModalProps> = ({
 				},
 			});
 		} catch (error) {
-			console.error('Error fetching pricing:', error);
+			logger.error('Error fetching pricing:', error);
 		}
 	};
 

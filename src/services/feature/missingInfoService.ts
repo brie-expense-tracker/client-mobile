@@ -5,6 +5,7 @@
  */
 
 import { MissingInfoChip } from '../../components/assistant/cards/MissingInfoCard';
+import { logger } from '../../utils/logger';
 
 export interface CollectedData {
 	[key: string]: string | number | boolean;
@@ -398,7 +399,7 @@ export class MissingInfoService {
 	 */
 	clearCache(): void {
 		this.cache.clear();
-		console.log('[MissingInfoService] Cache cleared');
+		logger.debug('[MissingInfoService] Cache cleared');
 	}
 
 	/**
@@ -443,7 +444,7 @@ export class MissingInfoService {
 			}
 			return false;
 		} catch (error) {
-			console.error('[MissingInfoService] Failed to import data:', error);
+			logger.error('[MissingInfoService] Failed to import data:', error);
 			return false;
 		}
 	}

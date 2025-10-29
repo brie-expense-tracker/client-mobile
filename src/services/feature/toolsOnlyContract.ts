@@ -3,6 +3,8 @@
 // Only passes {intent, toolsOut} to LLM - no raw user data, no PII
 
 import { FactPack } from '../../services/assistant/factPack';
+import { logger } from '../../../utils/logger';
+
 
 export interface ToolsOnlyInput {
 	intent: string;
@@ -341,7 +343,7 @@ export class ToolsOnlyContractService {
 				fallbackUsed: false,
 			};
 		} else {
-			console.warn(
+			logger.warn(
 				'Tools-Only Contract violation detected:',
 				validation.violations
 			);

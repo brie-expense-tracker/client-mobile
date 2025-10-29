@@ -1,6 +1,8 @@
 // Web functions for CD (Certificate of Deposit) research
 
 import { WebFns } from '../../types';
+import { logger } from '../../../../../../utils/logger';
+
 
 // Configuration for web scraping
 interface WebScrapingConfig {
@@ -62,14 +64,14 @@ export const webFnsForCD: WebFns = {
 		query: string,
 		recencyDays = 30
 	): Promise<{ title: string; url: string }[]> {
-		console.log(`[CD WebFns] Searching for: ${query} (${recencyDays} days)`);
+		logger.debug(`[CD WebFns] Searching for: ${query} (${recencyDays} days)`);
 
 		try {
 			// Check cache first
 			const cacheKey = `search:${query}:${recencyDays}`;
 			const cached = requestCache.get(cacheKey);
 			if (cached && Date.now() - cached.timestamp < DEFAULT_CONFIG.cacheTtl) {
-				console.log('[CD WebFns] Returning cached search results');
+				logger.debug('[CD WebFns] Returning cached search results');
 				return cached.data;
 			}
 
@@ -87,7 +89,7 @@ export const webFnsForCD: WebFns = {
 
 			return searchResults;
 		} catch (error) {
-			console.error('[CD WebFns] Search error:', error);
+			logger.error('[CD WebFns] Search error:', error);
 
 			// Fallback to mock data
 			return [
@@ -108,14 +110,14 @@ export const webFnsForCD: WebFns = {
 	},
 
 	async fetchText(url: string): Promise<string> {
-		console.log(`[CD WebFns] Fetching: ${url}`);
+		logger.debug(`[CD WebFns] Fetching: ${url}`);
 
 		try {
 			// Check cache first
 			const cacheKey = `fetch:${url}`;
 			const cached = requestCache.get(cacheKey);
 			if (cached && Date.now() - cached.timestamp < DEFAULT_CONFIG.cacheTtl) {
-				console.log('[CD WebFns] Returning cached content');
+				logger.debug('[CD WebFns] Returning cached content');
 				return cached.data;
 			}
 
@@ -135,7 +137,7 @@ export const webFnsForCD: WebFns = {
 
 			return html;
 		} catch (error) {
-			console.error('[CD WebFns] Fetch error:', error);
+			logger.error('[CD WebFns] Fetch error:', error);
 
 			// Fallback to mock data based on URL
 			if (url.includes('bankrate.com')) {
@@ -255,7 +257,7 @@ export const webFnsForCD: WebFns = {
 				extractedAt: new Date(),
 			};
 		} catch (error) {
-			console.error('[CD WebFns] Extraction error:', error);
+			logger.error('[CD WebFns] Extraction error:', error);
 
 			// Return fallback data
 			return {
@@ -375,7 +377,7 @@ async function fetchWithRetry(
 
 			return html;
 		} catch (error) {
-			console.warn(`[CD WebFns] Fetch attempt ${attempt} failed:`, error);
+			logger.warn(`[CD WebFns] Fetch attempt ${attempt} failed:`, error);
 
 			if (attempt === retries) {
 				throw error;

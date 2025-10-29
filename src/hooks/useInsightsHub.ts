@@ -5,6 +5,9 @@ import { useBudget } from '../context/budgetContext';
 import { useGoal } from '../context/goalContext';
 import { TransactionContext, Transaction } from '../context/transactionContext';
 import { useProfile } from '../context/profileContext';
+import { createLogger } from '../utils/sublogger';
+
+const insightsHubLog = createLogger('useInsightsHub');
 
 export type Period = 'week' | 'month' | 'quarter';
 
@@ -245,7 +248,9 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 			} else {
 				// Check if response had specific errors
 				if (response.error) {
-					console.log('Insights fetch error:', response.error);
+					insightsHubLog.warn('Insights fetch error', {
+						error: response.error,
+					});
 					setError(response.error);
 					setInsights([]);
 				} else {
@@ -253,7 +258,7 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 				}
 			}
 		} catch (error) {
-			console.error('Error fetching insights:', error);
+			insightsHubLog.error('Error fetching insights', error);
 			const errorMessage =
 				error instanceof Error ? error.message : 'Failed to fetch insights';
 			setError(errorMessage);
@@ -265,25 +270,25 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 
 	const generateNewInsights = useCallback(async () => {
 		if (!aiInsightsEnabled) {
-			console.log(
+			insightsHubLog.debug(
 				'AI insights are disabled for this user. Skipping new insights generation.'
 			);
 			return;
 		}
 
 		try {
-			console.log('generateNewInsights - Starting generation process...');
+			insightsHubLog.debug('Starting generation process...');
 			setGenerating(true);
 
 			// Generate insights only for the selected period
 			const insightsPeriod = convertPeriodToInsightsPeriod(period);
-			console.log(
-				`generateNewInsights - Calling generateInsights for ${insightsPeriod} period...`
+			insightsHubLog.debug(
+				`Calling generateInsights for ${insightsPeriod} period...`
 			);
 
 			const response = await InsightsService.generateInsights(insightsPeriod);
 
-			console.log('Generation response:', {
+			insightsHubLog.debug('Generation response', {
 				success: response.success,
 				dataLength: response.data?.length,
 				error: response.error,
@@ -299,18 +304,16 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 					)
 					.slice(0, 3);
 
-				console.log(
-					'generateNewInsights - Setting insights:',
-					sortedInsights.length
-				);
+				insightsHubLog.debug('Setting insights', {
+					count: sortedInsights.length,
+				});
 				setInsights(sortedInsights);
 
 				// If we have insights, show success message
 				if (sortedInsights.length > 0) {
-					console.log(
-						'generateNewInsights - Success! Generated insights:',
-						sortedInsights.length
-					);
+					insightsHubLog.info('Success! Generated insights', {
+						count: sortedInsights.length,
+					});
 					Alert.alert(
 						'Success',
 						`Generated ${sortedInsights.length} new insights!`,
@@ -319,11 +322,11 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 				}
 			} else {
 				// If no insights were generated, just set empty array instead of calling fetchInsights
-				console.log('No insights generated, setting empty array');
+				insightsHubLog.debug('No insights generated, setting empty array');
 				setInsights([]);
 			}
 		} catch (error) {
-			console.error('Error generating insights:', error);
+			insightsHubLog.error('Error generating insights', error);
 			Alert.alert('Error', 'Failed to generate insights. Please try again.');
 		} finally {
 			setGenerating(false);
@@ -333,7 +336,7 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 	const markInsightAsRead = useCallback(
 		async (insightId: string) => {
 			if (!aiInsightsEnabled) {
-				console.log(
+				insightsHubLog.debug(
 					'AI insights are disabled for this user. Skipping mark as read.'
 				);
 				return;
@@ -350,7 +353,7 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 						) || null
 				);
 			} catch (error) {
-				console.error('Error marking insight as read:', error);
+				insightsHubLog.error('Error marking insight as read', error);
 			}
 		},
 		[aiInsightsEnabled]
@@ -358,7 +361,9 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 
 	const onRefresh = useCallback(async () => {
 		if (!aiInsightsEnabled) {
-			console.log('AI insights are disabled for this user. Skipping refresh.');
+			insightsHubLog.debug(
+				'AI insights are disabled for this user. Skipping refresh.'
+			);
 			return;
 		}
 
@@ -367,8 +372,8 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 			// Only refresh insights, don't refresh transactions to avoid triggering dashboard refresh
 			try {
 				setLoadingInsights(true);
-				console.log(
-					`🔍 Refreshing insights for period: ${period}, AI insights enabled: ${aiInsightsEnabled}`
+				insightsHubLog.debug(
+					`Refreshing insights for period: ${period}, AI insights enabled: ${aiInsightsEnabled}`
 				);
 
 				// Set a timeout to prevent long loading
@@ -393,21 +398,21 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 						)
 						.slice(0, 3);
 
-					console.log(
-						`✅ Refreshed ${sortedInsights.length} insights for ${period}`
+					insightsHubLog.info(
+						`Refreshed ${sortedInsights.length} insights for ${period}`
 					);
 					setInsights(sortedInsights);
 				} else {
 					setInsights([]);
 				}
 			} catch (error) {
-				console.error('Error refreshing insights:', error);
+				insightsHubLog.error('Error refreshing insights', error);
 				setInsights([]);
 			} finally {
 				setLoadingInsights(false);
 			}
 		} catch (error) {
-			console.error('Error refreshing data:', error);
+			insightsHubLog.error('Error refreshing data', error);
 		} finally {
 			setRefreshing(false);
 		}
@@ -430,7 +435,7 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 				setError('Failed to fetch unread count');
 			}
 		} catch (error) {
-			console.error('Error fetching unread count:', error);
+			insightsHubLog.error('Error fetching unread count', error);
 			const errorMessage =
 				error instanceof Error ? error.message : 'Failed to fetch unread count';
 			setError(errorMessage);
@@ -451,7 +456,7 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 				const response = await InsightsService.getInsightDetail(insightId);
 				return response.success && response.data ? response.data : null;
 			} catch (error) {
-				console.error('Error fetching insight detail:', error);
+				insightsHubLog.error('Error fetching insight detail', error);
 				const errorMessage =
 					error instanceof Error
 						? error.message
@@ -466,22 +471,20 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 	// Generate profile-based weekly insights
 	const generateProfileBasedInsights = useCallback(async () => {
 		if (!aiInsightsEnabled) {
-			console.log(
+			insightsHubLog.debug(
 				'AI insights are disabled for this user. Skipping profile-based insights generation.'
 			);
 			return;
 		}
 
 		try {
-			console.log(
-				'generateProfileBasedInsights - Starting generation process...'
-			);
+			insightsHubLog.debug('Starting profile-based generation process...');
 			setGenerating(true);
 
 			const response =
 				await InsightsService.generateProfileBasedWeeklyInsights();
 
-			console.log('Profile-based generation response:', {
+			insightsHubLog.debug('Profile-based generation response', {
 				success: response.success,
 				dataLength: response.data?.length,
 				error: response.error,
@@ -497,18 +500,16 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 					)
 					.slice(0, 3);
 
-				console.log(
-					'generateProfileBasedInsights - Setting insights:',
-					sortedInsights.length
-				);
+				insightsHubLog.debug('Setting profile-based insights', {
+					count: sortedInsights.length,
+				});
 				setInsights(sortedInsights);
 
 				// If we have insights, show success message
 				if (sortedInsights.length > 0) {
-					console.log(
-						'generateProfileBasedInsights - Success! Generated insights:',
-						sortedInsights.length
-					);
+					insightsHubLog.info('Success! Generated profile-based insights', {
+						count: sortedInsights.length,
+					});
 					Alert.alert(
 						'Success',
 						`Generated ${sortedInsights.length} personalized insights!`,
@@ -516,11 +517,13 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 					);
 				}
 			} else {
-				console.log('No profile-based insights generated, setting empty array');
+				insightsHubLog.debug(
+					'No profile-based insights generated, setting empty array'
+				);
 				setInsights([]);
 			}
 		} catch (error) {
-			console.error('Error generating profile-based insights:', error);
+			insightsHubLog.error('Error generating profile-based insights', error);
 			Alert.alert(
 				'Error',
 				'Failed to generate personalized insights. Please try again.'
@@ -533,7 +536,7 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 	// Refresh insights after actions are completed
 	const refreshAfterActions = useCallback(async () => {
 		if (!aiInsightsEnabled) {
-			console.log(
+			insightsHubLog.debug(
 				'AI insights are disabled for this user. Skipping refresh after actions.'
 			);
 			return;
@@ -541,7 +544,9 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 
 		try {
 			setRefreshing(true);
-			console.log(`🔄 Refreshing insights after actions for period: ${period}`);
+			insightsHubLog.debug(
+				`Refreshing insights after actions for period: ${period}`
+			);
 
 			const insightsPeriod = convertPeriodToInsightsPeriod(period);
 			const response = await InsightsService.refreshInsightsAfterActions(
@@ -557,15 +562,15 @@ export function useInsightsHub(period: Period): UseInsightsHubReturn {
 					)
 					.slice(0, 3);
 
-				console.log(
-					`✅ Refreshed ${sortedInsights.length} insights after actions for ${period}`
+				insightsHubLog.info(
+					`Refreshed ${sortedInsights.length} insights after actions for ${period}`
 				);
 				setInsights(sortedInsights);
 			} else {
 				setInsights([]);
 			}
 		} catch (error) {
-			console.error('Error refreshing insights after actions:', error);
+			insightsHubLog.error('Error refreshing insights after actions', error);
 			setInsights([]);
 		} finally {
 			setRefreshing(false);

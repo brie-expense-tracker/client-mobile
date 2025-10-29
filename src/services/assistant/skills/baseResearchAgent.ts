@@ -3,6 +3,8 @@
 
 import { TimedLRU } from '../utils/timedLRU';
 import { ResearchSource, ResearchResult, WebFns } from './types';
+import { logger } from '../../../../utils/logger';
+
 
 export class BaseResearchAgent<T> {
 	private cache = new TimedLRU<string, ResearchResult<T>>(64);
@@ -23,11 +25,11 @@ export class BaseResearchAgent<T> {
 		const cached = this.cache.get(key);
 
 		if (cached) {
-			console.log(`[BaseResearchAgent] Using cached results for: ${key}`);
+			logger.debug(`[BaseResearchAgent] Using cached results for: ${key}`);
 			return cached;
 		}
 
-		console.log(`[BaseResearchAgent] Starting fresh research for: ${query}`);
+		logger.debug(`[BaseResearchAgent] Starting fresh research for: ${query}`);
 
 		try {
 			const recency = this.sources.recencyDays ?? 30;
@@ -38,7 +40,7 @@ export class BaseResearchAgent<T> {
 				.slice(0, 8);
 
 			if (editorial.length === 0) {
-				console.log('[BaseResearchAgent] No editorial results found');
+				logger.debug('[BaseResearchAgent] No editorial results found');
 				return null;
 			}
 
@@ -81,7 +83,7 @@ export class BaseResearchAgent<T> {
 			});
 
 			if (items.length === 0) {
-				console.log('[BaseResearchAgent] No valid items extracted');
+				logger.debug('[BaseResearchAgent] No valid items extracted');
 				return null;
 			}
 
@@ -97,13 +99,13 @@ export class BaseResearchAgent<T> {
 			};
 
 			this.cache.set(key, result, 24 * 60 * 60 * 1000); // 24 hours
-			console.log(
+			logger.debug(
 				`[BaseResearchAgent] Cached ${scored.length} items for: ${key}`
 			);
 
 			return result;
 		} catch (error) {
-			console.error('[BaseResearchAgent] Research failed:', error);
+			logger.error('[BaseResearchAgent] Research failed:', error);
 			return null;
 		}
 	}

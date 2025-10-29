@@ -6,6 +6,8 @@
  */
 
 import { ApiService } from '../core/apiService';
+import { logger } from '../../utils/logger';
+
 // Define FinancialContext interface locally to avoid circular dependencies
 interface FinancialContext {
 	profile: {
@@ -158,7 +160,7 @@ export class OrchestratorAIService {
 		try {
 			// Check if service is healthy
 			if (!this.isHealthy) {
-				console.warn(
+				logger.warn(
 					'[OrchestratorAIService] Service is unhealthy, using fallback'
 				);
 				return this.getFallbackResponse(message);
@@ -166,16 +168,16 @@ export class OrchestratorAIService {
 
 			// Rate limiting check
 			if (this.isRateLimited()) {
-				console.warn('[OrchestratorAIService] Rate limited, using fallback');
+				logger.warn('[OrchestratorAIService] Rate limited, using fallback');
 				return this.getFallbackResponse(message);
 			}
 
 			this.requestCount++;
 			this.lastRequestTime = new Date();
 
-			console.log('[OrchestratorAIService] Getting response for:', message);
-			console.log('[OrchestratorAIService] Session ID:', this.sessionId);
-			console.log('[OrchestratorAIService] Request count:', this.requestCount);
+			logger.debug('[OrchestratorAIService] Getting response for:', message);
+			logger.debug('[OrchestratorAIService] Session ID:', this.sessionId);
+			logger.debug('[OrchestratorAIService] Request count:', this.requestCount);
 
 			const requestPayload: OrchestratorRequest = {
 				message: message.trim(),
@@ -189,7 +191,7 @@ export class OrchestratorAIService {
 				},
 			};
 
-			console.log('[OrchestratorAIService] Sending request to orchestrator:', {
+			logger.debug('[OrchestratorAIService] Sending request to orchestrator:', {
 				endpoint: '/api/orchestrator/chat',
 				messageLength: message.trim().length,
 				hasOptions: !!options,
@@ -202,7 +204,7 @@ export class OrchestratorAIService {
 			);
 			const endTime = Date.now();
 
-			console.log('[OrchestratorAIService] API response received:', {
+			logger.debug('[OrchestratorAIService] API response received:', {
 				success: response.success,
 				hasData: !!response.data,
 				responseLength: response.data?.response?.length || 0,
@@ -219,7 +221,7 @@ export class OrchestratorAIService {
 					typeof response.data.response !== 'string' ||
 					!response.data.response.trim()
 				) {
-					console.warn(
+					logger.warn(
 						'[OrchestratorAIService] Empty or invalid response message, using fallback'
 					);
 					return this.getFallbackResponse(message);
@@ -233,7 +235,7 @@ export class OrchestratorAIService {
 				// Log performance metrics
 				this.logPerformanceMetrics(result, endTime - startTime);
 
-				console.log('[OrchestratorAIService] Returning successful response:', {
+				logger.debug('[OrchestratorAIService] Returning successful response:', {
 					responsePreview: result.response.substring(0, 100) + '...',
 					sessionId: result.sessionId,
 					timestamp: result.timestamp,
@@ -244,13 +246,13 @@ export class OrchestratorAIService {
 			}
 
 			// If the response is not successful, fall back to fallback response
-			console.log(
+			logger.debug(
 				'[OrchestratorAIService] API response not successful, using fallback'
 			);
 			this.isHealthy = false; // Mark as unhealthy on failure
 			return this.getFallbackResponse(message);
 		} catch (error) {
-			console.error('[OrchestratorAIService] Error getting response:', error);
+			logger.error('[OrchestratorAIService] Error getting response:', error);
 
 			// Mark as unhealthy on error
 			this.isHealthy = false;
@@ -314,7 +316,7 @@ export class OrchestratorAIService {
 	): void {
 		const { performance, metadata } = response;
 
-		console.log('[OrchestratorAIService] Performance Metrics:', {
+		logger.debug('[OrchestratorAIService] Performance Metrics:', {
 			requestId: metadata.requestId,
 			totalLatency: performance.totalLatency,
 			clientLatency,
@@ -332,7 +334,7 @@ export class OrchestratorAIService {
 		// Log individual tool timings
 		Object.entries(performance.parallelTools.timings).forEach(
 			([toolName, timing]) => {
-				console.log(
+				logger.debug(
 					`[OrchestratorAIService] Tool ${toolName} timing:`,
 					timing + 'ms'
 				);
@@ -341,7 +343,7 @@ export class OrchestratorAIService {
 
 		// Log phase breakdown
 		Object.entries(performance.phases).forEach(([phase, timing]) => {
-			console.log(
+			logger.debug(
 				`[OrchestratorAIService] Phase ${phase} timing:`,
 				timing + 'ms'
 			);
@@ -366,7 +368,7 @@ export class OrchestratorAIService {
 				services: Record<string, string>;
 			};
 		} catch (error) {
-			console.error('[OrchestratorAIService] Health check failed:', error);
+			logger.error('[OrchestratorAIService] Health check failed:', error);
 			return {
 				status: 'unhealthy',
 				timestamp: new Date(),
@@ -411,7 +413,7 @@ export class OrchestratorAIService {
 			const response = await ApiService.get('/api/orchestrator/metrics');
 			return (response.data as any).metrics;
 		} catch (error) {
-			console.error('[OrchestratorAIService] Metrics fetch failed:', error);
+			logger.error('[OrchestratorAIService] Metrics fetch failed:', error);
 			throw error;
 		}
 	}
@@ -421,7 +423,7 @@ export class OrchestratorAIService {
 	 */
 	updateContext(newContext: FinancialContext): void {
 		this.context = newContext;
-		console.log('[OrchestratorAIService] Context updated');
+		logger.debug('[OrchestratorAIService] Context updated');
 	}
 
 	/**
@@ -438,7 +440,10 @@ export class OrchestratorAIService {
 		this.sessionId = this.generateSessionId();
 		this.requestCount = 0;
 		this.lastRequestTime = null;
-		console.log('[OrchestratorAIService] New session created:', this.sessionId);
+		logger.debug(
+			'[OrchestratorAIService] New session created:',
+			this.sessionId
+		);
 	}
 
 	/**
@@ -464,12 +469,12 @@ export class OrchestratorAIService {
 			try {
 				const health = await this.getHealthStatus();
 				this.isHealthy = health.status === 'healthy';
-				console.log('[OrchestratorAIService] Health check:', {
+				logger.debug('[OrchestratorAIService] Health check:', {
 					status: health.status,
 					isHealthy: this.isHealthy,
 				});
 			} catch (error) {
-				console.warn('[OrchestratorAIService] Health check failed:', error);
+				logger.warn('[OrchestratorAIService] Health check failed:', error);
 				this.isHealthy = false;
 			}
 		}, 5 * 60 * 1000); // 5 minutes
@@ -510,7 +515,7 @@ export class OrchestratorAIService {
 		this.lastRequestTime = null;
 		this.isHealthy = true;
 		this.createNewSession();
-		console.log('[OrchestratorAIService] Service reset');
+		logger.debug('[OrchestratorAIService] Service reset');
 	}
 
 	/**
@@ -518,6 +523,6 @@ export class OrchestratorAIService {
 	 */
 	destroy(): void {
 		this.stopHealthMonitoring();
-		console.log('[OrchestratorAIService] Service destroyed');
+		logger.debug('[OrchestratorAIService] Service destroyed');
 	}
 }

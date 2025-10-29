@@ -1,4 +1,6 @@
 import { Budget, Goal, Transaction, RecurringExpense } from '../../types';
+import { logger } from '../../../utils/logger';
+
 
 export type Intent =
 	| 'GET_BALANCE'
@@ -169,7 +171,7 @@ export class GroundingService {
 				confidence: 0.95,
 			};
 		} catch (error) {
-			console.error('Error getting balance:', error);
+			logger.error('Error getting balance:', error);
 			return {
 				type: 'fallback',
 				payload: null,
@@ -219,7 +221,7 @@ export class GroundingService {
 				confidence: 0.9,
 			};
 		} catch (error) {
-			console.error('Error getting budget status:', error);
+			logger.error('Error getting budget status:', error);
 			return {
 				type: 'fallback',
 				payload: null,
@@ -296,7 +298,7 @@ export class GroundingService {
 				confidence: this.context.recurringExpenses ? 0.95 : 0.8,
 			};
 		} catch (error) {
-			console.error('Error listing subscriptions:', error);
+			logger.error('Error listing subscriptions:', error);
 			return {
 				type: 'fallback',
 				payload: null,
@@ -337,7 +339,7 @@ export class GroundingService {
 				confidence: 0.85,
 			};
 		} catch (error) {
-			console.error('Error getting goal progress:', error);
+			logger.error('Error getting goal progress:', error);
 			return {
 				type: 'fallback',
 				payload: null,
@@ -375,7 +377,7 @@ export class GroundingService {
 				confidence: 0.9,
 			};
 		} catch (error) {
-			console.error('Error getting spending breakdown:', error);
+			logger.error('Error getting spending breakdown:', error);
 			return {
 				type: 'fallback',
 				payload: null,
@@ -424,7 +426,7 @@ export class GroundingService {
 				confidence: confidence,
 			};
 		} catch (error) {
-			console.error('Error forecasting spend:', error);
+			logger.error('Error forecasting spend:', error);
 			return {
 				type: 'fallback',
 				payload: null,
@@ -511,7 +513,7 @@ export class GroundingService {
 				confidence: 0.9,
 			};
 		} catch (error) {
-			console.error('Error creating budget:', error);
+			logger.error('Error creating budget:', error);
 			return {
 				type: 'fallback',
 				payload: { error: 'Failed to create budget' },
@@ -624,7 +626,7 @@ export class GroundingService {
 				confidence: bestMatch.confidence,
 			};
 		} catch (error) {
-			console.error('Error categorizing transaction:', error);
+			logger.error('Error categorizing transaction:', error);
 			return {
 				type: 'fallback',
 				payload: null,
@@ -701,7 +703,7 @@ export class GroundingService {
 					};
 			}
 		} catch (error) {
-			console.warn('Grounding service error:', error);
+			logger.warn('Grounding service error:', error);
 			return {
 				type: 'fallback',
 				payload: null,

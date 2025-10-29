@@ -11,13 +11,12 @@
  */
 
 import { useBudget } from '../context/budgetContext';
+import { logger } from '../utils/logger';
 
 // Show deprecation warning in development
 if (__DEV__) {
-	console.warn(
-		'[Deprecation] useBudgets from hooks is deprecated. ' +
-			'Import { useBudget } from context/budgetContext instead. ' +
-			'This adapter will be removed in a future version.'
+	logger.warn(
+		'[Deprecation] useBudgets from hooks is deprecated. Import { useBudget } from context/budgetContext instead. This adapter will be removed in a future version.'
 	);
 }
 
@@ -40,36 +39,25 @@ import { ApiService } from '../services';
 // Budget-specific API functions
 // ==========================================
 const fetchBudgets_OLD = async (): Promise<Budget[]> => {
-	console.log('📡 [fetchBudgets] Fetching budgets from API...');
+		// Note: Deprecated adapter - logs should be in context
 	const response = await ApiService.get<{ data: Budget[] }>('/api/budgets');
-
-	console.log('📥 [fetchBudgets] Response:', {
-		success: response.success,
-		hasData: !!response.data,
-		dataIsArray: Array.isArray(response.data?.data),
-		count: response.data?.data?.length || 0,
-	});
 
 	// Handle authentication errors gracefully
 	if (!response.success && response.error?.includes('User not authenticated')) {
-		console.log('🔒 [Budgets] User not authenticated, returning empty array');
 		return [];
 	}
 
 	const budgets = response.data?.data || [];
-	console.log('✅ [fetchBudgets] Returning', budgets.length, 'budgets');
 	return budgets;
 };
 
 const createBudget = async (budgetData: CreateBudgetData): Promise<Budget> => {
-	console.log('🔍 [createBudget] Request data:', budgetData);
 	const response = await ApiService.post<{ data: Budget }>(
 		'/api/budgets',
 		budgetData
 	);
 
-	// Debug: Log the actual response structure
-	console.log(
+	logger.debug(
 		'🔍 [createBudget] Full response:',
 		JSON.stringify(response, null, 2)
 	);
@@ -104,7 +92,7 @@ const createBudget = async (budgetData: CreateBudgetData): Promise<Budget> => {
 		throw new Error('Failed to create budget: No data received');
 	}
 
-	console.log(
+	logger.debug(
 		'✅ [createBudget] Returning budget with ID:',
 		budget.id || (budget as any)._id
 	);
@@ -121,7 +109,7 @@ const updateBudget = async (
 	);
 
 	// Debug: Log the actual response structure
-	console.log(
+	logger.debug(
 		'🔍 [updateBudget] Full response:',
 		JSON.stringify(response, null, 2)
 	);
@@ -151,20 +139,20 @@ const updateBudget = async (
 };
 
 const deleteBudget = async (id: string): Promise<void> => {
-	console.log('🗑️ [deleteBudget] Starting deletion for ID:', id);
+	logger.debug('🗑️ [deleteBudget] Starting deletion for ID:', id);
 	await ApiService.delete(`/api/budgets/${id}`);
-	console.log('✅ [deleteBudget] API delete complete, clearing cache...');
+	logger.debug('✅ [deleteBudget] API delete complete, clearing cache...');
 
 	// Defensive: manually clear ALL budgets caches (prefix-based to catch all variants)
 	ApiService.clearCacheByPrefix('/api/budgets');
-	console.log('🗑️ [deleteBudget] All budgets caches cleared by prefix');
+	logger.debug('🗑️ [deleteBudget] All budgets caches cleared by prefix');
 };
 
 // ==========================================
 // Budget-specific data transformations
 // ==========================================
 const transformBudgetData = (budgets: Budget[]) => {
-	console.log(
+	logger.debug(
 		'🔄 [transformBudgetData] Transforming',
 		budgets.length,
 		'budgets'
@@ -173,7 +161,7 @@ const transformBudgetData = (budgets: Budget[]) => {
 	// For example, sorting by period, calculating alerts, etc.
 	const transformed = budgets.map((budget) => {
 		const id = (budget as any)._id || budget.id;
-		console.log(
+		logger.debug(
 			'🔄 [transformBudgetData] Budget:',
 			budget.name,
 			'- ID:',
@@ -195,7 +183,7 @@ const transformBudgetData = (budgets: Budget[]) => {
 				budget.amount > 0 && (budget.spent || 0) / budget.amount > 0.9,
 		};
 	});
-	console.log(
+	logger.debug(
 		'✅ [transformBudgetData] Transformed IDs:',
 		transformed.map((b) => b.id).join(', ')
 	);

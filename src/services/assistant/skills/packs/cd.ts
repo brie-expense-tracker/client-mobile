@@ -5,6 +5,8 @@ import { Skill } from '../types';
 import { BaseResearchAgent } from '../baseResearchAgent';
 import { scoreUsefulness } from '../../usefulness';
 import { webFnsForCD } from './webFns/cdWebFns';
+import { logger } from '../../../../../utils/logger';
+
 
 type CdItem = {
   bank: string;
@@ -172,7 +174,7 @@ export const CD_SKILL: Skill = {
       return null;
     }
 
-    console.log(`[CD Skill] Running research agent for: ${q}`);
+    logger.debug(`[CD Skill] Running research agent for: ${q}`);
     
     const data = await agent.run(q);
     if (!data || data.items.length === 0) {

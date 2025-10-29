@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from '../config/environment';
+import { logger } from '../utils/logger';
 
 export const API_BASE_URL = getApiBaseUrl();
 export const SSE_CHAT_URL = `${API_BASE_URL}/api/stream/chat`;
@@ -23,7 +24,7 @@ export function buildSseUrl(input: {
 		u.searchParams.set('expand', 'true');
 	}
 	if (__DEV__) {
-		console.log('🔧 [SSE] Built URL:', u.toString());
+		logger.debug('Built SSE URL', { url: u.toString() });
 	}
 	return u.toString();
 }
@@ -31,7 +32,7 @@ export function buildSseUrl(input: {
 export function buildTestSseUrl() {
 	const u = new URL(`${API_BASE_URL}/api/stream/test`);
 	if (__DEV__) {
-		console.log('🧪 [Test] Built test URL:', u.toString());
+		logger.debug('Built test URL', { url: u.toString() });
 	}
 	return u.toString();
 }

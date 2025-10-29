@@ -4,7 +4,9 @@
 import { TELEMETRY_CONFIG } from '../../config/telemetry';
 import { scrubError, scrubAnalyticsEvent } from '../../utils/piiScrubbing';
 import { featureFlags } from './featureFlags';
-import { isDevMode } from '../../config/environment';
+import { createLogger } from '../../utils/sublogger';
+
+const crashReportingLog = createLogger('CrashReporting');
 
 export interface CrashReportingOptions {
 	enableSentry?: boolean;
@@ -28,7 +30,9 @@ export class CrashReportingService {
 	private options: Required<CrashReportingOptions>;
 	private isInitialized = false;
 	private sentry: any = null;
-	private crashlytics: any = null;
+	private crashlytics: ReturnType<
+		typeof import('@react-native-firebase/crashlytics')['getCrashlytics']
+	> | null = null;
 
 	constructor(options: CrashReportingOptions = {}) {
 		this.options = {
@@ -54,9 +58,7 @@ export class CrashReportingService {
 		try {
 			// Check if crash reporting is enabled via feature flags
 			if (!featureFlags.isCrashReportingEnabled()) {
-				if (isDevMode) {
-					console.log('🚨 [CrashReporting] Disabled by feature flag');
-				}
+				crashReportingLog.info('Disabled by feature flag');
 				this.isInitialized = true;
 				return;
 			}
@@ -72,11 +74,9 @@ export class CrashReportingService {
 			}
 
 			this.isInitialized = true;
-			if (isDevMode) {
-				console.log('🚨 [CrashReporting] Service initialized');
-			}
+			crashReportingLog.info('Service initialized');
 		} catch (error) {
-			console.warn('🚨 [CrashReporting] Failed to initialize:', error);
+			crashReportingLog.warn('Failed to initialize', error);
 			this.isInitialized = true;
 		}
 	}
@@ -88,8 +88,8 @@ export class CrashReportingService {
 		try {
 			// Check if Sentry is enabled and DSN is properly configured
 			if (!TELEMETRY_CONFIG.SENTRY.ENABLED || !TELEMETRY_CONFIG.SENTRY.DSN) {
-				console.log(
-					'🚨 [CrashReporting] Sentry disabled or DSN not configured, skipping Sentry initialization'
+				crashReportingLog.debug(
+					'Sentry disabled or DSN not configured, skipping Sentry initialization'
 				);
 				return;
 			}
@@ -98,7 +98,7 @@ export class CrashReportingService {
 
 			// Verify Sentry is properly imported
 			if (!Sentry || typeof Sentry.init !== 'function') {
-				console.warn('🚨 [CrashReporting] Sentry import failed or invalid');
+				crashReportingLog.warn('Sentry import failed or invalid');
 				return;
 			}
 
@@ -131,11 +131,9 @@ export class CrashReportingService {
 			});
 
 			this.sentry = Sentry;
-			if (isDevMode) {
-				console.log('🚨 [CrashReporting] Sentry initialized');
-			}
+			crashReportingLog.info('Sentry initialized');
 		} catch (error) {
-			console.warn('🚨 [CrashReporting] Failed to initialize Sentry:', error);
+			crashReportingLog.warn('Failed to initialize Sentry', error);
 		}
 	}
 
@@ -153,70 +151,56 @@ export class CrashReportingService {
 
 			// Verify crashlytics is available
 			if (!getCrashlytics || typeof getCrashlytics !== 'function') {
-				console.warn(
-					'🚨 [CrashReporting] Crashlytics import failed or invalid'
-				);
+				crashReportingLog.warn('Crashlytics import failed or invalid');
 				return;
 			}
 
-			const config = getCrashlytics();
-			if (!config) {
-				console.warn(
-					'🚨 [CrashReporting] Crashlytics instance not properly initialized'
-				);
+			// Cache the instance (bind to default app explicitly)
+			const instance = getCrashlytics();
+			if (!instance) {
+				crashReportingLog.warn('Crashlytics instance not properly initialized');
 				return;
 			}
 
-			// Enable crash reporting only in production builds
-			// In development, we still want to collect logs but not crash reports
+			this.crashlytics = instance;
+
+			// Enable/disable collection (prod only, and only with consent later)
 			try {
-				await setCrashlyticsCollectionEnabled(config, !__DEV__);
+				await setCrashlyticsCollectionEnabled(instance, !__DEV__);
 			} catch (error) {
-				console.warn(
-					'🚨 [CrashReporting] Failed to set Crashlytics collection enabled:',
+				crashReportingLog.warn(
+					'Failed to set Crashlytics collection enabled',
 					error
 				);
 			}
 
 			// Log app start for debugging
 			try {
-				log(config, 'App started');
+				log(instance, 'App started');
 			} catch (error) {
-				console.warn('🚨 [CrashReporting] Failed to log app start:', error);
+				crashReportingLog.warn('Failed to log app start', error);
 			}
 
 			// Set some default attributes
 			try {
-				setAttribute(config, 'app_version', '1.0.0');
+				setAttribute(instance, 'app_version', '1.0.0');
 			} catch (error) {
-				console.warn(
-					'🚨 [CrashReporting] Failed to set app version attribute:',
-					error
-				);
+				crashReportingLog.warn('Failed to set app version attribute', error);
 			}
 
 			try {
 				setAttribute(
-					config,
+					instance,
 					'build_type',
 					__DEV__ ? 'development' : 'production'
 				);
 			} catch (error) {
-				console.warn(
-					'🚨 [CrashReporting] Failed to set build type attribute:',
-					error
-				);
+				crashReportingLog.warn('Failed to set build type attribute', error);
 			}
 
-			this.crashlytics = getCrashlytics;
-			if (isDevMode) {
-				console.log('🚨 [CrashReporting] Crashlytics initialized');
-			}
+			crashReportingLog.info('Crashlytics initialized');
 		} catch (error) {
-			console.warn(
-				'🚨 [CrashReporting] Failed to initialize Crashlytics:',
-				error
-			);
+			crashReportingLog.warn('Failed to initialize Crashlytics', error);
 		}
 	}
 
@@ -228,7 +212,7 @@ export class CrashReportingService {
 			if (!this.options.enableSampling) return true;
 			return Math.random() < this.options.sampleRate;
 		} catch (error) {
-			console.warn('🚨 [CrashReporting] Failed to determine sampling:', error);
+			crashReportingLog.warn('Failed to determine sampling', error);
 			return true; // Default to including the event if sampling fails
 		}
 	}
@@ -254,10 +238,7 @@ export class CrashReportingService {
 						})
 					);
 				} catch (error) {
-					console.warn(
-						'🚨 [CrashReporting] Failed to scrub exception values:',
-						error
-					);
+					crashReportingLog.warn('Failed to scrub exception values', error);
 				}
 			}
 
@@ -269,10 +250,7 @@ export class CrashReportingService {
 							this.scrubSentryBreadcrumb(crumb)
 						);
 				} catch (error) {
-					console.warn(
-						'🚨 [CrashReporting] Failed to scrub breadcrumbs:',
-						error
-					);
+					crashReportingLog.warn('Failed to scrub breadcrumbs', error);
 				}
 			}
 
@@ -284,16 +262,13 @@ export class CrashReportingService {
 						// Remove other potentially sensitive fields
 					};
 				} catch (error) {
-					console.warn(
-						'🚨 [CrashReporting] Failed to scrub user context:',
-						error
-					);
+					crashReportingLog.warn('Failed to scrub user context', error);
 				}
 			}
 
 			return scrubbedEvent;
 		} catch (error) {
-			console.warn('🚨 [CrashReporting] Failed to scrub Sentry event:', error);
+			crashReportingLog.warn('Failed to scrub Sentry event', error);
 			return event;
 		}
 	}
@@ -314,10 +289,7 @@ export class CrashReportingService {
 						new Error(scrubbedBreadcrumb.message)
 					).message;
 				} catch (error) {
-					console.warn(
-						'🚨 [CrashReporting] Failed to scrub breadcrumb message:',
-						error
-					);
+					crashReportingLog.warn('Failed to scrub breadcrumb message', error);
 				}
 			}
 
@@ -328,16 +300,13 @@ export class CrashReportingService {
 						scrubbedBreadcrumb.data
 					);
 				} catch (error) {
-					console.warn(
-						'🚨 [CrashReporting] Failed to scrub breadcrumb data:',
-						error
-					);
+					crashReportingLog.warn('Failed to scrub breadcrumb data', error);
 				}
 			}
 
 			return scrubbedBreadcrumb;
 		} catch (error) {
-			console.warn('🚨 [CrashReporting] Failed to scrub breadcrumb:', error);
+			crashReportingLog.warn('Failed to scrub breadcrumb', error);
 			return breadcrumb;
 		}
 	}
@@ -353,10 +322,7 @@ export class CrashReportingService {
 				try {
 					this.sentry.setUser({ consent });
 				} catch (error) {
-					console.warn(
-						'🚨 [CrashReporting] Failed to set Sentry user consent:',
-						error
-					);
+					crashReportingLog.warn('Failed to set Sentry user consent', error);
 				}
 			}
 
@@ -367,20 +333,20 @@ export class CrashReportingService {
 					const { setCrashlyticsCollectionEnabled } = await import(
 						'@react-native-firebase/crashlytics'
 					);
-					setCrashlyticsCollectionEnabled(this.crashlytics(), shouldEnable);
+					if (this.crashlytics) {
+						setCrashlyticsCollectionEnabled(this.crashlytics, shouldEnable);
+					}
 				} catch (error) {
-					console.warn(
-						'🚨 [CrashReporting] Failed to set Crashlytics collection enabled:',
+					crashReportingLog.warn(
+						'Failed to set Crashlytics collection enabled',
 						error
 					);
 				}
 			}
 
-			if (isDevMode) {
-				console.log(`🚨 [CrashReporting] User consent set to: ${consent}`);
-			}
+			crashReportingLog.info(`User consent set to: ${consent}`);
 		} catch (error) {
-			console.warn('🚨 [CrashReporting] Failed to set user consent:', error);
+			crashReportingLog.warn('Failed to set user consent', error);
 		}
 	}
 
@@ -405,15 +371,15 @@ export class CrashReportingService {
 				const { setUserId, setAttribute } = await import(
 					'@react-native-firebase/crashlytics'
 				);
-				setUserId(this.crashlytics(), userId);
+				setUserId(this.crashlytics, userId);
 				if (additionalData) {
 					Object.entries(additionalData).forEach(([key, value]) => {
-						setAttribute(this.crashlytics(), key, String(value));
+						setAttribute(this.crashlytics!, key, String(value));
 					});
 				}
 			}
 		} catch (error) {
-			console.warn('🚨 [CrashReporting] Failed to set user context:', error);
+			crashReportingLog.warn('Failed to set user context', error);
 		}
 	}
 
@@ -432,10 +398,10 @@ export class CrashReportingService {
 				const { setAttribute } = await import(
 					'@react-native-firebase/crashlytics'
 				);
-				setAttribute(this.crashlytics(), key, String(value));
+				setAttribute(this.crashlytics, key, String(value));
 			}
 		} catch (error) {
-			console.warn('🚨 [CrashReporting] Failed to set context:', error);
+			crashReportingLog.warn('Failed to set context', error);
 		}
 	}
 
@@ -468,18 +434,14 @@ export class CrashReportingService {
 				const { recordError } = await import(
 					'@react-native-firebase/crashlytics'
 				);
-				recordError(this.crashlytics(), processedError);
+				recordError(this.crashlytics, processedError);
 			}
 
-			console.log(
-				'🚨 [CrashReporting] Error captured:',
-				processedError.message
-			);
+			crashReportingLog.debug('Error captured', {
+				message: processedError.message,
+			});
 		} catch (reportingError) {
-			console.warn(
-				'🚨 [CrashReporting] Failed to capture error:',
-				reportingError
-			);
+			crashReportingLog.warn('Failed to capture error', reportingError);
 		}
 	}
 
@@ -513,19 +475,15 @@ export class CrashReportingService {
 						},
 					});
 				} catch (error) {
-					console.warn(
-						'🚨 [CrashReporting] Failed to capture Sentry message:',
-						error
-					);
+					crashReportingLog.warn('Failed to capture Sentry message', error);
 				}
 			}
 
-			console.log(
-				`🚨 [CrashReporting] Message captured (${level}):`,
-				processedMessage
-			);
+			crashReportingLog.debug(`Message captured (${level})`, {
+				message: processedMessage,
+			});
 		} catch (error) {
-			console.warn('🚨 [CrashReporting] Failed to capture message:', error);
+			crashReportingLog.warn('Failed to capture message', error);
 		}
 	}
 
@@ -551,14 +509,11 @@ export class CrashReportingService {
 								: data,
 					});
 				} catch (error) {
-					console.warn(
-						'🚨 [CrashReporting] Failed to add Sentry breadcrumb:',
-						error
-					);
+					crashReportingLog.warn('Failed to add Sentry breadcrumb', error);
 				}
 			}
 		} catch (error) {
-			console.warn('🚨 [CrashReporting] Failed to add breadcrumb:', error);
+			crashReportingLog.warn('Failed to add breadcrumb', error);
 		}
 	}
 
@@ -567,14 +522,14 @@ export class CrashReportingService {
 	 */
 	testCrashReporting(): void {
 		if (__DEV__ && this.sentry) {
-			console.log('🚨 [CrashReporting] Testing crash reporting...');
+			crashReportingLog.debug('Testing crash reporting');
 			this.captureMessage('Test message from development', 'info', {
 				screen: 'test',
 				action: 'test_crash_reporting',
 			});
 		} else if (__DEV__) {
-			console.log(
-				'🚨 [CrashReporting] Sentry not available, skipping crash reporting test'
+			crashReportingLog.debug(
+				'Sentry not available, skipping crash reporting test'
 			);
 		}
 	}
@@ -585,17 +540,16 @@ export class CrashReportingService {
 	async testCrashlytics(): Promise<void> {
 		if (__DEV__ && this.crashlytics) {
 			try {
-				console.log('🚨 [CrashReporting] Testing Crashlytics...');
+				crashReportingLog.debug('Testing Crashlytics');
 
 				// Test logging
 				try {
 					const { log } = await import('@react-native-firebase/crashlytics');
-					log(this.crashlytics(), 'Test log from development');
+					if (this.crashlytics) {
+						log(this.crashlytics, 'Test log from development');
+					}
 				} catch (error) {
-					console.warn(
-						'🚨 [CrashReporting] Failed to test Crashlytics logging:',
-						error
-					);
+					crashReportingLog.warn('Failed to test Crashlytics logging', error);
 				}
 
 				// Test custom attributes
@@ -603,10 +557,12 @@ export class CrashReportingService {
 					const { setAttribute } = await import(
 						'@react-native-firebase/crashlytics'
 					);
-					setAttribute(this.crashlytics(), 'test_attribute', 'test_value');
+					if (this.crashlytics) {
+						setAttribute(this.crashlytics, 'test_attribute', 'test_value');
+					}
 				} catch (error) {
-					console.warn(
-						'🚨 [CrashReporting] Failed to test Crashlytics attributes:',
+					crashReportingLog.warn(
+						'Failed to test Crashlytics attributes',
 						error
 					);
 				}
@@ -616,25 +572,25 @@ export class CrashReportingService {
 					const { recordError } = await import(
 						'@react-native-firebase/crashlytics'
 					);
-					recordError(
-						this.crashlytics(),
-						new Error('Test error from development')
-					);
+					if (this.crashlytics) {
+						recordError(
+							this.crashlytics,
+							new Error('Test error from development')
+						);
+					}
 				} catch (error) {
-					console.warn(
-						'🚨 [CrashReporting] Failed to test Crashlytics error recording:',
+					crashReportingLog.warn(
+						'Failed to test Crashlytics error recording',
 						error
 					);
 				}
 
-				console.log('🚨 [CrashReporting] Crashlytics test completed');
+				crashReportingLog.debug('Crashlytics test completed');
 			} catch (error) {
-				console.warn('🚨 [CrashReporting] Failed to test Crashlytics:', error);
+				crashReportingLog.warn('Failed to test Crashlytics', error);
 			}
 		} else if (__DEV__) {
-			console.log(
-				'🚨 [CrashReporting] Crashlytics not available, skipping test'
-			);
+			crashReportingLog.debug('Crashlytics not available, skipping test');
 		}
 	}
 
@@ -675,7 +631,7 @@ export class CrashReportingService {
 				op: operation,
 			});
 		} catch (error) {
-			console.warn('🚨 [CrashReporting] Failed to start transaction:', error);
+			crashReportingLog.warn('Failed to start transaction', error);
 			return null;
 		}
 	}
@@ -689,7 +645,7 @@ export class CrashReportingService {
 		try {
 			transaction.finish();
 		} catch (error) {
-			console.warn('🚨 [CrashReporting] Failed to finish transaction:', error);
+			crashReportingLog.warn('Failed to finish transaction', error);
 		}
 	}
 
@@ -705,7 +661,7 @@ export class CrashReportingService {
 				description: name,
 			});
 		} catch (error) {
-			console.warn('🚨 [CrashReporting] Failed to add span:', error);
+			crashReportingLog.warn('Failed to add span', error);
 			return null;
 		}
 	}
@@ -719,7 +675,7 @@ export class CrashReportingService {
 		try {
 			span.finish();
 		} catch (error) {
-			console.warn('🚨 [CrashReporting] Failed to finish span:', error);
+			crashReportingLog.warn('Failed to finish span', error);
 		}
 	}
 
@@ -738,10 +694,10 @@ export class CrashReportingService {
 				const { setAttribute } = await import(
 					'@react-native-firebase/crashlytics'
 				);
-				setAttribute(this.crashlytics(), key, value);
+				setAttribute(this.crashlytics, key, value);
 			}
 		} catch (error) {
-			console.warn('🚨 [CrashReporting] Failed to set tag:', error);
+			crashReportingLog.warn('Failed to set tag', error);
 		}
 	}
 
@@ -761,11 +717,11 @@ export class CrashReportingService {
 					'@react-native-firebase/crashlytics'
 				);
 				Object.entries(tags).forEach(([key, value]) => {
-					setAttribute(this.crashlytics(), key, value);
+					setAttribute(this.crashlytics!, key, value);
 				});
 			}
 		} catch (error) {
-			console.warn('🚨 [CrashReporting] Failed to set tags:', error);
+			crashReportingLog.warn('Failed to set tags', error);
 		}
 	}
 
@@ -784,7 +740,7 @@ export class CrashReportingService {
 		try {
 			this.sentry.captureUserFeedback(feedback);
 		} catch (error) {
-			console.warn('🚨 [CrashReporting] Failed to set user feedback:', error);
+			crashReportingLog.warn('Failed to set user feedback', error);
 		}
 	}
 
@@ -798,7 +754,7 @@ export class CrashReportingService {
 			await this.sentry.flush(timeout);
 			return true;
 		} catch (error) {
-			console.warn('🚨 [CrashReporting] Failed to flush events:', error);
+			crashReportingLog.warn('Failed to flush events', error);
 			return false;
 		}
 	}
@@ -820,13 +776,13 @@ export class CrashReportingService {
 				const { setUserId } = await import(
 					'@react-native-firebase/crashlytics'
 				);
-				setUserId(this.crashlytics(), '');
+				setUserId(this.crashlytics, '');
 				// Note: Crashlytics doesn't have a direct way to clear all attributes
 			}
 
-			console.log('🚨 [CrashReporting] Context cleared');
+			crashReportingLog.debug('Context cleared');
 		} catch (error) {
-			console.warn('🚨 [CrashReporting] Failed to clear context:', error);
+			crashReportingLog.warn('Failed to clear context', error);
 		}
 	}
 
@@ -839,7 +795,7 @@ export class CrashReportingService {
 		try {
 			return this.sentry.getCurrentScope()?.getSession()?.getId() || null;
 		} catch (error) {
-			console.warn('🚨 [CrashReporting] Failed to get session ID:', error);
+			crashReportingLog.warn('Failed to get session ID', error);
 			return null;
 		}
 	}
@@ -853,7 +809,7 @@ export class CrashReportingService {
 		try {
 			this.sentry.setRelease(release);
 		} catch (error) {
-			console.warn('🚨 [CrashReporting] Failed to set release:', error);
+			crashReportingLog.warn('Failed to set release', error);
 		}
 	}
 
@@ -867,7 +823,7 @@ export class CrashReportingService {
 			this.sentry.setEnvironment(environment);
 			this.options.environment = environment;
 		} catch (error) {
-			console.warn('🚨 [CrashReporting] Failed to set environment:', error);
+			crashReportingLog.warn('Failed to set environment', error);
 		}
 	}
 
@@ -905,10 +861,10 @@ export class CrashReportingService {
 				});
 			});
 
-			console.log('🚨 [CrashReporting] Unhandled rejection capture setup');
+			crashReportingLog.debug('Unhandled rejection capture setup');
 		} catch (error) {
-			console.warn(
-				'🚨 [CrashReporting] Failed to setup unhandled rejection capture:',
+			crashReportingLog.warn(
+				'Failed to setup unhandled rejection capture',
 				error
 			);
 		}
@@ -919,14 +875,12 @@ export class CrashReportingService {
 	 */
 	async testAllFeatures(): Promise<void> {
 		if (!__DEV__) {
-			console.log('🚨 [CrashReporting] Testing only available in development');
+			crashReportingLog.debug('Testing only available in development');
 			return;
 		}
 
 		try {
-			console.log(
-				'🚨 [CrashReporting] Testing all crash reporting features...'
-			);
+			crashReportingLog.debug('Testing all crash reporting features');
 
 			// Test basic message capture
 			await this.captureMessage(
@@ -977,9 +931,9 @@ export class CrashReportingService {
 			// Test Crashlytics
 			await this.testCrashlytics();
 
-			console.log('🚨 [CrashReporting] All features tested successfully');
+			crashReportingLog.info('All features tested successfully');
 		} catch (error) {
-			console.warn('🚨 [CrashReporting] Failed to test all features:', error);
+			crashReportingLog.warn('Failed to test all features', error);
 		}
 	}
 }

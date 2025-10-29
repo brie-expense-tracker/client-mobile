@@ -16,6 +16,10 @@ import {
 	RecurringExpenseService,
 } from '../../../../src/services';
 import { resolveRecurringExpenseAppearance } from '../../../../src/utils/recurringExpenseAppearance';
+import { isDevMode } from '../../../../src/config/environment';
+import { createLogger } from '../../../../src/utils/sublogger';
+
+const recurringExpensesFeedLog = createLogger('RecurringExpensesFeed');
 
 const formatCurrency = (amount: number): string => {
 	return new Intl.NumberFormat('en-US', {
@@ -222,9 +226,11 @@ export default function RecurringExpensesFeed({
 
 			// Skip if we already fetched for these exact expenses
 			if (lastFetchRef.current === cacheKey || isFetchingRef.current) {
-				console.log(
-					'⏭️ [RecurringExpensesFeed] Skipping duplicate payment status check'
-				);
+				if (isDevMode) {
+					recurringExpensesFeedLog.debug(
+						'⏭️ [RecurringExpensesFeed] Skipping duplicate payment status check'
+					);
+				}
 				return;
 			}
 
@@ -241,9 +247,11 @@ export default function RecurringExpensesFeed({
 					.filter((id) => id && objectIdRe.test(id));
 
 				if (patternIds.length === 0) {
-					console.log(
-						'⚠️ [RecurringExpensesFeed] No valid ObjectIds to check payment status'
-					);
+					if (isDevMode) {
+						recurringExpensesFeedLog.debug(
+							'⚠️ [RecurringExpensesFeed] No valid ObjectIds to check payment status'
+						);
+					}
 					setExpensesWithPaymentStatus(
 						expenses.map((expense) => ({
 							...expense,
@@ -292,7 +300,7 @@ export default function RecurringExpensesFeed({
 
 				setExpensesWithPaymentStatus(expensesWithStatus);
 			} catch (error) {
-				console.error('Error checking payment status:', error);
+				recurringExpensesFeedLog.error('Error checking payment status', error);
 				setPaymentStatusError('Failed to check payment status');
 				setExpensesWithPaymentStatus(
 					expenses.map((expense) => ({
@@ -442,7 +450,14 @@ export default function RecurringExpensesFeed({
 				renderItem={({ item }) => (
 					<RecurringExpenseRow
 						expense={item}
-						onPressMenu={onPressMenu ?? ((id) => console.log('menu:', id))}
+						onPressMenu={
+							onPressMenu ??
+							((id) => {
+								if (isDevMode) {
+									recurringExpensesFeedLog.debug('menu:', id);
+								}
+							})
+						}
 						onPressRow={onPressRow}
 					/>
 				)}

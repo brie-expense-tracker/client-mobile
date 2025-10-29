@@ -1,3 +1,4 @@
+import { logger } from '../../../utils/logger';
 // Simple QA Lane Logging - Track metrics and performance
 // Provides insights into Simple QA effectiveness and user satisfaction
 
@@ -45,7 +46,7 @@ export class SimpleQALogger {
 		try {
 			// Validate required fields
 			if (typeof metrics.tookSimpleQALane !== 'boolean') {
-				console.warn(
+				logger.warn(
 					'🔍 [SimpleQALogger] Invalid tookSimpleQALane value:',
 					metrics.tookSimpleQALane
 				);
@@ -56,7 +57,7 @@ export class SimpleQALogger {
 				typeof metrics.timeToFirstToken !== 'number' ||
 				metrics.timeToFirstToken < 0
 			) {
-				console.warn(
+				logger.warn(
 					'🔍 [SimpleQALogger] Invalid timeToFirstToken value:',
 					metrics.timeToFirstToken
 				);
@@ -64,7 +65,7 @@ export class SimpleQALogger {
 			}
 
 			if (typeof metrics.finalTokens !== 'number' || metrics.finalTokens < 0) {
-				console.warn(
+				logger.warn(
 					'🔍 [SimpleQALogger] Invalid finalTokens value:',
 					metrics.finalTokens
 				);
@@ -87,7 +88,7 @@ export class SimpleQALogger {
 			// Save to persistent storage
 			this.saveToStorage();
 
-			console.log('🔍 [SimpleQALogger] Logged metrics:', {
+			logger.debug('🔍 [SimpleQALogger] Logged metrics:', {
 				tookSimpleQALane: metricsWithTimestamp.tookSimpleQALane,
 				microSolverUsed: metricsWithTimestamp.microSolverUsed,
 				responseSource: metricsWithTimestamp.responseSource,
@@ -96,7 +97,7 @@ export class SimpleQALogger {
 				timestamp: new Date(metricsWithTimestamp.timestamp).toISOString(),
 			});
 		} catch (error) {
-			console.error('🔍 [SimpleQALogger] Error logging metrics:', error);
+			logger.error('🔍 [SimpleQALogger] Error logging metrics:', error);
 		}
 	}
 
@@ -325,7 +326,7 @@ export class SimpleQALogger {
 				localStorage.setItem(this.storageKey, data);
 			}
 		} catch (error) {
-			console.error('🔍 [SimpleQALogger] Error saving to storage:', error);
+			logger.error('🔍 [SimpleQALogger] Error saving to storage:', error);
 		}
 	}
 
@@ -346,7 +347,7 @@ export class SimpleQALogger {
 				}
 			}
 		} catch (error) {
-			console.error('🔍 [SimpleQALogger] Error loading from storage:', error);
+			logger.error('🔍 [SimpleQALogger] Error loading from storage:', error);
 			this.metrics = [];
 		}
 	}
@@ -374,7 +375,7 @@ export class SimpleQALogger {
 		if (typeof localStorage !== 'undefined') {
 			localStorage.removeItem(this.storageKey);
 		}
-		console.log('🔍 [SimpleQALogger] Cleared all metrics');
+		logger.debug('🔍 [SimpleQALogger] Cleared all metrics');
 	}
 
 	/**

@@ -8,11 +8,15 @@ import { ChatContext } from '../../services/feature/chatController';
 import { QuickAction } from './actionTypes';
 import { TimedLRU } from './utils/timedLRU';
 import { scoreUsefulness } from './usefulness';
+import { createLogger } from '../../utils/sublogger';
 import {
 	simpleQALogger,
 	SimpleQAMetrics,
 	SimpleQALogger,
 } from './simpleQALogging';
+
+// Create namespaced logger for this service
+const simpleQALog = createLogger('SimpleQA');
 
 export interface SimpleQAResult {
 	response: ChatResponse;
@@ -102,19 +106,19 @@ export class SimpleQALane {
 			typeof question !== 'string' ||
 			question.trim().length === 0
 		) {
-			console.warn('🔍 [SimpleQA] Invalid question provided');
+			simpleQALog.warn('Invalid question provided');
 			return false;
 		}
 
 		// Sanitize question (remove potentially harmful content)
 		const sanitizedQuestion = question.trim().substring(0, 1000); // Limit length
 		if (sanitizedQuestion !== question) {
-			console.warn('🔍 [SimpleQA] Question truncated due to length');
+			simpleQALog.warn('Question truncated due to length');
 		}
 
 		// Validate context
 		if (!context || typeof context !== 'object') {
-			console.warn('🔍 [SimpleQA] Invalid context provided');
+			simpleQALog.warn('Invalid context provided');
 			return false;
 		}
 
@@ -128,7 +132,7 @@ export class SimpleQALane {
 		];
 
 		if (suspiciousPatterns.some((pattern) => pattern.test(question))) {
-			console.warn('🔍 [SimpleQA] Suspicious content detected in question');
+			simpleQALog.warn('Suspicious content detected in question');
 			return false;
 		}
 
@@ -148,7 +152,7 @@ export class SimpleQALane {
 
 		// Validate inputs
 		if (!this.validateInputs(question, context)) {
-			console.warn('🔍 [SimpleQA] Invalid inputs provided');
+			simpleQALog.warn('Invalid inputs provided');
 			this.trackFailure('validation_failed');
 			return null;
 		}
@@ -158,15 +162,15 @@ export class SimpleQALane {
 			return null;
 		}
 
-		console.log('🔍 [SimpleQA] Attempting simple answer for:', question);
+		simpleQALog.debug('Attempting simple answer for:', question);
 
 		// Step 1: Try micro-solvers first (fastest)
 		const microResult = microSolve(question, context);
 		if (microResult) {
 			// Check repetition guard
 			if (this.shouldAvoidRepeat(question, microResult.matchedPattern)) {
-				console.log(
-					'🔍 [SimpleQA] Avoiding repeat of pattern:',
+				simpleQALog.debug(
+					'Avoiding repeat of pattern:',
 					microResult.matchedPattern
 				);
 				return null;
@@ -177,8 +181,8 @@ export class SimpleQALane {
 				microResult.matchedPattern === 'investing_starter' &&
 				this.wasTopicRecent('HYSA', 2)
 			) {
-				console.log(
-					'🔍 [SimpleQA] Suppressing generic investing card after HYSA discussion'
+				simpleQALog.debug(
+					'Suppressing generic investing card after HYSA discussion'
 				);
 				return null; // Force escalate to skill/agent
 			}
@@ -213,10 +217,7 @@ export class SimpleQALane {
 			const scored = scoreUsefulness(result.response, question);
 			this.trackUsefulnessScore(scored);
 			if (scored < SimpleQALane.SIMPLE_QA_MIN_SCORE) {
-				console.log(
-					'🔍 [SimpleQA] Micro-solver result too weak, score:',
-					scored
-				);
+				simpleQALog.debug('Micro-solver result too weak, score:', scored);
 				this.trackFailure('low_usefulness_score', question);
 				return null;
 			}
@@ -237,7 +238,7 @@ export class SimpleQALane {
 
 			// Check repetition guard
 			if (this.shouldAvoidRepeat(question, patternKey)) {
-				console.log('🔍 [SimpleQA] Avoiding repeat of KB item:', patternKey);
+				simpleQALog.debug('Avoiding repeat of KB item:', patternKey);
 				return null;
 			}
 
@@ -269,10 +270,7 @@ export class SimpleQALane {
 			const scored = scoreUsefulness(result.response, question);
 			this.trackUsefulnessScore(scored);
 			if (scored < SimpleQALane.SIMPLE_QA_MIN_SCORE) {
-				console.log(
-					'🔍 [SimpleQA] Knowledge base result too weak, score:',
-					scored
-				);
+				simpleQALog.debug('Knowledge base result too weak, score:', scored);
 				this.trackFailure('low_usefulness_score', question);
 				return null;
 			}
@@ -307,10 +305,7 @@ export class SimpleQALane {
 				const scored = scoreUsefulness(result.response, question);
 				this.trackUsefulnessScore(scored);
 				if (scored < SimpleQALane.SIMPLE_QA_MIN_SCORE) {
-					console.log(
-						'🔍 [SimpleQA] Mini model result too weak, score:',
-						scored
-					);
+					simpleQALog.debug('Mini model result too weak, score:', scored);
 					this.trackFailure('low_usefulness_score', question);
 					return null;
 				}
@@ -320,7 +315,7 @@ export class SimpleQALane {
 				return result;
 			}
 		} catch (error) {
-			console.warn('🔍 [SimpleQA] Mini model step failed:', {
+			simpleQALog.warn('Mini model step failed:', {
 				error: error instanceof Error ? error.message : String(error),
 				question: question.substring(0, 100) + '...',
 				timestamp: new Date().toISOString(),
@@ -398,15 +393,12 @@ export class SimpleQALane {
 			this.performanceMetrics.consecutiveFailures >= 5 &&
 			timeSinceLastAlert > 5 * 60 * 1000
 		) {
-			console.error(
-				'🚨 [SimpleQA] Performance Alert: 5 consecutive failures detected',
-				{
-					reason,
-					consecutiveFailures: this.performanceMetrics.consecutiveFailures,
-					totalRequests: this.performanceMetrics.totalRequests,
-					successRate: this.getSuccessRate(),
-				}
-			);
+			simpleQALog.error('Performance Alert: 5 consecutive failures detected', {
+				reason,
+				consecutiveFailures: this.performanceMetrics.consecutiveFailures,
+				totalRequests: this.performanceMetrics.totalRequests,
+				successRate: this.getSuccessRate(),
+			});
 			this.performanceMetrics.lastAlertTime = now;
 		}
 
@@ -417,7 +409,7 @@ export class SimpleQALane {
 			this.performanceMetrics.totalRequests > 10 &&
 			timeSinceLastAlert > 10 * 60 * 1000
 		) {
-			console.error('🚨 [SimpleQA] Performance Alert: Success rate below 50%', {
+			simpleQALog.error('Performance Alert: Success rate below 50%', {
 				successRate,
 				totalRequests: this.performanceMetrics.totalRequests,
 				failedRequests: this.performanceMetrics.failedRequests,
@@ -553,7 +545,7 @@ export class SimpleQALane {
 
 			return response;
 		} catch (error) {
-			console.warn('🔍 [SimpleQA] Mini model failed:', error);
+			simpleQALog.warn('Mini model failed:', error);
 			return null;
 		}
 	}
@@ -633,7 +625,7 @@ export class SimpleQALane {
 				confidence: response.confidence,
 			};
 		} catch (error) {
-			console.warn('🔍 [SimpleQA] Mini model call failed, using fallback:', {
+			simpleQALog.warn('Mini model call failed, using fallback:', {
 				error: error instanceof Error ? error.message : String(error),
 				stack: error instanceof Error ? error.stack : undefined,
 				timestamp: new Date().toISOString(),
@@ -814,7 +806,7 @@ What specific financial topic would you like help with?`;
 			'What is compound interest?',
 		];
 
-		console.log('🔍 [SimpleQA] Warming cache with common questions...');
+		simpleQALog.debug('Warming cache with common questions...');
 
 		for (const question of commonQuestions) {
 			try {
@@ -830,15 +822,11 @@ What specific financial topic would you like help with?`;
 
 				await this.tryAnswer(question, context, 'GENERAL_QA');
 			} catch (error) {
-				console.warn(
-					'🔍 [SimpleQA] Cache warming failed for question:',
-					question,
-					error
-				);
+				simpleQALog.warn('Cache warming failed for question:', question, error);
 			}
 		}
 
-		console.log('🔍 [SimpleQA] Cache warming completed');
+		simpleQALog.debug('Cache warming completed');
 	}
 
 	/**
@@ -865,7 +853,7 @@ What specific financial topic would you like help with?`;
 		this.topicHistory = [];
 		this.lastPatternKey = null;
 		this.lastPatternTimestamp = null;
-		console.log('🔍 [SimpleQA] Reset completed');
+		simpleQALog.debug('Reset completed');
 	}
 }
 

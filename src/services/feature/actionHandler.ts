@@ -4,6 +4,8 @@
 // import { PendingAction } from '../../types/assistant';
 import { ConversationState } from '../ConversationState';
 import { ChatResponse } from '../../services/assistant/responseSchema';
+import { logger } from '../../../utils/logger';
+
 
 // Action execution result
 export interface ActionExecutionResult {
@@ -42,7 +44,7 @@ export interface ActionStats {
 const Api = {
 	post: async (endpoint: string, body: any) => {
 		// This should be replaced with your actual API service
-		console.log(`[ActionHandler] POST ${endpoint}:`, body);
+		logger.debug(`[ActionHandler] POST ${endpoint}:`, body);
 
 		// Mock successful response
 		return {
@@ -54,7 +56,7 @@ const Api = {
 		};
 	},
 	put: async (endpoint: string, body: any) => {
-		console.log(`[ActionHandler] PUT ${endpoint}:`, body);
+		logger.debug(`[ActionHandler] PUT ${endpoint}:`, body);
 		return {
 			json: async () => ({
 				_id: endpoint.split('/').pop(),
@@ -64,7 +66,7 @@ const Api = {
 		};
 	},
 	delete: async (endpoint: string) => {
-		console.log(`[ActionHandler] DELETE ${endpoint}`);
+		logger.debug(`[ActionHandler] DELETE ${endpoint}`);
 		return {
 			json: async () => ({
 				success: true,
@@ -116,7 +118,7 @@ export class ActionHandler {
 			(this.stats.actionTypes[action.type] || 0) + 1;
 
 		if (this.config.enableLogging) {
-			console.log(`[ActionHandler] Executing action: ${action.type}`, action);
+			logger.debug(`[ActionHandler] Executing action: ${action.type}`, action);
 		}
 
 		try {
@@ -164,7 +166,7 @@ export class ActionHandler {
 				lastError = error instanceof Error ? error : new Error('Unknown error');
 
 				if (attempt < this.config.maxRetries) {
-					console.log(
+					logger.debug(
 						`[ActionHandler] Attempt ${attempt} failed, retrying...`,
 						error
 					);
@@ -466,7 +468,7 @@ export async function handleActionIntent(
 	const action = ConversationState.consumePendingAction(conversationId);
 
 	if (!action) {
-		console.log('[ActionHandler] No pending action found');
+		logger.debug('[ActionHandler] No pending action found');
 		return {
 			message: 'Got it! What would you like me to do?',
 			details: '',

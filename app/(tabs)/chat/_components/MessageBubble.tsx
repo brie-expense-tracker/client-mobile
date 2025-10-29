@@ -11,6 +11,7 @@ import { sharedStyles } from '../../../../src/components/assistant/shared/shared
 import { Message } from '../../../../src/services/assistant/types';
 import DisclaimerBanner from '../../../../src/components/assistant/shared/DisclaimerBanner';
 import FallbackActionCard from '../../../../src/components/FallbackActionCard';
+import { logger } from '../../../../src/utils/logger';
 
 interface MessageBubbleProps {
 	m: Message;
@@ -27,12 +28,12 @@ export default function MessageBubble({
 	showPremiumHint,
 	onAction,
 }: MessageBubbleProps) {
-	console.log('🔍 [DEBUG] MessageBubble rendering message:', m);
-	console.log('🔍 [DEBUG] Message type:', m.type);
-	console.log('🔍 [DEBUG] onPickPrompt function:', onPickPrompt);
+	logger.debug('🔍 [DEBUG] MessageBubble rendering message:', m);
+	logger.debug('🔍 [DEBUG] Message type:', m.type);
+	logger.debug('🔍 [DEBUG] onPickPrompt function:', onPickPrompt);
 
 	if (m.type === 'suggestion') {
-		console.log('🔍 [DEBUG] Rendering suggestion component');
+		logger.debug('🔍 [DEBUG] Rendering suggestion component');
 		// Check if this is welcome suggestions or regular suggestions
 		if (m.data?.isWelcomeSuggestions) {
 			return <WelcomeSuggestions onPick={onPickPrompt!} />;
@@ -46,7 +47,7 @@ export default function MessageBubble({
 	}
 
 	if (m.type === 'insight') {
-		console.log('🔍 [DEBUG] Rendering InsightsCard component');
+		logger.debug('🔍 [DEBUG] Rendering InsightsCard component');
 		return (
 			<InsightsCard
 				insights={m.data?.insights || []}
@@ -57,7 +58,7 @@ export default function MessageBubble({
 	}
 
 	if (m.type === 'fallback') {
-		console.log('🔍 [DEBUG] Rendering FallbackActionCard component');
+		logger.debug('🔍 [DEBUG] Rendering FallbackActionCard component');
 		return (
 			<View style={[sharedStyles.msgWrap, sharedStyles.msgAI]}>
 				<FallbackActionCard
@@ -88,7 +89,7 @@ export default function MessageBubble({
 	}
 
 	if (m.type === 'structured') {
-		console.log('🔍 [DEBUG] Rendering StructuredResponse component');
+		logger.debug('🔍 [DEBUG] Rendering StructuredResponse component');
 		return (
 			<View style={[sharedStyles.msgWrap, sharedStyles.msgAI]}>
 				<StructuredResponse
@@ -160,7 +161,10 @@ export default function MessageBubble({
 						style={styles.hybridDetailsButton}
 						onPress={() => {
 							// Show detailed breakdown in console for now
-							console.log('Hybrid Optimization Details:', m.hybridOptimization);
+							logger.debug(
+								'Hybrid Optimization Details:',
+								m.hybridOptimization
+							);
 						}}
 					>
 						<Ionicons
@@ -177,7 +181,7 @@ export default function MessageBubble({
 				<MessageFeedback
 					messageId={m.id}
 					onFeedback={(satisfaction) => {
-						console.log('User feedback:', satisfaction, 'for message:', m.id);
+						logger.debug('User feedback:', satisfaction, 'for message:', m.id);
 					}}
 				/>
 			)}

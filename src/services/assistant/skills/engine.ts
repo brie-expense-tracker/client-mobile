@@ -7,6 +7,8 @@ import { skillRegistry } from './registry';
 import { scoreUsefulness } from '../usefulness';
 import { SkillExecutionResult } from './types';
 import { skillMetrics } from './skillMetrics';
+import { logger } from '../../../../utils/logger';
+
 
 // Configuration for skill engine
 export interface SkillEngineConfig {
@@ -56,7 +58,7 @@ export async function trySkills(
 		const cacheKey = generateCacheKey(q, ctx);
 		const cached = executionCache.get(cacheKey);
 		if (cached && Date.now() - cached.timestamp < engineConfig.cacheTtlMs) {
-			console.log('[Skill Engine] Returning cached result');
+			logger.debug('[Skill Engine] Returning cached result');
 			return cached.result;
 		}
 	}
@@ -64,22 +66,22 @@ export async function trySkills(
 	// Find all skills that match this question
 	const skills = skillRegistry.find(q);
 	if (skills.length === 0) {
-		console.log('[Skill Engine] No matching skills found');
+		logger.debug('[Skill Engine] No matching skills found');
 		return null;
 	}
 
-	console.log(
+	logger.debug(
 		`[Skill Engine] Found ${skills.length} matching skills:`,
 		skills.map((s) => s.id)
 	);
 
 	// Try each skill in priority order
 	for (const skill of skills) {
-		console.log(`[Skill Engine] Trying skill: ${skill.id}`);
+		logger.debug(`[Skill Engine] Trying skill: ${skill.id}`);
 
 		// Check circuit breaker
 		if (engineConfig.enableCircuitBreaker && isCircuitBreakerOpen(skill.id)) {
-			console.log(`[Skill Engine] Circuit breaker open for skill: ${skill.id}`);
+			logger.debug(`[Skill Engine] Circuit breaker open for skill: ${skill.id}`);
 			continue;
 		}
 
@@ -99,7 +101,7 @@ export async function trySkills(
 						const minUsefulness = skill.config?.minUsefulness ?? 3;
 
 						if (usefulness >= minUsefulness) {
-							console.log(
+							logger.debug(
 								`[Skill Engine] ${skill.id} micro-solver success (usefulness: ${usefulness})`
 							);
 
@@ -140,7 +142,7 @@ export async function trySkills(
 
 							return result.response;
 						} else {
-							console.log(
+							logger.debug(
 								`[Skill Engine] ${skill.id} micro-solver too weak (usefulness: ${usefulness} < ${minUsefulness})`
 							);
 						}
@@ -162,7 +164,7 @@ export async function trySkills(
 					const minUsefulness = skill.config?.minUsefulness ?? 3;
 
 					if (usefulness >= minUsefulness) {
-						console.log(
+						logger.debug(
 							`[Skill Engine] ${skill.id} KB search success (usefulness: ${usefulness})`
 						);
 
@@ -202,7 +204,7 @@ export async function trySkills(
 
 						return result.response;
 					} else {
-						console.log(
+						logger.debug(
 							`[Skill Engine] ${skill.id} KB search too weak (usefulness: ${usefulness} < ${minUsefulness})`
 						);
 					}
@@ -223,7 +225,7 @@ export async function trySkills(
 					const minUsefulness = skill.config?.minUsefulness ?? 3;
 
 					if (usefulness >= minUsefulness) {
-						console.log(
+						logger.debug(
 							`[Skill Engine] ${skill.id} research agent success (usefulness: ${usefulness})`
 						);
 
@@ -263,7 +265,7 @@ export async function trySkills(
 
 						return result.response;
 					} else {
-						console.log(
+						logger.debug(
 							`[Skill Engine] ${skill.id} research agent too weak (usefulness: ${usefulness} < ${minUsefulness})`
 						);
 					}
@@ -277,7 +279,7 @@ export async function trySkills(
 				// Implementation depends on specific use cases
 			}
 		} catch (error) {
-			console.error(`[Skill Engine] Error in skill ${skill.id}:`, error);
+			logger.error(`[Skill Engine] Error in skill ${skill.id}:`, error);
 
 			// Record error metrics
 			if (engineConfig.enableMetrics) {
@@ -305,7 +307,7 @@ export async function trySkills(
 		}
 	}
 
-	console.log(
+	logger.debug(
 		`[Skill Engine] No skill provided a good enough response (tried ${skills.length} skills)`
 	);
 	return null;
@@ -344,7 +346,7 @@ async function executeWithTimeout<T>(
 			})
 			.catch((error) => {
 				clearTimeout(timer);
-				console.error('[Skill Engine] Execution error:', error);
+				logger.error('[Skill Engine] Execution error:', error);
 				resolve(null);
 			});
 	});
@@ -386,7 +388,7 @@ function recordCircuitBreakerFailure(skillId: string): void {
 	// Open circuit after 5 failures
 	if (state.failures >= 5) {
 		state.state = 'open';
-		console.log(`[Skill Engine] Circuit breaker opened for skill: ${skillId}`);
+		logger.debug(`[Skill Engine] Circuit breaker opened for skill: ${skillId}`);
 	}
 
 	circuitBreakerState.set(skillId, state);
@@ -467,7 +469,7 @@ export async function testSkill(
 	const engineConfig = { ...DEFAULT_CONFIG, ...config };
 	const skill = skillRegistry.getById(skillId);
 	if (!skill) {
-		console.error(`[Skill Engine] Skill ${skillId} not found`);
+		logger.error(`[Skill Engine] Skill ${skillId} not found`);
 		return null;
 	}
 

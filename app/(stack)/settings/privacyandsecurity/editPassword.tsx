@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { logger } from '../../../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -62,7 +63,7 @@ export default function EditPasswordScreen() {
 				]
 			);
 		} catch (error: any) {
-			console.error('Password reset error:', error);
+			logger.error('Password reset error:', error);
 
 			let errorMessage = 'Could not send reset email. Please try again.';
 			if (error.code === 'auth/user-not-found') {
@@ -88,8 +89,8 @@ export default function EditPasswordScreen() {
 					</View>
 					<Text style={styles.title}>Change Your Password</Text>
 					<Text style={styles.subtitle}>
-						Enter your email address and we&apos;ll send you a link to change your
-						password.
+						Enter your email address and we&apos;ll send you a link to change
+						your password.
 					</Text>
 
 					<Text style={styles.label}>Email Address</Text>

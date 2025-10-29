@@ -1,5 +1,6 @@
 /* budgetSettings.tsx — keeps it lightweight & self-contained */
 import React, { useState, useEffect } from 'react';
+import { logger } from '../../../../src/utils/logger';
 import {
 	SafeAreaView,
 	ScrollView,
@@ -98,7 +99,7 @@ export default function BudgetSettingsScreen() {
 				return;
 			}
 
-			console.log('Saving budget settings:', {
+			logger.debug('Saving budget settings:', {
 				cycleType,
 				cycleStart: cycleStartNum,
 				alertPct: alertPctNum,
@@ -116,7 +117,7 @@ export default function BudgetSettingsScreen() {
 
 			Alert.alert('Success', 'Budget settings saved successfully');
 		} catch (error) {
-			console.error('Error saving budget settings:', error);
+			logger.error('Error saving budget settings:', error);
 			const errorMessage =
 				error instanceof Error
 					? error.message

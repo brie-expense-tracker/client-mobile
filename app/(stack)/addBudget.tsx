@@ -12,6 +12,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useBudget } from '../../src/context/budgetContext';
+import { createLogger } from '../../src/utils/sublogger';
+
+const addBudgetLog = createLogger('AddBudget');
+import { isDevMode } from '../../src/config/environment';
 import {
 	BUDGET_ICONS,
 	BUDGET_AMOUNT_PRESETS,
@@ -94,7 +98,9 @@ const AddBudgetScreen: React.FC = () => {
 
 		setLoading(true);
 		try {
-			console.log('💾 [AddBudget] Creating new budget...');
+			if (isDevMode) {
+				addBudgetLog.debug('Creating new budget');
+			}
 			const newBudget = await addBudget({
 				name: name.trim(),
 				amount: amountValue,
@@ -107,10 +113,14 @@ const AddBudgetScreen: React.FC = () => {
 				rollover,
 			});
 
-			console.log('✅ [AddBudget] Budget created successfully:', newBudget);
-			console.log(
-				'🔙 [AddBudget] Navigating back - useFocusEffect will handle refetch'
-			);
+			if (isDevMode) {
+				addBudgetLog.info('Budget created successfully', {
+					budgetId: newBudget.id,
+				});
+				addBudgetLog.debug(
+					'Navigating back - useFocusEffect will handle refetch'
+				);
+			}
 
 			router.back();
 
@@ -118,7 +128,7 @@ const AddBudgetScreen: React.FC = () => {
 				Alert.alert('Success', 'Budget added successfully!');
 			}, 300);
 		} catch (error) {
-			console.error('[AddBudgetScreen] Error saving:', error);
+			addBudgetLog.error('Error saving budget', error);
 
 			let errorMessage = 'Failed to create budget. Please try again.';
 			if (error instanceof Error) {

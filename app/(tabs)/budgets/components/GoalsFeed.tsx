@@ -13,9 +13,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useGoal, Goal } from '../../../../src/context/goalContext';
+import { createLogger } from '../../../../src/utils/sublogger';
 import LinearProgressBar from './LinearProgressBar';
+
+const goalsFeedLog = createLogger('GoalsFeed');
 import { router } from 'expo-router';
 import { normalizeIconName } from '../../../../src/constants/uiConstants';
+import { isDevMode } from '../../../../src/config/environment';
 
 type GoalStatus = 'ongoing' | 'completed' | 'cancelled';
 
@@ -74,7 +78,9 @@ function GoalRow({
 
 	const handleKebabPress = () => {
 		setKebabPressed(true);
-		console.log('Kebab button pressed for goal:', goal.id);
+		if (isDevMode) {
+			goalsFeedLog.debug('Kebab button pressed for goal', { goalId: goal.id });
+		}
 		onPressMenu?.(goal.id);
 		// Reset the flag after a short delay
 		setTimeout(() => setKebabPressed(false), 100);
@@ -239,7 +245,7 @@ export default function GoalsFeed({
 		try {
 			await refetch();
 		} catch (error) {
-			console.error('Error refreshing goals:', error);
+			goalsFeedLog.error('Error refreshing goals', error);
 		} finally {
 			setRefreshing(false);
 		}
@@ -341,19 +347,26 @@ export default function GoalsFeed({
 						</TouchableOpacity>
 					</View>
 
-				<FlatList
-					data={filteredAndSorted}
-					extraData={filteredAndSorted}
-					keyExtractor={(g) => g.id || `goal-${Math.random()}`}
-					renderItem={({ item }) => (
-						<GoalRow
-							goal={item}
-							onPressMenu={onPressMenu ?? ((id) => console.log('menu:', id))}
-						/>
-					)}
-					ItemSeparatorComponent={() => <View style={styles.separator} />}
-					scrollEnabled={scrollEnabled}
-					refreshControl={
+					<FlatList
+						data={filteredAndSorted}
+						extraData={filteredAndSorted}
+						keyExtractor={(g) => g.id || `goal-${Math.random()}`}
+						renderItem={({ item }) => (
+							<GoalRow
+								goal={item}
+								onPressMenu={
+									onPressMenu ??
+									((id) => {
+										if (isDevMode) {
+											goalsFeedLog.debug('Menu action', { id });
+										}
+									})
+								}
+							/>
+						)}
+						ItemSeparatorComponent={() => <View style={styles.separator} />}
+						scrollEnabled={scrollEnabled}
+						refreshControl={
 							<RefreshControl
 								refreshing={refreshing}
 								onRefresh={handleRefresh}

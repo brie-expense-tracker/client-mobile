@@ -1,12 +1,12 @@
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
-import { isDevMode } from './environment';
+import { createLogger } from '../utils/sublogger';
+
+const googleSignInLog = createLogger('GoogleSignIn');
 
 // Google Sign-In configuration
 export const configureGoogleSignIn = () => {
 	try {
-		if (isDevMode) {
-			console.log('🔧 Configuring Google Sign-In...');
-		}
+		googleSignInLog.debug('Configuring Google Sign-In');
 		GoogleSignin.configure({
 			webClientId:
 				'807336746313-5spjml5hicchm614hbvk67csns8idd66.apps.googleusercontent.com', // Web client ID from Firebase Console
@@ -23,11 +23,9 @@ export const configureGoogleSignIn = () => {
 				'https://www.googleapis.com/auth/userinfo.profile',
 			], // Add required scopes
 		});
-		if (isDevMode) {
-			console.log('✅ Google Sign-In configured successfully');
-		}
+		googleSignInLog.info('Google Sign-In configured successfully');
 	} catch (error) {
-		console.error('❌ Failed to configure Google Sign-In:', error);
+		googleSignInLog.error('Failed to configure Google Sign-In', error);
 		throw error;
 	}
 };

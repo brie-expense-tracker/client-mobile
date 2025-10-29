@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { logger } from '../../../../src/utils/logger';
 import {
 	StyleSheet,
 	TouchableOpacity,
@@ -178,7 +179,7 @@ export default function ScrollToBottomFab({
 			await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 		} catch (error) {
 			// Haptics not available on this device, silently continue
-			console.warn('Haptic feedback not available:', error);
+			logger.warn('Haptic feedback not available:', error);
 		}
 
 		onPress();

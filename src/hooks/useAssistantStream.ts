@@ -3,6 +3,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Message, MessageAction } from './useMessagesReducer';
 import { ErrorService } from '../services/errorService';
 import { authService } from '../services/authService';
+import { createLogger } from '../utils/sublogger';
+
+const assistantStreamLog = createLogger('AssistantStream');
 
 interface StreamingCallbacks {
 	onMeta?: (data: any) => void;
@@ -157,7 +160,7 @@ export function useAssistantStream({
 			const streamingId = streamingRef.current.messageId;
 
 			if (streamingId && noDeltaMs > 7000) {
-				console.warn('🚨 [Watchdog] No delta for >7s', {
+				assistantStreamLog.warn('No delta for >7s', {
 					streamingId,
 					messagesCount: messages.length,
 					lastMessage: messages[messages.length - 1],
@@ -169,9 +172,7 @@ export function useAssistantStream({
 
 				// If we've been stuck for more than 15 seconds, force cleanup
 				if (noDeltaMs > 15000) {
-					console.error(
-						'🚨 [Watchdog] Force cleaning up stuck stream after 15s'
-					);
+					assistantStreamLog.error('Force cleaning up stuck stream after 15s');
 					if (currentConnection.current) {
 						currentConnection.current.close();
 						currentConnection.current = null;
@@ -212,9 +213,9 @@ export function useAssistantStream({
 
 			const finalUrl = `${apiBaseUrl}/orchestrator/chat/stream?${params.toString()}`;
 
-			console.log('🌊 [Chat] SSE baseUrl from env:', baseUrl);
-			console.log('🌊 [Chat] Final API baseUrl:', apiBaseUrl);
-			console.log('🌊 [Chat] Final SSE URL:', finalUrl);
+			assistantStreamLog.debug('SSE baseUrl from env', { baseUrl });
+			assistantStreamLog.debug('Final API baseUrl', { apiBaseUrl });
+			assistantStreamLog.debug('Final SSE URL', { finalUrl });
 
 			return finalUrl;
 		},
@@ -247,17 +248,19 @@ export function useAssistantStream({
 
 			// Single-flight guard with better cleanup
 			if (currentConnection.current) {
-				console.warn('🚨 [SSE] Existing connection found, cleaning up first');
+				assistantStreamLog.warn('Existing connection found, cleaning up first');
 				currentConnection.current.close();
 				currentConnection.current = null;
 			}
 
 			if (connecting.current) {
-				console.warn('🚨 [SSE] Already connecting, waiting...');
+				assistantStreamLog.warn('Already connecting, waiting...');
 				// Wait a bit and try again
 				await new Promise((resolve) => setTimeout(resolve, 100));
 				if (connecting.current) {
-					console.warn('🚨 [SSE] Still connecting, aborting duplicate request');
+					assistantStreamLog.warn(
+						'Still connecting, aborting duplicate request'
+					);
 					return () => {}; // no-op disposer
 				}
 			}
@@ -271,8 +274,8 @@ export function useAssistantStream({
 				// Check if EventSource is available
 				const hasES = typeof (global as any).EventSource !== 'undefined';
 				if (!hasES) {
-					console.warn(
-						'[SSE] EventSource missing; falling back to non-streaming'
+					assistantStreamLog.warn(
+						'EventSource missing; falling back to non-streaming'
 					);
 					throw new Error(
 						'EventSource is not available. Make sure polyfill is loaded.'
@@ -286,28 +289,28 @@ export function useAssistantStream({
 					.slice(2)}`;
 				const firebaseUID = await AsyncStorage.getItem('firebaseUID');
 
-				console.groupCollapsed('🟦 [SSE] start');
-				console.log({ messageId: aiId, sessionId, firebaseUID, retryCount });
+				assistantStreamLog.debug('Starting SSE connection', {
+					messageId: aiId,
+					sessionId,
+					firebaseUID,
+					retryCount,
+				});
 
 				// Verify the message exists before starting stream
 				// Use a more robust check with retries since state updates might be async
 				let messageExists = messages.some((m) => m.id === aiId);
 				if (!messageExists) {
-					console.warn('⚠️ [SSE] Message not found immediately, retrying...');
+					assistantStreamLog.warn('Message not found immediately, retrying...');
 					// Wait a bit and try again
 					await new Promise((resolve) => setTimeout(resolve, 50));
 					messageExists = messages.some((m) => m.id === aiId);
 				}
 
 				if (!messageExists) {
-					console.error(
-						'🚨 [SSE] Message not found in state after retry:',
-						aiId
-					);
-					console.error(
-						'🚨 [SSE] Available message IDs:',
-						messages.map((m) => m.id)
-					);
+					assistantStreamLog.error('Message not found in state after retry', {
+						searchingFor: aiId,
+						availableIds: messages.map((m) => m.id),
+					});
 					throw new Error(`Message ${aiId} not found in state`);
 				}
 
@@ -322,15 +325,18 @@ export function useAssistantStream({
 
 				// Build URL
 				const url = buildSseUrl(sessionId, message, firebaseUID || '');
-				console.log('🟦 [SSE] URL:', url);
+				assistantStreamLog.debug('SSE URL', { url });
 
 				// Session guard - verify URL contains correct sessionId
 				const urlSession = new URLSearchParams(url.split('?')[1] || '').get(
 					'sessionId'
 				);
-				console.log('🔐 session guard', { ui: sessionId, urlSession });
+				assistantStreamLog.debug('Session guard', {
+					ui: sessionId,
+					urlSession,
+				});
 				if (urlSession !== sessionId) {
-					console.warn('⚠️ Session mismatch; refusing to stream');
+					assistantStreamLog.warn('Session mismatch; refusing to stream');
 					throw new Error('Session ID mismatch in URL construction');
 				}
 
@@ -338,9 +344,12 @@ export function useAssistantStream({
 				let es: EventSource;
 				try {
 					es = new (global as any).EventSource(url);
-					console.log('🟦 [SSE] EventSource created successfully');
+					assistantStreamLog.debug('EventSource created successfully');
 				} catch (constructorError) {
-					console.error('❌ EventSource constructor failed:', constructorError);
+					assistantStreamLog.error(
+						'EventSource constructor failed',
+						constructorError
+					);
 					throw new Error(
 						`EventSource constructor failed: ${constructorError}`
 					);
@@ -350,7 +359,7 @@ export function useAssistantStream({
 				connecting.current = true;
 
 				es.addEventListener('open', () => {
-					console.log('🟩 [SSE] open');
+					assistantStreamLog.debug('SSE connection opened');
 					connecting.current = false;
 				});
 
@@ -358,8 +367,10 @@ export function useAssistantStream({
 				es.addEventListener('message', (ev: MessageEvent) => {
 					try {
 						const payload = JSON.parse(ev.data);
-						console.log('🟨 [SSE] message', payload?.type);
-						console.log('🟨 [SSE] message data length:', ev.data?.length || 0);
+						assistantStreamLog.debug('SSE message received', {
+							type: payload?.type,
+							dataLength: ev.data?.length || 0,
+						});
 
 						// Use the aiId from closure instead of reading from state
 						const id = aiId;
@@ -369,8 +380,8 @@ export function useAssistantStream({
 							'sessionId'
 						);
 						if (sessionId !== urlSession) {
-							console.warn(
-								'⚠️ sessionId mismatch - dropping stream to avoid corrupting state',
+							assistantStreamLog.warn(
+								'SessionId mismatch - dropping stream to avoid corrupting state',
 								{
 									uiSession: sessionId,
 									urlSession,
@@ -380,10 +391,9 @@ export function useAssistantStream({
 						}
 
 						if (payload.type === 'delta') {
-							console.log(
-								'🟨 [SSE] delta text length:',
-								payload.data?.text?.length || 0
-							);
+							assistantStreamLog.debug('Delta text length', {
+								length: payload.data?.text?.length || 0,
+							});
 
 							// Update activity timestamp
 							setStreamState((prev) => ({
@@ -405,23 +415,21 @@ export function useAssistantStream({
 								bufferedText.current
 							);
 						} else if (payload.type === 'final') {
-							console.log(
-								'🟨 [SSE] final response length:',
-								payload.data?.response?.length || 0
-							);
+							assistantStreamLog.debug('Final response received', {
+								length: payload.data?.response?.length || 0,
+							});
 							dispatch({ type: 'APPLY_FINAL', id, payload: payload.data });
 						} else if (payload.type === 'meta') {
-							console.log('🟨 [SSE] meta event');
+							assistantStreamLog.debug('Meta event received');
 							dispatch({ type: 'APPLY_META', id, meta: payload.data });
 							callbacks.onMeta?.(payload.data);
 						} else if (payload.type === 'trace') {
-							console.log('🟨 [SSE] trace event');
+							assistantStreamLog.debug('Trace event received');
 							callbacks.onTrace?.(payload.data);
 						} else if (payload.type === 'done') {
-							console.log('🟨 [SSE] done event');
-							console.log(
-								'🟨 [SSE] done event - finalizing stream for message:',
-								id
+							assistantStreamLog.debug(
+								'Done event received - finalizing stream',
+								{ messageId: id }
 							);
 
 							// Calculate performance metrics
@@ -450,21 +458,23 @@ export function useAssistantStream({
 							callbacks.onDone?.();
 						} else if (ev.data === '{}' || ev.data === '') {
 							// heartbeat → ignore
-							console.log('🟨 [SSE] heartbeat');
+							assistantStreamLog.debug('Heartbeat received');
 						} else {
-							console.log(
-								'🟨 [SSE] Unknown payload type:',
-								payload.type,
-								ev.data
-							);
+							assistantStreamLog.debug('Unknown payload type', {
+								type: payload.type,
+								data: ev.data,
+							});
 						}
 					} catch (e) {
-						console.error('Failed to parse SSE data', e, ev.data);
+						assistantStreamLog.error('Failed to parse SSE data', {
+							error: e,
+							data: ev.data,
+						});
 					}
 				});
 
 				es.addEventListener('error', (e) => {
-					console.error('🟥 [SSE] error event', {
+					assistantStreamLog.error('SSE error event', {
 						error: JSON.stringify(e, Object.getOwnPropertyNames(e)),
 						type: (e as any).type,
 					});
@@ -499,7 +509,7 @@ export function useAssistantStream({
 						const nextRetryCount = streamState.retryCount + 1;
 						const delay = calculateRetryDelay(nextRetryCount - 1);
 
-						console.log(
+						assistantStreamLog.debug(
 							`[AssistantStream] Retrying in ${delay}ms (attempt ${nextRetryCount}/${retryConfig.maxRetries})`
 						);
 
@@ -550,8 +560,8 @@ export function useAssistantStream({
 											callbacks.onDelta?.({ text: data.content }, data.content);
 										}
 									} catch (parseError) {
-										console.warn(
-											'[AssistantStream] Failed to parse message:',
+										assistantStreamLog.warn(
+											'Failed to parse message',
 											parseError
 										);
 									}
@@ -569,7 +579,7 @@ export function useAssistantStream({
 								});
 
 								es.addEventListener('error', (e) => {
-									console.error('[AssistantStream] Retry failed:', e);
+									assistantStreamLog.error('Retry failed', e);
 									setStreamState((prev) => ({
 										...prev,
 										isStreaming: false,
@@ -585,7 +595,7 @@ export function useAssistantStream({
 									callbacks.onError?.('Stream connection failed after retries');
 								});
 							} catch (retryError) {
-								console.error(
+								assistantStreamLog.error(
 									'[AssistantStream] Retry setup failed:',
 									retryError
 								);
@@ -644,7 +654,7 @@ I'm still here to help with your financial questions once the connection is rest
 
 				return cleanup;
 			} catch (error) {
-				console.error('🟥 [SSE] Failed to start stream:', error);
+				assistantStreamLog.error('Failed to start stream', error);
 				connecting.current = false;
 
 				// Update state
@@ -677,8 +687,8 @@ I'm still here to help with your financial questions once the connection is rest
 					const nextRetryCount = streamState.retryCount + 1;
 					const delay = calculateRetryDelay(nextRetryCount - 1);
 
-					console.log(
-						`[AssistantStream] Retrying in ${delay}ms (attempt ${nextRetryCount}/${retryConfig.maxRetries})`
+					assistantStreamLog.debug(
+						`Retrying in ${delay}ms (attempt ${nextRetryCount}/${retryConfig.maxRetries})`
 					);
 
 					// Schedule retry
@@ -721,7 +731,7 @@ I'm still here to help with your financial questions once the connection is rest
 	);
 
 	const stopStream = useCallback(() => {
-		console.log('🟥 [SSE] Manually stopping stream');
+		assistantStreamLog.debug('Manually stopping stream');
 
 		// Clear any pending retries
 		if (retryTimeoutRef.current) {

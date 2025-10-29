@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { logger } from '../../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -43,7 +44,7 @@ export default function BudgetLayout() {
 				await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 			} catch (error) {
 				// Haptics not available on this device, silently continue
-				console.warn('Haptic feedback not available:', error);
+				logger.warn('Haptic feedback not available:', error);
 			}
 			setActiveTab(tabName);
 		}

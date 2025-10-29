@@ -3,6 +3,8 @@ import { Budget, Goal, Transaction } from '../../types';
 import { GroundingService, detectIntent, Intent } from './groundingService';
 import { ResponseFormatterService } from './responseFormatterService';
 import {
+import { logger } from '../../../utils/logger';
+
 	executeHybridCostOptimization,
 	ModelTier,
 	calculateCostSavings,
@@ -142,19 +144,19 @@ export class EnhancedTieredAIService {
 	 * Main method to get AI response with grounding layer
 	 */
 	async getResponse(query: string): Promise<EnhancedTieredAIResponse> {
-		console.log('🔍 [EnhancedTieredAI] Processing query:', query);
+		logger.debug('🔍 [EnhancedTieredAI] Processing query:', query);
 		this.startTime = Date.now();
 
 		// Step 1: Detect intent
 		const intent = detectIntent(query);
-		console.log('🔍 [EnhancedTieredAI] Detected intent:', intent);
+		logger.debug('🔍 [EnhancedTieredAI] Detected intent:', intent);
 
 		// Step 2: Try grounding layer first
 		const groundedResponse = await this.tryGroundedResponse(query, intent);
 
 		if (groundedResponse && groundedResponse.confidence > 0.6) {
 			// Use grounded response
-			console.log(
+			logger.debug(
 				'🔍 [EnhancedTieredAI] Using grounded response, confidence:',
 				groundedResponse.confidence
 			);
@@ -184,7 +186,7 @@ export class EnhancedTieredAIService {
 		}
 
 		// Step 3: Try cascade system for complex queries
-		console.log('🔍 [EnhancedTieredAI] Trying cascade system');
+		logger.debug('🔍 [EnhancedTieredAI] Trying cascade system');
 		try {
 			const factPack = this.createFactPackFromContext();
 
@@ -256,18 +258,18 @@ export class EnhancedTieredAIService {
 			}
 
 			// Handle clarification or escalation
-			console.log(
+			logger.debug(
 				'🔍 [EnhancedTieredAI] Cascade requires clarification or escalation'
 			);
 		} catch (error) {
-			console.warn(
+			logger.warn(
 				'🔍 [EnhancedTieredAI] Cascade failed, falling back to LLM:',
 				error
 			);
 		}
 
 		// Step 4: Fall back to LLM with appropriate model selection
-		console.log('🔍 [EnhancedTieredAI] Using LLM fallback');
+		logger.debug('🔍 [EnhancedTieredAI] Using LLM fallback');
 		this.modelUsageStats.llmResponses++;
 
 		return await this.getLLMResponse(query, intent);
@@ -293,7 +295,7 @@ export class EnhancedTieredAIService {
 
 			return await this.groundingService.tryGrounded(intent, input);
 		} catch (error) {
-			console.warn('🔍 [EnhancedTieredAI] Grounding failed:', error);
+			logger.warn('🔍 [EnhancedTieredAI] Grounding failed:', error);
 			return null;
 		}
 	}
@@ -356,7 +358,7 @@ export class EnhancedTieredAIService {
 				},
 			};
 		} catch (error) {
-			console.error('🔍 [EnhancedTieredAI] LLM call failed:', error);
+			logger.error('🔍 [EnhancedTieredAI] LLM call failed:', error);
 
 			// Return fallback response
 			return {
@@ -616,7 +618,7 @@ export class EnhancedTieredAIService {
 
 			throw new Error(response.error || 'LLM API call failed');
 		} catch (error) {
-			console.error('🔍 [EnhancedTieredAI] LLM call failed:', error);
+			logger.error('🔍 [EnhancedTieredAI] LLM call failed:', error);
 			throw error;
 		}
 	}
@@ -720,7 +722,7 @@ Please provide a helpful response based on this data for the intent: ${
 
 			throw new Error(response.error || 'LLM API call failed');
 		} catch (error) {
-			console.error('🔍 [EnhancedTieredAI] Legacy LLM call failed:', error);
+			logger.error('🔍 [EnhancedTieredAI] Legacy LLM call failed:', error);
 			// Return fallback response
 			return {
 				response: `I understand you're asking about ${context.intent
@@ -1056,7 +1058,7 @@ Please provide a helpful response based on this data for the intent: ${
 		query: string,
 		userAsk: string
 	): Promise<EnhancedTieredAIResponse> {
-		console.log(
+		logger.debug(
 			'🔍 [EnhancedTieredAI] Using hybrid cost optimization for:',
 			query
 		);
@@ -1064,7 +1066,7 @@ Please provide a helpful response based on this data for the intent: ${
 		try {
 			// Detect intent for routing
 			const intent = detectIntent(query);
-			console.log('🔍 [EnhancedTieredAI] Detected intent:', intent);
+			logger.debug('🔍 [EnhancedTieredAI] Detected intent:', intent);
 
 			// Execute the complete 4-step hybrid cost optimization process
 			const hybridResult = await executeHybridCostOptimization(
@@ -1122,7 +1124,7 @@ Please provide a helpful response based on this data for the intent: ${
 				},
 			};
 
-			console.log('🔍 [EnhancedTieredAI] Hybrid optimization completed:', {
+			logger.debug('🔍 [EnhancedTieredAI] Hybrid optimization completed:', {
 				modelUsed: hybridResult.modelUsed,
 				totalTokens: hybridResult.totalTokens,
 				totalCost: hybridResult.totalCost,
@@ -1131,7 +1133,7 @@ Please provide a helpful response based on this data for the intent: ${
 
 			return response;
 		} catch (error) {
-			console.error('🔍 [EnhancedTieredAI] Hybrid optimization failed:', error);
+			logger.error('🔍 [EnhancedTieredAI] Hybrid optimization failed:', error);
 
 			// Fallback to traditional method
 			return this.getResponse(query);

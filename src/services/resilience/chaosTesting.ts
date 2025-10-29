@@ -7,6 +7,8 @@
 
 import { ResilientApiService } from './resilientApiService';
 import { MonitoringService } from './monitoringService';
+import { logger } from '../../../utils/logger';
+
 
 export interface ChaosTestScenario {
 	id: string;
@@ -237,7 +239,7 @@ export class ChaosTestingService {
 	 */
 	static async initialize(config?: Partial<ChaosTestConfig>): Promise<void> {
 		this.config = { ...this.DEFAULT_CONFIG, ...config };
-		console.log('[ChaosTestingService] Initialized with config:', this.config);
+		logger.debug('[ChaosTestingService] Initialized with config:', this.config);
 	}
 
 	/**
@@ -330,7 +332,7 @@ export class ChaosTestingService {
 		result: ChaosTestResult
 	): Promise<ChaosTestResult> {
 		try {
-			console.log(`🧪 Starting chaos test: ${scenario.name}`);
+			logger.debug(`🧪 Starting chaos test: ${scenario.name}`);
 
 			// Record initial metrics
 			result.metrics.before = MonitoringService.getOverallHealth();
@@ -350,7 +352,7 @@ export class ChaosTestingService {
 
 			this.testResults.push(result);
 
-			console.log(`🧪 Chaos test completed: ${scenario.name}`, {
+			logger.debug(`🧪 Chaos test completed: ${scenario.name}`, {
 				success: result.success,
 				totalRequests: result.totalRequests,
 				successRate:
@@ -361,7 +363,7 @@ export class ChaosTestingService {
 				circuitBreakerTrips: result.circuitBreakerTrips,
 			});
 		} catch (error) {
-			console.error('🧪 Chaos test failed:', error);
+			logger.error('🧪 Chaos test failed:', error);
 			result.errors.push(
 				error instanceof Error ? error.message : 'Unknown error'
 			);
@@ -389,7 +391,7 @@ export class ChaosTestingService {
 					// Wait between tests
 					await this.sleep(5000);
 				} catch (error) {
-					console.error(`Failed to run scenario ${scenario.id}:`, error);
+					logger.error(`Failed to run scenario ${scenario.id}:`, error);
 				}
 			}
 		}
@@ -793,16 +795,16 @@ export class ChaosTestingService {
 		for (const channel of notification.channels) {
 			switch (channel) {
 				case 'console':
-					console.log(
+					logger.debug(
 						`[${notification.severity.toUpperCase()}] ${notification.message}`
 					);
 					break;
 				case 'email':
 					// TODO: Implement email notification
-					console.log(`[EMAIL] ${notification.message}`);
+					logger.debug(`[EMAIL] ${notification.message}`);
 					break;
 				default:
-					console.log(`[${channel.toUpperCase()}] ${notification.message}`);
+					logger.debug(`[${channel.toUpperCase()}] ${notification.message}`);
 			}
 		}
 	}
@@ -940,7 +942,7 @@ export class ChaosTestingService {
 				this.schedules.splice(0, this.schedules.length, ...data.schedules);
 			return true;
 		} catch (error) {
-			console.error('Failed to import configuration:', error);
+			logger.error('Failed to import configuration:', error);
 			return false;
 		}
 	}

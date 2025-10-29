@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { logger } from '../../../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -169,7 +170,7 @@ MLInsightsPanelProps) {
 						actionable: healthScore.recommendations.length > 0,
 					});
 				} catch (healthError) {
-					console.warn(
+					logger.warn(
 						'[MLInsightsPanel] Failed to get financial health score:',
 						healthError
 					);
@@ -189,7 +190,7 @@ MLInsightsPanelProps) {
 						});
 					}
 				} catch (patternError) {
-					console.warn(
+					logger.warn(
 						'[MLInsightsPanel] Failed to get spending patterns:',
 						patternError
 					);
@@ -211,7 +212,7 @@ MLInsightsPanelProps) {
 						allInsights.push(...convertedAIInsights);
 					}
 				} catch (aiError) {
-					console.warn('[MLInsightsPanel] Failed to get AI insights:', aiError);
+					logger.warn('[MLInsightsPanel] Failed to get AI insights:', aiError);
 				}
 
 				// Get budget analysis for each budget
@@ -234,7 +235,7 @@ MLInsightsPanelProps) {
 								});
 							}
 						} catch (budgetError) {
-							console.warn(
+							logger.warn(
 								`[MLInsightsPanel] Failed to analyze budget ${budget.name}:`,
 								budgetError
 							);
@@ -262,7 +263,7 @@ MLInsightsPanelProps) {
 						});
 					}
 				} catch (forecastError) {
-					console.warn(
+					logger.warn(
 						'[MLInsightsPanel] Failed to get spending forecast:',
 						forecastError
 					);
@@ -273,7 +274,7 @@ MLInsightsPanelProps) {
 					const unread = await getUnreadInsightsCount();
 					setUnreadCount(unread);
 				} catch (unreadError) {
-					console.warn(
+					logger.warn(
 						'[MLInsightsPanel] Failed to get unread count:',
 						unreadError
 					);
@@ -281,7 +282,7 @@ MLInsightsPanelProps) {
 
 				setInsights(allInsights);
 			} catch (mlError) {
-				console.warn(
+				logger.warn(
 					'[MLInsightsPanel] ML services failed, generating basic insights:',
 					mlError
 				);

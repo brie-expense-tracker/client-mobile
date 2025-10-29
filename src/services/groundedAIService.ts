@@ -1,5 +1,7 @@
 import { API_BASE_URL } from '../config/api';
 import { SmartCacheService } from './utility/smartCacheService';
+import { logger } from '../../utils/logger';
+
 
 export interface FactPack {
 	specVersion: '1.0';
@@ -182,7 +184,7 @@ export class GroundedAIService {
 		} catch (error) {
 			this.recordMetrics(Date.now() - startTime, false);
 			const errorDetails = this.createErrorDetails(error, requestId);
-			console.error('[GroundedAIService] Query failed:', errorDetails);
+			logger.error('[GroundedAIService] Query failed:', errorDetails);
 			throw new Error(`Grounded AI query failed: ${errorDetails.message}`);
 		}
 	}
@@ -251,7 +253,7 @@ export class GroundedAIService {
 		} catch (error) {
 			this.recordMetrics(Date.now() - startTime, false);
 			const errorDetails = this.createErrorDetails(error, requestId);
-			console.error('[GroundedAIService] FactPack fetch failed:', errorDetails);
+			logger.error('[GroundedAIService] FactPack fetch failed:', errorDetails);
 			throw new Error(`FactPack fetch failed: ${errorDetails.message}`);
 		}
 	}
@@ -407,7 +409,7 @@ export class GroundedAIService {
 				0.8 // High confidence for grounded AI responses
 			);
 		} catch (error) {
-			console.warn('[GroundedAIService] Failed to cache response:', error);
+			logger.warn('[GroundedAIService] Failed to cache response:', error);
 		}
 	}
 
@@ -437,7 +439,7 @@ export class GroundedAIService {
 				0.9 // Very high confidence for fact packs
 			);
 		} catch (error) {
-			console.warn('[GroundedAIService] Failed to cache fact pack:', error);
+			logger.warn('[GroundedAIService] Failed to cache fact pack:', error);
 		}
 	}
 

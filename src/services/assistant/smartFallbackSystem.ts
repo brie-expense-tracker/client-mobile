@@ -5,6 +5,8 @@ import { ChatContext } from '../../services/feature/chatController';
 import { ChatResponse } from './responseSchema';
 import { FinancialSkillId } from './skills/comprehensiveSkillRegistry';
 import { answerabilityGating } from './answerabilityGating';
+import { logger } from '../../../utils/logger';
+
 
 // Fallback types
 export type FallbackType =
@@ -801,7 +803,7 @@ export class SmartFallbackSystem {
 			return response;
 		} catch (error) {
 			this.performanceMetrics.errorCount++;
-			console.error('Error generating fallback response:', error);
+			logger.error('Error generating fallback response:', error);
 
 			// Return a basic fallback on error
 			return {

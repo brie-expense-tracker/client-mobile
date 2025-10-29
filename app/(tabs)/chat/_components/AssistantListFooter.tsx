@@ -252,3 +252,6 @@ const styles = StyleSheet.create({
 	},
 	completeText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });
+
+// Default export to silence Expo Router warning (not used as route)
+export default AssistantListFooter;

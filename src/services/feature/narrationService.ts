@@ -1,4 +1,6 @@
 import {
+import { logger } from '../../../utils/logger';
+
 	narrationPrompt,
 	criticPrompt,
 	fallbackTemplate,
@@ -56,7 +58,7 @@ export class NarrationService {
 
 			// Check if aiService has the expected methods
 			if (!this.aiService || typeof this.aiService.getResponse !== 'function') {
-				console.warn(
+				logger.warn(
 					'AI service not properly initialized, using fallback template'
 				);
 				return fallbackTemplate(facts, questionType);
@@ -91,7 +93,7 @@ Please keep your response concise (max ${maxTokens} tokens) and maintain a profe
 					}
 				);
 			} catch (aiError) {
-				console.warn(
+				logger.warn(
 					'AI service call failed, using fallback template:',
 					aiError
 				);
@@ -103,7 +105,7 @@ Please keep your response concise (max ${maxTokens} tokens) and maintain a profe
 
 			// Check if we got a valid response
 			if (!aiResponse || !aiResponse.response) {
-				console.warn(
+				logger.warn(
 					'No valid response from AI service, using fallback template'
 				);
 				return fallbackTemplate(facts, questionType);
@@ -124,7 +126,7 @@ Please keep your response concise (max ${maxTokens} tokens) and maintain a profe
 					parsedResponse = JSON.parse(aiResponse.response);
 				}
 			} catch (parseError) {
-				console.warn(
+				logger.warn(
 					'Failed to parse AI response, using fallback template:',
 					parseError
 				);
@@ -133,7 +135,7 @@ Please keep your response concise (max ${maxTokens} tokens) and maintain a profe
 
 			// Validate response structure
 			if (!this.isValidResponse(parsedResponse)) {
-				console.warn('Invalid response structure, using fallback template');
+				logger.warn('Invalid response structure, using fallback template');
 				return fallbackTemplate(facts, questionType);
 			}
 
@@ -142,7 +144,7 @@ Please keep your response concise (max ${maxTokens} tokens) and maintain a profe
 				const criticResult = await this.runCriticPass(parsedResponse, facts);
 
 				if (!criticResult.isValid) {
-					console.warn('Critic found issues, using fallback template');
+					logger.warn('Critic found issues, using fallback template');
 					return fallbackTemplate(facts, questionType);
 				}
 			}
@@ -167,7 +169,7 @@ Please keep your response concise (max ${maxTokens} tokens) and maintain a profe
 
 			return parsedResponse;
 		} catch (error) {
-			console.error('Narration service error:', error);
+			logger.error('Narration service error:', error);
 
 			// Fallback to deterministic template
 			const questionType = this.detectQuestionType(userQuestion);
@@ -190,7 +192,7 @@ Please keep your response concise (max ${maxTokens} tokens) and maintain a profe
 		try {
 			// Check if aiService has the required method
 			if (!this.aiService || typeof this.aiService.getResponse !== 'function') {
-				console.warn(
+				logger.warn(
 					'AI service not available for critic pass, assuming response is valid'
 				);
 				return { isValid: true, issues: [], fixes: [], confidence: 0.7 };
@@ -203,7 +205,7 @@ Please keep your response concise (max ${maxTokens} tokens) and maintain a profe
 
 			// Check if we got a valid response
 			if (!criticResponse || !criticResponse.response) {
-				console.warn('No valid critic response, assuming response is valid');
+				logger.warn('No valid critic response, assuming response is valid');
 				return { isValid: true, issues: [], fixes: [], confidence: 0.7 };
 			}
 
@@ -218,14 +220,14 @@ Please keep your response concise (max ${maxTokens} tokens) and maintain a profe
 				return criticResult;
 			} catch (parseError) {
 				// If critic fails to parse, assume response is valid
-				console.warn(
+				logger.warn(
 					'Critic response parsing failed, assuming response is valid:',
 					parseError
 				);
 				return { isValid: true, issues: [], fixes: [], confidence: 0.8 };
 			}
 		} catch (error) {
-			console.warn('Critic pass failed, assuming response is valid:', error);
+			logger.warn('Critic pass failed, assuming response is valid:', error);
 			return { isValid: true, issues: [], fixes: [], confidence: 0.7 };
 		}
 	}
@@ -466,13 +468,13 @@ Please provide a structured response that follows the format exactly.`;
 					parsedResponse = JSON.parse(aiResponse.response);
 				}
 			} catch (parseError) {
-				console.warn('Failed to parse enhanced AI response:', parseError);
+				logger.warn('Failed to parse enhanced AI response:', parseError);
 				return fallbackTemplate(facts, this.detectQuestionType(userQuestion));
 			}
 
 			// Validate response structure
 			if (!this.isValidResponse(parsedResponse)) {
-				console.warn('Invalid enhanced response structure');
+				logger.warn('Invalid enhanced response structure');
 				return fallbackTemplate(facts, this.detectQuestionType(userQuestion));
 			}
 
@@ -480,7 +482,7 @@ Please provide a structured response that follows the format exactly.`;
 			if (enableCritic) {
 				const criticResult = await this.runCriticPass(parsedResponse, facts);
 				if (!criticResult.isValid) {
-					console.warn('Critic found issues with enhanced response');
+					logger.warn('Critic found issues with enhanced response');
 					return fallbackTemplate(facts, this.detectQuestionType(userQuestion));
 				}
 			}
@@ -509,7 +511,7 @@ Please provide a structured response that follows the format exactly.`;
 
 			return parsedResponse;
 		} catch (error) {
-			console.error('Enhanced narration failed:', error);
+			logger.error('Enhanced narration failed:', error);
 			return fallbackTemplate(facts, this.detectQuestionType(userQuestion));
 		}
 	}

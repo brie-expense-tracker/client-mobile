@@ -1,4 +1,10 @@
-import auth from '@react-native-firebase/auth';
+import { getApp } from '@react-native-firebase/app';
+import { getAuth, getIdToken } from '@react-native-firebase/auth';
+import { logger } from '../utils/logger';
+
+
+const app = getApp();
+const auth = getAuth(app);
 
 /**
  * Authentication service for Firebase Bearer tokens
@@ -22,7 +28,7 @@ export class AuthService {
 	 */
 	async getAuthToken(): Promise<string> {
 		try {
-			const user = auth().currentUser;
+			const user = auth.currentUser;
 
 			if (!user) {
 				throw new Error('No authenticated user found');
@@ -32,23 +38,23 @@ export class AuthService {
 			const now = Date.now();
 			if (this.cachedToken && this.tokenExpiry > now + 60000) {
 				// 1 minute buffer
-				console.log('[AuthService] Using cached token');
+				logger.debug('[AuthService] Using cached token');
 				return this.cachedToken;
 			}
 
-			console.log('[AuthService] Getting fresh Firebase ID token');
+			logger.debug('[AuthService] Getting fresh Firebase ID token');
 
 			// Get fresh token from Firebase
-			const token = await user.getIdToken(true); // Force refresh
+			const token = await getIdToken(user, true); // Force refresh
 
 			// Cache the token with expiry (Firebase tokens expire in 1 hour)
 			this.cachedToken = token;
 			this.tokenExpiry = now + 55 * 60 * 1000; // 55 minutes to be safe
 
-			console.log('[AuthService] Token obtained and cached');
+			logger.debug('[AuthService] Token obtained and cached');
 			return token;
 		} catch (error) {
-			console.error('[AuthService] Error getting auth token:', error);
+			logger.error('[AuthService] Error getting auth token:', error);
 			throw new Error('Failed to get authentication token');
 		}
 	}
@@ -65,7 +71,7 @@ export class AuthService {
 				Authorization: `Bearer ${token}`,
 			};
 		} catch (error) {
-			console.error('[AuthService] Error getting auth headers:', error);
+			logger.error('[AuthService] Error getting auth headers:', error);
 			throw error;
 		}
 	}
@@ -76,14 +82,14 @@ export class AuthService {
 	clearToken(): void {
 		this.cachedToken = null;
 		this.tokenExpiry = 0;
-		console.log('[AuthService] Token cache cleared');
+		logger.debug('[AuthService] Token cache cleared');
 	}
 
 	/**
 	 * Check if user is authenticated
 	 */
 	isAuthenticated(): boolean {
-		return !!auth().currentUser;
+		return !!auth.currentUser;
 	}
 
 	/**
@@ -91,10 +97,10 @@ export class AuthService {
 	 */
 	async getCurrentUserUID(): Promise<string | null> {
 		try {
-			const user = auth().currentUser;
+			const user = auth.currentUser;
 			return user?.uid || null;
 		} catch (error) {
-			console.error('[AuthService] Error getting user UID:', error);
+			logger.error('[AuthService] Error getting user UID:', error);
 			return null;
 		}
 	}

@@ -7,6 +7,8 @@
 
 import { ApiService } from '../core/apiService';
 import { buildSseUrl } from '../../networking/endpoints';
+import { logger } from '../../../utils/logger';
+
 
 // Define FinancialContext interface locally to avoid circular dependencies
 interface FinancialContext {
@@ -257,18 +259,18 @@ export class StreamingOrchestratorService {
 			this.connecting ||
 			(this.currentConnection && this.currentConnection.readyState === 1)
 		) {
-			console.warn(
+			logger.warn(
 				'[StreamingOrchestratorService] Already connecting/connected, skipping duplicate request'
 			);
 			return [];
 		}
 
 		try {
-			console.log(
+			logger.debug(
 				'[StreamingOrchestratorService] Starting stream for:',
 				message
 			);
-			console.log('[StreamingOrchestratorService] Session ID:', this.sessionId);
+			logger.debug('[StreamingOrchestratorService] Session ID:', this.sessionId);
 
 			const requestPayload: StreamingOrchestratorRequest = {
 				message: message.trim(),
@@ -285,7 +287,7 @@ export class StreamingOrchestratorService {
 			// Check if EventSource is available (React Native compatibility)
 			if (typeof (global as any).EventSource === 'undefined') {
 				// Fallback to regular API call for React Native
-				console.log(
+				logger.debug(
 					'[StreamingOrchestratorService] EventSource not available, using fallback'
 				);
 				const response = await fetch(`${this.baseUrl}/api/orchestrator/chat`, {
@@ -394,7 +396,7 @@ export class StreamingOrchestratorService {
 						timeToFirstToken === null
 					) {
 						timeToFirstToken = Date.now() - startTime;
-						console.log(
+						logger.debug(
 							'[StreamingOrchestratorService] Time to first token:',
 							timeToFirstToken + 'ms'
 						);
@@ -403,7 +405,7 @@ export class StreamingOrchestratorService {
 					// Add chunk to array
 					chunks.push(chunk);
 				} catch (error) {
-					console.error(
+					logger.error(
 						'[StreamingOrchestratorService] Error parsing chunk:',
 						error
 					);
@@ -433,11 +435,11 @@ export class StreamingOrchestratorService {
 
 			// Handle special events
 			eventSource.addEventListener('open', () => {
-				console.log('[StreamingOrchestratorService] Connection opened');
+				logger.debug('[StreamingOrchestratorService] Connection opened');
 				this.connecting = false;
 			});
 			eventSource.addEventListener('done', () => {
-				console.log('[StreamingOrchestratorService] Stream done');
+				logger.debug('[StreamingOrchestratorService] Stream done');
 				this.cleanup();
 			});
 			eventSource.addEventListener('ping', () => {
@@ -445,7 +447,7 @@ export class StreamingOrchestratorService {
 			});
 
 			eventSource.onerror = (error) => {
-				console.error(
+				logger.error(
 					'[StreamingOrchestratorService] EventSource error:',
 					error
 				);
@@ -462,7 +464,7 @@ export class StreamingOrchestratorService {
 			// Wait for completion
 			return new Promise<StreamingChunk[]>((resolve, reject) => {
 				const completeHandler = () => {
-					console.log('[StreamingOrchestratorService] Stream completed');
+					logger.debug('[StreamingOrchestratorService] Stream completed');
 					this.cleanup();
 					resolve(chunks);
 				};
@@ -478,7 +480,7 @@ export class StreamingOrchestratorService {
 				}, 30000);
 			});
 		} catch (error) {
-			console.error(
+			logger.error(
 				'[StreamingOrchestratorService] Error starting stream:',
 				error
 			);
@@ -505,14 +507,14 @@ export class StreamingOrchestratorService {
 			this.connecting ||
 			(this.currentConnection && this.currentConnection.readyState === 1)
 		) {
-			console.warn(
+			logger.warn(
 				'[StreamingOrchestratorService] Already connecting/connected, skipping duplicate request'
 			);
 			return;
 		}
 
 		try {
-			console.log(
+			logger.debug(
 				'[StreamingOrchestratorService] Starting stream with callbacks for:',
 				message
 			);
@@ -533,7 +535,7 @@ export class StreamingOrchestratorService {
 
 			// Check if EventSource is available (React Native compatibility)
 			if (typeof (global as any).EventSource === 'undefined') {
-				console.log(
+				logger.debug(
 					'[StreamingOrchestratorService] EventSource not available, using fallback'
 				);
 				callbacks.onError?.('EventSource not available');
@@ -574,7 +576,7 @@ export class StreamingOrchestratorService {
 						timeToFirstToken === null
 					) {
 						timeToFirstToken = Date.now() - startTime;
-						console.log(
+						logger.debug(
 							'[StreamingOrchestratorService] Time to first token:',
 							timeToFirstToken + 'ms'
 						);
@@ -609,7 +611,7 @@ export class StreamingOrchestratorService {
 							break;
 					}
 				} catch (error) {
-					console.error(
+					logger.error(
 						'[StreamingOrchestratorService] Error parsing chunk:',
 						error
 					);
@@ -635,11 +637,11 @@ export class StreamingOrchestratorService {
 
 			// Handle special events
 			eventSource.addEventListener('open', () => {
-				console.log('[StreamingOrchestratorService] Connection opened');
+				logger.debug('[StreamingOrchestratorService] Connection opened');
 				this.connecting = false;
 			});
 			eventSource.addEventListener('done', () => {
-				console.log('[StreamingOrchestratorService] Stream done');
+				logger.debug('[StreamingOrchestratorService] Stream done');
 				this.cleanup();
 				callbacks.onDone?.();
 			});
@@ -648,7 +650,7 @@ export class StreamingOrchestratorService {
 			});
 
 			eventSource.onerror = (error) => {
-				console.error(
+				logger.error(
 					'[StreamingOrchestratorService] EventSource error:',
 					error
 				);
@@ -657,7 +659,7 @@ export class StreamingOrchestratorService {
 				this.cleanup();
 			};
 		} catch (error) {
-			console.error(
+			logger.error(
 				'[StreamingOrchestratorService] Error starting stream:',
 				error
 			);
@@ -689,7 +691,7 @@ export class StreamingOrchestratorService {
 			for (const chunk of chunks) {
 				switch (chunk.type) {
 					case 'start':
-						console.log('[StreamingOrchestratorService] Stream started');
+						logger.debug('[StreamingOrchestratorService] Stream started');
 						break;
 
 					case 'chunk':
@@ -707,7 +709,7 @@ export class StreamingOrchestratorService {
 
 					case 'trace':
 						// Handle trace data for debugging
-						console.log(
+						logger.debug(
 							'[StreamingOrchestratorService] Trace data:',
 							chunk.data
 						);
@@ -753,7 +755,7 @@ export class StreamingOrchestratorService {
 				usage,
 			};
 		} catch (error) {
-			console.error(
+			logger.error(
 				'[StreamingOrchestratorService] Error in streaming response:',
 				error
 			);
@@ -826,7 +828,7 @@ export class StreamingOrchestratorService {
 	 */
 	updateContext(newContext: FinancialContext): void {
 		this.context = newContext;
-		console.log('[StreamingOrchestratorService] Context updated');
+		logger.debug('[StreamingOrchestratorService] Context updated');
 	}
 
 	/**
@@ -841,7 +843,7 @@ export class StreamingOrchestratorService {
 	 */
 	createNewSession(): void {
 		this.sessionId = this.generateSessionId();
-		console.log(
+		logger.debug(
 			'[StreamingOrchestratorService] New session created:',
 			this.sessionId
 		);
@@ -863,7 +865,7 @@ export class StreamingOrchestratorService {
 	 * Stop current streaming session
 	 */
 	stopStreaming(): void {
-		console.log('[StreamingOrchestratorService] Stopping streaming');
+		logger.debug('[StreamingOrchestratorService] Stopping streaming');
 		this.cleanup();
 	}
 

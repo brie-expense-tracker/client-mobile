@@ -9,6 +9,7 @@ import {
 	SafeAreaView,
 	Text,
 } from 'react-native';
+import { logger } from '../../src/utils/logger';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useGoal, Goal } from '../../src/context/goalContext';
@@ -67,14 +68,14 @@ const EditGoalScreen: React.FC = () => {
 	// Load goal data when component mounts
 	useEffect(() => {
 		if (goalId && goals.length > 0) {
-			console.log('[EditGoalScreen] Looking for goal with ID:', goalId);
-			console.log(
+			logger.debug('[EditGoalScreen] Looking for goal with ID:', goalId);
+			logger.debug(
 				'[EditGoalScreen] Available goals:',
 				goals.map((g) => ({ id: g.id, name: g.name }))
 			);
 			const foundGoal = goals.find((g) => g.id === goalId);
 			if (foundGoal) {
-				console.log('[EditGoalScreen] Found goal:', foundGoal);
+				logger.debug('[EditGoalScreen] Found goal:', foundGoal);
 				setGoal(foundGoal);
 				setName(foundGoal.name || '');
 				setTarget(foundGoal.target?.toString() || '');
@@ -94,7 +95,7 @@ const EditGoalScreen: React.FC = () => {
 				);
 				setShowCustomTarget(!isPreset && targetStr !== '');
 			} else {
-				console.log('[EditGoalScreen] Goal not found with ID:', goalId);
+				logger.debug('[EditGoalScreen] Goal not found with ID:', goalId);
 			}
 		}
 	}, [goalId, goals]);
@@ -158,7 +159,7 @@ const EditGoalScreen: React.FC = () => {
 			// Use _id if available, otherwise use id
 			const goalIdToUse = (goal as any)._id || goal.id;
 
-			console.log('[EditGoalScreen] Updating goal:', {
+			logger.debug('[EditGoalScreen] Updating goal:', {
 				goalId: goalIdToUse,
 				originalGoalId: goal.id,
 				updates: {
@@ -184,7 +185,7 @@ const EditGoalScreen: React.FC = () => {
 				{ text: 'OK', onPress: () => router.back() },
 			]);
 		} catch (error) {
-			console.error('[EditGoalScreen] Error updating:', error);
+			logger.error('[EditGoalScreen] Error updating:', error);
 			// More specific error message if available
 			const errorMessage =
 				(error as any)?.response?.data?.message ||
@@ -208,12 +209,12 @@ const EditGoalScreen: React.FC = () => {
 					style: 'destructive',
 					onPress: async () => {
 						try {
-							console.log('🗑️ [EditGoal] Deleting goal:', goal.id);
+							logger.debug('🗑️ [EditGoal] Deleting goal:', goal.id);
 							await deleteGoal(goal.id);
-							console.log('✅ [EditGoal] Goal deleted successfully');
+							logger.debug('✅ [EditGoal] Goal deleted successfully');
 							router.back();
 						} catch (error) {
-							console.error('❌ [EditGoal] Delete failed:', error);
+							logger.error('❌ [EditGoal] Delete failed:', error);
 							const errorMsg =
 								error instanceof Error
 									? error.message

@@ -1,5 +1,8 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
+import { createLogger } from '../utils/sublogger';
+
+const dataFetchingLog = createLogger('useDataFetching');
 
 // ==========================================
 // Types
@@ -225,9 +228,7 @@ export function useDataFetching<T extends { id: string }>(
 	const processOfflineQueue = useCallback(async () => {
 		if (offlineQueue.current.length === 0) return;
 
-		console.log(
-			`🔄 Processing ${offlineQueue.current.length} queued operations...`
-		);
+		dataFetchingLog.debug(`Processing ${offlineQueue.current.length} queued operations...`);
 		const operations = [...offlineQueue.current];
 		offlineQueue.current = [];
 
@@ -235,7 +236,7 @@ export function useDataFetching<T extends { id: string }>(
 			try {
 				await operation();
 			} catch (error) {
-				console.error('❌ Failed to process queued operation:', error);
+				dataFetchingLog.error('Failed to process queued operation', error);
 			}
 		}
 	}, []);
@@ -254,13 +255,13 @@ export function useDataFetching<T extends { id: string }>(
 		async (forceRefresh = false) => {
 			// Prevent concurrent fetches
 			if (isFetching.current) {
-				console.log('🔄 Fetch already in progress, skipping...');
+				dataFetchingLog.debug('Fetch already in progress, skipping...');
 				return;
 			}
 
 			// Check cache validity
 			if (!forceRefresh && isCacheValid()) {
-				console.log('📦 Using cached data');
+				dataFetchingLog.debug('Using cached data');
 				return;
 			}
 
@@ -270,7 +271,7 @@ export function useDataFetching<T extends { id: string }>(
 				setError(null);
 				setIsOffline(false);
 
-				console.log('🔄 Fetching data...');
+				dataFetchingLog.debug('Fetching data...');
 				const result = await fetchFunction();
 
 				// Handle both paginated and non-paginated responses
@@ -281,8 +282,8 @@ export function useDataFetching<T extends { id: string }>(
 				) {
 					// Paginated response
 					const paginatedResult = result as PaginatedResponse<T>;
-					console.log(
-						`✅ Paginated data received: ${paginatedResult.data.length} items (page ${paginatedResult.page}/${paginatedResult.totalPages})`
+					dataFetchingLog.debug(
+						`Paginated data received: ${paginatedResult.data.length} items (page ${paginatedResult.page}/${paginatedResult.totalPages})`
 					);
 					setData(paginatedResult.data);
 					setHasMore(paginatedResult.hasMore);
@@ -292,7 +293,7 @@ export function useDataFetching<T extends { id: string }>(
 				} else {
 					// Non-paginated response (array)
 					const arrayResult = result as T[];
-					console.log(`✅ Data received: ${arrayResult.length} items`);
+					dataFetchingLog.debug(`Data received: ${arrayResult.length} items`);
 					setData(arrayResult);
 					setHasMore(false);
 					setCurrentPage(1);
@@ -308,7 +309,7 @@ export function useDataFetching<T extends { id: string }>(
 				// Process any queued offline operations
 				await processOfflineQueue();
 			} catch (err) {
-				console.error('❌ Error fetching data:', err);
+				dataFetchingLog.error('Error fetching data', err);
 				const categorizedError = categorizeError(err);
 
 				// For authentication errors, don't set error state, just return empty data
@@ -316,9 +317,7 @@ export function useDataFetching<T extends { id: string }>(
 					categorizedError.type === 'permission' &&
 					categorizedError.code === 401
 				) {
-					console.log(
-						'🔒 [useDataFetching] User not authenticated, returning empty data'
-					);
+					dataFetchingLog.debug('User not authenticated, returning empty data');
 					setData([]);
 					setHasLoaded(true);
 					setError(null); // Don't show error for auth issues
@@ -333,8 +332,8 @@ export function useDataFetching<T extends { id: string }>(
 					const newRetryCount = retryCount + 1;
 					setRetryCount(newRetryCount);
 
-					console.log(
-						`🔄 Retrying in ${retryDelay}ms (attempt ${newRetryCount}/${maxRetries}) - ${categorizedError.type} error`
+					dataFetchingLog.debug(
+						`Retrying in ${retryDelay}ms (attempt ${newRetryCount}/${maxRetries}) - ${categorizedError.type} error`
 					);
 
 					retryTimeoutRef.current = setTimeout(() => {
@@ -425,10 +424,10 @@ export function useDataFetching<T extends { id: string }>(
 							existingItem.id === tempId ? newItem : existingItem
 						)
 					);
-					console.log('✅ Item added successfully');
+					dataFetchingLog.debug('Item added successfully');
 					return newItem;
 				} catch (err) {
-					console.error('❌ Error adding item:', err);
+					dataFetchingLog.error('Error adding item', err);
 
 					// Remove optimistic update on error
 					setData((prev) =>
@@ -441,7 +440,7 @@ export function useDataFetching<T extends { id: string }>(
 						// Queue for retry when online
 						offlineQueue.current.push(performAdd);
 						setIsOffline(true);
-						console.log('📱 Queued add operation for when online');
+						dataFetchingLog.debug('Queued add operation for when online');
 						return optimisticItem; // Return optimistic item for UI
 					}
 
@@ -467,7 +466,7 @@ export function useDataFetching<T extends { id: string }>(
 				(item) => item.id === id || (item as any)._id === id
 			);
 			if (!originalItem) {
-				console.error('[useDataFetching] Item not found for update:', {
+				dataFetchingLog.error('Item not found for update', {
 					searchingForId: id,
 					availableIds: data.map((item) => ({
 						id: item.id,
@@ -496,10 +495,10 @@ export function useDataFetching<T extends { id: string }>(
 							item.id === id || (item as any)._id === id ? updatedItem : item
 						)
 					);
-					console.log('✅ Item updated successfully');
+					dataFetchingLog.debug('Item updated successfully');
 					return updatedItem;
 				} catch (err) {
-					console.error('❌ Error updating item:', err);
+					dataFetchingLog.error('Error updating item', err);
 
 					// Revert optimistic update on error
 					setData((prev) =>
@@ -514,7 +513,7 @@ export function useDataFetching<T extends { id: string }>(
 						// Queue for retry when online
 						offlineQueue.current.push(performUpdate);
 						setIsOffline(true);
-						console.log('📱 Queued update operation for when online');
+						dataFetchingLog.debug('Queued update operation for when online');
 						return optimisticItem; // Return optimistic item for UI
 					}
 
@@ -540,7 +539,7 @@ export function useDataFetching<T extends { id: string }>(
 				(item) => item.id === id || (item as any)._id === id
 			);
 			if (!originalItem) {
-				console.error('[useDataFetching] Item not found for deletion:', {
+				dataFetchingLog.error('Item not found for deletion', {
 					searchingForId: id,
 					availableIds: data.map((item) => ({
 						id: item.id,
@@ -559,9 +558,9 @@ export function useDataFetching<T extends { id: string }>(
 				try {
 					setError(null);
 					await deleteFunction(id);
-					console.log('✅ Item deleted successfully');
+					dataFetchingLog.debug('Item deleted successfully');
 				} catch (err) {
-					console.error('❌ Error deleting item:', err);
+					dataFetchingLog.error('Error deleting item', err);
 
 					// Revert optimistic update on error
 					setData((prev) => [...prev, originalItem]);
@@ -572,7 +571,7 @@ export function useDataFetching<T extends { id: string }>(
 						// Queue for retry when online
 						offlineQueue.current.push(performDelete);
 						setIsOffline(true);
-						console.log('📱 Queued delete operation for when online');
+						dataFetchingLog.debug('Queued delete operation for when online');
 						return; // Don't throw error for offline queued operations
 					}
 
@@ -617,12 +616,12 @@ export function useDataFetching<T extends { id: string }>(
 			setError(null);
 
 			const nextPage = currentPage + 1;
-			console.log(`🔄 Loading more data (page ${nextPage})...`);
+			dataFetchingLog.debug(`Loading more data (page ${nextPage})...`);
 
 			const result = await loadMoreFunction(nextPage, pageSize);
 
-			console.log(
-				`✅ More data received: ${result.data.length} items (page ${result.page}/${result.totalPages})`
+			dataFetchingLog.debug(
+				`More data received: ${result.data.length} items (page ${result.page}/${result.totalPages})`
 			);
 
 			// Append new data to existing data
@@ -632,7 +631,7 @@ export function useDataFetching<T extends { id: string }>(
 			setTotalPages(result.totalPages);
 			setTotalItems(result.totalItems);
 		} catch (err) {
-			console.error('❌ Error loading more data:', err);
+			dataFetchingLog.error('Error loading more data', err);
 			const categorizedError = categorizeError(err);
 			setError(categorizedError);
 		} finally {
@@ -678,12 +677,10 @@ export function useDataFetching<T extends { id: string }>(
 					!lastRefreshed ||
 					Date.now() - lastRefreshed.getTime() > cacheTTL
 				) {
-					console.log(
-						'[useDataFetching] Component focused, refreshing data...'
-					);
+					dataFetchingLog.debug('Component focused, refreshing data...');
 					debouncedRefetch();
 				} else {
-					console.log('📦 Using cached data');
+					dataFetchingLog.debug('Using cached data');
 				}
 			}
 			if (isInitialMount.current) {

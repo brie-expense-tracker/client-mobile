@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ApiService } from '../services';
+import { createLogger } from '../utils/sublogger';
+
+const threadHookLog = createLogger('useThread');
 
 interface Message {
 	id: string;
@@ -28,24 +31,24 @@ export default function useThread(threadId: string) {
 
 		setLoading(true);
 		try {
-			const response = await ApiService.get(`/api/threads/${threadId}`);
+			const response = await ApiService.get<Thread>(`/api/threads/${threadId}`);
 
 			if (response.success && response.data) {
-				const threadData = response.data;
+				const threadData = response.data as any;
 				setThread({
-					id: threadData._id,
+					id: threadData._id || threadData.id,
 					_id: threadData._id,
 					title: threadData.title,
 					focusArea: threadData.focusArea,
 					createdAt: threadData.createdAt,
 					updatedAt: threadData.updatedAt,
-					messages: threadData.messages || [],
+					messages: (threadData.messages || []) as Message[],
 				});
 			} else {
 				setThread(null);
 			}
 		} catch (error) {
-			console.error('Failed to fetch thread:', error);
+			threadHookLog.error('Failed to fetch thread', error);
 			setThread(null);
 		} finally {
 			setLoading(false);
@@ -78,7 +81,7 @@ export default function useThread(threadId: string) {
 					});
 				}
 			} catch (error) {
-				console.error('Failed to complete action:', error);
+				threadHookLog.error('Failed to complete action', error);
 			}
 		},
 		[thread, threadId]
@@ -108,12 +111,12 @@ export default function useThread(threadId: string) {
 						if (!prev) return prev;
 						return {
 							...prev,
-							messages: [...prev.messages, response.data],
+							messages: [...prev.messages, response.data as Message],
 						};
 					});
 				}
 			} catch (error) {
-				console.error('Failed to add message:', error);
+				threadHookLog.error('Failed to add message', error);
 			}
 		},
 		[thread, threadId]

@@ -1,4 +1,7 @@
 import { SmartCacheService } from './smartCacheService';
+import { createLogger } from '../../utils/sublogger';
+
+const cacheInvalidationLog = createLogger('CacheInvalidation');
 
 /**
  * Utility functions for managing cache invalidation flags
@@ -43,10 +46,10 @@ const logInvalidationEvent = (
 		invalidationEvents.splice(0, invalidationEvents.length - MAX_EVENTS);
 	}
 
-	console.log(
-		`[CacheInvalidation] ${flag}: ${reason}${
-			userId ? ` (User: ${userId})` : ''
-		}${category ? ` (Category: ${category})` : ''}`
+	cacheInvalidationLog.debug(
+		`${flag}: ${reason}${userId ? ` (User: ${userId})` : ''}${
+			category ? ` (Category: ${category})` : ''
+		}`
 	);
 };
 
@@ -299,7 +302,7 @@ export const getUserInvalidationEvents = (
  */
 export const clearInvalidationAnalytics = () => {
 	invalidationEvents.length = 0;
-	console.log('[CacheInvalidation] Analytics cleared');
+	cacheInvalidationLog.debug('Analytics cleared');
 };
 
 /**

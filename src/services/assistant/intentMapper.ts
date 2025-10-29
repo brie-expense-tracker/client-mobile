@@ -4,6 +4,8 @@
 import { ChatResponse } from './responseSchema';
 import { FinancialContext } from './helpfulFallbacks';
 import { ConversationState } from '../../services/ConversationState';
+import { logger } from '../../../utils/logger';
+
 
 export type IntentType =
 	| 'GET_BALANCE'
@@ -495,15 +497,15 @@ export function testIntentMapper() {
 		profile: { monthlyIncome: 5000 },
 	};
 
-	console.log('Testing intent mapper...');
+	logger.debug('Testing intent mapper...');
 
 	Object.values(intentPatterns).forEach((pattern, index) => {
 		const intent = Object.keys(intentPatterns)[index] as IntentType;
 		try {
 			const response = generateIntentResponse(intent, mockContext);
-			console.log(`${intent}:`, response.message);
+			logger.debug(`${intent}:`, response.message);
 		} catch (error) {
-			console.error(`Error with ${intent}:`, error);
+			logger.error(`Error with ${intent}:`, error);
 		}
 	});
 }
@@ -526,14 +528,14 @@ export function routeIntent(
 	// Check for yes/no responses when there's a pending action
 	if (pending) {
 		if (YES_PATTERNS.test(userText)) {
-			console.log(
+			logger.debug(
 				`[IntentRouter] Detected YES confirmation for pending action:`,
 				pending
 			);
 			return { mode: 'ACTIONS', intent: 'CONFIRM_PENDING_ACTION' };
 		}
 		if (NO_PATTERNS.test(userText)) {
-			console.log(
+			logger.debug(
 				`[IntentRouter] Detected NO decline for pending action:`,
 				pending
 			);

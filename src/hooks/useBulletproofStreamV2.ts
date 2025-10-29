@@ -1,9 +1,12 @@
 import { useRef, useCallback, useEffect, useState, useMemo } from 'react';
 import { Message, MessageAction } from './useMessagesReducerV2';
-import { startStreaming, stopStreaming } from '../services/streaming';
+import { startStreaming } from '../services/streaming';
 import { buildSseUrl } from '../networking/endpoints';
 import { authService } from '../services/authService';
 import { ErrorService } from '../services/errorService';
+import { createLogger } from '../utils/sublogger';
+
+const bulletproofStreamV2Log = createLogger('BulletproofStreamV2');
 
 interface StreamingCallbacks {
 	onMeta?: (data: any) => void;
@@ -169,7 +172,7 @@ export function useBulletproofStreamV2({
 		) => {
 			// Prevent duplicate streams
 			if (streamState.isStreaming) {
-				console.warn(
+				bulletproofStreamV2Log.warn(
 					'[BulletproofStream] Already streaming, ignoring duplicate'
 				);
 				return;
@@ -195,7 +198,7 @@ export function useBulletproofStreamV2({
 			currentMessageId.current = messageId;
 			streamingRef.current.messageId = messageId;
 
-			console.log('🚀 [Stream] Starting:', {
+			bulletproofStreamV2Log.debug('Starting stream', {
 				messageId,
 				messageLength: message.length,
 				retryCount:
@@ -217,7 +220,7 @@ export function useBulletproofStreamV2({
 					throw new Error('No authenticated user found');
 				}
 
-				console.log('🔑 [Stream] Using Firebase UID for auth:', {
+				bulletproofStreamV2Log.debug('Using Firebase UID for auth', {
 					uid: firebaseUID.substring(0, 10) + '...',
 				});
 
@@ -229,184 +232,168 @@ export function useBulletproofStreamV2({
 					clientMessageId: messageId,
 				});
 
-				console.log('🔧 [Stream] Built URL with UID:', {
+				bulletproofStreamV2Log.debug('Built URL with UID', {
 					url: url.substring(0, 100) + '...',
 					hasUID: !!firebaseUID,
 				});
 
-				console.log('🔗 [Stream] Connecting to server');
+				bulletproofStreamV2Log.debug('Connecting to server');
 
 				// Start health monitoring
 				startHealthMonitoring();
 
-				// Start streaming using the new clientMessageId approach
-				const clientMessageId = startChatStream(
-					message.trim(),
-					{
-						onMeta: (data) => {
-							setStreamState((prev) => ({
-								...prev,
-								lastActivity: Date.now(),
-								isConnecting: false,
-							}));
-							callbacks.onMeta?.(data);
-						},
-						onDelta: (id, text) => {
-							// Update activity timestamp
-							setStreamState((prev) => ({
-								...prev,
-								lastActivity: Date.now(),
-								isConnecting: false,
-							}));
+				// Start streaming
+				const connection = startStreaming({
+					url,
+					token: '', // Not needed for UID-based auth
+					clientMessageId: messageId,
+					onDelta: (text: string) => {
+						// Update activity timestamp
+						setStreamState((prev) => ({
+							...prev,
+							lastActivity: Date.now(),
+							isConnecting: false,
+						}));
 
-							console.log('📝 [Stream] Received delta:', {
-								textLength: text.length,
-								text: text.substring(0, 50) + '...',
-								messageId,
-								clientMessageId: id,
-								timestamp: new Date().toISOString(),
-								bufferedLength: bufferedText.current.length,
-							});
-							bufferedText.current += text;
-							addDelta(messageId, text);
-							onDeltaReceived();
-							callbacks.onDelta?.({ text }, bufferedText.current);
-						},
-						onDone: (id) => {
-							// Calculate performance metrics
-							const endTime = Date.now();
-							const startTime = streamState.startTime || endTime;
-							const duration = endTime - startTime;
+						bulletproofStreamV2Log.debug('Received delta', {
+							textLength: text.length,
+							messageId,
+							timestamp: new Date().toISOString(),
+							bufferedLength: bufferedText.current.length,
+						});
+						bufferedText.current += text;
+						addDelta(messageId, text);
+						onDeltaReceived();
+						callbacks.onDelta?.({ text }, bufferedText.current);
+					},
+					onDone: () => {
+						// Calculate performance metrics
+						const endTime = Date.now();
+						const startTime = streamState.startTime || endTime;
+						const duration = endTime - startTime;
 
-							console.log('✅ [Stream] Completed:', {
+						bulletproofStreamV2Log.info('Stream completed', {
+							messageId,
+							duration: `${duration}ms`,
+							chars: bufferedText.current.length,
+							retryCount: streamState.retryCount,
+							timestamp: new Date().toISOString(),
+							finalTextPreview: bufferedText.current.substring(0, 100) + '...',
+						});
+
+						setStreamState((prev) => ({
+							...prev,
+							isStreaming: false,
+							isConnecting: false,
+							lastActivity: endTime,
+						}));
+
+						currentMessageId.current = null;
+						streamingRef.current.messageId = null;
+						clearStreaming();
+						stopHealthMonitoring();
+
+						// Finalize the message with performance data
+						finalizeMessage(messageId, bufferedText.current, {
+							totalLatency: duration,
+							timeToFirstToken: duration,
+							cacheHit: false,
+							modelUsed: 'streaming',
+							tokensUsed: bufferedText.current.length,
+						});
+						callbacks.onDone?.();
+					},
+					onError: (error: string) => {
+						setStreamState((prev) => ({
+							...prev,
+							isStreaming: false,
+							isConnecting: false,
+							lastError: error,
+						}));
+
+						stopHealthMonitoring();
+
+						// Log error with context
+						ErrorService.logError(
+							{ message: error },
+							{
 								messageId,
-								clientMessageId: id,
-								duration: `${duration}ms`,
-								chars: bufferedText.current.length,
+								sessionId: streamingRef.current.sessionId,
+								operation: 'streaming',
 								retryCount: streamState.retryCount,
-								timestamp: new Date().toISOString(),
-								finalText: bufferedText.current.substring(0, 100) + '...',
+							}
+						);
+
+						// Categorize error and get user-friendly message
+						const errorState = ErrorService.categorizeError({ message: error });
+						const userMessage = ErrorService.getUserFriendlyMessage({
+							message: error,
+						});
+
+						bulletproofStreamV2Log.error('Stream error', {
+							error,
+							messageId,
+							retryCount: streamState.retryCount,
+							errorType: errorState.type,
+						});
+
+						// Check if we should retry
+						const shouldRetry =
+							streamState.retryCount < retryConfig.maxRetries &&
+							(error.includes('network') ||
+								error.includes('timeout') ||
+								error.includes('connection'));
+
+						if (shouldRetry) {
+							const nextRetryCount = streamState.retryCount + 1;
+							const delay = calculateRetryDelay(nextRetryCount - 1);
+
+							bulletproofStreamV2Log.debug('Retrying stream', {
+								attempt: `${nextRetryCount}/${retryConfig.maxRetries}`,
+								delay: `${delay}ms`,
+								reason: error.includes('network') ? 'network' : 'connection',
 							});
 
 							setStreamState((prev) => ({
 								...prev,
-								isStreaming: false,
-								isConnecting: false,
-								lastActivity: endTime,
+								retryCount: nextRetryCount,
 							}));
+
+							retryTimeoutRef.current = setTimeout(async () => {
+								startStream(message, callbacks, {
+									messageId,
+									retryCount: nextRetryCount,
+								});
+							}, delay);
+
+							callbacks.onRetry?.(nextRetryCount, retryConfig.maxRetries);
+						} else {
+							bulletproofStreamV2Log.error('Final failure - no more retries', {
+								messageId,
+								error,
+								retryCount: streamState.retryCount,
+								maxRetries: retryConfig.maxRetries,
+								userMessage,
+							});
 
 							currentMessageId.current = null;
 							streamingRef.current.messageId = null;
 							clearStreaming();
-							stopHealthMonitoring();
-
-							// Finalize the message with performance data
-							finalizeMessage(messageId, bufferedText.current, {
-								totalLatency: duration,
-								timeToFirstToken: duration,
-								cacheHit: false,
-								modelUsed: 'streaming',
-								tokensUsed: bufferedText.current.length,
-							});
-							callbacks.onDone?.();
-						},
-						onError: (id, err) => {
-							// Update state
-							setStreamState((prev) => ({
-								...prev,
-								isStreaming: false,
-								isConnecting: false,
-								lastError: err.message,
-							}));
-
-							stopHealthMonitoring();
-
-							// Log error with context for debugging
-							ErrorService.logError(
-								{ message: err.message },
-								{
-									messageId,
-									sessionId: streamingRef.current.sessionId,
-									operation: 'streaming',
-									retryCount: streamState.retryCount,
-								}
-							);
-
-							// Categorize error and get user-friendly message
-							const errorState = ErrorService.categorizeError({
-								message: err.message,
-							});
-							const userMessage = ErrorService.getUserFriendlyMessage({
-								message: err.message,
-							});
-
-							console.error('🚨 [Stream] Error:', {
-								error: err.message,
-								messageId,
-								clientMessageId: id,
-								retryCount: streamState.retryCount,
-								errorType: errorState.type,
-							});
-
-							// Check if we should retry
-							const shouldRetry =
-								streamState.retryCount < retryConfig.maxRetries &&
-								(err.message.includes('network') ||
-									err.message.includes('timeout') ||
-									err.message.includes('connection'));
-
-							if (shouldRetry) {
-								const nextRetryCount = streamState.retryCount + 1;
-								const delay = calculateRetryDelay(nextRetryCount - 1);
-
-								console.log('🔄 [Stream] Retrying:', {
-									attempt: `${nextRetryCount}/${retryConfig.maxRetries}`,
-									delay: `${delay}ms`,
-									reason: err.message.includes('network')
-										? 'network'
-										: 'connection',
-								});
-
-								// Update retry count in state
-								setStreamState((prev) => ({
-									...prev,
-									retryCount: nextRetryCount,
-								}));
-
-								// Schedule retry with a new attempt
-								retryTimeoutRef.current = setTimeout(async () => {
-									startStream(message, callbacks, {
-										messageId,
-										retryCount: nextRetryCount,
-									});
-								}, delay);
-
-								// Notify about retry
-								callbacks.onRetry?.(nextRetryCount, retryConfig.maxRetries);
-							} else {
-								// Final error - no more retries
-								console.error('💥 [Stream] Final failure:', {
-									messageId,
-									error: err.message,
-									retryCount: streamState.retryCount,
-									maxRetries: retryConfig.maxRetries,
-									userMessage,
-								});
-
-								currentMessageId.current = null;
-								streamingRef.current.messageId = null;
-								clearStreaming();
-
-								// Set error on the message with user-friendly text
-								setError(messageId, userMessage);
-								callbacks.onError?.(userMessage);
-							}
-						},
+							setError(messageId, userMessage);
+							callbacks.onError?.(userMessage);
+						}
 					},
-					firebaseUID
-				);
+					onMeta: (data: any) => {
+						setStreamState((prev) => ({
+							...prev,
+							lastActivity: Date.now(),
+							isConnecting: false,
+						}));
+						callbacks.onMeta?.(data);
+					},
+				});
 
-				return { clientMessageId };
+				return { cancel: () => connection?.cancel?.() };
 			} catch (error: any) {
 				// Update state
 				setStreamState((prev) => ({
@@ -418,7 +405,7 @@ export function useBulletproofStreamV2({
 
 				stopHealthMonitoring();
 
-				// Log error with context for debugging
+				// Log error with context
 				ErrorService.logError(error, {
 					messageId,
 					sessionId: streamingRef.current.sessionId,
@@ -437,13 +424,12 @@ export function useBulletproofStreamV2({
 					const nextRetryCount = streamState.retryCount + 1;
 					const delay = calculateRetryDelay(nextRetryCount - 1);
 
-					console.log('🔄 [Stream] Retrying after error:', {
+					bulletproofStreamV2Log.debug('Retrying after error', {
 						attempt: `${nextRetryCount}/${retryConfig.maxRetries}`,
 						delay: `${delay}ms`,
 						error: error.message || String(error),
 					});
 
-					// Schedule retry
 					retryTimeoutRef.current = setTimeout(() => {
 						startStream(message, callbacks, {
 							messageId,
@@ -451,11 +437,9 @@ export function useBulletproofStreamV2({
 						});
 					}, delay);
 
-					// Notify about retry
 					callbacks.onRetry?.(nextRetryCount, retryConfig.maxRetries);
 				} else {
-					// Final error - no more retries
-					console.error('💥 [Stream] Failed to start:', {
+					bulletproofStreamV2Log.error('Failed to start stream', {
 						messageId,
 						error: error.message || String(error),
 						retryCount: streamState.retryCount,
@@ -465,11 +449,12 @@ export function useBulletproofStreamV2({
 					streamingRef.current.messageId = null;
 					clearStreaming();
 
-					// Categorize error and get user-friendly message
 					const userMessage = ErrorService.getUserFriendlyMessage(error);
 					setError(messageId, userMessage);
 					callbacks.onError?.(userMessage);
 				}
+
+				return () => {};
 			}
 		},
 		[

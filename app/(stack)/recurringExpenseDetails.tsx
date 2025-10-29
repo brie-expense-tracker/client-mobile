@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { logger } from '../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -60,7 +61,7 @@ const RecurringExpenseSummaryScreen: React.FC = () => {
 			);
 			setTransactions(completedTransactions);
 		} catch (error) {
-			console.error('Error loading transaction history:', error);
+			logger.error('Error loading transaction history:', error);
 		} finally {
 			setLoadingTransactions(false);
 		}

@@ -1,5 +1,7 @@
 import { ApiService } from './apiService';
-import { isDevMode } from '../../config/environment';
+import { createLogger } from '../../utils/sublogger';
+
+const userLog = createLogger('UserService');
 
 // API_BASE_URL is now handled by ApiService
 
@@ -106,39 +108,31 @@ export class UserService {
 	static async createUser(
 		userData: CreateUserRequest
 	): Promise<CreateUserResponse> {
-		if (isDevMode) {
-			console.log('🔍 [UserService] Creating user with data:', {
-				firebaseUID: userData.firebaseUID.substring(0, 8) + '...',
-				email: userData.email,
-				name: userData.name || 'not provided',
-			});
-		}
+		userLog.debug('Creating user', {
+			firebaseUID: userData.firebaseUID.substring(0, 8) + '...',
+			email: userData.email,
+			name: userData.name || 'not provided',
+		});
 
 		try {
-			if (isDevMode) {
-				console.log(
-					'🔍 [UserService] Making POST request to /api/users endpoint'
-				);
-			}
+			userLog.debug('Making POST request to /api/users endpoint');
 			const response = await ApiService.post<CreateUserResponse>(
 				'/api/users',
 				userData
 			);
 
-			if (isDevMode) {
-				console.log('🔍 [UserService] API response received:', {
-					success: response.success,
-					status: response.status,
-					error: response.error,
-					hasUser: !!response.data?.user,
-					hasProfile: !!response.data?.profile,
-				});
-			}
+			userLog.debug('API response received', {
+				success: response.success,
+				status: response.status,
+				error: response.error,
+				hasUser: !!response.data?.user,
+				hasProfile: !!response.data?.profile,
+			});
 
 			// Check if the response indicates success and has the required data
 			// Handle both new user creation and existing user update scenarios
 			if (!response.success) {
-				console.error('❌ [UserService] User creation failed:', {
+				userLog.error('User creation failed', {
 					success: response.success,
 					error: response.error,
 					data: response.data,
@@ -152,37 +146,30 @@ export class UserService {
 			const hasProfile = response.data?.profile;
 
 			if (!hasUser || !hasProfile) {
-				console.error(
-					'❌ [UserService] User creation failed - missing user or profile data:',
-					{
-						success: response.success,
-						error: response.error,
-						data: response.data,
-						hasUser,
-						hasProfile,
-					}
-				);
+				userLog.error('User creation failed - missing user or profile data', {
+					success: response.success,
+					error: response.error,
+					data: response.data,
+					hasUser,
+					hasProfile,
+				});
 				throw new Error('User creation failed - missing user or profile data');
 			}
 
-			if (isDevMode) {
-				console.log('✅ [UserService] User created successfully:', {
-					userId: response.data.user._id,
-					profileId: response.data.profile._id,
-				});
-			}
+			userLog.info('User created successfully', {
+				userId: response.data.user._id,
+				profileId: response.data.profile._id,
+			});
 
 			return response.data;
 		} catch (error) {
-			console.error('❌ [UserService] Error in createUser:', error);
+			userLog.error('Error in createUser', error);
 			throw error;
 		}
 	}
 
 	static async getUserByFirebaseUID(firebaseUID: string): Promise<User | null> {
-		if (isDevMode) {
-			console.log('🔍 [UserService] Getting user by Firebase UID');
-		}
+		userLog.debug('Getting user by Firebase UID');
 		const response = await ApiService.get<{ user: User }>(
 			`/api/users/${firebaseUID}`,
 			2, // retries
@@ -191,18 +178,14 @@ export class UserService {
 
 		if (!response.success) {
 			if (response.error?.includes('404')) {
-				if (isDevMode) {
-					console.log('🔍 [UserService] User not found (404)');
-				}
+				userLog.debug('User not found (404)');
 				return null;
 			}
-			console.error('🔍 [UserService] Failed to fetch user:', response.error);
+			userLog.error('Failed to fetch user', { error: response.error });
 			throw new Error(response.error || 'Failed to fetch user');
 		}
 
-		if (isDevMode) {
-			console.log('🔍 [UserService] User fetched successfully');
-		}
+		userLog.debug('User fetched successfully');
 		return response.data?.user || null;
 	}
 

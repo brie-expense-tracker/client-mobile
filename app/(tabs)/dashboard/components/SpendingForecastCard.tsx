@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { logger } from '../../../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -41,7 +42,7 @@ const SpendingForecastCard: React.FC<SpendingForecastCardProps> = ({
 				setBudgetForecasts(data.budgetForecasts);
 			}
 		} catch (error) {
-			console.error('[SpendingForecastCard] Error loading forecast:', error);
+			logger.error('[SpendingForecastCard] Error loading forecast:', error);
 			Alert.alert('Error', 'Failed to load spending forecast');
 		} finally {
 			setLoading(false);
@@ -76,6 +77,16 @@ const SpendingForecastCard: React.FC<SpendingForecastCardProps> = ({
 		forecast.trendDirection
 	);
 
+	// Derived values for stubbed service types
+	const isAboveAverage = forecast.currentSpending > forecast.avgMonthlySpending;
+	const computeDaysRemainingInMonth = (): number => {
+		const now = new Date();
+		const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+		const diffMs = endOfMonth.getTime() - now.getTime();
+		return Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+	};
+	const daysRemaining = computeDaysRemainingInMonth();
+
 	return (
 		<TouchableOpacity style={styles.container} onPress={handlePress}>
 			<View style={styles.header}>
@@ -84,7 +95,7 @@ const SpendingForecastCard: React.FC<SpendingForecastCardProps> = ({
 					<Text style={styles.title}>Spending Forecast</Text>
 				</View>
 				<View style={[styles.statusBadge, { backgroundColor: status.color }]}>
-					<Ionicons name={status.icon} size={14} color="#fff" />
+					<Ionicons name={status.icon as any} size={14} color="#fff" />
 					<Text style={styles.statusText}>{status.status}</Text>
 				</View>
 			</View>
@@ -113,7 +124,7 @@ const SpendingForecastCard: React.FC<SpendingForecastCardProps> = ({
 
 				<View style={styles.trendSection}>
 					<View style={styles.trendRow}>
-						<Ionicons name={trendIcon} size={16} color={trendColor} />
+						<Ionicons name={trendIcon as any} size={16} color={trendColor} />
 						<Text style={[styles.trendText, { color: trendColor }]}>
 							{SpendingForecastService.formatTrendDirection(
 								forecast.trendDirection
@@ -135,18 +146,18 @@ const SpendingForecastCard: React.FC<SpendingForecastCardProps> = ({
 								styles.progressFill,
 								{
 									width: `${Math.min(
-										(forecast.currentSpending / forecast.projectedTotal) * 100,
+										(forecast.currentSpending /
+											(forecast.projectedTotal || 1)) *
+											100,
 										100
 									)}%`,
-									backgroundColor: forecast.isAboveAverage
-										? '#f44336'
-										: '#4caf50',
+									backgroundColor: isAboveAverage ? '#f44336' : '#4caf50',
 								},
 							]}
 						/>
 					</View>
 					<Text style={styles.progressText}>
-						{forecast.daysRemaining} days remaining in month
+						{daysRemaining} days remaining in month
 					</Text>
 				</View>
 			</View>
@@ -157,6 +168,12 @@ const SpendingForecastCard: React.FC<SpendingForecastCardProps> = ({
 					{budgetForecasts.slice(0, 3).map((budgetForecast) => {
 						const budgetStatus =
 							SpendingForecastService.getBudgetForecastStatus(budgetForecast);
+						const budgetIcon =
+							budgetForecast.riskLevel === 'high'
+								? 'alert'
+								: budgetForecast.riskLevel === 'medium'
+								? 'warning'
+								: 'checkmark-circle';
 						return (
 							<View key={budgetForecast.budgetId} style={styles.budgetItem}>
 								<View style={styles.budgetHeader}>
@@ -169,32 +186,19 @@ const SpendingForecastCard: React.FC<SpendingForecastCardProps> = ({
 											{ backgroundColor: budgetStatus.color },
 										]}
 									>
-										<Ionicons name={budgetStatus.icon} size={12} color="#fff" />
+										<Ionicons name={budgetIcon as any} size={12} color="#fff" />
 										<Text style={styles.budgetStatusText}>
 											{budgetStatus.status}
 										</Text>
 									</View>
 								</View>
 								<View style={styles.budgetProgress}>
-									<View style={styles.budgetProgressBar}>
-										<View
-											style={[
-												styles.budgetProgressFill,
-												{
-													width: `${Math.min(
-														budgetForecast.utilizationPercentage,
-														100
-													)}%`,
-													backgroundColor: budgetForecast.willExceed
-														? '#f44336'
-														: '#4caf50',
-												},
-											]}
-										/>
-									</View>
 									<Text style={styles.budgetProgressText}>
-										${budgetForecast.currentSpending.toFixed(0)} / $
-										{budgetForecast.budgetAmount.toFixed(0)}
+										{budgetForecast.projectedOverspend > 0
+											? `Projected overspend: $${budgetForecast.projectedOverspend.toFixed(
+													0
+											  )}`
+											: 'On track'}
 									</Text>
 								</View>
 							</View>
