@@ -18,10 +18,12 @@ import {
 	Card,
 	Section,
 	LoadingState,
-	ErrorState,
 	EmptyState,
 	SegmentedControl,
 } from '../../../src/ui';
+import { createLogger } from '../../../src/utils/sublogger';
+
+const budgetsScreenLog = createLogger('BudgetsScreen');
 
 const startOfMonth = (d = new Date()) =>
 	new Date(d.getFullYear(), d.getMonth(), 1);
@@ -62,7 +64,6 @@ export default function BudgetScreen() {
 		monthlyPercentage,
 		weeklyPercentage,
 		hasLoaded,
-		error,
 	} = useBudget();
 
 	// ==========================================
@@ -72,7 +73,7 @@ export default function BudgetScreen() {
 	const router = useRouter();
 
 	// ==========================================
-	// State Managementnpm run
+	// State Management
 	// ==========================================
 	const [activeTab, setActiveTab] = useState<'monthly' | 'weekly' | 'all'>(
 		'all'
@@ -101,12 +102,10 @@ export default function BudgetScreen() {
 	useFocusEffect(
 		useCallback(() => {
 			if (!hasLoaded) {
-				console.log(
-					'🔄 [Budgets] Screen focused, no data loaded yet - fetching...'
-				);
+				budgetsScreenLog.debug('Screen focused, no data loaded yet - fetching');
 				refetch();
 			} else {
-				console.log('✅ [Budgets] Screen focused, using cached data');
+				budgetsScreenLog.debug('Screen focused, using cached data');
 			}
 		}, [refetch, hasLoaded])
 	);
@@ -141,17 +140,17 @@ export default function BudgetScreen() {
 	// Pull to Refresh Handler
 	// ==========================================
 	const onRefresh = useCallback(async () => {
-		console.log('🔄 [Budgets] Pull-to-refresh triggered');
+		budgetsScreenLog.debug('Pull-to-refresh triggered');
 		setRefreshing(true);
 		try {
 			// Clear cache before refetching to ensure fresh data
 			const { ApiService } = await import('../../../src/services');
 			ApiService.clearCacheByPrefix('/api/budgets');
-			console.log('🗑️ [Budgets] Cache cleared, fetching fresh data...');
+			budgetsScreenLog.debug('Cache cleared, fetching fresh data');
 			await refetch();
-			console.log('✅ [Budgets] Refresh complete');
+			budgetsScreenLog.debug('Refresh complete');
 		} catch (error) {
-			console.error('❌ [Budgets] Error refreshing:', error);
+			budgetsScreenLog.error('Error refreshing', error);
 			Alert.alert('Error', 'Failed to refresh budgets. Please try again.');
 		} finally {
 			// Always reset refreshing state, even on error
@@ -328,11 +327,6 @@ export default function BudgetScreen() {
 		return <LoadingState label="Loading budgets..." />;
 	}
 
-	// Show error state if there's an error
-	if (error && hasLoaded) {
-		return <ErrorState onRetry={onRefresh} title="Unable to load budgets" />;
-	}
-
 	// Show empty state if no budgets and data has loaded
 	if (budgets.length === 0 && hasLoaded) {
 		return (
@@ -424,17 +418,6 @@ export default function BudgetScreen() {
 					</Card>
 				</Section>
 			</ScrollView>
-
-			{/* Floating action button */}
-			<TouchableOpacity
-				onPress={showModal}
-				style={styles.fab}
-				accessibilityRole="button"
-				accessibilityLabel="Add budget"
-				activeOpacity={0.9}
-			>
-				<Ionicons name="add" size={28} color="#fff" />
-			</TouchableOpacity>
 		</Page>
 	);
 }
@@ -448,21 +431,5 @@ const styles = StyleSheet.create({
 	headerAddBtn: {
 		padding: 4,
 		borderRadius: 999,
-	},
-	fab: {
-		position: 'absolute',
-		right: 20,
-		bottom: 20,
-		width: 56,
-		height: 56,
-		borderRadius: 28,
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: '#007ACC',
-		shadowColor: '#000',
-		shadowOpacity: 0.18,
-		shadowRadius: 8,
-		shadowOffset: { width: 0, height: 4 },
-		elevation: 6,
 	},
 });

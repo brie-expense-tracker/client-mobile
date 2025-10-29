@@ -1,4 +1,5 @@
 import React, { useCallback, useContext, useMemo, useState } from 'react';
+import { logger } from '../../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -66,7 +67,7 @@ const Dashboard: React.FC = () => {
 		try {
 			await refetch();
 		} catch (error) {
-			console.error('Error refreshing dashboard:', error);
+			logger.error('Error refreshing dashboard:', error);
 		} finally {
 			setRefreshing(false);
 		}

@@ -1,4 +1,7 @@
 import { SecureCacheService } from '../security/secureCacheService';
+import { createLogger } from '../../utils/sublogger';
+
+const smartCacheServiceLog = createLogger('SmartCacheService');
 
 // Enhanced cache categories with specific TTLs
 export type CacheCategory =
@@ -70,7 +73,7 @@ export class SmartCacheService {
 	 */
 	setInvalidationFlag(flag: string): void {
 		this.invalidationFlags.add(flag);
-		console.log(`[SmartCacheService] Set invalidation flag: ${flag}`);
+		smartCacheServiceLog.debug(`Set invalidation flag: ${flag}`);
 	}
 
 	/**
@@ -78,7 +81,7 @@ export class SmartCacheService {
 	 */
 	clearInvalidationFlag(flag: string): void {
 		this.invalidationFlags.delete(flag);
-		console.log(`[SmartCacheService] Cleared invalidation flag: ${flag}`);
+		smartCacheServiceLog.debug(`Cleared invalidation flag: ${flag}`);
 	}
 
 	/**
@@ -93,8 +96,8 @@ export class SmartCacheService {
 			entry.category === 'NARRATION' &&
 			this.invalidationFlags.has('NEW_TX')
 		) {
-			console.log(
-				'[SmartCacheService] Invalidating narration cache due to new transactions'
+			smartCacheServiceLog.debug(
+				'Invalidating narration cache due to new transactions'
 			);
 			return false;
 		}
@@ -103,8 +106,8 @@ export class SmartCacheService {
 			entry.category === 'FORECAST' &&
 			this.invalidationFlags.has('BUDGET_CHANGE')
 		) {
-			console.log(
-				'[SmartCacheService] Invalidating forecast cache due to budget changes'
+			smartCacheServiceLog.debug(
+				'Invalidating forecast cache due to budget changes'
 			);
 			return false;
 		}
@@ -113,8 +116,8 @@ export class SmartCacheService {
 			entry.category === 'INSIGHT' &&
 			this.invalidationFlags.has('GOAL_UPDATE')
 		) {
-			console.log(
-				'[SmartCacheService] Invalidating insight cache due to goal updates'
+			smartCacheServiceLog.debug(
+				'Invalidating insight cache due to goal updates'
 			);
 			return false;
 		}
@@ -123,8 +126,8 @@ export class SmartCacheService {
 			entry.category === 'CATEGORIZATION' &&
 			this.invalidationFlags.has('CATEGORY_UPDATE')
 		) {
-			console.log(
-				'[SmartCacheService] Invalidating categorization cache due to category updates'
+			smartCacheServiceLog.debug(
+				'Invalidating categorization cache due to category updates'
 			);
 			return false;
 		}
@@ -137,7 +140,7 @@ export class SmartCacheService {
 	 */
 	async initialize(): Promise<void> {
 		try {
-			console.log('[SmartCacheService] Starting cache initialization...');
+			smartCacheServiceLog.debug('Starting cache initialization...');
 
 			// Add timeout protection for storage operations
 			const storageTimeout = new Promise((_, reject) => {
@@ -151,9 +154,9 @@ export class SmartCacheService {
 
 			await Promise.race([initPromise, storageTimeout]);
 
-			console.log('[SmartCacheService] Cache initialized successfully');
+			smartCacheServiceLog.debug('Cache initialized successfully');
 		} catch (error) {
-			console.error('[SmartCacheService] Error initializing cache:', error);
+			smartCacheServiceLog.error('Error initializing cache', error);
 			// Don't throw - allow service to continue with empty cache
 			this.cache = new Map();
 			this.userPatterns = new Map();
@@ -209,11 +212,8 @@ export class SmartCacheService {
 			? this.decompressResponse(entry.response)
 			: entry.response;
 
-		console.log(
-			`[SmartCacheService] Cache hit for ${category}: ${query.substring(
-				0,
-				50
-			)}...`
+		smartCacheServiceLog.debug(
+			`Cache hit for ${category}: ${query.substring(0, 50)}...`
 		);
 		return response;
 	}
@@ -229,8 +229,8 @@ export class SmartCacheService {
 		confidence: number = 1.0
 	): Promise<void> {
 		if (confidence < this.MIN_CONFIDENCE) {
-			console.log(
-				`[SmartCacheService] Skipping cache for low confidence response: ${confidence}`
+			smartCacheServiceLog.debug(
+				`Skipping cache for low confidence response: ${confidence}`
 			);
 			return;
 		}
@@ -266,11 +266,8 @@ export class SmartCacheService {
 
 		// Persist to storage
 		await this.persistCacheToStorage();
-		console.log(
-			`[SmartCacheService] Cached ${category} response for: ${query.substring(
-				0,
-				50
-			)}... ${
+		smartCacheServiceLog.debug(
+			`Cached ${category} response for: ${query.substring(0, 50)}... ${
 				compressed
 					? `(compressed: ${originalSize} -> ${compressedSize} bytes)`
 					: ''
@@ -378,7 +375,7 @@ export class SmartCacheService {
 				newestEntry,
 			};
 		} catch (error) {
-			console.error('[SmartCacheService] Error getting cache stats:', error);
+			smartCacheServiceLog.error('Error getting cache stats', error);
 			// Return safe defaults
 			return {
 				totalEntries: 0,
@@ -478,8 +475,8 @@ export class SmartCacheService {
 		expiredKeys.forEach((key) => this.cache.delete(key));
 
 		if (expiredKeys.length > 0) {
-			console.log(
-				`[SmartCacheService] Cleaned up ${expiredKeys.length} expired entries`
+			smartCacheServiceLog.debug(
+				`Cleaned up ${expiredKeys.length} expired entries`
 			);
 			await this.persistCacheToStorage();
 		}
@@ -500,8 +497,8 @@ export class SmartCacheService {
 		keysToDelete.forEach((key) => this.cache.delete(key));
 
 		if (keysToDelete.length > 0) {
-			console.log(
-				`[SmartCacheService] Invalidated ${keysToDelete.length} ${category} cache entries`
+			smartCacheServiceLog.debug(
+				`Invalidated ${keysToDelete.length} ${category} cache entries`
 			);
 			await this.persistCacheToStorage();
 		}
@@ -522,8 +519,8 @@ export class SmartCacheService {
 		keysToDelete.forEach((key) => this.cache.delete(key));
 
 		if (keysToDelete.length > 0) {
-			console.log(
-				`[SmartCacheService] Invalidated ${keysToDelete.length} cache entries for user ${userId}`
+			smartCacheServiceLog.debug(
+				`Invalidated ${keysToDelete.length} cache entries for user ${userId}`
 			);
 			await this.persistCacheToStorage();
 		}
@@ -538,14 +535,12 @@ export class SmartCacheService {
 	): Promise<void> {
 		const pattern = this.userPatterns.get(userId);
 		if (!pattern || pattern.commonQueries.length === 0) {
-			console.log(
-				`[SmartCacheService] No common queries found for user ${userId}`
-			);
+			smartCacheServiceLog.debug(`No common queries found for user ${userId}`);
 			return;
 		}
 
-		console.log(
-			`[SmartCacheService] Warming cache for user ${userId} with ${pattern.commonQueries.length} common queries`
+		smartCacheServiceLog.debug(
+			`Warming cache for user ${userId} with ${pattern.commonQueries.length} common queries`
 		);
 
 		// Warm cache with top common queries
@@ -568,16 +563,14 @@ export class SmartCacheService {
 					await this.cacheResponse(query, response, userId, category, 0.9);
 				}
 			} catch (error) {
-				console.error(
-					`[SmartCacheService] Error warming cache for query "${query}":`,
+				smartCacheServiceLog.error(
+					`Error warming cache for query "${query}"`,
 					error
 				);
 			}
 		}
 
-		console.log(
-			`[SmartCacheService] Cache warming completed for user ${userId}`
-		);
+		smartCacheServiceLog.debug(`Cache warming completed for user ${userId}`);
 	}
 
 	/**
@@ -771,8 +764,8 @@ export class SmartCacheService {
 		if (scoredEntries.length > 0) {
 			const toEvict = scoredEntries[0];
 			this.cache.delete(toEvict.key);
-			console.log(
-				`[SmartCacheService] Evicted cache entry with priority score ${toEvict.score}`
+			smartCacheServiceLog.debug(
+				`Evicted cache entry with priority score ${toEvict.score}`
 			);
 		}
 	}
@@ -888,8 +881,8 @@ export class SmartCacheService {
 				};
 			}
 		} catch (error) {
-			console.warn(
-				'[SmartCacheService] Compression failed, storing uncompressed:',
+			smartCacheServiceLog.warn(
+				'Compression failed, storing uncompressed',
 				error
 			);
 		}
@@ -914,36 +907,31 @@ export class SmartCacheService {
 			// If it's already an object, return as-is
 			return compressedResponse;
 		} catch (error) {
-			console.warn(
-				'[SmartCacheService] Decompression failed, returning as-is:',
-				error
-			);
+			smartCacheServiceLog.warn('Decompression failed, returning as-is', error);
 			return compressedResponse;
 		}
 	}
 
 	private async loadCacheFromStorage(): Promise<void> {
 		try {
-			console.log(
-				'[SmartCacheService] Loading encrypted cache from storage...'
-			);
+			smartCacheServiceLog.debug('Loading encrypted cache from storage...');
 			const cached = await SecureCacheService.getEncryptedItem<
 				Record<string, CacheEntry>
 			>('smart_cache');
 			if (cached) {
 				// Convert back to Map
 				this.cache = new Map(Object.entries(cached));
-				console.log(
-					`[SmartCacheService] Loaded ${this.cache.size} encrypted cache entries`
+				smartCacheServiceLog.debug(
+					`Loaded ${this.cache.size} encrypted cache entries`
 				);
 			} else {
-				console.log(
-					'[SmartCacheService] No encrypted cached data found, starting with empty cache'
+				smartCacheServiceLog.debug(
+					'No encrypted cached data found, starting with empty cache'
 				);
 			}
 		} catch (error) {
-			console.error(
-				'[SmartCacheService] Error loading encrypted cache from storage:',
+			smartCacheServiceLog.error(
+				'Error loading encrypted cache from storage',
 				error
 			);
 			// Continue with empty cache
@@ -957,8 +945,8 @@ export class SmartCacheService {
 			const cacheObj = Object.fromEntries(this.cache);
 			await SecureCacheService.setEncryptedItem('smart_cache', cacheObj);
 		} catch (error) {
-			console.error(
-				'[SmartCacheService] Error persisting encrypted cache to storage:',
+			smartCacheServiceLog.error(
+				'Error persisting encrypted cache to storage',
 				error
 			);
 		}
@@ -974,8 +962,8 @@ export class SmartCacheService {
 				this.userPatterns = new Map(Object.entries(patterns));
 			}
 		} catch (error) {
-			console.error(
-				'[SmartCacheService] Error loading encrypted user patterns:',
+			smartCacheServiceLog.error(
+				'Error loading encrypted user patterns',
 				error
 			);
 		}
@@ -987,8 +975,8 @@ export class SmartCacheService {
 			const patternsObj = Object.fromEntries(this.userPatterns);
 			await SecureCacheService.setEncryptedItem('user_patterns', patternsObj);
 		} catch (error) {
-			console.error(
-				'[SmartCacheService] Error persisting encrypted user patterns:',
+			smartCacheServiceLog.error(
+				'Error persisting encrypted user patterns',
 				error
 			);
 		}

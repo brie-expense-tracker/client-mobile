@@ -1,3 +1,4 @@
+import { logger } from '../../utils/logger';
 // Mode state management service for the AI assistant
 // Tracks mode changes, stability, and transition history
 
@@ -119,7 +120,7 @@ class ModeStateService {
 
 		// Validate transition
 		if (!this.isValidTransition(currentMode, newMode)) {
-			console.warn(
+			logger.warn(
 				`[ModeState] Invalid transition from ${currentMode} to ${newMode}`
 			);
 			return false;
@@ -150,7 +151,7 @@ class ModeStateService {
 		};
 
 		// Log transition
-		console.log(
+		logger.debug(
 			`[ModeState] ${currentMode} → ${newMode}${
 				reason ? ` (${reason})` : ''
 			} (${Math.round(timeInCurrentMode / 1000)}s)`
@@ -200,7 +201,7 @@ class ModeStateService {
 			setTimeout(() => {
 				// Only auto-transition if still in the same mode
 				if (this.state.current === mode) {
-					console.warn(
+					logger.warn(
 						`[ModeState] Auto-transitioning from ${mode} due to timeout`
 					);
 					this.transitionTo(ModeStateService.MODES.ERROR, 'timeout');
@@ -215,7 +216,7 @@ class ModeStateService {
 			try {
 				listener(this.state);
 			} catch (error) {
-				console.error('[ModeState] Error in listener:', error);
+				logger.error('[ModeState] Error in listener:', error);
 			}
 		});
 	}
@@ -324,13 +325,13 @@ class ModeStateService {
 	// Attempt recovery from stuck state
 	private attemptRecovery(): void {
 		if (this.recoveryAttempts >= this.maxRecoveryAttempts) {
-			console.error('[ModeState] Max recovery attempts reached, forcing reset');
+			logger.error('[ModeState] Max recovery attempts reached, forcing reset');
 			this.reset();
 			return;
 		}
 
 		this.recoveryAttempts++;
-		console.warn(`[ModeState] Attempting recovery #${this.recoveryAttempts}`);
+		logger.warn(`[ModeState] Attempting recovery #${this.recoveryAttempts}`);
 
 		// Force transition to idle
 		this.state = {
@@ -346,7 +347,7 @@ class ModeStateService {
 
 	// Force recovery (public method)
 	forceRecovery(): void {
-		console.warn('[ModeState] Force recovery requested');
+		logger.warn('[ModeState] Force recovery requested');
 		this.attemptRecovery();
 	}
 
@@ -405,9 +406,9 @@ class ModeStateService {
 			};
 			// In a real implementation, this would use AsyncStorage or similar
 			// For now, we'll just log it
-			console.log('[ModeState] State saved:', stateToSave);
+			logger.debug('[ModeState] State saved:', stateToSave);
 		} catch (error) {
-			console.error('[ModeState] Failed to save state:', error);
+			logger.error('[ModeState] Failed to save state:', error);
 		}
 	}
 
@@ -416,9 +417,9 @@ class ModeStateService {
 		try {
 			// In a real implementation, this would load from AsyncStorage
 			// For now, we'll just initialize with defaults
-			console.log('[ModeState] State loaded from storage');
+			logger.debug('[ModeState] State loaded from storage');
 		} catch (error) {
-			console.error('[ModeState] Failed to load state:', error);
+			logger.error('[ModeState] Failed to load state:', error);
 		}
 	}
 
@@ -453,7 +454,7 @@ class ModeStateService {
 			}
 			return false;
 		} catch (error) {
-			console.error('[ModeState] Failed to import state:', error);
+			logger.error('[ModeState] Failed to import state:', error);
 			return false;
 		}
 	}

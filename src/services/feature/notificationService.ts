@@ -7,7 +7,12 @@ import {
 	normalizeNotificationsResponse,
 	normalizeUnreadCountResponse,
 } from '../notifications/normalizer';
-import { isDevMode } from '../../config/environment';
+import { createLogger } from '../../utils/sublogger';
+
+const notificationServiceLog = createLogger('NotificationService');
+
+// Use __DEV__ global instead of isDevMode
+declare const __DEV__: boolean;
 
 export interface NotificationData {
 	id?: string;
@@ -88,9 +93,7 @@ class NotificationService {
 		try {
 			// Check if running on a physical device
 			if (!Device.isDevice) {
-				if (isDevMode) {
-					console.log('⚠️ Notifications require a physical device');
-				}
+				notificationServiceLog.warn('Notifications require a physical device');
 				return null;
 			}
 
@@ -105,9 +108,7 @@ class NotificationService {
 			}
 
 			if (finalStatus !== 'granted') {
-				if (isDevMode) {
-					console.log('❌ Notification permissions not granted');
-				}
+				notificationServiceLog.warn('Notification permissions not granted');
 				return null;
 			}
 
@@ -119,7 +120,7 @@ class NotificationService {
 				Constants?.expoConfig?.extra?.eas?.projectId ??
 				Constants?.easConfig?.projectId;
 			if (!projectId) {
-				console.log('❌ Project ID not found');
+				notificationServiceLog.warn('Project ID not found');
 				return null;
 			}
 
@@ -129,9 +130,9 @@ class NotificationService {
 			});
 
 			this.expoPushToken = tokenData.data;
-			if (isDevMode) {
-				console.log('✅ Push token obtained:', this.expoPushToken);
-			}
+			notificationServiceLog.info('Push token obtained', {
+				token: this.expoPushToken?.substring(0, 20) + '...',
+			});
 
 			// Update the token on the backend
 			if (this.expoPushToken) {
@@ -140,7 +141,7 @@ class NotificationService {
 
 			return this.expoPushToken;
 		} catch (error) {
-			console.error('❌ Error initializing notifications:', error);
+			notificationServiceLog.error('Error initializing notifications', error);
 			return null;
 		}
 	}
@@ -332,11 +333,16 @@ class NotificationService {
 				]);
 			}
 
-			if (isDevMode) {
-				console.log('✅ Notification channels and categories set up');
+			if (__DEV__) {
+				notificationServiceLog.debug(
+					'Notification channels and categories set up'
+				);
 			}
 		} catch (error) {
-			console.error('❌ Error setting up notification channels:', error);
+			notificationServiceLog.error(
+				'Error setting up notification channels',
+				error
+			);
 		}
 	}
 
@@ -353,15 +359,15 @@ class NotificationService {
 			});
 
 			if (response.success) {
-				if (isDevMode) {
-					console.log('✅ Push token updated on backend');
+				if (__DEV__) {
+					notificationServiceLog.debug('Push token updated on backend');
 				}
 				return true;
 			} else {
 				// Handle authentication errors gracefully
 				if (response.error?.includes('User not authenticated')) {
-					console.log(
-						'🔒 [Notifications] User not authenticated, skipping push token update'
+					notificationServiceLog.debug(
+						'User not authenticated, skipping push token update'
 					);
 					return false;
 				}
@@ -369,13 +375,16 @@ class NotificationService {
 				// For rate limiting, don't retry - just fail silently
 				// The token will be retried on next app launch
 				if (response.error?.includes('Rate limit')) {
-					console.log(
-						'⏸️ [Notifications] Rate limited, will retry on next app launch'
+					notificationServiceLog.debug(
+						'Rate limited, will retry on next app launch'
 					);
 					return false;
 				}
 
-				console.error('❌ Failed to update push token:', response.error);
+				notificationServiceLog.error(
+					'Failed to update push token',
+					response.error
+				);
 				return false;
 			}
 		} catch (error) {
@@ -384,21 +393,21 @@ class NotificationService {
 				error instanceof Error &&
 				error.message.includes('User not authenticated')
 			) {
-				console.log(
-					'🔒 [Notifications] User not authenticated, skipping push token update'
+				notificationServiceLog.debug(
+					'User not authenticated, skipping push token update'
 				);
 				return false;
 			}
 
 			// Handle rate limiting errors - no retry, just fail silently
 			if (error instanceof Error && error.message.includes('Rate limit')) {
-				console.log(
-					'⏸️ [Notifications] Rate limited, will retry on next app launch'
+				notificationServiceLog.debug(
+					'Rate limited, will retry on next app launch'
 				);
 				return false;
 			}
 
-			console.error('❌ Error updating push token:', error);
+			notificationServiceLog.error('Error updating push token', error);
 			return false;
 		}
 	}
@@ -437,12 +446,15 @@ class NotificationService {
 			} else {
 				// Handle authentication errors gracefully
 				if (response.error?.includes('User not authenticated')) {
-					console.log(
-						'🔒 [Notifications] User not authenticated, returning null'
+					notificationServiceLog.debug(
+						'User not authenticated, returning null'
 					);
 					return null;
 				}
-				console.error('❌ Failed to get notifications:', response.error);
+				notificationServiceLog.error(
+					'Failed to get notifications',
+					response.error
+				);
 				return null;
 			}
 		} catch (error) {
@@ -451,12 +463,10 @@ class NotificationService {
 				error instanceof Error &&
 				error.message.includes('User not authenticated')
 			) {
-				console.log(
-					'🔒 [Notifications] User not authenticated, returning null'
-				);
+				notificationServiceLog.debug('User not authenticated, returning null');
 				return null;
 			}
-			console.error('❌ Error getting notifications:', error);
+			notificationServiceLog.error('Error getting notifications', error);
 			return null;
 		}
 	}
@@ -473,12 +483,15 @@ class NotificationService {
 			} else {
 				// Handle authentication errors gracefully
 				if (response.error?.includes('User not authenticated')) {
-					console.log(
-						'🔒 [Notifications] User not authenticated, returning 0 unread count'
+					notificationServiceLog.debug(
+						'User not authenticated, returning 0 unread count'
 					);
 					return 0;
 				}
-				console.error('❌ Failed to get unread count:', response.error);
+				notificationServiceLog.error(
+					'Failed to get unread count',
+					response.error
+				);
 				return 0;
 			}
 		} catch (error) {
@@ -487,12 +500,12 @@ class NotificationService {
 				error instanceof Error &&
 				error.message.includes('User not authenticated')
 			) {
-				console.log(
-					'🔒 [Notifications] User not authenticated, returning 0 unread count'
+				notificationServiceLog.debug(
+					'User not authenticated, returning 0 unread count'
 				);
 				return 0;
 			}
-			console.error('❌ Error getting unread count:', error);
+			notificationServiceLog.error('Error getting unread count', error);
 			return 0;
 		}
 	}
@@ -506,17 +519,17 @@ class NotificationService {
 			);
 
 			if (response.success) {
-				console.log('✅ Notification marked as read');
+				notificationServiceLog.debug('Notification marked as read');
 				return true;
 			} else {
-				console.error(
-					'❌ Failed to mark notification as read:',
+				notificationServiceLog.error(
+					'Failed to mark notification as read',
 					response.error
 				);
 				return false;
 			}
 		} catch (error) {
-			console.error('❌ Error marking notification as read:', error);
+			notificationServiceLog.error('Error marking notification as read', error);
 			return false;
 		}
 	}
@@ -530,17 +543,20 @@ class NotificationService {
 			);
 
 			if (response.success) {
-				console.log('✅ All notifications marked as read');
+				notificationServiceLog.debug('All notifications marked as read');
 				return true;
 			} else {
-				console.error(
-					'❌ Failed to mark all notifications as read:',
+				notificationServiceLog.error(
+					'Failed to mark all notifications as read',
 					response.error
 				);
 				return false;
 			}
 		} catch (error) {
-			console.error('❌ Error marking all notifications as read:', error);
+			notificationServiceLog.error(
+				'Error marking all notifications as read',
+				error
+			);
 			return false;
 		}
 	}
@@ -553,14 +569,17 @@ class NotificationService {
 			);
 
 			if (response.success) {
-				console.log('✅ Notification deleted');
+				notificationServiceLog.debug('Notification deleted');
 				return true;
 			} else {
-				console.error('❌ Failed to delete notification:', response.error);
+				notificationServiceLog.error(
+					'Failed to delete notification',
+					response.error
+				);
 				return false;
 			}
 		} catch (error) {
-			console.error('❌ Error deleting notification:', error);
+			notificationServiceLog.error('Error deleting notification', error);
 			return false;
 		}
 	}
@@ -571,14 +590,17 @@ class NotificationService {
 			const response = await ApiService.delete('/api/notifications');
 
 			if (response.success) {
-				console.log('✅ All notifications deleted');
+				notificationServiceLog.debug('All notifications deleted');
 				return true;
 			} else {
-				console.error('❌ Failed to delete all notifications:', response.error);
+				notificationServiceLog.error(
+					'Failed to delete all notifications',
+					response.error
+				);
 				return false;
 			}
 		} catch (error) {
-			console.error('❌ Error deleting all notifications:', error);
+			notificationServiceLog.error('Error deleting all notifications', error);
 			return false;
 		}
 	}
@@ -586,7 +608,7 @@ class NotificationService {
 	// Send a test notification
 	async sendTestNotification(): Promise<boolean> {
 		if (!this.expoPushToken) {
-			console.error('❌ No push token available');
+			notificationServiceLog.warn('No push token available');
 			return false;
 		}
 
@@ -612,14 +634,17 @@ class NotificationService {
 			const result = await response.json();
 
 			if (response.ok) {
-				console.log('✅ Test notification sent successfully');
+				notificationServiceLog.info('Test notification sent successfully');
 				return true;
 			} else {
-				console.error('❌ Failed to send test notification:', result);
+				notificationServiceLog.error(
+					'Failed to send test notification',
+					result
+				);
 				return false;
 			}
 		} catch (error) {
-			console.error('❌ Error sending test notification:', error);
+			notificationServiceLog.error('Error sending test notification', error);
 			return false;
 		}
 	}
@@ -641,10 +666,15 @@ class NotificationService {
 				trigger: trigger || null, // null means send immediately
 			});
 
-			console.log('✅ Local notification scheduled:', identifier);
+			notificationServiceLog.debug('Local notification scheduled', {
+				identifier,
+			});
 			return identifier;
 		} catch (error) {
-			console.error('❌ Error scheduling local notification:', error);
+			notificationServiceLog.error(
+				'Error scheduling local notification',
+				error
+			);
 			return null;
 		}
 	}
@@ -653,10 +683,15 @@ class NotificationService {
 	async cancelScheduledNotification(identifier: string): Promise<boolean> {
 		try {
 			await Notifications.cancelScheduledNotificationAsync(identifier);
-			console.log('✅ Scheduled notification cancelled:', identifier);
+			notificationServiceLog.debug('Scheduled notification cancelled', {
+				identifier,
+			});
 			return true;
 		} catch (error) {
-			console.error('❌ Error cancelling scheduled notification:', error);
+			notificationServiceLog.error(
+				'Error cancelling scheduled notification',
+				error
+			);
 			return false;
 		}
 	}
@@ -665,10 +700,13 @@ class NotificationService {
 	async cancelAllScheduledNotifications(): Promise<boolean> {
 		try {
 			await Notifications.cancelAllScheduledNotificationsAsync();
-			console.log('✅ All scheduled notifications cancelled');
+			notificationServiceLog.debug('All scheduled notifications cancelled');
 			return true;
 		} catch (error) {
-			console.error('❌ Error cancelling all scheduled notifications:', error);
+			notificationServiceLog.error(
+				'Error cancelling all scheduled notifications',
+				error
+			);
 			return false;
 		}
 	}
@@ -678,7 +716,7 @@ class NotificationService {
 		try {
 			return await Notifications.getBadgeCountAsync();
 		} catch (error) {
-			console.error('❌ Error getting badge count:', error);
+			notificationServiceLog.error('Error getting badge count', error);
 			return 0;
 		}
 	}
@@ -689,7 +727,7 @@ class NotificationService {
 			await Notifications.setBadgeCountAsync(count);
 			return true;
 		} catch (error) {
-			console.error('❌ Error setting badge count:', error);
+			notificationServiceLog.error('Error setting badge count', error);
 			return false;
 		}
 	}
@@ -714,7 +752,9 @@ class NotificationService {
 				return this.consentSettings;
 			}
 		} catch {
-			console.log('❌ Failed to fetch consent settings, using defaults');
+			notificationServiceLog.warn(
+				'Failed to fetch consent settings, using defaults'
+			);
 		}
 
 		// Return default consent settings
@@ -783,7 +823,7 @@ class NotificationService {
 			}
 			return false;
 		} catch (error) {
-			console.error('❌ Error updating consent settings:', error);
+			notificationServiceLog.error('Error updating consent settings', error);
 			return false;
 		}
 	}
@@ -836,8 +876,8 @@ class NotificationService {
 		// Check if this notification type is allowed
 		const isAllowed = await this.isNotificationAllowed(type, category);
 		if (!isAllowed) {
-			console.log(
-				`❌ Notification blocked: ${type} not allowed by consent settings`
+			notificationServiceLog.debug(
+				`Notification blocked: ${type} not allowed by consent settings`
 			);
 			return false;
 		}
@@ -910,10 +950,10 @@ class NotificationService {
 				trigger: null, // Send immediately
 			});
 
-			console.log('✅ Notification sent:', identifier);
+			notificationServiceLog.debug('Notification sent', { identifier });
 			return true;
 		} catch (error) {
-			console.error('❌ Error sending notification:', error);
+			notificationServiceLog.error('Error sending notification', error);
 			return false;
 		}
 	}
@@ -938,14 +978,17 @@ class NotificationService {
 			});
 
 			if (response.success) {
-				console.log('✅ Push notification sent successfully');
+				notificationServiceLog.info('Push notification sent successfully');
 				return true;
 			} else {
-				console.error('❌ Failed to send push notification:', response.error);
+				notificationServiceLog.error(
+					'Failed to send push notification',
+					response.error
+				);
 				return false;
 			}
 		} catch (error) {
-			console.error('❌ Error sending push notification:', error);
+			notificationServiceLog.error('Error sending push notification', error);
 			return false;
 		}
 	}
@@ -955,13 +998,13 @@ class NotificationService {
 		try {
 			// Handle notification received while app is in foreground
 			Notifications.addNotificationReceivedListener((notification) => {
-				console.log('📱 Notification received:', notification);
+				notificationServiceLog.debug('Notification received', notification);
 				// You can add custom handling here, like updating UI state
 			});
 
 			// Handle notification tap/interaction
 			Notifications.addNotificationResponseReceivedListener((response) => {
-				console.log('👆 Notification tapped:', response);
+				notificationServiceLog.debug('Notification tapped', response);
 				const { actionIdentifier, notification } = response;
 
 				// Handle different action buttons
@@ -983,11 +1026,14 @@ class NotificationService {
 				}
 			});
 
-			if (isDevMode) {
-				console.log('✅ Notification listeners set up');
+			if (__DEV__) {
+				notificationServiceLog.debug('Notification listeners set up');
 			}
 		} catch (error) {
-			console.error('❌ Error setting up notification listeners:', error);
+			notificationServiceLog.error(
+				'Error setting up notification listeners',
+				error
+			);
 		}
 	}
 
@@ -1001,7 +1047,10 @@ class NotificationService {
 			const entityId = data?.entityId;
 			const route = data?.route;
 
-			console.log('🧭 Navigating based on notification:', { type, data });
+			notificationServiceLog.debug('Navigating based on notification', {
+				type,
+				data,
+			});
 
 			// Import router dynamically to avoid circular dependencies
 			import('expo-router').then(({ router }) => {
@@ -1055,7 +1104,10 @@ class NotificationService {
 				}
 			});
 		} catch (error) {
-			console.error('❌ Error handling notification navigation:', error);
+			notificationServiceLog.error(
+				'Error handling notification navigation',
+				error
+			);
 		}
 	}
 
@@ -1064,9 +1116,12 @@ class NotificationService {
 		try {
 			// Note: Expo Notifications doesn't provide a direct way to remove specific listeners
 			// The listeners are automatically cleaned up when the component unmounts
-			console.log('✅ Notification listeners cleaned up');
+			notificationServiceLog.debug('Notification listeners cleaned up');
 		} catch (error) {
-			console.error('❌ Error removing notification listeners:', error);
+			notificationServiceLog.error(
+				'Error removing notification listeners',
+				error
+			);
 		}
 	}
 
@@ -1103,7 +1158,10 @@ class NotificationService {
 				} as Notifications.NotificationTriggerInput
 			);
 		} catch (error) {
-			console.error('❌ Error scheduling recurring notification:', error);
+			notificationServiceLog.error(
+				'Error scheduling recurring notification',
+				error
+			);
 			return null;
 		}
 	}
@@ -1115,7 +1173,10 @@ class NotificationService {
 		try {
 			return await Notifications.getAllScheduledNotificationsAsync();
 		} catch (error) {
-			console.error('❌ Error getting scheduled notifications:', error);
+			notificationServiceLog.error(
+				'Error getting scheduled notifications',
+				error
+			);
 			return [];
 		}
 	}
@@ -1166,7 +1227,9 @@ class NotificationService {
 
 			const templateData = templates[template];
 			if (!templateData) {
-				console.error('❌ Unknown notification template:', template);
+				notificationServiceLog.error('Unknown notification template', {
+					template,
+				});
 				return false;
 			}
 
@@ -1178,7 +1241,10 @@ class NotificationService {
 				template
 			);
 		} catch (error) {
-			console.error('❌ Error sending templated notification:', error);
+			notificationServiceLog.error(
+				'Error sending templated notification',
+				error
+			);
 			return false;
 		}
 	}
@@ -1347,12 +1413,18 @@ class NotificationService {
 				);
 				await ensureBgPushRegistered();
 			} catch (error) {
-				console.log('⚠️ Background task service not available:', error);
+				notificationServiceLog.warn(
+					'Background task service not available',
+					error
+				);
 			}
 
 			return token;
 		} catch (error) {
-			console.error('❌ Error initializing with background tasks:', error);
+			notificationServiceLog.error(
+				'Error initializing with background tasks',
+				error
+			);
 			return null;
 		}
 	}
@@ -1387,11 +1459,14 @@ class NotificationService {
 			if (response.success && response.data) {
 				return response.data;
 			} else {
-				console.error('❌ Failed to get notification history:', response.error);
+				notificationServiceLog.error(
+					'Failed to get notification history',
+					response.error
+				);
 				return null;
 			}
 		} catch (error) {
-			console.error('❌ Error getting notification history:', error);
+			notificationServiceLog.error('Error getting notification history', error);
 			return null;
 		}
 	}
@@ -1412,17 +1487,20 @@ class NotificationService {
 			});
 
 			if (response.success) {
-				console.log('✅ Notification preferences updated');
+				notificationServiceLog.debug('Notification preferences updated');
 				return true;
 			} else {
-				console.error(
-					'❌ Failed to update notification preferences:',
+				notificationServiceLog.error(
+					'Failed to update notification preferences',
 					response.error
 				);
 				return false;
 			}
 		} catch (error) {
-			console.error('❌ Error updating notification preferences:', error);
+			notificationServiceLog.error(
+				'Error updating notification preferences',
+				error
+			);
 			return false;
 		}
 	}
@@ -1458,7 +1536,9 @@ class NotificationService {
 	): Promise<boolean> {
 		// Check if we're in quiet hours
 		if (this.isInQuietHours(quietHours)) {
-			console.log('🔇 Notification suppressed during quiet hours');
+			notificationServiceLog.debug(
+				'Notification suppressed during quiet hours'
+			);
 			return false;
 		}
 

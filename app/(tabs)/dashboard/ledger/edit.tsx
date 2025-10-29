@@ -1,3 +1,4 @@
+import { logger } from '../../../../src/utils/logger';
 import React, {
 	useEffect,
 	useMemo,
@@ -515,8 +516,8 @@ export default function EditTransactionScreen() {
 		if (!description.trim()) e.description = 'Please enter a description.';
 		if (parseMoney(amountInput) <= 0)
 			e.amount = 'Enter a valid amount greater than 0.';
-		if (!(date instanceof Date) || isNaN(date.getTime()))
-			e.date = 'Choose a valid date.';
+		const parsedDate = date ? new Date(`${date}T00:00:00`) : new Date('');
+		if (!date || isNaN(parsedDate.getTime())) e.date = 'Choose a valid date.';
 		if (modelOptions.length > 0 && targetModel && !targetId) {
 			e.target = `Select a ${targetModel.toLowerCase()}.`;
 		}
@@ -542,7 +543,7 @@ export default function EditTransactionScreen() {
 			description.trim() !== (tx.description ?? '').trim() ||
 			amountNum !== origAmount ||
 			type !== tx.type ||
-			toLocalISODate(date) !==
+			(date ?? '') !==
 				(tx.date.includes('T') ? tx.date.slice(0, 10) : tx.date) ||
 			(targetModel ?? undefined) !== (tx.targetModel ?? undefined) ||
 			(targetId ?? undefined) !== (tx.target ?? undefined) ||
@@ -632,7 +633,7 @@ export default function EditTransactionScreen() {
 				router.back();
 			}, 1000);
 		} catch (err: any) {
-			console.error('[EditTransaction] save error', err);
+			logger.error('[EditTransaction] save error', err);
 			Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 			Alert.alert('Save failed', err?.message ?? 'Please try again.');
 		} finally {
@@ -1080,7 +1081,7 @@ export default function EditTransactionScreen() {
 						value={recurringExpenseId}
 						onChange={setRecurringExpenseId}
 						data={recurringExpenses}
-						date={date}
+						date={new Date(`${date}T00:00:00`)}
 					/>
 				</View>
 

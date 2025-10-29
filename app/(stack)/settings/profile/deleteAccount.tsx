@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { logger } from '../../../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -82,7 +83,7 @@ export default function DeleteAccountScreen() {
 				try {
 					await refreshUserData();
 				} catch (error) {
-					console.log(
+					logger.debug(
 						'Failed to refresh user data for provider detection:',
 						error
 					);
@@ -138,7 +139,7 @@ export default function DeleteAccountScreen() {
 			//   exportData,
 			// });
 		} catch (error) {
-			console.log('Failed to submit feedback:', error);
+			logger.debug('Failed to submit feedback:', error);
 		}
 	}, []);
 
@@ -173,7 +174,7 @@ export default function DeleteAccountScreen() {
 				'Identity verified. You can now confirm deletion.'
 			);
 		} catch (e: any) {
-			console.warn('Reauth failed:', e);
+			logger.warn('Reauth failed:', e);
 			setFormError(
 				e?.code === 'auth/wrong-password'
 					? 'Incorrect password. Please try again.'
@@ -213,7 +214,7 @@ export default function DeleteAccountScreen() {
 								);
 							}, 500);
 						} catch (error: any) {
-							console.error('Delete error:', error);
+							logger.error('Delete error:', error);
 							Alert.alert(
 								'Error',
 								error?.code === 'auth/requires-recent-login'

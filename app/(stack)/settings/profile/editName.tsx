@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { logger } from '../../../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -69,7 +70,6 @@ export default function EditNameScreen() {
 		setLastName(validatedText);
 	};
 
-
 	useEffect(() => {
 		if (profile) {
 			const fetchedFirstName = profile.firstName || '';
@@ -123,7 +123,7 @@ export default function EditNameScreen() {
 				},
 			]);
 		} catch (error) {
-			console.error('Error updating name:', error);
+			logger.error('Error updating name:', error);
 			Alert.alert('Error', 'Failed to update name');
 		} finally {
 			setIsLoading(false);

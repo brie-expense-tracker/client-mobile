@@ -51,7 +51,10 @@ export const TELEMETRY_CONFIG = {
 
 	// Logging
 	LOGGING: {
-		LEVEL: process.env.LOG_LEVEL || 'info',
+		// EXPO_PUBLIC_LOG_LEVEL: 'debug' | 'info' | 'warn' | 'error' | 'silent'
+		// Defaults to 'debug' in dev (__DEV__) and 'warn' in production
+		// Set via EXPO_PUBLIC_LOG_LEVEL env variable
+		LEVEL: process.env.EXPO_PUBLIC_LOG_LEVEL || process.env.LOG_LEVEL || 'info',
 		SAMPLING_RATE: parseFloat(process.env.LOG_SAMPLING_RATE || '0.1'),
 		PII_SCRUBBING_ENABLED: process.env.PII_SCRUBBING_ENABLED !== 'false',
 	},

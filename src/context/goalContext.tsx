@@ -7,6 +7,9 @@ import React, {
 	ReactNode,
 } from 'react';
 import { ApiService } from '../services';
+import { createLogger } from '../utils/sublogger';
+
+const goalContextLog = createLogger('GoalContext');
 
 // ==========================================
 // Types
@@ -104,7 +107,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 		// Cancel any in-flight request
 		if (abortControllerRef.current) {
 			abortControllerRef.current.abort();
-			console.log('🛑 [GoalContext] Aborted previous fetch');
+			goalContextLog.debug('Aborted previous fetch');
 		}
 
 		// Create new abort controller for this fetch
@@ -139,17 +142,17 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 				setGoals(() => formatted);
 				setHasLoaded(true);
 			} else {
-				console.warn('[Goals] Unexpected response:', response);
+				goalContextLog.warn('Unexpected response', response);
 				setGoals(() => []);
 				setHasLoaded(true);
 			}
 		} catch (err: any) {
 			// Ignore abort errors (expected when a new fetch cancels the old one)
 			if (err?.name === 'AbortError') {
-				console.log('🛑 [GoalContext] Fetch aborted (new fetch started)');
+				goalContextLog.debug('Fetch aborted (new fetch started)');
 				return;
 			}
-			console.warn('[Goals] Failed to fetch goals, using empty array', err);
+			goalContextLog.warn('Failed to fetch goals, using empty array', err);
 			setGoals(() => []);
 			setHasLoaded(true);
 		} finally {
@@ -176,7 +179,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 		});
 
 		try {
-			console.log('💾 [GoalContext] Creating goal on server...');
+			goalContextLog.debug('Creating goal on server');
 			const response = await ApiService.post<any>('/api/goals', goalData);
 
 			// Handle the response format properly
@@ -201,7 +204,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 					updatedAt: actualData.updatedAt,
 				};
 
-				console.log('✅ [GoalContext] Goal created, replacing temp ID:', {
+				goalContextLog.info('Goal created, replacing temp ID', {
 					tempId,
 					realId: serverGoal.id,
 				});
@@ -211,8 +214,8 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 					// Defensive: if temp already removed, add server goal
 					const hasTempGoal = prev.some((g) => g.id === tempId);
 					if (!hasTempGoal) {
-						console.warn(
-							'[GoalContext] Temp goal already removed, adding server goal'
+						goalContextLog.warn(
+							'Temp goal already removed, adding server goal'
 						);
 						return [serverGoal, ...prev];
 					}
@@ -221,7 +224,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 
 				// Clear cache to ensure fresh data
 				ApiService.clearCacheByPrefix('/api/goals');
-				console.log('🗑️ [GoalContext] Cache cleared after goal creation');
+				goalContextLog.debug('Cache cleared after goal creation');
 
 				return serverGoal;
 			} else {
@@ -229,7 +232,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 				throw new Error(response.error || 'Failed to create goal');
 			}
 		} catch (error) {
-			console.error('❌ [GoalContext] Error adding goal:', error);
+			goalContextLog.error('Error adding goal', error);
 			// Remove the optimistic goal on error
 			setGoals((prev) => prev.filter((g) => g.id !== tempId));
 			throw error;
@@ -266,14 +269,14 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 
 					// Clear cache to ensure fresh data
 					ApiService.clearCacheByPrefix('/api/goals');
-					console.log('🗑️ [GoalContext] Cache cleared after goal update');
+					goalContextLog.debug('Cache cleared after goal update');
 
 					return updatedGoal;
 				} else {
 					throw new Error(response.error || 'Failed to update goal');
 				}
 			} catch (error) {
-				console.error('❌ [GoalContext] Failed to update goal:', error);
+				goalContextLog.error('Failed to update goal', error);
 				throw error;
 			}
 		},
@@ -281,7 +284,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 	);
 
 	const deleteGoal = useCallback(async (id: string) => {
-		console.log('🗑️ [GoalContext] Deleting goal:', id);
+		goalContextLog.debug('Deleting goal', { id });
 
 		// Save previous state for rollback
 		let previousGoals: Goal[] = [];
@@ -292,7 +295,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 		});
 
 		try {
-			console.log('🗑️ [GoalContext] Calling API delete...');
+			goalContextLog.debug('Calling API delete');
 			const result = await ApiService.delete(`/api/goals/${id}`);
 
 			if (!result.success) {
@@ -301,7 +304,7 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 				const errorCode = errorData?.error || 'Unknown';
 				const errorMessage = result.error || 'Delete failed';
 
-				console.error('❌ [GoalContext] Server error:', {
+				goalContextLog.error('Server error', {
 					code: errorCode,
 					message: errorMessage,
 					data: errorData,
@@ -321,12 +324,12 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 				}
 			}
 
-			console.log('✅ [GoalContext] Delete successful, clearing cache...');
+			goalContextLog.info('Delete successful, clearing cache');
 			// Clear cache to ensure fresh data
 			ApiService.clearCacheByPrefix('/api/goals');
-			console.log('🗑️ [GoalContext] Cache cleared after goal deletion');
+			goalContextLog.debug('Cache cleared after goal deletion');
 		} catch (err) {
-			console.error('❌ [GoalContext] Delete failed, rolling back:', err);
+			goalContextLog.error('Delete failed, rolling back', err);
 			// Rollback to previous state
 			setGoals(previousGoals);
 
@@ -373,16 +376,14 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 
 					// Clear cache to ensure fresh data
 					ApiService.clearCacheByPrefix('/api/goals');
-					console.log(
-						'🗑️ [GoalContext] Cache cleared after goal current update'
-					);
+					goalContextLog.debug('Cache cleared after goal current update');
 
 					return updatedGoal;
 				} else {
 					throw new Error(response.error || 'Failed to update goal current');
 				}
 			} catch (error) {
-				console.error('❌ [GoalContext] Failed to update goal current:', error);
+				goalContextLog.error('Failed to update goal current', error);
 				throw error;
 			}
 		},

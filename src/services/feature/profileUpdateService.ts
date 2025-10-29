@@ -1,4 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { logger } from '../../../utils/logger';
+
 
 interface ProfileUpdate {
 	action: string;
@@ -87,13 +89,13 @@ class ProfileUpdateService {
 				try {
 					callback(updatedContext);
 				} catch (error) {
-					console.error('Error in profile update callback:', error);
+					logger.error('Error in profile update callback:', error);
 				}
 			});
 
-			console.log('Profile update recorded:', update);
+			logger.debug('Profile update recorded:', update);
 		} catch (error) {
-			console.error('Error recording profile update:', error);
+			logger.error('Error recording profile update:', error);
 		}
 	}
 
@@ -105,7 +107,7 @@ class ProfileUpdateService {
 			const contextData = await AsyncStorage.getItem('aiProfileContext');
 			return contextData ? JSON.parse(contextData) : null;
 		} catch (error) {
-			console.error('Error getting AI profile context:', error);
+			logger.error('Error getting AI profile context:', error);
 			return null;
 		}
 	}
@@ -129,11 +131,11 @@ class ProfileUpdateService {
 						recentUpdates: [],
 					});
 				} catch (error) {
-					console.error('Error in profile update callback:', error);
+					logger.error('Error in profile update callback:', error);
 				}
 			});
 		} catch (error) {
-			console.error('Error clearing AI profile context:', error);
+			logger.error('Error clearing AI profile context:', error);
 		}
 	}
 

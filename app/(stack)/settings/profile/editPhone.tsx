@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { logger } from '../../../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -23,7 +24,7 @@ export default function EditPhoneScreen() {
 	useEffect(() => {
 		if (profile) {
 			const phoneNumber = profile.phone || '';
-			console.log('Current phone number:', phoneNumber);
+			logger.debug('Current phone number:', phoneNumber);
 			setCurrentPhone(phoneNumber);
 			// Don't set phone initially so placeholder shows current phone number
 		}
@@ -96,7 +97,7 @@ export default function EditPhoneScreen() {
 				},
 			]);
 		} catch (error) {
-			console.error('Error updating phone number:', error);
+			logger.error('Error updating phone number:', error);
 			Alert.alert('Error', 'Failed to update phone number');
 		} finally {
 			setIsLoading(false);

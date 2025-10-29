@@ -12,6 +12,7 @@ import {
 import { useConnectivity } from '../utils/connectivity';
 import { ApiService } from '../services/core/apiService';
 import useAuth from '../context/AuthContext';
+import { getIdToken } from '@react-native-firebase/auth';
 
 type StepStatus = 'pass' | 'fail' | 'skip';
 type Result = {
@@ -130,7 +131,7 @@ export default function ConnectivityTest() {
 			// 3) Token validity (only if server ok + user present)
 			if (serverOk && firebaseUser) {
 				await runStep('auth.token', 'Token validity', async () => {
-					const token = await firebaseUser.getIdToken();
+					const token = await getIdToken(firebaseUser);
 					const ok = !!token;
 					return { ok, detail: ok ? 'Firebase ID token acquired' : 'No token' };
 				});

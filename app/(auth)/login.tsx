@@ -18,6 +18,9 @@ import auth from '@react-native-firebase/auth';
 import * as Haptics from 'expo-haptics';
 import useAuth from '../../src/context/AuthContext';
 import { RectButton, BorderlessButton } from 'react-native-gesture-handler';
+import { createLogger } from '../../src/utils/sublogger';
+
+const loginScreenLog = createLogger('LoginScreen');
 
 type FieldErrors = {
 	email?: string;
@@ -138,7 +141,7 @@ export default function Login() {
 				errorMessage = 'Too many attempts. Please try again later.';
 			else if (e?.message) errorMessage = e.message;
 
-			console.warn('Login error:', e, errorMessage);
+			loginScreenLog.warn('Login error', { error: e, message: errorMessage });
 			setFormError(errorMessage);
 		} finally {
 			setIsLoading(false);
@@ -166,7 +169,7 @@ export default function Login() {
 				error?.code === 'GOOGLE_SIGNIN_CANCELED' ||
 				error?.message?.includes('Account creation cancelled');
 			if (!cancelled) {
-				console.warn('Google Sign-In error:', error);
+				loginScreenLog.warn('Google Sign-In error', error);
 				await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 				// Note: error will be set by authError effect above
 			}
@@ -189,7 +192,7 @@ export default function Login() {
 			await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 			// You could also surface a toast/snackbar confirming an email was sent.
 		} catch (e) {
-			console.warn('Reset email error:', e);
+			loginScreenLog.warn('Reset email error', e);
 			await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
 		}
 	}, [email]);

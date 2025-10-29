@@ -6,6 +6,8 @@
 
 import { MissingInfoChip } from '../../components/assistant/cards/MissingInfoCard';
 import { ApiService } from '../core/apiService';
+import { logger } from '../../utils/logger';
+
 
 export interface IntentContext {
 	profile?: {
@@ -80,7 +82,7 @@ export class IntentMissingInfoService {
 			// Check cache first
 			const cacheKey = `${intentId}_${JSON.stringify(context)}`;
 			if (this.cache.has(cacheKey)) {
-				console.log('[IntentMissingInfoService] Using cached result');
+				logger.debug('[IntentMissingInfoService] Using cached result');
 				return this.cache.get(cacheKey);
 			}
 
@@ -123,12 +125,12 @@ export class IntentMissingInfoService {
 
 			return resultData;
 		} catch (error) {
-			console.error('Error checking intent sufficiency:', error);
+			logger.error('Error checking intent sufficiency:', error);
 
 			// Retry logic
 			if (this.retryCount < this.maxRetries) {
 				this.retryCount++;
-				console.log(
+				logger.debug(
 					`[IntentMissingInfoService] Retrying... (${this.retryCount}/${this.maxRetries})`
 				);
 				await new Promise((resolve) =>
@@ -439,7 +441,7 @@ export class IntentMissingInfoService {
 	 */
 	clearCache(): void {
 		this.cache.clear();
-		console.log('[IntentMissingInfoService] Cache cleared');
+		logger.debug('[IntentMissingInfoService] Cache cleared');
 	}
 
 	/**
@@ -484,7 +486,7 @@ export class IntentMissingInfoService {
 			}
 			return false;
 		} catch (error) {
-			console.error('[IntentMissingInfoService] Failed to import data:', error);
+			logger.error('[IntentMissingInfoService] Failed to import data:', error);
 			return false;
 		}
 	}

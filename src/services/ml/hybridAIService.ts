@@ -1,6 +1,7 @@
 import { SmartCacheService, CacheEntry } from '../utility/smartCacheService';
 import { LocalMLService } from './localMLService';
 import { ApiService } from '../core/apiService';
+import { logger } from '../../utils/logger';
 
 export interface AIRequest {
 	type: 'categorization' | 'insight' | 'advice' | 'forecast' | 'analysis';
@@ -96,11 +97,11 @@ export class HybridAIService {
 	 */
 	async initialize(): Promise<void> {
 		try {
-			console.log('[HybridAIService] Starting initialization...');
+			logger.debug('[HybridAIService] Starting initialization...');
 
 			// Add individual timeouts for each service
 			const cacheInitPromise = this.cacheService.initialize().catch((error) => {
-				console.warn(
+				logger.warn(
 					'[HybridAIService] Cache service failed to initialize:',
 					error
 				);
@@ -108,7 +109,7 @@ export class HybridAIService {
 			});
 
 			const mlInitPromise = this.localMLService.initialize().catch((error) => {
-				console.warn(
+				logger.warn(
 					'[HybridAIService] Local ML service failed to initialize:',
 					error
 				);
@@ -121,7 +122,10 @@ export class HybridAIService {
 				mlInitPromise,
 			]);
 
-			console.log('[HybridAIService] Service initialization results:', results);
+			logger.debug(
+				'[HybridAIService] Service initialization results:',
+				results
+			);
 
 			// Check if at least one service initialized successfully
 			const successfulServices = results.filter(
@@ -129,18 +133,18 @@ export class HybridAIService {
 			).length;
 
 			if (successfulServices === 0) {
-				console.warn(
+				logger.warn(
 					'[HybridAIService] No services initialized successfully, but continuing'
 				);
 			} else {
-				console.log(
+				logger.debug(
 					`[HybridAIService] ${successfulServices} out of 2 services initialized successfully`
 				);
 			}
 
-			console.log('[HybridAIService] Initialization complete');
+			logger.debug('[HybridAIService] Initialization complete');
 		} catch (error) {
-			console.error(
+			logger.error(
 				'[HybridAIService] Critical error during initialization:',
 				error
 			);
@@ -155,7 +159,7 @@ export class HybridAIService {
 		const startTime = Date.now();
 
 		try {
-			console.log(
+			logger.debug(
 				`[HybridAIService] Processing ${
 					request.type
 				} request: ${request.query.substring(0, 50)}...`
@@ -199,7 +203,7 @@ export class HybridAIService {
 
 				case 'ai':
 					if (this.isCircuitBreakerOpen()) {
-						console.warn(
+						logger.warn(
 							'[HybridAIService] Circuit breaker is open, falling back to local processing'
 						);
 						response = await this.processLocally(request);
@@ -227,7 +231,7 @@ export class HybridAIService {
 					if (!this.isCircuitBreakerOpen()) {
 						aiPromise = this.processWithAI(request).catch((error) => {
 							this.recordCircuitBreakerFailure();
-							console.warn(
+							logger.warn(
 								'[HybridAIService] AI processing failed in hybrid mode:',
 								error
 							);
@@ -294,7 +298,7 @@ export class HybridAIService {
 				learningOpportunity
 			);
 		} catch (error) {
-			console.error('[HybridAIService] Error processing request:', error);
+			logger.error('[HybridAIService] Error processing request:', error);
 			this.recordResponseTime(Date.now() - startTime, false);
 
 			// Fallback to local processing
@@ -311,7 +315,7 @@ export class HybridAIService {
 					true
 				);
 			} catch (fallbackError) {
-				console.error('[HybridAIService] Fallback also failed:', fallbackError);
+				logger.error('[HybridAIService] Fallback also failed:', fallbackError);
 				this.recordResponseTime(Date.now() - startTime, false);
 				throw error;
 			}
@@ -470,7 +474,7 @@ export class HybridAIService {
 
 			throw new Error(`AI processing not supported for type: ${type}`);
 		} catch (error) {
-			console.error('[HybridAIService] AI processing failed:', error);
+			logger.error('[HybridAIService] AI processing failed:', error);
 			throw error;
 		}
 	}
@@ -654,7 +658,7 @@ export class HybridAIService {
 				uptime: Date.now() - this.startTime,
 			};
 		} catch (error) {
-			console.error('[HybridAIService] Error getting service metrics:', error);
+			logger.error('[HybridAIService] Error getting service metrics:', error);
 			// Return safe defaults
 			return {
 				cacheStats: {
@@ -713,11 +717,11 @@ export class HybridAIService {
 				);
 			}
 
-			console.log(
+			logger.debug(
 				`[HybridAIService] Learned from feedback for request: ${requestId}`
 			);
 		} catch (error) {
-			console.error('[HybridAIService] Error learning from feedback:', error);
+			logger.error('[HybridAIService] Error learning from feedback:', error);
 		}
 	}
 
@@ -766,7 +770,7 @@ export class HybridAIService {
 
 		if (this.circuitBreakerFailures >= this.CIRCUIT_BREAKER_THRESHOLD) {
 			this.circuitBreakerState = 'open';
-			console.warn('[HybridAIService] Circuit breaker opened due to failures');
+			logger.warn('[HybridAIService] Circuit breaker opened due to failures');
 		}
 	}
 
@@ -777,7 +781,7 @@ export class HybridAIService {
 		if (this.circuitBreakerState === 'half-open') {
 			this.circuitBreakerState = 'closed';
 			this.circuitBreakerFailures = 0;
-			console.log('[HybridAIService] Circuit breaker reset to closed');
+			logger.debug('[HybridAIService] Circuit breaker reset to closed');
 		}
 	}
 

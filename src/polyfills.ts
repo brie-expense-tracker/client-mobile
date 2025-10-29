@@ -1,5 +1,6 @@
 // MUST be imported before anything that uses uuid/crypto
 import 'react-native-get-random-values';
+import { logger } from './utils/logger';
 
 // EventSource polyfill for React Native/Expo
 // Import EventSource polyfill with proper error handling
@@ -10,7 +11,7 @@ try {
 	// Use the maintained react-native-sse implementation
 	EventSourcePolyfill = EventSource;
 } catch {
-	console.warn(
+	logger.warn(
 		'[Polyfill] react-native-sse not available, EventSource will not be polyfilled'
 	);
 	EventSourcePolyfill = undefined;
@@ -37,9 +38,9 @@ if (
 		}
 
 		(globalThis as any).EventSource = EventSourcePolyfill;
-		console.log('[Polyfill] EventSource polyfill attached successfully');
+		logger.info('[Polyfill] EventSource polyfill attached successfully');
 	} catch (error) {
-		console.error('[Polyfill] Failed to attach EventSource polyfill:', error);
+		logger.error('[Polyfill] Failed to attach EventSource polyfill', error);
 		// Don't throw here to prevent app crashes, just log the error
 	}
 }
@@ -65,19 +66,19 @@ export function debugEventSource(
 ) {
 	// Only enable debugging in development mode
 	if (__DEV__) {
-		console.log(`[${label}] EventSource instance created for debugging`);
+		logger.debug(`EventSource instance created for debugging`, { label });
 
 		// Add event listeners for debugging
 		es.addEventListener('open', () => {
-			console.log(`[${label}] Connection opened`);
+			logger.debug(`Connection opened`, { label });
 		});
 
 		es.addEventListener('error', (event: any) => {
-			console.error(`[${label}] Error:`, event);
+			logger.error(`Connection error`, { label, event });
 		});
 
 		es.addEventListener('close', () => {
-			console.log(`[${label}] Connection closed`);
+			logger.debug(`Connection closed`, { label });
 		});
 	}
 }

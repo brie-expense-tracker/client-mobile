@@ -5,6 +5,8 @@ import { AnalyticsEventInput } from './types';
 
 // API configuration - inline to avoid import issues
 import { API_BASE_URL } from '../../../config/api';
+import { logger } from '../../../../utils/logger';
+
 
 class AnalyticsEmitter {
 	private sessionId: string;
@@ -56,16 +58,16 @@ class AnalyticsEmitter {
 			});
 
 			// Also log to console for development
-			console.log('📊 [Analytics] Event emitted:', fullEvent);
+			logger.debug('📊 [Analytics] Event emitted:', fullEvent);
 		} catch (error) {
-			console.warn('Failed to emit analytics event:', error);
+			logger.warn('Failed to emit analytics event:', error);
 
 			// Fallback: store locally for retry
 			this.storeForRetry(fullEvent);
 
 			// In development, also log to console for debugging
 			if (__DEV__) {
-				console.log('📊 [Analytics] Event stored for retry:', fullEvent);
+				logger.debug('📊 [Analytics] Event stored for retry:', fullEvent);
 			}
 		}
 	}
@@ -84,7 +86,7 @@ class AnalyticsEmitter {
 				JSON.stringify(failedEvents.slice(-50))
 			); // Keep last 50
 		} catch (error) {
-			console.warn('Failed to store analytics event for retry:', error);
+			logger.warn('Failed to store analytics event for retry:', error);
 		}
 	}
 
@@ -111,7 +113,7 @@ class AnalyticsEmitter {
 					});
 					successful.push(event);
 				} catch (error) {
-					console.warn('Retry failed for event:', event, error);
+					logger.warn('Retry failed for event:', event, error);
 				}
 			}
 
@@ -120,12 +122,12 @@ class AnalyticsEmitter {
 			localStorage.setItem('analytics_failed', JSON.stringify(remaining));
 
 			if (successful.length > 0) {
-				console.log(
+				logger.debug(
 					`📊 [Analytics] Retried ${successful.length} failed events`
 				);
 			}
 		} catch (error) {
-			console.warn('Failed to retry analytics events:', error);
+			logger.warn('Failed to retry analytics events:', error);
 		}
 	}
 

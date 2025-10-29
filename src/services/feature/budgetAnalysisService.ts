@@ -1,5 +1,7 @@
 import { Budget, Transaction } from '../../types';
 import { ApiService } from '../core/apiService';
+import { logger } from '../../utils/logger';
+
 
 export interface BudgetAnalysis {
 	id: string;
@@ -72,11 +74,11 @@ export class BudgetAnalysisService {
 			const cached = this.analysisCache.get(cacheKey);
 			if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
 				this.performanceMetrics.cacheHits++;
-				console.log('[BudgetAnalysisService] Returning cached analysis');
+				logger.debug('[BudgetAnalysisService] Returning cached analysis');
 				return cached.data;
 			}
 
-			console.log(
+			logger.debug(
 				'[BudgetAnalysisService] Getting analysis for budget:',
 				budgetId
 			);
@@ -114,7 +116,7 @@ export class BudgetAnalysisService {
 			this.performanceMetrics.successfulRequests++;
 			this.updateResponseTime(responseTime);
 
-			console.log('[BudgetAnalysisService] Analysis completed:', {
+			logger.debug('[BudgetAnalysisService] Analysis completed:', {
 				budgetId,
 				responseTime,
 				spent: analysis.spent,
@@ -123,7 +125,7 @@ export class BudgetAnalysisService {
 
 			return analysis;
 		} catch (error) {
-			console.error('[BudgetAnalysisService] Analysis failed:', error);
+			logger.error('[BudgetAnalysisService] Analysis failed:', error);
 			this.performanceMetrics.failedRequests++;
 			this.performanceMetrics.lastError =
 				error instanceof Error ? error.message : String(error);
@@ -140,7 +142,7 @@ export class BudgetAnalysisService {
 			const response = await ApiService.get(`/api/budgets/${budgetId}`);
 			return response.success ? (response.data as Budget) : null;
 		} catch (error) {
-			console.error(
+			logger.error(
 				'[BudgetAnalysisService] Failed to get budget data:',
 				error
 			);
@@ -161,7 +163,7 @@ export class BudgetAnalysisService {
 			);
 			return response.success ? (response.data as Transaction[]) || [] : [];
 		} catch (error) {
-			console.error(
+			logger.error(
 				'[BudgetAnalysisService] Failed to get transactions:',
 				error
 			);
@@ -438,7 +440,7 @@ export class BudgetAnalysisService {
 	 */
 	static clearCache(): void {
 		this.analysisCache.clear();
-		console.log('[BudgetAnalysisService] Cache cleared');
+		logger.debug('[BudgetAnalysisService] Cache cleared');
 	}
 
 	/**

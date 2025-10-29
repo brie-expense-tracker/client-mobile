@@ -7,6 +7,9 @@ import {
 import { TransactionContext } from '../context/transactionContext';
 import { useBudget } from '../context/budgetContext';
 import { useGoal } from '../context/goalContext';
+import { createLogger } from '../utils/sublogger';
+
+const weeklyReflectionHookLog = createLogger('useWeeklyReflection');
 
 export interface UseWeeklyReflectionReturn {
 	currentReflection: WeeklyReflection | null;
@@ -40,7 +43,7 @@ export function useWeeklyReflection(): UseWeeklyReflectionReturn {
 				await WeeklyReflectionService.getCurrentWeekReflection();
 			setCurrentReflection(reflection);
 		} catch (err) {
-			console.error('Error fetching current reflection:', err);
+			weeklyReflectionHookLog.error('Error fetching current reflection', err);
 			setError('Failed to load weekly reflection');
 		} finally {
 			setLoading(false);
@@ -69,7 +72,7 @@ export function useWeeklyReflection(): UseWeeklyReflectionReturn {
 				setCurrentReflection(updatedReflection);
 				return updatedReflection;
 			} catch (err) {
-				console.error('Error saving reflection:', err);
+				weeklyReflectionHookLog.error('Error saving reflection', err);
 				setError('Failed to save weekly reflection');
 				throw err;
 			} finally {

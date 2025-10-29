@@ -1,7 +1,8 @@
 import React, { memo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import WhyThisTray from '../WhyThisTray';
+import WhyThisTray from '../../components/WhyThisTray';
 import type { Message } from '../../../../../src/hooks/useMessagesReducerV2';
+import { logger } from '../../../../../src/utils/logger';
 
 type Props = {
 	message: Message;
@@ -92,7 +93,7 @@ export const ChatMessage = memo(function ChatMessage({
 						<TouchableOpacity
 							style={styles.showWorkButton}
 							onPress={() => {
-								console.log('Show work button pressed');
+								logger.debug('Show work button pressed');
 							}}
 						>
 							<Text style={styles.showWorkButtonText}>📊 Show your work</Text>
@@ -180,3 +181,6 @@ const styles = StyleSheet.create({
 	},
 	expandButtonText: { color: '#0369a1', fontSize: 14, fontWeight: '500' },
 });
+
+// Default export to silence Expo Router warning (not used as route)
+export default ChatMessage;

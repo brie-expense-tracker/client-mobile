@@ -4,6 +4,8 @@
 import { ChatResponse } from './responseSchema';
 import { FinancialSkillId } from './skills/comprehensiveSkillRegistry';
 import { RouteDecision } from './hierarchicalRouter';
+import { logger } from '../../../utils/logger';
+
 
 // Define ChatContext locally to avoid import issues
 interface ChatContext {
@@ -413,23 +415,23 @@ export class Logger {
 	): void {
 		// Validate inputs
 		if (!message || typeof message !== 'string') {
-			console.error('Invalid message provided to logger:', message);
+			logger.error('Invalid message provided to logger:', message);
 			return;
 		}
 
 		if (!reasonCode || typeof reasonCode !== 'string') {
-			console.error('Invalid reasonCode provided to logger:', reasonCode);
+			logger.error('Invalid reasonCode provided to logger:', reasonCode);
 			return;
 		}
 
 		if (!context || typeof context !== 'object') {
-			console.error('Invalid context provided to logger:', context);
+			logger.error('Invalid context provided to logger:', context);
 			return;
 		}
 
 		// Validate required context fields
 		if (!context.sessionId || !context.messageId) {
-			console.warn('Missing required context fields (sessionId, messageId)');
+			logger.warn('Missing required context fields (sessionId, messageId)');
 		}
 
 		try {
@@ -455,10 +457,10 @@ export class Logger {
 
 			// Also log to console in development
 			if (__DEV__) {
-				console.log(`[${level}] ${reasonCode}: ${message}`, context, metadata);
+				logger.debug(`[${level}] ${reasonCode}: ${message}`, context, metadata);
 			}
 		} catch (error) {
-			console.error('Error logging entry:', error);
+			logger.error('Error logging entry:', error);
 		}
 	}
 

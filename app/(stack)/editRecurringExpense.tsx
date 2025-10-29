@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { logger } from '../../src/utils/logger';
 import {
 	View,
 	StyleSheet,
@@ -120,11 +121,11 @@ const EditRecurringExpenseScreen: React.FC = () => {
 		if (patternId && expenses.length > 0) {
 			const found = expenses.find((e) => e.patternId === patternId);
 			if (found) {
-				console.log('🔍 [EditRecurringExpense] Loading expense:', found);
-				console.log('🎨 [EditRecurringExpense] Icon/Color from data:');
-				console.log('  - icon:', found.icon);
-				console.log('  - color:', found.color);
-				console.log('  - categories:', found.categories);
+				logger.debug('🔍 [EditRecurringExpense] Loading expense:', found);
+				logger.debug('🎨 [EditRecurringExpense] Icon/Color from data:');
+				logger.debug('  - icon:', found.icon);
+				logger.debug('  - color:', found.color);
+				logger.debug('  - categories:', found.categories);
 
 				setExpense(found);
 				setVendor(found.vendor || '');
@@ -141,11 +142,11 @@ const EditRecurringExpenseScreen: React.FC = () => {
 				setColor(found.color || DEFAULT_COLOR);
 				setSelectedCategories(found.categories || []);
 
-				console.log('🎨 [EditRecurringExpense] Set state to:');
-				console.log('  - appearanceMode:', expenseMode);
-				console.log('  - icon:', normalized);
-				console.log('  - color:', found.color || DEFAULT_COLOR);
-				console.log('  - categories:', found.categories || []);
+				logger.debug('🎨 [EditRecurringExpense] Set state to:');
+				logger.debug('  - appearanceMode:', expenseMode);
+				logger.debug('  - icon:', normalized);
+				logger.debug('  - color:', found.color || DEFAULT_COLOR);
+				logger.debug('  - categories:', found.categories || []);
 			}
 		}
 	}, [patternId, expenses]);
@@ -164,14 +165,14 @@ const EditRecurringExpenseScreen: React.FC = () => {
 
 	// Wrapper to set icon and switch to custom mode
 	const handleIconChange = (newIcon: keyof typeof Ionicons.glyphMap) => {
-		console.log('🎨 [EditRecurringExpense] User changed icon to:', newIcon);
+		logger.debug('🎨 [EditRecurringExpense] User changed icon to:', newIcon);
 		setIcon(newIcon);
 		setAppearanceMode('custom');
 	};
 
 	// Wrapper to set color and switch to custom mode
 	const handleColorChange = (newColor: string) => {
-		console.log('🎨 [EditRecurringExpense] User changed color to:', newColor);
+		logger.debug('🎨 [EditRecurringExpense] User changed color to:', newColor);
 		setColor(newColor);
 		setAppearanceMode('custom');
 	};
@@ -204,7 +205,7 @@ const EditRecurringExpenseScreen: React.FC = () => {
 			categories: selectedCategories,
 		};
 
-		console.log(
+		logger.debug(
 			'🔍 [EditRecurringExpense] Saving update with data:',
 			updateData
 		);
@@ -213,21 +214,21 @@ const EditRecurringExpenseScreen: React.FC = () => {
 		try {
 			const result = await updateRecurringExpense(patternId, updateData);
 
-			console.log(
+			logger.debug(
 				'✅ [EditRecurringExpense] Update succeeded, result:',
 				result
 			);
-			console.log('🎨 [EditRecurringExpense] Checking fields in result:');
-			console.log('  - appearanceMode:', result.appearanceMode);
-			console.log('  - icon:', result.icon);
-			console.log('  - color:', result.color);
-			console.log('  - categories:', result.categories);
+			logger.debug('🎨 [EditRecurringExpense] Checking fields in result:');
+			logger.debug('  - appearanceMode:', result.appearanceMode);
+			logger.debug('  - icon:', result.icon);
+			logger.debug('  - color:', result.color);
+			logger.debug('  - categories:', result.categories);
 
 			Alert.alert('Success', 'Recurring expense updated successfully!', [
 				{ text: 'OK', onPress: () => router.back() },
 			]);
 		} catch (err) {
-			console.error('[EditRecurringExpense] update error:', err);
+			logger.error('[EditRecurringExpense] update error:', err);
 			Alert.alert(
 				'Error',
 				'Failed to update recurring expense. Please try again.'
@@ -254,7 +255,7 @@ const EditRecurringExpenseScreen: React.FC = () => {
 								{ text: 'OK', onPress: () => router.back() },
 							]);
 						} catch (err) {
-							console.error('[EditRecurringExpense] delete error:', err);
+							logger.error('[EditRecurringExpense] delete error:', err);
 							Alert.alert(
 								'Error',
 								'Failed to delete recurring expense. Please try again.'

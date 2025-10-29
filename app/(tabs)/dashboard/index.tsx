@@ -1,3 +1,4 @@
+import { logger } from '../../../src/utils/logger';
 import React, {
 	useCallback,
 	useContext,
@@ -593,10 +594,7 @@ function RecurringPreview({
 		.filter((expense) => {
 			// Safety check: ensure expense has required fields
 			if (!expense || !expense.nextExpectedDate || !expense.vendor) {
-				console.warn(
-					'⚠️ [RecurringPreview] Skipping invalid expense:',
-					expense
-				);
+				logger.warn('⚠️ [RecurringPreview] Skipping invalid expense:', expense);
 				return false;
 			}
 			return true;

@@ -5,6 +5,7 @@
  * Provides a unified interface for making reliable API calls to the assistant services.
  */
 
+import { createLogger } from '../../utils/sublogger';
 import {
 	CircuitBreakerManager,
 	orchestratorBreaker,
@@ -17,6 +18,9 @@ import {
 	getSignedApiClient,
 	SignedApiClient,
 } from '../../utils/signedApiClient';
+
+// Create namespaced logger for this service
+const resilientApiLog = createLogger('ResilientAPI');
 
 export interface ResilientApiResponse<T> {
 	success: boolean;
@@ -160,7 +164,7 @@ export class ResilientApiService {
 				};
 			}
 		} catch (error) {
-			console.error('[ResilientApiService] Orchestrator call failed:', error);
+			resilientApiLog.error('Orchestrator call failed:', error);
 
 			// Try fallback if enabled
 			if (options?.fallbackEnabled !== false) {
@@ -236,7 +240,7 @@ export class ResilientApiService {
 				};
 			}
 		} catch (error) {
-			console.error('[ResilientApiService] Streaming call failed:', error);
+			resilientApiLog.error('Streaming call failed:', error);
 
 			// Try fallback if enabled
 			if (options?.fallbackEnabled !== false) {
@@ -306,7 +310,7 @@ export class ResilientApiService {
 				};
 			}
 		} catch (error) {
-			console.error('[ResilientApiService] Tools call failed:', error);
+			resilientApiLog.error('Tools call failed:', error);
 
 			return {
 				success: false,
@@ -382,7 +386,7 @@ export class ResilientApiService {
 				};
 			}
 		} catch (error) {
-			console.error('[ResilientApiService] Secure API call failed:', error);
+			resilientApiLog.error('Secure API call failed:', error);
 
 			// Try fallback if enabled
 			if (options?.fallbackEnabled !== false) {
@@ -464,7 +468,7 @@ export class ResilientApiService {
 				};
 			}
 		} catch (error) {
-			console.error('[ResilientApiService] Action execution failed:', error);
+			resilientApiLog.error('Action execution failed:', error);
 
 			return {
 				success: false,
@@ -533,10 +537,7 @@ export class ResilientApiService {
 				};
 			}
 		} catch (error) {
-			console.error(
-				'[ResilientApiService] Confirmation request failed:',
-				error
-			);
+			resilientApiLog.error('Confirmation request failed:', error);
 
 			return {
 				success: false,
@@ -623,10 +624,7 @@ export class ResilientApiService {
 				},
 			};
 		} catch (error) {
-			console.error(
-				'[ResilientApiService] Failed to get fallback data:',
-				error
-			);
+			resilientApiLog.error('Failed to get fallback data:', error);
 			return null;
 		}
 	}

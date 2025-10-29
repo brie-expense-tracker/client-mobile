@@ -4,6 +4,8 @@
 import { Skill } from './types';
 import { HYSA_SKILL } from './packs/hysa';
 import { CD_SKILL } from './packs/cd';
+import { logger } from '../../../../utils/logger';
+
 // Import other skill packs as they're created...
 
 const SKILLS: Skill[] = [
@@ -58,11 +60,11 @@ export const skillRegistry = {
    */
   register(skill: Skill): void {
     if (SKILLS.find(s => s.id === skill.id)) {
-      console.warn(`[SkillRegistry] Skill ${skill.id} already registered, skipping`);
+      logger.warn(`[SkillRegistry] Skill ${skill.id} already registered, skipping`);
       return;
     }
     SKILLS.push(skill);
-    console.log(`[SkillRegistry] Registered skill: ${skill.id}`);
+    logger.debug(`[SkillRegistry] Registered skill: ${skill.id}`);
   },
 
   /**
@@ -73,7 +75,7 @@ export const skillRegistry = {
     if (index === -1) return false;
     
     SKILLS.splice(index, 1);
-    console.log(`[SkillRegistry] Unregistered skill: ${skillId}`);
+    logger.debug(`[SkillRegistry] Unregistered skill: ${skillId}`);
     return true;
   }
 };

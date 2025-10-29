@@ -1,5 +1,7 @@
 import { nanoid } from 'nanoid/non-secure';
 import { getApiBaseUrl } from '../config/environment';
+import { logger } from '../../utils/logger';
+
 
 type StreamHandlers = {
 	onMeta?: (m: any) => void;
@@ -40,7 +42,7 @@ export function startChatStream(
 		if (!guard(m.clientMessageId)) return;
 		started = true;
 		current.connecting = false;
-		console.log('🧠 [SSE] meta', m);
+		logger.debug('🧠 [SSE] meta', m);
 		handlers.onMeta?.(m);
 	});
 
@@ -50,7 +52,7 @@ export function startChatStream(
 			text: string;
 		};
 		if (!guard(d.clientMessageId)) {
-			console.warn('⚠️ Ignoring delta for stale message', {
+			logger.warn('⚠️ Ignoring delta for stale message', {
 				incoming: d.clientMessageId,
 				current: current.id,
 			});
@@ -81,6 +83,6 @@ export function startChatStream(
 		current = { id: null, connecting: false };
 	});
 
-	console.log('🚀 [SSE] Started', { clientMessageId, url: url.toString() });
+	logger.debug('🚀 [SSE] Started', { clientMessageId, url: url.toString() });
 	return clientMessageId;
 }

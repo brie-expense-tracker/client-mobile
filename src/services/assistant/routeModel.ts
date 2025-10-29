@@ -2,6 +2,7 @@
 // Implements the 4-step process to keep hybrid costs down while maintaining quality
 
 import { IntentType } from './intentMapper';
+import { logger } from '../../../utils/logger';
 import {
 	EnhancedCriticService,
 	CriticValidation,
@@ -149,7 +150,7 @@ export async function groundWithTools(
 
 		tokenCount = facts.join(' ').split(' ').length * 1.3; // Rough token estimation
 	} catch (error) {
-		console.warn('Grounding failed:', error);
+		logger.warn('Grounding failed:', error);
 		confidence = 0.4;
 	}
 
@@ -228,7 +229,7 @@ export async function miniCriticValidate(
 
 			// Log which guard failed for analytics clustering
 			if (!validation.isValid && validation.ruleValidation.guardFailed) {
-				console.log(
+				logger.debug(
 					'🔍 [EnhancedCritic] Guard failed:',
 					validation.ruleValidation.guardFailed
 				);
@@ -236,7 +237,7 @@ export async function miniCriticValidate(
 
 			return validation;
 		} catch (error) {
-			console.warn(
+			logger.warn(
 				'🔍 [EnhancedCritic] Enhanced critic failed, falling back to basic:',
 				error
 			);
@@ -364,11 +365,14 @@ export function pickModel(intent: IntentType, userAsk: string): ModelTier {
 	if (/plan|optimi[sz]e|strategy|invest|analyze|recommend/i.test(userAsk))
 		return 'pro';
 	if (/forecast|trend|pattern|compare/i.test(userAsk)) return 'std';
-	
+
 	// Intent weight-based complexity estimation
-	if (intent === 'OPTIMIZE_SPENDING')
-		return 'pro';
-	if (intent === 'FORECAST_SPEND' || intent === 'GET_BUDGET_STATUS' || intent === 'ANALYZE_SPENDING')
+	if (intent === 'OPTIMIZE_SPENDING') return 'pro';
+	if (
+		intent === 'FORECAST_SPEND' ||
+		intent === 'GET_BUDGET_STATUS' ||
+		intent === 'ANALYZE_SPENDING'
+	)
 		return 'std';
 	if (intent === 'GET_BALANCE' || intent === 'GET_GOAL_STATUS') return 'mini';
 
@@ -446,7 +450,7 @@ export async function executeHybridCostOptimization(
 
 	// Escalate to Pro if critic triggers escalation
 	if (criticValidation.escalationTriggered) {
-		console.log(
+		logger.debug(
 			'🔍 [EnhancedCritic] Escalating to Pro model:',
 			criticValidation.escalationReason
 		);
@@ -469,7 +473,7 @@ export async function executeHybridCostOptimization(
 			finalMessage = proResponse.message;
 			modelUsed = 'pro';
 		} catch (error) {
-			console.log('Pro model escalation failed:', error.message);
+			logger.debug('Pro model escalation failed:', error.message);
 		}
 	}
 	// Fallback escalation for strategic planning requests
@@ -497,7 +501,7 @@ export async function executeHybridCostOptimization(
 			modelUsed = 'pro';
 		} catch (error) {
 			// Pro model not needed, continue with mini response
-			console.log('Pro model not needed:', error.message);
+			logger.debug('Pro model not needed:', error.message);
 		}
 	}
 

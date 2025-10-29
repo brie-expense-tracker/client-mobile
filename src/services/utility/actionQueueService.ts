@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ApiService } from '../core/apiService';
+import { logger } from '../../../utils/logger';
+
 
 export interface QueuedAction {
 	id: string;
@@ -54,7 +56,7 @@ class ActionQueueService {
 				await this.saveQueue();
 			}
 		} catch (error) {
-			console.error('Error loading action queue:', error);
+			logger.error('Error loading action queue:', error);
 		}
 	}
 
@@ -62,7 +64,7 @@ class ActionQueueService {
 		try {
 			await AsyncStorage.setItem('actionQueue', JSON.stringify(this.queue));
 		} catch (error) {
-			console.error('Error saving action queue:', error);
+			logger.error('Error saving action queue:', error);
 		}
 	}
 
@@ -122,7 +124,7 @@ class ActionQueueService {
 		// Check connectivity before processing
 		const isOnline = await this.checkConnectivity();
 		if (!isOnline) {
-			console.log('Action queue: Skipping processing - offline');
+			logger.debug('Action queue: Skipping processing - offline');
 			return;
 		}
 
@@ -149,19 +151,19 @@ class ActionQueueService {
 					// Remove successful actions
 					this.queue = this.queue.filter((a) => a.id !== action.id);
 				} catch (error) {
-					console.error(`Error executing action ${action.id}:`, error);
+					logger.error(`Error executing action ${action.id}:`, error);
 					action.retryCount++;
 
 					if (action.retryCount >= action.maxRetries) {
 						// Remove permanently failed actions
-						console.error(
+						logger.error(
 							`Action ${action.id} permanently failed after ${action.maxRetries} retries`
 						);
 						this.queue = this.queue.filter((a) => a.id !== action.id);
 					} else {
 						// Calculate retry delay with exponential backoff
 						const retryDelay = this.calculateRetryDelay(action.retryCount);
-						console.log(
+						logger.debug(
 							`Action ${action.id} will retry in ${retryDelay}ms (attempt ${action.retryCount}/${action.maxRetries})`
 						);
 					}
@@ -203,7 +205,7 @@ class ActionQueueService {
 	}
 
 	private async executeBudgetAction(action: QueuedAction): Promise<void> {
-		console.log('Executing budget action:', action);
+		logger.debug('Executing budget action:', action);
 
 		switch (action.type) {
 			case 'CREATE':
@@ -221,7 +223,7 @@ class ActionQueueService {
 	}
 
 	private async executeGoalAction(action: QueuedAction): Promise<void> {
-		console.log('Executing goal action:', action);
+		logger.debug('Executing goal action:', action);
 
 		switch (action.type) {
 			case 'CREATE':
@@ -239,7 +241,7 @@ class ActionQueueService {
 	}
 
 	private async executeTransactionAction(action: QueuedAction): Promise<void> {
-		console.log('Executing transaction action:', action);
+		logger.debug('Executing transaction action:', action);
 
 		switch (action.type) {
 			case 'CREATE':
@@ -262,7 +264,7 @@ class ActionQueueService {
 	private async executeRecurringExpenseAction(
 		action: QueuedAction
 	): Promise<void> {
-		console.log('Executing recurring expense action:', action);
+		logger.debug('Executing recurring expense action:', action);
 
 		switch (action.type) {
 			case 'CREATE':
@@ -340,7 +342,7 @@ class ActionQueueService {
 			await this.saveQueue();
 			return true;
 		} catch (error) {
-			console.error(`Error retrying action ${actionId}:`, error);
+			logger.error(`Error retrying action ${actionId}:`, error);
 			action.retryCount++;
 			await this.saveQueue();
 			return false;
@@ -385,7 +387,7 @@ class ActionQueueService {
 
 	// Force connectivity check and process queue
 	async forceProcessQueue(): Promise<void> {
-		console.log('Force processing action queue...');
+		logger.debug('Force processing action queue...');
 		await this.checkConnectivity();
 		await this.processQueue();
 	}

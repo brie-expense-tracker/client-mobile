@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ApiService } from '../services';
+import { createLogger } from '../utils/sublogger';
+
+const threadsHookLog = createLogger('useThreads');
 
 interface Thread {
 	id: string;
@@ -50,7 +53,7 @@ export default function useThreads() {
 				setThreads([]);
 			}
 		} catch (error) {
-			console.error('Failed to fetch threads:', error);
+			threadsHookLog.error('Failed to fetch threads', error);
 			setThreads([]);
 		} finally {
 			setLoading(false);

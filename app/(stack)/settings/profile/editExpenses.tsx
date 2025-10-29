@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { logger } from '../../../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -67,7 +68,7 @@ export default function EditExpensesScreen() {
 				},
 			]);
 		} catch (error) {
-			console.error('Error updating expense information:', error);
+			logger.error('Error updating expense information:', error);
 			Alert.alert('Error', 'Failed to update expense information');
 		} finally {
 			setIsLoading(false);

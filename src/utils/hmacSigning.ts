@@ -1,5 +1,8 @@
 import hmacSHA256 from 'crypto-js/hmac-sha256';
 import encHex from 'crypto-js/enc-hex';
+import { createLogger } from './sublogger';
+
+const hmacLog = createLogger('HMAC');
 
 export interface SignedRequest {
 	timestamp: number;
@@ -73,28 +76,28 @@ export class HMACSigningService {
 		}
 		const payload = parts.join('.');
 
-		console.log('🔐 [HMAC] Debug - Full signing details:');
-		console.log('  📅 Timestamp:', timestamp);
-		console.log('  🎲 Nonce:', nonce);
-		console.log('  🔧 Method:', method.toUpperCase());
-		console.log('  🛣️  Original Path:', path);
-		console.log('  🛣️  Normalized Path:', normalizedPath);
-		console.log('  📦 Body length:', body.length);
-		console.log('  📦 Body content:', body || '(empty)');
-		console.log('  📦 Has body:', body && body.length > 0 ? 'YES' : 'NO');
-		console.log('  🔗 Payload to sign:', payload);
-		console.log(
-			'  🔑 Secret key (first 8 chars):',
-			this.secretKey.substring(0, 8) + '...'
-		);
-		console.log('  🔑 Secret key length:', this.secretKey.length);
+		hmacLog.debug('Full signing details', {
+			timestamp,
+			nonce,
+			method: method.toUpperCase(),
+			originalPath: path,
+			normalizedPath,
+			bodyLength: body.length,
+			bodyContent: body || '(empty)',
+			hasBody: body && body.length > 0 ? 'YES' : 'NO',
+			payloadToSign: payload,
+			secretKeyPreview: this.secretKey.substring(0, 8) + '...',
+			secretKeyLength: this.secretKey.length,
+		});
 
 		// Create HMAC signature using CryptoJS
 		const hmac = hmacSHA256(payload, this.secretKey);
 		const signature = hmac.toString(encHex);
 
-		console.log('  ✅ Generated signature:', signature);
-		console.log('  ✅ Signature length:', signature.length);
+		hmacLog.debug('Generated signature', {
+			signature,
+			signatureLength: signature.length,
+		});
 
 		return signature;
 	}
@@ -146,12 +149,13 @@ export class HMACSigningService {
 		path: string,
 		existingHeaders: Record<string, string> = {}
 	): Record<string, string> {
-		console.log('🔐 [HMAC] signRequestHeaders called with:');
-		console.log('  📦 Body type:', typeof body);
-		console.log('  📦 Body:', body);
-		console.log('  🔧 Method:', method);
-		console.log('  🛣️  Path:', path);
-		console.log('  📋 Existing headers:', Object.keys(existingHeaders));
+		hmacLog.debug('signRequestHeaders called', {
+			bodyType: typeof body,
+			body,
+			method,
+			path,
+			existingHeaderKeys: Object.keys(existingHeaders),
+		});
 
 		const signedRequest = this.createSignedRequest(body, method, path);
 		const normalizedPath = this.normalizePath(path);
@@ -173,12 +177,13 @@ export class HMACSigningService {
 			}.${method.toUpperCase()}.${normalizedPath}.${signedRequest.body}`,
 		};
 
-		console.log('🔐 [HMAC] Final headers with both formats for compatibility:');
-		console.log('  📅 x-timestamp:', signedRequest.timestamp);
-		console.log('  🎲 x-nonce:', signedRequest.nonce);
-		console.log('  ✅ x-signature:', signedRequest.signature);
-		console.log('  🔗 x-hmac-signature (old format):', signatureHeader);
-		console.log('🔐 [HMAC] Final headers keys:', Object.keys(finalHeaders));
+		hmacLog.debug('Final headers with both formats for compatibility', {
+			timestamp: signedRequest.timestamp,
+			nonce: signedRequest.nonce,
+			signature: signedRequest.signature,
+			hmacSignature: signatureHeader,
+			headerKeys: Object.keys(finalHeaders),
+		});
 
 		return finalHeaders;
 	}
@@ -194,17 +199,12 @@ export function getHMACService(): HMACSigningService {
 			process.env.HMAC_SECRET_KEY ||
 			'dev-hmac-secret-key-32-chars-minimum-required-for-development';
 
-		console.log('🔐 [HMAC] Initializing HMAC service:');
-		console.log(
-			'  🔑 EXPO_PUBLIC_HMAC_SECRET_KEY exists:',
-			!!process.env.EXPO_PUBLIC_HMAC_SECRET_KEY
-		);
-		console.log('  🔑 HMAC_SECRET_KEY exists:', !!process.env.HMAC_SECRET_KEY);
-		console.log(
-			'  🔑 Using secret key (first 8 chars):',
-			secretKey.substring(0, 8) + '...'
-		);
-		console.log('  🔑 Secret key length:', secretKey.length);
+		hmacLog.debug('Initializing HMAC service', {
+			hasExpoPublicKey: !!process.env.EXPO_PUBLIC_HMAC_SECRET_KEY,
+			hasHmacSecretKey: !!process.env.HMAC_SECRET_KEY,
+			secretKeyPreview: secretKey.substring(0, 8) + '...',
+			secretKeyLength: secretKey.length,
+		});
 
 		hmacService = new HMACSigningService({
 			secretKey,

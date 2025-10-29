@@ -1,3 +1,4 @@
+import { logger } from '../../utils/logger';
 // Stub service for SpendingForecastService - was removed during reorganization
 // This provides the expected interface to prevent import errors
 
@@ -24,7 +25,7 @@ export class SpendingForecastService {
 		monthlyForecast: MonthlyForecast;
 		budgetForecasts: BudgetForecast[];
 	}> {
-		console.warn(
+		logger.warn(
 			'SpendingForecastService.getSpendingAnalysis called - stub implementation'
 		);
 		return {
@@ -46,7 +47,7 @@ export class SpendingForecastService {
 		color: string;
 		icon: string;
 	} {
-		console.warn(
+		logger.warn(
 			'SpendingForecastService.getForecastStatus called - stub implementation'
 		);
 		return {
@@ -57,7 +58,7 @@ export class SpendingForecastService {
 	}
 
 	static getTrendColor(trendDirection: string): string {
-		console.warn(
+		logger.warn(
 			'SpendingForecastService.getTrendColor called - stub implementation'
 		);
 		switch (trendDirection) {
@@ -71,7 +72,7 @@ export class SpendingForecastService {
 	}
 
 	static getTrendIcon(trendDirection: string): string {
-		console.warn(
+		logger.warn(
 			'SpendingForecastService.getTrendIcon called - stub implementation'
 		);
 		switch (trendDirection) {
@@ -85,7 +86,7 @@ export class SpendingForecastService {
 	}
 
 	static formatTrendDirection(trendDirection: string): string {
-		console.warn(
+		logger.warn(
 			'SpendingForecastService.formatTrendDirection called - stub implementation'
 		);
 		switch (trendDirection) {
@@ -99,7 +100,7 @@ export class SpendingForecastService {
 	}
 
 	static formatPercentageDifference(percentageDifference: number): string {
-		console.warn(
+		logger.warn(
 			'SpendingForecastService.formatPercentageDifference called - stub implementation'
 		);
 		return `${percentageDifference}%`;
@@ -109,7 +110,7 @@ export class SpendingForecastService {
 		status: string;
 		color: string;
 	} {
-		console.warn(
+		logger.warn(
 			'SpendingForecastService.getBudgetForecastStatus called - stub implementation'
 		);
 		return {

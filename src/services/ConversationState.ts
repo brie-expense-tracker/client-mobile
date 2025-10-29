@@ -1,6 +1,8 @@
 // ConversationState.ts - Manage pending actions and conversation state
 
 import { PendingAction } from '../types/assistant';
+import { logger } from '../../utils/logger';
+
 
 const pendingActions = new Map<string, PendingAction | null>();
 const lastExecutedActions = new Map<string, string | null>();
@@ -8,7 +10,7 @@ const lastExecutedActions = new Map<string, string | null>();
 export const ConversationState = {
 	setPendingAction: (convId: string, action: PendingAction) => {
 		pendingActions.set(convId, action);
-		console.log(
+		logger.debug(
 			`[ConversationState] Set pending action for ${convId}:`,
 			action
 		);
@@ -21,7 +23,7 @@ export const ConversationState = {
 	consumePendingAction: (convId: string): PendingAction | null => {
 		const action = pendingActions.get(convId) ?? null;
 		pendingActions.set(convId, null);
-		console.log(
+		logger.debug(
 			`[ConversationState] Consumed pending action for ${convId}:`,
 			action
 		);
@@ -30,12 +32,12 @@ export const ConversationState = {
 
 	clearPendingAction: (convId: string) => {
 		pendingActions.set(convId, null);
-		console.log(`[ConversationState] Cleared pending action for ${convId}`);
+		logger.debug(`[ConversationState] Cleared pending action for ${convId}`);
 	},
 
 	setLastExecutedAction: (convId: string, actionId: string) => {
 		lastExecutedActions.set(convId, actionId);
-		console.log(
+		logger.debug(
 			`[ConversationState] Set last executed action for ${convId}:`,
 			actionId
 		);

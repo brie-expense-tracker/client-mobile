@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { logger } from '../../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -88,13 +89,13 @@ export default function SettingsScreen() {
 	const [refreshKey, setRefreshKey] = useState(0);
 
 	useEffect(() => {
-		console.log('🔧 [Settings] Feature flags updated:', {
+		logger.debug('🔧 [Settings] Feature flags updated:', {
 			aiInsights: aiInsightsEnabled,
 			aiInsightsPreview: aiInsightsPreviewEnabled,
 			newBudgetsV2: newBudgetsV2Enabled,
 			goalsTimeline: goalsTimelineEnabled,
 		});
-		console.log('🔧 [Settings] Environment variables:', {
+		logger.debug('🔧 [Settings] Environment variables:', {
 			EXPO_PUBLIC_AI_INSIGHTS: process.env.EXPO_PUBLIC_AI_INSIGHTS,
 			EXPO_PUBLIC_AI_INSIGHTS_PREVIEW:
 				process.env.EXPO_PUBLIC_AI_INSIGHTS_PREVIEW,
@@ -113,7 +114,7 @@ export default function SettingsScreen() {
 			await logout();
 			// Navigation is handled automatically by AuthContext when firebaseUser becomes null
 		} catch (error) {
-			console.error('Logout error:', error);
+			logger.error('Logout error:', error);
 		}
 	};
 
@@ -121,10 +122,10 @@ export default function SettingsScreen() {
 		try {
 			const newValue = !aiInsightsEnabled;
 			await setLocalOverride('aiInsights', newValue);
-			console.log('AI Insights toggled:', newValue);
+			logger.debug('AI Insights toggled:', newValue);
 			setRefreshKey((prev) => prev + 1); // Force re-render
 		} catch (error) {
-			console.error('Failed to toggle AI Insights:', error);
+			logger.error('Failed to toggle AI Insights:', error);
 		}
 	};
 
@@ -132,10 +133,10 @@ export default function SettingsScreen() {
 		try {
 			const newValue = !aiInsightsPreviewEnabled;
 			await setLocalOverride('aiInsightsPreview', newValue);
-			console.log('AI Insights Preview toggled:', newValue);
+			logger.debug('AI Insights Preview toggled:', newValue);
 			setRefreshKey((prev) => prev + 1); // Force re-render
 		} catch (error) {
-			console.error('Failed to toggle AI Insights Preview:', error);
+			logger.error('Failed to toggle AI Insights Preview:', error);
 		}
 	};
 
@@ -143,10 +144,10 @@ export default function SettingsScreen() {
 		try {
 			const newValue = !newBudgetsV2Enabled;
 			await setLocalOverride('newBudgetsV2', newValue);
-			console.log('New Budgets V2 toggled:', newValue);
+			logger.debug('New Budgets V2 toggled:', newValue);
 			setRefreshKey((prev) => prev + 1); // Force re-render
 		} catch (error) {
-			console.error('Failed to toggle New Budgets V2:', error);
+			logger.error('Failed to toggle New Budgets V2:', error);
 		}
 	};
 
@@ -154,32 +155,32 @@ export default function SettingsScreen() {
 		try {
 			const newValue = !goalsTimelineEnabled;
 			await setLocalOverride('goalsTimeline', newValue);
-			console.log('Goals Timeline toggled:', newValue);
+			logger.debug('Goals Timeline toggled:', newValue);
 			setRefreshKey((prev) => prev + 1); // Force re-render
 		} catch (error) {
-			console.error('Failed to toggle Goals Timeline:', error);
+			logger.error('Failed to toggle Goals Timeline:', error);
 		}
 	};
 
 	const resetLabs = async () => {
 		try {
 			clearLocalOverrides();
-			console.log('Labs settings reset - cleared local overrides');
-			console.log(
+			logger.debug('Labs settings reset - cleared local overrides');
+			logger.debug(
 				'Note: Environment variables (.env) cannot be reset at runtime'
 			);
-			console.log('Current base values from .env:');
-			console.log(
+			logger.debug('Current base values from .env:');
+			logger.debug(
 				'- EXPO_PUBLIC_AI_INSIGHTS:',
 				process.env.EXPO_PUBLIC_AI_INSIGHTS
 			);
-			console.log(
+			logger.debug(
 				'- EXPO_PUBLIC_AI_INSIGHTS_PREVIEW:',
 				process.env.EXPO_PUBLIC_AI_INSIGHTS_PREVIEW
 			);
 			setRefreshKey((prev) => prev + 1); // Force re-render
 		} catch (error) {
-			console.error('Failed to reset labs:', error);
+			logger.error('Failed to reset labs:', error);
 		}
 	};
 
@@ -358,18 +359,18 @@ export default function SettingsScreen() {
 							<TouchableOpacity
 								style={[styles.debugButton]}
 								onPress={() => {
-									console.log('🔧 [Settings] Debug button pressed!');
-									console.log(
+									logger.debug('🔧 [Settings] Debug button pressed!');
+									logger.debug(
 										'🔧 [Settings] debugFeatureFlags function:',
 										typeof debugFeatureFlags
 									);
 									try {
 										debugFeatureFlags();
-										console.log(
+										logger.debug(
 											'🔧 [Settings] debugFeatureFlags called successfully'
 										);
 									} catch (error) {
-										console.error(
+										logger.error(
 											'🔧 [Settings] Error calling debugFeatureFlags:',
 											error
 										);

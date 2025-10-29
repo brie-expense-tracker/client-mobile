@@ -2,6 +2,8 @@
 // Implements rules → ML → LLM routing with confidence calibration
 
 import { FinancialSkillId } from './skills/comprehensiveSkillRegistry';
+import { logger } from '../../../utils/logger';
+
 
 type ChatContext = any;
 
@@ -313,12 +315,12 @@ export class HierarchicalRouter {
 	}
 
 	async route(utterance: string, context: ChatContext): Promise<RouteDecision> {
-		console.log(`[HierarchicalRouter] Routing: "${utterance}"`);
+		logger.debug(`[HierarchicalRouter] Routing: "${utterance}"`);
 
 		// Pass 1: Rules-based routing (fast path)
 		const ruleResult = this.rulesRouter.route(utterance, context);
 		if (ruleResult && ruleResult.confidence >= this.threshold) {
-			console.log(
+			logger.debug(
 				`[HierarchicalRouter] Rule match: ${ruleResult.skillId} (${ruleResult.confidence})`
 			);
 			return ruleResult;
@@ -329,7 +331,7 @@ export class HierarchicalRouter {
 		const bestML = mlResults[0];
 
 		if (bestML && bestML.confidence >= this.threshold) {
-			console.log(
+			logger.debug(
 				`[HierarchicalRouter] ML match: ${bestML.skillId} (${bestML.confidence})`
 			);
 			return {
@@ -343,7 +345,7 @@ export class HierarchicalRouter {
 		if (needsLLM) {
 			const llmResult = await this.llmRouter.route(utterance, context);
 			if (llmResult && llmResult.confidence >= this.minConfidence) {
-				console.log(
+				logger.debug(
 					`[HierarchicalRouter] LLM match: ${llmResult.skillId} (${llmResult.confidence})`
 				);
 				return llmResult;
@@ -355,14 +357,14 @@ export class HierarchicalRouter {
 		const bestResult = this.combineResults(allResults);
 
 		if (bestResult && bestResult.confidence >= this.minConfidence) {
-			console.log(
+			logger.debug(
 				`[HierarchicalRouter] Combined match: ${bestResult.skillId} (${bestResult.confidence})`
 			);
 			return bestResult;
 		}
 
 		// Fallback to guided suggestions
-		console.log(
+		logger.debug(
 			`[HierarchicalRouter] No confident match, using guided fallback`
 		);
 		return this.createGuidedFallback(context);

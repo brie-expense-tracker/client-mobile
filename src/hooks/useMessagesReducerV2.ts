@@ -1,4 +1,7 @@
 import { useReducer, useRef, useCallback } from 'react';
+import { createLogger } from '../utils/sublogger';
+
+const messagesReducerV2Log = createLogger('useMessagesReducerV2');
 
 export type MessageAction = any; // Simplified for now
 
@@ -58,7 +61,8 @@ function upsert(state: State, msg: Message) {
 }
 
 export const messagesReducerV2 = (state = initial, action: any): State => {
-	console.log('[REDUCER_V2] Action:', action.type, {
+	messagesReducerV2Log.debug('Action', {
+		type: action.type,
 		id: 'id' in action ? action.id : undefined,
 	});
 
@@ -89,15 +93,14 @@ export const messagesReducerV2 = (state = initial, action: any): State => {
 		}
 		case 'APPEND_DELTA': {
 			const { id, text } = action as { id: string; text: string };
-			console.log('[APPEND_DELTA]', {
+			messagesReducerV2Log.debug('APPEND_DELTA', {
 				msgId: id,
 				len: text.length,
 				preview: text.slice(0, 30),
-				timestamp: new Date().toISOString(),
 			});
 
 			if (!state.byId[id]) {
-				console.warn('🧩 APPEND_DELTA upserting missing message', {
+				messagesReducerV2Log.warn('APPEND_DELTA upserting missing message', {
 					id,
 					keys: Object.keys(state.byId),
 				});
@@ -114,7 +117,9 @@ export const messagesReducerV2 = (state = initial, action: any): State => {
 			if (state.byId[id]) {
 				state.byId[id].buffered = (state.byId[id].buffered ?? '') + text;
 			} else {
-				console.error('❌ APPEND_DELTA failed to create message', { id });
+				messagesReducerV2Log.error('APPEND_DELTA failed to create message', {
+					id,
+				});
 			}
 			return { ...state };
 		}
@@ -123,20 +128,22 @@ export const messagesReducerV2 = (state = initial, action: any): State => {
 
 			// Guard: check if message already finalized (idempotent)
 			if (state.byId[id] && !state.byId[id].isStreaming) {
-				console.log('[Reducer] FINALIZE already completed for id:', id);
+				messagesReducerV2Log.debug('FINALIZE already completed', { id });
 				return state;
 			}
 
 			if (!state.byId[id]) {
-				console.error('❌ FINALIZE missing message', { id });
+				messagesReducerV2Log.error('FINALIZE missing message', { id });
 				// Try to find any streaming message to finalize
 				const streamingMessage = Object.values(state.byId).find(
 					(m) => m.isStreaming
 				);
 				if (streamingMessage) {
-					console.log(
-						'🔄 FINALIZE recovery: found streaming message',
-						streamingMessage.id
+					messagesReducerV2Log.debug(
+						'FINALIZE recovery: found streaming message',
+						{
+							id: streamingMessage.id,
+						}
 					);
 					state.byId[streamingMessage.id] = {
 						...streamingMessage,
@@ -162,7 +169,7 @@ export const messagesReducerV2 = (state = initial, action: any): State => {
 		case 'CLEAR_STREAMING': {
 			const id = action.id;
 			if (!id) {
-				console.warn('[Reducer] CLEAR_STREAMING without id — ignored');
+				messagesReducerV2Log.warn('CLEAR_STREAMING without id — ignored');
 				return state;
 			}
 			if (state.streamingId && state.byId[state.streamingId]) {
@@ -183,7 +190,7 @@ export const messagesReducerV2 = (state = initial, action: any): State => {
 			return { ...state, streamingId: null };
 		}
 		default:
-			console.warn('[REDUCER_V2] Unknown action type:', action.type);
+			messagesReducerV2Log.warn('Unknown action type', { type: action.type });
 			return state;
 	}
 };

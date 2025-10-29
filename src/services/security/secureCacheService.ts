@@ -7,6 +7,8 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CryptoJS from 'crypto-js';
+import { logger } from '../../utils/logger';
+
 
 // Dynamic imports with fallbacks for development
 let SecureStore: any = null;
@@ -21,11 +23,11 @@ const initializeModules = async () => {
 	} catch (error) {
 		// Only warn in production, silence in development
 		if (__DEV__) {
-			console.log(
+			logger.debug(
 				'[SecureCacheService] ExpoSecureStore not available in development'
 			);
 		} else {
-			console.warn(
+			logger.warn(
 				'[SecureCacheService] ExpoSecureStore not available:',
 				error
 			);
@@ -39,11 +41,11 @@ const initializeModules = async () => {
 	} catch (error) {
 		// Only warn in production, silence in development
 		if (__DEV__) {
-			console.log(
+			logger.debug(
 				'[SecureCacheService] ExpoCrypto not available in development'
 			);
 		} else {
-			console.warn('[SecureCacheService] ExpoCrypto not available:', error);
+			logger.warn('[SecureCacheService] ExpoCrypto not available:', error);
 		}
 	}
 };
@@ -81,11 +83,11 @@ export class SecureCacheService {
 			// Check if SecureStore is available
 			if (!SecureStore) {
 				if (__DEV__) {
-					console.log(
+					logger.debug(
 						'[SecureCacheService] SecureStore not available in development, using fallback key storage'
 					);
 				} else {
-					console.warn(
+					logger.warn(
 						'[SecureCacheService] SecureStore not available, using fallback key storage'
 					);
 				}
@@ -107,7 +109,7 @@ export class SecureCacheService {
 			}
 			return key;
 		} catch (error) {
-			console.error(
+			logger.error(
 				'[SecureCacheService] Failed to get AES key from SecureStore:',
 				error
 			);
@@ -139,7 +141,7 @@ export class SecureCacheService {
 			// At this point, key is guaranteed to be a string
 			return key as string;
 		} catch (error) {
-			console.error('[SecureCacheService] Failed to get fallback key:', error);
+			logger.error('[SecureCacheService] Failed to get fallback key:', error);
 			// Ultimate fallback - generate a deterministic key based on device info
 			return 'fallback_key_' + Date.now().toString(36);
 		}
@@ -166,7 +168,7 @@ export class SecureCacheService {
 			// Return as base64 string
 			return combined.toString(CryptoJS.enc.Base64);
 		} catch (error) {
-			console.error('[SecureCacheService] Encryption failed:', error);
+			logger.error('[SecureCacheService] Encryption failed:', error);
 			throw new Error('Failed to encrypt data');
 		}
 	}
@@ -201,7 +203,7 @@ export class SecureCacheService {
 
 			return decrypted.toString(CryptoJS.enc.Utf8);
 		} catch (error) {
-			console.error('[SecureCacheService] Decryption failed:', error);
+			logger.error('[SecureCacheService] Decryption failed:', error);
 			throw new Error('Failed to decrypt data');
 		}
 	}
@@ -226,11 +228,11 @@ export class SecureCacheService {
 			// Check if service is available
 			if (!this.isServiceAvailable()) {
 				if (__DEV__) {
-					console.log(
+					logger.debug(
 						'[SecureCacheService] Encryption service not available in development, storing as plaintext'
 					);
 				} else {
-					console.warn(
+					logger.warn(
 						'[SecureCacheService] Encryption service not available, storing as plaintext'
 					);
 				}
@@ -245,14 +247,14 @@ export class SecureCacheService {
 
 			await AsyncStorage.setItem(key, encryptedData);
 			await this.updateCacheStats('encrypted');
-			console.log(`[SecureCacheService] Encrypted data stored for key: ${key}`);
+			logger.debug(`[SecureCacheService] Encrypted data stored for key: ${key}`);
 		} catch (error) {
-			console.error(
+			logger.error(
 				`[SecureCacheService] Failed to store encrypted data for key ${key}:`,
 				error
 			);
 			// Fallback to plaintext storage
-			console.warn('[SecureCacheService] Falling back to plaintext storage');
+			logger.warn('[SecureCacheService] Falling back to plaintext storage');
 			const cacheItem: CacheItem = {
 				data: value,
 				timestamp: Date.now(),
@@ -320,11 +322,11 @@ export class SecureCacheService {
 			// Check if service is available
 			if (!this.isServiceAvailable()) {
 				if (__DEV__) {
-					console.log(
+					logger.debug(
 						'[SecureCacheService] Encryption service not available in development, reading as plaintext'
 					);
 				} else {
-					console.warn(
+					logger.warn(
 						'[SecureCacheService] Encryption service not available, reading as plaintext'
 					);
 				}
@@ -379,7 +381,7 @@ export class SecureCacheService {
 
 			return parsed as T;
 		} catch (error) {
-			console.error(
+			logger.error(
 				`[SecureCacheService] Failed to retrieve encrypted data for key ${key}:`,
 				error
 			);
@@ -401,7 +403,7 @@ export class SecureCacheService {
 
 				return parsed as T;
 			} catch (parseError) {
-				console.error(
+				logger.error(
 					'[SecureCacheService] Failed to parse data as plaintext:',
 					parseError
 				);
@@ -419,11 +421,11 @@ export class SecureCacheService {
 	static async removeEncryptedItem(key: string): Promise<void> {
 		try {
 			await AsyncStorage.removeItem(key);
-			console.log(
+			logger.debug(
 				`[SecureCacheService] Encrypted data removed for key: ${key}`
 			);
 		} catch (error) {
-			console.error(
+			logger.error(
 				`[SecureCacheService] Failed to remove encrypted data for key ${key}:`,
 				error
 			);
@@ -453,11 +455,11 @@ export class SecureCacheService {
 			// Remove all encrypted cache keys
 			await AsyncStorage.multiRemove(cacheKeys);
 
-			console.log(
+			logger.debug(
 				`[SecureCacheService] Cleared ${cacheKeys.length} encrypted cache items`
 			);
 		} catch (error) {
-			console.error(
+			logger.error(
 				'[SecureCacheService] Failed to clear encrypted cache:',
 				error
 			);
@@ -476,7 +478,7 @@ export class SecureCacheService {
 			await SecureStore.getItemAsync('test_key');
 			return true;
 		} catch (error) {
-			console.warn('[SecureCacheService] SecureStore not available:', error);
+			logger.warn('[SecureCacheService] SecureStore not available:', error);
 			return false;
 		}
 	}
@@ -493,7 +495,7 @@ export class SecureCacheService {
 	 */
 	static async migrateToEncryptedStorage(): Promise<void> {
 		try {
-			console.log(
+			logger.debug(
 				'[SecureCacheService] Starting migration to encrypted storage...'
 			);
 
@@ -520,20 +522,20 @@ export class SecureCacheService {
 							// Migrate to encrypted storage
 							const parsedData = JSON.parse(unencryptedData);
 							await this.setEncryptedItem(key, parsedData);
-							console.log(`[SecureCacheService] Migrated key: ${key}`);
+							logger.debug(`[SecureCacheService] Migrated key: ${key}`);
 						}
 					}
 				} catch (error) {
-					console.warn(
+					logger.warn(
 						`[SecureCacheService] Failed to migrate key ${key}:`,
 						error
 					);
 				}
 			}
 
-			console.log('[SecureCacheService] Migration completed');
+			logger.debug('[SecureCacheService] Migration completed');
 		} catch (error) {
-			console.error('[SecureCacheService] Migration failed:', error);
+			logger.error('[SecureCacheService] Migration failed:', error);
 		}
 	}
 
@@ -573,7 +575,7 @@ export class SecureCacheService {
 			}
 			await AsyncStorage.setItem(this.STATS_KEY, JSON.stringify(stats));
 		} catch (error) {
-			console.warn('[SecureCacheService] Failed to update cache stats:', error);
+			logger.warn('[SecureCacheService] Failed to update cache stats:', error);
 		}
 	}
 
@@ -587,7 +589,7 @@ export class SecureCacheService {
 				return JSON.parse(stats);
 			}
 		} catch (error) {
-			console.warn('[SecureCacheService] Failed to get cache stats:', error);
+			logger.warn('[SecureCacheService] Failed to get cache stats:', error);
 		}
 
 		return {
@@ -630,7 +632,7 @@ export class SecureCacheService {
 						}
 					}
 				} catch (error) {
-					console.warn(
+					logger.warn(
 						`[SecureCacheService] Failed to check key ${key}:`,
 						error
 					);
@@ -643,12 +645,12 @@ export class SecureCacheService {
 			stats.lastCleanup = Date.now();
 			await AsyncStorage.setItem(this.STATS_KEY, JSON.stringify(stats));
 
-			console.log(
+			logger.debug(
 				`[SecureCacheService] Cleaned up ${expiredCount} expired items`
 			);
 			return expiredCount;
 		} catch (error) {
-			console.error(
+			logger.error(
 				'[SecureCacheService] Failed to cleanup expired items:',
 				error
 			);
@@ -682,7 +684,7 @@ export class SecureCacheService {
 							results[key] = parsed as T;
 						}
 					} catch (error) {
-						console.warn(
+						logger.warn(
 							`[SecureCacheService] Failed to parse key ${key}:`,
 							error
 						);
@@ -693,7 +695,7 @@ export class SecureCacheService {
 				}
 			}
 		} catch (error) {
-			console.error('[SecureCacheService] Failed to get bulk items:', error);
+			logger.error('[SecureCacheService] Failed to get bulk items:', error);
 		}
 
 		return results;
@@ -723,7 +725,7 @@ export class SecureCacheService {
 						const encryptedData = await this.encryptData(jsonData, aesKey);
 						operations.push([key, encryptedData]);
 					} catch (encryptError) {
-						console.warn(
+						logger.warn(
 							`[SecureCacheService] Failed to encrypt key ${key}, storing as plaintext:`,
 							encryptError
 						);
@@ -735,11 +737,11 @@ export class SecureCacheService {
 			}
 
 			await AsyncStorage.multiSet(operations);
-			console.log(
+			logger.debug(
 				`[SecureCacheService] Bulk stored ${operations.length} items`
 			);
 		} catch (error) {
-			console.error('[SecureCacheService] Failed to set bulk items:', error);
+			logger.error('[SecureCacheService] Failed to set bulk items:', error);
 			throw error;
 		}
 	}
@@ -749,7 +751,7 @@ export class SecureCacheService {
 	 */
 	static async rotateEncryptionKey(): Promise<void> {
 		try {
-			console.log('[SecureCacheService] Starting key rotation...');
+			logger.debug('[SecureCacheService] Starting key rotation...');
 
 			// Generate new key
 			const newKey = CryptoJS.lib.WordArray.random(32).toString(
@@ -782,7 +784,7 @@ export class SecureCacheService {
 						await AsyncStorage.setItem(key, encryptedData);
 					}
 				} catch (error) {
-					console.warn(
+					logger.warn(
 						`[SecureCacheService] Failed to rotate key for ${key}:`,
 						error
 					);
@@ -796,9 +798,9 @@ export class SecureCacheService {
 				await AsyncStorage.setItem(this.AES_KEY_STORAGE_KEY, newKey);
 			}
 
-			console.log('[SecureCacheService] Key rotation completed');
+			logger.debug('[SecureCacheService] Key rotation completed');
 		} catch (error) {
-			console.error('[SecureCacheService] Key rotation failed:', error);
+			logger.error('[SecureCacheService] Key rotation failed:', error);
 			throw error;
 		}
 	}

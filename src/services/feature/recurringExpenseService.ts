@@ -1,5 +1,7 @@
 import { ApiService } from '../core/apiService';
-import { isDevMode } from '../../config/environment';
+import { createLogger } from '../../utils/sublogger';
+
+const recurringExpenseLog = createLogger('RecurringExpenseService');
 
 export interface RecurringPattern {
 	patternId: string;
@@ -59,7 +61,7 @@ export class RecurringExpenseService {
 
 			return [];
 		} catch (error) {
-			console.error(
+			recurringExpenseLog.error(
 				'[RecurringExpenseService] Error detecting patterns:',
 				error
 			);
@@ -74,24 +76,20 @@ export class RecurringExpenseService {
 		signal?: AbortSignal;
 	}): Promise<RecurringExpense[]> {
 		try {
-			if (isDevMode) {
-				console.log('🔄 Fetching recurring expenses...');
-			}
+			recurringExpenseLog.debug('Fetching recurring expenses');
 			const response = await ApiService.get<{
 				recurringExpenses: RecurringExpense[];
 			}>('/api/recurring-expenses', { signal: opts?.signal });
 
 			if (response.success && response.data) {
 				const expenses = response.data.recurringExpenses || [];
-				if (isDevMode) {
-					console.log(`✅ Found ${expenses.length} recurring expenses`);
-				}
+				recurringExpenseLog.info(`Found ${expenses.length} recurring expenses`);
 				return expenses;
 			}
 
 			return [];
 		} catch (error) {
-			console.error('❌ Error getting recurring expenses:', error);
+			recurringExpenseLog.error('❌ Error getting recurring expenses:', error);
 			return [];
 		}
 	}
@@ -113,7 +111,7 @@ export class RecurringExpenseService {
 
 			return [];
 		} catch (error) {
-			console.error(
+			recurringExpenseLog.error(
 				'[RecurringExpenseService] Error checking upcoming expenses:',
 				error
 			);
@@ -206,41 +204,38 @@ export class RecurringExpenseService {
 				((response as any).data as RecurringExpense);
 
 			if (response.success && recurringExpense) {
-				if (isDevMode) {
-					console.log(
-						`✅ [RecurringExpenseService] Server returned created item: ${
-							recurringExpense.patternId ||
-							(recurringExpense as any).id ||
-							(recurringExpense as any)._id
-						}`
-					);
-				}
+				recurringExpenseLog.info('Server returned created item', {
+					patternId:
+						recurringExpense.patternId ||
+						(recurringExpense as any).id ||
+						(recurringExpense as any)._id,
+				});
 
 				// WORKAROUND: Backend might not return appearance fields immediately after deploy
 				// Merge them from the request data if missing from response
 				if (!recurringExpense.appearanceMode && data.appearanceMode) {
-					console.warn(
+					recurringExpenseLog.warn(
 						'⚠️ [RecurringExpenseService] Backend did not return appearanceMode on create, using request data:',
 						data.appearanceMode
 					);
 					recurringExpense.appearanceMode = data.appearanceMode;
 				}
 				if (!recurringExpense.icon && data.icon) {
-					console.warn(
+					recurringExpenseLog.warn(
 						'⚠️ [RecurringExpenseService] Backend did not return icon field on create, using request data:',
 						data.icon
 					);
 					recurringExpense.icon = data.icon;
 				}
 				if (!recurringExpense.color && data.color) {
-					console.warn(
+					recurringExpenseLog.warn(
 						'⚠️ [RecurringExpenseService] Backend did not return color field on create, using request data:',
 						data.color
 					);
 					recurringExpense.color = data.color;
 				}
 				if (!recurringExpense.categories && data.categories) {
-					console.warn(
+					recurringExpenseLog.warn(
 						'⚠️ [RecurringExpenseService] Backend did not return categories field on create, using request data:',
 						data.categories
 					);
@@ -251,16 +246,14 @@ export class RecurringExpenseService {
 			}
 
 			// Fallback: server didn't return the created item → refetch & match
-			if (isDevMode) {
-				console.log(
-					'⚠️ [RecurringExpenseService] POST succeeded but no data returned, fetching to resolve ID...'
-				);
-				console.log('🔍 [RecurringExpenseService] Response structure:', {
+			recurringExpenseLog.warn(
+				'POST succeeded but no data returned, fetching to resolve ID',
+				{
 					hasData: !!response.data,
 					dataKeys: response.data ? Object.keys(response.data) : [],
 					topLevelKeys: Object.keys(response),
-				});
-			}
+				}
+			);
 
 			ApiService.clearCacheByPrefix('/api/recurring-expenses');
 
@@ -268,21 +261,20 @@ export class RecurringExpenseService {
 			await new Promise((resolve) => setTimeout(resolve, 500));
 
 			const all = await this.getRecurringExpenses();
-			if (isDevMode) {
-				console.log(
-					`🔍 [RecurringExpenseService] Matching: ${data.vendor} / $${data.amount} / ${data.frequency} / ${data.nextExpectedDate}`
-				);
-				console.log(
-					`🔍 [RecurringExpenseService] Candidates (${all.length}):`,
-					all.map((e) => ({
-						vendor: e.vendor,
-						amount: e.amount,
-						frequency: e.frequency,
-						date: e.nextExpectedDate?.slice(0, 10),
-						id: e.patternId || (e as any).id || (e as any)._id,
-					}))
-				);
-			}
+			recurringExpenseLog.debug('Matching created item', {
+				vendor: data.vendor,
+				amount: data.amount,
+				frequency: data.frequency,
+				nextExpectedDate: data.nextExpectedDate,
+				candidateCount: all.length,
+				candidates: all.map((e) => ({
+					vendor: e.vendor,
+					amount: e.amount,
+					frequency: e.frequency,
+					date: e.nextExpectedDate?.slice(0, 10),
+					id: e.patternId || (e as any).id || (e as any)._id,
+				})),
+			});
 
 			const created = all.find(
 				(e) =>
@@ -297,24 +289,23 @@ export class RecurringExpenseService {
 			if (created) {
 				const resolvedId =
 					created.patternId || (created as any).id || (created as any)._id;
-				if (isDevMode) {
-					console.log(
-						`✅ [RecurringExpenseService] Resolved created item: ${resolvedId}`
-					);
-				}
+				recurringExpenseLog.info('Resolved created item', { resolvedId });
 				return created;
 			}
 
-			console.error('❌ [RecurringExpenseService] No match found!', {
-				searchCriteria: data,
-				fetchedCount: all.length,
-			});
+			recurringExpenseLog.error(
+				'❌ [RecurringExpenseService] No match found!',
+				{
+					searchCriteria: data,
+					fetchedCount: all.length,
+				}
+			);
 			throw new Error(
 				response.error ||
 					'Created, but could not resolve new recurring expense ID'
 			);
 		} catch (error) {
-			console.error(
+			recurringExpenseLog.error(
 				'[RecurringExpenseService] Error creating recurring expense:',
 				error
 			);
@@ -344,7 +335,7 @@ export class RecurringExpenseService {
 				recurringExpense?: RecurringExpense;
 			}>(`/api/recurring-expenses/${encodeURIComponent(patternId)}`, data);
 
-			console.log(
+			recurringExpenseLog.debug(
 				'📝 [RecurringExpenseService] Update response:',
 				JSON.stringify(response, null, 2)
 			);
@@ -355,14 +346,14 @@ export class RecurringExpenseService {
 					response.data.data || response.data.recurringExpense;
 
 				if (!updatedExpense) {
-					console.error(
+					recurringExpenseLog.error(
 						'⚠️ [RecurringExpenseService] No expense found in response:',
 						response
 					);
 					throw new Error('Server returned success but no expense data');
 				}
 
-				console.log(
+				recurringExpenseLog.debug(
 					'✅ [RecurringExpenseService] Extracted expense:',
 					updatedExpense
 				);
@@ -370,35 +361,35 @@ export class RecurringExpenseService {
 				// WORKAROUND: Backend might not return appearance fields immediately after deploy
 				// Merge them from the request data if missing from response
 				if (!updatedExpense.appearanceMode && data.appearanceMode) {
-					console.warn(
+					recurringExpenseLog.warn(
 						'⚠️ [RecurringExpenseService] Backend did not return appearanceMode, using request data:',
 						data.appearanceMode
 					);
 					updatedExpense.appearanceMode = data.appearanceMode;
 				}
 				if (!updatedExpense.icon && data.icon) {
-					console.warn(
+					recurringExpenseLog.warn(
 						'⚠️ [RecurringExpenseService] Backend did not return icon field, using request data:',
 						data.icon
 					);
 					updatedExpense.icon = data.icon;
 				}
 				if (!updatedExpense.color && data.color) {
-					console.warn(
+					recurringExpenseLog.warn(
 						'⚠️ [RecurringExpenseService] Backend did not return color field, using request data:',
 						data.color
 					);
 					updatedExpense.color = data.color;
 				}
 				if (!updatedExpense.categories && data.categories) {
-					console.warn(
+					recurringExpenseLog.warn(
 						'⚠️ [RecurringExpenseService] Backend did not return categories field, using request data:',
 						data.categories
 					);
 					updatedExpense.categories = data.categories;
 				}
 
-				console.log(
+				recurringExpenseLog.debug(
 					'✅ [RecurringExpenseService] Final merged expense:',
 					updatedExpense
 				);
@@ -416,7 +407,7 @@ export class RecurringExpenseService {
 			error.response = response;
 			throw error;
 		} catch (error: any) {
-			console.error(
+			recurringExpenseLog.error(
 				'[RecurringExpenseService] Error updating recurring expense:',
 				error
 			);
@@ -452,7 +443,7 @@ export class RecurringExpenseService {
 
 			throw new Error(response.error || 'Failed to process recurring expenses');
 		} catch (error) {
-			console.error(
+			recurringExpenseLog.error(
 				'[RecurringExpenseService] Error processing recurring expenses:',
 				error
 			);
@@ -486,7 +477,7 @@ export class RecurringExpenseService {
 				response.error || 'Failed to clean up duplicate expenses'
 			);
 		} catch (error) {
-			console.error(
+			recurringExpenseLog.error(
 				'[RecurringExpenseService] Error cleaning up duplicate expenses:',
 				error
 			);
@@ -516,7 +507,7 @@ export class RecurringExpenseService {
 
 			throw new Error(response.error || 'Failed to delete recurring expense');
 		} catch (error) {
-			console.error(
+			recurringExpenseLog.error(
 				'[RecurringExpenseService] Error deleting recurring expense:',
 				error
 			);
@@ -556,7 +547,7 @@ export class RecurringExpenseService {
 				response.error || 'Failed to mark recurring expense as paid'
 			);
 		} catch (error) {
-			console.error(
+			recurringExpenseLog.error(
 				'[RecurringExpenseService] Error marking recurring expense as paid:',
 				error
 			);
@@ -582,7 +573,7 @@ export class RecurringExpenseService {
 
 			return [];
 		} catch (error) {
-			console.error(
+			recurringExpenseLog.error(
 				'[RecurringExpenseService] Error getting payment history:',
 				error
 			);
@@ -600,18 +591,20 @@ export class RecurringExpenseService {
 			// Check cache first
 			const cached = this.paymentStatusCache.get(patternId);
 			if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
-				console.log(`🔍 Using cached payment status for ${patternId}`);
+				recurringExpenseLog.debug(
+					`🔍 Using cached payment status for ${patternId}`
+				);
 				return cached.result;
 			}
 
-			console.log(`🔍 Checking payment status for ${patternId}`);
+			recurringExpenseLog.debug(`🔍 Checking payment status for ${patternId}`);
 			const response = await ApiService.get<{ isPaid: boolean | null }>(
 				`/api/recurring-expenses/${patternId}/paid`
 			);
 
 			if (response.success && response.data) {
 				const isPaid = response.data.isPaid;
-				console.log(
+				recurringExpenseLog.debug(
 					`💰 ${patternId}: ${
 						isPaid === null ? 'Unknown' : isPaid ? 'Paid' : 'Unpaid'
 					}`
@@ -628,7 +621,7 @@ export class RecurringExpenseService {
 
 			return null;
 		} catch (error) {
-			console.error(
+			recurringExpenseLog.error(
 				`❌ Error checking payment status for ${patternId}:`,
 				error
 			);
@@ -660,14 +653,14 @@ export class RecurringExpenseService {
 
 			// If all are cached, return cached results
 			if (uncachedIds.length === 0) {
-				console.log(
-					`🔍 Using cached payment status for all ${patternIds.length} expenses`
+				recurringExpenseLog.debug(
+					`Using cached payment status for all ${patternIds.length} expenses`
 				);
 				return cachedResults;
 			}
 
-			console.log(
-				`🔍 Batch checking payment status for ${uncachedIds.length} expenses`
+			recurringExpenseLog.debug(
+				`Batch checking payment status for ${uncachedIds.length} expenses`
 			);
 			const response = await ApiService.get<Record<string, boolean | null>>(
 				`/api/recurring-expenses/paid/status?ids=${uncachedIds.join(',')}`
@@ -687,14 +680,14 @@ export class RecurringExpenseService {
 				// Combine cached and new results
 				const allResults = { ...cachedResults, ...batchResults };
 
-				console.log(`💰 Batch payment status:`, allResults);
+				recurringExpenseLog.debug('Batch payment status', allResults);
 				return allResults;
 			}
 
 			// If batch request fails, return cached results only
 			return cachedResults;
 		} catch (error) {
-			console.error('❌ Error checking batch payment status:', error);
+			recurringExpenseLog.error('Error checking batch payment status', error);
 			// Return cached results if available
 			const cachedResults: Record<string, boolean | null> = {};
 			patternIds.forEach((patternId) => {
@@ -736,7 +729,7 @@ export class RecurringExpenseService {
 				response.error || 'Failed to generate recurring transactions'
 			);
 		} catch (error) {
-			console.error(
+			recurringExpenseLog.error(
 				'[RecurringExpenseService] Error generating recurring transactions:',
 				error
 			);
@@ -771,7 +764,7 @@ export class RecurringExpenseService {
 
 			throw new Error(response.error || 'Failed to link transaction');
 		} catch (error) {
-			console.error(
+			recurringExpenseLog.error(
 				'[RecurringExpenseService] Error linking transaction:',
 				error
 			);
@@ -796,7 +789,7 @@ export class RecurringExpenseService {
 
 			return [];
 		} catch (error) {
-			console.error(
+			recurringExpenseLog.error(
 				'[RecurringExpenseService] Error getting pending recurring transactions:',
 				error
 			);
@@ -822,7 +815,7 @@ export class RecurringExpenseService {
 
 			return [];
 		} catch (error) {
-			console.error(
+			recurringExpenseLog.error(
 				'[RecurringExpenseService] Error getting recurring transactions:',
 				error
 			);
@@ -854,7 +847,7 @@ export class RecurringExpenseService {
 
 			throw new Error(response.error || 'Failed to auto-apply transactions');
 		} catch (error) {
-			console.error(
+			recurringExpenseLog.error(
 				'[RecurringExpenseService] Error auto-applying transactions:',
 				error
 			);

@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 /**
  * Stream Manager - Hard-lock to single stream per message
  * Prevents duplicate streams and ensures proper cleanup
@@ -18,7 +19,7 @@ function resetInactivityTimer(reason: string, streamKey: string) {
 
 	clearTimeout(activeRef.current.inactivityTimer);
 	activeRef.current.inactivityTimer = setTimeout(() => {
-		console.warn(
+		logger.warn(
 			'🚨 [StreamManager] Stream timeout after inactivity:',
 			reason,
 			{ streamKey }
@@ -38,7 +39,7 @@ export function startSSE(
 ): EventSource | null {
 	// If this exact stream is already open, ignore.
 	if (activeRef.current?.key === streamKey) {
-		console.warn(
+		logger.warn(
 			'🚫 [StreamManager] Stream already active for key:',
 			streamKey
 		);
@@ -47,7 +48,7 @@ export function startSSE(
 
 	// Close any prior stream (prevents double output).
 	if (activeRef.current?.es) {
-		console.log(
+		logger.debug(
 			'🔄 [StreamManager] Closing previous stream for key:',
 			activeRef.current.key
 		);
@@ -58,11 +59,11 @@ export function startSSE(
 	const es = new EventSource(url, { withCredentials: false });
 	activeRef.current = { key: streamKey, es };
 
-	console.log('🚀 [StreamManager] Starting new stream for key:', streamKey);
+	logger.debug('🚀 [StreamManager] Starting new stream for key:', streamKey);
 
 	// Set up inactivity timer on stream open
 	es.addEventListener('open', () => {
-		console.log('🔗 [StreamManager] Connection opened for key:', streamKey);
+		logger.debug('🔗 [StreamManager] Connection opened for key:', streamKey);
 		resetInactivityTimer('open', streamKey);
 	});
 
@@ -72,7 +73,7 @@ export function startSSE(
 			handlers.onDelta(data);
 			resetInactivityTimer('delta', streamKey);
 		} catch (error) {
-			console.error('❌ [StreamManager] Failed to parse delta event:', error);
+			logger.error('❌ [StreamManager] Failed to parse delta event:', error);
 		}
 	});
 
@@ -90,7 +91,7 @@ export function startSSE(
 			const data = JSON.parse(e.data);
 			handlers.onDone(data?.full);
 		} catch (error) {
-			console.error('❌ [StreamManager] Failed to parse done event:', error);
+			logger.error('❌ [StreamManager] Failed to parse done event:', error);
 		}
 
 		// Clear timer on done
@@ -105,7 +106,7 @@ export function startSSE(
 	});
 
 	es.addEventListener('error', (e: any) => {
-		console.error('❌ [StreamManager] Stream error for key:', streamKey, e);
+		logger.error('❌ [StreamManager] Stream error for key:', streamKey, e);
 
 		// Clear timer on error
 		if (activeRef.current?.inactivityTimer) {
@@ -142,7 +143,7 @@ export function startSSE(
 
 export function cancelSSE() {
 	if (activeRef.current?.es) {
-		console.log(
+		logger.debug(
 			'🛑 [StreamManager] Cancelling active stream for key:',
 			activeRef.current.key
 		);

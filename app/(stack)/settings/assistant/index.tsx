@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { logger } from '../../../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -87,7 +88,7 @@ export default function AssistantSettings() {
 						mode === 'proactive' ? true : config.showProactiveCards,
 				});
 			} catch (error) {
-				console.error('Error updating assistant mode:', error);
+				logger.error('Error updating assistant mode:', error);
 				Alert.alert(
 					'Error',
 					'Failed to update assistant mode. Please try again.'
@@ -107,7 +108,7 @@ export default function AssistantSettings() {
 			try {
 				await updateAssistantSettings({ [setting]: value });
 			} catch (error) {
-				console.error(`Error updating ${setting}:`, error);
+				logger.error(`Error updating ${setting}:`, error);
 				Alert.alert('Error', `Failed to update ${setting}. Please try again.`);
 			}
 		});

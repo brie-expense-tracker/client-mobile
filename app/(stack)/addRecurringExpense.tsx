@@ -8,6 +8,7 @@ import {
 	SafeAreaView,
 	Text,
 } from 'react-native';
+import { logger } from '../../src/utils/logger';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { RecurringExpenseService } from '../../src/services';
@@ -62,7 +63,7 @@ const AddRecurringExpenseScreen: React.FC = () => {
 				},
 			]);
 		} catch (error) {
-			console.error('[AddRecurringExpenseScreen] Error saving:', error);
+			logger.error('[AddRecurringExpenseScreen] Error saving:', error);
 			Alert.alert(
 				'Error',
 				'Failed to save recurring expense. Please try again.'

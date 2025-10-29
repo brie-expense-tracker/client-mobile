@@ -1,6 +1,9 @@
 import { useMemo, useCallback } from 'react';
 import { useDataFetching } from './useDataFetching';
 import { RecurringExpenseService, RecurringExpense } from '../services';
+import { createLogger } from '../utils/sublogger';
+
+const recurringExpensesHookLog = createLogger('useRecurringExpenses');
 
 // Extended interface for recurring expense with id (required by useDataFetching)
 export interface RecurringExpenseWithId extends RecurringExpense {
@@ -47,16 +50,11 @@ const addRecurringExpense = async (data: {
 
 const updateRecurringExpense = async (
 	id: string,
-	data: {
-		vendor: string;
-		amount: number;
-		frequency: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
-		nextExpectedDate: string;
-	}
+	data: Partial<RecurringExpenseWithId>
 ): Promise<RecurringExpenseWithId> => {
 	const expense = await RecurringExpenseService.updateRecurringExpense(
 		id,
-		data
+		data as any
 	);
 	return {
 		...expense,
@@ -199,7 +197,10 @@ export function useRecurringExpenses() {
 					notes: 'Marked as paid via mobile app',
 				});
 			} catch (error) {
-				console.error('Error marking recurring expense as paid:', error);
+				recurringExpensesHookLog.error(
+					'Error marking recurring expense as paid',
+					error
+				);
 				throw error;
 			}
 		},
@@ -214,7 +215,7 @@ export function useRecurringExpenses() {
 					limit
 				);
 			} catch (error) {
-				console.error('Error getting payment history:', error);
+				recurringExpensesHookLog.error('Error getting payment history', error);
 				throw error;
 			}
 		},
@@ -225,7 +226,7 @@ export function useRecurringExpenses() {
 		try {
 			return await RecurringExpenseService.checkIfCurrentPeriodPaid(patternId);
 		} catch (error) {
-			console.error('Error checking payment status:', error);
+			recurringExpensesHookLog.error('Error checking payment status', error);
 			throw error;
 		}
 	}, []);
@@ -291,7 +292,7 @@ export function useRecurringExpenses() {
 	}, []);
 
 	const isCurrentPeriodPaid = useCallback(async (patternId: string) => {
-		return RecurringExpenseService.isCurrentPeriodPaid(patternId);
+		return RecurringExpenseService.checkIfCurrentPeriodPaid(patternId);
 	}, []);
 
 	const checkBatchPaidStatus = useCallback(async (patternIds: string[]) => {

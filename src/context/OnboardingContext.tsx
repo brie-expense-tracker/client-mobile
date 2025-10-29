@@ -7,7 +7,9 @@ import React, {
 } from 'react';
 import { OnboardingService } from '../services';
 import useAuth from './AuthContext'; // Import useAuth
-import { isDevMode } from '../config/environment';
+import { createLogger } from '../utils/sublogger';
+
+const onboardingContextLog = createLogger('OnboardingContext');
 
 interface OnboardingContextType {
 	hasSeenOnboarding: boolean | null;
@@ -40,21 +42,17 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
 			return;
 		}
 		try {
-			if (isDevMode) {
-				console.log('🔍 [OnboardingContext] Refreshing onboarding status...');
-			}
+			onboardingContextLog.debug('Refreshing onboarding status');
 			const onboardingSeen = await OnboardingService.hasSeenOnboarding();
 			const currentVersion = OnboardingService.getCurrentOnboardingVersion();
-			if (isDevMode) {
-				console.log('🔍 [OnboardingContext] Onboarding status result:', {
-					onboardingSeen,
-					currentVersion,
-				});
-			}
+			onboardingContextLog.debug('Onboarding status result', {
+				onboardingSeen,
+				currentVersion,
+			});
 			setHasSeenOnboarding(onboardingSeen);
 			setOnboardingVersion(currentVersion);
 		} catch (error) {
-			console.error('Error checking onboarding status:', error);
+			onboardingContextLog.error('Error checking onboarding status', error);
 			// Set to true as fallback to prevent infinite loading
 			setHasSeenOnboarding(true);
 			setOnboardingVersion(OnboardingService.getCurrentOnboardingVersion());
@@ -77,7 +75,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
 			const currentVersion = OnboardingService.getCurrentOnboardingVersion();
 			setOnboardingVersion(currentVersion);
 		} catch (error) {
-			console.error('Error marking onboarding complete:', error);
+			onboardingContextLog.error('Error marking onboarding complete', error);
 			throw error;
 		}
 	}, []);
@@ -88,7 +86,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
 			setHasSeenOnboarding(false);
 			setOnboardingVersion(0);
 		} catch (error) {
-			console.error('Error resetting onboarding status:', error);
+			onboardingContextLog.error('Error resetting onboarding status', error);
 			throw error;
 		}
 	}, []);
