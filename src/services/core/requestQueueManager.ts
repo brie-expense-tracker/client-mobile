@@ -1,3 +1,4 @@
+import { logger } from '../../../utils/logger';
 /**
  * Request Queue Manager
  * Manages concurrent requests to prevent rate limiting and improve performance
@@ -50,7 +51,7 @@ class RequestQueueManager {
 
 			// Check if request is already active
 			if (this.activeRequests.has(requestId)) {
-				console.log(`🔄 [RequestQueue] Request already active: ${requestId}`);
+				logger.debug(`🔄 [RequestQueue] Request already active: ${requestId}`);
 				reject(new Error('Request already in progress'));
 				return;
 			}
@@ -69,7 +70,7 @@ class RequestQueueManager {
 			this.queue.push(queuedRequest);
 			this.queue.sort((a, b) => b.priority - a.priority);
 
-			console.log(
+			logger.debug(
 				`📋 [RequestQueue] Enqueued request: ${requestId} (priority: ${priority})`
 			);
 
@@ -87,7 +88,7 @@ class RequestQueueManager {
 		if (this.processing) return;
 
 		this.processing = true;
-		console.log(
+		logger.debug(
 			`🔄 [RequestQueue] Starting queue processing (${this.queue.length} queued)`
 		);
 
@@ -101,7 +102,7 @@ class RequestQueueManager {
 			// Check if request is too old (5 minutes)
 			const age = Date.now() - request.timestamp;
 			if (age > 300000) {
-				console.log(`⏰ [RequestQueue] Request expired: ${request.id}`);
+				logger.debug(`⏰ [RequestQueue] Request expired: ${request.id}`);
 				request.reject(new Error('Request expired'));
 				continue;
 			}
@@ -117,7 +118,7 @@ class RequestQueueManager {
 	 * Execute a single request
 	 */
 	private async executeRequest(request: QueuedRequest): Promise<void> {
-		console.log(`🚀 [RequestQueue] Executing request: ${request.id}`);
+		logger.debug(`🚀 [RequestQueue] Executing request: ${request.id}`);
 
 		try {
 			// Simulate the actual request execution
@@ -167,7 +168,7 @@ class RequestQueueManager {
 			request.reject(new Error('Queue cleared'));
 		});
 		this.queue = [];
-		console.log(`🗑️ [RequestQueue] Queue cleared`);
+		logger.debug(`🗑️ [RequestQueue] Queue cleared`);
 	}
 
 	/**
@@ -175,7 +176,7 @@ class RequestQueueManager {
 	 */
 	updateConfig(newConfig: Partial<QueueConfig>): void {
 		this.config = { ...this.config, ...newConfig };
-		console.log(`⚙️ [RequestQueue] Config updated:`, this.config);
+		logger.debug(`⚙️ [RequestQueue] Config updated:`, this.config);
 	}
 }
 

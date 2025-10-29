@@ -2,6 +2,8 @@
 // Provides deterministic calculations and semantic caching for consistent responses
 
 import {
+import { logger } from '../../../utils/logger';
+
 	FactPack,
 	FactPackBuilder,
 	FactPackCalculator,
@@ -499,7 +501,7 @@ export class GroundingLayerService {
 	validateFactPack(factPack: FactPack): boolean {
 		const validation = FactPackCalculator.validateFactPack(factPack);
 		if (!validation.isValid) {
-			console.error('FactPack validation failed:', validation.errors);
+			logger.error('FactPack validation failed:', validation.errors);
 			return false;
 		}
 		return true;

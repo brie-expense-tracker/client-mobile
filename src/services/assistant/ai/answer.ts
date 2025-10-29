@@ -1,6 +1,8 @@
 // ai/answer.ts - Finalize & emit (one function to rule them all)
 
 import {
+import { logger } from '../../../../utils/logger';
+
 	CascadeResult,
 	WriterOutput,
 	CriticReport,
@@ -52,14 +54,14 @@ export class CascadeOrchestrator {
 		try {
 			// Check if this should bypass the Writer and go straight to Pro
 			if (isHighStakesQuery(args.userQuery)) {
-				console.log(
+				logger.debug(
 					'🔍 [Cascade] High-stakes query detected, bypassing Writer'
 				);
 				return await this.handleHighStakesQuery(args);
 			}
 
 			// Step 1: Mini Writer
-			console.log('🔍 [Cascade] Step 1: Mini Writer');
+			logger.debug('🔍 [Cascade] Step 1: Mini Writer');
 			const writer = await this.miniWriter.generateResponse(
 				args.userQuery,
 				args.factPack,
@@ -68,7 +70,7 @@ export class CascadeOrchestrator {
 			writerTokens = this.estimateTokens(writer.answer_text);
 
 			// Step 2: Guards (before critic)
-			console.log('🔍 [Cascade] Step 2: Running guards');
+			logger.debug('🔍 [Cascade] Step 2: Running guards');
 			const guards = [
 				guardNumbers(writer, args.factPack),
 				guardTimeStamp(writer, args.factPack),
@@ -79,13 +81,13 @@ export class CascadeOrchestrator {
 			guardFailures = failed.flatMap((g) => g.failures);
 
 			if (guardFailures.length > 0) {
-				console.log('🔍 [Cascade] Guards failed:', guardFailures);
+				logger.debug('🔍 [Cascade] Guards failed:', guardFailures);
 			}
 
 			// Step 3: Mini Critic (only if writer didn't already request clarification)
 			let critic: CriticReport;
 			if (writer.requires_clarification) {
-				console.log(
+				logger.debug(
 					'🔍 [Cascade] Writer requested clarification, skipping critic'
 				);
 				critic = {
@@ -95,7 +97,7 @@ export class CascadeOrchestrator {
 					recommend_escalation: false,
 				};
 			} else {
-				console.log('🔍 [Cascade] Step 3: Mini Critic');
+				logger.debug('🔍 [Cascade] Step 3: Mini Critic');
 				critic = await this.miniCritic.reviewResponse(
 					writer,
 					args.factPack,
@@ -105,9 +107,9 @@ export class CascadeOrchestrator {
 			}
 
 			// Step 4: Decide
-			console.log('🔍 [Cascade] Step 4: Decision logic');
+			logger.debug('🔍 [Cascade] Step 4: Decision logic');
 			const decision = decide(writer, critic, args.factPack);
-			console.log('🔍 [Cascade] Decision:', decision);
+			logger.debug('🔍 [Cascade] Decision:', decision);
 
 			// Step 5: Execute path
 			if (decision.path === 'return') {
@@ -129,7 +131,7 @@ export class CascadeOrchestrator {
 			}
 
 			// Escalate to Pro Improver
-			console.log('🔍 [Cascade] Step 5: Pro Improver escalation');
+			logger.debug('🔍 [Cascade] Step 5: Pro Improver escalation');
 			const improved = await this.proImprover.improveResponse(
 				writer,
 				critic,
@@ -145,7 +147,7 @@ export class CascadeOrchestrator {
 			];
 
 			if (postGuards.some((g) => !g.ok)) {
-				console.log(
+				logger.debug(
 					'🔍 [Cascade] Post-improvement guards failed, using safe template'
 				);
 				return this.createSafeTemplate(args.factPack, args.intent, {
@@ -167,7 +169,7 @@ export class CascadeOrchestrator {
 				decision_reason: decision.reason,
 			});
 		} catch (error) {
-			console.error('🔍 [Cascade] Cascade failed:', error);
+			logger.error('🔍 [Cascade] Cascade failed:', error);
 
 			// Return safe fallback
 			return this.createSafeTemplate(args.factPack, args.intent, {
@@ -187,7 +189,7 @@ export class CascadeOrchestrator {
 	private async handleHighStakesQuery(
 		args: AnswerWithCascadeArgs
 	): Promise<CascadeResult> {
-		console.log('🔍 [Cascade] Handling high-stakes query with Pro Improver');
+		logger.debug('🔍 [Cascade] Handling high-stakes query with Pro Improver');
 
 		// Create a minimal writer output for the improver
 		const minimalWriter: WriterOutput = {

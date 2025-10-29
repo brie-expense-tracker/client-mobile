@@ -2,6 +2,8 @@
 // Handles validation, caching, metrics, dependencies, and testing
 
 import {
+import { logger } from '../../../../utils/logger';
+
 	EnhancedSkill,
 	SkillValidationResult,
 	SkillCacheEntry,
@@ -82,7 +84,7 @@ export class SkillManager {
 
 		this.skills.set(skill.id, skill);
 		this.initializeMetrics(skill.id);
-		console.log(
+		logger.debug(
 			`[SkillManager] Registered skill: ${skill.id} v${
 				skill.version?.major || 1
 			}.${skill.version?.minor || 0}.${skill.version?.patch || 0}`
@@ -111,7 +113,7 @@ export class SkillManager {
 		this.skills.delete(skillId);
 		this.metrics.delete(skillId);
 		this.clearCacheForSkill(skillId);
-		console.log(`[SkillManager] Unregistered skill: ${skillId}`);
+		logger.debug(`[SkillManager] Unregistered skill: ${skillId}`);
 		return true;
 	}
 

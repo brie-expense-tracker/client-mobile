@@ -1,5 +1,7 @@
 import { ApiService } from '../core/apiService';
 import { Budget } from '../../context/budgetContext';
+import { logger } from '../../utils/logger';
+
 
 export interface BudgetSuggestion {
 	id: string;
@@ -31,10 +33,10 @@ export class BudgetSuggestionService {
 				return response.data;
 			}
 
-			console.error('Failed to get budget suggestions:', response.error);
+			logger.error('Failed to get budget suggestions:', response.error);
 			return [];
 		} catch (error) {
-			console.error('Error getting budget suggestions:', error);
+			logger.error('Error getting budget suggestions:', error);
 			return [];
 		}
 	}

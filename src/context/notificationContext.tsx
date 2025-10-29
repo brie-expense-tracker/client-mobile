@@ -14,7 +14,9 @@ import {
 	NotificationConsent,
 } from '../services';
 import useAuth from './AuthContext';
-import { isDevMode } from '../config/environment';
+import { createLogger } from '../utils/sublogger';
+
+const notificationContextLog = createLogger('NotificationContext');
 
 interface NotificationFilter {
 	type?: NotificationData['type'];
@@ -78,7 +80,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 }) => {
 	// Safety check for children prop - don't inspect it, just render it
 	if (!children) {
-		console.error('NotificationProvider: children prop is undefined');
+		notificationContextLog.error(
+			'NotificationProvider: children prop is undefined'
+		);
 		return null;
 	}
 	const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
@@ -109,7 +113,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 			!force &&
 			now - lastUnreadCountRefresh.current < UNREAD_COUNT_THROTTLE_MS
 		) {
-			console.log('⏳ [NotificationContext] Throttling unread count refresh');
+			notificationContextLog.debug('Throttling unread count refresh');
 			return;
 		}
 
@@ -120,12 +124,12 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 		} catch (err: any) {
 			// Don't log errors for missing user account - this is expected after account deletion
 			if (err?.message?.includes('User account not found')) {
-				console.log(
+				notificationContextLog.debug(
 					'ℹ️ [Notifications] User account not found, skipping count refresh'
 				);
 				setUnreadCount(0);
 			} else {
-				console.error('Failed to refresh unread count:', err);
+				notificationContextLog.error('Failed to refresh unread count', err);
 			}
 		}
 	}, []);
@@ -168,7 +172,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 				});
 			responseListener.current =
 				Notifications.addNotificationResponseReceivedListener((response) => {
-					console.log('📱 Notification response received:', response);
+					notificationContextLog.debug('Notification response received', {
+						response,
+					});
 					// The notification service will handle the navigation logic
 					// We just need to ensure the notification is marked as read if needed
 					if (response.notification.request.content.data?.id) {
@@ -192,11 +198,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 		async (page: number = 1, limit: number = 20) => {
 			// Prevent multiple simultaneous requests
 			if (loading) {
-				if (isDevMode) {
-					console.log(
-						'🔄 [Notifications] Request already in progress, skipping'
-					);
-				}
+				notificationContextLog.debug('Request already in progress, skipping');
 				return;
 			}
 
@@ -213,24 +215,20 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 					setNotifications(response.notifications || []);
 					setCurrentPage(page);
 					setHasMore(notificationCount === limit);
-					if (isDevMode) {
-						console.log(
-							`✅ [Notifications] Loaded ${notificationCount} notifications for page ${page}`
-						);
-					}
+					notificationContextLog.debug(
+						`Loaded ${notificationCount} notifications for page ${page}`
+					);
 				}
 			} catch (err: any) {
 				// Don't log errors for missing user account - this is expected after account deletion
 				if (err?.message?.includes('User account not found')) {
-					if (isDevMode) {
-						console.log(
-							'ℹ️ [Notifications] User account not found, skipping notifications fetch'
-						);
-					}
+					notificationContextLog.debug(
+						'User account not found, skipping notifications fetch'
+					);
 					setNotifications([]);
 					setHasMore(false);
 				} else {
-					console.error('❌ [Notifications] Error getting notifications:', err);
+					notificationContextLog.error('Error getting notifications', err);
 					setError(
 						err instanceof Error
 							? err
@@ -246,14 +244,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 
 	const loadMoreNotifications = useCallback(async () => {
 		if (!hasMore || loading) {
-			if (isDevMode) {
-				console.log(
-					'🔄 [Notifications] Load more blocked - hasMore:',
-					hasMore,
-					'loading:',
-					loading
-				);
-			}
+			notificationContextLog.debug('Load more blocked', { hasMore, loading });
 			return;
 		}
 
@@ -261,9 +252,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 			setLoading(true);
 			setError(null);
 			const nextPage = currentPage + 1;
-			if (isDevMode) {
-				console.log(`📄 [Notifications] Loading page ${nextPage}`);
-			}
+			notificationContextLog.debug(`Loading page ${nextPage}`);
 			const response = await notificationService.getNotifications(nextPage, 20);
 			if (response) {
 				// Use safe array operations to prevent crashes
@@ -273,14 +262,12 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 				setNotifications((prev) => [...prev, ...newNotifications]);
 				setCurrentPage(nextPage);
 				setHasMore(newNotificationCount === 20);
-				if (isDevMode) {
-					console.log(
-						`✅ [Notifications] Loaded ${newNotificationCount} more notifications`
-					);
-				}
+				notificationContextLog.debug(
+					`Loaded ${newNotificationCount} more notifications`
+				);
 			}
 		} catch (err) {
-			console.error(
+			notificationContextLog.error(
 				'❌ [Notifications] Error loading more notifications:',
 				err
 			);
@@ -297,15 +284,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 	const refreshNotifications = useCallback(async () => {
 		// Prevent refresh if already loading
 		if (loading) {
-			if (isDevMode) {
-				console.log('🔄 [Notifications] Refresh blocked - already loading');
-			}
+			notificationContextLog.debug('Refresh blocked - already loading');
 			return;
 		}
 
-		if (isDevMode) {
-			console.log('🔄 [Notifications] Refreshing notifications');
-		}
+		notificationContextLog.debug('Refreshing notifications');
 		setCurrentPage(1);
 		setHasMore(true);
 		await getNotifications(1, 20);
@@ -411,7 +394,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 		try {
 			return await notificationService.getConsentSettings();
 		} catch (err) {
-			console.error('Error getting consent settings:', err);
+			notificationContextLog.error('Error getting consent settings:', err);
 			throw err;
 		}
 	}, []);
@@ -422,7 +405,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 			try {
 				return await notificationService.updateConsentSettings(consent);
 			} catch (err) {
-				console.error('Error updating consent settings:', err);
+				notificationContextLog.error('Error updating consent settings:', err);
 				throw err;
 			}
 		},
@@ -435,7 +418,10 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 			try {
 				return await notificationService.isNotificationAllowed(type, category);
 			} catch (err) {
-				console.error('Error checking notification permission:', err);
+				notificationContextLog.error(
+					'Error checking notification permission:',
+					err
+				);
 				return false;
 			}
 		},
@@ -455,19 +441,15 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 			user._id !== 'temp' &&
 			!hasInitializedRef.current
 		) {
-			if (isDevMode) {
-				console.log(
-					'🔔 [Notifications] User authenticated, initializing notifications'
-				);
-			}
+			notificationContextLog.debug(
+				'User authenticated, initializing notifications'
+			);
 			hasInitializedRef.current = true;
 			initialize();
 		} else if (user && user._id === 'temp') {
-			if (isDevMode) {
-				console.log(
-					'ℹ️ [Notifications] Waiting for MongoDB user creation before initializing'
-				);
-			}
+			notificationContextLog.debug(
+				'Waiting for MongoDB user creation before initializing'
+			);
 		}
 
 		return () => {

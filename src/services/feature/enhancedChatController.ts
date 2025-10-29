@@ -4,6 +4,8 @@
 import { ChatResponse } from '../../services/assistant/responseSchema';
 import { ChatContext } from './chatController';
 import {
+import { logger } from '../../../utils/logger';
+
 	hybridAIOrchestrator,
 	ProcessingResult,
 } from '../../services/assistant/hybridAIOrchestrator';
@@ -82,7 +84,7 @@ export class EnhancedChatController {
 		this.performanceMetrics.totalRequests++;
 
 		try {
-			console.log(`[EnhancedChatController] Processing: "${utterance}"`);
+			logger.debug(`[EnhancedChatController] Processing: "${utterance}"`);
 
 			// Validate input
 			if (!utterance?.trim()) {
@@ -112,7 +114,7 @@ export class EnhancedChatController {
 
 					return result.response;
 				} catch (error) {
-					console.error('[EnhancedChatController] Hybrid AI error:', error);
+					logger.error('[EnhancedChatController] Hybrid AI error:', error);
 					this.performanceMetrics.failedRequests++;
 					this.performanceMetrics.lastError =
 						error instanceof Error ? error.message : String(error);
@@ -132,7 +134,7 @@ export class EnhancedChatController {
 				return this.processWithLegacyFallback(utterance, context);
 			}
 		} catch (error) {
-			console.error('[EnhancedChatController] Processing error:', error);
+			logger.error('[EnhancedChatController] Processing error:', error);
 			this.performanceMetrics.failedRequests++;
 			this.performanceMetrics.lastError =
 				error instanceof Error ? error.message : String(error);
@@ -159,7 +161,7 @@ export class EnhancedChatController {
 		);
 
 		// Log the processing result
-		console.log(`[EnhancedChatController] Hybrid AI result:`, {
+		logger.debug(`[EnhancedChatController] Hybrid AI result:`, {
 			skillId: result.metadata.skillId,
 			confidence: result.metadata.confidence,
 			reason: result.metadata.reason,
@@ -178,7 +180,7 @@ export class EnhancedChatController {
 		context: ChatContext,
 		error?: any
 	): Promise<ChatResponse> {
-		console.log('[EnhancedChatController] Using legacy fallback');
+		logger.debug('[EnhancedChatController] Using legacy fallback');
 
 		// Simple fallback response based on context
 		const hasBudgets = !!context.budgets?.length;
@@ -288,7 +290,7 @@ export class EnhancedChatController {
 				),
 			});
 		} catch (error) {
-			console.warn('[EnhancedChatController] Analytics logging failed:', error);
+			logger.warn('[EnhancedChatController] Analytics logging failed:', error);
 		}
 	}
 
@@ -378,7 +380,7 @@ export class EnhancedChatController {
 		this.performanceMetrics.streamingRequests++;
 
 		try {
-			console.log(
+			logger.debug(
 				`[EnhancedChatController] Processing with streaming: "${utterance}"`
 			);
 
@@ -413,7 +415,7 @@ export class EnhancedChatController {
 				callbacks.onDone?.();
 			}
 		} catch (error) {
-			console.error('[EnhancedChatController] Streaming error:', error);
+			logger.error('[EnhancedChatController] Streaming error:', error);
 			this.performanceMetrics.failedRequests++;
 			this.performanceMetrics.lastError =
 				error instanceof Error ? error.message : String(error);

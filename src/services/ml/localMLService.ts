@@ -1,4 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { logger } from '../../utils/logger';
+
 
 export interface TransactionFeatures {
 	description: string;
@@ -94,7 +96,7 @@ export class LocalMLService {
 	 */
 	async initialize(): Promise<void> {
 		try {
-			console.log('[LocalMLService] Starting local ML initialization...');
+			logger.debug('[LocalMLService] Starting local ML initialization...');
 
 			// Add timeout protection for storage operations
 			const storageTimeout = new Promise((_, reject) => {
@@ -105,9 +107,9 @@ export class LocalMLService {
 
 			await Promise.race([initPromise, storageTimeout]);
 
-			console.log('[LocalMLService] Local ML models initialized successfully');
+			logger.debug('[LocalMLService] Local ML models initialized successfully');
 		} catch (error) {
-			console.error('[LocalMLService] Error initializing models:', error);
+			logger.error('[LocalMLService] Error initializing models:', error);
 			// Don't throw - allow service to continue with empty models
 			this.vendorPatterns = new Map();
 			this.categoryPatterns = new Map();
@@ -176,12 +178,12 @@ export class LocalMLService {
 
 			// Log performance metrics
 			if (processingTime > 100) {
-				console.warn(`[LocalMLService] Slow prediction: ${processingTime}ms`);
+				logger.warn(`[LocalMLService] Slow prediction: ${processingTime}ms`);
 			}
 
 			return result;
 		} catch (error) {
-			console.error('[LocalMLService] Error categorizing transaction:', error);
+			logger.error('[LocalMLService] Error categorizing transaction:', error);
 			return {
 				category: 'Uncategorized',
 				confidence: 0,
@@ -221,7 +223,7 @@ export class LocalMLService {
 			// Persist updated models
 			await this.persistModelsToStorage();
 
-			console.log(
+			logger.debug(
 				`[LocalMLService] Learned from feedback: ${
 					originalPrediction.category
 				} → ${correctCategory} (Accuracy: ${(this.modelAccuracy * 100).toFixed(
@@ -229,7 +231,7 @@ export class LocalMLService {
 				)}%)`
 			);
 		} catch (error) {
-			console.error('[LocalMLService] Error learning from feedback:', error);
+			logger.error('[LocalMLService] Error learning from feedback:', error);
 		}
 	}
 
@@ -257,7 +259,7 @@ export class LocalMLService {
 
 			return patterns;
 		} catch (error) {
-			console.error(
+			logger.error(
 				'[LocalMLService] Error analyzing spending patterns:',
 				error
 			);
@@ -313,7 +315,7 @@ export class LocalMLService {
 				modelVersion: this.MODEL_VERSION,
 			};
 		} catch (error) {
-			console.error('[LocalMLService] Error getting model metrics:', error);
+			logger.error('[LocalMLService] Error getting model metrics:', error);
 			// Return safe defaults
 			return {
 				totalVendorPatterns: 0,
@@ -332,7 +334,7 @@ export class LocalMLService {
 	 */
 	async trainModel(trainingData: TrainingData): Promise<void> {
 		try {
-			console.log(
+			logger.debug(
 				`[LocalMLService] Training model with ${trainingData.transactions.length} transactions`
 			);
 
@@ -372,11 +374,11 @@ export class LocalMLService {
 			this.lastTrainingTime = Date.now();
 			const trainingTime = this.lastTrainingTime - startTime;
 
-			console.log(
+			logger.debug(
 				`[LocalMLService] Model training completed in ${trainingTime}ms`
 			);
 		} catch (error) {
-			console.error('[LocalMLService] Error training model:', error);
+			logger.error('[LocalMLService] Error training model:', error);
 			throw error;
 		}
 	}
@@ -416,7 +418,7 @@ export class LocalMLService {
 				issues,
 			};
 		} catch (error) {
-			console.error('[LocalMLService] Error validating model:', error);
+			logger.error('[LocalMLService] Error validating model:', error);
 			return {
 				isValid: false,
 				issues: ['Model validation failed: ' + error],
@@ -444,9 +446,9 @@ export class LocalMLService {
 				AsyncStorage.removeItem('category_patterns'),
 			]);
 
-			console.log('[LocalMLService] Model reset completed');
+			logger.debug('[LocalMLService] Model reset completed');
 		} catch (error) {
-			console.error('[LocalMLService] Error resetting model:', error);
+			logger.error('[LocalMLService] Error resetting model:', error);
 			throw error;
 		}
 	}
@@ -1018,7 +1020,7 @@ export class LocalMLService {
 
 	private async loadModelsFromStorage(): Promise<void> {
 		try {
-			console.log('[LocalMLService] Loading models from storage...');
+			logger.debug('[LocalMLService] Loading models from storage...');
 			const [vendorData, categoryData] = await Promise.all([
 				AsyncStorage.getItem('vendor_patterns'),
 				AsyncStorage.getItem('category_patterns'),
@@ -1033,24 +1035,24 @@ export class LocalMLService {
 				for (const [userId, userData] of Object.entries(parsed)) {
 					this.vendorPatterns.set(userId, new Map(Object.entries(userData)));
 				}
-				console.log(
+				logger.debug(
 					`[LocalMLService] Loaded vendor patterns for ${this.vendorPatterns.size} users`
 				);
 			} else {
-				console.log('[LocalMLService] No vendor patterns found');
+				logger.debug('[LocalMLService] No vendor patterns found');
 			}
 
 			if (categoryData) {
 				const parsed = JSON.parse(categoryData);
 				this.categoryPatterns = new Map(Object.entries(parsed));
-				console.log(
+				logger.debug(
 					`[LocalMLService] Loaded ${this.categoryPatterns.size} category patterns`
 				);
 			} else {
-				console.log('[LocalMLService] No category patterns found');
+				logger.debug('[LocalMLService] No category patterns found');
 			}
 		} catch (error) {
-			console.error(
+			logger.error(
 				'[LocalMLService] Error loading models from storage:',
 				error
 			);
@@ -1077,7 +1079,7 @@ export class LocalMLService {
 				AsyncStorage.setItem('category_patterns', JSON.stringify(categoryObj)),
 			]);
 		} catch (error) {
-			console.error(
+			logger.error(
 				'[LocalMLService] Error persisting models to storage:',
 				error
 			);

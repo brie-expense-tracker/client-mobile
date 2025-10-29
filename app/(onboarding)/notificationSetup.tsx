@@ -9,6 +9,7 @@ import {
 	Switch,
 	Alert,
 } from 'react-native';
+import { logger } from '../../src/utils/logger';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useNotification } from '../../src/context/notificationContext';
@@ -107,19 +108,19 @@ export default function NotificationPermissionScreen() {
 	};
 
 	const handleContinue = async () => {
-		console.log('🚀 [NotificationSetup] handleContinue called');
+		logger.debug('🚀 [NotificationSetup] handleContinue called');
 		setLoading(true);
 		try {
 			// Only ask for OS permission when user explicitly continues
-			console.log(
+			logger.debug(
 				'📱 [NotificationSetup] Requesting notification permissions...'
 			);
 			await initialize();
 			// If initialize() completes without throwing, permissions were granted
 			const granted = true;
-			console.log('✅ [NotificationSetup] Permissions granted successfully');
+			logger.debug('✅ [NotificationSetup] Permissions granted successfully');
 
-			console.log('💾 [NotificationSetup] Saving notification preferences...');
+			logger.debug('💾 [NotificationSetup] Saving notification preferences...');
 			await updatePreferences({
 				notifications: {
 					enableNotifications: granted,
@@ -142,17 +143,17 @@ export default function NotificationPermissionScreen() {
 					},
 				},
 			});
-			console.log('✅ [NotificationSetup] Preferences saved successfully');
+			logger.debug('✅ [NotificationSetup] Preferences saved successfully');
 
 			// Mark onboarding as complete
-			console.log('🎯 [NotificationSetup] Marking onboarding as complete...');
+			logger.debug('🎯 [NotificationSetup] Marking onboarding as complete...');
 			await markOnboardingComplete();
-			console.log('✅ [NotificationSetup] Onboarding marked as complete');
+			logger.debug('✅ [NotificationSetup] Onboarding marked as complete');
 
-			console.log('🎉 [NotificationSetup] Navigating to dashboard...');
+			logger.debug('🎉 [NotificationSetup] Navigating to dashboard...');
 			router.replace('/(tabs)/dashboard');
 		} catch (error) {
-			console.error(
+			logger.error(
 				'❌ [NotificationSetup] Error setting up notifications:',
 				error
 			);
@@ -161,8 +162,8 @@ export default function NotificationPermissionScreen() {
 			let errorMessage = 'Unknown error occurred';
 			if (error instanceof Error) {
 				errorMessage = error.message;
-				console.error('❌ [NotificationSetup] Error message:', errorMessage);
-				console.error('❌ [NotificationSetup] Error stack:', error.stack);
+				logger.error('❌ [NotificationSetup] Error message:', errorMessage);
+				logger.error('❌ [NotificationSetup] Error stack:', error.stack);
 			}
 
 			Alert.alert(
@@ -173,16 +174,16 @@ export default function NotificationPermissionScreen() {
 						text: 'Continue Anyway',
 						onPress: async () => {
 							try {
-								console.log(
+								logger.debug(
 									'⚠️ [NotificationSetup] Continuing despite error, marking onboarding complete...'
 								);
 								await markOnboardingComplete();
-								console.log(
+								logger.debug(
 									'✅ [NotificationSetup] Onboarding marked complete, navigating...'
 								);
 								router.replace('/(tabs)/dashboard');
 							} catch (fallbackError) {
-								console.error(
+								logger.error(
 									'❌ [NotificationSetup] Error in fallback:',
 									fallbackError
 								);
@@ -197,17 +198,17 @@ export default function NotificationPermissionScreen() {
 				]
 			);
 		} finally {
-			console.log('🏁 [NotificationSetup] Continue handler complete');
+			logger.debug('🏁 [NotificationSetup] Continue handler complete');
 			setLoading(false);
 		}
 	};
 
 	const handleSkip = async () => {
-		console.log('🚀 [NotificationSetup] handleSkip called');
+		logger.debug('🚀 [NotificationSetup] handleSkip called');
 		setLoading(true);
 		try {
 			// Store preferences but with notifications disabled
-			console.log(
+			logger.debug(
 				'💾 [NotificationSetup] Saving preferences with notifications disabled...'
 			);
 			await updatePreferences({
@@ -232,35 +233,35 @@ export default function NotificationPermissionScreen() {
 					},
 				},
 			});
-			console.log('✅ [NotificationSetup] Preferences saved successfully');
+			logger.debug('✅ [NotificationSetup] Preferences saved successfully');
 
 			// Mark onboarding as complete even when skipping
-			console.log('🎯 [NotificationSetup] Marking onboarding as complete...');
+			logger.debug('🎯 [NotificationSetup] Marking onboarding as complete...');
 			await markOnboardingComplete();
-			console.log('✅ [NotificationSetup] Onboarding marked as complete');
+			logger.debug('✅ [NotificationSetup] Onboarding marked as complete');
 
-			console.log('🎉 [NotificationSetup] Navigating to dashboard...');
+			logger.debug('🎉 [NotificationSetup] Navigating to dashboard...');
 			router.replace('/(tabs)/dashboard');
 		} catch (error) {
-			console.error('❌ [NotificationSetup] Error in skip handler:', error);
+			logger.error('❌ [NotificationSetup] Error in skip handler:', error);
 
 			// Extract error message
 			if (error instanceof Error) {
-				console.error('❌ [NotificationSetup] Error message:', error.message);
-				console.error('❌ [NotificationSetup] Error stack:', error.stack);
+				logger.error('❌ [NotificationSetup] Error message:', error.message);
+				logger.error('❌ [NotificationSetup] Error stack:', error.stack);
 			}
 
 			// Even on error, mark onboarding complete and continue
 			try {
-				console.log(
+				logger.debug(
 					'⚠️ [NotificationSetup] Error occurred, still marking onboarding complete...'
 				);
 				await markOnboardingComplete();
-				console.log(
+				logger.debug(
 					'✅ [NotificationSetup] Onboarding marked complete despite error'
 				);
 			} catch (markError) {
-				console.error(
+				logger.error(
 					'❌ [NotificationSetup] Failed to mark onboarding complete:',
 					markError
 				);
@@ -268,7 +269,7 @@ export default function NotificationPermissionScreen() {
 
 			router.replace('/(tabs)/dashboard');
 		} finally {
-			console.log('🏁 [NotificationSetup] Skip handler complete');
+			logger.debug('🏁 [NotificationSetup] Skip handler complete');
 			setLoading(false);
 		}
 	};

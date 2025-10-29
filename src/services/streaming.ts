@@ -4,6 +4,7 @@
  */
 
 import { startSSE as startSSEManager, cancelSSE } from './streamManager';
+import { logger } from '../utils/logger';
 
 export interface StreamingCallbacks {
 	onDelta: (text: string) => void;
@@ -50,7 +51,7 @@ export function startSSE({
 			clearTimeout(inactivityTimer);
 		}
 		inactivityTimer = setTimeout(() => {
-			console.warn('🚨 [SSE] Stream timeout (inactivity):', reason);
+			logger.warn('🚨 [SSE] Stream timeout (inactivity):', reason);
 			onError('Stream timeout - inactivity');
 			cleanup();
 		}, INACTIVITY_MS);
@@ -61,7 +62,7 @@ export function startSSE({
 		const timeSinceLastTick = Date.now() - lastTick;
 		if (timeSinceLastTick > 150000) {
 			// 2.5 minutes of silence (fallback to inactivity timer)
-			console.warn('🚨 [SSE] Stream stalled after 2.5m, closing connection', {
+			logger.warn('🚨 [SSE] Stream stalled after 2.5m, closing connection', {
 				timeSinceLastTick,
 				readyState: eventSource ? (eventSource as any).readyState : 'no source',
 				url: url.substring(0, 100) + '...',
@@ -71,7 +72,7 @@ export function startSSE({
 			cleanup();
 		} else if (timeSinceLastTick > 30000) {
 			// 30s warning
-			console.warn('⚠️ [SSE] Stream slow - no data for 30s', {
+			logger.warn('⚠️ [SSE] Stream slow - no data for 30s', {
 				timeSinceLastTick,
 				readyState: eventSource ? (eventSource as any).readyState : 'no source',
 			});
@@ -101,7 +102,7 @@ export function startSSE({
 					// Handle sequence number deduplication
 					if (typeof data.seq === 'number') {
 						if (data.seq <= lastSeq) {
-							console.warn('🚫 [SSE] Dropping duplicate/out-of-order delta:', {
+							logger.warn('🚫 [SSE] Dropping duplicate/out-of-order delta:', {
 								seq: data.seq,
 								lastSeq,
 								text: data.text?.substring(0, 50) + '...',
@@ -117,7 +118,7 @@ export function startSSE({
 					}
 				},
 				onDone: (full?: string) => {
-					console.log('✅ [SSE] Stream completed via stream manager', {
+					logger.debug('✅ [SSE] Stream completed via stream manager', {
 						timestamp: new Date().toISOString(),
 						hasFull: !!full,
 					});
@@ -126,7 +127,7 @@ export function startSSE({
 					onDone();
 				},
 				onError: (e: any) => {
-					console.error('🚨 [SSE] Stream error via stream manager:', e);
+					logger.error('🚨 [SSE] Stream error via stream manager:', e);
 					lastTick = Date.now();
 					cleanup();
 					onError('Stream error');
@@ -139,7 +140,7 @@ export function startSSE({
 
 			// Handle connection open
 			eventSource.addEventListener('open', () => {
-				console.log('🔗 [SSE] Connection established', {
+				logger.debug('🔗 [SSE] Connection established', {
 					url: url.substring(0, 100) + '...',
 					readyState: (eventSource as any).readyState,
 					timestamp: new Date().toISOString(),
@@ -154,10 +155,10 @@ export function startSSE({
 				resetInactivityTimer('meta');
 				try {
 					const data = JSON.parse(ev.data);
-					console.log('📦 [SSE] Meta event received:', data);
+					logger.debug('📦 [SSE] Meta event received:', data);
 					onMeta?.(data);
 				} catch (error) {
-					console.warn('⚠️ [SSE] Failed to parse meta event:', error);
+					logger.warn('⚠️ [SSE] Failed to parse meta event:', error);
 				}
 			});
 
@@ -176,7 +177,7 @@ export function startSSE({
 
 					// Gate on clientMessageId to prevent processing events from wrong messages
 					if (clientMessageId && data.clientMessageId !== clientMessageId) {
-						console.warn('🚫 [SSE] Dropping delta for different message:', {
+						logger.warn('🚫 [SSE] Dropping delta for different message:', {
 							expected: clientMessageId,
 							received: data.clientMessageId,
 							text: data.text?.substring(0, 50) + '...',
@@ -187,7 +188,7 @@ export function startSSE({
 					// Handle sequence number deduplication
 					if (typeof data.seq === 'number') {
 						if (data.seq <= lastSeq) {
-							console.warn('🚫 [SSE] Dropping duplicate/out-of-order delta:', {
+							logger.warn('🚫 [SSE] Dropping duplicate/out-of-order delta:', {
 								seq: data.seq,
 								lastSeq,
 								text: data.text?.substring(0, 50) + '...',
@@ -197,7 +198,7 @@ export function startSSE({
 						lastSeq = data.seq;
 					}
 
-					console.log('📝 [SSE] Delta event received:', {
+					logger.debug('📝 [SSE] Delta event received:', {
 						textLength: data.text?.length || 0,
 						text: data.text?.substring(0, 50) + '...',
 						seq: data.seq,
@@ -208,7 +209,7 @@ export function startSSE({
 						onDelta(data.text);
 					}
 				} catch (error) {
-					console.warn('⚠️ [SSE] Failed to parse delta event:', error, {
+					logger.warn('⚠️ [SSE] Failed to parse delta event:', error, {
 						rawData: ev.data,
 						timestamp: new Date().toISOString(),
 					});
@@ -217,7 +218,7 @@ export function startSSE({
 
 			// Handle done event
 			eventSource.addEventListener('done', (ev: MessageEvent) => {
-				console.log('✅ [SSE] Stream completed', {
+				logger.debug('✅ [SSE] Stream completed', {
 					timestamp: new Date().toISOString(),
 					readyState: (eventSource as any).readyState,
 					rawData: ev.data,
@@ -234,7 +235,7 @@ export function startSSE({
 
 			// Handle error event
 			eventSource.addEventListener('error', (ev: MessageEvent) => {
-				console.error('🚨 [SSE] Stream error event:', {
+				logger.error('🚨 [SSE] Stream error event:', {
 					event: ev,
 					timestamp: new Date().toISOString(),
 					readyState: (eventSource as any).readyState,
@@ -252,7 +253,7 @@ export function startSSE({
 
 			// Handle connection errors
 			eventSource.onerror = (error) => {
-				console.error('🚨 [SSE] EventSource error:', {
+				logger.error('🚨 [SSE] EventSource error:', {
 					error,
 					timestamp: new Date().toISOString(),
 					readyState: (eventSource as any).readyState,
@@ -279,7 +280,7 @@ export function startSSE({
 			// but we already handle delta, meta, done, error events specifically above
 		}
 	} catch (error) {
-		console.error('💥 [SSE] Failed to create EventSource:', error);
+		logger.error('💥 [SSE] Failed to create EventSource:', error);
 		cleanup();
 		onError('Failed to create connection');
 	}
@@ -307,7 +308,7 @@ class ConnectionManager {
 			(this.currentConnection?.eventSource &&
 				(this.currentConnection.eventSource as any).readyState === 1)
 		) {
-			console.warn('⚠️ [SSE] Connection already active, skipping duplicate');
+			logger.warn('⚠️ [SSE] Connection already active, skipping duplicate');
 			return { cancel: () => {} };
 		}
 

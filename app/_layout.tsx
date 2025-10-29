@@ -1,5 +1,4 @@
-// MUST be imported before anything that uses uuid/crypto
-import '../src/polyfills';
+// Polyfills are loaded in `client-mobile/index.ts` before router entry
 
 import { Stack, useRouter, useSegments } from 'expo-router';
 import React, { useEffect, useState, useCallback } from 'react';
@@ -18,6 +17,7 @@ import {
 	StatusBar,
 	Linking,
 } from 'react-native';
+import { createLogger } from '../src/utils/sublogger';
 import {
 	SafeAreaProvider,
 	initialWindowMetrics,
@@ -36,17 +36,13 @@ import { GoalProvider } from '../src/context/goalContext';
 import { RecurringExpenseProvider } from '../src/context/recurringExpenseContext';
 import { ThemeProvider } from '../src/context/ThemeContext';
 import { loadLocalOverrides, getResolvedFlags } from '../src/config/features';
-
 import * as Notifications from 'expo-notifications';
-
-// Import background task service
 import { ensureBgPushRegistered } from '../src/services/notifications/backgroundTaskService';
-
-// Import app initialization hook
 import { useAppInit } from '../src/hooks/useAppInit';
-
-// Import dev mode from environment config (single source of truth)
 import { DEV_MODE, isDevMode } from '../src/config/environment';
+
+// Create namespaced logger for this service
+const layoutLog = createLogger('Layout');
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -102,7 +98,7 @@ function RootLayoutContent() {
 	const logState = useCallback(
 		(label: string) => {
 			if (isDevMode) {
-				console.log(`🔎 [Layout][${label}]`, {
+				layoutLog.debug(`${label}`, {
 					loading,
 					loadingTimeout,
 					firebaseUser: !!firebaseUser,
@@ -125,7 +121,7 @@ function RootLayoutContent() {
 		try {
 			setIsMounted(true);
 		} catch (error) {
-			console.warn('Failed to set mounted state:', error);
+			layoutLog.warn('Failed to set mounted state:', error);
 		}
 	}, []);
 
@@ -142,7 +138,7 @@ function RootLayoutContent() {
 				}),
 			});
 		} catch (error) {
-			console.warn(
+			layoutLog.warn(
 				'[Notifications] Failed to set notification handler:',
 				error
 			);
@@ -157,11 +153,11 @@ function RootLayoutContent() {
 		const handleDeepLink = (url: string) => {
 			try {
 				if (isDevMode) {
-					console.log('Deep link received:', url);
+					layoutLog.debug('Deep link received:', url);
 				}
 				// expo-router will handle the navigation automatically
 			} catch (error) {
-				console.warn('Failed to handle deep link:', error);
+				layoutLog.warn('Failed to handle deep link:', error);
 			}
 		};
 
@@ -174,10 +170,10 @@ function RootLayoutContent() {
 					}
 				})
 				.catch((error) => {
-					console.warn('Failed to get initial URL:', error);
+					layoutLog.warn('Failed to get initial URL:', error);
 				});
 		} catch (error) {
-			console.warn('Failed to get initial URL:', error);
+			layoutLog.warn('Failed to get initial URL:', error);
 		}
 
 		// Handle deep links when app is already running
@@ -187,7 +183,7 @@ function RootLayoutContent() {
 				handleDeepLink(event.url);
 			});
 		} catch (error) {
-			console.warn('Failed to add deep link listener:', error);
+			layoutLog.warn('Failed to add deep link listener:', error);
 		}
 
 		return () => {
@@ -196,7 +192,7 @@ function RootLayoutContent() {
 					subscription.remove();
 				}
 			} catch (error) {
-				console.warn('Failed to remove deep link listener:', error);
+				layoutLog.warn('Failed to remove deep link listener:', error);
 			}
 		};
 	}, []);
@@ -211,10 +207,8 @@ function RootLayoutContent() {
 			// Set a timeout to prevent infinite loading when onboarding status won't load
 			const timeout = setTimeout(() => {
 				if (isDevMode) {
-					console.log(
-						'⚠️ [Layout] Loading timeout reached for null onboarding status'
-					);
-					console.log('🔍 [Layout] Debug state:', {
+					layoutLog.debug('Loading timeout reached for null onboarding status');
+					layoutLog.debug('Debug state:', {
 						loading,
 						user: !!user,
 						hasSeenOnboarding,
@@ -260,14 +254,14 @@ function RootLayoutContent() {
 				if (needsOnboarding && !inOnboardingGroup) {
 					logState('nav-effect:redirecting-to-onboarding');
 					if (isDevMode) {
-						console.log(
-							'🧭 [Layout] User needs onboarding, redirecting to profile setup'
+						layoutLog.debug(
+							'User needs onboarding, redirecting to profile setup'
 						);
 					}
 					try {
 						router.replace('/(onboarding)/profileSetup');
 					} catch (error) {
-						console.warn('Failed to navigate to onboarding:', error);
+						layoutLog.warn('Failed to navigate to onboarding:', error);
 					}
 				} else if (
 					hasCompletedOnboarding &&
@@ -278,14 +272,14 @@ function RootLayoutContent() {
 					// Only redirect to dashboard if onboarding is confirmed complete
 					logState('nav-effect:redirecting-to-dashboard');
 					if (isDevMode) {
-						console.log(
-							'🧭 [Layout] User completed onboarding, redirecting to dashboard'
+						layoutLog.debug(
+							'User completed onboarding, redirecting to dashboard'
 						);
 					}
 					try {
 						router.replace('/(tabs)/dashboard');
 					} catch (error) {
-						console.warn('Failed to navigate to dashboard:', error);
+						layoutLog.warn('Failed to navigate to dashboard:', error);
 					}
 				} else if (
 					hasSeenOnboarding === null &&
@@ -297,14 +291,14 @@ function RootLayoutContent() {
 					// Timeout reached and status still null - assume completed for now to unblock
 					logState('nav-effect:timeout-redirect');
 					if (isDevMode) {
-						console.log(
-							'🧭 [Layout] Timeout reached with null onboarding status, redirecting to dashboard'
+						layoutLog.debug(
+							'Timeout reached with null onboarding status, redirecting to dashboard'
 						);
 					}
 					try {
 						router.replace('/(tabs)/dashboard');
 					} catch (error) {
-						console.warn('Failed to navigate to dashboard:', error);
+						layoutLog.warn('Failed to navigate to dashboard:', error);
 					}
 				}
 			} else if (firebaseUser && !user) {
@@ -312,7 +306,7 @@ function RootLayoutContent() {
 					try {
 						router.replace('/(auth)/login');
 					} catch (error) {
-						console.warn('Failed to navigate to login:', error);
+						layoutLog.warn('Failed to navigate to login:', error);
 					}
 				}
 			} else {
@@ -320,12 +314,12 @@ function RootLayoutContent() {
 					try {
 						router.replace('/(auth)/login');
 					} catch (error) {
-						console.warn('Failed to navigate to login:', error);
+						layoutLog.warn('Failed to navigate to login:', error);
 					}
 				}
 			}
 		} catch (error) {
-			console.warn('Failed to handle navigation logic:', error);
+			layoutLog.warn('Failed to handle navigation logic:', error);
 		}
 	}, [
 		user,
@@ -345,7 +339,7 @@ function RootLayoutContent() {
 		(user && hasSeenOnboarding === null && !loadingTimeout)
 	) {
 		if (isDevMode) {
-			console.log('🧩 [Layout] Rendering: loading screen');
+			layoutLog.debug('Rendering: loading screen');
 		}
 		return (
 			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -363,7 +357,7 @@ function RootLayoutContent() {
 	// If user is authenticated, always wrap all screens in ProfileProvider
 	if (firebaseUser && user) {
 		if (isDevMode) {
-			console.log('🧩 [Layout] Rendering: authenticated app');
+			layoutLog.debug('Rendering: authenticated app');
 		}
 		try {
 			return (
@@ -413,7 +407,7 @@ function RootLayoutContent() {
 				</ProfileProvider>
 			);
 		} catch (error) {
-			console.warn('Failed to render authenticated user layout:', error);
+			layoutLog.warn('Failed to render authenticated user layout:', error);
 			// Fallback to basic loading screen
 			return (
 				<View
@@ -428,7 +422,7 @@ function RootLayoutContent() {
 
 	// For unauthenticated or auth screens, just show the stack (no user-dependent providers)
 	if (isDevMode) {
-		console.log('🧩 [Layout] Rendering: unauthenticated stack');
+		layoutLog.debug('Rendering: unauthenticated stack');
 	}
 	return (
 		<GestureHandlerRootView style={{ flex: 1 }}>
@@ -480,29 +474,28 @@ export default function RootLayout() {
 				// Log resolved feature flags for debugging
 				const flags = getResolvedFlags();
 				if (isDevMode) {
-					console.log('🔧 [Features] Resolved flags:', flags);
+					layoutLog.debug('Resolved flags:', flags);
 				}
 
 				// Production safety check
 				if (process.env.NODE_ENV === 'production') {
-					console.assert(
-						!flags.aiInsights,
-						'AI Insights must be off in production'
-					);
+					if (flags.aiInsights) {
+						layoutLog.error('AI Insights must be off in production');
+					}
 				}
 
 				// Verify Firebase configuration
 				try {
 					const app = getApp();
 					if (isDevMode) {
-						console.log('✅ Firebase initialized successfully:', app.name);
-						console.log('Firebase project ID:', app.options.projectId);
+						layoutLog.debug('Firebase initialized successfully:', app.name);
+						layoutLog.debug('Firebase project ID:', app.options.projectId);
 					}
 				} catch (firebaseError) {
-					console.error('❌ Firebase initialization failed:', firebaseError);
+					layoutLog.error('Firebase initialization failed:', firebaseError);
 				}
 			} catch (error) {
-				console.warn('Failed to load fonts:', error);
+				layoutLog.warn('Failed to load fonts:', error);
 				setFontsLoaded(true);
 			}
 		})();
@@ -553,7 +546,7 @@ export default function RootLayout() {
 			</SafeAreaProvider>
 		);
 	} catch (error) {
-		console.warn('Failed to render root layout:', error);
+		layoutLog.warn('Failed to render root layout:', error);
 		// Fallback to basic error screen
 		return (
 			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>

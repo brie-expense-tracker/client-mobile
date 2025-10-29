@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { logger } from '../../src/utils/logger';
 import {
 	View,
 	StyleSheet,
@@ -131,7 +132,7 @@ const EditBudgetScreen: React.FC = () => {
 				{ text: 'OK', onPress: () => router.back() },
 			]);
 		} catch (error) {
-			console.error('[EditBudgetScreen] Error updating:', error);
+			logger.error('[EditBudgetScreen] Error updating:', error);
 			// More specific error message if available
 			const errorMessage =
 				(error as any)?.response?.data?.message ||
@@ -155,12 +156,12 @@ const EditBudgetScreen: React.FC = () => {
 					style: 'destructive',
 					onPress: async () => {
 						try {
-							console.log('🗑️ [EditBudget] Deleting budget:', budget.id);
+							logger.debug('🗑️ [EditBudget] Deleting budget:', budget.id);
 							await deleteBudget(budget.id);
-							console.log('✅ [EditBudget] Budget deleted successfully');
+							logger.debug('✅ [EditBudget] Budget deleted successfully');
 							router.back();
 						} catch (error) {
-							console.error('❌ [EditBudget] Delete failed:', error);
+							logger.error('❌ [EditBudget] Delete failed:', error);
 							const errorMsg =
 								error instanceof Error
 									? error.message

@@ -1,5 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { RecurringExpense } from '../services';
+import { createLogger } from './sublogger';
+
+const appearanceLog = createLogger('AppearanceResolver');
 
 // Vendor icon/color mappings - smart defaults for known services
 const VENDOR_MAPPINGS: Record<
@@ -120,10 +123,12 @@ export function resolveRecurringExpenseAppearance(
 	color: string;
 	source: 'custom' | 'brand' | 'default';
 } {
-	console.log('🎨 [AppearanceResolver] Resolving for:', expense.vendor);
-	console.log('  - appearanceMode:', expense.appearanceMode);
-	console.log('  - icon:', expense.icon);
-	console.log('  - color:', expense.color);
+	appearanceLog.debug('Resolving appearance', {
+		vendor: expense.vendor,
+		appearanceMode: expense.appearanceMode,
+		icon: expense.icon,
+		color: expense.color,
+	});
 
 	// 1) Custom overrides win - user explicitly chose icon/color
 	if (expense.appearanceMode === 'custom') {
@@ -133,7 +138,7 @@ export function resolveRecurringExpenseAppearance(
 			color: expense.color || '#1E88E5',
 			source: 'custom' as const,
 		};
-		console.log('  ✅ Using CUSTOM appearance:', result);
+		appearanceLog.debug('Using CUSTOM appearance', result);
 		return result;
 	}
 
@@ -145,7 +150,7 @@ export function resolveRecurringExpenseAppearance(
 			color: brandMapping.color,
 			source: 'brand' as const,
 		};
-		console.log('  ✅ Using BRAND appearance:', result);
+		appearanceLog.debug('Using BRAND appearance', result);
 		return result;
 	}
 
@@ -155,6 +160,6 @@ export function resolveRecurringExpenseAppearance(
 		color: '#1E88E5',
 		source: 'default' as const,
 	};
-	console.log('  ✅ Using DEFAULT appearance:', result);
+	appearanceLog.debug('Using DEFAULT appearance', result);
 	return result;
 }

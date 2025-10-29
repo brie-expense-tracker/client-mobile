@@ -1,5 +1,8 @@
 import { Platform } from 'react-native';
 import * as Device from 'expo-device';
+import { createLogger } from '../utils/sublogger';
+
+const envLog = createLogger('Environment');
 
 // Environment configuration with proper URL resolution
 export const ENV = {
@@ -40,7 +43,7 @@ function isSimulator(): boolean {
 export function resolveApiBaseUrl(): string {
 	// Only log in dev mode
 	if (isDevMode) {
-		console.log('🔧 [Environment] Using API URL:', ENV.API_URL);
+		envLog.debug('Using API URL', { url: ENV.API_URL });
 	}
 	return ENV.API_URL;
 }
@@ -91,24 +94,20 @@ export const isDevMode = isDevelopment && DEV_MODE;
 
 // Debug logging - only when dev mode is enabled
 if (isDevMode) {
-	console.log('🔧 [Environment] Configuration loaded:');
-	console.log('🔧 [Environment] NODE_ENV:', ENV.NODE_ENV);
-	console.log('🔧 [Environment] EXPO_PUBLIC_ENV:', ENV.EXPO_PUBLIC_ENV);
-	console.log('🔧 [Environment] DEV_MODE:', DEV_MODE);
-	console.log('🔧 [Environment] isDevMode:', isDevMode);
-	console.log('🔧 [Environment] Platform:', Platform.OS);
-	console.log('🔧 [Environment] Is Device:', Device.isDevice);
-	console.log('🔧 [Environment] Is Simulator:', isSimulator());
-	console.log('🔧 [Environment] API URL:', ENV.API_URL);
-	console.log('🔧 [Environment] API Base URL:', resolveApiBaseUrl());
-	console.log('🔧 [Environment] Full API URL:', getApiUrl());
-	console.log('🔧 [Environment] HMAC Secret available:', !!ENV.HMAC_SECRET_KEY);
-	console.log(
-		'🔧 [Environment] HMAC Secret length:',
-		ENV.HMAC_SECRET_KEY?.length || 0
-	);
-	console.log(
-		'🔧 [Environment] HMAC Secret (first 8 chars):',
-		ENV.HMAC_SECRET_KEY?.substring(0, 8) + '...' || 'undefined'
-	);
+	envLog.debug('Configuration loaded', {
+		NODE_ENV: ENV.NODE_ENV,
+		EXPO_PUBLIC_ENV: ENV.EXPO_PUBLIC_ENV,
+		DEV_MODE: DEV_MODE,
+		isDevMode,
+		platform: Platform.OS,
+		isDevice: Device.isDevice,
+		isSimulator: isSimulator(),
+		apiUrl: ENV.API_URL,
+		apiBaseUrl: resolveApiBaseUrl(),
+		fullApiUrl: getApiUrl(),
+		hmacSecretAvailable: !!ENV.HMAC_SECRET_KEY,
+		hmacSecretLength: ENV.HMAC_SECRET_KEY?.length || 0,
+		hmacSecretPreview:
+			ENV.HMAC_SECRET_KEY?.substring(0, 8) + '...' || 'undefined',
+	});
 }

@@ -28,8 +28,12 @@ import { useGoal, Goal } from '../../../src/context/goalContext';
 import { useBudget, Budget } from '../../../src/context/budgetContext';
 import { navigateToGoalsWithModal } from '../../../src/utils/navigationUtils';
 import { FooterBar } from '../../../src/ui';
-import { DateField } from '../../../src/components/DateField';
 import BottomSheet from '../../../src/components/BottomSheet';
+import { isDevMode } from '../../../src/config/environment';
+import { createLogger } from '../../../src/utils/sublogger';
+
+// Create namespaced logger for this service
+const transactionScreenLog = createLogger('TransactionScreen');
 
 // =============================================================
 // Design tokens (modern blue accent)
@@ -119,19 +123,23 @@ export default function TransactionScreenProModern() {
 
 	// Debug logging for goals and budgets
 	useEffect(() => {
-		console.log('🎯 [TransactionScreen] Goals data:', {
-			count: goals?.length || 0,
-			goals: goals,
-			isLoading: goalsLoading,
-		});
+		if (isDevMode) {
+			transactionScreenLog.debug('Goals data', {
+				count: goals?.length || 0,
+				goals: goals,
+				isLoading: goalsLoading,
+			});
+		}
 	}, [goals, goalsLoading]);
 
 	useEffect(() => {
-		console.log('💰 [TransactionScreen] Budgets data:', {
-			count: budgets?.length || 0,
-			budgets: budgets,
-			isLoading: budgetsLoading,
-		});
+		if (isDevMode) {
+			transactionScreenLog.debug('Budgets data', {
+				count: budgets?.length || 0,
+				budgets: budgets,
+				isLoading: budgetsLoading,
+			});
+		}
 	}, [budgets, budgetsLoading]);
 
 	const ready = mode === 'income' ? !goalsLoading : !budgetsLoading;
@@ -303,7 +311,9 @@ export default function TransactionScreenProModern() {
 				]
 			);
 		} catch (e) {
-			console.log('Save transaction error', e);
+			if (isDevMode) {
+				transactionScreenLog.error('Save transaction error', e);
+			}
 			Alert.alert('Error', 'Failed to save. Please try again.');
 		} finally {
 			setIsSubmitting(false);
@@ -650,11 +660,13 @@ export default function TransactionScreenProModern() {
 					getItemLayout={(_, i) => ({ length: 48, offset: 48 * i, index: i })}
 					ListEmptyComponent={() => {
 						const data = pickerOpen === 'goal' ? goals : budgets;
-						console.log('📋 [TransactionScreen] Picker Empty:', {
-							type: pickerOpen,
-							dataLength: data?.length || 0,
-							data: data,
-						});
+						if (isDevMode) {
+							transactionScreenLog.debug('Picker Empty', {
+								type: pickerOpen,
+								dataLength: data?.length || 0,
+								data: data,
+							});
+						}
 						return (
 							<View style={{ paddingVertical: 16 }}>
 								<Text style={{ color: palette.sub }}>

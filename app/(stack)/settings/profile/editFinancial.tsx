@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { logger } from '../../../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -28,7 +29,6 @@ export default function EditFinancialScreen() {
 			setDebt(profile.debt?.toString() || '');
 		}
 	}, [profile]);
-
 
 	const formatCurrency = (value: string) => {
 		// Remove any non-digit characters except decimal point
@@ -66,7 +66,7 @@ export default function EditFinancialScreen() {
 				},
 			]);
 		} catch (error) {
-			console.error('Error updating financial information:', error);
+			logger.error('Error updating financial information:', error);
 			Alert.alert('Error', 'Failed to update financial information');
 		} finally {
 			setIsLoading(false);

@@ -3,6 +3,8 @@
 
 import { ChatResponse } from './responseSchema';
 import {
+import { logger } from '../../../utils/logger';
+
 	FinancialSkillId,
 	getSkill,
 } from './skills/comprehensiveSkillRegistry';
@@ -198,7 +200,7 @@ export class HybridAIOrchestrator {
 				}
 			);
 		} catch (error) {
-			console.error('[HybridAIOrchestrator] Processing error:', error);
+			logger.error('[HybridAIOrchestrator] Processing error:', error);
 
 			// Fallback to smart fallback system
 			const fallbackResponse = smartFallbackSystem.generateFallbackResponse(
@@ -255,7 +257,7 @@ export class HybridAIOrchestrator {
 		try {
 			return await hierarchicalRouter.route(utterance, context);
 		} catch (error) {
-			console.error('[HybridAIOrchestrator] Routing error:', error);
+			logger.error('[HybridAIOrchestrator] Routing error:', error);
 			return {
 				type: 'FALLBACK_GUIDED',
 				confidence: 0.3,
@@ -289,7 +291,7 @@ export class HybridAIOrchestrator {
 				context
 			);
 		} catch (error) {
-			console.error('[HybridAIOrchestrator] Answerability check error:', error);
+			logger.error('[HybridAIOrchestrator] Answerability check error:', error);
 			return {
 				canAnswer: false,
 				confidence: 0.0,
@@ -325,7 +327,7 @@ export class HybridAIOrchestrator {
 
 			return slotResolver.resolveSlots(utterance, requiredSlots, context);
 		} catch (error) {
-			console.error('[HybridAIOrchestrator] Slot resolution error:', error);
+			logger.error('[HybridAIOrchestrator] Slot resolution error:', error);
 			return undefined;
 		}
 	}
@@ -441,7 +443,7 @@ export class HybridAIOrchestrator {
 
 			return response;
 		} catch (error) {
-			console.error(
+			logger.error(
 				`[HybridAIOrchestrator] Skill execution error for ${skillId}:`,
 				error
 			);
@@ -464,7 +466,7 @@ export class HybridAIOrchestrator {
 				.classifyResponse(response, context);
 
 			if (!safetyClassification.isSafe) {
-				console.warn(
+				logger.warn(
 					'[HybridAIOrchestrator] Safety issue detected:',
 					safetyClassification.reasons
 				);
@@ -487,7 +489,7 @@ export class HybridAIOrchestrator {
 
 			return response;
 		} catch (error) {
-			console.error('[HybridAIOrchestrator] Safety check error:', error);
+			logger.error('[HybridAIOrchestrator] Safety check error:', error);
 			return response;
 		}
 	}

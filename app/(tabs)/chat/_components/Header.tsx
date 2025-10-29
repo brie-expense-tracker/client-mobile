@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { logger } from '../../../../src/utils/logger';
 import {
 	SafeAreaView,
 	Text,
@@ -35,7 +36,7 @@ export default function Header({
 		}
 
 		// Debug logging to see actual usage values
-		console.log('🔍 [Header] Current usage:', {
+		logger.debug('🔍 [Header] Current usage:', {
 			tokens: `${currentUsage.currentTokens}/${currentUsage.tokenLimit}`,
 			requests: `${currentUsage.currentRequests}/${currentUsage.requestLimit}`,
 			conversations: `${currentUsage.currentConversations}/${currentUsage.conversationLimit}`,
@@ -50,7 +51,7 @@ export default function Header({
 			(currentUsage.currentConversations / currentUsage.conversationLimit) *
 			100;
 
-		console.log('🔍 [Header] Usage percentages:', {
+		logger.debug('🔍 [Header] Usage percentages:', {
 			tokens: tokenUsagePercent.toFixed(1) + '%',
 			requests: requestUsagePercent.toFixed(1) + '%',
 			conversations: conversationUsagePercent.toFixed(1) + '%',
@@ -65,14 +66,14 @@ export default function Header({
 
 		// Only show indicator when actually approaching limits (above 60%)
 		if (maxUsagePercent > 60) {
-			console.log(
+			logger.debug(
 				'🔍 [Header] Showing usage indicator at',
 				maxUsagePercent.toFixed(1) + '%'
 			);
 			setUsagePercent(maxUsagePercent);
 			setShowUsageIndicator(true);
 		} else {
-			console.log('🔍 [Header] Hiding usage indicator (usage below 60%)');
+			logger.debug('🔍 [Header] Hiding usage indicator (usage below 60%)');
 			setShowUsageIndicator(false);
 		}
 	}, [currentUsage]);

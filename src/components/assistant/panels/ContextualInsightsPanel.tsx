@@ -12,6 +12,9 @@ import {
 	Insight,
 } from '../../../services/insights/insightsContextService';
 import { useProfile } from '../../../context/profileContext';
+import { createLogger } from '../../../utils/sublogger';
+
+const contextualInsightsLog = createLogger('ContextualInsightsPanel');
 
 type Props = {
 	conversationContext?: string;
@@ -39,11 +42,10 @@ export default function ContextualInsightsPanel({
 
 	// Debug: Log insights panel state changes
 	useEffect(() => {
-		console.log('🔧 [DEBUG] ContextualInsightsPanel state changed:', {
+		contextualInsightsLog.debug('State changed', {
 			isAIInsightsEnabled,
 			hasProfile: !!profile,
 			aiInsightsEnabled: profile?.preferences?.aiInsights?.enabled,
-			timestamp: new Date().toISOString(),
 		});
 	}, [isAIInsightsEnabled, profile]);
 

@@ -13,6 +13,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { BorderlessButton, RectButton } from 'react-native-gesture-handler';
 import RNModal from 'react-native-modal';
 import { TransactionContext } from '../../../../src/context/transactionContext';
+import { isDevMode } from '../../../../src/config/environment';
+import { createLogger } from '../../../../src/utils/sublogger';
+
+const quickAddBudgetTransactionLog = createLogger('QuickAddBudgetTransaction');
 // Transaction interface defined inline since we removed the mock data file
 interface Transaction {
 	id: string;
@@ -48,12 +52,14 @@ const QuickAddBudgetTransaction: React.FC<QuickAddBudgetTransactionProps> = ({
 	budgetColor = '#00a2ff',
 	onTransactionAdded,
 }) => {
-	console.log('[QuickAddBudgetTransaction] Props received:', {
-		isVisible,
-		budgetId,
-		budgetName,
-		budgetColor,
-	});
+	if (isDevMode) {
+		quickAddBudgetTransactionLog.debug('Props received', {
+			isVisible,
+			budgetId,
+			budgetName,
+			budgetColor,
+		});
+	}
 
 	const { addTransaction } = useContext(TransactionContext);
 	const [transaction, setTransaction] = useState({
@@ -166,10 +172,12 @@ const QuickAddBudgetTransaction: React.FC<QuickAddBudgetTransactionProps> = ({
 				targetModel: 'Budget',
 			};
 
-			console.log(
-				'[QuickAddBudgetTransaction] Creating transaction:',
-				transactionData
-			);
+			if (isDevMode) {
+				quickAddBudgetTransactionLog.debug(
+					'[QuickAddBudgetTransaction] Creating transaction:',
+					transactionData
+				);
+			}
 
 			await addTransaction(transactionData);
 
@@ -185,7 +193,7 @@ const QuickAddBudgetTransaction: React.FC<QuickAddBudgetTransactionProps> = ({
 			Alert.alert('Success', 'Transaction added to budget successfully!');
 			onTransactionAdded?.(); // Notify parent
 		} catch (error) {
-			console.error('Error adding budget transaction:', error);
+			quickAddBudgetTransactionLog.error('Error adding budget transaction', error);
 			Alert.alert('Error', 'Failed to add transaction. Please try again.');
 		}
 	};

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { logger } from '../../../../src/utils/logger';
 import {
 	SafeAreaView,
 	ScrollView,
@@ -144,7 +145,7 @@ export default function GoalSettingsScreen() {
 
 			Alert.alert('Success', 'Goal settings saved successfully');
 		} catch (error) {
-			console.error('Error saving goal settings:', error);
+			logger.error('Error saving goal settings:', error);
 			Alert.alert('Error', 'Failed to save goal settings');
 		} finally {
 			setSaving(false);

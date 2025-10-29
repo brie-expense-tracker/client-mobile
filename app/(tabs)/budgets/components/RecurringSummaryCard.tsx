@@ -11,6 +11,10 @@ import { RectButton } from 'react-native-gesture-handler';
 import { RecurringExpenseService } from '../../../../src/services';
 import { palette, space, type as typography } from '../../../../src/ui';
 import { currency } from '../../../../src/utils/format';
+import { isDevMode } from '../../../../src/config/environment';
+import { createLogger } from '../../../../src/utils/sublogger';
+
+const recurringSummaryCardLog = createLogger('RecurringSummaryCard');
 
 interface RecurringExpense {
 	patternId: string;
@@ -81,9 +85,11 @@ const RecurringSummaryCard: React.FC<Props> = ({
 					.filter((id) => id && objectIdRe.test(id));
 
 				if (patternIds.length === 0) {
-					console.log(
-						'⚠️ [RecurringSummaryCard] No valid ObjectIds to check payment status'
-					);
+					if (isDevMode) {
+						recurringSummaryCardLog.debug(
+							'⚠️ [RecurringSummaryCard] No valid ObjectIds to check payment status'
+						);
+					}
 					setExpensesWithPaymentStatus(
 						expenses.map((expense) => ({
 							...expense,
@@ -124,7 +130,7 @@ const RecurringSummaryCard: React.FC<Props> = ({
 
 				setExpensesWithPaymentStatus(expensesWithStatus);
 			} catch (error) {
-				console.error('Error checking payment status:', error);
+				recurringSummaryCardLog.error('Error checking payment status', error);
 				setPaymentStatusError('Failed to load payment status');
 				setExpensesWithPaymentStatus(
 					expenses.map((expense) => ({
@@ -181,7 +187,7 @@ const RecurringSummaryCard: React.FC<Props> = ({
 
 				setExpensesWithPaymentStatus(expensesWithStatus);
 			} catch (error) {
-				console.error('Error refreshing payment status:', error);
+				recurringSummaryCardLog.error('Error refreshing payment status', error);
 				setPaymentStatusError('Failed to refresh payment status');
 			} finally {
 				setIsLoadingPaymentStatus(false);

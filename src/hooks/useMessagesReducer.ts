@@ -1,4 +1,7 @@
 import { useReducer, useRef, useCallback } from 'react';
+import { createLogger } from '../utils/sublogger';
+
+const messagesReducerLog = createLogger('useMessagesReducer');
 
 export interface Message {
 	id: string;
@@ -62,12 +65,11 @@ export function messagesReducer(
 	state: Message[],
 	action: MessageAction
 ): Message[] {
-	console.log('[REDUCER] before:', {
+	messagesReducerLog.debug('Reducer before', {
 		len: state.length,
 		ids: state.map((m) => m.id),
 		action: action.type,
 		actionId: 'id' in action ? action.id : undefined,
-		timestamp: new Date().toISOString(),
 	});
 
 	switch (action.type) {
@@ -76,7 +78,7 @@ export function messagesReducer(
 				...action.msg,
 				timestamp: new Date(),
 			};
-			console.log('[REDUCER] Adding user message:', userMsg.id);
+			messagesReducerLog.debug('Adding user message', { id: userMsg.id });
 			return [...state, userMsg];
 
 		case 'ADD_AI_PLACEHOLDER':
@@ -86,20 +88,20 @@ export function messagesReducer(
 				isStreaming: true,
 				streamingText: '',
 			};
-			console.log('[REDUCER] Adding AI placeholder:', aiMsg.id);
-			console.log(
-				'[REDUCER] Current state before adding:',
-				state.map((m) => ({ id: m.id, isUser: m.isUser }))
-			);
+			messagesReducerLog.debug('Adding AI placeholder', {
+				id: aiMsg.id,
+				stateBefore: state.map((m) => ({ id: m.id, isUser: m.isUser })),
+			});
 			const newState = [...state, aiMsg];
-			console.log(
-				'[REDUCER] New state after adding:',
-				newState.map((m) => ({ id: m.id, isUser: m.isUser }))
-			);
+			messagesReducerLog.debug('New state after adding', {
+				newState: newState.map((m) => ({ id: m.id, isUser: m.isUser })),
+			});
 			return newState;
 
 		case 'START_STREAM':
-			console.log('[REDUCER] Starting stream for message:', action.id);
+			messagesReducerLog.debug('Starting stream for message', {
+				id: action.id,
+			});
 			return state.map((m) =>
 				m.id === action.id
 					? { ...m, isStreaming: true, streamingText: m.streamingText ?? '' }
@@ -107,12 +109,10 @@ export function messagesReducer(
 			);
 
 		case 'DELTA':
-			console.log(
-				'[REDUCER] Delta for message:',
-				action.id,
-				'text length:',
-				action.text.length
-			);
+			messagesReducerLog.debug('Delta for message', {
+				id: action.id,
+				textLength: action.text.length,
+			});
 			return state.map((m) =>
 				m.id === action.id
 					? { ...m, streamingText: (m.streamingText ?? '') + action.text }
@@ -120,16 +120,16 @@ export function messagesReducer(
 			);
 
 		case 'FINALIZE':
-			console.log('[REDUCER] Finalizing message:', action.id);
+			messagesReducerLog.debug('Finalizing message', { id: action.id });
 			return state.map((m) =>
 				m.id === action.id
 					? {
 							...m,
 							text:
 								action.finalText ||
-								(m.streamingText && m.streamingText.length > 0)
+								(m.streamingText && m.streamingText.length > 0
 									? m.streamingText
-									: m.text ?? '',
+									: m.text || ''),
 							isStreaming: false,
 							streamingText: '',
 							performance: action.performance || m.performance,
@@ -140,12 +140,10 @@ export function messagesReducer(
 			);
 
 		case 'ERROR':
-			console.log(
-				'[REDUCER] Error for message:',
-				action.id,
-				'error:',
-				action.error
-			);
+			messagesReducerLog.debug('Error for message', {
+				id: action.id,
+				error: action.error,
+			});
 			if (action.id) {
 				return state.map((m) =>
 					m.id === action.id
@@ -162,11 +160,11 @@ export function messagesReducer(
 
 		case 'RESET_TO_WELCOME_IF_EMPTY':
 			// Safety valve: NEVER nuke to 1 unless truly empty
-			console.log('[REDUCER] Reset check - current length:', state.length);
+			messagesReducerLog.debug('Reset check', { currentLength: state.length });
 			return state.length === 0 ? state : state;
 
 		case 'APPLY_META':
-			console.log('[REDUCER] Applying meta for message:', action.id);
+			messagesReducerLog.debug('Applying meta for message', { id: action.id });
 			return state.map((m) =>
 				m.id === action.id
 					? { ...m, performance: { ...m.performance, ...action.meta } }
@@ -174,7 +172,7 @@ export function messagesReducer(
 			);
 
 		case 'APPLY_FINAL':
-			console.log('[REDUCER] Applying final for message:', action.id);
+			messagesReducerLog.debug('Applying final for message', { id: action.id });
 			return state.map((m) =>
 				m.id === action.id
 					? {
@@ -187,7 +185,7 @@ export function messagesReducer(
 			);
 
 		case 'END_STREAM':
-			console.log('[REDUCER] Ending stream for message:', action.id);
+			messagesReducerLog.debug('Ending stream for message', { id: action.id });
 			return state.map((m) =>
 				m.id === action.id
 					? {
@@ -203,12 +201,10 @@ export function messagesReducer(
 			);
 
 		case 'FAIL_STREAM':
-			console.log(
-				'[REDUCER] Failing stream for message:',
-				action.id,
-				'error:',
-				action.error
-			);
+			messagesReducerLog.debug('Failing stream for message', {
+				id: action.id,
+				error: action.error,
+			});
 			return state.map((m) =>
 				m.id === action.id
 					? {
@@ -221,15 +217,13 @@ export function messagesReducer(
 			);
 
 		case 'CLEAR_STREAMING':
-			console.log('[REDUCER] Clearing streaming state');
-			console.log(
-				'[REDUCER] Current messages before clear:',
-				state.map((m) => ({
+			messagesReducerLog.debug('Clearing streaming state', {
+				currentMessages: state.map((m) => ({
 					id: m.id,
 					isStreaming: m.isStreaming,
 					hasStreamingText: !!(m.streamingText && m.streamingText.length > 0),
-				}))
-			);
+				})),
+			});
 			return state.map((m) => ({
 				...m,
 				isStreaming: false,
@@ -237,7 +231,9 @@ export function messagesReducer(
 			}));
 
 		default:
-			console.warn('[REDUCER] Unknown action type:', (action as any).type);
+			messagesReducerLog.warn('Unknown action type', {
+				type: (action as any).type,
+			});
 			return state;
 	}
 }

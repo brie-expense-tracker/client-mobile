@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { logger } from '../../../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -45,7 +46,7 @@ export default function DownloadDataScreen() {
 									);
 								}
 							} catch (error) {
-								console.error('Error downloading data:', error);
+								logger.error('Error downloading data:', error);
 								Alert.alert(
 									'Download Failed',
 									'Unable to prepare your data for download. Please try again later.'
@@ -56,7 +57,7 @@ export default function DownloadDataScreen() {
 				]
 			);
 		} catch (error) {
-			console.error('Error initiating download:', error);
+			logger.error('Error initiating download:', error);
 			Alert.alert('Error', 'Failed to initiate download. Please try again.');
 		} finally {
 			setDownloading(false);

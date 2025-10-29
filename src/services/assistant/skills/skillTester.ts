@@ -2,6 +2,8 @@
 // Provides automated testing, mocking, and validation
 
 import {
+import { logger } from '../../../../utils/logger';
+
 	Skill,
 	SkillTestCase,
 	SkillExecutionResult,
@@ -58,7 +60,7 @@ export class SkillTester {
 	 */
 	registerTestSuite(suite: TestSuite): void {
 		this.testSuites.set(suite.name, suite);
-		console.log(`[SkillTester] Registered test suite: ${suite.name}`);
+		logger.debug(`[SkillTester] Registered test suite: ${suite.name}`);
 	}
 
 	/**
@@ -73,7 +75,7 @@ export class SkillTester {
 		const startTime = Date.now();
 		const results: TestResult[] = [];
 
-		console.log(`[SkillTester] Running test suite: ${suite.name}`);
+		logger.debug(`[SkillTester] Running test suite: ${suite.name}`);
 
 		// Run beforeAll hook
 		if (suite.beforeAll) {
@@ -140,7 +142,7 @@ export class SkillTester {
 				const result = await this.runTestSuite(suiteName);
 				results.push(result);
 			} catch (error) {
-				console.error(
+				logger.error(
 					`[SkillTester] Failed to run test suite ${suiteName}:`,
 					error
 				);

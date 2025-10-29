@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Features, guardFeature } from '../../config/features';
+import { logger } from '../../utils/logger';
 
 export interface Insight {
 	id: string;
@@ -73,7 +74,7 @@ export class InsightsContextService {
 					this.insights = insights;
 					return insights;
 				} catch (error) {
-					console.error(
+					logger.error(
 						'[InsightsContextService] Failed to load insights:',
 						error
 					);
@@ -184,7 +185,7 @@ export class InsightsContextService {
 				return this.context;
 			}
 		} catch (error) {
-			console.error('[InsightsContextService] Failed to load context:', error);
+			logger.error('[InsightsContextService] Failed to load context:', error);
 		}
 		return null;
 	}
@@ -197,7 +198,7 @@ export class InsightsContextService {
 			await AsyncStorage.removeItem('aiProfileContext');
 			this.context = null;
 		} catch (error) {
-			console.error('[InsightsContextService] Failed to clear context:', error);
+			logger.error('[InsightsContextService] Failed to clear context:', error);
 		}
 	}
 

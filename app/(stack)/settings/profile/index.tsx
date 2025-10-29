@@ -1,4 +1,5 @@
 import React, { useEffect, useCallback, useMemo, useState } from 'react';
+import { logger } from '../../../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -192,7 +193,7 @@ export default function AccountScreen() {
 				title: 'Profile Export',
 			});
 		} catch (err) {
-			console.error('Export error:', err);
+			logger.error('Export error:', err);
 			Alert.alert('Error', 'Failed to export profile data');
 		}
 	};

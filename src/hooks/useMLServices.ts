@@ -13,6 +13,9 @@ import { useBudget } from '../context/budgetContext';
 import { useGoal } from '../context/goalContext';
 import { TransactionContext } from '../context/transactionContext';
 import useAuth from '../context/AuthContext';
+import { createLogger } from '../utils/sublogger';
+
+const mlServicesLog = createLogger('useMLServices');
 
 export interface MLInsight {
 	type:
@@ -48,7 +51,7 @@ export const useMLServices = () => {
 	const { goals } = useGoal();
 	const { transactions } = useContext(TransactionContext);
 
-	console.log('[useMLServices] Hook initialized with:', {
+	mlServicesLog.debug('Hook initialized', {
 		hasUser: !!user,
 		userId: user?._id,
 		hasBudgets: !!budgets,
@@ -74,7 +77,7 @@ export const useMLServices = () => {
 	 */
 	const initializeML = useCallback(async () => {
 		if (!user?._id) {
-			console.log('[useMLServices] No user ID, skipping initialization');
+			mlServicesLog.debug('No user ID, skipping initialization');
 			return;
 		}
 
@@ -82,8 +85,9 @@ export const useMLServices = () => {
 			setIsLoading(true);
 			setError(null);
 
-			console.log('[useMLServices] Starting ML services initialization...');
-			console.log('[useMLServices] User ID:', user._id);
+			mlServicesLog.info('Starting ML services initialization...', {
+				userId: user._id,
+			});
 
 			// Add timeout to prevent hanging
 			const timeoutPromise = new Promise((_, reject) => {
@@ -96,12 +100,12 @@ export const useMLServices = () => {
 			const initPromise = HybridAIService.getInstance().initialize();
 
 			try {
-				console.log('[useMLServices] Waiting for service initialization...');
+				mlServicesLog.debug('Waiting for service initialization...');
 				await Promise.race([initPromise, timeoutPromise]);
-				console.log('[useMLServices] HybridAIService initialized successfully');
+				mlServicesLog.info('HybridAIService initialized successfully');
 			} catch (initError) {
-				console.warn(
-					'[useMLServices] Service initialization had issues, but continuing:',
+				mlServicesLog.warn(
+					'Service initialization had issues, but continuing',
 					initError
 				);
 				// Continue with partial initialization
@@ -110,7 +114,7 @@ export const useMLServices = () => {
 			// Update status
 			try {
 				const metrics = HybridAIService.getInstance().getServiceMetrics();
-				console.log('[useMLServices] Got service metrics:', metrics);
+				mlServicesLog.debug('Got service metrics', { metrics });
 
 				setStatus((prev) => ({
 					...prev,
@@ -121,8 +125,8 @@ export const useMLServices = () => {
 					totalRequests: metrics.costMetrics.totalRequests,
 				}));
 			} catch (metricsError) {
-				console.warn(
-					'[useMLServices] Could not get metrics, using defaults:',
+				mlServicesLog.warn(
+					'Could not get metrics, using defaults',
 					metricsError
 				);
 				// Set default status to allow the UI to work
@@ -136,12 +140,9 @@ export const useMLServices = () => {
 				}));
 			}
 
-			console.log('[useMLServices] ML services initialization complete');
+			mlServicesLog.info('ML services initialization complete');
 		} catch (err) {
-			console.error(
-				'[useMLServices] Critical error during initialization:',
-				err
-			);
+			mlServicesLog.error('Critical error during initialization', err);
 			setError(
 				err instanceof Error ? err.message : 'Failed to initialize ML services'
 			);
@@ -156,16 +157,13 @@ export const useMLServices = () => {
 					costSavings: 0,
 					totalRequests: 0,
 				}));
-				console.log('[useMLServices] Set fallback initialized state');
+				mlServicesLog.debug('Set fallback initialized state');
 			} catch (fallbackError) {
-				console.error(
-					'[useMLServices] Failed to set fallback state:',
-					fallbackError
-				);
+				mlServicesLog.error('Failed to set fallback state', fallbackError);
 			}
 		} finally {
 			setIsLoading(false);
-			console.log('[useMLServices] Initialization process finished');
+			mlServicesLog.debug('Initialization process finished');
 		}
 	}, [user?._id]);
 
@@ -188,7 +186,7 @@ export const useMLServices = () => {
 	 */
 	const handleError = useCallback((error: Error, context: string) => {
 		const errorMessage = `${context}: ${error.message}`;
-		console.error(`[useMLServices] ${errorMessage}`, error);
+		mlServicesLog.error(errorMessage, error);
 
 		setError(errorMessage);
 		setStatus((prev) => ({
@@ -204,15 +202,13 @@ export const useMLServices = () => {
 	 */
 	const retryInitialization = useCallback(async () => {
 		if (status.retryCount >= 3) {
-			console.warn('[useMLServices] Max retry attempts reached');
+			mlServicesLog.warn('Max retry attempts reached');
 			return;
 		}
 
 		const delay = Math.pow(2, status.retryCount) * 1000; // Exponential backoff
-		console.log(
-			`[useMLServices] Retrying initialization in ${delay}ms (attempt ${
-				status.retryCount + 1
-			})`
+		mlServicesLog.debug(
+			`Retrying initialization in ${delay}ms (attempt ${status.retryCount + 1})`
 		);
 
 		setTimeout(() => {
@@ -293,7 +289,7 @@ export const useMLServices = () => {
 					reason: response.response.reason || 'No reason provided',
 				};
 			} catch (err) {
-				console.error('[useMLServices] Error categorizing transaction:', err);
+				mlServicesLog.error('Error categorizing transaction', err);
 				throw err;
 			}
 		},
@@ -327,7 +323,7 @@ export const useMLServices = () => {
 
 			return response.response;
 		} catch (err) {
-			console.error('[useMLServices] Error getting spending forecast:', err);
+			mlServicesLog.error('Error getting spending forecast', err);
 			throw err;
 		}
 	}, [user?._id, status.isInitialized, transactions, budgets, goals]);
@@ -363,7 +359,7 @@ export const useMLServices = () => {
 
 				return response.response;
 			} catch (err) {
-				console.error('[useMLServices] Error getting advice:', err);
+				mlServicesLog.error('Error getting advice', err);
 				throw err;
 			}
 		},
@@ -389,7 +385,7 @@ export const useMLServices = () => {
 					user._id
 				);
 			} catch (err) {
-				console.error('[useMLServices] Error providing feedback:', err);
+				mlServicesLog.error('Error providing feedback', err);
 			}
 		},
 		[user?._id]
@@ -420,7 +416,7 @@ export const useMLServices = () => {
 				totalRequests: metrics.costMetrics.totalRequests,
 			}));
 		} catch (err) {
-			console.error('[useMLServices] Error updating status:', err);
+			mlServicesLog.error('Error updating status', err);
 		}
 	}, [status.isInitialized]);
 
@@ -431,9 +427,9 @@ export const useMLServices = () => {
 		try {
 			await SmartCacheService.getInstance().cleanupExpiredCache();
 			updateStatus();
-			console.log('[useMLServices] Cache cleared successfully');
+			mlServicesLog.debug('Cache cleared successfully');
 		} catch (error) {
-			console.error('[useMLServices] Error clearing cache:', error);
+			mlServicesLog.error('Error clearing cache', error);
 		}
 	}, [updateStatus]);
 
@@ -459,7 +455,7 @@ export const useMLServices = () => {
 
 				return analysis;
 			} catch (err) {
-				console.error('[useMLServices] Error getting budget analysis:', err);
+				mlServicesLog.error('Error getting budget analysis', err);
 				throw new Error('Failed to analyze budget');
 			}
 		},
@@ -483,7 +479,7 @@ export const useMLServices = () => {
 
 			return [];
 		} catch (err) {
-			console.error('[useMLServices] Error getting AI insights:', err);
+			mlServicesLog.error('Error getting AI insights', err);
 			throw new Error('Failed to get AI insights');
 		}
 	}, [user?._id, status.isInitialized]);
@@ -498,7 +494,7 @@ export const useMLServices = () => {
 			try {
 				await InsightsService.markInsightAsRead(insightId);
 			} catch (err) {
-				console.error('[useMLServices] Error marking insight as read:', err);
+				mlServicesLog.error('Error marking insight as read', err);
 			}
 		},
 		[user?._id]
@@ -514,7 +510,7 @@ export const useMLServices = () => {
 			const response = await InsightsService.getUnreadCount();
 			return response.success && response.data ? response.data.unreadCount : 0;
 		} catch (err) {
-			console.error('[useMLServices] Error getting unread count:', err);
+			mlServicesLog.error('Error getting unread count', err);
 			return 0;
 		}
 	}, [user?._id]);
@@ -546,7 +542,7 @@ export const useMLServices = () => {
 
 			return response.response;
 		} catch (err) {
-			console.error('[useMLServices] Error getting spending patterns:', err);
+			mlServicesLog.error('Error getting spending patterns', err);
 			throw new Error('Failed to analyze spending patterns');
 		}
 	}, [user?._id, status.isInitialized, transactions, budgets, goals]);
@@ -583,10 +579,7 @@ export const useMLServices = () => {
 
 			return response.response;
 		} catch (err) {
-			console.error(
-				'[useMLServices] Error getting financial health score:',
-				err
-			);
+			mlServicesLog.error('Error getting financial health score', err);
 			throw new Error('Failed to calculate financial health score');
 		}
 	}, [user?._id, status.isInitialized, transactions, budgets, goals]);
@@ -616,7 +609,7 @@ export const useMLServices = () => {
 	// Initialize ML services when user is available
 	useEffect(() => {
 		if (user?._id && !status.isInitialized) {
-			console.log('[useMLServices] User available, starting initialization...');
+			mlServicesLog.debug('User available, starting initialization...');
 			initializeML();
 		}
 	}, [user?._id, status.isInitialized, initializeML]);
@@ -625,9 +618,7 @@ export const useMLServices = () => {
 	useEffect(() => {
 		if (user?._id && !status.isInitialized && !isLoading) {
 			const emergencyTimeout = setTimeout(() => {
-				console.warn(
-					'[useMLServices] Emergency timeout reached, forcing initialization'
-				);
+				mlServicesLog.warn('Emergency timeout reached, forcing initialization');
 				setStatus((prev) => ({
 					...prev,
 					isInitialized: true,
@@ -647,9 +638,7 @@ export const useMLServices = () => {
 	useEffect(() => {
 		if (user?._id && !status.isInitialized) {
 			const ultimateTimeout = setTimeout(() => {
-				console.warn(
-					'[useMLServices] Ultimate fallback: forcing service to be ready'
-				);
+				mlServicesLog.warn('Ultimate fallback: forcing service to be ready');
 				setStatus((prev) => ({
 					...prev,
 					isInitialized: true,

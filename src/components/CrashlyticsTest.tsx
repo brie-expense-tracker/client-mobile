@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { crashReporting } from '../services/feature/crashReporting';
+import { logger } from '../../utils/logger';
+
 
 export const CrashlyticsTest: React.FC = () => {
 	const testCrashlytics = () => {
@@ -27,7 +29,7 @@ export const CrashlyticsTest: React.FC = () => {
 				'Crashlytics test completed! Check your Firebase console.'
 			);
 		} catch (error) {
-			console.error('Crashlytics test failed:', error);
+			logger.error('Crashlytics test failed:', error);
 			Alert.alert(
 				'Error',
 				'Crashlytics test failed. Check console for details.'
@@ -46,7 +48,7 @@ export const CrashlyticsTest: React.FC = () => {
 
 			Alert.alert('Success', 'Non-fatal error recorded!');
 		} catch (error) {
-			console.error('Non-fatal error test failed:', error);
+			logger.error('Non-fatal error test failed:', error);
 			Alert.alert('Error', 'Non-fatal error test failed.');
 		}
 	};
@@ -60,7 +62,7 @@ export const CrashlyticsTest: React.FC = () => {
 
 			Alert.alert('Success', 'Custom attributes set!');
 		} catch (error) {
-			console.error('Custom attributes test failed:', error);
+			logger.error('Custom attributes test failed:', error);
 			Alert.alert('Error', 'Custom attributes test failed.');
 		}
 	};

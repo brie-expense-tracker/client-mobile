@@ -2,6 +2,9 @@ import { useMemo, useCallback } from 'react';
 import { useDataFetching } from './useDataFetching';
 import { Goal, CreateGoalData, UpdateGoalData } from '../context/goalContext';
 import { ApiService } from '../services';
+import { createLogger } from '../utils/sublogger';
+
+const goalsHookLog = createLogger('useGoals');
 
 // ==========================================
 // Goal-specific API functions
@@ -11,7 +14,7 @@ const fetchGoals = async (): Promise<Goal[]> => {
 
 	// Handle authentication errors gracefully
 	if (!response.success && response.error?.includes('User not authenticated')) {
-		console.log('🔒 [Goals] User not authenticated, returning empty array');
+		goalsHookLog.debug('User not authenticated, returning empty array');
 		return [];
 	}
 
@@ -83,26 +86,28 @@ export function useGoals(options: { refreshOnFocus?: boolean } = {}) {
 	// Create wrapper functions for the API calls
 	const updateGoalDirect = useCallback(
 		async (id: string, updates: UpdateGoalData): Promise<Goal> => {
-			console.log('🎯 [useGoals] updateGoalDirect called with:');
-			console.log('  🆔 Goal ID:', id);
-			console.log('  📝 Updates:', updates);
-			console.log('  📝 Updates type:', typeof updates);
-			console.log('  📝 Updates keys:', Object.keys(updates));
+			goalsHookLog.debug('updateGoalDirect called', {
+				goalId: id,
+				updates,
+				updatesType: typeof updates,
+				updatesKeys: Object.keys(updates),
+			});
 
 			const response = await ApiService.put<{ data: Goal }>(
 				`/api/goals/${id}`,
 				updates
 			);
 
-			console.log('🎯 [useGoals] updateGoalDirect response:');
-			console.log('  ✅ Success:', response.success);
-			console.log('  ❌ Error:', response.error);
-			console.log('  📦 Data:', response.data);
-			console.log('  📊 Status:', (response as any).status);
+			goalsHookLog.debug('updateGoalDirect response', {
+				success: response.success,
+				error: response.error,
+				data: response.data,
+				status: (response as any).status,
+			});
 
 			// Check if the request failed
 			if (!response.success) {
-				console.error('🎯 [useGoals] Update failed:', response.error);
+				goalsHookLog.error('Update failed', response.error);
 				throw new Error(response.error || 'Failed to update goal');
 			}
 
@@ -111,12 +116,11 @@ export function useGoals(options: { refreshOnFocus?: boolean } = {}) {
 				!responseData ||
 				(typeof responseData === 'object' && 'data' in responseData)
 			) {
-				console.error('🎯 [useGoals] No valid response data received');
-				console.error('  📦 Raw response:', response);
+				goalsHookLog.error('No valid response data received', { rawResponse: response });
 				throw new Error('Failed to update goal: No data received');
 			}
 
-			console.log('🎯 [useGoals] Returning goal data:', responseData);
+			goalsHookLog.debug('Returning goal data', responseData);
 			return responseData as Goal;
 		},
 		[]
@@ -169,7 +173,7 @@ export function useGoals(options: { refreshOnFocus?: boolean } = {}) {
 	// ==========================================
 	const transformedData = useMemo(() => {
 		const transformed = transformGoalData(goals);
-		console.log(`🎯 Goals: ${transformed.length} active`);
+		goalsHookLog.debug(`Goals: ${transformed.length} active`);
 		return transformed;
 	}, [goals]);
 

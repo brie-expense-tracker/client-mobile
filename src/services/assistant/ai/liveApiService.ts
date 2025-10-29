@@ -1,6 +1,8 @@
 // ai/liveApiService.ts - Live API service for production LLM calls
 
 import { ApiService } from '../../core/apiService';
+import { logger } from '../../../../utils/logger';
+
 
 export interface LLMRequest {
 	systemPrompt: string;
@@ -41,7 +43,7 @@ export class LiveApiService {
 				temperature: options?.temperature || 0.1,
 			};
 
-			console.log('[LiveApiService] Making LLM call:', {
+			logger.debug('[LiveApiService] Making LLM call:', {
 				model: requestPayload.model,
 				maxTokens: requestPayload.maxTokens,
 				temperature: requestPayload.temperature,
@@ -55,7 +57,7 @@ export class LiveApiService {
 			);
 
 			if (response.success && response.data) {
-				console.log('[LiveApiService] LLM call successful:', {
+				logger.debug('[LiveApiService] LLM call successful:', {
 					responseLength: response.data.response.length,
 					usage: response.data.usage,
 				});
@@ -64,7 +66,7 @@ export class LiveApiService {
 
 			throw new Error(response.error || 'LLM API call failed');
 		} catch (error) {
-			console.error('[LiveApiService] LLM call failed:', error);
+			logger.error('[LiveApiService] LLM call failed:', error);
 			throw error;
 		}
 	}

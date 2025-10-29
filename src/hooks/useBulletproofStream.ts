@@ -4,6 +4,9 @@ import { startStreaming, stopStreaming } from '../services/streaming';
 import { buildSseUrl } from '../networking/endpoints';
 import { authService } from '../services/authService';
 import { ErrorService } from '../services/errorService';
+import { createLogger } from '../utils/sublogger';
+
+const bulletproofStreamLog = createLogger('BulletproofStream');
 
 interface StreamingCallbacks {
 	onMeta?: (data: any) => void;
@@ -171,7 +174,7 @@ export function useBulletproofStream({
 		) => {
 			// Prevent duplicate streams
 			if (streamState.isStreaming) {
-				console.warn(
+				bulletproofStreamLog.warn(
 					'[BulletproofStream] Already streaming, ignoring duplicate'
 				);
 				return;
@@ -197,7 +200,7 @@ export function useBulletproofStream({
 			currentMessageId.current = messageId;
 			streamingRef.current.messageId = messageId;
 
-			console.log('🚀 [Stream] Starting:', {
+			bulletproofStreamLog.debug('Starting stream', {
 				messageId,
 				messageLength: message.length,
 				retryCount:
@@ -219,7 +222,7 @@ export function useBulletproofStream({
 					throw new Error('No authenticated user found');
 				}
 
-				console.log('🔑 [Stream] Using Firebase UID for auth:', {
+				bulletproofStreamLog.debug('Using Firebase UID for auth', {
 					uid: firebaseUID.substring(0, 10) + '...',
 				});
 
@@ -231,12 +234,12 @@ export function useBulletproofStream({
 					clientMessageId: messageId,
 				});
 
-				console.log('🔧 [Stream] Built URL with UID:', {
+				bulletproofStreamLog.debug('Built URL with UID', {
 					url: url.substring(0, 100) + '...',
 					hasUID: !!firebaseUID,
 				});
 
-				console.log('🔗 [Stream] Connecting to server');
+				bulletproofStreamLog.debug('Connecting to server');
 
 				// Start health monitoring
 				startHealthMonitoring();
@@ -253,9 +256,9 @@ export function useBulletproofStream({
 							isConnecting: false,
 						}));
 
-						console.log('📝 [Stream] Received delta:', {
+						bulletproofStreamLog.debug('Received delta', {
 							textLength: text.length,
-							text: text.substring(0, 50) + '...',
+							textPreview: text.substring(0, 50) + '...',
 							messageId,
 							timestamp: new Date().toISOString(),
 							bufferedLength: bufferedText.current.length,
@@ -271,13 +274,13 @@ export function useBulletproofStream({
 						const startTime = streamState.startTime || endTime;
 						const duration = endTime - startTime;
 
-						console.log('✅ [Stream] Completed:', {
+						bulletproofStreamLog.info('Stream completed', {
 							messageId,
 							duration: `${duration}ms`,
 							chars: bufferedText.current.length,
 							retryCount: streamState.retryCount,
 							timestamp: new Date().toISOString(),
-							finalText: bufferedText.current.substring(0, 100) + '...',
+							finalTextPreview: bufferedText.current.substring(0, 100) + '...',
 						});
 
 						setStreamState((prev) => ({
@@ -330,7 +333,7 @@ export function useBulletproofStream({
 							message: error,
 						});
 
-						console.error('🚨 [Stream] Error:', {
+						bulletproofStreamLog.error('Stream error', {
 							error,
 							messageId,
 							retryCount: streamState.retryCount,
@@ -348,7 +351,7 @@ export function useBulletproofStream({
 							const nextRetryCount = streamState.retryCount + 1;
 							const delay = calculateRetryDelay(nextRetryCount - 1);
 
-							console.log('🔄 [Stream] Retrying:', {
+							bulletproofStreamLog.debug('Retrying stream', {
 								attempt: `${nextRetryCount}/${retryConfig.maxRetries}`,
 								delay: `${delay}ms`,
 								reason: error.includes('network') ? 'network' : 'connection',
@@ -402,7 +405,7 @@ export function useBulletproofStream({
 											callbacks.onDone?.();
 										},
 										onError: (error: string) => {
-											console.error('🚨 [Stream] Retry failed:', {
+											bulletproofStreamLog.error('Retry failed', {
 												error,
 												attempt: nextRetryCount,
 												messageId,
@@ -422,7 +425,7 @@ export function useBulletproofStream({
 										},
 									});
 								} catch (retryError) {
-									console.error('🚨 [Stream] Retry setup failed:', {
+									bulletproofStreamLog.error('Retry setup failed', {
 										error:
 											retryError instanceof Error
 												? retryError.message
@@ -445,7 +448,7 @@ export function useBulletproofStream({
 							callbacks.onRetry?.(nextRetryCount, retryConfig.maxRetries);
 						} else {
 							// Final error - no more retries
-							console.error('💥 [Stream] Final failure:', {
+							bulletproofStreamLog.error('Final failure - no more retries', {
 								messageId,
 								error,
 								retryCount: streamState.retryCount,
@@ -500,7 +503,7 @@ export function useBulletproofStream({
 					const nextRetryCount = streamState.retryCount + 1;
 					const delay = calculateRetryDelay(nextRetryCount - 1);
 
-					console.log('🔄 [Stream] Retrying after error:', {
+					bulletproofStreamLog.debug('Retrying after error', {
 						attempt: `${nextRetryCount}/${retryConfig.maxRetries}`,
 						delay: `${delay}ms`,
 						error: error.message || String(error),
@@ -518,7 +521,7 @@ export function useBulletproofStream({
 					callbacks.onRetry?.(nextRetryCount, retryConfig.maxRetries);
 				} else {
 					// Final error - no more retries
-					console.error('💥 [Stream] Failed to start:', {
+					bulletproofStreamLog.error('Failed to start stream', {
 						messageId,
 						error: error.message || String(error),
 						retryCount: streamState.retryCount,

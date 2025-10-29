@@ -1,5 +1,6 @@
 // index.tsx
 import React, { useState, useMemo, useContext, useEffect } from 'react';
+import { logger } from '../../../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -144,7 +145,7 @@ export default function TransactionScreen() {
 
 	// Debug logging
 	useEffect(() => {
-		console.log('[Ledger] Current state:', {
+		logger.debug('[Ledger] Current state:', {
 			transactionsCount: transactions.length,
 			transactions: transactions.map((tx) => ({
 				id: tx.id,
@@ -179,7 +180,7 @@ export default function TransactionScreen() {
 
 	// filter transactions
 	const filtered = useMemo(() => {
-		console.log('[Ledger] Filtering transactions:', {
+		logger.debug('[Ledger] Filtering transactions:', {
 			totalTransactions: transactions.length,
 			selectedGoals,
 			selectedBudgets,
@@ -195,7 +196,7 @@ export default function TransactionScreen() {
 				// transaction type match
 				const typeMatch = transactionTypes[tx.type];
 				if (!typeMatch) {
-					console.log(
+					logger.debug(
 						'[Ledger] Transaction filtered out by type filter:',
 						tx.description,
 						'type:',
@@ -215,14 +216,14 @@ export default function TransactionScreen() {
 						tx.recurringPattern &&
 						tx.recurringPattern.patternId === selectedPatternId
 					) {
-						console.log(
+						logger.debug(
 							'[Ledger] Transaction matches selected pattern:',
 							tx.description
 						);
 						return true;
 					}
 
-					console.log(
+					logger.debug(
 						'[Ledger] Transaction filtered out by pattern filter:',
 						tx.description
 					);
@@ -233,7 +234,7 @@ export default function TransactionScreen() {
 				const goalBudgetMatch = (() => {
 					// If no goals or budgets are selected, show all transactions
 					if (selectedGoals.length === 0 && selectedBudgets.length === 0) {
-						console.log(
+						logger.debug(
 							'[Ledger] No filters selected, showing all transactions'
 						);
 						return true;
@@ -248,7 +249,7 @@ export default function TransactionScreen() {
 									selectedGoals.includes(goal.id) && tx.target === goal.id
 							);
 							if (matchingGoals.length > 0) {
-								console.log(
+								logger.debug(
 									'[Ledger] Transaction matches selected goal:',
 									tx.description
 								);
@@ -257,7 +258,7 @@ export default function TransactionScreen() {
 						} else {
 							// Transaction doesn't have a goal target, but we have goals selected
 							// This means it's an "Other" transaction for goals
-							console.log(
+							logger.debug(
 								'[Ledger] Transaction is "Other" for goals:',
 								tx.description
 							);
@@ -274,7 +275,7 @@ export default function TransactionScreen() {
 									selectedBudgets.includes(budget.id) && tx.target === budget.id
 							);
 							if (matchingBudgets.length > 0) {
-								console.log(
+								logger.debug(
 									'[Ledger] Transaction matches selected budget:',
 									tx.description
 								);
@@ -283,7 +284,7 @@ export default function TransactionScreen() {
 						} else {
 							// Transaction doesn't have a budget target, but we have budgets selected
 							// This means it's an "Other" transaction for budgets
-							console.log(
+							logger.debug(
 								'[Ledger] Transaction is "Other" for budgets:',
 								tx.description
 							);
@@ -298,14 +299,14 @@ export default function TransactionScreen() {
 						(selectedGoals.length > 0 && tx.type === 'expense') ||
 						(selectedBudgets.length > 0 && tx.type === 'income')
 					) {
-						console.log(
+						logger.debug(
 							'[Ledger] Transaction type mismatch with selected filters:',
 							tx.description
 						);
 						return false;
 					}
 
-					console.log(
+					logger.debug(
 						'[Ledger] Transaction filtered out by goal/budget filter:',
 						tx.description
 					);
@@ -319,7 +320,7 @@ export default function TransactionScreen() {
 					(dateFilterMode === 'day' && txDay === selectedDate);
 
 				if (!dateMatch) {
-					console.log(
+					logger.debug(
 						'[Ledger] Transaction filtered out by date filter:',
 						tx.description,
 						'txDay:',
@@ -335,7 +336,7 @@ export default function TransactionScreen() {
 					!text || tx.description.toLowerCase().includes(text);
 
 				if (!searchMatch) {
-					console.log(
+					logger.debug(
 						'[Ledger] Transaction filtered out by search filter:',
 						tx.description
 					);
@@ -344,7 +345,7 @@ export default function TransactionScreen() {
 				const shouldInclude =
 					patternMatch && goalBudgetMatch && dateMatch && searchMatch;
 				if (shouldInclude) {
-					console.log('[Ledger] Transaction included:', tx.description);
+					logger.debug('[Ledger] Transaction included:', tx.description);
 				}
 
 				return shouldInclude;

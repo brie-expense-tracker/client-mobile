@@ -1,5 +1,7 @@
 import { ApiService } from '../core/apiService';
 import { Budget, Goal, Transaction } from '../../types';
+import { logger } from '../../utils/logger';
+
 
 export interface TieredAIResponse {
 	response: string;
@@ -232,23 +234,23 @@ export class TieredAIService {
 	 */
 	async getResponse(message: string): Promise<TieredAIResponse> {
 		try {
-			console.log('[TieredAIService] Getting response for:', message);
+			logger.debug('[TieredAIService] Getting response for:', message);
 
 			// Add message to conversation history
 			this.conversationHistory.push(message);
 
 			// Analyze query complexity
 			const complexity = this.estimateComplexity(message, this.context);
-			console.log('[TieredAIService] Complexity analysis:', complexity);
+			logger.debug('[TieredAIService] Complexity analysis:', complexity);
 
 			// Route to appropriate model
 			const model = this.routeModel(complexity);
-			console.log('[TieredAIService] Routing to model:', model);
+			logger.debug('[TieredAIService] Routing to model:', model);
 
 			// Trim context based on complexity
 			const tokenBudget = complexity.estimatedTokens;
 			const trimmedContext = this.trimContext(this.context, tokenBudget);
-			console.log(
+			logger.debug(
 				'[TieredAIService] Context trimmed to',
 				tokenBudget,
 				'tokens'
@@ -265,7 +267,7 @@ export class TieredAIService {
 				tokenBudget,
 			};
 
-			console.log('[TieredAIService] Sending request to API:', {
+			logger.debug('[TieredAIService] Sending request to API:', {
 				endpoint: '/api/tiered-ai/chat',
 				model,
 				complexity: complexity.complexity,
@@ -296,7 +298,7 @@ export class TieredAIService {
 					usage: response.data.usage,
 				};
 
-				console.log('[TieredAIService] Success response:', {
+				logger.debug('[TieredAIService] Success response:', {
 					modelUsed: result.modelUsed,
 					complexity: result.complexity,
 					confidence: result.confidence,
@@ -307,10 +309,10 @@ export class TieredAIService {
 			}
 
 			// Fallback to standard response if tiered routing fails
-			console.log('[TieredAIService] Tiered routing failed, using fallback');
+			logger.debug('[TieredAIService] Tiered routing failed, using fallback');
 			return this.getFallbackResponse(message);
 		} catch (error: any) {
-			console.log('[TieredAIService] Error in tiered routing:', error.message);
+			logger.debug('[TieredAIService] Error in tiered routing:', error.message);
 
 			// Fallback to standard response
 			return this.getFallbackResponse(message);

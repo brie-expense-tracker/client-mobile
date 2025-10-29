@@ -1,4 +1,6 @@
 import { ApiService } from '../core/apiService';
+import { logger } from '../../utils/logger';
+
 
 export interface WeeklyReflection {
 	_id: string;
@@ -93,10 +95,10 @@ export class WeeklyReflectionService {
 
 			return (response.data as any).reflection;
 		} catch (error) {
-			console.error('Error fetching current week reflection:', error);
+			logger.error('Error fetching current week reflection:', error);
 
 			// Always return a default reflection for any error (API or network issues)
-			console.log('Error detected, returning default reflection structure');
+			logger.debug('Error detected, returning default reflection structure');
 			const now = new Date();
 			const dayOfWeek = now.getDay();
 			const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
@@ -143,10 +145,10 @@ export class WeeklyReflectionService {
 			);
 			return (response.data as any).reflection;
 		} catch (error) {
-			console.error('Error saving weekly reflection:', error);
+			logger.error('Error saving weekly reflection:', error);
 
 			// Always return a default reflection with saved data for any error
-			console.log(
+			logger.debug(
 				'Error detected, returning default reflection with saved data'
 			);
 			const now = new Date();
@@ -198,10 +200,10 @@ export class WeeklyReflectionService {
 			);
 			return (response.data as any).reflections;
 		} catch (error) {
-			console.error('Error fetching reflection history:', error);
+			logger.error('Error fetching reflection history:', error);
 
 			// Always return empty array for any error
-			console.log('Error detected, returning empty reflection history');
+			logger.debug('Error detected, returning empty reflection history');
 			return [];
 		}
 	}
@@ -211,10 +213,10 @@ export class WeeklyReflectionService {
 			const response = await ApiService.get('/api/weekly-reflections/stats');
 			return (response.data as any).stats;
 		} catch (error) {
-			console.error('Error fetching reflection stats:', error);
+			logger.error('Error fetching reflection stats:', error);
 
 			// Always return default stats for any error
-			console.log('Error detected, returning default reflection stats');
+			logger.debug('Error detected, returning default reflection stats');
 			return {
 				totalReflections: 0,
 				averageMoodRating: 0,

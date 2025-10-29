@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import StatWidget from './StatWidget';
+import { logger } from '../../../../src/utils/logger';
 
 // Transaction interface defined inline since we removed the mock data file
 interface Transaction {
@@ -28,7 +29,7 @@ const SimpleBalanceWidget: React.FC<BalanceWidgetProps> = ({
 	transactions,
 }) => {
 	const { totalIncome, totalExpense } = useMemo(() => {
-		console.log(`💰 Processing ${transactions.length} transactions`);
+		logger.debug(`💰 Processing ${transactions.length} transactions`);
 
 		const income = transactions
 			.filter((t) => t.type === 'income')
@@ -44,7 +45,7 @@ const SimpleBalanceWidget: React.FC<BalanceWidgetProps> = ({
 				return s + amount;
 			}, 0);
 
-		console.log(`✅ Balance: +${income} / -${expense}`);
+		logger.debug(`✅ Balance: +${income} / -${expense}`);
 		return { totalIncome: income, totalExpense: expense } as const;
 	}, [transactions]);
 

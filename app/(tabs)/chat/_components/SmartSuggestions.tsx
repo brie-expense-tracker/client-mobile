@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { sharedStyles } from '../../../../src/components/assistant/shared/sharedStyles';
 import { InterfaceMode } from '../../../../src/services/assistant/types';
+import { logger } from '../../../../src/utils/logger';
 
 interface SmartSuggestionsProps {
 	onPick: (prompt: string) => void;
@@ -57,7 +58,7 @@ export default function SmartSuggestions({
 					<TouchableOpacity
 						key={index}
 						onPress={() => {
-							console.log('🔍 [DEBUG] Smart suggestion tapped:', text);
+							logger.debug('🔍 [DEBUG] Smart suggestion tapped:', text);
 							onPick(text);
 						}}
 						style={[

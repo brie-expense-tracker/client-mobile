@@ -4,6 +4,8 @@ import { WriterOutput } from './types';
 import { FactPack } from '../factPack';
 import { LiveApiService } from './liveApiService';
 import {
+import { logger } from '../../../../utils/logger';
+
 	ToolsOnlyContractService,
 	ToolsOnlyInput,
 } from '../../../services/feature/toolsOnlyContract';
@@ -88,7 +90,7 @@ export class MiniWriter {
 		if (this.config.enableCaching) {
 			const cached = this.getCachedResponse(cacheKey);
 			if (cached) {
-				console.log('[MiniWriter] Using cached response');
+				logger.debug('[MiniWriter] Using cached response');
 				return cached;
 			}
 		}
@@ -98,7 +100,7 @@ export class MiniWriter {
 		let tokensOut = 0;
 
 		try {
-			console.log('[MiniWriter] Starting response generation', {
+			logger.debug('[MiniWriter] Starting response generation', {
 				intent,
 				queryLength: userQuery.length,
 				factPackSize: JSON.stringify(factPack).length,
@@ -119,7 +121,7 @@ export class MiniWriter {
 
 			tokensIn = systemPrompt.length + userPrompt.length;
 
-			console.log('[MiniWriter] Calling LLM', {
+			logger.debug('[MiniWriter] Calling LLM', {
 				systemPromptLength: systemPrompt.length,
 				userPromptLength: userPrompt.length,
 				model: this.config.model,
@@ -130,7 +132,7 @@ export class MiniWriter {
 
 			tokensOut = response.length;
 
-			console.log('[MiniWriter] LLM response received', {
+			logger.debug('[MiniWriter] LLM response received', {
 				responseLength: response.length,
 			});
 
@@ -142,7 +144,7 @@ export class MiniWriter {
 			);
 
 			if (!validatedResponse.isValid) {
-				console.warn(
+				logger.warn(
 					'MiniWriter: Tools-only contract violation:',
 					validatedResponse.violations
 				);
@@ -172,7 +174,7 @@ export class MiniWriter {
 				});
 			}
 
-			console.log('[MiniWriter] Response generated successfully', {
+			logger.debug('[MiniWriter] Response generated successfully', {
 				contentKind: writerOutput.content_kind,
 				requiresClarification: writerOutput.requires_clarification,
 				processingTime: Date.now() - startTime,
@@ -180,7 +182,7 @@ export class MiniWriter {
 
 			return writerOutput;
 		} catch (error) {
-			console.error('[MiniWriter] Generation failed:', error);
+			logger.error('[MiniWriter] Generation failed:', error);
 
 			// Log error analytics
 			if (this.config.enableAnalytics) {
@@ -328,7 +330,7 @@ Generate a response using ONLY the data from toolsOut. Do not invent any numbers
 
 		for (let attempt = 1; attempt <= this.config.retryAttempts!; attempt++) {
 			try {
-				console.log(
+				logger.debug(
 					`[MiniWriter] LLM call attempt ${attempt}/${this.config.retryAttempts}`
 				);
 
@@ -340,7 +342,7 @@ Generate a response using ONLY the data from toolsOut. Do not invent any numbers
 				});
 			} catch (error) {
 				lastError = error instanceof Error ? error : new Error(String(error));
-				console.warn(
+				logger.warn(
 					`[MiniWriter] LLM call attempt ${attempt} failed:`,
 					lastError.message
 				);
@@ -353,14 +355,14 @@ Generate a response using ONLY the data from toolsOut. Do not invent any numbers
 				// Wait before retrying (exponential backoff)
 				if (attempt < this.config.retryAttempts!) {
 					const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-					console.log(`[MiniWriter] Waiting ${delay}ms before retry`);
+					logger.debug(`[MiniWriter] Waiting ${delay}ms before retry`);
 					await new Promise((resolve) => setTimeout(resolve, delay));
 				}
 			}
 		}
 
 		// All retries failed
-		console.error('[MiniWriter] All LLM call attempts failed:', lastError);
+		logger.error('[MiniWriter] All LLM call attempts failed:', lastError);
 		throw new LLMError('Failed to call LLM service after all retry attempts', {
 			originalError: lastError?.message || 'Unknown error',
 			model: this.config.model,
@@ -463,7 +465,7 @@ Generate a response using ONLY the data from toolsOut. Do not invent any numbers
 		}
 
 		expiredKeys.forEach((key) => this.responseCache.delete(key));
-		console.log(
+		logger.debug(
 			`[MiniWriter] Cleaned up ${expiredKeys.length} expired cache entries`
 		);
 	}
@@ -485,7 +487,7 @@ Generate a response using ONLY the data from toolsOut. Do not invent any numbers
 		this.analytics.push(analyticsEvent as any);
 
 		// In production, you would send this to your analytics service
-		console.log('[MiniWriter] Analytics event:', analyticsEvent);
+		logger.debug('[MiniWriter] Analytics event:', analyticsEvent);
 	}
 
 	/**
@@ -530,7 +532,7 @@ Generate a response using ONLY the data from toolsOut. Do not invent any numbers
 
 			// Validate version
 			if (parsed.version !== '1.0') {
-				console.warn(
+				logger.warn(
 					'[MiniWriter] Unexpected response version:',
 					parsed.version
 				);
@@ -542,7 +544,7 @@ Generate a response using ONLY the data from toolsOut. Do not invent any numbers
 				parsed.content_kind &&
 				!validContentKinds.includes(parsed.content_kind)
 			) {
-				console.warn('[MiniWriter] Invalid content_kind:', parsed.content_kind);
+				logger.warn('[MiniWriter] Invalid content_kind:', parsed.content_kind);
 				parsed.content_kind = 'status';
 			}
 
@@ -574,7 +576,7 @@ Generate a response using ONLY the data from toolsOut. Do not invent any numbers
 				uncertainty_notes: parsed.uncertainty_notes || [],
 			};
 		} catch (error) {
-			console.error('[MiniWriter] Failed to parse LLM response:', error);
+			logger.error('[MiniWriter] Failed to parse LLM response:', error);
 			if (error instanceof ValidationError) {
 				throw error;
 			}

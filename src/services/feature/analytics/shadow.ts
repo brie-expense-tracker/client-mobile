@@ -2,6 +2,8 @@
 // Runs current and candidate prompts in parallel without changing UX
 
 import { emit, getSessionId, getMessageId } from './emit';
+import { logger } from '../../../../utils/logger';
+
 
 export interface ShadowConfig {
 	rate: number; // 0.05 = 5% of traffic
@@ -113,7 +115,7 @@ export class ShadowABService {
 				message_id: getMessageId(),
 			} as const);
 		} catch (error) {
-			console.warn('Shadow candidate failed:', error);
+			logger.warn('Shadow candidate failed:', error);
 			// Don't emit error - just log it
 		}
 	}
@@ -160,7 +162,7 @@ export class ShadowABService {
 				Math.abs(currentLength - candidateLength) / Math.max(currentLength, 1);
 			return lengthDiff < 0.2;
 		} catch (error) {
-			console.warn('Error comparing responses:', error);
+			logger.warn('Error comparing responses:', error);
 			return false;
 		}
 	}
@@ -218,7 +220,7 @@ export class ShadowABService {
 				}
 			}
 		} catch (error) {
-			console.warn('Failed to load shadow AB daily count:', error);
+			logger.warn('Failed to load shadow AB daily count:', error);
 		}
 	}
 
@@ -235,7 +237,7 @@ export class ShadowABService {
 				})
 			);
 		} catch (error) {
-			console.warn('Failed to save shadow AB daily count:', error);
+			logger.warn('Failed to save shadow AB daily count:', error);
 		}
 	}
 

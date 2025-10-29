@@ -5,6 +5,8 @@ import { AnalyticsEmitter } from './emit';
 import { scrubAnalyticsEvent, scrubError } from '../../../utils/piiScrubbing';
 import { TELEMETRY_CONFIG, SAMPLING_CONFIG } from '../../../config/telemetry';
 import { AnalyticsEvent } from './types';
+import { logger } from '../../../../utils/logger';
+
 
 export interface EnhancedAnalyticsOptions {
 	enablePIIScrubbing?: boolean;
@@ -80,7 +82,7 @@ export class EnhancedAnalyticsService {
 
 		// Apply sampling
 		if (!this.shouldSample()) {
-			console.log('📊 [Analytics] Event sampled out:', event.type);
+			logger.debug('📊 [Analytics] Event sampled out:', event.type);
 			return;
 		}
 
@@ -102,11 +104,11 @@ export class EnhancedAnalyticsService {
 		try {
 			await this.analyticsEmitter.emit(enhancedEvent);
 		} catch (error) {
-			console.warn('Failed to emit enhanced analytics event:', error);
+			logger.warn('Failed to emit enhanced analytics event:', error);
 
 			// Log to console in development
 			if (__DEV__) {
-				console.log('📊 [Analytics] Event (development):', enhancedEvent);
+				logger.debug('📊 [Analytics] Event (development):', enhancedEvent);
 			}
 		}
 	}
@@ -266,7 +268,7 @@ export class EnhancedAnalyticsService {
 	 */
 	startNewSession(): void {
 		this.sessionId = this.generateSessionId();
-		console.log('📊 [Analytics] New session started:', this.sessionId);
+		logger.debug('📊 [Analytics] New session started:', this.sessionId);
 	}
 
 	/**

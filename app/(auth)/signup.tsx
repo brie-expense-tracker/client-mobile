@@ -17,6 +17,9 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import useAuth from '../../src/context/AuthContext';
 import { RectButton, BorderlessButton } from 'react-native-gesture-handler';
+import { createLogger } from '../../src/utils/sublogger';
+
+const signupScreenLog = createLogger('SignupScreen');
 
 type FieldErrors = {
 	email?: string;
@@ -103,7 +106,7 @@ export default function Signup() {
 			}
 
 			// Show a compact inline error message at the top of the form
-			console.warn('Signup error:', e, errorMessage);
+			signupScreenLog.warn('Signup error', { error: e, message: errorMessage });
 			// Optionally, set a banner state if you want a persistent bar.
 		} finally {
 			setIsLoading(false);
@@ -123,7 +126,7 @@ export default function Signup() {
 					error?.message?.includes('cancelled')) ||
 				error?.code === 'GOOGLE_SIGNUP_CANCELED';
 			if (!cancelled) {
-				console.warn('Google Sign-Up error:', error);
+				signupScreenLog.warn('Google Sign-Up error', error);
 				await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 			}
 		} finally {

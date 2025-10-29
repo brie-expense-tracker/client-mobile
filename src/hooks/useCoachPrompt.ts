@@ -1,5 +1,8 @@
 import { useState, useCallback } from 'react';
 import { ApiService } from '../services';
+import { createLogger } from '../utils/sublogger';
+
+const coachPromptHookLog = createLogger('useCoachPrompt');
 
 interface CoachPromptResponse {
 	success: boolean;
@@ -44,7 +47,7 @@ export default function useCoachPrompt() {
 					error: 'Failed to create conversation thread',
 				};
 			} catch (error) {
-				console.error('Error submitting prompt:', error);
+				coachPromptHookLog.error('Error submitting prompt', error);
 				return {
 					success: false,
 					error: error instanceof Error ? error.message : 'Unknown error',
@@ -72,7 +75,7 @@ export default function useCoachPrompt() {
 			// Fallback response
 			return `I understand you're asking about "${prompt}". Let me analyze your financial data and provide personalized insights. I'll help you create actionable steps to improve your financial health.`;
 		} catch (error) {
-			console.error('Error generating AI response:', error);
+			coachPromptHookLog.error('Error generating AI response', error);
 			return `I'd be happy to help you with "${prompt}". Let me analyze your financial situation and provide personalized recommendations.`;
 		}
 	};

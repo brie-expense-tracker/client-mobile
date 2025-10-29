@@ -1,3 +1,3 @@
-// Make sure the polyfill loads BEFORE expo-router.
+// index.ts
 import './src/polyfills';
 import 'expo-router/entry';

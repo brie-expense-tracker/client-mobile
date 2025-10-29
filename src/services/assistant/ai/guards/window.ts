@@ -2,6 +2,8 @@
 
 import { FactPack } from '../../factPack';
 import { WriterOutput, GuardReport, GuardFailure } from '../types';
+import { logger } from '../../../../../utils/logger';
+
 
 export function guardTimeStamp(out: WriterOutput, fp: FactPack): GuardReport {
 	const failures: GuardFailure[] = [];
@@ -33,7 +35,7 @@ export function guardTimeStamp(out: WriterOutput, fp: FactPack): GuardReport {
 				}
 			} catch {
 				// Invalid date format, but not necessarily out of window
-				console.warn('Invalid date format in answer:', dateStr);
+				logger.warn('Invalid date format in answer:', dateStr);
 			}
 		}
 	}

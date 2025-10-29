@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 /**
  * Error handling service for consistent UX error states
  */
@@ -457,7 +458,7 @@ export class ErrorService {
 	 */
 	static logError(error: any, context?: any): void {
 		const errorState = this.categorizeError(error);
-		console.error('[ErrorService] Error occurred:', {
+		logger.error('[ErrorService] Error occurred:', {
 			type: errorState.type,
 			message: errorState.message,
 			retryable: errorState.retryable,
@@ -481,7 +482,7 @@ export class ErrorService {
 		}
 
 		const delay = this.calculateRetryDelay(retryCount);
-		console.log(
+		logger.debug(
 			`[ErrorService] Retrying in ${delay}ms (attempt ${retryCount + 1})`
 		);
 

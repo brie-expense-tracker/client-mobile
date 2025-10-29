@@ -1,4 +1,6 @@
 import { ApiService } from '../core/apiService';
+import { logger } from '../../utils/logger';
+
 
 export interface AIInsight {
 	_id: string;
@@ -75,7 +77,7 @@ export class InsightsService {
 		period: 'daily' | 'weekly' | 'monthly'
 	): Promise<InsightsResponse> {
 		try {
-			console.log(`🧠 Fetching ${period} insights...`);
+			logger.debug(`🧠 Fetching ${period} insights...`);
 			const response = await ApiService.get<any>(`/insights/${period}`);
 
 			// Simplified response processing
@@ -106,14 +108,14 @@ export class InsightsService {
 				}
 			}
 
-			console.log(`✅ Found ${insightsArray.length} ${period} insights`);
+			logger.debug(`✅ Found ${insightsArray.length} ${period} insights`);
 			return {
 				success: response.success,
 				data: insightsArray,
 				error: response.error,
 			};
 		} catch (error) {
-			console.error(`❌ Error fetching ${period} insights:`, error);
+			logger.error(`❌ Error fetching ${period} insights:`, error);
 			return {
 				success: false,
 				data: [],
@@ -132,7 +134,7 @@ export class InsightsService {
 		period: 'daily' | 'weekly' | 'monthly'
 	): Promise<InsightsResponse> {
 		try {
-			console.log(`🚀 Generating ${period} insights...`);
+			logger.debug(`🚀 Generating ${period} insights...`);
 
 			const response = await ApiService.post<any>(
 				`/insights/generate/${period}`,
@@ -171,18 +173,18 @@ export class InsightsService {
 			}
 
 			if (!Array.isArray(insightsArray)) {
-				console.warn(`⚠️ Generated data is not an array for ${period}`);
+				logger.warn(`⚠️ Generated data is not an array for ${period}`);
 				insightsArray = [];
 			}
 
-			console.log(`✅ Generated ${insightsArray.length} ${period} insights`);
+			logger.debug(`✅ Generated ${insightsArray.length} ${period} insights`);
 			return {
 				success: response.success,
 				data: insightsArray,
 				error: response.error,
 			};
 		} catch (error) {
-			console.error(`❌ Error generating ${period} insights:`, error);
+			logger.error(`❌ Error generating ${period} insights:`, error);
 			throw error;
 		}
 	}
@@ -190,7 +192,7 @@ export class InsightsService {
 	// Generate profile-based weekly insights using user profile data
 	static async generateProfileBasedWeeklyInsights(): Promise<InsightsResponse> {
 		try {
-			console.log(
+			logger.debug(
 				'InsightsService.generateProfileBasedWeeklyInsights() - Starting generation...'
 			);
 
@@ -200,7 +202,7 @@ export class InsightsService {
 			);
 
 			// Debug: Log the response to see what we're getting
-			console.log(
+			logger.debug(
 				'InsightsService.generateProfileBasedWeeklyInsights() - Response:',
 				JSON.stringify(response, null, 2)
 			);
@@ -237,14 +239,14 @@ export class InsightsService {
 			}
 
 			if (!Array.isArray(insightsArray)) {
-				console.warn(
+				logger.warn(
 					'InsightsService.generateProfileBasedWeeklyInsights() - Data is not an array:',
 					response.data
 				);
 				insightsArray = [];
 			}
 
-			console.log(
+			logger.debug(
 				'InsightsService.generateProfileBasedWeeklyInsights() - Final processed data:',
 				insightsArray
 			);
@@ -255,7 +257,7 @@ export class InsightsService {
 				error: response.error,
 			};
 		} catch (error) {
-			console.error(
+			logger.error(
 				'InsightsService.generateProfileBasedWeeklyInsights() - Error:',
 				error
 			);
@@ -278,7 +280,7 @@ export class InsightsService {
 		period: 'daily' | 'weekly' | 'monthly'
 	): Promise<InsightsResponse> {
 		try {
-			console.log(
+			logger.debug(
 				`InsightsService.refreshInsightsAfterActions(${period}) - Starting refresh...`
 			);
 
@@ -290,19 +292,19 @@ export class InsightsService {
 				generateResponse.data &&
 				Array.isArray(generateResponse.data)
 			) {
-				console.log(
+				logger.debug(
 					`InsightsService.refreshInsightsAfterActions(${period}) - Generated ${generateResponse.data.length} new insights`
 				);
 				return generateResponse;
 			}
 
 			// If generation fails, fall back to fetching existing insights
-			console.log(
+			logger.debug(
 				`InsightsService.refreshInsightsAfterActions(${period}) - Generation failed, fetching existing insights`
 			);
 			return await this.getInsights(period);
 		} catch (error) {
-			console.error(
+			logger.error(
 				`InsightsService.refreshInsightsAfterActions(${period}) - Error:`,
 				error
 			);

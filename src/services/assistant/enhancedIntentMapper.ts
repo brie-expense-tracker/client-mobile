@@ -3,6 +3,8 @@
 
 import { ChatResponse } from './responseSchema';
 import { FinancialContext } from './helpfulFallbacks';
+import { logger } from '../../../utils/logger';
+
 
 // Enhanced intent types including UNKNOWN
 export type Intent =
@@ -514,7 +516,7 @@ export class EnhancedIntentMapper {
 				delta,
 			};
 		} catch (error) {
-			console.warn('Shadow routing failed:', error);
+			logger.warn('Shadow routing failed:', error);
 			return undefined;
 		}
 	}

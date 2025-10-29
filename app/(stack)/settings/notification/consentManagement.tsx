@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { logger } from '../../../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -63,7 +64,7 @@ export default function NotificationConsentScreen() {
 			setConsent(settings);
 			setLoading(false);
 		} catch (error) {
-			console.error('Error loading consent settings:', error);
+			logger.error('Error loading consent settings:', error);
 			Alert.alert('Error', 'Failed to load notification preferences');
 			setLoading(false);
 		}
@@ -97,7 +98,7 @@ export default function NotificationConsentScreen() {
 				Alert.alert('Error', 'Failed to update notification preferences');
 			}
 		} catch (error) {
-			console.error('Error updating consent settings:', error);
+			logger.error('Error updating consent settings:', error);
 			Alert.alert('Error', 'Failed to update notification preferences');
 		} finally {
 			setSaving(false);
@@ -109,7 +110,7 @@ export default function NotificationConsentScreen() {
 			await sendTestNotification();
 			Alert.alert('Test Sent', 'Test notification sent successfully!');
 		} catch (error) {
-			console.error('Error sending test notification:', error);
+			logger.error('Error sending test notification:', error);
 			Alert.alert('Error', 'Failed to send test notification');
 		}
 	};

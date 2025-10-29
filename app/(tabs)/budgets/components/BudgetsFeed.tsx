@@ -13,9 +13,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Budget, getBudgetId } from '../../../../src/context/budgetContext';
+import { createLogger } from '../../../../src/utils/sublogger';
 import LinearProgressBar from './LinearProgressBar';
+
+const budgetsFeedLog = createLogger('BudgetsFeed');
 import { router } from 'expo-router';
 import { normalizeIconName } from '../../../../src/constants/uiConstants';
+import { isDevMode } from '../../../../src/config/environment';
 
 const currency = (n: number) =>
 	`$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
@@ -52,7 +56,11 @@ function BudgetRow({
 
 	const handleKebabPress = () => {
 		setKebabPressed(true);
-		console.log('Kebab button pressed for budget:', budget.id);
+		if (isDevMode) {
+			budgetsFeedLog.debug('Kebab button pressed for budget', {
+				budgetId: budget.id,
+			});
+		}
 		onPressMenu?.(budget.id);
 		// Reset the flag after a short delay
 		setTimeout(() => setKebabPressed(false), 100);
@@ -181,7 +189,7 @@ export default function BudgetsFeed({
 		try {
 			await onRefresh();
 		} catch (error) {
-			console.error('Error refreshing budgets:', error);
+			budgetsFeedLog.error('Error refreshing budgets', error);
 		} finally {
 			setRefreshing(false);
 		}
@@ -238,15 +246,15 @@ export default function BudgetsFeed({
 						</TouchableOpacity>
 					</View>
 
-				<FlatList
-					data={filteredAndSorted}
-					extraData={filteredAndSorted}
-					keyExtractor={(b) => getBudgetId(b)}
-					renderItem={({ item }) => (
-						<BudgetRow budget={item} onPressMenu={onPressMenu} />
-					)}
-					ItemSeparatorComponent={() => <View style={styles.separator} />}
-					refreshControl={
+					<FlatList
+						data={filteredAndSorted}
+						extraData={filteredAndSorted}
+						keyExtractor={(b) => getBudgetId(b)}
+						renderItem={({ item }) => (
+							<BudgetRow budget={item} onPressMenu={onPressMenu} />
+						)}
+						ItemSeparatorComponent={() => <View style={styles.separator} />}
+						refreshControl={
 							<RefreshControl
 								refreshing={refreshing}
 								onRefresh={handleRefresh}
