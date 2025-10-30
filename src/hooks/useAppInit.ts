@@ -42,9 +42,11 @@ export function useAppInit() {
 					appInitLog.warn('CrashReporting failed to initialize', error);
 				}
 
-				// Set user consent based on settings (you can integrate with user preferences)
+				// Set user consent via environment (default off outside dev)
 				try {
-					crashReporting.setUserConsent(true);
+					const consent =
+						process.env.EXPO_PUBLIC_CRASH_CONSENT === 'true' || isDevMode;
+					crashReporting.setUserConsent(consent);
 				} catch (error) {
 					appInitLog.warn('Failed to set user consent', error);
 				}

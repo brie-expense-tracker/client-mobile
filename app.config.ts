@@ -1,9 +1,9 @@
 import { ExpoConfig, ConfigContext } from 'expo/config';
 
 export default ({ config }: ConfigContext): ExpoConfig => {
+	const profile = process.env.EAS_BUILD_PROFILE; // e.g., "production" | "testflight" | "development"
 	const isProduction =
-		process.env.EXPO_PUBLIC_ENV === 'prod' ||
-		process.env.NODE_ENV === 'production';
+		profile === 'production' || process.env.EXPO_PUBLIC_ENV === 'production';
 
 	return {
 		...config,
@@ -45,8 +45,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 					'This app uses notifications to keep you informed about your budget goals and financial insights.',
 				NSLocationWhenInUseUsageDescription:
 					'Location is used to provide location-based financial insights and merchant information.',
-				// Only enable background modes in production
-				...(isProduction && { UIBackgroundModes: ['remote-notification'] }),
+				// Only enable background modes in production builds
+				...(profile === 'production' && {
+					UIBackgroundModes: ['remote-notification'],
+				}),
 			},
 		},
 		android: {

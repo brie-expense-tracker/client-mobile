@@ -1,10 +1,7 @@
-import { API_BASE_URL, API_CONFIG } from '../../config/api';
-import { getHMACService } from '../../utils/hmacSigning';
+import { API_BASE_URL } from '../../config/api';
 import { RequestManager } from './requestManager';
-import { getApp } from '@react-native-firebase/app';
-import { getAuth, getIdToken } from '@react-native-firebase/auth';
-import { getAuthHeaders as getHttpAuthHeaders } from './httpClient';
-import { ApiError, ApiErrorType } from './apiTypes';
+import { ApiError, ApiErrorType } from './apiErrors';
+import { isDevMode } from '../../config/environment';
 import { createLogger } from '../../utils/sublogger';
 
 // Re-export for backward compatibility
@@ -58,7 +55,6 @@ const CACHE_TTL = {
 	default: 10000, // 10 seconds
 };
 
-const THROTTLE_DELAY = __DEV__ ? 1000 : 1000; // 1 second delay in development to avoid rate limiting
 const RATE_LIMIT_BACKOFF_BASE = __DEV__ ? 2000 : 5000; // 2 seconds in dev, 5 seconds in prod
 
 // Request/Response interceptors
@@ -106,32 +102,7 @@ function cacheRequest(endpoint: string, data: any): void {
 	apiLog.debug('Cached response', { endpoint, ttl });
 }
 
-// Check if request should be throttled
-function shouldThrottleRequest(endpoint: string): boolean {
-	const now = Date.now();
-	const lastRequest = requestThrottle.get(endpoint);
-
-	if (lastRequest && now - lastRequest < THROTTLE_DELAY) {
-		apiLog.debug('Throttling request', { endpoint });
-		return true;
-	}
-
-	requestThrottle.set(endpoint, now);
-	return false;
-}
-
-// Check if endpoint is in rate limit backoff
-function isRateLimited(endpoint: string): boolean {
-	const backoffUntil = rateLimitBackoff.get(endpoint);
-	if (backoffUntil && Date.now() < backoffUntil) {
-		apiLog.warn('Rate limited', {
-			endpoint,
-			backoffUntil: new Date(backoffUntil).toISOString(),
-		});
-		return true;
-	}
-	return false;
-}
+// (removed unused shouldThrottleRequest and isRateLimited helpers)
 
 // Set rate limit backoff
 function setRateLimitBackoff(
@@ -219,8 +190,7 @@ export interface ApiResponse<T = any> {
 	};
 }
 
-// ApiError and ApiErrorType are now imported from ./apiTypes above
-
+// ApiError and ApiErrorType are imported above for compatibility
 export class ApiService {
 	private static isOnline(): boolean {
 		// Check if we're online using navigator.onLine if available
@@ -231,94 +201,7 @@ export class ApiService {
 		return true;
 	}
 
-	// Check if endpoint requires HMAC signing
-	private static requiresHMACSigning(endpoint: string): boolean {
-		const hmacEndpoints = [
-			'/api/budgets',
-			'/api/budgets/',
-			'/api/goals',
-			'/api/goals/',
-		];
-
-		return hmacEndpoints.some((hmacEndpoint) =>
-			endpoint.startsWith(hmacEndpoint)
-		);
-	}
-
-	// Add HMAC signature to headers if required
-	private static async addHMACSignatureIfRequired(
-		endpoint: string,
-		method: string,
-		body: any,
-		headers: Record<string, string>
-	): Promise<{ headers: Record<string, string>; bodyString: string | null }> {
-		// Determine if this request has a body
-		const hasBody = body !== undefined && body !== null;
-
-		if (!this.requiresHMACSigning(endpoint)) {
-			return {
-				headers,
-				bodyString: hasBody
-					? typeof body === 'string'
-						? body
-						: JSON.stringify(body)
-					: null,
-			};
-		}
-
-		try {
-			const hmacService = getHMACService();
-
-			apiLog.debugLazy(() => [
-				'HMAC signing process starting',
-				{ hasBody, bodyType: typeof body, endpoint, method },
-			]);
-
-			// For bodyless requests, bodyString will be empty string for signing
-			// but we return null to indicate no body should be sent in fetch
-			const bodyString = hasBody
-				? typeof body === 'string'
-					? body
-					: stableStringify(body)
-				: null;
-
-			apiLog.debugLazy(() => [
-				'HMAC debug info',
-				{
-					bodyString: bodyString
-						? bodyString.substring(0, 100) + '...'
-						: 'NO BODY',
-					method,
-					endpoint,
-				},
-			]);
-
-			const signedHeaders = hmacService.signRequestHeaders(
-				body,
-				method,
-				endpoint,
-				headers
-			);
-
-			apiLog.debug('HMAC signing completed', {
-				endpoint,
-				headerKeys: Object.keys(signedHeaders),
-			});
-
-			return { headers: signedHeaders, bodyString };
-		} catch (error) {
-			apiLog.error('Failed to add HMAC signature', error);
-			// Continue without HMAC signature - let the server handle the error
-			return {
-				headers,
-				bodyString: hasBody
-					? typeof body === 'string'
-						? body
-						: JSON.stringify(body)
-					: null,
-			};
-		}
-	}
+	// HMAC signing removed: no special headers are added
 
 	private static createAbortController(key: string): AbortController {
 		// Cancel any existing request with the same key
@@ -418,10 +301,12 @@ export class ApiService {
 
 	private static async getAuthHeaders(): Promise<Record<string, string>> {
 		try {
-			const headers = await getHttpAuthHeaders();
-
-			// Check if headers have x-firebase-uid (user is authenticated)
-			if (!headers['x-firebase-uid']) {
+			// Import Firebase modular auth
+			const { getAuth, getIdToken } = await import(
+				'@react-native-firebase/auth'
+			);
+			const currentUser = getAuth().currentUser;
+			if (!currentUser) {
 				const error = new Error(
 					'User not authenticated - no Firebase user found'
 				);
@@ -429,9 +314,16 @@ export class ApiService {
 				throw error;
 			}
 
+			const firebaseUID = currentUser.uid;
+			const idToken = await getIdToken(currentUser);
+
+			const headers: Record<string, string> = {
+				'Content-Type': 'application/json',
+				'x-firebase-uid': firebaseUID,
+				Authorization: `Bearer ${idToken}`,
+			};
 			return headers;
 		} catch (error) {
-			// Re-throw auth errors with a flag so callers can handle them appropriately
 			if ((error as any).isAuthError) {
 				throw error;
 			}
@@ -444,7 +336,7 @@ export class ApiService {
 		endpoint: string,
 		options?: { retries?: number; useCache?: boolean; signal?: AbortSignal }
 	): Promise<ApiResponse<T>> {
-		const { retries = 2, useCache = true, signal } = options || {};
+		const { useCache = true, signal } = options || {};
 
 		// Check if offline
 		if (!this.isOnline()) {
@@ -543,21 +435,6 @@ export class ApiService {
 				let headers: Record<string, string>;
 				try {
 					headers = await this.getAuthHeaders();
-
-					// Add Firebase ID token for write operations
-					if (this.requiresHMACSigning(endpoint)) {
-						const authInstance = getAuth(getApp());
-						const currentUser = authInstance.currentUser;
-						if (currentUser) {
-							try {
-								const idToken = await getIdToken(currentUser);
-								headers['Authorization'] = `Bearer ${idToken}`;
-								apiLog.debug('Added Firebase ID token for write operation');
-							} catch (tokenError) {
-								apiLog.warn('Failed to get Firebase ID token', tokenError);
-							}
-						}
-					}
 				} catch (authError: any) {
 					// Handle authentication errors gracefully
 					if (authError.isAuthError) {
@@ -570,14 +447,8 @@ export class ApiService {
 					throw authError;
 				}
 
-				// Add HMAC signature if required
-				const { headers: signedHeaders, bodyString } =
-					await this.addHMACSignatureIfRequired(
-						endpoint,
-						'POST',
-						body,
-						headers
-					);
+				const bodyString =
+					typeof body === 'string' ? body : JSON.stringify(body);
 
 				const url = `${API_BASE_URL}${endpoint}`;
 
@@ -588,14 +459,14 @@ export class ApiService {
 						endpoint,
 						headers: {
 							'x-firebase-uid':
-								signedHeaders['x-firebase-uid']?.substring(0, 8) + '...',
+								headers['x-firebase-uid']?.substring(0, 8) + '...',
 						},
 					},
 				]);
 
 				const response = await fetch(url, {
 					method: 'POST',
-					headers: signedHeaders,
+					headers,
 					body: bodyString,
 				});
 
@@ -719,21 +590,6 @@ export class ApiService {
 			let headers: Record<string, string>;
 			try {
 				headers = await this.getAuthHeaders();
-
-				// Add Firebase ID token for write operations
-				if (this.requiresHMACSigning(endpoint)) {
-					const authInstance = getAuth(getApp());
-					const currentUser = authInstance.currentUser;
-					if (currentUser) {
-						try {
-							const idToken = await getIdToken(currentUser);
-							headers['Authorization'] = `Bearer ${idToken}`;
-							apiLog.debug('Added Firebase ID token for write operation');
-						} catch (tokenError) {
-							apiLog.warn('Failed to get Firebase ID token', tokenError);
-						}
-					}
-				}
 			} catch (authError: any) {
 				// Handle authentication errors gracefully
 				if (authError.isAuthError) {
@@ -746,45 +602,21 @@ export class ApiService {
 				throw authError;
 			}
 
-			// Add HMAC signature if required
-			const { headers: signedHeaders, bodyString } =
-				await this.addHMACSignatureIfRequired(endpoint, 'PUT', body, headers);
+			const bodyString = typeof body === 'string' ? body : JSON.stringify(body);
 
 			const url = `${API_BASE_URL}${endpoint}`;
 
-			// Comprehensive request debugging
-			apiLog.debugLazy(() => {
-				const headerSummary = Object.entries(signedHeaders).reduce(
-					(acc, [key, value]) => {
-						if (
-							key.toLowerCase().includes('signature') ||
-							key.toLowerCase().includes('authorization')
-						) {
-							acc[key] = value.substring(0, 20) + '...';
-						} else if (key === 'x-hmac-signature') {
-							acc[key] = value.substring(0, 30) + '...';
-						} else {
-							acc[key] = value;
-						}
-						return acc;
-					},
-					{} as Record<string, string>
-				);
-				return [
-					'PUT request details',
-					{
-						endpoint,
-						url,
-						method: 'PUT',
-						headers: headerSummary,
-						bodyStringLength: bodyString?.length ?? 0,
-					},
-				];
-			});
+			// Comprehensive request debugging (dev only)
+			if (isDevMode) {
+				apiLog.debug('📝 PUT request', { endpoint, url, headers });
+				apiLog.debug('📝 PUT body details', {
+					length: bodyString.length,
+				});
+			}
 
 			const response = await fetch(url, {
 				method: 'PUT',
-				headers: signedHeaders,
+				headers,
 				body: bodyString,
 			});
 
@@ -818,7 +650,6 @@ export class ApiService {
 					return {
 						success: false,
 						error: 'Invalid JSON response from server',
-						rawResponse: textResponse,
 					} as ApiResponse<T>;
 				}
 			} else {
@@ -835,14 +666,12 @@ export class ApiService {
 					return {
 						success: false,
 						error: `HTTP error! status: ${response.status}`,
-						rawResponse: textResponse,
 					} as ApiResponse<T>;
 				}
 
 				return {
 					success: false,
 					error: 'Server returned non-JSON response',
-					rawResponse: textResponse,
 				} as ApiResponse<T>;
 			}
 
@@ -983,21 +812,6 @@ export class ApiService {
 			let headers: Record<string, string>;
 			try {
 				headers = await this.getAuthHeaders();
-
-				// Add Firebase ID token for write operations
-				if (this.requiresHMACSigning(endpoint)) {
-					const authInstance = getAuth(getApp());
-					const currentUser = authInstance.currentUser;
-					if (currentUser) {
-						try {
-							const idToken = await getIdToken(currentUser);
-							headers['Authorization'] = `Bearer ${idToken}`;
-							apiLog.debug('Added Firebase ID token for write operation');
-						} catch (tokenError) {
-							apiLog.warn('Failed to get Firebase ID token', tokenError);
-						}
-					}
-				}
 			} catch (authError: any) {
 				// Handle authentication errors gracefully
 				if (authError.isAuthError) {
@@ -1010,14 +824,7 @@ export class ApiService {
 				throw authError;
 			}
 
-			// Add HMAC signature if required (pass null for body since DELETE is bodyless)
-			const { headers: signedHeaders, bodyString } =
-				await this.addHMACSignatureIfRequired(
-					endpoint,
-					'DELETE',
-					null,
-					headers
-				);
+			const bodyString: string | null = null;
 
 			const url = `${API_BASE_URL}${endpoint}`;
 
@@ -1027,8 +834,7 @@ export class ApiService {
 			// IMPORTANT: Keep Content-Type for DELETE (server policy requires it)
 			// But we still won't send a body - Content-Length: 0 prevents JSON parsing
 			const requestHeaders: Record<string, string> = {
-				...signedHeaders,
-				// Ensure Content-Type is set even for bodyless DELETE (server requires it)
+				...headers,
 				'Content-Type': 'application/json',
 			};
 
@@ -1052,7 +858,7 @@ export class ApiService {
 				if (hasBody && bodyString) {
 					fetchOptions.body = bodyString;
 					apiLog.debug('Including body in DELETE', {
-						bodyPreview: bodyString.substring(0, 100),
+						bodyPreview: String(bodyString).substring(0, 100),
 					});
 				} else {
 					apiLog.debug('DELETE is bodyless (Content-Length: 0)');

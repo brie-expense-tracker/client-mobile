@@ -33,8 +33,9 @@
 			"env": {
 				"EXPO_PUBLIC_API_URL": "https://brie-staging-api.onrender.com",
 				"EXPO_PUBLIC_ENV": "testflight",
-				"EXPO_PUBLIC_AI_INSIGHTS": "1",
-				"EXPO_PUBLIC_AI_INSIGHTS_PREVIEW": "0"
+				"EXPO_PUBLIC_AI_INSIGHTS": "0",
+				"EXPO_PUBLIC_AI_INSIGHTS_PREVIEW": "0",
+				"EXPO_PUBLIC_CRASH_CONSENT": "true"
 			},
 			"ios": {
 				"image": "latest"

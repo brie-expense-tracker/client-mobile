@@ -23,11 +23,6 @@ export const ENV = {
 		10
 	),
 
-	// Security
-	HMAC_SECRET_KEY:
-		process.env.EXPO_PUBLIC_HMAC_SECRET_KEY ||
-		'dev-hmac-secret-key-32-chars-minimum-required-for-development',
-
 	// Primary API URL - use EXPO_PUBLIC_API_URL everywhere
 	API_URL:
 		process.env.EXPO_PUBLIC_API_URL || 'https://brie-staging-api.onrender.com',
@@ -94,10 +89,10 @@ export const isDevMode = isDevelopment && DEV_MODE;
 
 // Debug logging - only when dev mode is enabled
 if (isDevMode) {
-	envLog.debug('Configuration loaded', {
+	envLog.debug('Environment configuration', {
 		NODE_ENV: ENV.NODE_ENV,
 		EXPO_PUBLIC_ENV: ENV.EXPO_PUBLIC_ENV,
-		DEV_MODE: DEV_MODE,
+		DEV_MODE,
 		isDevMode,
 		platform: Platform.OS,
 		isDevice: Device.isDevice,
@@ -105,9 +100,5 @@ if (isDevMode) {
 		apiUrl: ENV.API_URL,
 		apiBaseUrl: resolveApiBaseUrl(),
 		fullApiUrl: getApiUrl(),
-		hmacSecretAvailable: !!ENV.HMAC_SECRET_KEY,
-		hmacSecretLength: ENV.HMAC_SECRET_KEY?.length || 0,
-		hmacSecretPreview:
-			ENV.HMAC_SECRET_KEY?.substring(0, 8) + '...' || 'undefined',
 	});
 }

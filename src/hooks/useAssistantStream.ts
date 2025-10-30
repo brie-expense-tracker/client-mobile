@@ -198,9 +198,8 @@ export function useAssistantStream({
 
 	const buildSseUrl = useCallback(
 		(sessionId: string, message: string, uid: string) => {
-			// Get the actual API base URL from environment
-			const baseUrl =
-				process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+			// Centralized API base URL
+			const { API_BASE_URL: baseUrl } = await import('../config/api');
 
 			// Ensure baseUrl ends with /api
 			const apiBaseUrl = baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
@@ -529,9 +528,7 @@ export function useAssistantStream({
 								}
 
 								// Build URL
-								const baseUrl =
-									process.env.EXPO_PUBLIC_API_URL ||
-									'https://brie-staging-api.onrender.com';
+								const { API_BASE_URL: baseUrl } = await import('../config/api');
 								const apiBaseUrl = baseUrl.endsWith('/api')
 									? baseUrl
 									: `${baseUrl}/api`;

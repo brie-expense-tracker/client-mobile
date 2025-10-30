@@ -117,6 +117,8 @@ export const ChatMessage = memo(function ChatMessage({
 	);
 });
 
+export default ChatMessage;
+
 const styles = StyleSheet.create({
 	message: { maxWidth: '80%', marginBottom: 16, padding: 12, borderRadius: 18 },
 	userMessage: {

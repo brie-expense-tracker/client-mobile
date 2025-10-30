@@ -1,11 +1,11 @@
 // api.ts - API configuration for the mobile app
-import { resolveApiBaseUrl, getApiUrl, ENV } from './environment';
+import { AppConfig } from './appConfig';
 
 // Base URL for API endpoints
-export const API_BASE_URL = resolveApiBaseUrl();
+export const API_BASE_URL = AppConfig.apiBaseUrl;
 
 // Full API URL with base path
-export const API_URL = getApiUrl();
+export const API_URL = `${API_BASE_URL}/api`;
 
 // API endpoints
 export const API_ENDPOINTS = {
@@ -69,7 +69,7 @@ export const API_ENDPOINTS = {
 
 // API configuration
 export const API_CONFIG = {
-	timeout: ENV.API_TIMEOUT_MS,
+	timeout: AppConfig.network.timeoutMs,
 	retries: 3,
 	headers: {
 		'Content-Type': 'application/json',
@@ -78,11 +78,4 @@ export const API_CONFIG = {
 };
 
 // Re-export environment settings for convenience
-export {
-	isDevelopment,
-	isProduction,
-	isTest,
-	isDev,
-	isDevMode,
-	DEV_MODE,
-} from './environment';
+export {} from './environment';

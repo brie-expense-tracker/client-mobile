@@ -88,7 +88,7 @@ import ChatComposer from './components/ChatComposer';
 // New components
 import { MessagesList } from './_components/MessagesList';
 import { AssistantListFooter } from './_components/AssistantListFooter';
-import { useComposerHeight } from './_hooks/useComposerHeight';
+import { useComposerHeight } from '../../../src/hooks/useComposerHeight';
 import { isDevMode } from '../../../src/config/environment';
 
 export default function ChatScreen() {

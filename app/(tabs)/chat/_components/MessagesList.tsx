@@ -51,5 +51,4 @@ export const MessagesList = memo(function MessagesList({
 	);
 });
 
-// Default export to silence Expo Router warning (not used as route)
 export default MessagesList;
