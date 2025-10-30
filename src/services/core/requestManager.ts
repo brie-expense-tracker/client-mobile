@@ -1,4 +1,4 @@
-import { ApiError, ApiErrorType } from './apiTypes';
+import { ApiError, ApiErrorType } from './apiErrors';
 import { httpFetchWithRefresh } from './httpClient';
 import { createLogger } from '../../utils/sublogger';
 

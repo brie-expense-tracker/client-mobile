@@ -229,9 +229,7 @@ export class StreamingOrchestratorService {
 	constructor(context: FinancialContext, sessionId?: string) {
 		this.context = context;
 		this.sessionId = sessionId || this.generateSessionId();
-		this.baseUrl =
-			process.env.EXPO_PUBLIC_API_URL ||
-			'https://brie-staging-api.onrender.com';
+		this.baseUrl = (await import('../../config/api')).API_BASE_URL;
 	}
 
 	/**

@@ -1,27 +1,15 @@
 // telemetry.ts - Centralized telemetry and stability configuration
-// Environment variables and feature flags for production monitoring
+// Streamlined: derive from AppConfig; DSN presence toggles telemetry
+import { AppConfig } from './appConfig';
 
 export const TELEMETRY_CONFIG = {
 	// Crash Reporting
 	SENTRY: {
-		DSN: process.env.SENTRY_DSN || process.env.EXPO_PUBLIC_SENTRY_DSN || null,
-		ENVIRONMENT:
-			process.env.SENTRY_ENVIRONMENT ||
-			process.env.EXPO_PUBLIC_SENTRY_ENVIRONMENT ||
-			'development',
-		TRACES_SAMPLE_RATE: parseFloat(
-			process.env.SENTRY_TRACES_SAMPLE_RATE ||
-				process.env.EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE ||
-				'0.1'
-		),
-		PROFILES_SAMPLE_RATE: parseFloat(
-			process.env.SENTRY_PROFILES_SAMPLE_RATE ||
-				process.env.EXPO_PUBLIC_SENTRY_PROFILES_SAMPLE_RATE ||
-				'0.1'
-		),
-		ENABLED:
-			(process.env.SENTRY_DSN || process.env.EXPO_PUBLIC_SENTRY_DSN) !==
-			undefined,
+		DSN: AppConfig.telemetry.dsn || null,
+		ENVIRONMENT: AppConfig.telemetry.environment,
+		TRACES_SAMPLE_RATE: AppConfig.telemetry.tracesSampleRate,
+		PROFILES_SAMPLE_RATE: AppConfig.telemetry.profilesSampleRate,
+		ENABLED: AppConfig.telemetry.enabled,
 	},
 
 	// Firebase Remote Config
@@ -34,13 +22,12 @@ export const TELEMETRY_CONFIG = {
 		),
 	},
 
-	// Analytics & Monitoring
+	// Analytics & Monitoring (minimal; derive from Sentry enabled)
 	ANALYTICS: {
-		SAMPLE_RATE: parseFloat(process.env.ANALYTICS_SAMPLE_RATE || '1.0'),
-		ENABLED: process.env.ANALYTICS_ENABLED !== 'false',
-		CRASH_REPORTING_ENABLED: process.env.CRASH_REPORTING_ENABLED !== 'false',
-		PERFORMANCE_MONITORING_ENABLED:
-			process.env.PERFORMANCE_MONITORING_ENABLED !== 'false',
+		SAMPLE_RATE: 1.0,
+		ENABLED: AppConfig.telemetry.enabled,
+		CRASH_REPORTING_ENABLED: AppConfig.telemetry.enabled,
+		PERFORMANCE_MONITORING_ENABLED: AppConfig.telemetry.enabled,
 	},
 
 	// Feature Flags
@@ -51,20 +38,15 @@ export const TELEMETRY_CONFIG = {
 
 	// Logging
 	LOGGING: {
-		// EXPO_PUBLIC_LOG_LEVEL: 'debug' | 'info' | 'warn' | 'error' | 'silent'
-		// Defaults to 'debug' in dev (__DEV__) and 'warn' in production
-		// Set via EXPO_PUBLIC_LOG_LEVEL env variable
-		LEVEL: process.env.EXPO_PUBLIC_LOG_LEVEL || process.env.LOG_LEVEL || 'info',
-		SAMPLING_RATE: parseFloat(process.env.LOG_SAMPLING_RATE || '0.1'),
-		PII_SCRUBBING_ENABLED: process.env.PII_SCRUBBING_ENABLED !== 'false',
+		LEVEL: AppConfig.telemetry.logLevel,
+		SAMPLING_RATE: 0.1,
+		PII_SCRUBBING_ENABLED: true,
 	},
 
 	// API Configuration
 	API: {
-		BASE_URL:
-			process.env.EXPO_PUBLIC_API_URL ||
-			'https://brie-staging-api.onrender.com',
-		TIMEOUT: parseInt(process.env.API_TIMEOUT || '10000'),
+		BASE_URL: AppConfig.apiBaseUrl,
+		TIMEOUT: AppConfig.network.timeoutMs,
 	},
 } as const;
 

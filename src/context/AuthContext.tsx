@@ -9,23 +9,18 @@ import {
 	useState,
 } from 'react';
 import { AppState, AppStateStatus, Alert } from 'react-native';
-import { getApp } from '@react-native-firebase/app';
 import {
+	FirebaseAuthTypes,
 	getAuth,
 	onAuthStateChanged,
 	onIdTokenChanged,
+	getIdToken,
 	signOut,
-	createUserWithEmailAndPassword,
-	signInWithCredential,
 	GoogleAuthProvider,
 	EmailAuthProvider,
-	confirmPasswordReset,
-	sendPasswordResetEmail,
-	getIdToken,
-	type FirebaseAuthTypes,
 } from '@react-native-firebase/auth';
-
-import { getItem, setItem, removeItem } from '../utils/safeStorage';
+import { isDevMode } from '../config/environment';
+import { setItem, removeItem } from '../utils/safeStorage';
 import * as Sentry from '@sentry/react-native';
 import { UserService, User, Profile } from '../services';
 import { ApiService } from '../services/core/apiService';
@@ -36,8 +31,7 @@ import { createLogger } from '../utils/sublogger';
 
 const authContextLog = createLogger('AuthContext');
 
-const app = getApp();
-const auth = getAuth(app);
+// Use modular getAuth() directly where needed
 
 // Error types for better error handling
 export interface AuthError {
@@ -267,7 +261,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 					// Sign out of Firebase to clear orphaned state
 					try {
-						await signOut(auth);
+						await signOut(getAuth());
 						setFirebaseUser(null);
 						setUser(null);
 						setProfile(null);
@@ -323,14 +317,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			}
 		};
 
-		const unsubAuth = onAuthStateChanged(auth, async (fbUser) => {
-			authContextLog.debug('Firebase auth state changed', {
-				hasUser: !!fbUser,
-				uid: fbUser ? fbUser.uid.substring(0, 8) + '...' : null,
-				processingTimeout: processingTimeoutRef.current,
-				lastProcessedUID: lastProcessedUIDRef.current,
-				isManualLogin: isManualLoginRef.current,
-			});
+		const unsubAuth = onAuthStateChanged(getAuth(), async (fbUser) => {
+			if (isDevMode) {
+				authContextLog.debug('Firebase auth state changed', {
+					uid: fbUser ? fbUser.uid.substring(0, 8) + '...' : 'null',
+					processingTimeoutRef: processingTimeoutRef.current,
+					lastProcessedUIDRef: lastProcessedUIDRef.current,
+					isManualLoginRef: isManualLoginRef.current,
+				});
+			}
 
 			// Skip processing if we're handling manual login, reauthentication, or cancelled Google Sign-In
 			if (
@@ -411,12 +406,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 		// Keep ID token fresh (useful for your HMAC + server auth flow)
 		// Note: This is separate from onAuthStateChanged to avoid duplicate processing
-		const unsubToken = onIdTokenChanged(auth, async (fbUser) => {
+
+		const unsubToken = onIdTokenChanged(getAuth(), async (fbUser) => {
 			if (!fbUser) return;
 			try {
 				// Only refresh token, don't trigger user processing
 				await getIdToken(fbUser, true); // force refresh
-				authContextLog.debug('ID token refreshed');
+				if (isDevMode) {
+					authContextLog.debug('ID token refreshed');
+				}
 			} catch (err) {
 				authContextLog.error('Failed to refresh ID token', err);
 				Sentry.captureException(err);
@@ -436,8 +434,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 	// Refresh user data function
 	const refreshUserData = useCallback(async (): Promise<void> => {
-		authContextLog.debug('refreshUserData called');
-		const currentFirebaseUser = auth.currentUser;
+		if (isDevMode) {
+			authContextLog.debug('refreshUserData called');
+		}
+		const currentFirebaseUser = getAuth().currentUser;
 		if (!currentFirebaseUser) return;
 
 		try {
@@ -497,7 +497,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				authContextLog.debug('App became active, refreshing user data');
 				lastRefreshTime = now;
 				try {
-					const fbUser = auth.currentUser;
+					const fbUser = getAuth().currentUser;
 					if (fbUser) {
 						// Only refresh token, don't refetch all user data
 						await getIdToken(fbUser, true);
@@ -681,7 +681,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 	const logout = useCallback(async () => {
 		try {
-			await signOut(auth);
+			await signOut(getAuth());
 			setUser(null);
 			setProfile(null);
 			setFirebaseUser(null);
@@ -706,16 +706,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		try {
 			authContextLog.debug('Starting password reset process', {
 				email,
-				hasCurrentUser: !!auth.currentUser,
+				hasCurrentUser: !!getAuth().currentUser,
 			});
 
 			// Check if Firebase is properly initialized
-			const authInstance = auth;
+			const authInstance = getAuth();
 			if (!authInstance) {
 				throw new Error('Firebase Auth is not initialized');
 			}
 
-			await sendPasswordResetEmail(auth, email);
+			const { sendPasswordResetEmail } = await import(
+				'@react-native-firebase/auth'
+			);
+			await sendPasswordResetEmail(getAuth(), email);
 			setError(null); // Clear any existing errors
 		} catch (error: any) {
 			authContextLog.error('Error sending password reset email', error);
@@ -736,7 +739,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const confirmPasswordResetCode = useCallback(
 		async (code: string, newPassword: string) => {
 			try {
-				await confirmPasswordReset(auth, code, newPassword);
+				const { confirmPasswordReset } = await import(
+					'@react-native-firebase/auth'
+				);
+				await confirmPasswordReset(getAuth(), code, newPassword);
 				setError(null); // Clear any existing errors
 			} catch (error) {
 				authContextLog.error('Error confirming password reset', error);
@@ -753,7 +759,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 	const updatePasswordToUser = useCallback(async (newPassword: string) => {
 		try {
-			const currentUser = auth.currentUser;
+			const currentUser = getAuth().currentUser;
 			if (!currentUser) {
 				throw new Error('No user is currently signed in');
 			}
@@ -776,8 +782,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 			try {
 				// Create user in Firebase first
+				const { createUserWithEmailAndPassword } = await import(
+					'@react-native-firebase/auth'
+				);
 				const userCredential = await createUserWithEmailAndPassword(
-					auth,
+					getAuth(),
 					email,
 					password
 				);
@@ -879,8 +888,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			const googleCredential = GoogleAuthProvider.credential(idToken);
 
 			// Sign-in the user with the credential
-			authContextLog.debug('Step 4: Signing in with Firebase');
-			const userCredential = await signInWithCredential(auth, googleCredential);
+			const { signInWithCredential } = await import(
+				'@react-native-firebase/auth'
+			);
+			const userCredential = await signInWithCredential(
+				getAuth(),
+				googleCredential
+			);
 			const firebaseUser = userCredential.user;
 
 			authContextLog.info('Firebase auth successful', {
@@ -1056,11 +1070,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			authContextLog.debug('Sign-In result', { type: signInResult.type });
 
 			// Handle the actual data structure returned by Google Sign-In
-			let idToken, user, serverAuthCode;
+			let idToken, user;
 
 			if (signInResult.type === 'success' && signInResult.data) {
 				// Success case - data is in signInResult.data
-				({ idToken, user, serverAuthCode } = signInResult.data);
+				({ idToken, user } = signInResult.data);
 				authContextLog.debug('Got data from success result');
 			} else if (signInResult.type === 'cancelled') {
 				// User cancelled - exit silently
@@ -1070,7 +1084,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				return;
 			} else {
 				// Direct access for other cases
-				({ idToken, user, serverAuthCode } = signInResult);
+				({ idToken, user } = signInResult);
 				authContextLog.debug('Got data from direct access');
 			}
 			authContextLog.debug('Sign-in data', {
@@ -1104,7 +1118,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 			// Sign-in the user with the credential
 			authContextLog.debug('Step 7: Signing in with Firebase');
-			const userCredential = await signInWithCredential(auth, googleCredential);
+			const { signInWithCredential } = await import(
+				'@react-native-firebase/auth'
+			);
+			const userCredential = await signInWithCredential(
+				getAuth(),
+				googleCredential
+			);
+
 			const firebaseUser = userCredential.user;
 			authContextLog.debug('Firebase auth successful', {
 				uid: firebaseUser.uid.substring(0, 12) + '...',
@@ -1122,8 +1143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 					authContextLog.warn('Account already exists in MongoDB', {
 						userId: existingMongoUser._id,
 					});
-					authContextLog.debug('Signing out Firebase and showing alert');
-					await signOut(auth);
+					await signOut(getAuth());
 					setLoading(false);
 					Alert.alert(
 						'Account Already Exists',
@@ -1266,12 +1286,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const deleteAccount = useCallback(async (password: string) => {
 		setLoading(true);
 		try {
-			const user = auth.currentUser;
+			const user = getAuth().currentUser;
+
 			if (!user) throw new Error('No user is currently signed in');
 			if (!user.email) throw new Error('User email is missing');
 
 			// Re-authenticate
 			const credential = EmailAuthProvider.credential(user.email, password);
+
 			await user.reauthenticateWithCredential(credential);
 
 			// Delete backend data
@@ -1308,7 +1330,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			setError(null);
 			isReauthInProgressRef.current = true;
 
-			const currentUser = auth.currentUser;
+			const currentUser = getAuth().currentUser;
+
 			if (!currentUser) {
 				throw Object.assign(new Error('No authenticated user'), {
 					code: 'auth/no-current-user',
@@ -1415,7 +1438,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			// 2) Use RN Firebase's auth.GoogleAuthProvider
 			const googleCredential = GoogleAuthProvider.credential(idToken);
 
-			const currentUser = auth.currentUser;
+			const currentUser = getAuth().currentUser;
 			if (!currentUser) {
 				throw Object.assign(new Error('No authenticated user'), {
 					code: 'auth/no-current-user',
@@ -1448,7 +1471,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const deleteAccountAfterReauth = useCallback(async () => {
 		setLoading(true);
 		try {
-			const user = auth.currentUser;
+			const user = getAuth().currentUser;
+
 			if (!user)
 				throw Object.assign(new Error('No user signed in'), {
 					code: 'auth/no-current-user',
@@ -1507,7 +1531,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	}, []);
 
 	const checkSessionValidity = useCallback((): boolean => {
-		const currentFirebaseUser = auth.currentUser;
+		const currentFirebaseUser = getAuth().currentUser;
 		if (!currentFirebaseUser) return false;
 		const now = Date.now();
 		return now - lastActivity < sessionTimeout;

@@ -1,10 +1,5 @@
-import { getApp } from '@react-native-firebase/app';
 import { getAuth, getIdToken } from '@react-native-firebase/auth';
 import { logger } from '../utils/logger';
-
-
-const app = getApp();
-const auth = getAuth(app);
 
 /**
  * Authentication service for Firebase Bearer tokens
@@ -28,7 +23,7 @@ export class AuthService {
 	 */
 	async getAuthToken(): Promise<string> {
 		try {
-			const user = auth.currentUser;
+			const user = getAuth().currentUser;
 
 			if (!user) {
 				throw new Error('No authenticated user found');
@@ -89,7 +84,7 @@ export class AuthService {
 	 * Check if user is authenticated
 	 */
 	isAuthenticated(): boolean {
-		return !!auth.currentUser;
+		return !!getAuth().currentUser;
 	}
 
 	/**
@@ -97,7 +92,7 @@ export class AuthService {
 	 */
 	async getCurrentUserUID(): Promise<string | null> {
 		try {
-			const user = auth.currentUser;
+			const user = getAuth().currentUser;
 			return user?.uid || null;
 		} catch (error) {
 			logger.error('[AuthService] Error getting user UID:', error);

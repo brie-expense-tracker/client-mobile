@@ -14,10 +14,6 @@ import {
 } from './circuitBreaker';
 import { FallbackService, CachedSpendPlan } from './fallbackService';
 import { ApiService } from '../core/apiService';
-import {
-	getSignedApiClient,
-	SignedApiClient,
-} from '../../utils/signedApiClient';
 
 // Create namespaced logger for this service
 const resilientApiLog = createLogger('ResilientAPI');
@@ -72,8 +68,6 @@ export interface StreamingChunk {
 
 export class ResilientApiService {
 	private static readonly circuitBreakerManager = new CircuitBreakerManager();
-	private static readonly signedApiClient: SignedApiClient =
-		getSignedApiClient();
 
 	// Request tracking and metrics
 	private static readonly requestMetrics = new Map<string, RequestMetrics>();
@@ -321,36 +315,28 @@ export class ResilientApiService {
 		}
 	}
 
-	/**
-	 * Make a secure signed API call for sensitive operations
-	 * This method uses HMAC signing for all requests
-	 */
+	// Deprecated: callSecureApi used signed requests; now routes to ApiService without signatures
 	static async callSecureApi<T>(
 		endpoint: string,
 		payload: any,
 		method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' = 'POST',
-		options?: {
-			timeout?: number;
-			retries?: number;
-			fallbackEnabled?: boolean;
-		}
+		options?: { timeout?: number; retries?: number; fallbackEnabled?: boolean }
 	): Promise<ResilientApiResponse<T>> {
 		const startTime = Date.now();
-
 		try {
 			const result = await orchestratorBreaker.executeWithRetry(async () => {
-				const response = await this.signedApiClient.request<T>({
-					method,
-					path: endpoint,
-					body: payload,
-					requireSignature: true,
-				});
+				let res;
+				if (method === 'GET') res = await ApiService.get<T>(endpoint);
+				else if (method === 'PUT')
+					res = await ApiService.put<T>(endpoint, payload);
+				else if (method === 'PATCH')
+					res = await ApiService.patch<T>(endpoint, payload);
+				else if (method === 'DELETE')
+					res = await ApiService.delete<T>(endpoint);
+				else res = await ApiService.post<T>(endpoint, payload);
 
-				if (!response.success) {
-					throw new Error(response.error || 'Secure API call failed');
-				}
-
-				return response.data!;
+				if (!res.success) throw new Error(res.error || 'API call failed');
+				return res.data!;
 			}, `secure_${endpoint}`);
 
 			if (result.success && result.result) {
@@ -360,35 +346,30 @@ export class ResilientApiService {
 					attempts: result.attempts,
 					totalTime: result.totalTime,
 				};
-			} else {
-				// Try fallback if enabled
-				if (options?.fallbackEnabled !== false) {
-					const fallbackData = await this.getFallbackData();
-					if (fallbackData) {
-						return {
-							success: true,
-							data: fallbackData as T,
-							fallbackUsed: true,
-							attempts: result.attempts,
-							totalTime: result.totalTime,
-						};
-					}
-				}
-
-				return {
-					success: false,
-					error:
-						result.errors[result.errors.length - 1]?.message ||
-						'All retry attempts failed',
-					circuitBreakerState: orchestratorBreaker.getStats().state,
-					attempts: result.attempts,
-					totalTime: result.totalTime,
-				};
 			}
+			if (options?.fallbackEnabled !== false) {
+				const fallbackData = await this.getFallbackData();
+				if (fallbackData) {
+					return {
+						success: true,
+						data: fallbackData as T,
+						fallbackUsed: true,
+						attempts: result.attempts,
+						totalTime: result.totalTime,
+					};
+				}
+			}
+			return {
+				success: false,
+				error:
+					result.errors[result.errors.length - 1]?.message ||
+					'All retry attempts failed',
+				circuitBreakerState: orchestratorBreaker.getStats().state,
+				attempts: result.attempts,
+				totalTime: result.totalTime,
+			};
 		} catch (error) {
 			resilientApiLog.error('Secure API call failed:', error);
-
-			// Try fallback if enabled
 			if (options?.fallbackEnabled !== false) {
 				const fallbackData = await this.getFallbackData();
 				if (fallbackData) {
@@ -400,7 +381,6 @@ export class ResilientApiService {
 					};
 				}
 			}
-
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : 'Unknown error',
@@ -435,17 +415,12 @@ export class ResilientApiService {
 					...(idempotencyKey && { idempotencyKey }),
 				};
 
-				const response = await this.signedApiClient.request<T>({
-					method: 'POST',
-					path: '/api/intelligent-actions/execute',
-					body: payload,
-					requireSignature: true,
-				});
-
-				if (!response.success) {
+				const response = await ApiService.post<T>(
+					'/api/intelligent-actions/execute',
+					payload
+				);
+				if (!response.success)
 					throw new Error(response.error || 'Action execution failed');
-				}
-
 				return response.data!;
 			}, `action_${actionType}`);
 
@@ -500,21 +475,16 @@ export class ResilientApiService {
 					parameters,
 				};
 
-				const response = await this.signedApiClient.request<T>({
-					method: 'POST',
-					path: '/api/intelligent-actions/execute',
-					body: payload,
-					requireSignature: true,
-				});
-
-				// This should return a 202 with confirmation details
+				const response = await ApiService.post<T>(
+					'/api/intelligent-actions/execute',
+					payload
+				);
 				if (
 					!response.success &&
 					!(response.data as any)?.requiresConfirmation
 				) {
 					throw new Error(response.error || 'Confirmation request failed');
 				}
-
 				return response.data!;
 			}, `confirmation_${actionType}`);
 
@@ -548,20 +518,7 @@ export class ResilientApiService {
 		}
 	}
 
-	/**
-	 * Configure the signed API client with authentication headers
-	 */
-	static configureAuth(
-		authHeader: string,
-		firebaseUID: string,
-		requestId?: string
-	): void {
-		this.signedApiClient.setAuthHeader(authHeader);
-		this.signedApiClient.setFirebaseUID(firebaseUID);
-		if (requestId) {
-			this.signedApiClient.setRequestId(requestId);
-		}
-	}
+	// configureAuth no longer required without signed client
 
 	/**
 	 * Get circuit breaker health status

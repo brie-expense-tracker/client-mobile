@@ -200,6 +200,8 @@ export function AssistantListFooter({
 	);
 }
 
+export default AssistantListFooter;
+
 function Row({ text, color }: { text: string; color: string }) {
 	return (
 		<View style={styles.row}>
