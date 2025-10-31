@@ -16,24 +16,31 @@ import {
 	ActivityIndicator,
 	TouchableOpacity,
 	FlatList,
+	Platform,
+	Keyboard,
+	InputAccessoryView,
 } from 'react-native';
-import { RectButton } from 'react-native-gesture-handler';
 import { useForm, Controller } from 'react-hook-form';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+	SafeAreaView,
+	useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import { Calendar } from 'react-native-calendars';
 import { TransactionContext } from '../../../src/context/transactionContext';
 import { useGoal, Goal } from '../../../src/context/goalContext';
 import { useBudget, Budget } from '../../../src/context/budgetContext';
 import { navigateToGoalsWithModal } from '../../../src/utils/navigationUtils';
-import { FooterBar } from '../../../src/ui';
 import BottomSheet from '../../../src/components/BottomSheet';
 import { isDevMode } from '../../../src/config/environment';
 import { createLogger } from '../../../src/utils/sublogger';
 
 // Create namespaced logger for this service
 const transactionScreenLog = createLogger('TransactionScreen');
+
+// iOS InputAccessoryView ID
+const accessoryId = 'tx-input-accessory';
 
 // =============================================================
 // Design tokens (modern blue accent)
@@ -62,7 +69,6 @@ interface TransactionFormData {
 	date: string; // yyyy-mm-dd
 	target?: string;
 	targetModel?: 'Budget' | 'Goal';
-	ignoreFromBudgets?: boolean;
 	recurring?: {
 		enabled: boolean;
 		frequency: Frequency;
@@ -106,6 +112,12 @@ export default function TransactionScreenProModern() {
 	}>();
 	const amountRef = useRef<TextInput>(null);
 	const descRef = useRef<TextInput>(null);
+	const scrollRef = useRef<ScrollView>(null);
+
+	const insets = useSafeAreaInsets();
+
+	// Dynamic bottom padding from safe area only (no magic numbers)
+	const contentBottomPad = insets.bottom + 24;
 
 	const [mode, setMode] = useState<'income' | 'expense'>(
 		params.mode === 'expense' ? 'expense' : 'expense' // default to Expense
@@ -167,7 +179,6 @@ export default function TransactionScreenProModern() {
 			date: getLocalIsoDate(),
 			target: undefined,
 			targetModel: undefined,
-			ignoreFromBudgets: false,
 			recurring: { enabled: false, frequency: 'None' },
 		},
 		mode: 'onChange',
@@ -176,7 +187,6 @@ export default function TransactionScreenProModern() {
 	const amount = watch('amount');
 	const description = watch('description');
 	const selectedDate = watch('date');
-	const ignoreFromBudgets = watch('ignoreFromBudgets');
 	const recurring = watch('recurring');
 
 	// Focus amount on mount for speed entry
@@ -266,10 +276,6 @@ export default function TransactionScreenProModern() {
 				recurring: data.recurring,
 			};
 
-			if (isExpense) {
-				payload.ignoreFromBudgets = data.ignoreFromBudgets;
-			}
-
 			if (isIncome) {
 				if (selectedGoals.length > 0) {
 					payload.target = selectedGoals[0].id;
@@ -299,7 +305,6 @@ export default function TransactionScreenProModern() {
 								date: getLocalIsoDate(),
 								target: undefined,
 								targetModel: undefined,
-								ignoreFromBudgets: false,
 								recurring: { enabled: false, frequency: 'None' },
 							});
 							setSelectedGoals([]);
@@ -403,6 +408,9 @@ export default function TransactionScreenProModern() {
 								returnKeyType="next"
 								accessibilityLabel="Amount"
 								maxLength={9}
+								inputAccessoryViewID={
+									Platform.OS === 'ios' ? accessoryId : undefined
+								}
 							/>
 						)}
 					/>
@@ -435,12 +443,18 @@ export default function TransactionScreenProModern() {
 			</View>
 
 			<ScrollView
+				ref={scrollRef}
 				style={{ flex: 1 }}
-				contentContainerStyle={styles.content}
+				contentContainerStyle={[
+					styles.content,
+					{ paddingBottom: contentBottomPad },
+				]}
 				keyboardShouldPersistTaps="handled"
+				keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+				automaticallyAdjustKeyboardInsets
 				showsVerticalScrollIndicator={false}
 			>
-				{/* Category / Note / Recurring / Date / Ignore from Budgets */}
+				{/* Category / Note / Recurring / Date */}
 				<View style={styles.cardList}>
 					<Row
 						icon={mode === 'expense' ? 'scale-outline' : 'trophy-outline'}
@@ -501,19 +515,6 @@ export default function TransactionScreenProModern() {
 						}
 						onPress={() => setDatePickerOpen(true)}
 					/>
-
-					{mode === 'expense' && (
-						<Row
-							icon="ban-outline"
-							label="Ignore from Budgets"
-							right={<ValueText>{ignoreFromBudgets ? 'Yes' : 'No'}</ValueText>}
-							onPress={() =>
-								setValue('ignoreFromBudgets', !ignoreFromBudgets, {
-									shouldValidate: false,
-								})
-							}
-						/>
-					)}
 				</View>
 
 				{/* Description input */}
@@ -539,8 +540,20 @@ export default function TransactionScreenProModern() {
 									onBlur();
 									trigger('description');
 								}}
+								onFocus={() => {
+									// Give layout a frame to update, then scroll the input fully into view
+									requestAnimationFrame(() => {
+										scrollRef.current?.scrollToEnd({ animated: true });
+									});
+								}}
+								returnKeyType="done"
+								blurOnSubmit={true}
+								onSubmitEditing={() => Keyboard.dismiss()}
 								accessibilityLabel="Description"
 								maxLength={120}
+								inputAccessoryViewID={
+									Platform.OS === 'ios' ? accessoryId : undefined
+								}
 							/>
 						)}
 					/>
@@ -581,38 +594,65 @@ export default function TransactionScreenProModern() {
 							: ''}
 					</Text>
 				</View>
+
+				{/* Inline CTA (part of content, so it scrolls with the page) */}
+				<View style={styles.inlineCtaWrap}>
+					<TouchableOpacity
+						style={[
+							styles.inlineCtaBtn,
+							!canSubmit && styles.inlineCtaBtnDisabled,
+						]}
+						activeOpacity={0.8}
+						onPress={() => {
+							if (isSubmitting) return;
+							handleSubmit(onSubmit)();
+						}}
+						disabled={!canSubmit}
+						accessibilityLabel={`Create ${mode}`}
+						testID="create-transaction"
+					>
+						{isSubmitting ? (
+							<>
+								<ActivityIndicator size="small" color="#fff" />
+								<Text style={styles.inlineCtaText}>Saving…</Text>
+							</>
+						) : (
+							<>
+								<Text style={styles.inlineCtaText}>Create Transaction</Text>
+								<Ionicons name="add" size={18} color="#fff" />
+							</>
+						)}
+					</TouchableOpacity>
+
+					{!canSubmit && (
+						<Text style={styles.inlineCtaHint}>
+							Enter amount and description to continue.
+						</Text>
+					)}
+				</View>
 			</ScrollView>
 
-			{/* Footer */}
-			<FooterBar>
-				<RectButton
-					style={[styles.ctaBtn, !canSubmit && styles.ctaBtnDisabled]}
-					enabled={canSubmit}
-					onPress={() => {
-						if (isSubmitting) return;
-						handleSubmit(onSubmit)();
-					}}
-					accessibilityLabel={`Create ${mode}`}
-					testID="create-transaction"
-				>
-					{isSubmitting ? (
-						<>
-							<ActivityIndicator size="small" color="#fff" />
-							<Text style={styles.ctaText}>Saving…</Text>
-						</>
-					) : (
-						<>
-							<Text style={styles.ctaText}>Create Transaction</Text>
-							<Ionicons name="add" size={18} color="#fff" />
-						</>
-					)}
-				</RectButton>
-				{!canSubmit && (
-					<Text style={styles.footerHint}>
-						Enter amount and description to continue.
-					</Text>
-				)}
-			</FooterBar>
+			{/* (Optional) iOS accessory bar just for a "Done" keyboard dismiss */}
+			{Platform.OS === 'ios' && (
+				<InputAccessoryView nativeID={accessoryId}>
+					<View
+						style={{
+							padding: 8,
+							alignItems: 'flex-end',
+							backgroundColor: '#F7F8FA',
+						}}
+					>
+						<TouchableOpacity
+							onPress={() => Keyboard.dismiss()}
+							hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+						>
+							<Text style={{ color: palette.accent, fontWeight: '700' }}>
+								Done
+							</Text>
+						</TouchableOpacity>
+					</View>
+				</InputAccessoryView>
+			)}
 
 			{/* Picker Modal */}
 			<BottomSheet
@@ -907,7 +947,7 @@ export default function TransactionScreenProModern() {
 // =============================================================
 const styles = StyleSheet.create({
 	container: { flex: 1, backgroundColor: palette.bg },
-	content: { padding: 16, paddingBottom: 20 },
+	content: { padding: 16 },
 
 	// Header
 	header: {
@@ -1064,21 +1104,31 @@ const styles = StyleSheet.create({
 	previewLine: { color: palette.text },
 	previewEmph: { fontWeight: '900' },
 
-	// CTA footer
-	ctaBtn: {
-		flex: 1,
+	// Inline CTA
+	inlineCtaWrap: {
+		marginTop: 16,
+		paddingHorizontal: 16,
+	},
+	inlineCtaBtn: {
+		minHeight: 52,
+		borderRadius: 14,
+		backgroundColor: palette.accent,
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'center',
 		gap: 8,
-		borderRadius: 14,
-		backgroundColor: palette.accent,
-		paddingVertical: 14,
-		marginHorizontal: 16,
+		// subtle elevation/shadow
+		shadowColor: '#000',
+		shadowOpacity: 0.12,
+		shadowRadius: 10,
+		shadowOffset: { width: 0, height: 6 },
+		elevation: 5,
 	},
-	ctaBtnDisabled: { backgroundColor: '#A7D8FF' },
-	ctaText: { color: '#fff', fontWeight: '800', fontSize: 16 },
-	footerHint: {
+	inlineCtaBtnDisabled: {
+		backgroundColor: '#A7D8FF',
+	},
+	inlineCtaText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+	inlineCtaHint: {
 		marginTop: 8,
 		textAlign: 'center',
 		color: palette.sub,
