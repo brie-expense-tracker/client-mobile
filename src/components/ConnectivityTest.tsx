@@ -13,7 +13,6 @@ import { useConnectivity } from '../utils/connectivity';
 import { getIdToken } from '@react-native-firebase/auth';
 import { ApiService } from '../services/core/apiService';
 import useAuth from '../context/AuthContext';
-import { getIdToken } from '@react-native-firebase/auth';
 
 type StepStatus = 'pass' | 'fail' | 'skip';
 type Result = {
