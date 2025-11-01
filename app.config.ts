@@ -1,24 +1,25 @@
 import { ExpoConfig, ConfigContext } from 'expo/config';
 
 export default ({ config }: ConfigContext): ExpoConfig => {
-	const profile = process.env.EAS_BUILD_PROFILE; // e.g., "production" | "testflight" | "development"
+	const profile = process.env.EAS_BUILD_PROFILE ?? ''; // e.g., "production" | "testflight" | "development"
 	const isProduction =
 		profile === 'production' || process.env.EXPO_PUBLIC_ENV === 'production';
+	const isTestflight = profile === 'testflight';
 
 	return {
 		...config,
 		name: 'Brie',
 		slug: 'brie',
-		version: '0.1.2',
+		version: '1.0.1',
 		orientation: 'portrait',
 		icon: './src/assets/icons/adaptive-icon.png',
 		scheme: 'brie',
 		userInterfaceStyle: 'automatic',
-		newArchEnabled: true,
+		newArchEnabled: !isTestflight, // Disable New Architecture for TestFlight to isolate potential issues
 		ios: {
 			supportsTablet: true,
 			bundleIdentifier: 'com.brie.mobile',
-			buildNumber: '5',
+			// Let EAS handle buildNumber via autoIncrement in eas.json
 			googleServicesFile:
 				process.env.GOOGLE_SERVICES_PLIST || './GoogleService-Info.plist',
 			icon: {
@@ -51,6 +52,14 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 				}),
 			},
 		},
+		updates: {
+			enabled: !isTestflight, // Disable OTA for TestFlight to isolate potential runtime mismatch
+			checkAutomatically: 'ON_ERROR_RECOVERY',
+			url: 'https://u.expo.dev/86bf0001-bc3c-4327-85d5-9ceca2cd9150',
+		},
+		runtimeVersion: {
+			policy: 'sdkVersion',
+		},
 		android: {
 			package: 'com.brie.mobile',
 			versionCode: 1,
@@ -81,6 +90,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 					},
 				},
 			],
+			'@sentry/react-native/expo',
 			'@react-native-firebase/app',
 			'@react-native-firebase/auth',
 			'@react-native-firebase/crashlytics',
