@@ -8,6 +8,7 @@
 			"developmentClient": true,
 			"distribution": "internal",
 			"autoIncrement": true,
+			"channel": "development",
 			"env": {
 				"EXPO_PUBLIC_API_URL": "https://brie-staging-api.onrender.com",
 				"EXPO_PUBLIC_ENV": "dev",
@@ -27,6 +28,7 @@
 			}
 		},
 		"testflight": {
+			"developmentClient": false,
 			"channel": "testflight",
 			"distribution": "store",
 			"autoIncrement": true,
@@ -35,13 +37,17 @@
 				"EXPO_PUBLIC_ENV": "testflight",
 				"EXPO_PUBLIC_AI_INSIGHTS": "0",
 				"EXPO_PUBLIC_AI_INSIGHTS_PREVIEW": "0",
-				"EXPO_PUBLIC_CRASH_CONSENT": "true"
+				"EXPO_PUBLIC_CRASH_CONSENT": "true",
+				"EXPO_PUBLIC_SENTRY_DSN": "https://0aa04ab29bda6f4399d2048e47378d9f@o4510286315323392.ingest.us.sentry.io/4510286321352704",
+				"EXPO_PUBLIC_SENTRY_ENVIRONMENT": "testflight",
+				"SENTRY_DISABLE_AUTO_UPLOAD": "true"
 			},
 			"ios": {
 				"image": "latest"
 			}
 		},
 		"production": {
+			"developmentClient": false,
 			"channel": "production",
 			"distribution": "store",
 			"autoIncrement": true,
@@ -49,19 +55,22 @@
 				"EXPO_PUBLIC_API_URL": "https://brie-staging-api.onrender.com",
 				"EXPO_PUBLIC_ENV": "production",
 				"EXPO_PUBLIC_AI_INSIGHTS": "1",
-				"EXPO_PUBLIC_AI_INSIGHTS_PREVIEW": "0"
+				"EXPO_PUBLIC_AI_INSIGHTS_PREVIEW": "0",
+				"EXPO_PUBLIC_SENTRY_DSN": "https://0aa04ab29bda6f4399d2048e47378d9f@o4510286315323392.ingest.us.sentry.io/4510286321352704",
+				"EXPO_PUBLIC_SENTRY_ENVIRONMENT": "production",
+				"SENTRY_DISABLE_AUTO_UPLOAD": "true"
 			}
 		}
 	},
 	"submit": {
 		"testflight": {
 			"ios": {
-				"ascAppId": "YOUR_APP_ID_FROM_ASC"
+				"ascAppId": "6753355431"
 			}
 		},
 		"production": {
 			"ios": {
-				"ascAppId": "YOUR_APP_ID_FROM_ASC"
+				"ascAppId": "6753355431"
 			}
 		}
 	}
