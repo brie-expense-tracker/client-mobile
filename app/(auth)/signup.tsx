@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import {
 	View,
 	Text,
@@ -38,6 +38,7 @@ export default function Signup() {
 	);
 	const [isLoading, setIsLoading] = useState(false);
 	const [showPassword, setShowPassword] = useState(false);
+	const [formError, setFormError] = useState<string | null>(null);
 	const { signup, signUpWithGoogle } = useAuth();
 
 	const palette = useMemo(
@@ -72,16 +73,29 @@ export default function Signup() {
 	const canSubmit =
 		isValidEmail(email) && isValidPassword(password) && !isLoading;
 
+	// Clear errors when user starts typing
+	useEffect(() => {
+		if (formError && (email || password)) {
+			setFormError(null);
+		}
+	}, [email, password, formError]);
+
 	const handleSignup = useCallback(async () => {
+		// Clear any previous errors
+		setFormError(null);
 		// mark both fields as touched to reveal errors if present
 		setTouched({ email: true, password: true });
 
 		if (!isValidEmail(email) || !isValidPassword(password) || isLoading) return;
 
 		setIsLoading(true);
+		signupScreenLog.info('Starting signup process', {
+			email: email.substring(0, 5) + '...',
+		});
 		try {
 			// Use the auth context signup method
 			await signup(email.trim().toLowerCase(), password.trim());
+			signupScreenLog.info('Signup completed successfully');
 
 			await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 		} catch (e: any) {
@@ -107,7 +121,7 @@ export default function Signup() {
 
 			// Show a compact inline error message at the top of the form
 			signupScreenLog.warn('Signup error', { error: e, message: errorMessage });
-			// Optionally, set a banner state if you want a persistent bar.
+			setFormError(errorMessage);
 		} finally {
 			setIsLoading(false);
 		}
@@ -249,21 +263,36 @@ export default function Signup() {
 								</Text>
 							)}
 
+							{/* Form-level error message */}
+							{!!formError && (
+								<View style={styles.formErrorContainer}>
+									<Ionicons name="alert-circle" size={18} color="#DC2626" />
+									<Text
+										style={styles.formErrorText}
+										accessibilityLiveRegion="polite"
+									>
+										{formError}
+									</Text>
+								</View>
+							)}
+
 							{/* Submit */}
-							<RectButton
-								enabled={canSubmit}
-								onPress={handleSignup}
-								style={[
-									styles.cta,
-									{ backgroundColor: canSubmit ? palette.brand : '#CBD5E1' },
-								]}
-							>
-								{isLoading ? (
-									<ActivityIndicator size="small" color="#FFFFFF" />
-								) : (
-									<Text style={styles.ctaText}>Sign Up</Text>
-								)}
-							</RectButton>
+							<View style={styles.ctaContainer}>
+								<RectButton
+									enabled={canSubmit}
+									onPress={handleSignup}
+									style={[
+										styles.cta,
+										{ backgroundColor: canSubmit ? palette.brand : '#CBD5E1' },
+									]}
+								>
+									{isLoading ? (
+										<ActivityIndicator size="small" color="#FFFFFF" />
+									) : (
+										<Text style={styles.ctaText}>Sign Up</Text>
+									)}
+								</RectButton>
+							</View>
 
 							{/* Divider */}
 							<View style={styles.dividerContainer}>
@@ -406,6 +435,23 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		marginTop: 6,
 	},
+	formErrorContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#FEF2F2',
+		borderColor: '#FECACA',
+		borderWidth: 1,
+		borderRadius: 8,
+		padding: 12,
+		marginTop: 12,
+		gap: 8,
+	},
+	formErrorText: {
+		flex: 1,
+		color: '#DC2626',
+		fontSize: 13,
+		fontWeight: '500',
+	},
 	passwordInputContainer: {
 		position: 'relative',
 		width: '100%',
@@ -428,13 +474,18 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 		paddingHorizontal: 6,
 	},
+	ctaContainer: {
+		width: '100%',
+		marginTop: 12,
+		overflow: 'hidden',
+	},
 	cta: {
 		width: '100%',
-		borderRadius: 999,
+		borderRadius: 12,
 		alignItems: 'center',
 		justifyContent: 'center',
 		paddingVertical: 14,
-		marginTop: 12,
+		overflow: 'hidden',
 	},
 	ctaText: {
 		color: '#FFFFFF',

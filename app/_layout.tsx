@@ -44,6 +44,9 @@ import { DEV_MODE, isDevMode } from '../src/config/environment';
 // Create namespaced logger for this service
 const layoutLog = createLogger('Layout');
 
+// Performance tracking - only in non-production
+const PERFORMANCE_TRACKING = __DEV__ || process.env.EXPO_PUBLIC_ENV === 'testflight';
+
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
 
@@ -120,6 +123,9 @@ function RootLayoutContent() {
 	useEffect(() => {
 		try {
 			setIsMounted(true);
+			if (PERFORMANCE_TRACKING) {
+				layoutLog.info('[Perf] RootLayoutContent mounted');
+			}
 		} catch (error) {
 			layoutLog.warn('Failed to set mounted state:', error);
 		}

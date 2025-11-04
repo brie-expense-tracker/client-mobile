@@ -1,0 +1,13 @@
+# Sentry Configuration Template
+# Copy this file to sentry.properties and fill in your values
+# 
+# For Expo with EAS builds, source maps are automatically uploaded via the
+# @sentry/react-native/expo plugin, so this file is mainly for reference.
+# The DSN is configured in eas.json via EXPO_PUBLIC_SENTRY_DSN environment variable.
+
+defaults.org=brie-mobile
+defaults.project=react-native
+
+# Get your auth token from: https://sentry.io/settings/account/api/auth-tokens/
+# Create a token with 'project:releases' scope
+auth.token=YOUR_SENTRY_AUTH_TOKEN_HERE

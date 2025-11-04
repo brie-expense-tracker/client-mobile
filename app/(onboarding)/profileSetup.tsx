@@ -134,6 +134,7 @@ const OnboardingScreen = () => {
 	const firstNameRef = useRef<TextInput>(null);
 	const lastNameRef = useRef<TextInput>(null);
 	const incomeRef = useRef<TextInput>(null);
+	const isManualNavigationRef = useRef(false);
 	const [currentIndex, setCurrentIndex] = useState(0);
 
 	const { updateProfile } = useProfile();
@@ -1009,12 +1010,21 @@ const OnboardingScreen = () => {
 		}
 
 		if (currentIndex < 2) {
-			flatListRef.current?.scrollToIndex({
-				index: currentIndex + 1,
-				animated: true,
+			// Update state first for immediate UI response
+			const nextIndex = currentIndex + 1;
+			isManualNavigationRef.current = true;
+			setCurrentIndex(nextIndex);
+
+			// Trigger haptics without waiting (fire and forget)
+			Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+			// Scroll after state update with requestAnimationFrame for smooth transition
+			requestAnimationFrame(() => {
+				flatListRef.current?.scrollToIndex({
+					index: nextIndex,
+					animated: true,
+				});
 			});
-			setCurrentIndex(currentIndex + 1);
-			await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 		} else {
 			await handleSubmit();
 		}
@@ -1022,11 +1032,18 @@ const OnboardingScreen = () => {
 
 	const handleBack = useCallback(() => {
 		if (currentIndex > 0) {
-			flatListRef.current?.scrollToIndex({
-				index: currentIndex - 1,
-				animated: true,
+			// Update state first for immediate UI response
+			const prevIndex = currentIndex - 1;
+			isManualNavigationRef.current = true;
+			setCurrentIndex(prevIndex);
+
+			// Scroll after state update with requestAnimationFrame for smooth transition
+			requestAnimationFrame(() => {
+				flatListRef.current?.scrollToIndex({
+					index: prevIndex,
+					animated: true,
+				});
 			});
-			setCurrentIndex(currentIndex - 1);
 		}
 	}, [currentIndex]);
 
@@ -1060,8 +1077,15 @@ const OnboardingScreen = () => {
 					pagingEnabled
 					showsHorizontalScrollIndicator={false}
 					onMomentumScrollEnd={(e) => {
-						const newIndex = Math.round(e.nativeEvent.contentOffset.x / width);
-						setCurrentIndex(newIndex);
+						// Only update index if this was a user swipe (not manual navigation)
+						if (!isManualNavigationRef.current) {
+							const newIndex = Math.round(
+								e.nativeEvent.contentOffset.x / width
+							);
+							setCurrentIndex(newIndex);
+						}
+						// Reset the flag after scroll ends
+						isManualNavigationRef.current = false;
 					}}
 					style={styles.flatList}
 					keyboardShouldPersistTaps="handled"

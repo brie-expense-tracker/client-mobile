@@ -1,9 +1,12 @@
 // useAppInit.ts
 import { useEffect, useRef } from 'react';
+import { InteractionManager } from 'react-native';
+import * as Updates from 'expo-updates';
 import { featureFlags } from '../services/feature/featureFlags';
 import { crashReporting } from '../services/feature/crashReporting';
 import { runCacheMigrations } from '../services/security/cacheMigration';
 import { createLogger } from '../utils/sublogger';
+import { isDevMode } from '../config/environment';
 
 const appInitLog = createLogger('AppInit');
 
@@ -14,9 +17,40 @@ export function useAppInit() {
 		if (didInit.current) return;
 		didInit.current = true;
 
+		const startTime = Date.now();
+		if (__DEV__ || process.env.EXPO_PUBLIC_ENV === 'testflight') {
+			appInitLog.info('[Perf] AppInit started');
+		}
+
 		const initializeTelemetry = async () => {
 			try {
 				appInitLog.debug('Initializing services');
+
+				// Check for updates from EAS (only if not in development mode with local dev server)
+				if (Updates.isEnabled) {
+					try {
+						appInitLog.debug('Checking for updates...');
+						const update = await Updates.checkForUpdateAsync();
+
+						if (update.isAvailable) {
+							appInitLog.info('Update available, downloading...');
+							await Updates.fetchUpdateAsync();
+							appInitLog.info('Update downloaded, will apply on next restart');
+							// Optionally reload immediately, or let user continue and reload later
+							// await Updates.reloadAsync();
+						} else {
+							appInitLog.debug('No updates available');
+						}
+					} catch (error) {
+						appInitLog.warn('Failed to check for updates', error);
+					}
+				} else {
+					if (isDevMode) {
+						appInitLog.debug(
+							'Updates disabled (likely using local dev server)'
+						);
+					}
+				}
 
 				// Run cache migrations first
 				try {
@@ -64,12 +98,20 @@ export function useAppInit() {
 					}
 				}
 
+				const duration = Date.now() - startTime;
 				appInitLog.info('All services initialized successfully');
+				if (__DEV__ || process.env.EXPO_PUBLIC_ENV === 'testflight') {
+					appInitLog.info(`[Perf] AppInit completed in ${duration}ms`);
+				}
 			} catch (error) {
 				appInitLog.warn('Failed to initialize some services', error);
 			}
 		};
 
-		initializeTelemetry();
+		// Defer telemetry initialization until after interactions complete
+		// This improves initial render performance, especially on TestFlight builds
+		InteractionManager.runAfterInteractions(() => {
+			initializeTelemetry();
+		});
 	}, []);
 }

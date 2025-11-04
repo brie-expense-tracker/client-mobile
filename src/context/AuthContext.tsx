@@ -567,6 +567,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			// Set manual login flag to prevent auth state change interference
 			isManualLoginRef.current = true;
 
+			// Set firebaseUser immediately since auth state listener won't do it during manual login
+			setFirebaseUser(firebaseUser);
+
 			authContextLog.debug('Login attempt: Regular user');
 
 			// Race the login operation against timeout
@@ -937,7 +940,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			return new Promise<void>((resolve, reject) => {
 				authContextLog.debug('Showing Alert dialog');
 				Alert.alert(
-					'Create Account?',
+					'Sign In',
 					`No account found for ${
 						firebaseUser.email || 'this Google account'
 					}. Would you like to create a new account?`,
@@ -1169,10 +1172,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 			return new Promise<void>((resolve, reject) => {
 				Alert.alert(
-					'Create Account?',
-					`Create a new Brie account with ${
+					'Sign Up',
+					`Welcome! We'll create your Brie account with ${
 						firebaseUser.email || 'this Google account'
-					}?`,
+					}.`,
 					[
 						{
 							text: 'Cancel',
@@ -1194,7 +1197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 							},
 						},
 						{
-							text: 'Create Account',
+							text: 'Continue',
 							onPress: async () => {
 								authContextLog.info('User confirmed account creation');
 								try {

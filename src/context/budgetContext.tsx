@@ -413,6 +413,14 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 						budgetContextLog.warn(
 							'⚠️ [BudgetContext] Temp budget already removed, adding server budget'
 						);
+						// Ensure we don't duplicate the budget
+						const existingBudget = prev.find((b) => b.id === serverBudget.id);
+						if (existingBudget) {
+							budgetContextLog.warn(
+								'Server budget already exists, updating instead'
+							);
+							return prev.map((b) => (b.id === serverBudget.id ? serverBudget : b));
+						}
 						return [serverBudget, ...prev];
 					}
 
@@ -424,6 +432,11 @@ export const BudgetProvider = ({ children }: { children: ReactNode }) => {
 					});
 					return updated;
 				});
+
+				// Ensure hasLoaded is set to true after first budget creation
+				if (!hasLoaded) {
+					setHasLoaded(true);
+				}
 
 				// Invalidate relevant cache entries
 				setCacheInvalidationFlags.onBudgetChange();

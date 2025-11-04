@@ -10,12 +10,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 		...config,
 		name: 'Brie',
 		slug: 'brie',
-		version: '1.0.1',
+		version: '1.0.2',
 		orientation: 'portrait',
 		icon: './src/assets/icons/adaptive-icon.png',
 		scheme: 'brie',
 		userInterfaceStyle: 'automatic',
-		newArchEnabled: !isTestflight, // Disable New Architecture for TestFlight to isolate potential issues
+		newArchEnabled: true, // Enable New Architecture for all builds for better performance
 		ios: {
 			supportsTablet: true,
 			bundleIdentifier: 'com.brie.mobile',

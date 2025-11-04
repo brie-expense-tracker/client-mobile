@@ -115,10 +115,15 @@ export default function NotificationPermissionScreen() {
 			logger.debug(
 				'📱 [NotificationSetup] Requesting notification permissions...'
 			);
-			await initialize();
-			// If initialize() completes without throwing, permissions were granted
-			const granted = true;
-			logger.debug('✅ [NotificationSetup] Permissions granted successfully');
+			const pushToken = await initialize();
+			// Check if permissions were actually granted
+			const granted = pushToken !== null;
+
+			if (granted) {
+				logger.debug('✅ [NotificationSetup] Permissions granted successfully');
+			} else {
+				logger.debug('⚠️ [NotificationSetup] Permissions denied');
+			}
 
 			logger.debug('💾 [NotificationSetup] Saving notification preferences...');
 			await updatePreferences({
@@ -152,6 +157,24 @@ export default function NotificationPermissionScreen() {
 
 			logger.debug('🎉 [NotificationSetup] Navigating to dashboard...');
 			router.replace('/(tabs)/dashboard');
+			
+			// Show alert about denied permissions AFTER navigation
+			if (!granted) {
+				logger.debug('⏰ [NotificationSetup] Scheduling notification alert after 1000ms');
+				setTimeout(() => {
+					logger.debug('🔔 [NotificationSetup] Showing notification disabled alert');
+					Alert.alert(
+						'Notifications Disabled',
+						"You haven't allowed notifications. You can enable them later in your device settings to receive budget alerts and insights.",
+						[
+							{
+								text: 'OK',
+								style: 'default',
+							},
+						]
+					);
+				}, 1000); // Delay to ensure navigation completes
+			}
 		} catch (error) {
 			logger.error(
 				'❌ [NotificationSetup] Error setting up notifications:',
