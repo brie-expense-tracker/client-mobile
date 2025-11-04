@@ -67,9 +67,15 @@ const RecurringExpensesScreen: React.FC = () => {
 			} else {
 				if (isDevMode) {
 					recurringExpensesScreenLog.debug(
-						'✅ [RecurringExpenses] Screen focused, using cached data'
+						'🔄 [RecurringExpenses] Screen focused, refreshing to ensure latest data'
 					);
 				}
+				// Add a small delay to avoid race conditions with optimistic updates
+				// This ensures any in-flight expense creation completes before we refetch
+				const timer = setTimeout(() => {
+					refetch();
+				}, 300);
+				return () => clearTimeout(timer);
 			}
 		}, [refetch, hasLoaded])
 	);

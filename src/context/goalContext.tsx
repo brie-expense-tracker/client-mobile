@@ -182,9 +182,22 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 			goalContextLog.debug('Creating goal on server');
 			const response = await ApiService.post<any>('/api/goals', goalData);
 
+			goalContextLog.debug('Goal creation response', {
+				success: response.success,
+				hasData: !!response.data,
+				dataKeys: response.data ? Object.keys(response.data) : [],
+			});
+
 			// Handle the response format properly
+			// ApiService.post returns { success: true, data: savedGoal } when server returns { success: true, data: savedGoal }
 			const actualData = response.data?.data || response.data;
 			const actualSuccess = response.success;
+
+			goalContextLog.debug('Parsed response', {
+				actualSuccess,
+				hasActualData: !!actualData,
+				actualDataId: actualData?._id || actualData?.id,
+			});
 
 			if (actualSuccess && actualData) {
 				// Update with the real ID from the server
@@ -209,6 +222,10 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 					realId: serverGoal.id,
 				});
 
+				// Clear cache to ensure fresh data
+				ApiService.clearCacheByPrefix('/api/goals');
+				goalContextLog.debug('Cache cleared after goal creation');
+
 				// Replace the temporary goal with the real one
 				setGoals((prev) => {
 					// Defensive: if temp already removed, add server goal
@@ -217,14 +234,21 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
 						goalContextLog.warn(
 							'Temp goal already removed, adding server goal'
 						);
+						// Ensure we don't duplicate the goal
+						const existingGoal = prev.find((g) => g.id === serverGoal.id);
+						if (existingGoal) {
+							goalContextLog.warn('Server goal already exists, updating instead');
+							return prev.map((g) => (g.id === serverGoal.id ? serverGoal : g));
+						}
 						return [serverGoal, ...prev];
 					}
 					return prev.map((g) => (g.id === tempId ? serverGoal : g));
 				});
 
-				// Clear cache to ensure fresh data
-				ApiService.clearCacheByPrefix('/api/goals');
-				goalContextLog.debug('Cache cleared after goal creation');
+				// Ensure hasLoaded is set to true after first goal creation
+				if (!hasLoaded) {
+					setHasLoaded(true);
+				}
 
 				return serverGoal;
 			} else {

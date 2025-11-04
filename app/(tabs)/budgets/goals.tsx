@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Alert, ScrollView } from 'react-native';
+import { Alert, ScrollView, RefreshControl } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useGoal, Goal } from '../../../src/context/goalContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -43,6 +43,7 @@ export default function GoalsScreen() {
 	const [filterBy, setFilterBy] = useState<
 		'all' | 'active' | 'completed' | 'overdue'
 	>('all');
+	const [refreshing, setRefreshing] = useState(false);
 
 	// ==========================================
 	// Memoized Data
@@ -79,6 +80,22 @@ export default function GoalsScreen() {
 	);
 
 	// ==========================================
+	// Refresh Handler
+	// ==========================================
+	const handleRefresh = useCallback(async () => {
+		setRefreshing(true);
+		try {
+			await refetch();
+		} catch (error) {
+			if (isDevMode) {
+				goalsScreenLog.error('Error refreshing goals', error);
+			}
+		} finally {
+			setRefreshing(false);
+		}
+	}, [refetch]);
+
+	// ==========================================
 	// Focus Effect - Refresh on Screen Focus
 	// ==========================================
 	useFocusEffect(
@@ -92,8 +109,16 @@ export default function GoalsScreen() {
 				refetch();
 			} else {
 				if (isDevMode) {
-					goalsScreenLog.debug('Screen focused, using cached data');
+					goalsScreenLog.debug(
+						'Screen focused, refreshing to ensure latest data'
+					);
 				}
+				// Add a small delay to avoid race conditions with optimistic updates
+				// This ensures any in-flight goal creation completes before we refetch
+				const timer = setTimeout(() => {
+					refetch();
+				}, 300);
+				return () => clearTimeout(timer);
 			}
 		}, [refetch, hasLoaded])
 	);
@@ -186,6 +211,14 @@ export default function GoalsScreen() {
 			<ScrollView
 				showsVerticalScrollIndicator={false}
 				contentContainerStyle={{ paddingBottom: 24 }}
+				refreshControl={
+					<RefreshControl
+						refreshing={refreshing}
+						onRefresh={handleRefresh}
+						tintColor="#007ACC"
+						colors={['#007ACC']}
+					/>
+				}
 			>
 				<Card>
 					<GoalsSummaryCard

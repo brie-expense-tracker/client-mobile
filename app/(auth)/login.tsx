@@ -544,11 +544,12 @@ const styles = StyleSheet.create({
 	},
 	cta: {
 		width: '100%',
-		borderRadius: 999,
+		borderRadius: 12,
 		alignItems: 'center',
 		justifyContent: 'center',
 		paddingVertical: 14,
 		marginTop: 12,
+		overflow: 'hidden',
 	},
 	ctaText: {
 		color: '#FFFFFF',

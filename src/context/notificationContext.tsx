@@ -434,21 +434,27 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 
 	useEffect(() => {
 		// Only initialize notifications when user is authenticated AND has a real MongoDB ID (not 'temp')
+		// AND has completed onboarding (to avoid requesting permissions during onboarding)
 		// And only initialize once
 		if (
 			isAuthenticated &&
 			user &&
 			user._id !== 'temp' &&
+			user.onboardingVersion >= 1 &&
 			!hasInitializedRef.current
 		) {
 			notificationContextLog.debug(
-				'User authenticated, initializing notifications'
+				'User authenticated and onboarding complete, initializing notifications'
 			);
 			hasInitializedRef.current = true;
 			initialize();
 		} else if (user && user._id === 'temp') {
 			notificationContextLog.debug(
 				'Waiting for MongoDB user creation before initializing'
+			);
+		} else if (user && user.onboardingVersion < 1) {
+			notificationContextLog.debug(
+				'Waiting for onboarding completion before initializing notifications'
 			);
 		}
 

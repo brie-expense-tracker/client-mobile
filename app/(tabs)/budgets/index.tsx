@@ -97,15 +97,23 @@ export default function BudgetScreen() {
 		}
 	}, [refetch, hasLoaded]);
 
-	// Only refetch when screen comes into focus if we don't have data yet
-	// Avoid clearing cache on every navigation to reduce API calls
+	// Refresh when screen comes into focus
+	// This ensures the list updates after returning from creating a budget
 	useFocusEffect(
 		useCallback(() => {
 			if (!hasLoaded) {
 				budgetsScreenLog.debug('Screen focused, no data loaded yet - fetching');
 				refetch();
 			} else {
-				budgetsScreenLog.debug('Screen focused, using cached data');
+				budgetsScreenLog.debug(
+					'Screen focused, refreshing to ensure latest data'
+				);
+				// Add a small delay to avoid race conditions with optimistic updates
+				// This ensures any in-flight budget creation completes before we refetch
+				const timer = setTimeout(() => {
+					refetch();
+				}, 300);
+				return () => clearTimeout(timer);
 			}
 		}, [refetch, hasLoaded])
 	);

@@ -201,16 +201,45 @@ export const RecurringExpenseProvider: React.FC<{ children: ReactNode }> = ({
 
 				// Replace the temporary expense with the real one
 				setExpenses((prev) => {
-					// Defensive: if temp already removed, add server expense
+					// Check if temp expense still exists (might have been removed by another operation)
 					const hasTempExpense = prev.some((e) => e.patternId === tempId);
 					if (!hasTempExpense) {
 						recurringExpenseContextLog.warn(
-							'Temp expense already removed, adding server expense'
+							'⚠️ [RecurringExpenseContext] Temp expense already removed, adding server expense'
 						);
+						// Ensure we don't duplicate the expense
+						const existingExpense = prev.find(
+							(e) => e.patternId === serverExpense.patternId
+						);
+						if (existingExpense) {
+							recurringExpenseContextLog.warn(
+								'Server expense already exists, updating instead'
+							);
+							return prev.map((e) =>
+								e.patternId === serverExpense.patternId ? serverExpense : e
+							);
+						}
 						return [serverExpense, ...prev];
 					}
-					return prev.map((e) => (e.patternId === tempId ? serverExpense : e));
+
+					const updated = prev.map((e) =>
+						e.patternId === tempId ? serverExpense : e
+					);
+					recurringExpenseContextLog.info(
+						'Replaced temp expense with server expense',
+						{
+							tempId,
+							realId: serverExpense.patternId,
+							count: updated.length,
+						}
+					);
+					return updated;
 				});
+
+				// Ensure hasLoaded is set to true after first expense creation
+				if (!hasLoaded) {
+					setHasLoaded(true);
+				}
 
 				// Clear cache to ensure fresh data
 				ApiService.clearCacheByPrefix('/api/recurring-expenses');
@@ -222,11 +251,20 @@ export const RecurringExpenseProvider: React.FC<{ children: ReactNode }> = ({
 			} catch (error) {
 				recurringExpenseContextLog.error('Error adding expense', error);
 				// Remove the optimistic expense on error
-				setExpenses((prev) => prev.filter((e) => e.patternId !== tempId));
+				setExpenses((prev) => {
+					const updated = prev.filter((e) => e.patternId !== tempId);
+					recurringExpenseContextLog.debug(
+						'Removed optimistic expense on error',
+						{
+							count: updated.length,
+						}
+					);
+					return updated;
+				});
 				throw error;
 			}
 		},
-		[]
+		[hasLoaded]
 	);
 
 	const updateRecurringExpense = useCallback(
