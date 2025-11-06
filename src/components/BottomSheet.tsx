@@ -143,19 +143,56 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(
 		const sheetStyle = useAnimatedStyle(() => ({
 			transform: [{ translateY: y.value }],
 		}));
+		
+		// Content container maxHeight should adapt to current sheet position
+		const contentStyle = useAnimatedStyle(() => {
+			// Calculate available height: screen height minus current sheet top position
+			// Subtract approximate space for drag handle (~21px) and header (~50px)
+			const HEADER_AND_HANDLE_HEIGHT = 71;
+			const availableHeight = H - y.value - HEADER_AND_HANDLE_HEIGHT;
+			return {
+				maxHeight: availableHeight > 0 ? availableHeight : H * 0.5, // fallback to 50% if calculation fails
+			};
+		});
 
 		// Pan gesture
 		const contentGestureRef = useRef(null); // NativeViewGestureHandler for inner scrolls
+		// Track if gesture moved significantly to distinguish from scrolling
+		const gestureTranslation = useSharedValue(0);
+		const MIN_SNAP_THRESHOLD = 30; // Minimum pixels moved to trigger snap (prevents accidental snaps during scrolling)
+		
 		const pan = Gesture.Pan()
 			.onBegin(() => {
 				dragStartY.value = y.value;
+				gestureTranslation.value = 0;
 			})
 			.onUpdate((e) => {
+				gestureTranslation.value = e.translationY;
 				const next = dragStartY.value + e.translationY;
 				y.value = wClamp(next, minY, maxY);
 			})
 			.onEnd((e) => {
+				'worklet';
+				const translation = Math.abs(gestureTranslation.value);
 				const velocity = e.velocityY;
+				
+				// Only process snap if gesture moved significantly (prevents accidental snaps from scrolling)
+				if (translation < MIN_SNAP_THRESHOLD && Math.abs(velocity) < 500) {
+					// Small movement - likely just scrolling, return to current position
+					// Find the closest snap point to current position
+					let currentSnap = snapsY[0];
+					let minDist = Math.abs(y.value - snapsY[0]);
+					for (let i = 1; i < snapsY.length; i++) {
+						const d = Math.abs(y.value - snapsY[i]);
+						if (d < minDist) {
+							currentSnap = snapsY[i];
+							minDist = d;
+						}
+					}
+					y.value = withTiming(currentSnap, TIMING_CONFIG);
+					return;
+				}
+				
 				// if flicking down fast, close
 				if (velocity > 1200) {
 					y.value = withTiming(closedY, { duration: 200 }, (finished) => {
@@ -241,10 +278,10 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(
 
 							{/* Content area */}
 							<NativeViewGestureHandler ref={contentGestureRef}>
-								<View
+								<Animated.View
 									style={[
 										styles.contentContainer,
-										{ maxHeight: H - (snapsY[0] ?? H * 0.4) },
+										contentStyle,
 									]}
 									renderToHardwareTextureAndroid
 									{...(Platform.OS === 'ios'
@@ -252,7 +289,7 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(
 										: {})}
 								>
 									{children}
-								</View>
+								</Animated.View>
 							</NativeViewGestureHandler>
 						</Animated.View>
 					</GestureDetector>

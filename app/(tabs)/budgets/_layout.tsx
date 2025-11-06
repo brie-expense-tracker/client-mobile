@@ -13,6 +13,7 @@ import * as Haptics from 'expo-haptics';
 import BudgetScreen from './index';
 import GoalsScreen from './goals';
 import RecurringExpensesScreen from './recurringExpenses';
+import DebtsScreen from './debts';
 import {
 	accessibilityProps,
 	dynamicTextStyle,
@@ -33,6 +34,8 @@ export default function BudgetLayout() {
 			setActiveTab('budgets');
 		} else if (params.tab === 'recurring') {
 			setActiveTab('recurring');
+		} else if (params.tab === 'debts') {
+			setActiveTab('debts');
 		}
 	}, [params.tab]);
 
@@ -159,6 +162,37 @@ export default function BudgetLayout() {
 								Recurring
 							</Text>
 						</TouchableOpacity>
+
+						<TouchableOpacity
+							style={[styles.tab, activeTab === 'debts' && styles.activeTab]}
+							onPress={() => handleTabPress('debts')}
+							{...accessibilityProps.button}
+							accessibilityRole="tab"
+							accessibilityLabel={generateAccessibilityLabel.button(
+								'Debts',
+								'tab'
+							)}
+							accessibilityHint={voiceOverHints.select}
+							accessibilityState={{ selected: activeTab === 'debts' }}
+						>
+							<Ionicons
+								name="card-outline"
+								size={20}
+								color={activeTab === 'debts' ? palette.text : palette.textMuted}
+								accessibilityRole="image"
+								accessibilityLabel="Debts icon"
+							/>
+							<Text
+								style={[
+									styles.tabText,
+									activeTab === 'debts' && styles.activeTabText,
+									dynamicTextStyle,
+								]}
+								accessibilityRole="text"
+							>
+								Debts
+							</Text>
+						</TouchableOpacity>
 					</View>
 				</View>
 
@@ -171,8 +205,10 @@ export default function BudgetLayout() {
 						<BudgetScreen />
 					) : activeTab === 'goals' ? (
 						<GoalsScreen />
-					) : (
+					) : activeTab === 'recurring' ? (
 						<RecurringExpensesScreen />
+					) : (
+						<DebtsScreen />
 					)}
 				</View>
 			</View>

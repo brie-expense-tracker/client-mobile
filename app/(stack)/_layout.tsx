@@ -60,6 +60,12 @@ const StackLayout = () => {
 					headerShown: false,
 				}}
 			/>
+			<Stack.Screen
+				name="debts"
+				options={{
+					headerShown: false,
+				}}
+			/>
 		</Stack>
 	);
 };

@@ -1,4 +1,3 @@
-import { logger } from '../../../src/utils/logger';
 import React, {
 	useCallback,
 	useContext,
@@ -19,9 +18,10 @@ import {
 	Image,
 	Animated,
 	Easing,
+	Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, {
@@ -33,15 +33,18 @@ import Svg, {
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { TransactionContext } from '../../../src/context/transactionContext';
 import { useNotification } from '../../../src/context/notificationContext';
-import { useRecurringExpense } from '../../../src/context/recurringExpenseContext';
-import { useBudget } from '../../../src/context/budgetContext';
 import { useGoal } from '../../../src/context/goalContext';
 import { TransactionHistory } from './components';
+import {
+	DashboardService,
+	DashboardRollup,
+} from '../../../src/services/feature/dashboardService';
 import {
 	accessibilityProps,
 	dynamicTextStyle,
 	generateAccessibilityLabel,
 } from '../../../src/utils/accessibility';
+import BottomSheet from '../../../src/components/BottomSheet';
 
 const currency = new Intl.NumberFormat('en-US', {
 	style: 'currency',
@@ -57,25 +60,247 @@ const getLocalIsoDate = () => {
 export default function DashboardPro() {
 	const { transactions, isLoading, refetch } = useContext(TransactionContext);
 	const { unreadCount } = useNotification();
-	const { budgets, isLoading: budgetsLoading } = useBudget();
-	const { goals, isLoading: goalsLoading } = useGoal();
+	const { goals } = useGoal();
+	const params = useLocalSearchParams<{ transactionImpact?: string }>();
 	const [refreshing, setRefreshing] = useState(false);
+	const [rollup, setRollup] = useState<DashboardRollup | null>(null);
+	const [rollupLoading, setRollupLoading] = useState(true);
+	const [transactionImpact, setTransactionImpact] = useState<{
+		message: string;
+		type: 'debt' | 'budget' | 'goal' | 'none';
+	} | null>(null);
+	const [helpModalOpen, setHelpModalOpen] = useState<string | null>(null);
+	const [previousRollup, setPreviousRollup] = useState<DashboardRollup | null>(
+		null
+	);
+
+	const fetchRollup = useCallback(async () => {
+		try {
+			setRollupLoading(true);
+			const data = await DashboardService.getDashboardRollup();
+			// Validate data structure
+			if (
+				data &&
+				data.cashflow &&
+				data.budgets &&
+				data.debts &&
+				data.recurring
+			) {
+				setRollup(data);
+			} else {
+				console.error('Invalid rollup data structure:', data);
+				setRollup(null);
+			}
+		} catch (error) {
+			console.error('Error fetching dashboard rollup:', error);
+			setRollup(null);
+		} finally {
+			setRollupLoading(false);
+		}
+	}, []);
 
 	const onRefresh = useCallback(async () => {
 		setRefreshing(true);
 		try {
-			await refetch();
+			await Promise.all([refetch(), fetchRollup()]);
 		} finally {
 			setRefreshing(false);
 		}
-	}, [refetch]);
+	}, [refetch, fetchRollup]);
 
-	// Refresh transactions when dashboard comes into focus
+	// Refresh transactions and rollup when dashboard comes into focus
 	useFocusEffect(
 		useCallback(() => {
 			refetch();
-		}, [refetch])
+			fetchRollup();
+		}, [refetch, fetchRollup])
 	);
+
+	// Initial fetch
+	useEffect(() => {
+		fetchRollup();
+	}, [fetchRollup]);
+
+	// Detect transaction impact from URL params
+	useEffect(() => {
+		if (params.transactionImpact) {
+			try {
+				const impact = JSON.parse(params.transactionImpact);
+				setTransactionImpact(impact);
+				// Auto-dismiss after 5 seconds
+				setTimeout(() => setTransactionImpact(null), 5000);
+				// Clear the param
+				router.setParams({ transactionImpact: undefined });
+			} catch {
+				// Invalid JSON, ignore
+			}
+		}
+	}, [params.transactionImpact]);
+
+	// Detect changes in rollup to show impact
+	useEffect(() => {
+		if (!rollup || !previousRollup || rollupLoading) {
+			setPreviousRollup(rollup);
+			return;
+		}
+
+		// Index budgets by id for safe comparison
+		const prevById = Object.fromEntries(
+			previousRollup.budgets.budgets.map((b) => [b.budgetId, b])
+		);
+
+		let shown = false;
+
+		// Check for budget changes
+		for (const b of rollup.budgets.budgets) {
+			const prev = prevById[b.budgetId];
+			if (prev && b.spent > prev.spent && !transactionImpact) {
+				setTransactionImpact({
+					message: `Counted toward: ${b.budgetName} (${b.percentageUsed.toFixed(
+						0
+					)}% used)`,
+					type: 'budget',
+				});
+				shown = true;
+				setTimeout(() => setTransactionImpact(null), 5000);
+				break;
+			}
+		}
+
+		// Check for debt payment changes
+		if (!shown) {
+			const prevPaid = previousRollup.debts.paidThisMonth ?? 0;
+			const currPaid = rollup.debts.paidThisMonth ?? 0;
+			if (currPaid > prevPaid && !transactionImpact) {
+				const diff = currPaid - prevPaid;
+				setTransactionImpact({
+					message: `Applied to debt • Paid this month: ${currency(diff)}`,
+					type: 'debt',
+				});
+				setTimeout(() => setTransactionImpact(null), 5000);
+			}
+		}
+
+		setPreviousRollup(rollup);
+	}, [rollup, previousRollup, rollupLoading, transactionImpact]);
+
+	// Calculate next best action
+	const nextAction = useMemo(() => {
+		if (!rollup) return null;
+
+		const now = new Date();
+		const dayOfMonth = now.getDate();
+		const daysInMonth = new Date(
+			now.getFullYear(),
+			now.getMonth() + 1,
+			0
+		).getDate();
+		const monthProgress = (dayOfMonth / daysInMonth) * 100;
+
+		// Check budget overages
+		const overBudget = rollup.budgets.budgets.find(
+			(b) => b.percentageUsed > 80 && monthProgress < 80
+		);
+		if (overBudget) {
+			return {
+				type: 'budget',
+				message: `You've spent ${overBudget.percentageUsed.toFixed(0)}% of ${
+					overBudget.budgetName
+				} and it's the ${dayOfMonth}${
+					dayOfMonth === 1
+						? 'st'
+						: dayOfMonth === 2
+						? 'nd'
+						: dayOfMonth === 3
+						? 'rd'
+						: 'th'
+				}. Consider reducing spending.`,
+				priority: 'high',
+			};
+		}
+
+		// Check debt payments
+		if (rollup.debts.paidThisMonth === 0 && rollup.debts.totalDebt > 0) {
+			return {
+				type: 'debt',
+				message: 'You made no debt payments this month — add one?',
+				priority: 'medium',
+			};
+		}
+
+		// Check negative cashflow
+		if (rollup.cashflow.netSavings < 0) {
+			return {
+				type: 'cashflow',
+				message:
+					'Net savings is negative this month — review biggest expenses?',
+				priority: 'high',
+			};
+		}
+
+		// Check goal progress
+		if (goals && goals.length > 0) {
+			const lowProgressGoal = goals.find((g) => {
+				if (!g.deadline) return false; // Guard against missing deadline
+				const progress = (g.current / g.target) * 100;
+				const daysLeft = Math.ceil(
+					(new Date(g.deadline).getTime() - now.getTime()) /
+						(1000 * 60 * 60 * 24)
+				);
+				return progress < 50 && daysLeft < 30 && daysLeft >= 0;
+			});
+			if (lowProgressGoal && lowProgressGoal.deadline) {
+				const daysLeft = Math.max(
+					0,
+					Math.ceil(
+						(new Date(lowProgressGoal.deadline).getTime() - now.getTime()) /
+							(1000 * 60 * 60 * 24)
+					)
+				);
+				return {
+					type: 'goal',
+					message: `${lowProgressGoal.name} is ${(
+						(lowProgressGoal.current / lowProgressGoal.target) *
+						100
+					).toFixed(0)}% complete with ${daysLeft} days left.`,
+					priority: 'medium',
+				};
+			}
+		}
+
+		return null;
+	}, [rollup, goals]);
+
+	// Calculate financial health score
+	const healthScore = useMemo(() => {
+		if (!rollup) return null;
+
+		// Calculate individual scores (0-100)
+		const budgetsTotal = Math.max(1, rollup.budgets.totalBudgets);
+		const budgetScore = (rollup.budgets.budgetsOnTrack / budgetsTotal) * 100; // 0-100
+		const cashflowScore = rollup.cashflow.netSavings >= 0 ? 100 : 50;
+		const debtScore = rollup.debts.isHealthy ? 100 : 60;
+		const loggingScore = transactions.length > 0 ? 100 : 50;
+
+		// Weighted sum
+		const score =
+			budgetScore * 0.3 +
+			cashflowScore * 0.3 +
+			debtScore * 0.25 +
+			loggingScore * 0.15;
+
+		const reasons: string[] = [];
+		if (budgetScore < 80) reasons.push('Some budgets need attention');
+		if (cashflowScore < 100) reasons.push('Negative cashflow this month');
+		if (!rollup.debts.isHealthy) reasons.push('Debt-to-income ratio is high');
+
+		return {
+			score: Math.round(score),
+			status:
+				score >= 80 ? 'excellent' : score >= 60 ? 'good' : 'needs_attention',
+			reasons,
+		};
+	}, [rollup, transactions.length]);
 
 	const { totalBalance, dailyChange, last7 } = useMemo(() => {
 		const today = getLocalIsoDate();
@@ -108,103 +333,6 @@ export default function DashboardPro() {
 
 		return { totalBalance: balance, dailyChange: change, last7 };
 	}, [transactions]);
-
-	// Calculate real budget and goal metrics
-	const budgetMetrics = useMemo(() => {
-		if (budgetsLoading || budgets.length === 0) {
-			return {
-				budgetUsed: 0,
-				budgetHint: 'No budgets set',
-			};
-		}
-
-		const currentMonth = new Date().getMonth();
-		const currentYear = new Date().getFullYear();
-
-		let totalBudget = 0;
-		let totalSpent = 0;
-
-		for (const budget of budgets) {
-			totalBudget += budget.amount;
-
-			// Calculate spent amount for current month
-			const monthlyTransactions = transactions.filter((t) => {
-				const tDate = new Date(t.date);
-				return (
-					tDate.getMonth() === currentMonth &&
-					tDate.getFullYear() === currentYear &&
-					t.amount < 0
-				); // Only expenses
-			});
-
-			const monthlySpent = monthlyTransactions.reduce(
-				(sum, t) => sum + Math.abs(t.amount),
-				0
-			);
-			totalSpent += monthlySpent;
-		}
-
-		const budgetUsed = totalBudget > 0 ? totalSpent / totalBudget : 0;
-		let budgetHint = 'No budgets set';
-
-		if (totalBudget > 0) {
-			if (budgetUsed < 0.5) {
-				budgetHint = 'Under target this month';
-			} else if (budgetUsed < 0.8) {
-				budgetHint = 'On track this month';
-			} else if (budgetUsed < 1.0) {
-				budgetHint = 'Approaching limit';
-			} else {
-				budgetHint = 'Over budget this month';
-			}
-		}
-
-		return { budgetUsed, budgetHint };
-	}, [budgets, transactions, budgetsLoading]);
-
-	const goalMetrics = useMemo(() => {
-		if (goalsLoading || goals.length === 0) {
-			return {
-				savingsPace: 0,
-				savingsHint: 'No goals set',
-			};
-		}
-
-		if (goals.length === 0) {
-			return {
-				savingsPace: 0,
-				savingsHint: 'No goals set',
-			};
-		}
-
-		// Calculate overall progress across all goals
-		let totalProgress = 0;
-		let totalTarget = 0;
-
-		for (const goal of goals) {
-			totalProgress += goal.current || 0;
-			totalTarget += goal.target;
-		}
-
-		const savingsPace = totalTarget > 0 ? totalProgress / totalTarget : 0;
-		let savingsHint = 'No goals set';
-
-		if (totalTarget > 0) {
-			if (savingsPace < 0.25) {
-				savingsHint = 'Getting started';
-			} else if (savingsPace < 0.5) {
-				savingsHint = 'Making progress';
-			} else if (savingsPace < 0.75) {
-				savingsHint = 'On track for goal';
-			} else if (savingsPace < 1.0) {
-				savingsHint = 'Almost there!';
-			} else {
-				savingsHint = 'Goal achieved!';
-			}
-		}
-
-		return { savingsPace, savingsHint };
-	}, [goals, goalsLoading]);
 
 	if (isLoading) {
 		return (
@@ -289,6 +417,33 @@ export default function DashboardPro() {
 					}
 					keyboardShouldPersistTaps="handled"
 				>
+					{/* Transaction Impact Banner */}
+					{transactionImpact && (
+						<TransactionImpactBanner
+							message={transactionImpact.message}
+							type={transactionImpact.type}
+							onDismiss={() => setTransactionImpact(null)}
+							onViewDetails={
+								transactionImpact.type === 'budget'
+									? () => {
+											setTransactionImpact(null);
+											router.push('/(tabs)/budgets');
+									  }
+									: transactionImpact.type === 'debt'
+									? () => {
+											setTransactionImpact(null);
+											router.push('/(tabs)/budgets?tab=debts');
+									  }
+									: transactionImpact.type === 'goal'
+									? () => {
+											setTransactionImpact(null);
+											router.push('/(tabs)/budgets?tab=goals');
+									  }
+									: undefined
+							}
+						/>
+					)}
+
 					{/* ---------- Hero Pro Balance Card ---------- */}
 					<HeroPro
 						total={totalBalance}
@@ -303,32 +458,76 @@ export default function DashboardPro() {
 						onSetGoal={() => router.push('/(tabs)/budgets?tab=goals')}
 					/>
 
-					{/* ---------- Quick Financial Summary ---------- */}
-					<QuickSummary
-						items={[
-							{
-								label: 'Budget used',
-								value: budgetMetrics.budgetUsed,
-								hint: budgetMetrics.budgetHint,
-							},
-							{
-								label: 'Savings pace',
-								value: goalMetrics.savingsPace,
-								hint: goalMetrics.savingsHint,
-							},
-							{
-								label: 'Debt payoff',
-								value: 0.18, // TODO: Calculate real debt payoff metrics
-								hint: 'Consider rounding up payments',
-							},
-						]}
-					/>
+					{/* Next Best Action Card */}
+					{nextAction && (
+						<NextBestActionCard
+							action={nextAction}
+							onAction={() => {
+								if (nextAction.type === 'debt') {
+									router.push('/(tabs)/budgets?tab=debts');
+								} else if (nextAction.type === 'budget') {
+									router.push('/(tabs)/budgets');
+								} else if (nextAction.type === 'goal') {
+									router.push('/(tabs)/budgets?tab=goals');
+								} else {
+									router.push('/(tabs)/transaction');
+								}
+							}}
+						/>
+					)}
 
-					{/* ---------- Recurring Expenses preview ---------- */}
-					<RecurringPreview
-						rowsLimit={3}
-						onViewAll={() => router.push('/(tabs)/budgets?tab=recurring')}
-					/>
+					{/* ---------- 4 Rollup Cards ---------- */}
+					{rollupLoading ? (
+						<View style={styles.card}>
+							<ActivityIndicator size="small" color="#3B82F6" />
+							<Text style={[styles.loadingText, dynamicTextStyle]}>
+								Loading dashboard data...
+							</Text>
+						</View>
+					) : rollup?.cashflow &&
+					  rollup?.budgets &&
+					  rollup?.debts &&
+					  rollup?.recurring ? (
+						<>
+							{/* Cashflow Card */}
+							<CashflowCard
+								cashflow={rollup.cashflow}
+								onPress={() => router.push('/(tabs)/transaction')}
+								onHelp={() => setHelpModalOpen('cashflow')}
+							/>
+
+							{/* Budgets Card */}
+							<BudgetsCard
+								budgets={rollup.budgets}
+								onPress={() => router.push('/(tabs)/budgets')}
+								onHelp={() => setHelpModalOpen('budgets')}
+							/>
+
+							{/* Debts Card */}
+							<DebtsCard
+								debts={rollup.debts}
+								onPress={() => router.push('/(tabs)/budgets?tab=debts')}
+								onHelp={() => setHelpModalOpen('debts')}
+							/>
+
+							{/* Recurring Card */}
+							<RecurringCard
+								recurring={rollup.recurring}
+								onPress={() => router.push('/(tabs)/budgets?tab=recurring')}
+							/>
+						</>
+					) : null}
+
+					{/* Financial Health Score Card */}
+					{healthScore && (
+						<FinancialHealthCard
+							score={healthScore.score}
+							status={
+								healthScore.status as 'excellent' | 'good' | 'needs_attention'
+							}
+							reasons={healthScore.reasons}
+						/>
+					)}
 
 					{/* ---------- Transaction History ---------- */}
 					<TransactionHistory
@@ -337,6 +536,12 @@ export default function DashboardPro() {
 						isLoading={isLoading}
 					/>
 				</ScrollView>
+
+				{/* Help Modal */}
+				<HelpModal
+					type={helpModalOpen}
+					onClose={() => setHelpModalOpen(null)}
+				/>
 			</GestureHandlerRootView>
 		</SafeAreaView>
 	);
@@ -380,7 +585,8 @@ function HeroPro({
 	}, [total]);
 
 	// ------- sparkline path (with area) -------
-	const w = 300;
+	const screenWidth = Dimensions.get('window').width;
+	const w = screenWidth - 24 * 2; // padding from container
 	const h = 72;
 	const pad = 6;
 	const step = (w - pad * 2) / Math.max(last7.length - 1, 1);
@@ -540,132 +746,628 @@ function ActionChip({
 	);
 }
 
-function QuickSummary({
-	items,
+// 4 Rollup Cards
+function CashflowCard({
+	cashflow,
+	onPress,
+	onHelp,
 }: {
-	items: { label: string; value: number; hint?: string }[];
+	cashflow: DashboardRollup['cashflow'];
+	onPress: () => void;
+	onHelp?: () => void;
 }) {
+	if (!cashflow) return null;
+
+	const totalIncome = cashflow.totalIncome || 0;
+	const totalExpenses = cashflow.totalExpenses || 0;
+	const netSavings = cashflow.netSavings || 0;
+
+	const hasAnyData = totalIncome !== 0 || totalExpenses !== 0;
+
+	// pick colors
+	const isPositive = netSavings >= 0;
+	const netColor = isPositive ? '#16AE05' : '#DC2626';
+
 	return (
-		<View style={styles.card}>
+		<TouchableOpacity
+			onPress={onPress}
+			style={styles.card}
+			{...accessibilityProps.button}
+			accessibilityLabel={`Cashflow this month. Income ${currency(
+				totalIncome
+			)}, expenses ${currency(totalExpenses)}, net ${currency(netSavings)}`}
+		>
+			{/* header */}
 			<View style={styles.cardHeaderRow}>
-				<Text style={[styles.cardTitle, dynamicTextStyle]}>
-					Quick Financial Summary
-				</Text>
-			</View>
-			{items.map((it, idx) => (
-				<View key={idx} style={{ marginTop: idx === 0 ? 4 : 14 }}>
-					<View style={styles.summaryRow}>
-						<Text style={[styles.summaryLabel, dynamicTextStyle]}>
-							{it.label}
-						</Text>
-						<Text style={[styles.summaryValue, dynamicTextStyle]}>
-							{Math.round(it.value * 100)}%
+				<View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+					<Text style={[styles.cardTitle, dynamicTextStyle]}>Cashflow</Text>
+					{onHelp && (
+						<TouchableOpacity
+							onPress={onHelp}
+							hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+						>
+							<Ionicons name="help-circle-outline" size={16} color="#9CA3AF" />
+						</TouchableOpacity>
+					)}
+				</View>
+				<View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+					{/* time range pill */}
+					<View
+						style={{
+							backgroundColor: '#EFF6FF',
+							borderRadius: 999,
+							paddingHorizontal: 10,
+							paddingVertical: 3,
+						}}
+					>
+						<Text style={{ fontSize: 11, color: '#1D4ED8', fontWeight: '600' }}>
+							This month
 						</Text>
 					</View>
+					<Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+				</View>
+			</View>
+
+			{/* body */}
+			{hasAnyData ? (
+				<View style={{ marginTop: 12 }}>
+					{/* Net as hero */}
+					<View
+						style={{
+							flexDirection: 'row',
+							justifyContent: 'space-between',
+							alignItems: 'center',
+							marginBottom: 12,
+						}}
+					>
+						<Text style={[styles.netSavingsLabel, dynamicTextStyle]}>
+							Net this month
+						</Text>
+						<Text
+							style={[
+								styles.netSavingsValue,
+								{ color: netColor, fontSize: 20 },
+								dynamicTextStyle,
+							]}
+						>
+							{currency(netSavings)}
+						</Text>
+					</View>
+
+					{/* income / expenses */}
+					<View style={styles.cashflowRow}>
+						<View style={styles.cashflowItem}>
+							<Text style={[styles.cashflowLabel, dynamicTextStyle]}>
+								Income
+							</Text>
+							<Text
+								style={[
+									styles.cashflowValue,
+									{ color: '#16AE05' },
+									dynamicTextStyle,
+								]}
+							>
+								{currency(totalIncome)}
+							</Text>
+						</View>
+						<View style={styles.cashflowItem}>
+							<Text style={[styles.cashflowLabel, dynamicTextStyle]}>
+								Expenses
+							</Text>
+							<Text
+								style={[
+									styles.cashflowValue,
+									{ color: '#DC2626' },
+									dynamicTextStyle,
+								]}
+							>
+								{currency(totalExpenses)}
+							</Text>
+						</View>
+					</View>
+				</View>
+			) : (
+				// empty / low-data state
+				<View style={{ marginTop: 12 }}>
+					<Text style={[styles.cardSummary, dynamicTextStyle]}>
+						No cashflow yet this month.
+					</Text>
+					<Text style={[styles.hint, { marginTop: 4 }, dynamicTextStyle]}>
+						Add income or an expense to see how you&apos;re doing.
+					</Text>
+				</View>
+			)}
+		</TouchableOpacity>
+	);
+}
+
+function BudgetsCard({
+	budgets,
+	onPress,
+	onHelp,
+}: {
+	budgets: DashboardRollup['budgets'];
+	onPress: () => void;
+	onHelp?: () => void;
+}) {
+	if (!budgets) {
+		return null;
+	}
+
+	const percentageOnTrack =
+		(budgets.totalBudgets || 0) > 0
+			? ((budgets.budgetsOnTrack || 0) / budgets.totalBudgets) * 100
+			: 0;
+
+	return (
+		<TouchableOpacity
+			onPress={onPress}
+			style={styles.card}
+			{...accessibilityProps.button}
+			accessibilityLabel={`Budgets: ${budgets.summary}`}
+		>
+			<View style={styles.cardHeaderRow}>
+				<View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+					<Text style={[styles.cardTitle, dynamicTextStyle]}>Budgets</Text>
+					{onHelp && (
+						<TouchableOpacity
+							onPress={onHelp}
+							hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+						>
+							<Ionicons name="help-circle-outline" size={16} color="#9CA3AF" />
+						</TouchableOpacity>
+					)}
+				</View>
+				<Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+			</View>
+			<View style={{ marginTop: 12 }}>
+				<Text style={[styles.cardSummary, dynamicTextStyle]}>
+					{budgets.summary}
+				</Text>
+				{budgets.totalBudgets > 0 && (
+					<View style={{ marginTop: 12 }}>
+						<View style={styles.progressTrack}>
+							<View
+								style={[
+									styles.progressFill,
+									{
+										width: `${Math.min(100, percentageOnTrack)}%`,
+										backgroundColor:
+											percentageOnTrack >= 80 ? '#16AE05' : '#60A5FA',
+									},
+								]}
+							/>
+						</View>
+						<Text style={[styles.hint, dynamicTextStyle, { marginTop: 6 }]}>
+							{budgets.budgetsOnTrack} of {budgets.totalBudgets} on track
+						</Text>
+						{budgets.budgets.length > 0 && (
+							<View style={{ marginTop: 8 }}>
+								{budgets.budgets.slice(0, 2).map((budget) => {
+									const now = new Date();
+									const dayOfMonth = now.getDate();
+									const daysInMonth = new Date(
+										now.getFullYear(),
+										now.getMonth() + 1,
+										0
+									).getDate();
+									const monthProgress = (dayOfMonth / daysInMonth) * 100;
+									const budgetProgress = budget.percentageUsed;
+									const isOnTrack = budgetProgress <= monthProgress + 10; // 10% buffer
+
+									return (
+										<View key={budget.budgetId} style={{ marginTop: 6 }}>
+											<Text
+												style={[
+													styles.hint,
+													dynamicTextStyle,
+													{ fontSize: 11 },
+												]}
+											>
+												{budget.budgetName}: {currency(budget.spent)} of{' '}
+												{currency(budget.limit)} (
+												{budget.percentageUsed.toFixed(0)}%) •{' '}
+												{isOnTrack ? 'on track' : 'ahead of pace'}
+											</Text>
+										</View>
+									);
+								})}
+							</View>
+						)}
+					</View>
+				)}
+			</View>
+		</TouchableOpacity>
+	);
+}
+
+function DebtsCard({
+	debts,
+	onPress,
+	onHelp,
+}: {
+	debts: DashboardRollup['debts'];
+	onPress: () => void;
+	onHelp?: () => void;
+}) {
+	if (!debts) {
+		return null;
+	}
+
+	const debtRatio = (debts.debtToIncomeRatio || 0) * 100;
+	const isHealthy = debts.isHealthy || false;
+	const totalDebt = debts.totalDebt || 0;
+	const paidThisMonth = debts.paidThisMonth || 0;
+	const summary = debts.summary || 'No debt data';
+
+	return (
+		<TouchableOpacity
+			onPress={onPress}
+			style={styles.card}
+			{...accessibilityProps.button}
+			accessibilityLabel={`Debts: ${debts.summary}`}
+		>
+			<View style={styles.cardHeaderRow}>
+				<View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+					<Text style={[styles.cardTitle, dynamicTextStyle]}>Debts</Text>
+					{onHelp && (
+						<TouchableOpacity
+							onPress={onHelp}
+							hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+						>
+							<Ionicons name="help-circle-outline" size={16} color="#9CA3AF" />
+						</TouchableOpacity>
+					)}
+				</View>
+				<Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+			</View>
+			<View style={{ marginTop: 12 }}>
+				<View style={styles.debtRow}>
+					<Text style={[styles.debtLabel, dynamicTextStyle]}>Total Debt</Text>
+					<Text style={[styles.debtValue, dynamicTextStyle]}>
+						{currency(totalDebt)}
+					</Text>
+				</View>
+				<View style={[styles.debtRow, { marginTop: 8 }]}>
+					<Text style={[styles.debtLabel, dynamicTextStyle]}>
+						Paid This Month
+					</Text>
+					<Text
+						style={[styles.debtValue, { color: '#16AE05' }, dynamicTextStyle]}
+					>
+						{currency(paidThisMonth)}
+					</Text>
+				</View>
+				<View style={{ marginTop: 12 }}>
 					<View style={styles.progressTrack}>
 						<View
 							style={[
 								styles.progressFill,
-								{ width: `${Math.min(100, Math.max(0, it.value * 100))}%` },
+								{
+									width: `${Math.min(100, (debtRatio / 36) * 100)}%`,
+									backgroundColor: isHealthy ? '#16AE05' : '#F59E0B',
+								},
 							]}
 						/>
 					</View>
-					{it.hint ? (
-						<Text style={[styles.hint, dynamicTextStyle]}>{it.hint}</Text>
-					) : null}
+					<Text style={[styles.hint, dynamicTextStyle, { marginTop: 6 }]}>
+						{summary}
+					</Text>
+					{paidThisMonth > 0 && totalDebt > 0 && (
+						<Text
+							style={[
+								styles.hint,
+								dynamicTextStyle,
+								{ marginTop: 4, fontSize: 11 },
+							]}
+						>
+							{paidThisMonth > 0
+								? `${currency(paidThisMonth)} paid this month`
+								: 'No payments this month'}{' '}
+							• {((paidThisMonth / totalDebt) * 100).toFixed(1)}% of total debt
+						</Text>
+					)}
 				</View>
-			))}
+			</View>
+		</TouchableOpacity>
+	);
+}
+
+function RecurringCard({
+	recurring,
+	onPress,
+}: {
+	recurring: DashboardRollup['recurring'];
+	onPress: () => void;
+}) {
+	if (!recurring) {
+		return null;
+	}
+
+	const upcoming = recurring.upcoming || [];
+	const summary = recurring.summary || 'No recurring expenses';
+
+	return (
+		<TouchableOpacity
+			onPress={onPress}
+			style={styles.card}
+			{...accessibilityProps.button}
+			accessibilityLabel={`Recurring: ${summary}`}
+		>
+			<View style={styles.cardHeaderRow}>
+				<Text style={[styles.cardTitle, dynamicTextStyle]}>Recurring</Text>
+				<Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+			</View>
+			<View style={{ marginTop: 12 }}>
+				<Text style={[styles.cardSummary, dynamicTextStyle]}>{summary}</Text>
+				{upcoming.length > 0 && (
+					<View style={{ marginTop: 12 }}>
+						{upcoming.slice(0, 3).map((item, i) => (
+							<View key={i} style={styles.recurringRow}>
+								<View
+									style={[
+										styles.dot,
+										{
+											backgroundColor:
+												item.daysUntilDue <= 3 ? '#F59E0B' : '#60A5FA',
+										},
+									]}
+								/>
+								<View style={{ flex: 1 }}>
+									<Text style={[styles.recurringName, dynamicTextStyle]}>
+										{item.name}
+									</Text>
+									<Text style={[styles.recurringMeta, dynamicTextStyle]}>
+										{item.daysUntilDue === 0
+											? 'Due today'
+											: item.daysUntilDue === 1
+											? 'Due tomorrow'
+											: `Due in ${item.daysUntilDue} days`}
+									</Text>
+								</View>
+								<Text style={[styles.recurringAmount, dynamicTextStyle]}>
+									{currency(item.amount)}
+								</Text>
+							</View>
+						))}
+					</View>
+				)}
+			</View>
+		</TouchableOpacity>
+	);
+}
+
+// Transaction Impact Banner
+function TransactionImpactBanner({
+	message,
+	type,
+	onDismiss,
+	onViewDetails,
+}: {
+	message: string;
+	type: 'debt' | 'budget' | 'goal' | 'none';
+	onDismiss: () => void;
+	onViewDetails?: () => void;
+}) {
+	const iconMap = {
+		debt: 'card-outline',
+		budget: 'wallet-outline',
+		goal: 'trophy-outline',
+		none: 'checkmark-circle-outline',
+	};
+
+	const colorMap = {
+		debt: '#3B82F6',
+		budget: '#EF4444',
+		goal: '#10B981',
+		none: '#10B981',
+	};
+
+	return (
+		<View
+			style={[
+				styles.impactBanner,
+				{
+					backgroundColor: colorMap[type] + '15',
+					borderColor: colorMap[type] + '30',
+				},
+			]}
+		>
+			<Ionicons name={iconMap[type] as any} size={18} color={colorMap[type]} />
+			<Text style={[styles.impactBannerText, { color: '#111827' }]}>
+				{message}
+			</Text>
+			<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+				{onViewDetails && (
+					<TouchableOpacity onPress={onViewDetails}>
+						<Text style={[styles.impactBannerLink, { color: colorMap[type] }]}>
+							View
+						</Text>
+					</TouchableOpacity>
+				)}
+				<TouchableOpacity
+					onPress={onDismiss}
+					hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+				>
+					<Ionicons name="close" size={18} color="#6B7280" />
+				</TouchableOpacity>
+			</View>
 		</View>
 	);
 }
 
-function RecurringPreview({
-	rowsLimit = 3,
-	onViewAll,
+// Financial Health Score Card
+function FinancialHealthCard({
+	score,
+	status,
+	reasons,
 }: {
-	rowsLimit?: number;
-	onViewAll: () => void;
+	score: number;
+	status: 'excellent' | 'good' | 'needs_attention';
+	reasons: string[];
 }) {
-	// Get real recurring expenses data
-	const { expenses } = useRecurringExpense();
+	const statusConfig = {
+		excellent: {
+			color: '#10B981',
+			icon: 'checkmark-circle',
+			label: 'Excellent',
+		},
+		good: { color: '#F59E0B', icon: 'alert-circle', label: 'Good' },
+		needs_attention: {
+			color: '#EF4444',
+			icon: 'warning',
+			label: 'Needs Attention',
+		},
+	};
 
-	// Process recurring expenses for display
-	const rows = expenses
-		.filter((expense) => {
-			// Safety check: ensure expense has required fields
-			if (!expense || !expense.nextExpectedDate || !expense.vendor) {
-				logger.warn('⚠️ [RecurringPreview] Skipping invalid expense:', expense);
-				return false;
-			}
-			return true;
-		})
-		.map((expense) => {
-			const nextDue = new Date(expense.nextExpectedDate);
-			const today = new Date();
-			const daysUntilDue = Math.ceil(
-				(nextDue.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-			);
-
-			let status = 'upcoming';
-			if (daysUntilDue <= 0) {
-				status = 'overdue';
-			} else if (daysUntilDue <= 3) {
-				status = 'due-soon';
-			}
-
-			return {
-				name: expense.vendor,
-				due: nextDue.toLocaleDateString('en-US', {
-					month: 'short',
-					day: 'numeric',
-				}),
-				amount: expense.amount,
-				status,
-			};
-		})
-		.sort((a, b) => {
-			// Sort by due date
-			const aDate = new Date(a.due);
-			const bDate = new Date(b.due);
-			return aDate.getTime() - bDate.getTime();
-		})
-		.slice(0, rowsLimit);
+	const config = statusConfig[status];
 
 	return (
-		<View style={styles.card}>
-			<View style={styles.cardHeaderRow}>
-				<Text style={[styles.cardTitle, dynamicTextStyle]}>
-					Recurring Expenses
-				</Text>
-				<TouchableOpacity onPress={onViewAll} {...accessibilityProps.button}>
-					<Text style={styles.viewAll}>View all</Text>
-				</TouchableOpacity>
-			</View>
-			{rows.map((r, i) => (
-				<View key={i} style={styles.recurringRow}>
-					<View
-						style={[
-							styles.dot,
-							{
-								backgroundColor:
-									r.status === 'due-soon' ? '#F59E0B' : '#60A5FA',
-							},
-						]}
-					/>
-					<View style={{ flex: 1 }}>
-						<Text style={[styles.recurringName, dynamicTextStyle]}>
-							{r.name}
-						</Text>
-						<Text style={[styles.recurringMeta, dynamicTextStyle]}>
-							Due {r.due}
-						</Text>
-					</View>
-					<Text style={[styles.recurringAmount, dynamicTextStyle]}>
-						{currency(r.amount)}
+		<View style={styles.healthCard}>
+			<View style={styles.healthHeader}>
+				<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+					<Ionicons name={config.icon as any} size={20} color={config.color} />
+					<Text style={[styles.healthTitle, dynamicTextStyle]}>
+						Financial Health
 					</Text>
 				</View>
-			))}
+				<View
+					style={[
+						styles.healthScoreBadge,
+						{ backgroundColor: config.color + '20' },
+					]}
+				>
+					<Text style={[styles.healthScoreText, { color: config.color }]}>
+						{score}/100
+					</Text>
+				</View>
+			</View>
+			<View style={{ marginTop: 12 }}>
+				<Text
+					style={[
+						styles.healthStatus,
+						{ color: config.color },
+						dynamicTextStyle,
+					]}
+				>
+					{config.label}
+				</Text>
+				{reasons.length > 0 && (
+					<View style={{ marginTop: 8, gap: 4 }}>
+						{reasons.slice(0, 2).map((reason, i) => (
+							<Text key={i} style={[styles.healthReason, dynamicTextStyle]}>
+								• {reason}
+							</Text>
+						))}
+					</View>
+				)}
+			</View>
 		</View>
+	);
+}
+
+// Next Best Action Card
+function NextBestActionCard({
+	action,
+	onAction,
+}: {
+	action: { type: string; message: string; priority: string };
+	onAction: () => void;
+}) {
+	const priorityConfig = {
+		high: { color: '#EF4444', icon: 'alert-circle' },
+		medium: { color: '#F59E0B', icon: 'information-circle' },
+		low: { color: '#3B82F6', icon: 'bulb-outline' },
+	};
+
+	const config =
+		priorityConfig[action.priority as 'high' | 'medium' | 'low'] ||
+		priorityConfig.medium;
+
+	return (
+		<TouchableOpacity
+			style={styles.actionCard}
+			onPress={onAction}
+			activeOpacity={0.7}
+		>
+			<View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
+				<View
+					style={[styles.actionIcon, { backgroundColor: config.color + '20' }]}
+				>
+					<Ionicons name={config.icon as any} size={20} color={config.color} />
+				</View>
+				<View style={{ flex: 1 }}>
+					<Text style={[styles.actionTitle, dynamicTextStyle]}>Today</Text>
+					<Text style={[styles.actionMessage, dynamicTextStyle]}>
+						{action.message}
+					</Text>
+				</View>
+				<Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+			</View>
+		</TouchableOpacity>
+	);
+}
+
+// Help Modal
+function HelpModal({
+	type,
+	onClose,
+}: {
+	type: string | null;
+	onClose: () => void;
+}) {
+	const helpContent: Record<string, { title: string; content: string }> = {
+		cashflow: {
+			title: 'How Cashflow Works',
+			content:
+				"Cashflow shows your income, expenses, and net savings for this month. It's calculated from all your transactions. Income is money coming in, expenses are money going out, and net savings is the difference.",
+		},
+		budgets: {
+			title: 'How Budgets Work',
+			content:
+				'Budgets track your spending by category or type. When you add an expense transaction and link it to a budget, that amount is counted toward the budget. A budget is "on track" if you\'ve used less than 80% of it.',
+		},
+		debts: {
+			title: 'How Debt Tracking Works',
+			content:
+				'Debt payments are automatically detected from your transactions based on patterns, descriptions, or when you explicitly link an expense to a debt. The debt-to-income ratio shows how much debt you have compared to your monthly income. A healthy ratio is under 36%.',
+		},
+	};
+
+	const content = type ? helpContent[type] : null;
+
+	return (
+		<BottomSheet
+			isOpen={!!type}
+			onClose={onClose}
+			snapPoints={[0.4]}
+			header={
+				<View
+					style={{
+						flexDirection: 'row',
+						alignItems: 'center',
+						justifyContent: 'space-between',
+						paddingHorizontal: 16,
+						paddingBottom: 8,
+					}}
+				>
+					<Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>
+						{content?.title}
+					</Text>
+					<TouchableOpacity onPress={onClose}>
+						<Ionicons name="close" size={24} color="#64748B" />
+					</TouchableOpacity>
+				</View>
+			}
+		>
+			{content && (
+				<View style={{ padding: 16 }}>
+					<Text style={{ fontSize: 15, color: '#374151', lineHeight: 22 }}>
+						{content.content}
+					</Text>
+				</View>
+			)}
+		</BottomSheet>
 	);
 }
 
@@ -797,6 +1499,105 @@ const styles = StyleSheet.create({
 	recurringName: { fontSize: 14, fontWeight: '600', color: '#111827' },
 	recurringMeta: { fontSize: 12, color: '#6B7280', marginTop: 2 },
 	recurringAmount: { fontSize: 14, fontWeight: '700', color: '#111827' },
+	cardSummary: { fontSize: 14, color: '#6B7280', fontWeight: '500' },
+	cashflowRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		gap: 16,
+	},
+	cashflowItem: { flex: 1 },
+	cashflowLabel: { fontSize: 12, color: '#6B7280', fontWeight: '500' },
+	cashflowValue: { fontSize: 18, fontWeight: '700', marginTop: 4 },
+	netSavingsRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		paddingTop: 12,
+		borderTopWidth: 1,
+		borderTopColor: '#E5E7EB',
+	},
+	netSavingsLabel: { fontSize: 14, fontWeight: '600', color: '#374151' },
+	netSavingsValue: { fontSize: 20, fontWeight: '700' },
+	debtRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+	},
+	debtLabel: { fontSize: 14, color: '#6B7280', fontWeight: '500' },
+	debtValue: { fontSize: 16, fontWeight: '700', color: '#111827' },
+
+	// Impact banner
+	impactBanner: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 10,
+		padding: 12,
+		borderRadius: 12,
+		borderWidth: 1,
+		marginBottom: 16,
+	},
+	impactBannerText: {
+		flex: 1,
+		fontSize: 14,
+		fontWeight: '600',
+	},
+	impactBannerLink: {
+		fontSize: 13,
+		fontWeight: '700',
+	},
+
+	// Health card
+	healthCard: {
+		backgroundColor: '#FFFFFF',
+		borderRadius: 16,
+		padding: 16,
+		paddingTop: 20,
+		marginBottom: 16,
+		borderWidth: 1,
+		borderColor: '#E5E7EB',
+		shadowColor: '#000',
+		shadowOpacity: 0.03,
+		shadowRadius: 6,
+		elevation: 1,
+	},
+	healthHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	healthTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
+	healthScoreBadge: {
+		paddingHorizontal: 12,
+		paddingVertical: 4,
+		borderRadius: 999,
+	},
+	healthScoreText: { fontSize: 14, fontWeight: '700' },
+	healthStatus: { fontSize: 14, fontWeight: '600' },
+	healthReason: { fontSize: 13, color: '#6B7280' },
+
+	// Action card
+	actionCard: {
+		backgroundColor: '#F8FAFC',
+		borderRadius: 12,
+		padding: 14,
+		marginTop: 16,
+		borderWidth: 1,
+		borderColor: '#E5E7EB',
+	},
+	actionIcon: {
+		width: 36,
+		height: 36,
+		borderRadius: 18,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	actionTitle: {
+		fontSize: 12,
+		fontWeight: '700',
+		color: '#6B7280',
+		marginBottom: 4,
+	},
+	actionMessage: { fontSize: 14, fontWeight: '600', color: '#111827' },
 });
 
 const heroStyles = StyleSheet.create({

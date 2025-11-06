@@ -35,6 +35,12 @@ import { navigateToGoalsWithModal } from '../../../src/utils/navigationUtils';
 import BottomSheet from '../../../src/components/BottomSheet';
 import { isDevMode } from '../../../src/config/environment';
 import { createLogger } from '../../../src/utils/sublogger';
+import {
+	DashboardService,
+	DashboardRollup,
+	DebtRollup,
+} from '../../../src/services/feature/dashboardService';
+import { normalizeIconName } from '../../../src/constants/uiConstants';
 
 // Create namespaced logger for this service
 const transactionScreenLog = createLogger('TransactionScreen');
@@ -68,7 +74,7 @@ interface TransactionFormData {
 	budgets?: Budget[];
 	date: string; // yyyy-mm-dd
 	target?: string;
-	targetModel?: 'Budget' | 'Goal';
+	targetModel?: 'Budget' | 'Goal' | 'Debt';
 	recurring?: {
 		enabled: boolean;
 		frequency: Frequency;
@@ -125,9 +131,14 @@ export default function TransactionScreenProModern() {
 	const [selectedGoals, setSelectedGoals] = useState<Goal[]>([]);
 	const [selectedBudgets, setSelectedBudgets] = useState<Budget[]>([]);
 	const [isSubmitting, setIsSubmitting] = useState(false);
-	const [pickerOpen, setPickerOpen] = useState<null | 'goal' | 'budget'>(null);
+	const [pickerOpen, setPickerOpen] = useState<
+		null | 'goal' | 'budget' | 'debt'
+	>(null);
 	const [datePickerOpen, setDatePickerOpen] = useState(false);
 	const [recurringOpen, setRecurringOpen] = useState(false);
+	const [debts, setDebts] = useState<DebtRollup[]>([]);
+	const [debtsLoading, setDebtsLoading] = useState(false);
+	const [selectedDebt, setSelectedDebt] = useState<DebtRollup | null>(null);
 
 	const { addTransaction } = useContext(TransactionContext);
 	const { goals, isLoading: goalsLoading } = useGoal();
@@ -153,6 +164,30 @@ export default function TransactionScreenProModern() {
 			});
 		}
 	}, [budgets, budgetsLoading]);
+
+	// Load debts once
+	useEffect(() => {
+		let isMounted = true;
+		const loadDebts = async () => {
+			try {
+				setDebtsLoading(true);
+				const rollup: DashboardRollup =
+					await DashboardService.getDashboardRollup();
+				if (!isMounted) return;
+				setDebts(rollup.debts?.debts || []);
+			} catch (err) {
+				if (isDevMode) {
+					transactionScreenLog.error('Failed to load debts', err);
+				}
+			} finally {
+				if (isMounted) setDebtsLoading(false);
+			}
+		};
+		loadDebts();
+		return () => {
+			isMounted = false;
+		};
+	}, []);
 
 	const ready = mode === 'income' ? !goalsLoading : !budgetsLoading;
 
@@ -242,6 +277,7 @@ export default function TransactionScreenProModern() {
 		(b: Budget) => {
 			setSelectedBudgets([b]);
 			setValue('budgets', [b], { shouldValidate: false });
+			setSelectedDebt(null); // Clear debt when budget is selected
 			setPickerOpen(null);
 		},
 		[setValue]
@@ -282,17 +318,27 @@ export default function TransactionScreenProModern() {
 					payload.targetModel = 'Goal';
 				}
 			} else if (isExpense) {
+				// Budget takes priority if chosen
 				if (selectedBudgets.length > 0) {
 					payload.target = selectedBudgets[0].id;
 					payload.targetModel = 'Budget';
+				} else if (selectedDebt) {
+					// Allow expense to be applied to a debt
+					payload.target = selectedDebt.debtId;
+					payload.targetModel = 'Debt';
 				}
 			}
 
 			await addTransaction(payload);
 
+			const wasDebtPayment =
+				!isIncome && !selectedBudgets.length && selectedDebt;
+
 			Alert.alert(
 				'Success',
-				`${isIncome ? 'Income' : 'Expense'} saved successfully!`,
+				wasDebtPayment
+					? `Payment added to ${selectedDebt?.debtName}.`
+					: `${isIncome ? 'Income' : 'Expense'} saved successfully!`,
 				[
 					{
 						text: 'OK',
@@ -309,6 +355,7 @@ export default function TransactionScreenProModern() {
 							});
 							setSelectedGoals([]);
 							setSelectedBudgets([]);
+							setSelectedDebt(null);
 							if (router.canGoBack()) router.back();
 							else router.replace('/(tabs)/dashboard');
 						},
@@ -419,6 +466,27 @@ export default function TransactionScreenProModern() {
 				{errors.amount && (
 					<Text style={styles.errorText}>{String(errors.amount.message)}</Text>
 				)}
+				{selectedDebt && mode === 'expense' && (
+					<View
+						style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}
+					>
+						<View
+							style={{
+								flexDirection: 'row',
+								backgroundColor: '#E0F2FE',
+								paddingHorizontal: 10,
+								paddingVertical: 4,
+								borderRadius: 999,
+								gap: 4,
+							}}
+						>
+							<Ionicons name="card-outline" size={14} color="#0369A1" />
+							<Text style={{ color: '#0369A1', fontWeight: '600' }}>
+								Paying debt: {selectedDebt.debtName}
+							</Text>
+						</View>
+					</View>
+				)}
 			</View>
 
 			{/* Segmented control */}
@@ -485,6 +553,27 @@ export default function TransactionScreenProModern() {
 							mode === 'expense' ? 'Select Budget' : 'Select Goal'
 						}
 					/>
+
+					{/* Debt row, only for expense */}
+					{mode === 'expense' && (
+						<Row
+							icon="card-outline"
+							label="Debt"
+							right={
+								debtsLoading ? (
+									<ActivityIndicator size="small" />
+								) : selectedDebt ? (
+									<ValueText>{selectedDebt.debtName}</ValueText>
+								) : (
+									<ValueText>None</ValueText>
+								)
+							}
+							onPress={() => {
+								setPickerOpen('debt');
+							}}
+							accessibilityLabel="Select Debt"
+						/>
+					)}
 
 					<Row
 						icon="chatbox-ellipses-outline"
@@ -590,7 +679,9 @@ export default function TransactionScreenProModern() {
 							: mode === 'expense'
 							? selectedBudgets.length > 0
 								? ` • Budget: ${selectedBudgets[0].name}`
-								: ' • No budget selected'
+								: selectedDebt
+								? ` • Debt: ${selectedDebt.debtName}`
+								: ' • No budget or debt selected'
 							: ''}
 					</Text>
 				</View>
@@ -618,7 +709,11 @@ export default function TransactionScreenProModern() {
 							</>
 						) : (
 							<>
-								<Text style={styles.inlineCtaText}>Create Transaction</Text>
+								<Text style={styles.inlineCtaText}>
+									{mode === 'expense' && !selectedBudgets.length && selectedDebt
+										? 'Pay Debt'
+										: 'Create Transaction'}
+								</Text>
 								<Ionicons name="add" size={18} color="#fff" />
 							</>
 						)}
@@ -670,7 +765,13 @@ export default function TransactionScreenProModern() {
 						}}
 					>
 						<Ionicons
-							name={pickerOpen === 'goal' ? 'trophy-outline' : 'wallet-outline'}
+							name={
+								pickerOpen === 'goal'
+									? 'trophy-outline'
+									: pickerOpen === 'debt'
+									? 'card-outline'
+									: 'wallet-outline'
+							}
 							size={20}
 							color="#0095FF"
 							style={{ marginRight: 12 }}
@@ -683,7 +784,11 @@ export default function TransactionScreenProModern() {
 								color: '#0F172A',
 							}}
 						>
-							{pickerOpen === 'goal' ? 'Select Goal' : 'Select Budget'}
+							{pickerOpen === 'goal'
+								? 'Select Goal'
+								: pickerOpen === 'debt'
+								? 'Select Debt'
+								: 'Select Budget'}
 						</Text>
 						<TouchableOpacity onPress={() => setPickerOpen(null)}>
 							<Ionicons name="close" size={24} color="#64748B" />
@@ -692,14 +797,27 @@ export default function TransactionScreenProModern() {
 				}
 			>
 				<FlatList
-					data={(pickerOpen === 'goal' ? goals : budgets) as (Goal | Budget)[]}
-					keyExtractor={(item) => (item as any).id}
+					data={
+						pickerOpen === 'goal'
+							? (goals as any[])
+							: pickerOpen === 'debt'
+							? debts
+							: (budgets as any[])
+					}
+					keyExtractor={(item) =>
+						pickerOpen === 'debt' ? item.debtId : (item as any).id
+					}
 					initialNumToRender={12}
 					windowSize={6}
 					maxToRenderPerBatch={12}
 					getItemLayout={(_, i) => ({ length: 48, offset: 48 * i, index: i })}
 					ListEmptyComponent={() => {
-						const data = pickerOpen === 'goal' ? goals : budgets;
+						const data =
+							pickerOpen === 'goal'
+								? goals
+								: pickerOpen === 'debt'
+								? debts
+								: budgets;
 						if (isDevMode) {
 							transactionScreenLog.debug('Picker Empty', {
 								type: pickerOpen,
@@ -712,6 +830,8 @@ export default function TransactionScreenProModern() {
 								<Text style={{ color: palette.sub }}>
 									{pickerOpen === 'goal'
 										? 'No goals yet. Create one from Goals.'
+										: pickerOpen === 'debt'
+										? 'No debts yet. Add one from Debts.'
 										: 'No budgets yet. Create one from Budgets.'}
 								</Text>
 							</View>
@@ -726,24 +846,39 @@ export default function TransactionScreenProModern() {
 								borderBottomWidth: StyleSheet.hairlineWidth,
 								borderBottomColor: palette.line,
 							}}
-							onPress={() =>
-								pickerOpen === 'goal'
-									? selectGoal(item as Goal)
-									: selectBudget(item as Budget)
-							}
+							onPress={() => {
+								if (pickerOpen === 'goal') {
+									selectGoal(item as Goal);
+								} else if (pickerOpen === 'debt') {
+									setSelectedDebt(item as DebtRollup);
+									setSelectedBudgets([]); // Clear budget when debt is selected
+									setValue('budgets', [], { shouldValidate: false });
+									setPickerOpen(null);
+								} else {
+									selectBudget(item as Budget);
+								}
+							}}
 						>
 							<Ionicons
 								name={
 									pickerOpen === 'goal'
-										? (item as any).icon ?? 'trophy-outline'
-										: (item as any).icon ?? 'wallet-outline'
+										? normalizeIconName((item as any).icon ?? 'trophy-outline')
+										: pickerOpen === 'debt'
+										? 'card-outline'
+										: normalizeIconName((item as any).icon ?? 'wallet-outline')
 								}
 								size={18}
-								color={(item as any).color ?? palette.text}
+								color={
+									pickerOpen === 'debt'
+										? palette.text
+										: (item as any).color ?? palette.text
+								}
 								style={{ marginRight: 8 }}
 							/>
 							<Text style={{ fontSize: 16, color: palette.text }}>
-								{(item as any).name}
+								{pickerOpen === 'debt'
+									? (item as DebtRollup).debtName
+									: (item as any).name}
 							</Text>
 						</TouchableOpacity>
 					)}
