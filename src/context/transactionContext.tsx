@@ -357,11 +357,37 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 
 	const deleteTransaction = useCallback(
 		async (id: string) => {
+			// Store the transaction being deleted to check if it affects budgets/goals
+			const transactionToDelete = transactionsRef.current.find((t) => t.id === id);
+
 			// Optimistically update UI
 			setTransactions((prev) => prev.filter((t) => t.id !== id));
 
 			try {
 				await ApiService.delete(`/api/transactions/${id}`);
+
+				// Refresh budgets and goals if the deleted transaction had a target
+				// The backend updates budgets/goals when deleting, so we need to refresh client state
+				if (transactionToDelete?.target && transactionToDelete?.targetModel) {
+					if (transactionToDelete.targetModel === 'Budget') {
+						transactionContextLog.debug(
+							`Transaction deleted that affected budget ${transactionToDelete.target}, refreshing budgets...`
+						);
+						await refetchBudgetsRef.current();
+					} else if (transactionToDelete.targetModel === 'Goal') {
+						transactionContextLog.debug(
+							`Transaction deleted that affected goal ${transactionToDelete.target}, refreshing goals...`
+						);
+						await refetchGoalsRef.current();
+					}
+				} else {
+					// Even if no specific target, refresh both to ensure consistency
+					// (transactions might affect budget calculations even without explicit target)
+					await Promise.all([
+						refetchBudgetsRef.current(),
+						refetchGoalsRef.current(),
+					]);
+				}
 
 				// Invalidate relevant cache entries
 				setCacheInvalidationFlags.onNewTransaction();

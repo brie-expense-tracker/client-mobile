@@ -1,13 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-	ScrollView,
-	Alert,
-	RefreshControl,
-	TouchableOpacity,
-	View,
-	StyleSheet,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ScrollView, Alert, RefreshControl } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useBudget, Budget } from '../../../src/context/budgetContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -170,20 +162,6 @@ export default function BudgetScreen() {
 	// Generate Budget Insights
 	// ==========================================
 
-	// ==========================================
-	// Period Toggle Handler
-	// ==========================================
-	const handlePeriodToggle = useCallback(() => {
-		// Cycle through: all -> monthly -> weekly -> all
-		if (activeTab === 'all') {
-			setActiveTab('monthly');
-		} else if (activeTab === 'monthly') {
-			setActiveTab('weekly');
-		} else {
-			setActiveTab('all');
-		}
-	}, [activeTab]);
-
 	// ========= ADDED: computed period stats for the "professional" summary =========
 	const now = useMemo(() => new Date(), []);
 
@@ -225,8 +203,6 @@ export default function BudgetScreen() {
 			const totalDays = daysBetween(periodStart, periodEnd);
 			const elapsedDays = Math.min(totalDays, daysBetween(periodStart, now));
 			const daysLeft = Math.max(0, totalDays - elapsedDays);
-			const pacePerDay = elapsedDays > 0 ? spent / elapsedDays : 0;
-			const projected = pacePerDay * totalDays;
 
 			return {
 				label: `This Month • ${fmt(periodStart)}–${fmt(periodEnd)}`,
@@ -234,7 +210,6 @@ export default function BudgetScreen() {
 				spent,
 				remaining,
 				daysLeft,
-				projected,
 			};
 		}
 
@@ -247,8 +222,6 @@ export default function BudgetScreen() {
 			const totalDays = daysBetween(periodStart, periodEnd);
 			const elapsedDays = Math.min(totalDays, daysBetween(periodStart, now));
 			const daysLeft = Math.max(0, totalDays - elapsedDays);
-			const pacePerDay = elapsedDays > 0 ? spent / elapsedDays : 0;
-			const projected = pacePerDay * totalDays;
 
 			return {
 				label: `This Week • ${fmt(periodStart)}–${fmt(periodEnd)}`,
@@ -256,7 +229,6 @@ export default function BudgetScreen() {
 				spent,
 				remaining,
 				daysLeft,
-				projected,
 			};
 		}
 
@@ -273,7 +245,6 @@ export default function BudgetScreen() {
 			spent,
 			remaining,
 			daysLeft: null as number | null,
-			projected: null as number | null,
 		};
 	}, [activeTab, now, monthlySummary, weeklySummary, combined]);
 
@@ -289,7 +260,6 @@ export default function BudgetScreen() {
 				total: monthlySummary.totalAllocated,
 				subtitle: periodStats.label,
 				daysLeft: periodStats.daysLeft,
-				projected: periodStats.projected,
 			};
 		}
 		if (activeTab === 'weekly') {
@@ -300,7 +270,6 @@ export default function BudgetScreen() {
 				total: weeklySummary.totalAllocated,
 				subtitle: periodStats.label,
 				daysLeft: periodStats.daysLeft,
-				projected: periodStats.projected,
 			};
 		}
 		// 'all' view
@@ -355,26 +324,15 @@ export default function BudgetScreen() {
 				budgets.length === 1 ? 'budget' : 'budgets'
 			} • ${activeTab} view`}
 			right={
-				<View style={styles.headerRight}>
-					<SegmentedControl
-						segments={[
-							{ key: 'all', label: 'All' },
-							{ key: 'monthly', label: 'Monthly' },
-							{ key: 'weekly', label: 'Weekly' },
-						]}
-						value={activeTab}
-						onChange={(k) => setActiveTab(k as any)}
-					/>
-					<TouchableOpacity
-						onPress={showModal}
-						style={styles.headerAddBtn}
-						accessibilityRole="button"
-						accessibilityLabel="Add budget"
-						hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-					>
-						<Ionicons name="add-circle-outline" size={24} color="#007ACC" />
-					</TouchableOpacity>
-				</View>
+				<SegmentedControl
+					segments={[
+						{ key: 'all', label: 'All' },
+						{ key: 'monthly', label: 'Monthly' },
+						{ key: 'weekly', label: 'Weekly' },
+					]}
+					value={activeTab}
+					onChange={(k) => setActiveTab(k as any)}
+				/>
 			}
 		>
 			<ScrollView
@@ -391,17 +349,18 @@ export default function BudgetScreen() {
 				accessibilityLabel="Budgets overview content"
 			>
 				{/* Hero */}
-				<HeroBudget
-					mode={heroProps.mode}
-					percent={heroProps.percent}
-					spent={heroProps.spent}
-					total={heroProps.total}
-					subtitle={heroProps.subtitle}
-					daysLeft={heroProps.daysLeft}
-					projected={heroProps.projected}
-					onPress={handlePeriodToggle}
-					variant="compact"
-				/>
+				<Card>
+					<HeroBudget
+						mode={heroProps.mode}
+						percent={heroProps.percent}
+						spent={heroProps.spent}
+						total={heroProps.total}
+						subtitle={heroProps.subtitle}
+						daysLeft={heroProps.daysLeft}
+						onAddBudget={showModal}
+						variant="compact"
+					/>
+				</Card>
 
 				{/* List */}
 				<Section title="Your Budgets">
@@ -429,15 +388,3 @@ export default function BudgetScreen() {
 		</Page>
 	);
 }
-
-const styles = StyleSheet.create({
-	headerRight: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-	},
-	headerAddBtn: {
-		padding: 4,
-		borderRadius: 999,
-	},
-});

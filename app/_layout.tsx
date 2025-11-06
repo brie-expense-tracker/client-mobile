@@ -245,6 +245,23 @@ function RootLayoutContent() {
 			const inTabsGroup = segments[0] === '(tabs)';
 			const inOnboardingGroup = segments[0] === '(onboarding)';
 			const inStackGroup = segments[0] === '(stack)';
+			// Stack routes don't include the group name in segments, so check for known stack routes
+			const knownStackRoutes = [
+				'settings',
+				'addBudget',
+				'editBudget',
+				'budgetDetails',
+				'addGoal',
+				'editGoal',
+				'goalDetails',
+				'addRecurringExpense',
+				'editRecurringExpense',
+				'recurringExpenseDetails',
+				'debts',
+			];
+			const isStackRoute =
+				inStackGroup ||
+				knownStackRoutes.includes(segments[0] || '');
 			if (firebaseUser && user) {
 				// In dev mode, allow access to onboarding even if completed
 				if (isDevMode && inOnboardingGroup) {
@@ -272,7 +289,7 @@ function RootLayoutContent() {
 				} else if (
 					hasCompletedOnboarding &&
 					!inTabsGroup &&
-					!inStackGroup &&
+					!isStackRoute &&
 					!inOnboardingGroup
 				) {
 					// Only redirect to dashboard if onboarding is confirmed complete
@@ -291,7 +308,7 @@ function RootLayoutContent() {
 					hasSeenOnboarding === null &&
 					loadingTimeout &&
 					!inTabsGroup &&
-					!inStackGroup &&
+					!isStackRoute &&
 					!inOnboardingGroup
 				) {
 					// Timeout reached and status still null - assume completed for now to unblock
