@@ -10,7 +10,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 		...config,
 		name: 'Brie',
 		slug: 'brie',
-		version: '1.0.2',
+		version: '1.0.3',
 		orientation: 'portrait',
 		icon: './src/assets/icons/adaptive-icon.png',
 		scheme: 'brie',

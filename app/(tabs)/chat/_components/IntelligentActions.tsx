@@ -644,11 +644,11 @@ export default function IntelligentActions({
 		switch (action.type) {
 			case 'create_budget':
 				// Navigate to budgets screen to see the created budget
-				router.push('/(tabs)/budgets');
+				router.push('/(tabs)/wallet/budgets');
 				break;
 			case 'create_goal':
 				// Navigate to goals screen to see the created goal
-				router.push('/(tabs)/budgets/goals');
+				router.push('/(tabs)/wallet/goals');
 				break;
 			case 'set_reminder':
 				// Navigate to notification settings

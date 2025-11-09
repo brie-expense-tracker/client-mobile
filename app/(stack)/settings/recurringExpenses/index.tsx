@@ -131,7 +131,7 @@ export default function RecurringExpensesSettingsScreen() {
 					<Text style={styles.sectionTitle}>Quick Actions</Text>
 					<TouchableOpacity
 						style={styles.actionButton}
-						onPress={() => router.push('/(tabs)/budgets?tab=recurring')}
+						onPress={() => router.push('/(tabs)/wallet/recurring')}
 					>
 						<Ionicons name="list-outline" size={20} color="#007AFF" />
 						<Text style={styles.actionButtonText}>

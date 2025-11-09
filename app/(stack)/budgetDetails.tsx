@@ -16,7 +16,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import { useBudget, Budget } from '../../src/context/budgetContext';
-import LinearProgressBar from '../(tabs)/budgets/components/LinearProgressBar';
+import LinearProgressBar from '../(tabs)/wallet/components/LinearProgressBar';
 import {
 	BudgetAnalysisService,
 	BudgetAnalysis,

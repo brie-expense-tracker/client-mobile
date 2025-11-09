@@ -1277,9 +1277,9 @@ export default function ChatScreen() {
 		// Route to appropriate screen based on action
 		if (insight.action) {
 			if (insight.action === 'create_budget') {
-				router.push('/(tabs)/budgets?tab=budgets');
+				router.push('/(tabs)/wallet/budgets');
 			} else if (insight.action === 'set_savings_goal') {
-				router.push('/(tabs)/budgets?tab=goals');
+				router.push('/(tabs)/wallet/goals');
 			} else if (
 				insight.action === 'debt_strategy' ||
 				insight.action === 'optimize_income'

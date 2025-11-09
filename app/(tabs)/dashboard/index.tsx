@@ -45,6 +45,7 @@ import {
 	generateAccessibilityLabel,
 } from '../../../src/utils/accessibility';
 import BottomSheet from '../../../src/components/BottomSheet';
+import { palette, space, shadow } from '../../../src/ui/theme';
 
 const currency = new Intl.NumberFormat('en-US', {
 	style: 'currency',
@@ -404,7 +405,7 @@ export default function DashboardPro() {
 
 				<ScrollView
 					style={styles.scrollView}
-					contentContainerStyle={{ padding: 24, paddingTop: 8 }}
+					contentContainerStyle={styles.content}
 					showsVerticalScrollIndicator={false}
 					refreshControl={
 						<RefreshControl
@@ -427,17 +428,17 @@ export default function DashboardPro() {
 								transactionImpact.type === 'budget'
 									? () => {
 											setTransactionImpact(null);
-											router.push('/(tabs)/budgets');
+											router.push('/(tabs)/wallet/budgets');
 									  }
 									: transactionImpact.type === 'debt'
 									? () => {
 											setTransactionImpact(null);
-											router.push('/(tabs)/budgets?tab=debts');
+											router.push('/(tabs)/wallet/debts');
 									  }
 									: transactionImpact.type === 'goal'
 									? () => {
 											setTransactionImpact(null);
-											router.push('/(tabs)/budgets?tab=goals');
+											router.push('/(tabs)/wallet/goals');
 									  }
 									: undefined
 							}
@@ -453,9 +454,9 @@ export default function DashboardPro() {
 
 					{/* ---------- Inline Quick Actions (replaces FAB) ---------- */}
 					<QuickActionsRow
-						onAddIncome={() => router.push('/(tabs)/transaction?mode=income')}
-						onAddExpense={() => router.push('/(tabs)/transaction?mode=expense')}
-						onSetGoal={() => router.push('/(tabs)/budgets?tab=goals')}
+						onLogExpense={() => router.push('/(tabs)/transaction?mode=expense')}
+						onLogIncome={() => router.push('/(tabs)/transaction?mode=income')}
+						onReviewCashflow={() => router.push('/(tabs)/dashboard/ledger')}
 					/>
 
 					{/* Next Best Action Card */}
@@ -464,11 +465,11 @@ export default function DashboardPro() {
 							action={nextAction}
 							onAction={() => {
 								if (nextAction.type === 'debt') {
-									router.push('/(tabs)/budgets?tab=debts');
+									router.push('/(tabs)/wallet/debts');
 								} else if (nextAction.type === 'budget') {
-									router.push('/(tabs)/budgets');
+									router.push('/(tabs)/wallet/budgets');
 								} else if (nextAction.type === 'goal') {
-									router.push('/(tabs)/budgets?tab=goals');
+									router.push('/(tabs)/wallet/goals');
 								} else {
 									router.push('/(tabs)/transaction');
 								}
@@ -476,7 +477,7 @@ export default function DashboardPro() {
 						/>
 					)}
 
-					{/* ---------- 4 Rollup Cards ---------- */}
+					{/* ---------- Performance Cards ---------- */}
 					{rollupLoading ? (
 						<View style={styles.card}>
 							<ActivityIndicator size="small" color="#3B82F6" />
@@ -484,10 +485,7 @@ export default function DashboardPro() {
 								Loading dashboard data...
 							</Text>
 						</View>
-					) : rollup?.cashflow &&
-					  rollup?.budgets &&
-					  rollup?.debts &&
-					  rollup?.recurring ? (
+					) : rollup ? (
 						<>
 							{/* Cashflow Card */}
 							<CashflowCard
@@ -496,24 +494,11 @@ export default function DashboardPro() {
 								onHelp={() => setHelpModalOpen('cashflow')}
 							/>
 
-							{/* Budgets Card */}
-							<BudgetsCard
+							<SetupPulseCard
 								budgets={rollup.budgets}
-								onPress={() => router.push('/(tabs)/budgets')}
-								onHelp={() => setHelpModalOpen('budgets')}
-							/>
-
-							{/* Debts Card */}
-							<DebtsCard
 								debts={rollup.debts}
-								onPress={() => router.push('/(tabs)/budgets?tab=debts')}
-								onHelp={() => setHelpModalOpen('debts')}
-							/>
-
-							{/* Recurring Card */}
-							<RecurringCard
 								recurring={rollup.recurring}
-								onPress={() => router.push('/(tabs)/budgets?tab=recurring')}
+								onManage={() => router.push('/(tabs)/wallet')}
 							/>
 						</>
 					) : null}
@@ -628,7 +613,7 @@ function HeroPro({
 		>
 			<View style={heroStyles.topRow}>
 				<View>
-					<Text style={heroStyles.label}>Your Balance</Text>
+					<Text style={heroStyles.label}>Today&apos;s Performance</Text>
 					<Text
 						style={[
 							heroStyles.amount,
@@ -637,6 +622,9 @@ function HeroPro({
 						accessibilityRole="header"
 					>
 						{currency(display)}
+					</Text>
+					<Text style={heroStyles.subLabel}>
+						Live cashflow across logged transactions
 					</Text>
 				</View>
 
@@ -700,27 +688,31 @@ function HeroPro({
 }
 
 function QuickActionsRow({
-	onAddIncome,
-	onAddExpense,
-	onSetGoal,
+	onLogExpense,
+	onLogIncome,
+	onReviewCashflow,
 }: {
-	onAddIncome: () => void;
-	onAddExpense: () => void;
-	onSetGoal: () => void;
+	onLogExpense: () => void;
+	onLogIncome: () => void;
+	onReviewCashflow: () => void;
 }) {
 	return (
 		<View style={styles.qaRow}>
 			<ActionChip
-				label="Add Income"
-				icon="arrow-down-circle-outline"
-				onPress={onAddIncome}
+				label="Log Expense"
+				icon="arrow-up-circle-outline"
+				onPress={onLogExpense}
 			/>
 			<ActionChip
-				label="Add Expense"
-				icon="arrow-up-circle-outline"
-				onPress={onAddExpense}
+				label="Log Income"
+				icon="arrow-down-circle-outline"
+				onPress={onLogIncome}
 			/>
-			<ActionChip label="Set Goal" icon="flag-outline" onPress={onSetGoal} />
+			<ActionChip
+				label="Cashflow"
+				icon="analytics-outline"
+				onPress={onReviewCashflow}
+			/>
 		</View>
 	);
 }
@@ -881,257 +873,105 @@ function CashflowCard({
 	);
 }
 
-function BudgetsCard({
+function SetupPulseCard({
 	budgets,
-	onPress,
-	onHelp,
+	debts,
+	recurring,
+	onManage,
 }: {
 	budgets: DashboardRollup['budgets'];
-	onPress: () => void;
-	onHelp?: () => void;
-}) {
-	if (!budgets) {
-		return null;
-	}
-
-	const percentageOnTrack =
-		(budgets.totalBudgets || 0) > 0
-			? ((budgets.budgetsOnTrack || 0) / budgets.totalBudgets) * 100
-			: 0;
-
-	return (
-		<TouchableOpacity
-			onPress={onPress}
-			style={styles.card}
-			{...accessibilityProps.button}
-			accessibilityLabel={`Budgets: ${budgets.summary}`}
-		>
-			<View style={styles.cardHeaderRow}>
-				<View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-					<Text style={[styles.cardTitle, dynamicTextStyle]}>Budgets</Text>
-					{onHelp && (
-						<TouchableOpacity
-							onPress={onHelp}
-							hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-						>
-							<Ionicons name="help-circle-outline" size={16} color="#9CA3AF" />
-						</TouchableOpacity>
-					)}
-				</View>
-				<Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-			</View>
-			<View style={{ marginTop: 12 }}>
-				<Text style={[styles.cardSummary, dynamicTextStyle]}>
-					{budgets.summary}
-				</Text>
-				{budgets.totalBudgets > 0 && (
-					<View style={{ marginTop: 12 }}>
-						<View style={styles.progressTrack}>
-							<View
-								style={[
-									styles.progressFill,
-									{
-										width: `${Math.min(100, percentageOnTrack)}%`,
-										backgroundColor:
-											percentageOnTrack >= 80 ? '#16AE05' : '#60A5FA',
-									},
-								]}
-							/>
-						</View>
-						<Text style={[styles.hint, dynamicTextStyle, { marginTop: 6 }]}>
-							{budgets.budgetsOnTrack} of {budgets.totalBudgets} on track
-						</Text>
-						{budgets.budgets.length > 0 && (
-							<View style={{ marginTop: 8 }}>
-								{budgets.budgets.slice(0, 2).map((budget) => {
-									const now = new Date();
-									const dayOfMonth = now.getDate();
-									const daysInMonth = new Date(
-										now.getFullYear(),
-										now.getMonth() + 1,
-										0
-									).getDate();
-									const monthProgress = (dayOfMonth / daysInMonth) * 100;
-									const budgetProgress = budget.percentageUsed;
-									const isOnTrack = budgetProgress <= monthProgress + 10; // 10% buffer
-
-									return (
-										<View key={budget.budgetId} style={{ marginTop: 6 }}>
-											<Text
-												style={[
-													styles.hint,
-													dynamicTextStyle,
-													{ fontSize: 11 },
-												]}
-											>
-												{budget.budgetName}: {currency(budget.spent)} of{' '}
-												{currency(budget.limit)} (
-												{budget.percentageUsed.toFixed(0)}%) •{' '}
-												{isOnTrack ? 'on track' : 'ahead of pace'}
-											</Text>
-										</View>
-									);
-								})}
-							</View>
-						)}
-					</View>
-				)}
-			</View>
-		</TouchableOpacity>
-	);
-}
-
-function DebtsCard({
-	debts,
-	onPress,
-	onHelp,
-}: {
 	debts: DashboardRollup['debts'];
-	onPress: () => void;
-	onHelp?: () => void;
-}) {
-	if (!debts) {
-		return null;
-	}
-
-	const debtRatio = (debts.debtToIncomeRatio || 0) * 100;
-	const isHealthy = debts.isHealthy || false;
-	const totalDebt = debts.totalDebt || 0;
-	const paidThisMonth = debts.paidThisMonth || 0;
-	const summary = debts.summary || 'No debt data';
-
-	return (
-		<TouchableOpacity
-			onPress={onPress}
-			style={styles.card}
-			{...accessibilityProps.button}
-			accessibilityLabel={`Debts: ${debts.summary}`}
-		>
-			<View style={styles.cardHeaderRow}>
-				<View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-					<Text style={[styles.cardTitle, dynamicTextStyle]}>Debts</Text>
-					{onHelp && (
-						<TouchableOpacity
-							onPress={onHelp}
-							hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-						>
-							<Ionicons name="help-circle-outline" size={16} color="#9CA3AF" />
-						</TouchableOpacity>
-					)}
-				</View>
-				<Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-			</View>
-			<View style={{ marginTop: 12 }}>
-				<View style={styles.debtRow}>
-					<Text style={[styles.debtLabel, dynamicTextStyle]}>Total Debt</Text>
-					<Text style={[styles.debtValue, dynamicTextStyle]}>
-						{currency(totalDebt)}
-					</Text>
-				</View>
-				<View style={[styles.debtRow, { marginTop: 8 }]}>
-					<Text style={[styles.debtLabel, dynamicTextStyle]}>
-						Paid This Month
-					</Text>
-					<Text
-						style={[styles.debtValue, { color: '#16AE05' }, dynamicTextStyle]}
-					>
-						{currency(paidThisMonth)}
-					</Text>
-				</View>
-				<View style={{ marginTop: 12 }}>
-					<View style={styles.progressTrack}>
-						<View
-							style={[
-								styles.progressFill,
-								{
-									width: `${Math.min(100, (debtRatio / 36) * 100)}%`,
-									backgroundColor: isHealthy ? '#16AE05' : '#F59E0B',
-								},
-							]}
-						/>
-					</View>
-					<Text style={[styles.hint, dynamicTextStyle, { marginTop: 6 }]}>
-						{summary}
-					</Text>
-					{paidThisMonth > 0 && totalDebt > 0 && (
-						<Text
-							style={[
-								styles.hint,
-								dynamicTextStyle,
-								{ marginTop: 4, fontSize: 11 },
-							]}
-						>
-							{paidThisMonth > 0
-								? `${currency(paidThisMonth)} paid this month`
-								: 'No payments this month'}{' '}
-							• {((paidThisMonth / totalDebt) * 100).toFixed(1)}% of total debt
-						</Text>
-					)}
-				</View>
-			</View>
-		</TouchableOpacity>
-	);
-}
-
-function RecurringCard({
-	recurring,
-	onPress,
-}: {
 	recurring: DashboardRollup['recurring'];
-	onPress: () => void;
+	onManage: () => void;
 }) {
-	if (!recurring) {
+	if (!budgets && !debts && !recurring) {
 		return null;
 	}
 
-	const upcoming = recurring.upcoming || [];
-	const summary = recurring.summary || 'No recurring expenses';
+	const offTrackBudgets = (budgets?.budgets || []).filter(
+		(budget) => budget.onTrack === false
+	);
+	const budgetLine =
+		(budgets?.totalBudgets || 0) === 0
+			? 'No budgets yet'
+			: offTrackBudgets.length > 0
+			? `${offTrackBudgets.length} ${
+					offTrackBudgets.length === 1 ? 'budget' : 'budgets'
+			  } need attention`
+			: 'All budgets on track';
+
+	const nextUpcoming = recurring?.upcoming?.[0];
+	const recurringLine = nextUpcoming
+		? `${nextUpcoming.name} • ${currency(nextUpcoming.amount)} ${
+				nextUpcoming.daysUntilDue === 0
+					? 'due today'
+					: nextUpcoming.daysUntilDue === 1
+					? 'due tomorrow'
+					: `in ${nextUpcoming.daysUntilDue} days`
+		  }`
+		: 'No bills due this week';
+
+	const debtSummary =
+		(debts?.totalDebt || 0) === 0
+			? 'No debts tracked yet'
+			: debts?.summary || 'Debt payoff is on track';
 
 	return (
 		<TouchableOpacity
-			onPress={onPress}
+			onPress={onManage}
 			style={styles.card}
+			activeOpacity={0.85}
 			{...accessibilityProps.button}
-			accessibilityLabel={`Recurring: ${summary}`}
+			accessibilityLabel="Open wallet setup overview"
 		>
 			<View style={styles.cardHeaderRow}>
-				<Text style={[styles.cardTitle, dynamicTextStyle]}>Recurring</Text>
-				<Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+				<Text style={[styles.cardTitle, dynamicTextStyle]}>Setup Pulse</Text>
+				<View style={styles.pulseBadge}>
+					<Text style={styles.pulseBadgeText}>Wallet</Text>
+				</View>
 			</View>
-			<View style={{ marginTop: 12 }}>
-				<Text style={[styles.cardSummary, dynamicTextStyle]}>{summary}</Text>
-				{upcoming.length > 0 && (
-					<View style={{ marginTop: 12 }}>
-						{upcoming.slice(0, 3).map((item, i) => (
-							<View key={i} style={styles.recurringRow}>
-								<View
-									style={[
-										styles.dot,
-										{
-											backgroundColor:
-												item.daysUntilDue <= 3 ? '#F59E0B' : '#60A5FA',
-										},
-									]}
-								/>
-								<View style={{ flex: 1 }}>
-									<Text style={[styles.recurringName, dynamicTextStyle]}>
-										{item.name}
-									</Text>
-									<Text style={[styles.recurringMeta, dynamicTextStyle]}>
-										{item.daysUntilDue === 0
-											? 'Due today'
-											: item.daysUntilDue === 1
-											? 'Due tomorrow'
-											: `Due in ${item.daysUntilDue} days`}
-									</Text>
-								</View>
-								<Text style={[styles.recurringAmount, dynamicTextStyle]}>
-									{currency(item.amount)}
-								</Text>
-							</View>
-						))}
+
+			<View style={{ marginTop: 12, gap: 12 }}>
+				<View style={styles.pulseRow}>
+					<View style={styles.pulseIconWrapper}>
+						<Ionicons name="wallet-outline" size={18} color="#2563EB" />
 					</View>
-				)}
+					<View style={{ flex: 1 }}>
+						<Text style={[styles.pulseLabel, dynamicTextStyle]}>Budgets</Text>
+						<Text style={[styles.pulseValue, dynamicTextStyle]}>
+							{budgetLine}
+						</Text>
+					</View>
+					<Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+				</View>
+
+				<View style={styles.pulseRow}>
+					<View style={styles.pulseIconWrapper}>
+						<Ionicons name="calendar-outline" size={18} color="#2563EB" />
+					</View>
+					<View style={{ flex: 1 }}>
+						<Text style={[styles.pulseLabel, dynamicTextStyle]}>
+							Upcoming Bill
+						</Text>
+						<Text style={[styles.pulseValue, dynamicTextStyle]}>
+							{recurringLine}
+						</Text>
+					</View>
+					<Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+				</View>
+
+				<View style={styles.pulseRow}>
+					<View style={styles.pulseIconWrapper}>
+						<Ionicons name="trending-down-outline" size={18} color="#2563EB" />
+					</View>
+					<View style={{ flex: 1 }}>
+						<Text style={[styles.pulseLabel, dynamicTextStyle]}>Debt</Text>
+						<Text style={[styles.pulseValue, dynamicTextStyle]}>
+							{debtSummary}
+						</Text>
+					</View>
+					<Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+				</View>
 			</View>
 		</TouchableOpacity>
 	);
@@ -1374,7 +1214,7 @@ function HelpModal({
 /** ----------------- Styles ----------------- */
 
 const styles = StyleSheet.create({
-	safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
+	safeArea: { flex: 1, backgroundColor: palette.surfaceAlt },
 	loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 	loadingText: {
 		marginTop: 16,
@@ -1382,17 +1222,21 @@ const styles = StyleSheet.create({
 		color: '#6B7280',
 		fontWeight: '500',
 	},
-
-	scrollView: { flex: 1, backgroundColor: '#FFFFFF' },
-
+	scrollView: { flex: 1, backgroundColor: palette.surfaceAlt },
+	content: {
+		paddingHorizontal: space.xl,
+		paddingTop: space.sm,
+		paddingBottom: space.xxl,
+		gap: 18,
+	},
 	stickyHeader: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
-		paddingHorizontal: 24,
-		paddingTop: 8,
-		paddingBottom: 6,
-		backgroundColor: '#FFFFFF',
+		paddingHorizontal: space.xl,
+		paddingTop: space.sm,
+		paddingBottom: space.sm,
+		backgroundColor: palette.surfaceAlt,
 	},
 	logo: { height: 40, width: 90 },
 	headerTitle: { fontSize: 20, fontWeight: '700', color: '#111827' },
@@ -1430,38 +1274,30 @@ const styles = StyleSheet.create({
 		textAlign: 'center',
 	},
 
-	qaRow: { flexDirection: 'row', gap: 6, marginTop: 14, marginBottom: 8 },
+	qaRow: {
+		flexDirection: 'row',
+		gap: 8,
+		flexWrap: 'wrap',
+	},
 	actionChip: {
 		flex: 1,
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'center',
 		gap: 2,
-		backgroundColor: '#FFFFFF',
-		paddingVertical: 12,
+		backgroundColor: palette.surface,
+		paddingVertical: 10,
 		paddingHorizontal: 8,
-		borderRadius: 14,
-		borderWidth: 1.5,
-		borderColor: '#E5E7EB',
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.04,
-		shadowRadius: 3,
-		elevation: 1,
+		borderRadius: 16,
+		...shadow.card,
 	},
-	actionChipText: { color: '#374151', fontSize: 13, fontWeight: '600' },
+	actionChipText: { color: palette.text, fontSize: 13, fontWeight: '600' },
 
 	card: {
-		backgroundColor: '#FFFFFF',
-		borderRadius: 16,
-		padding: 16,
-		marginTop: 16,
-		borderWidth: 1,
-		borderColor: '#E5E7EB',
-		shadowColor: '#000',
-		shadowOpacity: 0.03,
-		shadowRadius: 6,
-		elevation: 1,
+		backgroundColor: palette.surface,
+		borderRadius: 22,
+		padding: 18,
+		...shadow.card,
 	},
 	cardHeaderRow: {
 		flexDirection: 'row',
@@ -1469,16 +1305,43 @@ const styles = StyleSheet.create({
 		justifyContent: 'space-between',
 		marginBottom: 4,
 	},
-	cardTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
-	viewAll: { fontSize: 14, color: '#3B82F6', fontWeight: '600' },
+	cardTitle: { fontSize: 16, fontWeight: '700', color: palette.text },
+	viewAll: { fontSize: 14, color: palette.primary, fontWeight: '600' },
+	pulseBadge: {
+		paddingHorizontal: 10,
+		paddingVertical: 4,
+		borderRadius: 999,
+		backgroundColor: '#EEF2FF',
+	},
+	pulseBadgeText: {
+		fontSize: 11,
+		fontWeight: '700',
+		color: '#3730A3',
+	},
+	pulseRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingVertical: 6,
+		gap: 12,
+	},
+	pulseIconWrapper: {
+		width: 32,
+		height: 32,
+		borderRadius: 16,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#EFF6FF',
+	},
+	pulseLabel: { fontSize: 12, fontWeight: '700', color: '#6B7280' },
+	pulseValue: { fontSize: 14, fontWeight: '600', color: '#0F172A' },
 
 	summaryRow: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
 	},
-	summaryLabel: { fontSize: 14, color: '#374151', fontWeight: '600' },
-	summaryValue: { fontSize: 14, color: '#111827', fontWeight: '700' },
+	summaryLabel: { fontSize: 14, color: palette.text, fontWeight: '600' },
+	summaryValue: { fontSize: 14, color: palette.text, fontWeight: '700' },
 	progressTrack: {
 		height: 8,
 		backgroundColor: '#F3F4F6',
@@ -1496,10 +1359,10 @@ const styles = StyleSheet.create({
 		gap: 10,
 	},
 	dot: { width: 8, height: 8, borderRadius: 4 },
-	recurringName: { fontSize: 14, fontWeight: '600', color: '#111827' },
+	recurringName: { fontSize: 14, fontWeight: '600', color: palette.text },
 	recurringMeta: { fontSize: 12, color: '#6B7280', marginTop: 2 },
-	recurringAmount: { fontSize: 14, fontWeight: '700', color: '#111827' },
-	cardSummary: { fontSize: 14, color: '#6B7280', fontWeight: '500' },
+	recurringAmount: { fontSize: 14, fontWeight: '700', color: palette.text },
+	cardSummary: { fontSize: 14, color: palette.textMuted, fontWeight: '500' },
 	cashflowRow: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
@@ -1514,17 +1377,17 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		paddingTop: 12,
 		borderTopWidth: 1,
-		borderTopColor: '#E5E7EB',
+		borderTopColor: palette.border,
 	},
-	netSavingsLabel: { fontSize: 14, fontWeight: '600', color: '#374151' },
+	netSavingsLabel: { fontSize: 14, fontWeight: '600', color: palette.text },
 	netSavingsValue: { fontSize: 20, fontWeight: '700' },
 	debtRow: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
 	},
-	debtLabel: { fontSize: 14, color: '#6B7280', fontWeight: '500' },
-	debtValue: { fontSize: 16, fontWeight: '700', color: '#111827' },
+	debtLabel: { fontSize: 14, color: palette.textMuted, fontWeight: '500' },
+	debtValue: { fontSize: 16, fontWeight: '700', color: palette.text },
 
 	// Impact banner
 	impactBanner: {
@@ -1534,7 +1397,7 @@ const styles = StyleSheet.create({
 		padding: 12,
 		borderRadius: 12,
 		borderWidth: 1,
-		marginBottom: 16,
+		...shadow.card,
 	},
 	impactBannerText: {
 		flex: 1,
@@ -1548,24 +1411,18 @@ const styles = StyleSheet.create({
 
 	// Health card
 	healthCard: {
-		backgroundColor: '#FFFFFF',
-		borderRadius: 16,
-		padding: 16,
+		backgroundColor: palette.surface,
+		borderRadius: 22,
+		padding: 18,
 		paddingTop: 20,
-		marginBottom: 16,
-		borderWidth: 1,
-		borderColor: '#E5E7EB',
-		shadowColor: '#000',
-		shadowOpacity: 0.03,
-		shadowRadius: 6,
-		elevation: 1,
+		...shadow.card,
 	},
 	healthHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
 	},
-	healthTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
+	healthTitle: { fontSize: 16, fontWeight: '700', color: palette.text },
 	healthScoreBadge: {
 		paddingHorizontal: 12,
 		paddingVertical: 4,
@@ -1577,12 +1434,10 @@ const styles = StyleSheet.create({
 
 	// Action card
 	actionCard: {
-		backgroundColor: '#F8FAFC',
-		borderRadius: 12,
-		padding: 14,
-		marginTop: 16,
-		borderWidth: 1,
-		borderColor: '#E5E7EB',
+		backgroundColor: palette.surface,
+		borderRadius: 18,
+		padding: 16,
+		...shadow.card,
 	},
 	actionIcon: {
 		width: 36,
@@ -1597,32 +1452,33 @@ const styles = StyleSheet.create({
 		color: '#6B7280',
 		marginBottom: 4,
 	},
-	actionMessage: { fontSize: 14, fontWeight: '600', color: '#111827' },
+	actionMessage: { fontSize: 14, fontWeight: '600', color: palette.text },
 });
 
 const heroStyles = StyleSheet.create({
 	card: {
-		borderRadius: 18,
-		padding: 20,
-		borderWidth: 1,
-		borderColor: '#E5E7EB',
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 3 },
-		shadowOpacity: 0.06,
-		shadowRadius: 10,
-		elevation: 2,
+		borderRadius: 24,
+		padding: 22,
+		...shadow.card,
 	},
 	topRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
 	},
-	label: { color: '#6B7280', fontSize: 13, fontWeight: '600' },
+	label: { color: palette.textMuted, fontSize: 13, fontWeight: '600' },
 	amount: {
 		marginTop: 4,
 		fontSize: 30,
 		fontWeight: '800',
 		letterSpacing: -0.3,
+		color: palette.text,
+	},
+	subLabel: {
+		marginTop: 6,
+		fontSize: 12,
+		color: palette.textMuted,
+		fontWeight: '500',
 	},
 	pill: {
 		flexDirection: 'row',
