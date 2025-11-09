@@ -11,7 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useGoal } from '../../src/context/goalContext';
 import { Goal } from '../../src/context/goalContext';
-import LinearProgressBar from '../(tabs)/budgets/components/LinearProgressBar';
+import LinearProgressBar from '../(tabs)/wallet/components/LinearProgressBar';
 import { normalizeIconName } from '../../src/constants/uiConstants';
 
 const GoalSummaryScreen: React.FC = () => {

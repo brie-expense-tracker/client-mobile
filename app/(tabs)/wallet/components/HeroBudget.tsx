@@ -34,7 +34,7 @@ const Chip = ({
 		<Text style={styles.chipLabel} numberOfLines={1}>
 			{label}
 		</Text>
-		<Text 
+		<Text
 			style={[styles.chipValue, danger && { color: '#ef4444' }]}
 			numberOfLines={1}
 			ellipsizeMode="tail"
@@ -43,7 +43,6 @@ const Chip = ({
 		</Text>
 	</View>
 );
-
 
 function HeroBudget({
 	mode,
@@ -137,9 +136,7 @@ function HeroBudget({
 			</View>
 
 			{/* footer */}
-			<View
-				style={[styles.footer, variant === 'compact' && { marginTop: 10 }]}
-			>
+			<View style={[styles.footer, variant === 'compact' && { marginTop: 10 }]}>
 				<Text style={styles.subtitle} numberOfLines={1}>
 					{subtitle}
 				</Text>
@@ -154,9 +151,6 @@ const styles = StyleSheet.create({
 	container: {
 		backgroundColor: palette.surface,
 		borderRadius: 20,
-		padding: 14,
-		borderWidth: 1,
-		borderColor: palette.border,
 	},
 	header: {
 		flexDirection: 'row',
@@ -193,9 +187,9 @@ const styles = StyleSheet.create({
 		marginTop: 4,
 		overflow: 'hidden', // Prevent content from overflowing
 	},
-	chipsCol: { 
-		flex: 1, 
-		marginLeft: 16, 
+	chipsCol: {
+		flex: 1,
+		marginLeft: 16,
 		rowGap: 8,
 		minWidth: 0, // Allow flex children to shrink below content size
 		overflow: 'hidden', // Prevent chips from falling off the card
@@ -211,9 +205,9 @@ const styles = StyleSheet.create({
 		minWidth: 0, // Allow chip to shrink below content size
 	},
 	chipLabel: { fontSize: 12, color: '#64748B' },
-	chipValue: { 
-		fontSize: 16, 
-		fontWeight: '700', 
+	chipValue: {
+		fontSize: 16,
+		fontWeight: '700',
 		color: '#0F172A',
 	},
 	footer: {

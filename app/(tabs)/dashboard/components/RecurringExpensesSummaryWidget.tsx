@@ -216,11 +216,13 @@ const RecurringExpensesSummaryWidget: React.FC<
 	const showExpenseActions = (expense: TransformedRecurringExpense) => {
 		// For now, navigate to the recurring expenses detail with this expense selected
 		// In the future, this could open a modal with quick actions
-		router.push(`/(tabs)/budgets?tab=recurring&expense=${expense.patternId}`);
+		router.push(
+			`/(stack)/recurringExpenseDetails?patternId=${expense.patternId}`
+		);
 	};
 
 	const handleViewAll = () => {
-		router.push('/(tabs)/budgets?tab=recurring');
+		router.push('/(tabs)/wallet/recurring');
 	};
 
 	const formatCurrency = (amount: number) => {

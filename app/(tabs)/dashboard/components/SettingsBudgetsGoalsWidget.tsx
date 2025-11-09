@@ -78,7 +78,7 @@ const SettingsBudgetsGoalsWidget: React.FC<SettingsBudgetsGoalsWidgetProps> = ({
 				<View style={styles.compactRow}>
 					<TouchableOpacity
 						style={styles.compactButton}
-						onPress={() => router.push('/(tabs)/budgets?tab=goals')}
+						onPress={() => router.push('/(tabs)/wallet/goals')}
 						disabled={isLoading}
 					>
 						{isLoading ? (
@@ -100,7 +100,7 @@ const SettingsBudgetsGoalsWidget: React.FC<SettingsBudgetsGoalsWidgetProps> = ({
 
 					<TouchableOpacity
 						style={styles.compactButton}
-						onPress={() => router.push('/(tabs)/budgets?tab=budgets')}
+						onPress={() => router.push('/(tabs)/wallet/budgets')}
 						disabled={isLoading}
 					>
 						{isLoading ? (
@@ -154,7 +154,7 @@ const SettingsBudgetsGoalsWidget: React.FC<SettingsBudgetsGoalsWidgetProps> = ({
 				{/* Budgets Card */}
 				<TouchableOpacity
 					style={styles.card}
-					onPress={() => router.push('/(tabs)/budgets?tab=budgets')}
+					onPress={() => router.push('/(tabs)/wallet/budgets')}
 					disabled={isLoading}
 				>
 					<View style={styles.cardHeader}>
@@ -205,7 +205,7 @@ const SettingsBudgetsGoalsWidget: React.FC<SettingsBudgetsGoalsWidgetProps> = ({
 				{/* Goals Card */}
 				<TouchableOpacity
 					style={styles.card}
-					onPress={() => router.push('/(tabs)/budgets?tab=goals')}
+					onPress={() => router.push('/(tabs)/wallet/goals')}
 					disabled={isLoading}
 				>
 					<View style={styles.cardHeader}>

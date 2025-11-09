@@ -23,7 +23,7 @@ export default function DebtsLayout() {
 					},
 					headerLeft: () => (
 						<BorderlessButton
-							onPress={() => router.push('/(tabs)/budgets/debts')}
+							onPress={() => router.push('/(tabs)/wallet/debts')}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />
@@ -48,7 +48,7 @@ export default function DebtsLayout() {
 					},
 					headerLeft: () => (
 						<BorderlessButton
-							onPress={() => router.push('/(tabs)/budgets/debts')}
+							onPress={() => router.push('/(tabs)/wallet/debts')}
 							style={{ width: 50 }}
 						>
 							<Ionicons name="chevron-back" size={24} color="#333" />

@@ -179,16 +179,16 @@ const NotificationItem = ({
 			switch (type) {
 				case 'budget':
 					if (entityId) {
-						router.push(`/(tabs)/budgets?budgetId=${entityId}` as any);
+						router.push(`/(stack)/budgetDetails?id=${entityId}` as any);
 					} else {
-						router.push('/(tabs)/budgets');
+						router.push('/(tabs)/wallet/budgets');
 					}
 					break;
 				case 'goal':
 					if (entityId) {
-						router.push(`/(tabs)/budgets?goalId=${entityId}` as any);
+						router.push(`/(stack)/goalDetails?id=${entityId}` as any);
 					} else {
-						router.push('/(tabs)/budgets');
+						router.push('/(tabs)/wallet/goals');
 					}
 					break;
 				case 'transaction':

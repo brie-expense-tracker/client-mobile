@@ -626,7 +626,7 @@ export default function AccountScreen() {
 							alignItems: 'center',
 							gap: 8,
 						}}
-						onPress={() => router.push('/(tabs)/budgets?tab=goals')}
+						onPress={() => router.push('/(tabs)/wallet/goals')}
 					>
 						<Ionicons name="flag-outline" size={22} color={colors.tint} />
 						<Text
@@ -705,9 +705,9 @@ export default function AccountScreen() {
 								else if (a === 'reduce_expenses')
 									router.push('/(stack)/settings/profile/editExpenses');
 								else if (a === 'set_savings_goal')
-									router.push('/(tabs)/budgets?tab=goals');
+									router.push('/(tabs)/wallet/goals');
 								else if (a === 'create_budget')
-									router.push('/(tabs)/budgets?tab=budgets');
+									router.push('/(tabs)/wallet/budgets');
 								else router.push('/(tabs)/chat');
 							}}
 							mode="preview"

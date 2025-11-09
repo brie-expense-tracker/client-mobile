@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRecurringExpense } from '../../src/context/recurringExpenseContext';
 import { RecurringExpense, RecurringExpenseService } from '../../src/services';
-import LinearProgressBar from '../(tabs)/budgets/components/LinearProgressBar';
+import LinearProgressBar from '../(tabs)/wallet/components/LinearProgressBar';
 import { resolveRecurringExpenseAppearance } from '../../src/utils/recurringExpenseAppearance';
 
 interface RecurringTransaction {

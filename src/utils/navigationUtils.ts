@@ -8,28 +8,28 @@ import { router } from 'expo-router';
  * Navigate to the goals screen and automatically open the goal creation modal
  */
 export const navigateToGoalsWithModal = () => {
-	router.push('/(tabs)/budgets/goals?openModal=true&tab=goals');
+	router.push('/(tabs)/wallet/goals?openModal=true');
 };
 
 /**
  * Navigate to the goals screen without opening the modal
  */
 export const navigateToGoals = () => {
-	router.push('/(tabs)/budgets/goals');
+	router.push('/(tabs)/wallet/goals');
 };
 
 /**
  * Navigate to the budgets screen
  */
 export const navigateToBudgets = () => {
-	router.push('/(tabs)/budgets');
+	router.push('/(tabs)/wallet/budgets');
 };
 
 /**
  * Navigate to the budgets screen and automatically open the budget creation modal
  */
 export const navigateToBudgetsWithModal = () => {
-	router.push('/(tabs)/budgets?openModal=true');
+	router.push('/(tabs)/wallet/budgets?openModal=true');
 };
 
 /**

@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import { DebtsService, Debt } from '../../../src/services/feature/debtsService';
 import { Page, Card, LoadingState, EmptyState } from '../../../src/ui';
 import { dynamicTextStyle } from '../../../src/utils/accessibility';
+import { palette, radius, space } from '../../../src/ui/theme';
 
 const currency = new Intl.NumberFormat('en-US', {
 	style: 'currency',
@@ -85,54 +86,67 @@ export default function DebtsScreen() {
 					: undefined
 			}
 		>
-			<ScrollView
-				showsVerticalScrollIndicator={false}
-				contentContainerStyle={{ paddingBottom: 24 }}
-				refreshControl={
-					<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-				}
-			>
-				{/* Summary Card */}
-				<Card style={styles.summaryCard}>
-					<View style={styles.summaryRow}>
-						<View style={styles.summaryItem}>
-							<Text style={[styles.summaryLabel, dynamicTextStyle]}>
-								Total Debt
-							</Text>
-							<Text style={[styles.summaryValue, dynamicTextStyle]}>
-								{currency(totalDebt)}
-							</Text>
+			<View style={styles.layout}>
+				<ScrollView
+					showsVerticalScrollIndicator={false}
+					contentContainerStyle={styles.scrollContent}
+					refreshControl={
+						<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+					}
+				>
+					{/* Summary Card */}
+					<Card style={styles.summaryCard}>
+						<View style={styles.summaryRow}>
+							<View style={styles.summaryItem}>
+								<Text style={[styles.summaryLabel, dynamicTextStyle]}>
+									Total Debt
+								</Text>
+								<Text style={[styles.summaryValue, dynamicTextStyle]}>
+									{currency(totalDebt)}
+								</Text>
+							</View>
+							<View style={styles.summaryItem}>
+								<Text style={[styles.summaryLabel, dynamicTextStyle]}>
+									Count
+								</Text>
+								<Text style={[styles.summaryValue, dynamicTextStyle]}>
+									{debts.length}
+								</Text>
+							</View>
 						</View>
-						<View style={styles.summaryItem}>
-							<Text style={[styles.summaryLabel, dynamicTextStyle]}>Count</Text>
-							<Text style={[styles.summaryValue, dynamicTextStyle]}>
-								{debts.length}
-							</Text>
-						</View>
-					</View>
-				</Card>
+					</Card>
 
-				{/* Debts List */}
-				<Card>
-					{debts.map((debt, index) => (
-						<DebtRow
-							key={debt._id ?? `debt-${index}`}
-							debt={debt}
-							isLast={index === debts.length - 1}
+					{/* Debts List */}
+					<Card>
+						{debts.map((debt, index) => (
+							<DebtRow
+								key={debt._id ?? `debt-${index}`}
+								debt={debt}
+								isLast={index === debts.length - 1}
+							/>
+						))}
+					</Card>
+				</ScrollView>
+
+				<View style={styles.addDebtContainer}>
+					<TouchableOpacity
+						style={styles.addDebtButton}
+						onPress={() => {
+							router.push('/(stack)/debts/new');
+						}}
+						activeOpacity={0.85}
+					>
+						<Ionicons
+							name="add-circle-outline"
+							size={22}
+							color={palette.primaryTextOn}
 						/>
-					))}
-				</Card>
-			</ScrollView>
-
-			{/* Floating add button */}
-			<TouchableOpacity
-				style={styles.fab}
-				onPress={() => {
-					router.push('/(stack)/debts/new');
-				}}
-			>
-				<Ionicons name="add" size={26} color="#fff" />
-			</TouchableOpacity>
+						<Text style={[styles.addDebtLabel, dynamicTextStyle]}>
+							Add a debt
+						</Text>
+					</TouchableOpacity>
+				</View>
+			</View>
 		</Page>
 	);
 }
@@ -175,8 +189,14 @@ function DebtRow({ debt, isLast }: { debt: Debt; isLast: boolean }) {
 }
 
 const styles = StyleSheet.create({
+	layout: {
+		flex: 1,
+	},
+	scrollContent: {
+		paddingBottom: space.xl + 88,
+	},
 	summaryCard: {
-		marginBottom: 16,
+		marginBottom: space.lg,
 	},
 	summaryRow: {
 		flexDirection: 'row',
@@ -235,19 +255,25 @@ const styles = StyleSheet.create({
 		marginLeft: 0,
 		marginVertical: 8,
 	},
-	fab: {
-		position: 'absolute',
-		right: 20,
-		bottom: 30,
-		width: 54,
-		height: 54,
-		borderRadius: 27,
-		backgroundColor: '#0f172a',
+	addDebtContainer: {
+		paddingVertical: space.lg,
+		borderTopWidth: StyleSheet.hairlineWidth,
+		borderTopColor: palette.border,
+		backgroundColor: palette.bg,
+	},
+	addDebtButton: {
+		width: '100%',
+		height: 52,
+		borderRadius: radius.lg,
+		backgroundColor: palette.primary,
 		alignItems: 'center',
 		justifyContent: 'center',
-		elevation: 4,
-		shadowColor: '#000',
-		shadowOpacity: 0.1,
-		shadowRadius: 10,
+		flexDirection: 'row',
+		gap: space.sm,
+	},
+	addDebtLabel: {
+		color: palette.primaryTextOn,
+		fontSize: 16,
+		fontWeight: '600',
 	},
 });
