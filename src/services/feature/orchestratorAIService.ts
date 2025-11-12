@@ -129,6 +129,31 @@ export interface OrchestratorRequest {
 	};
 }
 
+export interface OrchestratorAsyncAck {
+	success: true;
+	mode: 'async';
+	status: 'queued';
+	intent: string;
+	jobType: string;
+	jobId?: string;
+	sessionId: string;
+	message: string;
+	handshake?: boolean;
+}
+
+export interface OrchestratorStreamHandshake {
+	success: true;
+	mode: 'stream';
+	intent: string;
+	sessionId: string;
+	placeholder?: string;
+	handshake: true;
+}
+
+export type OrchestratorHandshakeResponse =
+	| OrchestratorAsyncAck
+	| OrchestratorStreamHandshake;
+
 export class OrchestratorAIService {
 	private sessionId: string;
 	private context: FinancialContext;
@@ -215,6 +240,9 @@ export class OrchestratorAIService {
 			});
 
 			if (response.success && response.data) {
+				if ((response.data as any)?.sessionId) {
+					this.sessionId = (response.data as any).sessionId;
+				}
 				// Validate that we have a proper response message
 				if (
 					!response.data.response ||
@@ -416,6 +444,43 @@ export class OrchestratorAIService {
 			logger.error('[OrchestratorAIService] Metrics fetch failed:', error);
 			throw error;
 		}
+	}
+
+	/**
+	 * Lightweight handshake to determine routing mode (stream vs async)
+	 */
+	async handshake(
+		message: string,
+		options?: OrchestratorRequest['options']
+	): Promise<OrchestratorHandshakeResponse> {
+		const requestPayload = {
+			message: message.trim(),
+			sessionId: this.sessionId,
+			handshakeOnly: true,
+			options: {
+				timezone: 'America/Los_Angeles',
+				year: new Date().getFullYear(),
+				month: new Date().getMonth() + 1,
+				includeForecasts: true,
+				...options,
+			},
+		};
+
+		const response = await ApiService.post('/api/orchestrator/chat', requestPayload);
+
+		if (!response.success || !response.data) {
+			throw new Error(response.error || 'Handshake failed');
+		}
+
+		const handshake = response.data as OrchestratorHandshakeResponse;
+
+		if (!handshake.sessionId) {
+			throw new Error('Handshake response missing sessionId');
+		}
+
+		this.sessionId = handshake.sessionId;
+
+		return handshake;
 	}
 
 	/**

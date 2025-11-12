@@ -5,6 +5,8 @@ const messagesReducerV2Log = createLogger('useMessagesReducerV2');
 
 export type MessageAction = any; // Simplified for now
 
+export type MessagePhase = 'deterministic' | 'llm' | 'final';
+
 export interface Message {
 	id: string;
 	isUser: boolean;
@@ -12,6 +14,8 @@ export interface Message {
 	buffered?: string;
 	isStreaming?: boolean;
 	timestamp: Date;
+	phase?: MessagePhase;
+	meta?: Record<string, unknown>;
 	performance?: {
 		totalLatency?: number;
 		timeToFirstToken?: number;
@@ -90,6 +94,21 @@ export const messagesReducerV2 = (state = initial, action: any): State => {
 			};
 			upsert(state, msg);
 			return { ...state, streamingId: id };
+		}
+		case 'ADD_ASSISTANT': {
+			const id = action.id as string;
+			const msg: Message = {
+				id,
+				isUser: false,
+				text: action.text,
+				isStreaming: false,
+				timestamp: new Date(),
+				performance: action.performance,
+				phase: action.phase,
+				meta: action.meta,
+			};
+			upsert(state, msg);
+			return { ...state };
 		}
 		case 'APPEND_DELTA': {
 			const { id, text } = action as { id: string; text: string };
@@ -189,6 +208,19 @@ export const messagesReducerV2 = (state = initial, action: any): State => {
 			}
 			return { ...state, streamingId: null };
 		}
+		case 'UPDATE_MESSAGE': {
+			const { id, patch } = action as {
+				id: string;
+				patch: Partial<Message>;
+			};
+			if (state.byId[id]) {
+				state.byId[id] = {
+					...state.byId[id],
+					...patch,
+				};
+			}
+			return { ...state };
+		}
 		default:
 			messagesReducerV2Log.warn('Unknown action type', { type: action.type });
 			return state;
@@ -229,6 +261,34 @@ export function useMessagesReducerV2(initialMessages: Message[]) {
 	const addAIPlaceholder = useCallback((id: string) => {
 		dispatch({ type: 'ADD_AI_PLACEHOLDER', id });
 		return id;
+	}, []);
+
+	const addAssistantMessage = useCallback(
+		(
+			text: string,
+			options?: {
+				id?: string;
+				performance?: Message['performance'];
+				phase?: Message['phase'];
+				meta?: Message['meta'];
+			}
+		) => {
+			const id = options?.id || Date.now().toString();
+			dispatch({
+				type: 'ADD_ASSISTANT',
+				id,
+				text,
+				performance: options?.performance,
+				phase: options?.phase,
+				meta: options?.meta,
+			});
+			return id;
+		},
+		[]
+	);
+
+	const updateMessage = useCallback((id: string, patch: Partial<Message>) => {
+		dispatch({ type: 'UPDATE_MESSAGE', id, patch });
 	}, []);
 
 	const addDelta = useCallback((messageId: string, text: string) => {
@@ -276,8 +336,10 @@ export function useMessagesReducerV2(initialMessages: Message[]) {
 		onDeltaReceived,
 		addUserMessage,
 		addAIPlaceholder,
+		addAssistantMessage,
 		addDelta,
 		finalizeMessage,
+		updateMessage,
 		setError,
 		clearStreaming,
 	};

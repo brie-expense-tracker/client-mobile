@@ -101,11 +101,8 @@ export function AssistantListFooter({
 				)}
 
 			{/* Loading States */}
-			{isStreaming && !hasStreamingId && (
-				<Row text="AI is thinking..." color="#3b82f6" />
-			)}
-
-			{hasStreamingId && <Row text="AI is responding..." color="#10b981" />}
+			{/* Only show "AI is responding..." when we have a streaming message ID and content is actually streaming */}
+			{hasStreamingId && isStreaming && <Row text="AI is responding..." color="#10b981" />}
 
 			{/* Debug Panel */}
 			{__DEV__ && (
