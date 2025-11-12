@@ -199,8 +199,10 @@ const styles = StyleSheet.create({
 	},
 	aiMessage: {
 		alignSelf: 'flex-start',
-		backgroundColor: '#f3f4f6',
+		backgroundColor: '#ffffff',
 		borderBottomLeftRadius: 4,
+		borderWidth: 1,
+		borderColor: '#E5E7EB',
 	},
 	deterministicMessage: {
 		backgroundColor: '#ffffff',

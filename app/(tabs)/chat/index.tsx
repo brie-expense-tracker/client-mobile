@@ -287,6 +287,8 @@ export default function ChatScreen() {
 	// Mode state management
 	const [modeState, setModeState] = useState(modeStateService.getState());
 
+	const personalizationEnabled = isPersonalizationOn(config);
+
 	// Use the streaming hook
 	const { startStream, stopStream, isStreaming } = useBulletproofStreamV3({
 		messages,
@@ -1987,10 +1989,13 @@ export default function ChatScreen() {
 			<View style={styles.header}>
 				<TouchableOpacity
 					onPress={() => router.push('/(stack)/settings/aiInsights')}
+					style={styles.headerIconButton}
+					activeOpacity={0.7}
 				>
-					<Ionicons name="settings-outline" size={24} color="#374151" />
+					<Ionicons name="settings-outline" size={20} color="#4B5563" />
 				</TouchableOpacity>
-				<View style={styles.headerCenter}>
+
+				<View style={styles.headerLogoContainer}>
 					<Image
 						source={require('../../../src/assets/logos/brieai-logo.png')}
 						style={styles.logo}
@@ -1998,15 +2003,48 @@ export default function ChatScreen() {
 						accessibilityRole="image"
 						accessibilityLabel="Brie app logo"
 					/>
-					{/* <Text style={styles.headerTitle}>AI Assistant</Text> */}
-					{budgetStatus && (
-						<Text style={styles.budgetIndicator}>
-							💰 {budgetStatus.percentage}% used (
-							{budgetStatus.remaining.toFixed(2)} left)
+				</View>
+
+				{/* Pills row - right side */}
+				<View style={styles.headerPillsRow}>
+					<View
+						style={[
+							styles.modePill,
+							personalizationEnabled
+								? styles.modePillPersonalized
+								: styles.modePillPrivate,
+						]}
+					>
+						<View
+							style={[
+								styles.modeDot,
+								personalizationEnabled
+									? styles.modeDotPersonalized
+									: styles.modeDotPrivate,
+							]}
+						/>
+						<Text
+							style={[
+								styles.modePillText,
+								personalizationEnabled
+									? styles.modePillTextPersonalized
+									: styles.modePillTextPrivate,
+							]}
+						>
+							{personalizationEnabled ? 'Personalized' : 'Private mode'}
 						</Text>
+					</View>
+
+					{budgetStatus && (
+						<View style={styles.budgetPill}>
+							<Text style={styles.budgetPillLabel}>Monthly budget</Text>
+							<Text style={styles.budgetPillValue}>
+								{Math.round(budgetStatus.percentage)}% used ·{' '}
+								{Math.round(budgetStatus.remaining)} left
+							</Text>
+						</View>
 					)}
 				</View>
-				<View style={{ width: 24 }} />
 			</View>
 
 			<View style={styles.container}>
@@ -2067,32 +2105,110 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
 	safeArea: {
 		flex: 1,
-		backgroundColor: '#ffffff',
+		backgroundColor: '#F9FAFB', // match header background
 	},
 	header: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
 		paddingHorizontal: 20,
-		paddingVertical: 8,
-		borderBottomWidth: 1,
-		borderBottomColor: '#e5e7eb',
+		paddingVertical: 10,
+		backgroundColor: '#F9FAFB',
+		position: 'relative',
 	},
-	logo: { height: 30, width: 80 },
-	headerCenter: {
-		flex: 1,
+	headerIconButton: {
+		height: 32,
+		width: 32,
+		borderRadius: 16,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#E5E7EB',
+	},
+	headerLogoContainer: {
+		position: 'absolute',
+		left: 0,
+		right: 0,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	logo: {
+		height: 80,
+		width: 80,
+	},
+	headerSubtitle: {
+		marginLeft: 8,
+		fontSize: 12,
+		color: '#6B7280',
+	},
+	headerPillsRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		columnGap: 8,
+		flexWrap: 'wrap',
+	},
+	modePill: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		borderRadius: 999,
+		paddingHorizontal: 10,
+		paddingVertical: 4,
+	},
+	modePillPersonalized: {
+		backgroundColor: '#DCFCE7',
+	},
+	modePillPrivate: {
+		backgroundColor: '#E5E7EB',
+	},
+	modeDot: {
+		height: 8,
+		width: 8,
+		borderRadius: 4,
+		marginRight: 6,
+	},
+	modeDotPersonalized: {
+		backgroundColor: '#16A34A',
+	},
+	modeDotPrivate: {
+		backgroundColor: '#6B7280',
+	},
+	modePillText: {
+		fontSize: 11,
+		fontWeight: '500',
+	},
+	modePillTextPersonalized: {
+		color: '#166534',
+	},
+	modePillTextPrivate: {
+		color: '#374151',
+	},
+	budgetPill: {
+		borderRadius: 999,
+		paddingHorizontal: 10,
+		paddingVertical: 4,
+		borderWidth: 1,
+		borderColor: '#E5E7EB',
+		backgroundColor: '#FFFFFF',
 		alignItems: 'center',
 	},
-	budgetIndicator: {
-		fontSize: 12,
-		color: '#6b7280',
-		marginTop: 2,
+	budgetPillLabel: {
+		fontSize: 10,
+		color: '#9CA3AF',
+		marginBottom: 2,
+	},
+	budgetPillValue: {
+		fontSize: 11,
+		color: '#111827',
+		fontWeight: '500',
 	},
 	container: {
 		flex: 1,
+		backgroundColor: '#F3F4F6', // message content background
 	},
 	inputContainer: {
 		flexDirection: 'row',
 		alignItems: 'flex-end',
+		backgroundColor: '#FFFFFF',
+		borderTopWidth: 1,
+		borderTopColor: '#E5E7EB',
 	},
 });
