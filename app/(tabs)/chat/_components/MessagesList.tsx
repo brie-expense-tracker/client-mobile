@@ -44,6 +44,7 @@ export const MessagesList = memo(function MessagesList({
 						showExpandButton && !item.isUser && !item.isStreaming
 					}
 					onExpandPress={onExpandPress}
+					streamingMessageId={streamingMessageId}
 				/>
 			)}
 			ListFooterComponent={<View>{children}</View>}

@@ -4,6 +4,7 @@ import React, {
 	useRef,
 	useContext,
 	useCallback,
+	useMemo,
 } from 'react';
 import {
 	View,
@@ -20,6 +21,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
 	OrchestratorAIService,
 	OrchestratorAIResponse,
+	OrchestratorHandshakeResponse,
+	OrchestratorAsyncAck,
 } from '../../../src/services/feature/orchestratorAIService';
 import { useProfile } from '../../../src/context/profileContext';
 import { useBudget } from '../../../src/context/budgetContext';
@@ -44,13 +47,12 @@ import {
 } from '../../../src/services/feature/intentSufficiencyService';
 import { ResilientApiService } from '../../../src/services/resilience/resilientApiService';
 import { createLogger } from '../../../src/utils/sublogger';
-
-const chatScreenLog = createLogger('ChatScreen');
 import {
 	FallbackService,
 	CachedSpendPlan,
 	CachedBudget,
 	CachedGoal,
+	CachedTransaction,
 } from '../../../src/services/resilience/fallbackService';
 import { TraceEventData } from '../../../src/services/feature/enhancedStreamingService';
 import DevHud from './_components/DevHud';
@@ -60,7 +62,10 @@ import {
 } from '../../../src/hooks/useMessagesReducerV2';
 import { useBulletproofStreamV3 } from '../../../src/hooks/useBulletproofStreamV3';
 import { modeStateService } from '../../../src/services/assistant/modeStateService';
-import { buildTestSseUrl } from '../../../src/networking/endpoints';
+import {
+	buildTestSseUrl,
+	API_BASE_URL,
+} from '../../../src/networking/endpoints';
 import { startStreaming } from '../../../src/services/streaming';
 import { Image } from 'expo-image';
 import {
@@ -90,6 +95,18 @@ import { MessagesList } from './_components/MessagesList';
 import { AssistantListFooter } from './_components/AssistantListFooter';
 import { useComposerHeight } from '../../../src/hooks/useComposerHeight';
 import { isDevMode } from '../../../src/config/environment';
+import { authService } from '../../../src/services/authService';
+
+const chatScreenLog = createLogger('ChatScreen');
+type PendingAsyncJob = {
+	ackMessageId: string;
+	baseText: string;
+};
+
+const DEFAULT_ASYNC_ACK =
+	"I queued a deeper analysis and will post the results here once it's ready.";
+const LEGACY_STREAM_FALLBACK_ACK =
+	"I couldn't detect async mode from the server, so I'll try answering directly.";
 
 export default function ChatScreen() {
 	const router = useRouter();
@@ -195,8 +212,10 @@ export default function ChatScreen() {
 		onDeltaReceived,
 		addUserMessage,
 		addAIPlaceholder,
+		addAssistantMessage,
 		addDelta,
 		finalizeMessage,
+		updateMessage,
 		setError,
 		clearStreaming,
 	} = useMessagesReducerV2(initialMessages);
@@ -204,6 +223,7 @@ export default function ChatScreen() {
 	const [inputText, setInputText] = useState('');
 	const [orchestratorService, setOrchestratorService] =
 		useState<OrchestratorAIService | null>(null);
+	const [sessionId, setSessionId] = useState<string | null>(null);
 	const [missingInfoState, setMissingInfoState] = useState<MissingInfoState>({
 		chips: [],
 		collectedData: {},
@@ -227,6 +247,7 @@ export default function ChatScreen() {
 		spendPlan?: CachedSpendPlan | null;
 		budgets?: CachedBudget[];
 		goals?: CachedGoal[];
+		transactions?: CachedTransaction[];
 		lastSync?: Date | null;
 	}>({});
 	const [traceData, setTraceData] = useState<TraceEventData | null>(null);
@@ -249,8 +270,18 @@ export default function ChatScreen() {
 	const [showExpandButton, setShowExpandButton] = useState(false);
 	const [currentConversationContext, setCurrentConversationContext] =
 		useState('');
+	const [hasSharedContext, setHasSharedContext] = useState(false);
 	const [insightsService] = useState(() =>
 		InsightsContextService.getInstance()
+	);
+	const currencyFormatter = useMemo(
+		() =>
+			new Intl.NumberFormat('en-US', {
+				style: 'currency',
+				currency: 'USD',
+				maximumFractionDigits: 0,
+			}),
+		[]
 	);
 
 	// Mode state management
@@ -276,6 +307,283 @@ export default function ChatScreen() {
 	useEffect(() => {
 		messagesRef.current = messages;
 	}, [messages]);
+	const asyncJobsRef = useRef<Map<string, PendingAsyncJob>>(new Map());
+	const seenAsyncMessageIdsRef = useRef<Set<string>>(new Set());
+	const asyncEventSourceRef = useRef<EventSource | null>(null);
+
+	const handleAsyncPayload = useCallback(
+		(payload: any) => {
+			if (!payload || typeof payload !== 'object') {
+				return;
+			}
+
+			const toMetaRecord = (
+				value: unknown
+			): Record<string, unknown> | undefined => {
+				if (!value || typeof value !== 'object' || Array.isArray(value)) {
+					return undefined;
+				}
+				return value as Record<string, unknown>;
+			};
+
+			const toMessagePhase = (value: unknown): Message['phase'] | undefined => {
+				if (value === 'deterministic' || value === 'llm' || value === 'final') {
+					return value;
+				}
+				return undefined;
+			};
+
+			const extractPerformance = (
+				meta: Record<string, unknown> | undefined
+			): Message['performance'] | undefined => {
+				if (!meta) {
+					return undefined;
+				}
+				const performance = meta.performance;
+				if (performance && typeof performance === 'object') {
+					return performance as Message['performance'];
+				}
+				return undefined;
+			};
+
+			const { type } = payload as { type?: string };
+
+			switch (type) {
+				case 'assistant_progress': {
+					const jobId = payload.jobId as string | undefined;
+					if (!jobId) {
+						return;
+					}
+					const entry = asyncJobsRef.current.get(jobId);
+					if (!entry) {
+						return;
+					}
+					const progress =
+						typeof payload.progress === 'number'
+							? Math.max(0, Math.min(100, Math.round(payload.progress * 100)))
+							: null;
+					const label =
+						typeof payload.label === 'string' && payload.label.length > 0
+							? payload.label
+							: 'Working';
+					const statusLine =
+						progress !== null ? `${label} (${progress}%)` : `${label}…`;
+					updateMessage(entry.ackMessageId, {
+						text: `${entry.baseText}\n${statusLine}`,
+					});
+					break;
+				}
+				case 'assistant_message': {
+					const jobId = payload.jobId as string | undefined;
+					if (jobId) {
+						const entry = asyncJobsRef.current.get(jobId);
+						if (entry) {
+							updateMessage(entry.ackMessageId, {
+								text: `${entry.baseText}\nDone — I've shared the full results above.`,
+								isStreaming: false,
+							});
+							asyncJobsRef.current.delete(jobId);
+						}
+					}
+
+					const messageId =
+						typeof payload.messageId === 'string'
+							? payload.messageId
+							: undefined;
+					const meta = toMetaRecord(payload.meta);
+					const phase = meta ? toMessagePhase(meta.phase) : undefined;
+					const performance = extractPerformance(meta);
+					if (messageId && seenAsyncMessageIdsRef.current.has(messageId)) {
+						break;
+					}
+
+					const text =
+						typeof payload.text === 'string' ? payload.text.trim() : '';
+					if (text) {
+						const fallbackPhase: Message['phase'] =
+							messageId !== undefined ? 'final' : undefined;
+						const effectivePhase = phase ?? fallbackPhase;
+
+						const parentId =
+							meta && typeof (meta as any).parentId === 'string'
+								? ((meta as any).parentId as string)
+								: meta && typeof (meta as any).parentMessageId === 'string'
+								? ((meta as any).parentMessageId as string)
+								: undefined;
+
+						const shouldReplaceExisting =
+							parentId !== undefined &&
+							(effectivePhase === 'final' || effectivePhase === 'llm');
+
+						if (shouldReplaceExisting) {
+							const targetMessage = messagesRef.current.find(
+								(message) => message.id === parentId
+							);
+							if (targetMessage) {
+								updateMessage(parentId, {
+									text,
+									isStreaming: false,
+									phase: effectivePhase,
+									meta: { ...(targetMessage.meta || {}), ...(meta || {}) },
+									performance,
+								});
+								if (messageId) {
+									seenAsyncMessageIdsRef.current.add(messageId);
+								}
+								modeStateService.transitionTo(
+									'idle',
+									'deterministic preview replaced'
+								);
+								setDebugInfo('Snapshot preview replaced with final response');
+								break;
+							}
+						}
+
+						addAssistantMessage(text, {
+							id: messageId,
+							phase: effectivePhase,
+							meta,
+							performance,
+						});
+						if (messageId) {
+							seenAsyncMessageIdsRef.current.add(messageId);
+						}
+						modeStateService.transitionTo('idle', 'async analysis completed');
+						setDebugInfo('Async analysis completed');
+					}
+					break;
+				}
+				case 'assistant_error': {
+					const jobId = payload.jobId as string | undefined;
+					const errorMessage =
+						typeof payload.text === 'string'
+							? payload.text
+							: 'I encountered an issue while completing that analysis.';
+
+					if (jobId) {
+						const entry = asyncJobsRef.current.get(jobId);
+						if (entry) {
+							updateMessage(entry.ackMessageId, {
+								text: `${entry.baseText}\n⚠️ ${errorMessage}`,
+								isStreaming: false,
+							});
+							asyncJobsRef.current.delete(jobId);
+							modeStateService.transitionTo('idle', 'async analysis failed');
+							setDebugInfo('Async analysis failed');
+							return;
+						}
+					}
+
+					addAssistantMessage(`I ran into an issue: ${errorMessage}`);
+					modeStateService.transitionTo('idle', 'async analysis failed');
+					setDebugInfo('Async analysis failed');
+					break;
+				}
+				case 'assistant_replace': {
+					const messageId =
+						typeof payload.messageId === 'string'
+							? payload.messageId
+							: undefined;
+					const meta = toMetaRecord(payload.meta);
+					const phase = meta ? toMessagePhase(meta.phase) : undefined;
+					const performance = extractPerformance(meta);
+					const text =
+						typeof payload.text === 'string' ? payload.text.trim() : '';
+					if (!messageId || !text) {
+						break;
+					}
+					const effectivePhase: Message['phase'] = phase ?? 'final';
+					updateMessage(messageId, {
+						text,
+						isStreaming: false,
+						phase: effectivePhase,
+						meta,
+						performance,
+					});
+					break;
+				}
+				default:
+					if (isDevMode) {
+						chatScreenLog.debug('Unhandled async payload', payload);
+					}
+			}
+		},
+		[addAssistantMessage, updateMessage, setDebugInfo]
+	);
+
+	useEffect(() => {
+		if (asyncEventSourceRef.current) {
+			asyncEventSourceRef.current.close();
+			asyncEventSourceRef.current = null;
+		}
+
+		if (!sessionId) {
+			asyncJobsRef.current.clear();
+			seenAsyncMessageIdsRef.current.clear();
+			return;
+		}
+
+		let cancelled = false;
+		asyncJobsRef.current.clear();
+		seenAsyncMessageIdsRef.current.clear();
+
+		const connect = async () => {
+			try {
+				const uid = await authService.getCurrentUserUID();
+				if (!uid || cancelled) {
+					return;
+				}
+
+				const url = new URL(`${API_BASE_URL}/api/orchestrator/chat/events`);
+				url.searchParams.set('sessionId', sessionId);
+				url.searchParams.set('uid', uid);
+
+				const es = new EventSource(url.toString());
+				asyncEventSourceRef.current = es;
+
+				es.addEventListener('ready', () => {
+					if (isDevMode) {
+						chatScreenLog.debug('[AsyncStream] ready', { sessionId });
+					}
+				});
+
+				es.onmessage = (event) => {
+					if (!event.data) {
+						return;
+					}
+					try {
+						const payload = JSON.parse(event.data);
+						handleAsyncPayload(payload);
+					} catch (error) {
+						chatScreenLog.error(
+							'[AsyncStream] Failed to parse event payload',
+							error
+						);
+					}
+				};
+
+				es.onerror = (event) => {
+					chatScreenLog.error('[AsyncStream] error', event);
+					es.close();
+					if (asyncEventSourceRef.current === es) {
+						asyncEventSourceRef.current = null;
+					}
+				};
+			} catch (error) {
+				chatScreenLog.error('[AsyncStream] failed to connect', error);
+			}
+		};
+
+		connect();
+
+		return () => {
+			cancelled = true;
+			if (asyncEventSourceRef.current) {
+				asyncEventSourceRef.current.close();
+				asyncEventSourceRef.current = null;
+			}
+		};
+	}, [sessionId, handleAsyncPayload]);
 
 	// Debug: Log messages state changes
 	useEffect(() => {
@@ -347,6 +655,7 @@ export default function ChatScreen() {
 		};
 		const service = new OrchestratorAIService(financialContext);
 		setOrchestratorService(service);
+		setSessionId(service.getSessionId());
 
 		// Load fallback data
 		loadFallbackData();
@@ -405,6 +714,7 @@ export default function ChatScreen() {
 			}
 			insightsService.clearInsights(); // Wipe any lingering context/insights
 			setCurrentConversationContext(''); // Clear conversation-derived context
+			setHasSharedContext(false);
 		}
 	}, [config, insightsService]);
 
@@ -429,20 +739,32 @@ export default function ChatScreen() {
 		}
 	}, [messages]);
 
+	// Reset snapshot sharing when conversation resets
+	useEffect(() => {
+		if (messages.length <= 1) {
+			setHasSharedContext(false);
+		}
+	}, [messages]);
+
 	// Load fallback data for offline use
 	const loadFallbackData = async () => {
 		try {
-			const [spendPlan, budgets, goals, lastSync] = await Promise.all([
-				FallbackService.getCachedSpendPlans().then((plans) => plans[0] || null),
-				FallbackService.getCachedBudgets(),
-				FallbackService.getCachedGoals(),
-				FallbackService.getLastSyncTime(),
-			]);
+			const [spendPlan, budgets, goals, transactions, lastSync] =
+				await Promise.all([
+					FallbackService.getCachedSpendPlans().then(
+						(plans) => plans[0] || null
+					),
+					FallbackService.getCachedBudgets(),
+					FallbackService.getCachedGoals(),
+					FallbackService.getCachedTransactions(),
+					FallbackService.getLastSyncTime(),
+				]);
 
 			setFallbackData({
 				spendPlan,
 				budgets,
 				goals,
+				transactions,
 				lastSync,
 			});
 		} catch (error) {
@@ -673,14 +995,14 @@ export default function ChatScreen() {
 
 	// Helper function to bridge ChatComposer with existing handleSendMessage
 	const sendFromComposer = async (text: string) => {
-		// Set the input text temporarily for handleSendMessage to use
+		// Keep inputText in sync for retry flows, but pass text directly to avoid race conditions
 		setInputText(text);
-		// Call handleSendMessage which will clear inputText after processing
-		await handleSendMessage();
+		await handleSendMessage(text);
 	};
 
-	const handleSendMessage = async () => {
-		const trimmedInput = inputText.trim();
+	const handleSendMessage = async (messageOverride?: string) => {
+		const sourceText = messageOverride ?? inputText;
+		const trimmedInput = sourceText.trim();
 
 		// Enhanced validation and recovery
 		if (!trimmedInput) {
@@ -691,6 +1013,11 @@ export default function ChatScreen() {
 		if (lastProcessedMessage === trimmedInput) {
 			chatScreenLog.warn('Duplicate message detected, ignoring');
 			setDebugInfo('Duplicate message ignored');
+			return;
+		}
+
+		if (!orchestratorService) {
+			chatScreenLog.warn('Orchestrator service not ready, ignoring input');
 			return;
 		}
 
@@ -767,8 +1094,216 @@ export default function ChatScreen() {
 			}
 		}
 
+		// Resolve financial data from live contexts with fallback support
+		const resolvedBudgets = (
+			Array.isArray(budgets) && budgets.length > 0
+				? budgets
+				: fallbackData.budgets || []
+		).map((budget: any) => {
+			const amount = Number(budget.amount ?? 0);
+			const spentFromContext =
+				typeof budget.spent === 'number'
+					? Number(budget.spent)
+					: typeof budget.spentPercentage === 'number' && amount > 0
+					? (Number(budget.spentPercentage) / 100) * amount
+					: undefined;
+			const spent =
+				typeof spentFromContext === 'number'
+					? spentFromContext
+					: typeof budget.remaining === 'number' && amount > 0
+					? amount - Number(budget.remaining)
+					: undefined;
+			const rawUtilization =
+				typeof budget.utilization === 'number'
+					? Number(budget.utilization)
+					: typeof budget.spentPercentage === 'number'
+					? Number(budget.spentPercentage)
+					: undefined;
+			const utilization =
+				typeof rawUtilization === 'number'
+					? rawUtilization <= 1
+						? rawUtilization * 100
+						: rawUtilization
+					: amount > 0 && typeof spent === 'number'
+					? (spent / amount) * 100
+					: undefined;
+			return {
+				name: budget.name || 'Budget',
+				amount,
+				spent,
+				utilization,
+				period: budget.period,
+			};
+		});
+
+		const resolvedGoals = (
+			Array.isArray(goals) && goals.length > 0
+				? goals
+				: fallbackData.goals || []
+		).map((goal: any) => {
+			const target = Number(goal.target ?? goal.targetAmount ?? 0);
+			const current = Number(goal.current ?? goal.progressAmount ?? 0);
+			const progressFromContext =
+				typeof goal.progress === 'number'
+					? Number(goal.progress)
+					: typeof goal.percent === 'number'
+					? Number(goal.percent)
+					: undefined;
+			const progress =
+				typeof progressFromContext === 'number'
+					? progressFromContext
+					: target > 0
+					? (current / target) * 100
+					: undefined;
+			return {
+				name: goal.name || 'Goal',
+				target,
+				current,
+				deadline:
+					goal.deadline ||
+					goal.dueDate ||
+					goal.targetDate ||
+					goal.lastUpdated ||
+					'No deadline set',
+				progress,
+			};
+		});
+
+		const resolvedTransactions = (
+			Array.isArray(transactions) && transactions.length > 0
+				? transactions
+				: fallbackData.transactions || []
+		)
+			.map((tx: any) => ({
+				amount: Number(tx.amount ?? 0),
+				category:
+					tx.category ||
+					tx.targetModel ||
+					(tx.target?.name ? `${tx.target.name} (${tx.targetModel})` : null) ||
+					'general',
+				description:
+					tx.description ||
+					tx.memo ||
+					tx.note ||
+					tx.summary ||
+					(tx.target?.name ? `Payment for ${tx.target.name}` : 'Transaction'),
+				date: tx.date || tx.createdAt || tx.updatedAt || '',
+				type: tx.type || (tx.amount >= 0 ? 'income' : 'expense'),
+			}))
+			.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+		const resolvedRecurringExpenses = Array.isArray(recurringExpenses)
+			? recurringExpenses.map((expense: any) => ({
+					vendor: expense.vendor || 'Recurring expense',
+					amount: Number(expense.amount ?? 0),
+					frequency: expense.frequency || 'monthly',
+					nextDue:
+						expense.nextExpectedDate ||
+						expense.nextDueDate ||
+						expense.lastRun ||
+						'',
+			  }))
+			: [];
+
+		// Share a compact financial snapshot with the AI once per session
+		const shouldAttachSnapshot =
+			isPersonalizationOn(config) &&
+			!hasSharedContext &&
+			dataInitialized &&
+			(resolvedBudgets.length > 0 ||
+				resolvedGoals.length > 0 ||
+				resolvedTransactions.length > 0 ||
+				!!profile);
+
+		if (shouldAttachSnapshot) {
+			const snapshotSections: string[] = [];
+
+			if (profile) {
+				const profileBits = [
+					typeof profile.monthlyIncome === 'number'
+						? `monthly income ${currencyFormatter.format(
+								profile.monthlyIncome
+						  )}`
+						: null,
+					typeof profile.savings === 'number'
+						? `savings ${currencyFormatter.format(profile.savings)}`
+						: null,
+					typeof profile.debt === 'number'
+						? `debt ${currencyFormatter.format(profile.debt)}`
+						: null,
+				].filter(Boolean);
+				if (profileBits.length > 0) {
+					snapshotSections.push(`Profile: ${profileBits.join(', ')}`);
+				}
+			}
+
+			if (resolvedBudgets.length > 0) {
+				const budgetLines = resolvedBudgets.slice(0, 5).map((budget) => {
+					const pieces = [
+						`${budget.name}: ${currencyFormatter.format(budget.amount)}`,
+					];
+					if (typeof budget.spent === 'number') {
+						pieces.push(
+							`spent ${currencyFormatter.format(Math.max(budget.spent, 0))}`
+						);
+					}
+					if (typeof budget.utilization === 'number') {
+						pieces.push(`${Math.round(budget.utilization)}% utilized`);
+					}
+					return `- ${pieces.join(', ')}`;
+				});
+				if (resolvedBudgets.length > 5) {
+					budgetLines.push('- …');
+				}
+				snapshotSections.push(`Budgets:\n${budgetLines.join('\n')}`);
+			}
+
+			if (resolvedGoals.length > 0) {
+				const goalLines = resolvedGoals.slice(0, 4).map((goal) => {
+					const pieces = [
+						`${goal.name}: ${currencyFormatter.format(
+							goal.current
+						)} of ${currencyFormatter.format(goal.target)}`,
+					];
+					if (typeof goal.progress === 'number') {
+						pieces.push(`${Math.round(goal.progress)}% complete`);
+					}
+					if (goal.deadline && goal.deadline !== 'No deadline set') {
+						pieces.push(`due ${goal.deadline}`);
+					}
+					return `- ${pieces.join(', ')}`;
+				});
+				if (resolvedGoals.length > 4) {
+					goalLines.push('- …');
+				}
+				snapshotSections.push(`Goals:\n${goalLines.join('\n')}`);
+			}
+
+			if (resolvedTransactions.length > 0) {
+				const transactionLines = resolvedTransactions.slice(0, 3).map((tx) => {
+					const date = tx.date ? new Date(tx.date).toLocaleDateString() : '';
+					return `- ${tx.description}: ${currencyFormatter.format(tx.amount)}${
+						tx.category ? ` (${tx.category})` : ''
+					}${date ? ` on ${date}` : ''}`;
+				});
+				if (resolvedTransactions.length > 3) {
+					transactionLines.push('- …');
+				}
+				snapshotSections.push(
+					`Recent spending:\n${transactionLines.join('\n')}`
+				);
+			}
+
+			if (snapshotSections.length > 0) {
+				enhancedInput += `\n\nFinancial snapshot:\n${snapshotSections.join(
+					'\n\n'
+				)}`;
+				setHasSharedContext(true);
+			}
+		}
+
 		// Check intent sufficiency before sending to AI
-		const context: IntentContext = {
+		const intentContext: IntentContext = {
 			profile: {
 				monthlyIncome: profile?.monthlyIncome || 0,
 				savings: profile?.savings || 0,
@@ -776,18 +1311,35 @@ export default function ChatScreen() {
 				riskProfile: profile?.riskProfile?.tolerance || 'moderate',
 			},
 			bills: [],
-			budgets: fallbackData.budgets || [],
-			goals: (fallbackData.goals || []).map((goal) => ({
+			budgets: resolvedBudgets.map((budget) => ({
+				name: budget.name,
+				amount: budget.amount,
+			})),
+			goals: resolvedGoals.map((goal) => ({
 				name: goal.name,
 				target: goal.target,
-				deadline: goal.dueDate || 'No deadline set',
+				deadline: goal.deadline,
 			})),
-			transactions: [],
+			transactions: resolvedTransactions
+				.slice(0, 50)
+				.map((tx) => ({ amount: tx.amount, category: tx.category })),
+			...(resolvedRecurringExpenses.length
+				? {
+						recurringExpenses: resolvedRecurringExpenses
+							.slice(0, 25)
+							.map((expense) => ({
+								vendor: expense.vendor,
+								amount: expense.amount,
+								frequency: expense.frequency,
+								nextDue: expense.nextDue,
+							})),
+				  }
+				: {}),
 		};
 
 		const sufficiencyResult = await checkIntentSufficiency(
 			currentInput,
-			context
+			intentContext
 		);
 
 		if (sufficiencyResult.shouldShowMissingInfo) {
@@ -808,6 +1360,59 @@ export default function ChatScreen() {
 			);
 			return;
 		}
+
+		let handshakeResult: OrchestratorHandshakeResponse;
+		try {
+			handshakeResult = await orchestratorService.handshake(enhancedInput);
+			setSessionId((prev) =>
+				prev === handshakeResult.sessionId ? prev : handshakeResult.sessionId
+			);
+		} catch (error) {
+			chatScreenLog.error('Failed to perform assistant handshake', error);
+			addAssistantMessage(
+				"I'm having trouble reaching the assistant right now. Please try again in a bit."
+			);
+			modeStateService.transitionTo('idle', 'handshake failed');
+			setDebugInfo('Handshake with assistant failed');
+			setShowFallback(true);
+			await loadFallbackData();
+			return;
+		}
+
+		const handshakeMode = (handshakeResult as { mode?: string }).mode;
+		const handshakeMessage =
+			typeof (handshakeResult as { message?: unknown }).message === 'string'
+				? ((handshakeResult as { message: string }).message || '').trim()
+				: undefined;
+
+		if (handshakeMode === 'async') {
+			const asyncAck = handshakeResult as OrchestratorAsyncAck;
+			const ackText = handshakeMessage || DEFAULT_ASYNC_ACK;
+			const ackMessageId = addAssistantMessage(ackText);
+			if (asyncAck.jobId) {
+				asyncJobsRef.current.set(asyncAck.jobId, {
+					ackMessageId,
+					baseText: ackText,
+				});
+			}
+			setShowExpandButton(false);
+			modeStateService.transitionTo('processing', 'async analysis queued');
+			setDebugInfo('Running deeper analysis asynchronously');
+			return;
+		}
+
+		if (!handshakeMode) {
+			const fallbackAck = handshakeMessage || LEGACY_STREAM_FALLBACK_ACK;
+			addAssistantMessage(fallbackAck);
+			setShowExpandButton(false);
+			modeStateService.transitionTo(
+				'processing',
+				'async mode unavailable, falling back to stream'
+			);
+			setDebugInfo('Async mode unavailable, falling back to stream');
+		}
+
+		streamingRef.current.sessionId = handshakeResult.sessionId;
 
 		// Create streaming AI message using reducer with proper synchronization
 		let aiMessageId = (Date.now() + 1).toString();
@@ -1069,6 +1674,17 @@ export default function ChatScreen() {
 					},
 					onDone: () => {
 						// Transition to idle mode on completion
+						// Handle state transition properly - if we're in thinking mode,
+						// we need to transition to streaming first, then to idle
+						const currentState = modeStateService.getState().current;
+						if (currentState === 'thinking') {
+							// Transition to streaming first, then to idle
+							modeStateService.transitionTo(
+								'streaming',
+								'stream completed (from thinking)'
+							);
+						}
+						// Now transition to idle (works from streaming, processing, or if already streaming)
 						modeStateService.transitionTo('idle', 'stream completed');
 
 						// Debug: Log current state before finalization
@@ -1255,8 +1871,9 @@ export default function ChatScreen() {
 			// Try to send the last message again
 			const lastUserMessage = messages.find((msg) => msg.isUser);
 			if (lastUserMessage) {
-				setInputText(lastUserMessage.text || '');
-				await handleSendMessage();
+				const retryText = lastUserMessage.text || '';
+				setInputText(retryText);
+				await handleSendMessage(retryText);
 			}
 		} catch (error) {
 			chatScreenLog.error('[Chat] Retry failed:', error);

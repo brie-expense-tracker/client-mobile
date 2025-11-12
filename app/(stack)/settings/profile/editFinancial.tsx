@@ -136,17 +136,22 @@ export default function EditFinancialScreen() {
 						/>
 					</View>
 
-					{/* Total Savings */}
+					{/* Total Savings & Investments */}
 					<View style={styles.inputContainer}>
-						<Text style={styles.label}>Total Savings ($)</Text>
+						<Text style={styles.label}>
+							Total Savings & Investments ($)
+						</Text>
 						<TextInput
 							style={styles.input}
 							value={savings}
 							onChangeText={(text) => setSavings(formatCurrency(text))}
-							placeholder="Enter total savings"
+							placeholder="Enter total savings and investment balances"
 							placeholderTextColor="#999"
 							keyboardType="numeric"
 						/>
+						<Text style={styles.helperText}>
+							Combine cash savings plus the balance of any investment accounts.
+						</Text>
 					</View>
 
 					{/* Total Debt */}
@@ -235,6 +240,12 @@ const styles = StyleSheet.create({
 		padding: 16,
 		fontSize: 16,
 		color: '#333',
+	},
+	helperText: {
+		fontSize: 12,
+		color: '#666',
+		marginTop: 6,
+		lineHeight: 18,
 	},
 	infoContainer: {
 		flexDirection: 'row',

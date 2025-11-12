@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import WhyThisTray from '../../components/WhyThisTray';
 import type { Message } from '../../../../../src/hooks/useMessagesReducerV2';
@@ -10,6 +10,46 @@ type Props = {
 	traceData?: any;
 	showExpandButton?: boolean;
 	onExpandPress?: () => void;
+	streamingMessageId?: string | null;
+};
+
+const sanitizeMessageText = (input?: string | null) => {
+	if (!input) return '';
+
+	let sanitized = input.replace(/\*\*(.*?)\*\*/g, '$1'); // Bold
+	sanitized = sanitized.replace(/__([^_]+)__/g, '$1'); // Bold/underline variants
+	sanitized = sanitized.replace(/\*([^*\n]+)\*/g, '$1'); // Italic
+
+	// Remove any leftover double asterisks from uneven markdown
+	sanitized = sanitized.replace(/\*\*/g, '');
+
+	// Normalize curly apostrophes and quotes to straight ones for better compatibility
+	// This ensures apostrophes display correctly in React Native
+	sanitized = sanitized.replace(/['']/g, "'"); // Curly apostrophes to straight
+	sanitized = sanitized.replace(/[""]/g, '"'); // Curly quotes to straight
+
+	// Normalize Unicode to handle composed characters properly
+	try {
+		sanitized = sanitized.normalize('NFKC');
+	} catch {
+		// If normalization fails, continue with original string
+	}
+
+	// Remove invalid Unicode replacement character (\uFFFD) which appears as '?'
+	// This is the character used when UTF-8 sequences can't be decoded
+	sanitized = sanitized.replace(/\uFFFD/g, '');
+
+	// Remove control characters that can't be displayed
+	// Note: We preserve apostrophe (U+0027) and common punctuation
+	sanitized = sanitized.replace(
+		/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g,
+		''
+	);
+
+	// Remove zero-width characters that might cause issues
+	sanitized = sanitized.replace(/[\u200B-\u200D\uFEFF\u2060]/g, '');
+
+	return sanitized;
 };
 
 export const ChatMessage = memo(function ChatMessage({
@@ -18,21 +58,52 @@ export const ChatMessage = memo(function ChatMessage({
 	traceData,
 	showExpandButton,
 	onExpandPress,
+	streamingMessageId,
 }: Props) {
 	const isUser = message.isUser;
-	const text = message.isStreaming ? message.buffered : message.text;
+	const rawText = message.isStreaming ? message.buffered : message.text;
+	const displayText = useMemo(() => {
+		if (isUser) {
+			return rawText || '';
+		}
+		return sanitizeMessageText(rawText);
+	}, [isUser, rawText]);
+	const isDeterministic = !isUser && message.phase === 'deterministic';
+
+	// Don't render empty AI messages until they have content
+	// Only show if: has text content OR is actively streaming with buffered content
+	if (!isUser && !displayText) {
+		const isActiveStreaming = streamingMessageId === message.id;
+		const hasBufferedContent = message.buffered && message.buffered.length > 0;
+		// Only show if it's the active streaming message AND has buffered content
+		if (!(isActiveStreaming && hasBufferedContent)) {
+			return null;
+		}
+	}
 
 	return (
 		<View
-			style={[styles.message, isUser ? styles.userMessage : styles.aiMessage]}
+			style={[
+				styles.message,
+				isUser ? styles.userMessage : styles.aiMessage,
+				isDeterministic ? styles.deterministicMessage : null,
+			]}
 		>
+			{isDeterministic && (
+				<View style={styles.deterministicHeader}>
+					<Text style={styles.deterministicBadge}>Snapshot preview</Text>
+					<Text style={styles.deterministicNote}>
+						The full narrative will replace this shortly.
+					</Text>
+				</View>
+			)}
 			<Text
 				style={[
 					styles.messageText,
 					isUser ? styles.userMessageText : styles.aiMessageText,
 				]}
 			>
-				{text}
+				{displayText}
 				{message.isStreaming ? (
 					<Text style={styles.streamingCursor}>|</Text>
 				) : null}
@@ -131,6 +202,26 @@ const styles = StyleSheet.create({
 		backgroundColor: '#f3f4f6',
 		borderBottomLeftRadius: 4,
 	},
+	deterministicMessage: {
+		backgroundColor: '#ffffff',
+		borderWidth: 1,
+		borderColor: '#d4d4d8',
+		borderStyle: 'dashed',
+		paddingTop: 10,
+	},
+	deterministicHeader: {
+		marginBottom: 8,
+	},
+	deterministicBadge: {
+		color: '#111827',
+		fontSize: 12,
+		fontWeight: '600',
+		marginBottom: 2,
+	},
+	deterministicNote: {
+		color: '#6b7280',
+		fontSize: 12,
+	},
 	messageText: { fontSize: 16, lineHeight: 22 },
 	userMessageText: { color: '#ffffff' },
 	aiMessageText: { color: '#111827' },
@@ -183,6 +274,3 @@ const styles = StyleSheet.create({
 	},
 	expandButtonText: { color: '#0369a1', fontSize: 14, fontWeight: '500' },
 });
-
-// Default export to silence Expo Router warning (not used as route)
-export default ChatMessage;

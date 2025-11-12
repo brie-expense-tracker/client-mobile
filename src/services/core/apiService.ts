@@ -421,6 +421,13 @@ export class ApiService {
 		// Create a unique key for deduplication (use stable stringify to prevent key drift)
 		const bodyHash = stableStringify(body).slice(0, 50);
 		const requestKey = `POST:${endpoint}:${bodyHash}`;
+		const isOrchestratorEndpoint = endpoint.includes('/orchestrator/chat');
+		const isHandshakeRequest =
+			isOrchestratorEndpoint &&
+			typeof body === 'object' &&
+			body !== null &&
+			'handshakeOnly' in body &&
+			Boolean((body as Record<string, unknown>).handshakeOnly);
 
 		return singleflight(requestKey, async () => {
 			return retryWithBackoff(async () => {
@@ -553,10 +560,13 @@ export class ApiService {
 				}
 
 				// Validate response has a message for orchestrator endpoints
-				if (endpoint.includes('/orchestrator/chat') && data?.success) {
+				if (isOrchestratorEndpoint && data?.success) {
 					const message =
 						data.message || data.data?.message || data.data?.response;
-					if (!message || typeof message !== 'string' || !message.trim()) {
+					if (
+						(!message || typeof message !== 'string' || !message.trim()) &&
+						!isHandshakeRequest
+					) {
 						apiLog.error('Empty message from orchestrator', {
 							endpoint,
 							success: data.success,
@@ -567,6 +577,15 @@ export class ApiService {
 							success: false,
 							error: 'Empty message from orchestrator',
 						};
+					}
+
+					if (
+						isHandshakeRequest &&
+						(!message || typeof message !== 'string' || !message.trim())
+					) {
+						apiLog.warn(
+							'Orchestrator handshake response missing message, continuing with fallback'
+						);
 					}
 				}
 
