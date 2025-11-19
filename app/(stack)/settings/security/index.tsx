@@ -54,6 +54,24 @@ export default function SecurityScreen() {
 							</View>
 							<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
 						</TouchableOpacity>
+
+						<TouchableOpacity
+							style={styles.optionItem}
+							onPress={() =>
+								router.push('/(stack)/settings/security/loginHistory')
+							}
+						>
+							<View style={styles.optionLeft}>
+								<Ionicons name="time-outline" size={24} color="#555" />
+								<View style={styles.optionText}>
+									<Text style={styles.optionTitle}>Login History</Text>
+									<Text style={styles.optionSubtitle}>
+										View your recent login sessions
+									</Text>
+								</View>
+							</View>
+							<Ionicons name="chevron-forward" size={18} color="#BEBEBE" />
+						</TouchableOpacity>
 					</View>
 
 					{/* Security Tips */}

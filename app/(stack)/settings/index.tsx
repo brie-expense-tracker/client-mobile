@@ -36,14 +36,7 @@ type Item = {
 function Section({ title, items }: { title: string; items: Item[] }) {
 	return (
 		<View style={styles.section}>
-			<Text
-				style={[
-					type.labelSm,
-					{ color: palette.textSubtle },
-				]}
-			>
-				{title}
-			</Text>
+			<Text style={[type.labelSm, { color: palette.textSubtle }]}>{title}</Text>
 
 			{/* Legal-style card */}
 			<View style={styles.settingsContainer}>
@@ -235,6 +228,11 @@ export default function SettingsScreen() {
 			label: 'About',
 			icon: 'information-circle-outline',
 			onPress: () => router.push('/(stack)/settings/about'),
+		},
+		{
+			label: 'FAQ',
+			icon: 'help-circle-outline',
+			onPress: () => router.push('/(stack)/settings/faq'),
 		},
 	];
 
