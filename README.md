@@ -1,4 +1,4 @@
-# Brie Mobile App
+g# Brie Mobile App
 
 A React Native mobile application built with Expo for personal finance management with AI-powered insights.
 
@@ -53,7 +53,8 @@ A React Native mobile application built with Expo for personal finance managemen
 - **Crash Reporting**: Firebase Crashlytics integration
 - **Error Monitoring**: Sentry integration for error tracking
 
-## 🏗️ Project Structure
+<details>
+<summary>🏗️ Project Structure</summary>
 
 ```
 client-mobile/
@@ -189,6 +190,8 @@ client-mobile/
 ├── tsconfig.json                  # TypeScript configuration
 └── package.json                   # Dependencies & scripts
 ```
+
+</details>
 
 ## 🔧 Configuration
 
