@@ -14,6 +14,12 @@ export default function ReflectionsLayout() {
 					title: 'Weekly Reflections',
 				}}
 			/>
+			<Stack.Screen
+				name="[reflectionId]"
+				options={{
+					title: 'Reflection Details',
+				}}
+			/>
 		</Stack>
 	);
 }

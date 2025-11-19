@@ -35,7 +35,7 @@ export const FormHeader: React.FC<FormHeaderProps> = ({
 	return (
 		<View style={styles.header}>
 			<TouchableOpacity style={styles.backButton} onPress={handleBack}>
-				<Ionicons name="chevron-back" size={24} color="#007ACC" />
+				<Ionicons name="chevron-back" size={24} color="#000" />
 			</TouchableOpacity>
 			<Text style={styles.screenTitle}>{title}</Text>
 			<TouchableOpacity
@@ -63,16 +63,20 @@ const styles = StyleSheet.create({
 		borderBottomWidth: 1,
 		borderBottomColor: '#e5e7eb',
 		backgroundColor: '#ffffff',
+		position: 'relative',
 	},
 	backButton: {
 		flexDirection: 'row',
 		alignItems: 'center',
+		zIndex: 1,
 	},
 	screenTitle: {
 		fontSize: 20,
 		fontWeight: 'bold',
 		color: '#0a0a0a',
-		flex: 1,
+		position: 'absolute',
+		left: 0,
+		right: 0,
 		textAlign: 'center',
 	},
 	saveButton: {
@@ -80,6 +84,7 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 16,
 		paddingVertical: 8,
 		borderRadius: 16,
+		zIndex: 1,
 	},
 	saveButtonDisabled: {
 		backgroundColor: '#a1a1aa',

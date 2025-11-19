@@ -13,9 +13,13 @@ interface FinancialMetrics {
 
 interface FinancialMetricsCardProps {
 	metrics: FinancialMetrics;
+	variant?: 'card' | 'embedded';
 }
 
-export function FinancialMetricsCard({ metrics }: FinancialMetricsCardProps) {
+export function FinancialMetricsCard({
+	metrics,
+	variant = 'card',
+}: FinancialMetricsCardProps) {
 	const formatCurrency = (amount: number) => {
 		return new Intl.NumberFormat('en-US', {
 			style: 'currency',
@@ -47,7 +51,13 @@ export function FinancialMetricsCard({ metrics }: FinancialMetricsCardProps) {
 	};
 
 	return (
-		<View style={styles.container}>
+		<View
+			style={[
+				styles.root,
+				variant === 'card' && styles.rootCard,
+				variant === 'embedded' && styles.rootEmbedded,
+			]}
+		>
 			<Text style={[styles.title, dynamicTextStyle]}>Financial Summary</Text>
 			<Text style={[styles.subtitle, dynamicTextStyle]}>
 				Your financial metrics for this week
@@ -150,8 +160,22 @@ export function FinancialMetricsCard({ metrics }: FinancialMetricsCardProps) {
 }
 
 const styles = StyleSheet.create({
-	container: {
+	root: {
+		borderRadius: 16,
+		padding: 16,
+	},
+	rootCard: {
+		backgroundColor: '#FFFFFF',
+		borderWidth: StyleSheet.hairlineWidth,
+		borderColor: '#E5E7EB',
 		marginBottom: 20,
+	},
+	rootEmbedded: {
+		backgroundColor: '#FFFFFF',
+		borderWidth: 0,
+		paddingHorizontal: 0,
+		marginTop: 8,
+		marginBottom: 0,
 	},
 	title: {
 		fontSize: 18,

@@ -69,12 +69,12 @@ export default function GoalsScreen() {
 	// Modal Handlers
 	// ==========================================
 	const showModal = useCallback(() => {
-		router.push('/(stack)/addGoal');
+		router.push('/(stack)/goals/new');
 	}, [router]);
 
 	const showEditModal = useCallback(
 		(goal: Goal) => {
-			router.push(`/(stack)/editGoal?id=${goal.id}`);
+			router.push(`/(stack)/goals/edit?id=${goal.id}`);
 		},
 		[router]
 	);

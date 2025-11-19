@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { logger } from '../../src/utils/logger';
+import { logger } from '../../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -10,10 +10,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useRecurringExpense } from '../../src/context/recurringExpenseContext';
-import { RecurringExpense, RecurringExpenseService } from '../../src/services';
-import LinearProgressBar from '../(tabs)/wallet/components/LinearProgressBar';
-import { resolveRecurringExpenseAppearance } from '../../src/utils/recurringExpenseAppearance';
+import { useRecurringExpense } from '../../../src/context/recurringExpenseContext';
+import { RecurringExpense, RecurringExpenseService } from '../../../src/services';
+import LinearProgressBar from '../../(tabs)/wallet/components/LinearProgressBar';
+import { resolveRecurringExpenseAppearance } from '../../../src/utils/recurringExpenseAppearance';
 
 interface RecurringTransaction {
 	id: string;

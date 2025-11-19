@@ -76,7 +76,7 @@ export default function BudgetScreen() {
 	// Modal Handlers
 	// ==========================================
 	const showModal = useCallback(() => {
-		router.push('/(stack)/addBudget');
+		router.push('/(stack)/budgets/new');
 	}, [router]);
 
 	// ==========================================
@@ -175,7 +175,7 @@ export default function BudgetScreen() {
 	// Modal Handlers
 	// ==========================================
 	const showEditModal = (budget: Budget) => {
-		router.push(`/(stack)/editBudget?id=${budget.id}`);
+		router.push(`/(stack)/budgets/edit?id=${budget.id}`);
 	};
 
 	// Filter budgets based on active tab

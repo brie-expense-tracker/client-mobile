@@ -6,13 +6,13 @@ import {
 	ScrollView,
 	Alert,
 	ActivityIndicator,
-	SafeAreaView,
 	Text,
 } from 'react-native';
-import { logger } from '../../src/utils/logger';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { logger } from '../../../src/utils/logger';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useGoal, Goal } from '../../src/context/goalContext';
+import { useGoal, Goal } from '../../../src/context/goalContext';
 import {
 	GOAL_ICONS,
 	GOAL_TARGET_PRESETS,
@@ -20,8 +20,8 @@ import {
 	DEFAULT_COLOR,
 	isValidIoniconsName,
 	normalizeIconName,
-} from '../../src/constants/uiConstants';
-import { DateField } from '../../src/components/DateField';
+} from '../../../src/constants/uiConstants';
+import { DateField } from '../../../src/components/DateField';
 import {
 	FormHeader,
 	FormInputGroup,
@@ -29,7 +29,7 @@ import {
 	ColorPicker,
 	AmountPresets,
 	DeleteButton,
-} from '../../src/components/forms';
+} from '../../../src/components/forms';
 
 // Helper to clean currency input
 const cleanCurrencyToNumberString = (v: string) =>
@@ -238,110 +238,117 @@ const EditGoalScreen: React.FC = () => {
 
 	if (!goal) {
 		return (
-			<SafeAreaView style={styles.container}>
-				<FormHeader
-					title="Edit Goal"
-					onSave={handleSave}
-					saveDisabled={true}
-					loading={false}
-				/>
-				<View style={styles.loadingContainer}>
-					<ActivityIndicator size="large" color="#007ACC" />
-					<Text style={styles.loadingText}>Loading goal...</Text>
+			<SafeAreaView style={styles.safeArea} edges={['top']}>
+				<View style={styles.container}>
+					<FormHeader
+						title="Edit Goal"
+						onSave={handleSave}
+						saveDisabled={true}
+						loading={false}
+					/>
+					<View style={styles.loadingContainer}>
+						<ActivityIndicator size="large" color="#007ACC" />
+						<Text style={styles.loadingText}>Loading goal...</Text>
+					</View>
 				</View>
 			</SafeAreaView>
 		);
 	}
 
 	return (
-		<SafeAreaView style={styles.container}>
-			<FormHeader
-				title="Edit Goal"
-				onSave={handleSave}
-				saveDisabled={saveDisabled}
-				loading={loading}
-			/>
+		<SafeAreaView style={styles.safeArea} edges={['top']}>
+			<View style={styles.container}>
+				<FormHeader
+					title="Edit Goal"
+					onSave={handleSave}
+					saveDisabled={saveDisabled}
+					loading={loading}
+				/>
 
-			<ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-				<View style={styles.formContainer}>
-					{/* Goal Name */}
-					<FormInputGroup label="Goal Name">
-						<TextInput
-							style={styles.textInput}
-							value={name}
-							onChangeText={setName}
-							placeholder="e.g., Emergency Fund"
-							placeholderTextColor="#999"
-						/>
-					</FormInputGroup>
+				<ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+					<View style={styles.formContainer}>
+						{/* Goal Name */}
+						<FormInputGroup label="Goal Name">
+							<TextInput
+								style={styles.textInput}
+								value={name}
+								onChangeText={setName}
+								placeholder="e.g., Emergency Fund"
+								placeholderTextColor="#999"
+							/>
+						</FormInputGroup>
 
-					{/* Target Amount */}
-					<FormInputGroup
-						label="Target Amount"
-						subtext="Set your target amount for this goal"
-					>
-						<AmountPresets
-							presets={GOAL_TARGET_PRESETS}
-							selectedAmount={target}
-							onPresetSelect={(amt) => {
-								setTarget(amt);
-								setShowCustomTarget(false);
-							}}
-							showCustom={showCustomTarget}
-							onToggleCustom={handleToggleCustomTarget}
-							onCustomAmountChange={(v) =>
-								setTarget(cleanCurrencyToNumberString(v))
-							}
-							customPlaceholder="e.g., 10000"
-						/>
-					</FormInputGroup>
+						{/* Target Amount */}
+						<FormInputGroup
+							label="Target Amount"
+							subtext="Set your target amount for this goal"
+						>
+							<AmountPresets
+								presets={GOAL_TARGET_PRESETS}
+								selectedAmount={target}
+								onPresetSelect={(amt) => {
+									setTarget(amt);
+									setShowCustomTarget(false);
+								}}
+								showCustom={showCustomTarget}
+								onToggleCustom={handleToggleCustomTarget}
+								onCustomAmountChange={(v) =>
+									setTarget(cleanCurrencyToNumberString(v))
+								}
+								customPlaceholder="e.g., 10000"
+							/>
+						</FormInputGroup>
 
-					{/* Target Date */}
-					<FormInputGroup label="Target Date">
-						<DateField
-							value={deadline}
-							onChange={handleDateChange}
-							title=""
-							placeholder="Select date"
-							minDate={new Date().toISOString().split('T')[0]}
-						/>
-					</FormInputGroup>
+						{/* Target Date */}
+						<FormInputGroup label="Target Date">
+							<DateField
+								value={deadline}
+								onChange={handleDateChange}
+								title=""
+								placeholder="Select date"
+								minDate={new Date().toISOString().split('T')[0]}
+							/>
+						</FormInputGroup>
 
-					{/* Icon Selection */}
-					<FormInputGroup label="Choose Icon">
-						<IconPicker
-							selectedIcon={icon}
-							selectedColor={color}
-							icons={GOAL_ICONS}
-							onIconSelect={setIcon}
-							isOpen={showIconPicker}
-							onToggle={() => setShowIconPicker(!showIconPicker)}
-						/>
-					</FormInputGroup>
+						{/* Icon Selection */}
+						<FormInputGroup label="Choose Icon">
+							<IconPicker
+								selectedIcon={icon}
+								selectedColor={color}
+								icons={GOAL_ICONS}
+								onIconSelect={setIcon}
+								isOpen={showIconPicker}
+								onToggle={() => setShowIconPicker(!showIconPicker)}
+							/>
+						</FormInputGroup>
 
-					{/* Color Selection */}
-					<FormInputGroup label="Choose Color">
-						<ColorPicker
-							selectedColor={color}
-							onColorSelect={setColor}
-							isOpen={showColorPicker}
-							onToggle={() => setShowColorPicker(!showColorPicker)}
-						/>
-					</FormInputGroup>
+						{/* Color Selection */}
+						<FormInputGroup label="Choose Color">
+							<ColorPicker
+								selectedColor={color}
+								onColorSelect={setColor}
+								isOpen={showColorPicker}
+								onToggle={() => setShowColorPicker(!showColorPicker)}
+							/>
+						</FormInputGroup>
 
-					{/* Delete Button */}
-					<DeleteButton onPress={handleDelete} text="Delete Goal" />
-				</View>
-			</ScrollView>
+						{/* Delete Button */}
+						<DeleteButton onPress={handleDelete} text="Delete Goal" />
+					</View>
+				</ScrollView>
+			</View>
 		</SafeAreaView>
 	);
 };
 
 const styles = StyleSheet.create({
-	container: {
+	safeArea: {
 		flex: 1,
 		backgroundColor: '#ffffff',
-		paddingTop: 0,
+	},
+	container: {
+		flex: 1,
+		backgroundColor: '#F8FAFC',
 	},
 	content: {
 		flex: 1,

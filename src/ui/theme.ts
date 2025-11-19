@@ -4,6 +4,7 @@ export const palette = {
 	surface: '#FFFFFF',
 	surfaceAlt: '#F8FAFC',
 	text: '#111827',
+	textSecondary: '#333333',
 	textMuted: '#6B7280',
 	textSubtle: '#9CA3AF',
 	border: '#E5E7EB',

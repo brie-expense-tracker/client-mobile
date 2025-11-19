@@ -1,7 +1,6 @@
 import { ApiService } from '../core/apiService';
 import { logger } from '../../utils/logger';
 
-
 export interface WeeklyReflection {
 	_id: string;
 	userId: string;
@@ -48,6 +47,8 @@ export interface SaveReflectionData {
 		budgetUtilization: number;
 		goalProgress: number;
 	};
+	markCompleted?: boolean;
+	reflectionId?: string;
 }
 
 export class WeeklyReflectionService {
@@ -143,7 +144,21 @@ export class WeeklyReflectionService {
 				'/api/weekly-reflections/save',
 				data
 			);
-			return (response.data as any).reflection;
+
+			// Handle different response structures
+			// Server returns: { success: true, reflection: {...}, message: '...' }
+			// ApiService wraps it as: { success: true, data: { success: true, reflection: {...}, message: '...' } }
+			const reflection =
+				(response.data as any)?.reflection ||
+				(response as any).reflection ||
+				response.data;
+
+			if (!reflection || !reflection._id) {
+				logger.error('Invalid reflection response', { response });
+				throw new Error('Invalid response from server');
+			}
+
+			return reflection;
 		} catch (error) {
 			logger.error('Error saving weekly reflection:', error);
 

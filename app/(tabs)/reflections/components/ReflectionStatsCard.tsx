@@ -6,15 +6,23 @@ import { dynamicTextStyle } from '../../../../src/utils/accessibility';
 
 interface ReflectionStatsCardProps {
 	reflection: WeeklyReflection | null;
+	variant?: 'card' | 'embedded';
 }
 
-export function ReflectionStatsCard({ reflection }: ReflectionStatsCardProps) {
+export function ReflectionStatsCard({
+	reflection,
+	variant = 'card',
+}: ReflectionStatsCardProps) {
 	// Early return if reflection is null or undefined
 	if (!reflection) {
 		return null;
 	}
 	const formatDate = (dateString: string) => {
-		const date = new Date(dateString);
+		// Extract date part (YYYY-MM-DD) to avoid timezone issues
+		const datePart = dateString.split('T')[0];
+		const [year, month, day] = datePart.split('-').map(Number);
+		// Create date in local timezone (month is 0-indexed)
+		const date = new Date(year, month - 1, day);
 		return date.toLocaleDateString('en-US', {
 			month: 'short',
 			day: 'numeric',
@@ -103,7 +111,13 @@ export function ReflectionStatsCard({ reflection }: ReflectionStatsCardProps) {
 	};
 
 	return (
-		<View style={styles.container}>
+		<View
+			style={[
+				styles.root,
+				variant === 'card' && styles.rootCard,
+				variant === 'embedded' && styles.rootEmbedded,
+			]}
+		>
 			<Text style={[styles.title, dynamicTextStyle]}>Week Summary</Text>
 
 			<View style={styles.statsGrid}>
@@ -182,10 +196,14 @@ export function ReflectionStatsCard({ reflection }: ReflectionStatsCardProps) {
 }
 
 const styles = StyleSheet.create({
-	container: {
-		backgroundColor: '#fff',
-		borderRadius: 12,
-		padding: 20,
+	root: {
+		borderRadius: 16,
+		padding: 16,
+	},
+	rootCard: {
+		backgroundColor: '#FFFFFF',
+		borderWidth: StyleSheet.hairlineWidth,
+		borderColor: '#E5E7EB',
 		marginBottom: 16,
 		shadowColor: '#000',
 		shadowOffset: {
@@ -195,6 +213,13 @@ const styles = StyleSheet.create({
 		shadowOpacity: 0.1,
 		shadowRadius: 3.84,
 		elevation: 5,
+	},
+	rootEmbedded: {
+		backgroundColor: '#FFFFFF',
+		borderWidth: 0,
+		paddingHorizontal: 0,
+		marginTop: 8,
+		marginBottom: 0,
 	},
 	title: {
 		fontSize: 18,

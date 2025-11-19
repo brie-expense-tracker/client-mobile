@@ -10,7 +10,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import useAuth from '../../../src/context/AuthContext';
-import { useTheme } from '../../../src/context/ThemeContext';
 import ConnectivityTest from '../../../src/components/ConnectivityTest';
 import {
 	useFeature,
@@ -18,6 +17,7 @@ import {
 	clearLocalOverrides,
 	debugFeatureFlags,
 } from '../../../src/config/features';
+import { palette, radius, space, type, shadow } from '../../../src/ui/theme';
 
 // Development mode toggle - controls visibility of debug/testing features
 const SHOW_DEBUG_SECTION = false;
@@ -29,46 +29,73 @@ type Item = {
 	icon: keyof typeof Ionicons.glyphMap;
 	route?: string;
 	onPress?: () => void;
+	// Optional subtitle if you want to mirror Legal descriptions later
+	description?: string;
 };
 
-function Section({
-	title,
-	items,
-	colors,
-}: {
-	title: string;
-	items: Item[];
-	colors: any;
-}) {
+function Section({ title, items }: { title: string; items: Item[] }) {
 	return (
-		<View style={[styles.section, { backgroundColor: colors.bg }]}>
-			<Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
-			<View
+		<View style={styles.section}>
+			<Text
 				style={[
-					styles.card,
-					{ backgroundColor: colors.card, borderColor: colors.line },
+					type.labelSm,
+					{ color: palette.textSubtle },
 				]}
 			>
-				{items.map((item, index) => {
-					const isLast = index === items.length - 1;
-					return (
-						<TouchableOpacity
-							key={item.label}
-							style={[styles.row, isLast && styles.rowLast]}
-							onPress={item.onPress}
-						>
-							<Ionicons name={item.icon} size={24} color={colors.tint} />
-							<Text style={[styles.rowText, { color: colors.text }]}>
+				{title}
+			</Text>
+
+			{/* Legal-style card */}
+			<View style={styles.settingsContainer}>
+				{items.map((item) => (
+					<TouchableOpacity
+						key={item.label}
+						style={[
+							styles.settingItem,
+							{
+								borderBottomWidth: 1,
+								borderBottomColor: '#f0f0f0',
+							},
+						]}
+						onPress={item.onPress}
+						activeOpacity={0.7}
+						accessibilityRole="button"
+						accessibilityLabel={item.label}
+						accessibilityHint={`Open ${item.label} settings`}
+					>
+						<Ionicons
+							name={item.icon}
+							size={24}
+							color={palette.textMuted}
+							accessibilityElementsHidden
+							importantForAccessibility="no"
+						/>
+						<View style={styles.settingContent}>
+							<Text
+								style={[styles.settingText, { color: palette.textSecondary }]}
+							>
 								{item.label}
 							</Text>
-							<Ionicons
-								name="chevron-forward"
-								size={20}
-								color={colors.subtle}
-							/>
-						</TouchableOpacity>
-					);
-				})}
+							{item.description ? (
+								<Text
+									style={[
+										styles.settingDescription,
+										{ color: palette.textSubtle },
+									]}
+								>
+									{item.description}
+								</Text>
+							) : null}
+						</View>
+						<Ionicons
+							name="chevron-forward"
+							size={18}
+							color="#BEBEBE"
+							accessibilityElementsHidden
+							importantForAccessibility="no"
+						/>
+					</TouchableOpacity>
+				))}
 			</View>
 		</View>
 	);
@@ -79,7 +106,6 @@ function Section({
 export default function SettingsScreen() {
 	const router = useRouter();
 	const { logout } = useAuth();
-	const { colors } = useTheme();
 	const aiInsightsEnabled = useFeature('aiInsights');
 	const aiInsightsPreviewEnabled = useFeature('aiInsightsPreview');
 	const newBudgetsV2Enabled = useFeature('newBudgetsV2');
@@ -112,7 +138,6 @@ export default function SettingsScreen() {
 	const handleLogout = async () => {
 		try {
 			await logout();
-			// Navigation is handled automatically by AuthContext when firebaseUser becomes null
 		} catch (error) {
 			logger.error('Logout error:', error);
 		}
@@ -123,7 +148,7 @@ export default function SettingsScreen() {
 			const newValue = !aiInsightsEnabled;
 			await setLocalOverride('aiInsights', newValue);
 			logger.debug('AI Insights toggled:', newValue);
-			setRefreshKey((prev) => prev + 1); // Force re-render
+			setRefreshKey((prev) => prev + 1);
 		} catch (error) {
 			logger.error('Failed to toggle AI Insights:', error);
 		}
@@ -134,7 +159,7 @@ export default function SettingsScreen() {
 			const newValue = !aiInsightsPreviewEnabled;
 			await setLocalOverride('aiInsightsPreview', newValue);
 			logger.debug('AI Insights Preview toggled:', newValue);
-			setRefreshKey((prev) => prev + 1); // Force re-render
+			setRefreshKey((prev) => prev + 1);
 		} catch (error) {
 			logger.error('Failed to toggle AI Insights Preview:', error);
 		}
@@ -145,7 +170,7 @@ export default function SettingsScreen() {
 			const newValue = !newBudgetsV2Enabled;
 			await setLocalOverride('newBudgetsV2', newValue);
 			logger.debug('New Budgets V2 toggled:', newValue);
-			setRefreshKey((prev) => prev + 1); // Force re-render
+			setRefreshKey((prev) => prev + 1);
 		} catch (error) {
 			logger.error('Failed to toggle New Budgets V2:', error);
 		}
@@ -156,7 +181,7 @@ export default function SettingsScreen() {
 			const newValue = !goalsTimelineEnabled;
 			await setLocalOverride('goalsTimeline', newValue);
 			logger.debug('Goals Timeline toggled:', newValue);
-			setRefreshKey((prev) => prev + 1); // Force re-render
+			setRefreshKey((prev) => prev + 1);
 		} catch (error) {
 			logger.error('Failed to toggle Goals Timeline:', error);
 		}
@@ -178,7 +203,7 @@ export default function SettingsScreen() {
 				'- EXPO_PUBLIC_AI_INSIGHTS_PREVIEW:',
 				process.env.EXPO_PUBLIC_AI_INSIGHTS_PREVIEW
 			);
-			setRefreshKey((prev) => prev + 1); // Force re-render
+			setRefreshKey((prev) => prev + 1);
 		} catch (error) {
 			logger.error('Failed to reset labs:', error);
 		}
@@ -224,39 +249,80 @@ export default function SettingsScreen() {
 	return (
 		<ScrollView
 			key={refreshKey}
-			style={[styles.container, { backgroundColor: colors.bg }]}
+			style={[styles.container, { backgroundColor: palette.bg }]}
 			contentContainerStyle={styles.scrollContent}
 			showsVerticalScrollIndicator={false}
 		>
-			{/* Debug / Testing (kept simple and white) - Only show when enabled */}
+			{/* Optional header to match LegalDocumentsScreen vibe more */}
+			<View style={styles.headerSection}>
+				<Text style={[styles.headerTitle, { color: palette.text }]}>
+					Settings
+				</Text>
+				<Text
+					style={[
+						type.bodySm,
+						styles.headerDescription,
+						{ color: palette.textSubtle },
+					]}
+				>
+					Manage your account, notifications, privacy, and app preferences.
+				</Text>
+			</View>
+
+			{/* Debug / Testing - Only show when enabled */}
 			{__DEV__ && SHOW_DEBUG_SECTION && (
-				<View style={[styles.section, { backgroundColor: colors.bg }]}>
-					<Text style={[styles.sectionTitle, { color: colors.text }]}>
+				<View style={styles.section}>
+					<Text
+						style={[
+							type.labelSm,
+							styles.sectionTitle,
+							{ color: palette.textSubtle },
+						]}
+					>
 						Debug & Testing
 					</Text>
 					<View
 						style={[
 							styles.cardNoRows,
-							{ backgroundColor: colors.card, borderColor: colors.line },
+							{
+								backgroundColor: palette.surface,
+								borderColor: palette.border,
+							},
 						]}
 					>
 						<ConnectivityTest />
 
 						{/* AI Insights Toggle */}
 						<View style={styles.debugRow}>
-							<Text style={[styles.debugLabel, { color: colors.text }]}>
+							<Text
+								style={[type.body, styles.debugLabel, { color: palette.text }]}
+							>
 								AI Insights
 							</Text>
 							<TouchableOpacity
 								style={[
 									styles.toggleButton,
 									{
-										backgroundColor: aiInsightsEnabled ? '#10b981' : '#e5e7eb',
+										backgroundColor: aiInsightsEnabled
+											? palette.successSubtle
+											: palette.subtle,
+										borderColor: aiInsightsEnabled
+											? palette.success
+											: palette.border,
 									},
 								]}
 								onPress={toggleAIInsights}
 							>
-								<Text style={styles.toggleText}>
+								<Text
+									style={[
+										styles.toggleText,
+										{
+											color: aiInsightsEnabled
+												? palette.success
+												: palette.textSubtle,
+										},
+									]}
+								>
 									{aiInsightsEnabled ? 'ON' : 'OFF'}
 								</Text>
 							</TouchableOpacity>
@@ -264,7 +330,9 @@ export default function SettingsScreen() {
 
 						{/* AI Insights Preview Toggle */}
 						<View style={styles.debugRow}>
-							<Text style={[styles.debugLabel, { color: colors.text }]}>
+							<Text
+								style={[type.body, styles.debugLabel, { color: palette.text }]}
+							>
 								AI Insights Preview
 							</Text>
 							<TouchableOpacity
@@ -272,13 +340,25 @@ export default function SettingsScreen() {
 									styles.toggleButton,
 									{
 										backgroundColor: aiInsightsPreviewEnabled
-											? '#10b981'
-											: '#e5e7eb',
+											? palette.successSubtle
+											: palette.subtle,
+										borderColor: aiInsightsPreviewEnabled
+											? palette.success
+											: palette.border,
 									},
 								]}
 								onPress={toggleAIInsightsPreview}
 							>
-								<Text style={styles.toggleText}>
+								<Text
+									style={[
+										styles.toggleText,
+										{
+											color: aiInsightsPreviewEnabled
+												? palette.success
+												: palette.textSubtle,
+										},
+									]}
+								>
 									{aiInsightsPreviewEnabled ? 'ON' : 'OFF'}
 								</Text>
 							</TouchableOpacity>
@@ -286,7 +366,9 @@ export default function SettingsScreen() {
 
 						{/* New Budgets V2 Toggle */}
 						<View style={styles.debugRow}>
-							<Text style={[styles.debugLabel, { color: colors.text }]}>
+							<Text
+								style={[type.body, styles.debugLabel, { color: palette.text }]}
+							>
 								New Budgets V2
 							</Text>
 							<TouchableOpacity
@@ -294,13 +376,25 @@ export default function SettingsScreen() {
 									styles.toggleButton,
 									{
 										backgroundColor: newBudgetsV2Enabled
-											? '#10b981'
-											: '#e5e7eb',
+											? palette.successSubtle
+											: palette.subtle,
+										borderColor: newBudgetsV2Enabled
+											? palette.success
+											: palette.border,
 									},
 								]}
 								onPress={toggleNewBudgetsV2}
 							>
-								<Text style={styles.toggleText}>
+								<Text
+									style={[
+										styles.toggleText,
+										{
+											color: newBudgetsV2Enabled
+												? palette.success
+												: palette.textSubtle,
+										},
+									]}
+								>
 									{newBudgetsV2Enabled ? 'ON' : 'OFF'}
 								</Text>
 							</TouchableOpacity>
@@ -308,7 +402,9 @@ export default function SettingsScreen() {
 
 						{/* Goals Timeline Toggle */}
 						<View style={styles.debugRow}>
-							<Text style={[styles.debugLabel, { color: colors.text }]}>
+							<Text
+								style={[type.body, styles.debugLabel, { color: palette.text }]}
+							>
 								Goals Timeline
 							</Text>
 							<TouchableOpacity
@@ -316,13 +412,25 @@ export default function SettingsScreen() {
 									styles.toggleButton,
 									{
 										backgroundColor: goalsTimelineEnabled
-											? '#10b981'
-											: '#e5e7eb',
+											? palette.successSubtle
+											: palette.subtle,
+										borderColor: goalsTimelineEnabled
+											? palette.success
+											: palette.border,
 									},
 								]}
 								onPress={toggleGoalsTimeline}
 							>
-								<Text style={styles.toggleText}>
+								<Text
+									style={[
+										styles.toggleText,
+										{
+											color: goalsTimelineEnabled
+												? palette.success
+												: palette.textSubtle,
+										},
+									]}
+								>
 									{goalsTimelineEnabled ? 'ON' : 'OFF'}
 								</Text>
 							</TouchableOpacity>
@@ -330,22 +438,32 @@ export default function SettingsScreen() {
 
 						{/* Feature Flag Status */}
 						<View style={styles.debugRow}>
-							<Text style={[styles.debugLabel, { color: colors.text }]}>
+							<Text
+								style={[type.body, styles.debugLabel, { color: palette.text }]}
+							>
 								Base Values (.env)
 							</Text>
 							<View style={styles.debugValueContainer}>
-								<Text style={[styles.debugValue, { color: colors.subtext }]}>
+								<Text
+									style={[styles.debugValue, { color: palette.textSubtle }]}
+								>
 									AI: {process.env.EXPO_PUBLIC_AI_INSIGHTS || 'undefined'}
 								</Text>
-								<Text style={[styles.debugValue, { color: colors.subtext }]}>
+								<Text
+									style={[styles.debugValue, { color: palette.textSubtle }]}
+								>
 									Preview:{' '}
 									{process.env.EXPO_PUBLIC_AI_INSIGHTS_PREVIEW || 'undefined'}
 								</Text>
-								<Text style={[styles.debugValue, { color: colors.subtext }]}>
+								<Text
+									style={[styles.debugValue, { color: palette.textSubtle }]}
+								>
 									Budgets:{' '}
 									{process.env.EXPO_PUBLIC_NEW_BUDGETS_V2 || 'undefined'}
 								</Text>
-								<Text style={[styles.debugValue, { color: colors.subtext }]}>
+								<Text
+									style={[styles.debugValue, { color: palette.textSubtle }]}
+								>
 									Goals: {process.env.EXPO_PUBLIC_GOALS_TIMELINE || 'undefined'}
 								</Text>
 							</View>
@@ -353,11 +471,13 @@ export default function SettingsScreen() {
 
 						{/* Debug Feature Flags Button */}
 						<View style={styles.debugRow}>
-							<Text style={[styles.debugLabel, { color: colors.text }]}>
+							<Text
+								style={[type.body, styles.debugLabel, { color: palette.text }]}
+							>
 								Debug Flags
 							</Text>
 							<TouchableOpacity
-								style={[styles.debugButton]}
+								style={styles.debugButton}
 								onPress={() => {
 									logger.debug('🔧 [Settings] Debug button pressed!');
 									logger.debug(
@@ -383,13 +503,12 @@ export default function SettingsScreen() {
 
 						{/* Reset Labs Button */}
 						<View style={styles.debugRow}>
-							<Text style={[styles.debugLabel, { color: colors.text }]}>
+							<Text
+								style={[type.body, styles.debugLabel, { color: palette.text }]}
+							>
 								Reset Labs
 							</Text>
-							<TouchableOpacity
-								style={[styles.resetButton]}
-								onPress={resetLabs}
-							>
+							<TouchableOpacity style={styles.resetButton} onPress={resetLabs}>
 								<Text style={styles.resetText}>Reset</Text>
 							</TouchableOpacity>
 						</View>
@@ -397,22 +516,35 @@ export default function SettingsScreen() {
 				</View>
 			)}
 
-			{/* Sections */}
-			<Section title="Account" items={accountItems} colors={colors} />
-			<Section
-				title="Notifications"
-				items={notificationItems}
-				colors={colors}
-			/>
-
-			<Section title="Support" items={supportItems} colors={colors} />
-			<Section title="Legal" items={legalItems} colors={colors} />
+			{/* Sections (now styled like Legal) */}
+			<Section title="Account" items={accountItems} />
+			<Section title="Notifications" items={notificationItems} />
+			<Section title="Support" items={supportItems} />
+			<Section title="Legal" items={legalItems} />
 
 			{/* Logout */}
-			<View style={styles.logoutContainer}>
-				<TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-					<Ionicons name="log-out-outline" size={20} color="#6B7280" />
-					<Text style={styles.logoutText}>Logout</Text>
+			<View style={[styles.logoutContainer, { paddingHorizontal: space.lg }]}>
+				<TouchableOpacity
+					style={[
+						styles.logoutButton,
+						{
+							borderColor: palette.border,
+							backgroundColor: palette.surface,
+						},
+					]}
+					onPress={handleLogout}
+					activeOpacity={0.8}
+				>
+					<Ionicons
+						name="log-out-outline"
+						size={18}
+						color={palette.textMuted}
+					/>
+					<Text
+						style={[type.body, styles.logoutText, { color: palette.textMuted }]}
+					>
+						Logout
+					</Text>
 				</TouchableOpacity>
 			</View>
 		</ScrollView>
@@ -424,94 +556,97 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: '#fff', // pure white background
 	},
 	scrollContent: {
-		paddingBottom: 32,
+		paddingBottom: space.xxl,
+		paddingHorizontal: space.lg,
+	},
+
+	/* Header */
+	headerSection: {
+		paddingHorizontal: space.sm,
+		paddingTop: space.lg,
+		paddingBottom: space.sm,
+	},
+	headerTitle: {
+		fontSize: 28,
+		fontWeight: '700',
+		marginBottom: space.xs,
+	},
+	headerDescription: {
+		lineHeight: 20,
 	},
 
 	/* Sections */
 	section: {
-		backgroundColor: '#fff',
-		paddingHorizontal: 20,
-		marginTop: 8,
-		marginBottom: 16,
+		marginHorizontal: space.sm,
+		marginTop: space.md,
 	},
+
 	sectionTitle: {
-		fontSize: 14,
-		fontWeight: '600',
-		color: '#8e8e8e',
-		textTransform: 'uppercase',
-		marginBottom: 8,
+		marginBottom: space.xs,
 	},
 
-	/* Cards */
-	card: {
+	/* Card container */
+	settingsContainer: {
 		backgroundColor: '#fff',
 		borderRadius: 12,
-		overflow: 'hidden', // keeps last-row border clean
-		borderWidth: StyleSheet.hairlineWidth,
-		borderColor: '#EEE',
-	},
-	cardNoRows: {
-		backgroundColor: '#fff',
-		borderRadius: 12,
-		borderWidth: StyleSheet.hairlineWidth,
-		borderColor: '#EEE',
-		padding: 12,
 	},
 
-	/* Rows */
-	row: {
+	settingItem: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		paddingVertical: 14,
-		paddingHorizontal: 14,
-		borderBottomWidth: StyleSheet.hairlineWidth,
-		borderBottomColor: '#EEE',
+		padding: 8,
+		minHeight: 64,
 	},
-	rowLast: {
-		borderBottomWidth: 0, // ✨ no divider on the final item
-	},
-	rowText: {
+	settingContent: {
 		flex: 1,
-		marginLeft: 14,
+		marginLeft: 12,
+	},
+	settingText: {
 		fontSize: 16,
-		color: '#333',
+		fontWeight: '500',
+		marginBottom: 2,
+	},
+	settingDescription: {
+		fontSize: 14,
+		lineHeight: 18,
+	},
+
+	/* Legacy card for debug block (no row dividers) */
+	cardNoRows: {
+		borderRadius: radius.lg,
+		borderWidth: StyleSheet.hairlineWidth,
+		padding: space.md,
+		...shadow.card,
 	},
 
 	/* Logout */
 	logoutContainer: {
-		paddingHorizontal: 20,
-		marginTop: 8,
-		marginBottom: 28,
+		marginTop: space.lg,
+		marginBottom: space.xl,
 	},
 	logoutButton: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'center',
-		paddingVertical: 12,
-		backgroundColor: 'transparent',
-		borderRadius: 12,
+		paddingVertical: space.md,
+		borderRadius: radius.lg,
 		borderWidth: 1,
-		borderColor: '#E5E7EB',
 	},
 	logoutText: {
-		color: '#6B7280',
-		fontSize: 15,
-		fontWeight: '500',
-		marginLeft: 8,
+		marginLeft: space.sm,
 	},
 
-	/* Debug Toggle */
+	/* Debug Toggle / Labs */
 	debugRow: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
-		marginTop: 12,
-		paddingTop: 12,
-		borderTopWidth: 1,
-		borderTopColor: '#E5E7EB',
+		marginTop: space.sm,
+		paddingTop: space.sm,
+		borderTopWidth: StyleSheet.hairlineWidth,
+		borderTopColor: palette.border,
 	},
 	debugLabel: {
 		fontSize: 14,
@@ -524,43 +659,43 @@ const styles = StyleSheet.create({
 	},
 	debugValueContainer: {
 		flex: 1,
-		marginLeft: 8,
+		marginLeft: space.sm,
 	},
 	toggleButton: {
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		borderRadius: 16,
-		minWidth: 50,
+		paddingHorizontal: space.md,
+		paddingVertical: space.xs,
+		borderRadius: radius.pill,
+		minWidth: 64,
 		alignItems: 'center',
+		borderWidth: 1,
 	},
 	toggleText: {
-		color: '#fff',
 		fontSize: 12,
 		fontWeight: '600',
 	},
 	resetButton: {
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		borderRadius: 16,
-		backgroundColor: '#ef4444',
-		minWidth: 50,
+		paddingHorizontal: space.md,
+		paddingVertical: space.xs,
+		borderRadius: radius.pill,
+		backgroundColor: palette.dangerSubtle,
+		minWidth: 64,
 		alignItems: 'center',
 	},
 	resetText: {
-		color: '#fff',
+		color: palette.danger,
 		fontSize: 12,
 		fontWeight: '600',
 	},
 	debugButton: {
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		borderRadius: 16,
-		backgroundColor: '#3b82f6',
-		minWidth: 50,
+		paddingHorizontal: space.md,
+		paddingVertical: space.xs,
+		borderRadius: radius.pill,
+		backgroundColor: palette.primarySubtle,
+		minWidth: 64,
 		alignItems: 'center',
 	},
 	debugButtonText: {
-		color: '#fff',
+		color: palette.primary,
 		fontSize: 12,
 		fontWeight: '600',
 	},

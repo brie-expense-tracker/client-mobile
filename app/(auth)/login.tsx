@@ -11,6 +11,7 @@ import {
 	Platform,
 	ActivityIndicator,
 	Pressable,
+	Alert,
 } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,6 +27,77 @@ type FieldErrors = {
 	email?: string;
 	password?: string;
 	form?: string;
+};
+
+// Map Firebase auth error codes to user-friendly messages
+const getAuthErrorMessage = (error: any): string => {
+	const code = error?.code || '';
+	const message = error?.message || '';
+
+	// Handle Firebase auth error codes
+	switch (code) {
+		case 'auth/invalid-credential':
+		case 'auth/wrong-password':
+			return 'Incorrect password. Please try again or use "Forgot password?" to reset it.';
+
+		case 'auth/user-not-found':
+			return 'No account found with this email. Please sign up to create an account.';
+
+		case 'auth/invalid-email':
+			return 'Invalid email format. Please check your email and try again.';
+
+		case 'auth/user-disabled':
+			return 'This account has been disabled. Please contact support for assistance.';
+
+		case 'auth/too-many-requests':
+			return 'Too many failed attempts. Please wait a few minutes and try again, or reset your password.';
+
+		case 'auth/network-request-failed':
+			return 'Network error. Please check your internet connection and try again.';
+
+		case 'auth/operation-not-allowed':
+			return 'This sign-in method is not enabled. Please try a different method.';
+
+		case 'auth/requires-recent-login':
+			return 'For security, please sign out and sign back in, then try again.';
+
+		case 'auth/invalid-verification-code':
+		case 'auth/invalid-verification-id':
+			return 'Invalid verification code. Please try again.';
+
+		case 'auth/email-already-in-use':
+			return 'An account with this email already exists. Please sign in instead.';
+
+		case 'auth/weak-password':
+			return 'Password is too weak. Please use a stronger password.';
+
+		case 'auth/account-exists-with-different-credential':
+			return 'An account already exists with the same email but different sign-in method. Please use the original sign-in method.';
+
+		case 'auth/credential-already-in-use':
+			return 'This credential is already associated with a different account.';
+
+		case 'auth/invalid-action-code':
+			return 'This link has expired or is invalid. Please request a new one.';
+
+		case 'auth/expired-action-code':
+			return 'This link has expired. Please request a new password reset email.';
+
+		case 'auth/popup-closed-by-user':
+		case 'auth/cancelled-popup-request':
+			return 'Sign-in was cancelled. Please try again.';
+
+		case 'auth/popup-blocked':
+			return 'Pop-up was blocked. Please allow pop-ups and try again.';
+
+		default:
+			// If there's a user-friendly message in the error, use it
+			if (message && !message.includes('auth/')) {
+				return message;
+			}
+			// Fallback to generic message
+			return 'Unable to sign in. Please check your email and password, or try again later.';
+	}
 };
 
 export default function Login() {
@@ -117,9 +189,84 @@ export default function Login() {
 
 		setIsLoading(true);
 		try {
-			// Firebase RN SDK
+			const emailTrimmed = email.trim().toLowerCase();
+
+			// First, check if user exists by checking sign-in methods for this email
+			// Wrap this in try-catch to handle errors separately from sign-in errors
+			let signInMethods: string[] = [];
+			let userExists = false;
+			try {
+				signInMethods = await auth().fetchSignInMethodsForEmail(emailTrimmed);
+				// If we got sign-in methods (even if empty), the user exists
+				// Empty array might mean user exists but no methods are available (edge case)
+				userExists = true;
+			} catch (fetchError: any) {
+				// If fetchSignInMethodsForEmail throws auth/user-not-found, user definitely doesn't exist
+				if (fetchError?.code === 'auth/user-not-found') {
+					const errorMessage =
+						'No account found with this email. Please sign up to create an account.';
+					await Haptics.notificationAsync(
+						Haptics.NotificationFeedbackType.Error
+					);
+					loginScreenLog.warn('Login error - user not found', {
+						email: emailTrimmed,
+					});
+					setFormError(errorMessage);
+					Alert.alert('Account Not Found', errorMessage, [{ text: 'OK' }]);
+					return;
+				}
+				// For other errors (network, etc.), log but continue to attempt sign-in
+				// Firebase will handle the actual error when we try to sign in
+				loginScreenLog.warn('Error fetching sign-in methods', {
+					error: fetchError,
+					email: emailTrimmed,
+				});
+				// Don't assume user doesn't exist - let sign-in attempt determine this
+			}
+
+			// Only check for sign-in method mismatch if we successfully fetched methods
+			// If fetchSignInMethodsForEmail failed, we'll let signInWithEmailAndPassword handle it
+			if (userExists && signInMethods.length > 0) {
+				// Check if user signed up with a different method (e.g., Google)
+				if (!signInMethods.includes('password')) {
+					// User exists but doesn't have password auth enabled
+					const hasGoogle = signInMethods.includes('google.com');
+					const hasApple = signInMethods.includes('apple.com');
+
+					let errorMessage = 'This account was created using ';
+					if (hasGoogle && hasApple) {
+						errorMessage +=
+							'Google or Apple Sign-In. Please use one of those methods to sign in.';
+					} else if (hasGoogle) {
+						errorMessage +=
+							'Google Sign-In. Please use Google Sign-In to sign in.';
+					} else if (hasApple) {
+						errorMessage +=
+							'Apple Sign-In. Please use Apple Sign-In to sign in.';
+					} else {
+						errorMessage +=
+							'a different sign-in method. Please use the original method you used to create your account.';
+					}
+
+					await Haptics.notificationAsync(
+						Haptics.NotificationFeedbackType.Error
+					);
+					loginScreenLog.warn('Login error - wrong sign-in method', {
+						email: emailTrimmed,
+						signInMethods,
+					});
+					setFormError(errorMessage);
+					Alert.alert('Sign-In Method Mismatch', errorMessage, [
+						{ text: 'OK' },
+					]);
+					return;
+				}
+			}
+
+			// User exists and has password auth (or we couldn't determine), attempt to sign in
+			// Firebase will return the correct error if password is wrong or user doesn't exist
 			const userCredential = await auth().signInWithEmailAndPassword(
-				email.trim().toLowerCase(),
+				emailTrimmed,
 				password.trim()
 			);
 
@@ -130,19 +277,32 @@ export default function Login() {
 		} catch (e: any) {
 			await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 
-			let errorMessage = 'Invalid email or password.';
-			if (e?.code === 'auth/user-not-found')
-				errorMessage = 'No account found for this email.';
-			else if (e?.code === 'auth/wrong-password')
-				errorMessage = 'Incorrect password.';
-			else if (e?.code === 'auth/invalid-email')
-				errorMessage = 'Invalid email format.';
-			else if (e?.code === 'auth/too-many-requests')
-				errorMessage = 'Too many attempts. Please try again later.';
-			else if (e?.message) errorMessage = e.message;
+			// Handle sign-in errors (wrong password, network issues, etc.)
+			let errorMessage = getAuthErrorMessage(e);
+
+			// Ensure wrong password errors are clearly identified
+			// Note: Firebase may return auth/invalid-credential for wrong password
+			if (
+				e?.code === 'auth/wrong-password' ||
+				e?.code === 'auth/invalid-credential'
+			) {
+				errorMessage =
+					'Incorrect password. Please try again or use "Forgot password?" to reset it.';
+			}
+
+			// Don't show "user not found" if we're here - that means sign-in was attempted
+			// which implies the user exists (or fetchSignInMethodsForEmail failed silently)
+			if (e?.code === 'auth/user-not-found') {
+				// This shouldn't happen if fetchSignInMethodsForEmail worked, but handle it anyway
+				errorMessage =
+					'No account found with this email. Please sign up to create an account.';
+			}
 
 			loginScreenLog.warn('Login error', { error: e, message: errorMessage });
 			setFormError(errorMessage);
+
+			// Show alert dialog
+			Alert.alert('Sign In Failed', errorMessage, [{ text: 'OK' }]);
 		} finally {
 			setIsLoading(false);
 		}
@@ -167,11 +327,49 @@ export default function Login() {
 				(error?.code === 'auth/internal-error' &&
 					error?.message?.includes('cancelled')) ||
 				error?.code === 'GOOGLE_SIGNIN_CANCELED' ||
+				error?.code === 'auth/popup-closed-by-user' ||
+				error?.code === 'auth/cancelled-popup-request' ||
 				error?.message?.includes('Account creation cancelled');
 			if (!cancelled) {
+				let errorMessage = getAuthErrorMessage(error);
+
+				// Check if account exists with different credential (email/password)
+				if (error?.code === 'auth/account-exists-with-different-credential') {
+					// Try to get the email from the error
+					const email = error?.email || error?.customData?.email;
+					if (email) {
+						try {
+							// Check what sign-in methods are available for this email
+							const signInMethods = await auth().fetchSignInMethodsForEmail(
+								email
+							);
+							if (signInMethods.includes('password')) {
+								errorMessage =
+									'This account was created using email and password. Please use email and password to sign in.';
+							} else if (signInMethods.includes('apple.com')) {
+								errorMessage =
+									'This account was created using Apple Sign-In. Please use Apple Sign-In to sign in.';
+							} else {
+								errorMessage =
+									'This account was created using a different sign-in method. Please use the original method you used to create your account.';
+							}
+						} catch {
+							// If we can't check, use the default message
+							errorMessage =
+								'This account was created using email and password. Please use email and password to sign in.';
+						}
+					} else {
+						errorMessage =
+							'This account was created using email and password. Please use email and password to sign in.';
+					}
+				}
+
 				loginScreenLog.warn('Google Sign-In error', error);
 				await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-				// Note: error will be set by authError effect above
+				setFormError(errorMessage);
+
+				// Show alert dialog
+				Alert.alert('Sign-In Method Mismatch', errorMessage, [{ text: 'OK' }]);
 			}
 		} finally {
 			setIsLoading(false);
@@ -180,22 +378,6 @@ export default function Login() {
 
 	const onBlurEmail = () => setTouched((t) => ({ ...t, email: true }));
 	const onBlurPassword = () => setTouched((t) => ({ ...t, password: true }));
-
-	const forgotPassword = useCallback(async () => {
-		if (!isValidEmail(email)) {
-			setTouched((t) => ({ ...t, email: true }));
-			await Haptics.selectionAsync();
-			return;
-		}
-		try {
-			await auth().sendPasswordResetEmail(email.trim().toLowerCase());
-			await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-			// You could also surface a toast/snackbar confirming an email was sent.
-		} catch (e) {
-			loginScreenLog.warn('Reset email error', e);
-			await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-		}
-	}, [email]);
 
 	return (
 		<SafeAreaView
@@ -325,7 +507,7 @@ export default function Login() {
 							{/* Forgot password */}
 							<View style={styles.forgotPasswordContainer}>
 								<BorderlessButton
-									onPress={forgotPassword}
+									onPress={() => router.push('/forgotPassword')}
 									rippleColor="rgba(0,0,0,0.08)"
 								>
 									<Text style={styles.forgotPasswordText}>

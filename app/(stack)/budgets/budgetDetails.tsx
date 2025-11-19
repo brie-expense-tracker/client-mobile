@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { logger } from '../../src/utils/logger';
+import { logger } from '../../../src/utils/logger';
 import {
 	View,
 	Text,
@@ -15,17 +15,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
-import { useBudget, Budget } from '../../src/context/budgetContext';
-import LinearProgressBar from '../(tabs)/wallet/components/LinearProgressBar';
+import { useBudget, Budget } from '../../../src/context/budgetContext';
+import LinearProgressBar from '../../(tabs)/wallet/components/LinearProgressBar';
 import {
 	BudgetAnalysisService,
 	BudgetAnalysis,
-} from '../../src/services/feature/budgetAnalysisService';
+} from '../../../src/services/feature/budgetAnalysisService';
 import {
 	FinancialSnapshotService,
 	BudgetHistoryItem,
-} from '../../src/services/feature/financialSnapshotService';
-import { useProfile } from '../../src/context/profileContext';
+} from '../../../src/services/feature/financialSnapshotService';
+import { useProfile } from '../../../src/context/profileContext';
 
 const BudgetSummaryScreen: React.FC = () => {
 	const params = useLocalSearchParams();

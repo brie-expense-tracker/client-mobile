@@ -290,7 +290,7 @@ export default function AICoach({
 				<View style={styles.actionGrid}>
 					<TouchableOpacity
 						style={styles.actionButton}
-						onPress={() => router.push('/(stack)/addBudget')}
+						onPress={() => router.push('/(stack)/budgets/new')}
 					>
 						<Ionicons name="add-circle" size={24} color="#3b82f6" />
 						<Text style={styles.actionText}>Add Budget</Text>
@@ -298,7 +298,7 @@ export default function AICoach({
 
 					<TouchableOpacity
 						style={styles.actionButton}
-						onPress={() => router.push('/(stack)/addGoal')}
+						onPress={() => router.push('/(stack)/goals/new')}
 					>
 						<Ionicons name="flag" size={24} color="#10b981" />
 						<Text style={styles.actionText}>Add Goal</Text>

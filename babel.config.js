@@ -8,6 +8,7 @@ module.exports = function (api) {
         presets: ['babel-preset-expo'],
         plugins: [
             isProd && ['transform-remove-console', { exclude: ['error', 'warn'] }],
+            // Reanimated plugin MUST be last
             'react-native-reanimated/plugin',
         ].filter(Boolean),
     };

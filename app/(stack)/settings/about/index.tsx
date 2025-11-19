@@ -2,12 +2,22 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 
 export default function AboutScreen() {
+	// Get version dynamically from app config
+	const appVersion = Constants.expoConfig?.version || 'Unknown';
+
+	// Get build number dynamically (iOS buildNumber or Android versionCode)
+	const buildNumber =
+		Constants.expoConfig?.ios?.buildNumber ||
+		Constants.expoConfig?.android?.versionCode?.toString() ||
+		'Unknown';
+
 	const appInfo = {
 		name: 'Brie',
-		version: '0.0.1-alpha.N',
-		build: '2024.1.0',
+		version: appVersion,
+		build: buildNumber,
 		description:
 			'Your personal finance companion for smarter money management.',
 		company: 'Brie Finance Inc.',
@@ -130,7 +140,7 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 	},
 
-	 appIcon: {
+	appIcon: {
 		width: 120,
 		height: 70,
 		borderRadius: 16,

@@ -22,6 +22,17 @@ export {
 	type NotificationConsent,
 } from './feature/notificationService';
 export {
+	type NotificationPreferences,
+	type NotificationSettingsView,
+	type NotificationConsentView,
+	prefsToSettingsView,
+	applySettingsViewToPrefs,
+	prefsToConsentView,
+	applyConsentViewToPrefs,
+	legacyProfileToPreferences,
+	preferencesToLegacyProfile,
+} from './notificationMapping';
+export {
 	WeeklyReflectionService,
 	type WeeklyReflection,
 	type SaveReflectionData,

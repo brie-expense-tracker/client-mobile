@@ -105,6 +105,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 	const lastUnreadCountRefresh = useRef<number>(0);
 	const UNREAD_COUNT_THROTTLE_MS = 30000; // 30 seconds
 	const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+	// Track loading state with ref to prevent infinite loops in useCallback dependencies
+	const isLoadingRef = useRef<boolean>(false);
 
 	// Refresh unread count function with throttling
 	const refreshUnreadCount = useCallback(async (force: boolean = false) => {
@@ -196,13 +198,14 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 
 	const getNotifications = useCallback(
 		async (page: number = 1, limit: number = 20) => {
-			// Prevent multiple simultaneous requests
-			if (loading) {
+			// Prevent multiple simultaneous requests using ref to avoid dependency issues
+			if (isLoadingRef.current) {
 				notificationContextLog.debug('Request already in progress, skipping');
 				return;
 			}
 
 			try {
+				isLoadingRef.current = true;
 				setLoading(true);
 				setError(null);
 				const response = await notificationService.getNotifications(
@@ -236,19 +239,21 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 					);
 				}
 			} finally {
+				isLoadingRef.current = false;
 				setLoading(false);
 			}
 		},
-		[loading]
+		[] // Empty deps - use ref for loading state to prevent infinite loops
 	);
 
 	const loadMoreNotifications = useCallback(async () => {
-		if (!hasMore || loading) {
-			notificationContextLog.debug('Load more blocked', { hasMore, loading });
+		if (!hasMore || isLoadingRef.current) {
+			notificationContextLog.debug('Load more blocked', { hasMore, loading: isLoadingRef.current });
 			return;
 		}
 
 		try {
+			isLoadingRef.current = true;
 			setLoading(true);
 			setError(null);
 			const nextPage = currentPage + 1;
@@ -277,13 +282,14 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 					: new Error('Failed to load more notifications')
 			);
 		} finally {
+			isLoadingRef.current = false;
 			setLoading(false);
 		}
-	}, [hasMore, loading, currentPage]);
+	}, [hasMore, currentPage]); // Removed loading from deps, using ref instead
 
 	const refreshNotifications = useCallback(async () => {
 		// Prevent refresh if already loading
-		if (loading) {
+		if (isLoadingRef.current) {
 			notificationContextLog.debug('Refresh blocked - already loading');
 			return;
 		}
@@ -292,7 +298,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 		setCurrentPage(1);
 		setHasMore(true);
 		await getNotifications(1, 20);
-	}, [getNotifications, loading]);
+	}, [getNotifications]); // Removed loading from deps, using ref instead
 
 	const setFilterCallback = useCallback(
 		(newFilter: Partial<NotificationFilter>) => {

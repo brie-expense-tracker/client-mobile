@@ -490,7 +490,7 @@ export default function DashboardPro() {
 							{/* Cashflow Card */}
 							<CashflowCard
 								cashflow={rollup.cashflow}
-								onPress={() => router.push('/(tabs)/transaction')}
+								onPress={() => router.push('/(tabs)/dashboard/ledger')}
 								onHelp={() => setHelpModalOpen('cashflow')}
 							/>
 

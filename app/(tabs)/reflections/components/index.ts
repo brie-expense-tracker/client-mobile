@@ -1,7 +1,6 @@
 export { WeeklyReflectionCard } from './WeeklyReflectionCard';
 export { MoodRatingSelector } from './MoodRatingSelector';
-export { WinOfTheWeekInput } from './WinOfTheWeekInput';
-export { ReflectionNotesInput } from './ReflectionNotesInput';
+export { BaseTextArea } from './BaseTextArea';
 export { FinancialMetricsCard } from './FinancialMetricsCard';
 export { ReflectionStatsCard } from './ReflectionStatsCard';
 

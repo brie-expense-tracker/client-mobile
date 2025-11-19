@@ -61,17 +61,15 @@ export default function DebtsScreen() {
 
 	if (debts.length === 0) {
 		return (
-			<Page title="Debts">
-				<EmptyState
-					icon="card-outline"
-					title="No debts tracked yet"
-					description="Add your credit cards, loans, or any balances you want the dashboard to calculate against."
-					ctaLabel="Add a debt"
-					onPress={() => {
-						router.push('/(stack)/debts/new');
-					}}
-				/>
-			</Page>
+			<EmptyState
+				icon="card-outline"
+				title="No debts tracked yet"
+				subtitle="Add your credit cards, loans, or any balances you want the dashboard to calculate against."
+				ctaLabel="Add a debt"
+				onPress={() => {
+					router.push('/(stack)/debts/new');
+				}}
+			/>
 		);
 	}
 

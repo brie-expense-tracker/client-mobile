@@ -217,7 +217,7 @@ const RecurringExpensesSummaryWidget: React.FC<
 		// For now, navigate to the recurring expenses detail with this expense selected
 		// In the future, this could open a modal with quick actions
 		router.push(
-			`/(stack)/recurringExpenseDetails?patternId=${expense.patternId}`
+			`/(stack)/recurring/${expense.patternId}`
 		);
 	};
 
