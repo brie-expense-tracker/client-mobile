@@ -45,9 +45,13 @@ A React Native mobile application built with Expo for personal finance managemen
 - **Budget Management**: Create and track budgets with visual progress
 - **Goal Setting**: Set financial goals with progress tracking
 - **Transaction Management**: Add and categorize transactions
+- **Recurring Expenses**: Track and manage recurring financial obligations
+- **Debt Tracking**: Monitor and manage debt payments
+- **Weekly Reflections**: Financial reflection and mood tracking
 - **Offline Support**: Works without internet connection
 - **Accessibility**: Full VoiceOver and TalkBack support
 - **Crash Reporting**: Firebase Crashlytics integration
+- **Error Monitoring**: Sentry integration for error tracking
 
 ## 🏗️ Project Structure
 
@@ -190,10 +194,16 @@ client-mobile/
 
 ### Environment Setup
 
-The app uses Firebase for authentication and crash reporting. Ensure you have:
+The app uses Firebase for authentication, crash reporting, and remote configuration. Ensure you have:
 
 - `google-services.json` (Android Firebase config)
 - `GoogleService-Info.plist` (iOS Firebase config)
+
+**Firebase Services Used:**
+
+- Firebase Authentication (email/password, Google Sign-In, Apple Sign-In)
+- Firebase Crashlytics (crash reporting)
+- Firebase Remote Config (feature flags and configuration)
 
 ### Build Configuration
 
