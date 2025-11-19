@@ -53,21 +53,137 @@ A React Native mobile application built with Expo for personal finance managemen
 
 ```
 client-mobile/
-├── app/                    # Expo Router app directory
-│   ├── (auth)/            # Authentication screens
-│   ├── (onboarding)/      # Onboarding flow
-│   ├── (stack)/           # Main app screens
-│   └── (tabs)/            # Tab navigation screens
-├── src/
-│   ├── components/        # Reusable UI components
-│   ├── services/          # API and business logic
-│   ├── context/           # React Context providers
-│   ├── hooks/             # Custom React hooks
-│   ├── utils/             # Utility functions
-│   └── types/             # TypeScript type definitions
-├── docs/                  # Implementation documentation
-├── ios/                   # iOS native code
-└── android/               # Android native code
+├── app/                           # Expo Router app directory (file-based routing)
+│   ├── _layout.tsx                # Root layout
+│   ├── (auth)/                    # Authentication flow
+│   │   ├── _layout.tsx
+│   │   ├── login.tsx
+│   │   ├── signup.tsx
+│   │   └── forgotPassword.tsx
+│   ├── (onboarding)/              # First-time user onboarding
+│   │   ├── _layout.tsx
+│   │   ├── profileSetup.tsx
+│   │   └── notificationSetup.tsx
+│   ├── (stack)/                   # Stack navigation screens
+│   │   ├── _layout.tsx
+│   │   ├── budgets/               # Budget management screens
+│   │   ├── debts/                 # Debt tracking screens
+│   │   ├── goals/                 # Financial goals screens
+│   │   ├── recurring/             # Recurring expenses screens
+│   │   └── settings/              # Settings & configuration
+│   │       ├── index.tsx
+│   │       ├── _layout.tsx
+│   │       ├── profile/           # User profile management
+│   │       ├── security/          # Security & login settings
+│   │       ├── privacyandsecurity/ # Privacy & data management
+│   │       ├── notification/      # Notification preferences
+│   │       ├── assistant/         # AI assistant settings
+│   │       ├── aiInsights/        # AI insights configuration
+│   │       ├── budgets/           # Budget settings
+│   │       ├── goals/             # Goal settings
+│   │       ├── recurringExpenses/ # Recurring expense settings
+│   │       ├── legal/             # Legal documents (ToS, Privacy, etc.)
+│   │       ├── about/             # About page
+│   │       ├── faq/               # Frequently asked questions
+│   │       └── upgrade/           # Subscription upgrade
+│   └── (tabs)/                    # Tab navigation screens
+│       ├── _layout.tsx
+│       ├── dashboard/             # Main dashboard with transactions
+│       │   ├── index.tsx
+│       │   ├── ledger/           # Transaction ledger & editing
+│       │   └── components/       # Dashboard widgets
+│       ├── chat/                  # AI assistant chat interface
+│       │   ├── index.tsx
+│       │   ├── _components/      # Chat UI components
+│       │   └── components/       # Chat utilities
+│       ├── wallet/               # Financial overview & management
+│       │   ├── index.tsx
+│       │   ├── budgets.tsx
+│       │   ├── goals.tsx
+│       │   ├── debts.tsx
+│       │   ├── recurring.tsx
+│       │   └── components/       # Wallet components
+│       ├── reflections/           # Weekly financial reflections
+│       │   ├── index.tsx
+│       │   ├── ReflectionWizard.tsx
+│       │   └── components/
+│       └── transaction/           # Transaction entry
+│
+├── src/                           # Source code
+│   ├── assets/                    # Static assets
+│   │   ├── fonts/                 # Custom fonts
+│   │   ├── icons/                 # App icons
+│   │   ├── images/                # Images & illustrations
+│   │   └── logos/                 # Brand logos
+│   ├── components/                # Reusable UI components
+│   │   ├── assistant/             # AI assistant UI components
+│   │   ├── budgets/               # Budget-related components
+│   │   ├── forms/                 # Form components
+│   │   └── __tests__/             # Component tests
+│   ├── config/                    # App configuration
+│   │   ├── api.ts                 # API endpoints
+│   │   ├── env.ts                 # Environment variables
+│   │   ├── features.ts            # Feature flags
+│   │   └── telemetry.ts           # Analytics configuration
+│   ├── constants/                 # App constants
+│   ├── context/                   # React Context providers
+│   │   ├── AuthContext.tsx        # Authentication state
+│   │   ├── ThemeContext.tsx       # Theme management
+│   │   ├── transactionContext.tsx # Transaction state
+│   │   └── ...                    # Other context providers
+│   ├── hooks/                     # Custom React hooks
+│   │   ├── useBudgets.ts          # Budget operations
+│   │   ├── useGoals.ts            # Goal operations
+│   │   ├── useAssistantStream.ts  # AI streaming
+│   │   └── ...                    # Other custom hooks
+│   ├── lib/                       # Core libraries
+│   │   ├── firebaseClient.ts      # Firebase initialization
+│   │   └── eventBus.ts            # Event system
+│   ├── networking/                # Network configuration
+│   ├── services/                  # Business logic & API services
+│   │   ├── assistant/             # AI assistant services
+│   │   ├── core/                  # Core services
+│   │   ├── feature/               # Feature-specific services
+│   │   ├── ml/                    # Machine learning services
+│   │   ├── resilience/            # Error handling & retry logic
+│   │   ├── security/              # Security utilities
+│   │   └── utility/               # Utility services
+│   ├── state/                     # Global state management
+│   ├── types/                     # TypeScript type definitions
+│   ├── ui/                        # UI primitives & theme
+│   │   ├── theme.ts               # Design system (colors, spacing, etc.)
+│   │   ├── Card.tsx
+│   │   ├── Page.tsx
+│   │   └── ...                    # Other UI primitives
+│   └── utils/                     # Utility functions
+│       ├── logger.ts              # Logging utilities
+│       ├── format.ts              # Formatting helpers
+│       ├── accessibility.ts       # Accessibility utilities
+│       └── ...                    # Other utilities
+│
+├── docs/                          # Documentation
+│   ├── README.md                  # Documentation index
+│   ├── workflows/                 # Workflow documentation
+│   └── *.md                       # Feature-specific docs
+│
+├── scripts/                       # Build & utility scripts
+│   ├── clear-cache-and-restart.sh
+│   └── testflight-build.sh
+│
+├── ios/                           # iOS native code
+│   ├── brie/                      # iOS app bundle
+│   └── Podfile                    # CocoaPods dependencies
+│
+├── android/                       # Android native code
+│   ├── app/                       # Android app module
+│   └── build.gradle               # Gradle build config
+│
+├── app.config.ts                  # Expo app configuration
+├── eas.json                       # EAS Build configuration
+├── babel.config.js                # Babel configuration
+├── metro.config.js                # Metro bundler config
+├── tsconfig.json                  # TypeScript configuration
+└── package.json                   # Dependencies & scripts
 ```
 
 ## 🔧 Configuration
