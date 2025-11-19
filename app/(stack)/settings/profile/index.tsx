@@ -458,6 +458,14 @@ export default function AccountScreen() {
 						onPress={() => router.push('/(stack)/settings/profile/editName')}
 					/>
 					<View style={[styles.divider, { backgroundColor: palette.border }]} />
+					<View style={[styles.divider, { backgroundColor: palette.border }]} />
+					<Row
+						icon="call-outline"
+						label="Phone"
+						value={profile.phone || 'Not set'}
+						onPress={() => router.push('/(stack)/settings/profile/editPhone')}
+					/>
+					<View style={[styles.divider, { backgroundColor: palette.border }]} />
 					<Row
 						icon="mail-outline"
 						label="Email"
