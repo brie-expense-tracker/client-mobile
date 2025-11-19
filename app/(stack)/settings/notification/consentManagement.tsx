@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, {
+	useState,
+	useEffect,
+	useCallback,
+	useMemo,
+	useRef,
+} from 'react';
 import { logger } from '../../../../src/utils/logger';
 import {
 	View,
@@ -10,100 +16,263 @@ import {
 	TouchableOpacity,
 	Alert,
 	ActivityIndicator,
+	Modal,
+	Animated,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useNotification } from '../../../../src/context/notificationContext';
-import { NotificationConsent } from '../../../../src/services';
+import {
+	type NotificationConsentView,
+	legacyProfileToPreferences,
+	prefsToConsentView,
+} from '../../../../src/services';
+import { useProfile } from '../../../../src/context/profileContext';
+import { BorderlessButton } from 'react-native-gesture-handler';
+
+// Type declaration for __DEV__ (provided by Metro bundler in React Native)
+declare const __DEV__: boolean;
+
+// Show test notification button in dev mode or TestFlight
+const SHOW_TEST_NOTIFICATION_BUTTON =
+	__DEV__ || process.env.EXPO_PUBLIC_ENV === 'testflight';
+
+type SelectOption = {
+	label: string;
+	value: string;
+};
+
+function SelectField({
+	value,
+	onChange,
+	options,
+	placeholder,
+}: {
+	value: string;
+	onChange: (value: string) => void;
+	options: SelectOption[];
+	placeholder?: string;
+}) {
+	const [visible, setVisible] = useState(false);
+	const selected = options.find((o) => o.value === value);
+	const slideAnim = useRef(new Animated.Value(0)).current;
+
+	useEffect(() => {
+		if (visible) {
+			// Reset animation value
+			slideAnim.setValue(0);
+			// Start animation after a brief delay to let overlay appear first
+			Animated.timing(slideAnim, {
+				toValue: 1,
+				duration: 300,
+				useNativeDriver: true,
+			}).start();
+		} else {
+			// Reset when closing
+			slideAnim.setValue(0);
+		}
+	}, [visible, slideAnim]);
+
+	const handleClose = () => {
+		Animated.timing(slideAnim, {
+			toValue: 0,
+			duration: 200,
+			useNativeDriver: true,
+		}).start(() => {
+			setVisible(false);
+		});
+	};
+
+	const translateY = slideAnim.interpolate({
+		inputRange: [0, 1],
+		outputRange: [300, 0],
+	});
+
+	return (
+		<>
+			<TouchableOpacity
+				activeOpacity={0.8}
+				style={styles.selectField}
+				onPress={() => setVisible(true)}
+			>
+				<Text
+					style={[styles.selectFieldText, !selected && { color: '#9ca3af' }]}
+				>
+					{selected ? selected.label : placeholder || 'Select...'}
+				</Text>
+				<Ionicons name="chevron-down" size={18} color="#6b7280" />
+			</TouchableOpacity>
+
+			<Modal
+				visible={visible}
+				transparent
+				animationType="fade"
+				onRequestClose={handleClose}
+			>
+				<View style={styles.modalBackdrop}>
+					<Animated.View
+						style={[
+							styles.modalSheet,
+							{
+								transform: [{ translateY }],
+							},
+						]}
+					>
+						<View style={styles.modalHeader}>
+							<Text style={styles.modalTitle}>Choose an option</Text>
+							<TouchableOpacity onPress={handleClose}>
+								<Ionicons name="close" size={22} color="#6b7280" />
+							</TouchableOpacity>
+						</View>
+
+						<ScrollView>
+							{options.map((option) => (
+								<TouchableOpacity
+									key={option.value}
+									style={styles.modalOption}
+									onPress={() => {
+										onChange(option.value);
+										handleClose();
+									}}
+								>
+									<Text style={styles.modalOptionLabel}>{option.label}</Text>
+									{option.value === value && (
+										<Ionicons name="checkmark" size={20} color="#007ACC" />
+									)}
+								</TouchableOpacity>
+							))}
+						</ScrollView>
+					</Animated.View>
+				</View>
+			</Modal>
+		</>
+	);
+}
 
 export default function NotificationConsentScreen() {
-	const { updateConsentSettings, getConsentSettings, sendTestNotification } =
-		useNotification();
+	const { sendTestNotification } = useNotification();
+	const { profile, updateNotificationConsent } = useProfile();
 
-	const [consent, setConsent] = useState<NotificationConsent>({
-		core: {
-			budget: true,
-			goals: true,
-			transactions: true,
-			system: true,
-		},
+	const [consent, setConsent] = useState<NotificationConsentView>({
 		aiInsights: {
 			enabled: true,
 			frequency: 'weekly',
-			pushNotifications: true,
-			emailAlerts: false,
+			channels: {
+				push: true,
+				email: false,
+			},
 		},
 		marketing: {
-			enabled: false,
-			promotional: false,
-			newsletter: false,
-			productUpdates: false,
-			specialOffers: false,
+			marketingUpdatesEnabled: false,
+			newsletterEnabled: false,
 		},
-		reminders: {
-			enabled: true,
-			weeklySummary: true,
-			monthlyCheck: true,
-			overspendingAlerts: false,
+		quietHours: {
+			enabled: false,
+			start: '22:00',
+			end: '08:00',
 		},
 	});
 
+	// Snapshot of last-saved (or loaded) state so we know if anything changed
+	const [initialConsent, setInitialConsent] =
+		useState<NotificationConsentView | null>(null);
+
 	const [loading, setLoading] = useState(false);
 	const [saving, setSaving] = useState(false);
-	const [quietHours, setQuietHours] = useState({
-		enabled: false,
-		start: '22:00',
-		end: '08:00',
-	});
+	const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>(
+		'idle'
+	);
+
+	const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	const loadConsentSettings = useCallback(async () => {
 		setLoading(true);
 		try {
-			const settings = await getConsentSettings();
-			setConsent(settings);
-			setLoading(false);
+			if (profile?.preferences) {
+				const prefs = legacyProfileToPreferences(
+					profile.preferences.notifications,
+					profile.preferences.aiInsights,
+					profile.preferences.marketing || undefined
+				);
+				const view = prefsToConsentView(prefs);
+				setConsent(view);
+				setInitialConsent(view); // 🔹 store as baseline
+			}
 		} catch (error) {
 			logger.error('Error loading consent settings:', error);
 			Alert.alert('Error', 'Failed to load notification preferences');
+		} finally {
 			setLoading(false);
 		}
-	}, [getConsentSettings]);
+	}, [profile]);
 
 	useEffect(() => {
 		loadConsentSettings();
 	}, [loadConsentSettings]);
 
-	const updateConsent = (
-		section: keyof NotificationConsent,
-		key: string,
-		value: boolean
-	) => {
-		setConsent((prev) => ({
-			...prev,
-			[section]: {
-				...prev[section],
-				[key]: value,
-			},
-		}));
-	};
+	// Simple deep equality via JSON stringify (good enough here)
+	const isDirty = useMemo(() => {
+		if (!initialConsent) return false;
+		return JSON.stringify(initialConsent) !== JSON.stringify(consent);
+	}, [initialConsent, consent]);
 
-	const handleSave = async () => {
-		setSaving(true);
-		try {
-			const success = await updateConsentSettings(consent);
-			if (success) {
-				Alert.alert('Success', 'Notification preferences updated successfully');
-			} else {
-				Alert.alert('Error', 'Failed to update notification preferences');
+	// Save function (called by auto-save effect when dirty)
+	const saveConsent = useCallback(
+		async (next: NotificationConsentView) => {
+			if (!profile?.preferences) {
+				Alert.alert('Error', 'Profile not loaded');
+				return;
 			}
-		} catch (error) {
-			logger.error('Error updating consent settings:', error);
-			Alert.alert('Error', 'Failed to update notification preferences');
-		} finally {
-			setSaving(false);
+
+			logger.debug('[NotificationConsent] Saving consent', { next });
+			setSaving(true);
+			setSaveStatus('saving');
+
+			try {
+				await updateNotificationConsent(next);
+				setInitialConsent(next); // 🔹 new baseline after successful save
+				setSaveStatus('saved');
+
+				// Clear "saved" status after 2 seconds
+				setTimeout(() => {
+					setSaveStatus('idle');
+				}, 2000);
+			} catch (error) {
+				logger.error('Error updating consent settings:', error);
+				setSaveStatus('idle');
+				let errorMessage = 'Failed to update notification preferences.';
+				if (error instanceof Error) {
+					errorMessage = error.message;
+				}
+				Alert.alert('Error', errorMessage);
+			} finally {
+				setSaving(false);
+			}
+		},
+		[profile, updateNotificationConsent]
+	);
+
+	// Auto-save when consent changes (debounced, only if dirty)
+	useEffect(() => {
+		if (!initialConsent) return; // nothing loaded yet
+		if (!isDirty) return; // no changes to save
+
+		// Clear any pending save
+		if (saveTimeoutRef.current) {
+			clearTimeout(saveTimeoutRef.current);
 		}
-	};
+
+		// Debounce 500ms after last change
+		saveTimeoutRef.current = setTimeout(() => {
+			void saveConsent(consent);
+		}, 500);
+
+		return () => {
+			if (saveTimeoutRef.current) {
+				clearTimeout(saveTimeoutRef.current);
+			}
+		};
+	}, [initialConsent, isDirty, consent, saveConsent]);
 
 	const handleTestNotification = async () => {
 		try {
@@ -125,33 +294,27 @@ export default function NotificationConsentScreen() {
 					text: 'Reset',
 					style: 'destructive',
 					onPress: () => {
-						setConsent({
-							core: {
-								budget: true,
-								goals: true,
-								transactions: true,
-								system: true,
-							},
+						const defaults: NotificationConsentView = {
 							aiInsights: {
 								enabled: true,
 								frequency: 'weekly',
-								pushNotifications: true,
-								emailAlerts: false,
+								channels: {
+									push: true,
+									email: false,
+								},
 							},
 							marketing: {
+								marketingUpdatesEnabled: false,
+								newsletterEnabled: false,
+							},
+							quietHours: {
 								enabled: false,
-								promotional: false,
-								newsletter: false,
-								productUpdates: false,
-								specialOffers: false,
+								start: '22:00',
+								end: '08:00',
 							},
-							reminders: {
-								enabled: true,
-								weeklySummary: true,
-								monthlyCheck: true,
-								overspendingAlerts: false,
-							},
-						});
+						};
+						setConsent(defaults);
+						// Don't update initialConsent here: user still needs to hit Save
 					},
 				},
 			]
@@ -173,89 +336,37 @@ export default function NotificationConsentScreen() {
 		<SafeAreaView style={styles.container}>
 			<Stack.Screen
 				options={{
-					title: 'Notification Consent',
 					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Advanced Preferences',
+					headerShadowVisible: false,
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerLeft: () => (
+						<BorderlessButton
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</BorderlessButton>
+					),
 				}}
 			/>
 
 			<ScrollView contentContainerStyle={styles.content}>
 				{/* Header */}
 				<View style={styles.header}>
-					<Ionicons name="shield-checkmark-outline" size={32} color="#007ACC" />
+					{/* <Ionicons name="shield-checkmark-outline" size={32} color="#007ACC" />
 					<Text style={styles.title}>Notification Consent</Text>
 					<Text style={styles.subtitle}>
 						Control how and when you receive notifications
-					</Text>
-				</View>
-
-				{/* Core Notifications */}
-				<View style={styles.section}>
-					<Text style={styles.sectionTitle}>Essential Updates</Text>
-					<Text style={styles.sectionDescription}>
-						These notifications help you stay on top of your finances
-					</Text>
-
-					<View style={styles.settingRow}>
-						<View style={styles.settingInfo}>
-							<Text style={styles.settingLabel}>Budget Alerts</Text>
-							<Text style={styles.settingDescription}>
-								Get notified when approaching budget limits
-							</Text>
-						</View>
-						<Switch
-							value={consent.core.budget}
-							onValueChange={(value) => updateConsent('core', 'budget', value)}
-							trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
-							thumbColor={consent.core.budget ? '#ffffff' : '#9ca3af'}
-						/>
-					</View>
-
-					<View style={styles.settingRow}>
-						<View style={styles.settingInfo}>
-							<Text style={styles.settingLabel}>Goal Progress</Text>
-							<Text style={styles.settingDescription}>
-								Updates on savings and investment goals
-							</Text>
-						</View>
-						<Switch
-							value={consent.core.goals}
-							onValueChange={(value) => updateConsent('core', 'goals', value)}
-							trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
-							thumbColor={consent.core.goals ? '#ffffff' : '#9ca3af'}
-						/>
-					</View>
-
-					<View style={styles.settingRow}>
-						<View style={styles.settingInfo}>
-							<Text style={styles.settingLabel}>Transaction Alerts</Text>
-							<Text style={styles.settingDescription}>
-								Important account updates and alerts
-							</Text>
-						</View>
-						<Switch
-							value={consent.core.transactions}
-							onValueChange={(value) =>
-								updateConsent('core', 'transactions', value)
-							}
-							trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
-							thumbColor={consent.core.transactions ? '#ffffff' : '#9ca3af'}
-						/>
-					</View>
-
-					<View style={styles.settingRow}>
-						<View style={styles.settingInfo}>
-							<Text style={styles.settingLabel}>System Notifications</Text>
-							<Text style={styles.settingDescription}>
-								App updates and maintenance notices
-							</Text>
-						</View>
-						<Switch
-							value={consent.core.system}
-							onValueChange={(value) => updateConsent('core', 'system', value)}
-							trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
-							thumbColor={consent.core.system ? '#ffffff' : '#9ca3af'}
-						/>
-					</View>
+					</Text> */}
 				</View>
 
 				{/* AI Insights */}
@@ -275,7 +386,13 @@ export default function NotificationConsentScreen() {
 						<Switch
 							value={consent.aiInsights.enabled}
 							onValueChange={(value) =>
-								updateConsent('aiInsights', 'enabled', value)
+								setConsent((prev) => ({
+									...prev,
+									aiInsights: {
+										...prev.aiInsights,
+										enabled: value,
+									},
+								}))
 							}
 							trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
 							thumbColor={consent.aiInsights.enabled ? '#ffffff' : '#9ca3af'}
@@ -286,155 +403,84 @@ export default function NotificationConsentScreen() {
 						<>
 							<View style={styles.settingRow}>
 								<View style={styles.settingInfo}>
+									<Text style={styles.settingLabel}>Frequency</Text>
+									<Text style={styles.settingDescription}>
+										How often to receive AI insights
+									</Text>
+								</View>
+								<View style={{ minWidth: 140 }}>
+									<SelectField
+										value={consent.aiInsights.frequency}
+										onChange={(value) =>
+											setConsent((prev) => ({
+												...prev,
+												aiInsights: {
+													...prev.aiInsights,
+													frequency: value as 'daily' | 'weekly' | 'monthly',
+												},
+											}))
+										}
+										options={[
+											{ label: 'Daily', value: 'daily' },
+											{ label: 'Weekly', value: 'weekly' },
+											{ label: 'Monthly', value: 'monthly' },
+										]}
+									/>
+								</View>
+							</View>
+
+							<View style={styles.settingRow}>
+								<View style={styles.settingInfo}>
 									<Text style={styles.settingLabel}>Push Notifications</Text>
 									<Text style={styles.settingDescription}>
 										Receive insights as notifications
 									</Text>
 								</View>
 								<Switch
-									value={consent.aiInsights.pushNotifications}
+									value={consent.aiInsights.channels.push}
 									onValueChange={(value) =>
-										updateConsent('aiInsights', 'pushNotifications', value)
+										setConsent((prev) => ({
+											...prev,
+											aiInsights: {
+												...prev.aiInsights,
+												channels: {
+													...prev.aiInsights.channels,
+													push: value,
+												},
+											},
+										}))
 									}
 									trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
 									thumbColor={
-										consent.aiInsights.pushNotifications ? '#ffffff' : '#9ca3af'
+										consent.aiInsights.channels.push ? '#ffffff' : '#9ca3af'
 									}
 								/>
 							</View>
 
 							<View style={styles.settingRow}>
 								<View style={styles.settingInfo}>
-									<Text style={styles.settingLabel}>Email Alerts</Text>
+									<Text style={styles.settingLabel}>Email</Text>
 									<Text style={styles.settingDescription}>
 										Receive insights via email
 									</Text>
 								</View>
 								<Switch
-									value={consent.aiInsights.emailAlerts}
+									value={consent.aiInsights.channels.email}
 									onValueChange={(value) =>
-										updateConsent('aiInsights', 'emailAlerts', value)
-									}
-									trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
-									thumbColor={
-										consent.aiInsights.emailAlerts ? '#ffffff' : '#9ca3af'
-									}
-								/>
-							</View>
-
-							<View style={styles.settingRow}>
-								<View style={styles.settingInfo}>
-									<Text style={styles.settingLabel}>Frequency</Text>
-									<Text style={styles.settingDescription}>
-										How often to receive AI insights
-									</Text>
-								</View>
-								<View style={styles.pickerContainer}>
-									<Picker
-										selectedValue={consent.aiInsights.frequency}
-										onValueChange={(
-											value: 'daily' | 'weekly' | 'monthly' | 'disabled'
-										) =>
-											setConsent((prev) => ({
-												...prev,
-												aiInsights: {
-													...prev.aiInsights,
-													frequency: value,
+										setConsent((prev) => ({
+											...prev,
+											aiInsights: {
+												...prev.aiInsights,
+												channels: {
+													...prev.aiInsights.channels,
+													email: value,
 												},
-											}))
-										}
-										style={styles.picker}
-									>
-										<Picker.Item label="Daily" value="daily" />
-										<Picker.Item label="Weekly" value="weekly" />
-										<Picker.Item label="Monthly" value="monthly" />
-										<Picker.Item label="Disabled" value="disabled" />
-									</Picker>
-								</View>
-							</View>
-						</>
-					)}
-				</View>
-
-				{/* Reminders */}
-				<View style={styles.section}>
-					<Text style={styles.sectionTitle}>Reminders & Alerts</Text>
-					<Text style={styles.sectionDescription}>
-						Helpful reminders to keep you on track
-					</Text>
-
-					<View style={styles.settingRow}>
-						<View style={styles.settingInfo}>
-							<Text style={styles.settingLabel}>Enable Reminders</Text>
-							<Text style={styles.settingDescription}>
-								Receive helpful financial reminders
-							</Text>
-						</View>
-						<Switch
-							value={consent.reminders.enabled}
-							onValueChange={(value) =>
-								updateConsent('reminders', 'enabled', value)
-							}
-							trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
-							thumbColor={consent.reminders.enabled ? '#ffffff' : '#9ca3af'}
-						/>
-					</View>
-
-					{consent.reminders.enabled && (
-						<>
-							<View style={styles.settingRow}>
-								<View style={styles.settingInfo}>
-									<Text style={styles.settingLabel}>Weekly Summary</Text>
-									<Text style={styles.settingDescription}>
-										Weekly overview of your finances
-									</Text>
-								</View>
-								<Switch
-									value={consent.reminders.weeklySummary}
-									onValueChange={(value) =>
-										updateConsent('reminders', 'weeklySummary', value)
+											},
+										}))
 									}
 									trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
 									thumbColor={
-										consent.reminders.weeklySummary ? '#ffffff' : '#9ca3af'
-									}
-								/>
-							</View>
-
-							<View style={styles.settingRow}>
-								<View style={styles.settingInfo}>
-									<Text style={styles.settingLabel}>Monthly Check-in</Text>
-									<Text style={styles.settingDescription}>
-										Monthly financial health review
-									</Text>
-								</View>
-								<Switch
-									value={consent.reminders.monthlyCheck}
-									onValueChange={(value) =>
-										updateConsent('reminders', 'monthlyCheck', value)
-									}
-									trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
-									thumbColor={
-										consent.reminders.monthlyCheck ? '#ffffff' : '#9ca3af'
-									}
-								/>
-							</View>
-
-							<View style={styles.settingRow}>
-								<View style={styles.settingInfo}>
-									<Text style={styles.settingLabel}>Overspending Alerts</Text>
-									<Text style={styles.settingDescription}>
-										Get notified when you exceed budgets
-									</Text>
-								</View>
-								<Switch
-									value={consent.reminders.overspendingAlerts}
-									onValueChange={(value) =>
-										updateConsent('reminders', 'overspendingAlerts', value)
-									}
-									trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
-									thumbColor={
-										consent.reminders.overspendingAlerts ? '#ffffff' : '#9ca3af'
+										consent.aiInsights.channels.email ? '#ffffff' : '#9ca3af'
 									}
 								/>
 							</View>
@@ -451,81 +497,57 @@ export default function NotificationConsentScreen() {
 
 					<View style={styles.settingRow}>
 						<View style={styles.settingInfo}>
-							<Text style={styles.settingLabel}>Enable Marketing</Text>
+							<Text style={styles.settingLabel}>
+								Marketing & Product Updates
+							</Text>
 							<Text style={styles.settingDescription}>
-								Receive marketing and promotional content
+								Receive updates about new features and improvements
 							</Text>
 						</View>
 						<Switch
-							value={consent.marketing.enabled}
+							value={consent.marketing.marketingUpdatesEnabled}
 							onValueChange={(value) =>
-								updateConsent('marketing', 'enabled', value)
+								setConsent((prev) => ({
+									...prev,
+									marketing: {
+										...prev.marketing,
+										marketingUpdatesEnabled: value,
+									},
+								}))
 							}
 							trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
-							thumbColor={consent.marketing.enabled ? '#ffffff' : '#9ca3af'}
+							thumbColor={
+								consent.marketing.marketingUpdatesEnabled
+									? '#ffffff'
+									: '#9ca3af'
+							}
 						/>
 					</View>
 
-					{consent.marketing.enabled && (
-						<>
-							<View style={styles.settingRow}>
-								<View style={styles.settingInfo}>
-									<Text style={styles.settingLabel}>Product Updates</Text>
-									<Text style={styles.settingDescription}>
-										New features and improvements
-									</Text>
-								</View>
-								<Switch
-									value={consent.marketing.productUpdates}
-									onValueChange={(value) =>
-										updateConsent('marketing', 'productUpdates', value)
-									}
-									trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
-									thumbColor={
-										consent.marketing.productUpdates ? '#ffffff' : '#9ca3af'
-									}
-								/>
-							</View>
-
-							<View style={styles.settingRow}>
-								<View style={styles.settingInfo}>
-									<Text style={styles.settingLabel}>Special Offers</Text>
-									<Text style={styles.settingDescription}>
-										Exclusive deals and promotions
-									</Text>
-								</View>
-								<Switch
-									value={consent.marketing.specialOffers}
-									onValueChange={(value) =>
-										updateConsent('marketing', 'specialOffers', value)
-									}
-									trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
-									thumbColor={
-										consent.marketing.specialOffers ? '#ffffff' : '#9ca3af'
-									}
-								/>
-							</View>
-
-							<View style={styles.settingRow}>
-								<View style={styles.settingInfo}>
-									<Text style={styles.settingLabel}>Newsletter</Text>
-									<Text style={styles.settingDescription}>
-										Financial tips and insights
-									</Text>
-								</View>
-								<Switch
-									value={consent.marketing.newsletter}
-									onValueChange={(value) =>
-										updateConsent('marketing', 'newsletter', value)
-									}
-									trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
-									thumbColor={
-										consent.marketing.newsletter ? '#ffffff' : '#9ca3af'
-									}
-								/>
-							</View>
-						</>
-					)}
+					<View style={styles.settingRow}>
+						<View style={styles.settingInfo}>
+							<Text style={styles.settingLabel}>Newsletter</Text>
+							<Text style={styles.settingDescription}>
+								Financial tips and insights via email
+							</Text>
+						</View>
+						<Switch
+							value={consent.marketing.newsletterEnabled}
+							onValueChange={(value) =>
+								setConsent((prev) => ({
+									...prev,
+									marketing: {
+										...prev.marketing,
+										newsletterEnabled: value,
+									},
+								}))
+							}
+							trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
+							thumbColor={
+								consent.marketing.newsletterEnabled ? '#ffffff' : '#9ca3af'
+							}
+						/>
+					</View>
 				</View>
 
 				{/* Quiet Hours */}
@@ -543,16 +565,19 @@ export default function NotificationConsentScreen() {
 							</Text>
 						</View>
 						<Switch
-							value={quietHours.enabled}
+							value={consent.quietHours.enabled}
 							onValueChange={(value) =>
-								setQuietHours((prev) => ({ ...prev, enabled: value }))
+								setConsent((prev) => ({
+									...prev,
+									quietHours: { ...prev.quietHours, enabled: value },
+								}))
 							}
 							trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
-							thumbColor={quietHours.enabled ? '#ffffff' : '#9ca3af'}
+							thumbColor={consent.quietHours.enabled ? '#ffffff' : '#9ca3af'}
 						/>
 					</View>
 
-					{quietHours.enabled && (
+					{consent.quietHours.enabled && (
 						<>
 							<View style={styles.settingRow}>
 								<View style={styles.settingInfo}>
@@ -561,25 +586,23 @@ export default function NotificationConsentScreen() {
 										When to start suppressing notifications
 									</Text>
 								</View>
-								<View style={styles.pickerContainer}>
-									<Picker
-										selectedValue={quietHours.start}
-										onValueChange={(value: string) =>
-											setQuietHours((prev) => ({ ...prev, start: value }))
+								<View style={{ minWidth: 140 }}>
+									<SelectField
+										value={consent.quietHours.start}
+										onChange={(value) =>
+											setConsent((prev) => ({
+												...prev,
+												quietHours: { ...prev.quietHours, start: value },
+											}))
 										}
-										style={styles.picker}
-									>
-										{Array.from({ length: 24 }, (_, i) => {
+										options={Array.from({ length: 24 }, (_, i) => {
 											const hour = i.toString().padStart(2, '0');
-											return (
-												<Picker.Item
-													key={hour}
-													label={`${hour}:00`}
-													value={`${hour}:00`}
-												/>
-											);
+											return {
+												label: `${hour}:00`,
+												value: `${hour}:00`,
+											};
 										})}
-									</Picker>
+									/>
 								</View>
 							</View>
 
@@ -590,25 +613,23 @@ export default function NotificationConsentScreen() {
 										When to resume notifications
 									</Text>
 								</View>
-								<View style={styles.pickerContainer}>
-									<Picker
-										selectedValue={quietHours.end}
-										onValueChange={(value: string) =>
-											setQuietHours((prev) => ({ ...prev, end: value }))
+								<View style={{ minWidth: 140 }}>
+									<SelectField
+										value={consent.quietHours.end}
+										onChange={(value) =>
+											setConsent((prev) => ({
+												...prev,
+												quietHours: { ...prev.quietHours, end: value },
+											}))
 										}
-										style={styles.picker}
-									>
-										{Array.from({ length: 24 }, (_, i) => {
+										options={Array.from({ length: 24 }, (_, i) => {
 											const hour = i.toString().padStart(2, '0');
-											return (
-												<Picker.Item
-													key={hour}
-													label={`${hour}:00`}
-													value={`${hour}:00`}
-												/>
-											);
+											return {
+												label: `${hour}:00`,
+												value: `${hour}:00`,
+											};
 										})}
-									</Picker>
+									/>
 								</View>
 							</View>
 						</>
@@ -630,14 +651,20 @@ export default function NotificationConsentScreen() {
 
 				{/* Action Buttons */}
 				<View style={styles.buttonContainer}>
-					<TouchableOpacity
-						style={[styles.button, styles.testButton]}
-						onPress={handleTestNotification}
-						disabled={saving}
-					>
-						<Ionicons name="notifications-outline" size={20} color="#007ACC" />
-						<Text style={styles.testButtonText}>Send Test Notification</Text>
-					</TouchableOpacity>
+					{SHOW_TEST_NOTIFICATION_BUTTON && (
+						<TouchableOpacity
+							style={[styles.button, styles.testButton]}
+							onPress={handleTestNotification}
+							disabled={saving}
+						>
+							<Ionicons
+								name="notifications-outline"
+								size={20}
+								color="#007ACC"
+							/>
+							<Text style={styles.testButtonText}>Send Test Notification</Text>
+						</TouchableOpacity>
+					)}
 
 					<TouchableOpacity
 						style={[styles.button, styles.resetButton]}
@@ -646,16 +673,17 @@ export default function NotificationConsentScreen() {
 					>
 						<Text style={styles.resetButtonText}>Reset to Defaults</Text>
 					</TouchableOpacity>
+				</View>
 
-					<TouchableOpacity
-						style={[styles.button, styles.saveButton]}
-						onPress={handleSave}
-						disabled={saving}
-					>
-						<Text style={styles.saveButtonText}>
-							{saving ? 'Saving...' : 'Save Changes'}
-						</Text>
-					</TouchableOpacity>
+				{/* Save Status Indicator */}
+				<View style={styles.statusContainer}>
+					<Text style={styles.statusText}>
+						{saveStatus === 'saving'
+							? 'Saving changes…'
+							: saveStatus === 'saved'
+							? 'All changes saved'
+							: ''}
+					</Text>
 				</View>
 			</ScrollView>
 		</SafeAreaView>
@@ -683,8 +711,7 @@ const styles = StyleSheet.create({
 	},
 	header: {
 		alignItems: 'center',
-		marginTop: 24,
-		marginBottom: 32,
+		marginBottom: 24,
 	},
 	title: {
 		fontSize: 24,
@@ -701,6 +728,9 @@ const styles = StyleSheet.create({
 	},
 	section: {
 		marginBottom: 32,
+	},
+	sectionHeader: {
+		marginBottom: 16,
 	},
 	sectionTitle: {
 		fontSize: 20,
@@ -792,13 +822,67 @@ const styles = StyleSheet.create({
 		fontWeight: '600',
 		color: '#ffffff',
 	},
-	pickerContainer: {
-		minWidth: 120,
-		height: 40,
-		justifyContent: 'center',
+	statusContainer: {
+		alignItems: 'center',
+		marginTop: 8,
+		minHeight: 20,
 	},
-	picker: {
-		height: 40,
-		width: 120,
+	statusText: {
+		fontSize: 12,
+		color: '#6b7280',
+	},
+	selectField: {
+		borderWidth: 1,
+		borderColor: '#e5e7eb',
+		borderRadius: 10,
+		paddingHorizontal: 12,
+		paddingVertical: 10,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		backgroundColor: '#f9fafb',
+	},
+	selectFieldText: {
+		fontSize: 14,
+		color: '#111827',
+	},
+	modalBackdrop: {
+		flex: 1,
+		backgroundColor: 'rgba(0,0,0,0.35)',
+		justifyContent: 'flex-end',
+	},
+	modalSheet: {
+		backgroundColor: '#ffffff',
+		borderTopLeftRadius: 16,
+		borderTopRightRadius: 16,
+		maxHeight: '60%',
+		paddingBottom: 24,
+	},
+	modalHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		paddingHorizontal: 20,
+		paddingVertical: 16,
+		borderBottomWidth: 1,
+		borderBottomColor: '#f3f4f6',
+	},
+	modalTitle: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#111827',
+	},
+	modalOption: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		paddingHorizontal: 20,
+		paddingVertical: 14,
+		borderBottomWidth: 1,
+		borderBottomColor: '#f3f4f6',
+	},
+	modalOptionLabel: {
+		fontSize: 15,
+		color: '#111827',
 	},
 });

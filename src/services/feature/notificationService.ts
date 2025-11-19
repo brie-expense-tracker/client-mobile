@@ -1064,14 +1064,14 @@ class NotificationService {
 				switch (type) {
 					case 'budget':
 						if (entityId) {
-							router.push(`/(stack)/budgetDetails?id=${entityId}`);
+							router.push(`/(stack)/budgets/${entityId}`);
 						} else {
 							router.push('/(tabs)/wallet/budgets');
 						}
 						break;
 					case 'goal':
 						if (entityId) {
-							router.push(`/(stack)/goalDetails?id=${entityId}`);
+							router.push(`/(stack)/goals/${entityId}`);
 						} else {
 							router.push('/(tabs)/wallet/goals');
 						}

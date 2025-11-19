@@ -142,7 +142,7 @@ export default function RecurringExpensesSettingsScreen() {
 
 					<TouchableOpacity
 						style={styles.actionButton}
-						onPress={() => router.push('/(stack)/addRecurringExpense')}
+						onPress={() => router.push('/(stack)/recurring/new')}
 					>
 						<Ionicons name="add-circle-outline" size={20} color="#007AFF" />
 						<Text style={styles.actionButtonText}>

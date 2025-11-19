@@ -14,35 +14,61 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useProfile } from '../../../../src/context/profileContext';
 import useAuth from '../../../../src/context/AuthContext';
-import { useTheme } from '../../../../src/context/ThemeContext';
 import AIProfileInsights from './components/AIProfileInsights';
 import CircularProgress from '../../../../src/components/CircularProgress';
 import { useFeature } from '../../../../src/config/features';
 import { IncomeSourceBadge } from '../../../../src/components/IncomeSourceBadge';
 import { IncomeDivergenceWarning } from '../../../../src/components/IncomeDivergenceWarning';
 import { logger } from '../../../../src/utils/logger';
+import { palette, radius, space, type, shadow } from '../../../../src/ui/theme';
 
 const currency = (n?: number) =>
 	typeof n === 'number' && !Number.isNaN(n) ? `$${n.toLocaleString()}` : '$0';
 
-const Section = ({ title, children, right, colors }: any) => (
+const Section = ({
+	title,
+	children,
+	right,
+}: {
+	title: string;
+	children: React.ReactNode;
+	right?: React.ReactNode;
+}) => (
 	<View style={styles.section}>
 		<View style={styles.sectionHeader}>
-			<Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
+			<Text
+				style={[
+					type.labelSm,
+					styles.sectionTitle,
+					{ color: palette.textSubtle },
+				]}
+			>
+				{title}
+			</Text>
 			{right}
 		</View>
 		<View style={styles.sectionBody}>{children}</View>
 	</View>
 );
 
-const Card = ({ children, colors, style }: any) => (
+const Card = ({
+	children,
+	style,
+}: {
+	children: React.ReactNode;
+	style?: any;
+}) => (
 	<View
 		style={[
 			styles.card,
 			{
-				backgroundColor: colors.card,
-				shadowOpacity: colors.isDark ? 0.18 : 0.05,
-				borderColor: colors.line,
+				backgroundColor: palette.surface,
+				borderColor: palette.border,
+				shadowOpacity: shadow.card.shadowOpacity,
+				shadowRadius: shadow.card.shadowRadius,
+				shadowColor: shadow.card.shadowColor,
+				shadowOffset: shadow.card.shadowOffset,
+				elevation: shadow.card.elevation,
 			},
 			style,
 		]}
@@ -51,17 +77,33 @@ const Card = ({ children, colors, style }: any) => (
 	</View>
 );
 
-const Row = ({ icon, label, value, onPress, colors, badge }: any) => {
+const Row = ({
+	icon,
+	label,
+	value,
+	onPress,
+	badge,
+}: {
+	icon: keyof typeof Ionicons.glyphMap;
+	label: string;
+	value?: string;
+	onPress?: () => void;
+	badge?: React.ReactNode;
+}) => {
 	const Wrapper = onPress ? TouchableOpacity : View;
 	return (
-		<Wrapper activeOpacity={0.65} onPress={onPress} style={styles.rowContainer}>
+		<Wrapper
+			activeOpacity={onPress ? 0.7 : 1}
+			onPress={onPress}
+			style={styles.rowContainer}
+		>
 			<View style={styles.rowLeft}>
-				<View style={styles.rowIconWrap}>
-					<Ionicons name={icon} size={18} color={colors.subtext} />
+				<View style={[styles.rowIconWrap, { backgroundColor: palette.subtle }]}>
+					<Ionicons name={icon} size={18} color={palette.textMuted} />
 				</View>
 				<View style={styles.rowTextWrap}>
 					<Text
-						style={[styles.rowLabel, { color: colors.text }]}
+						style={[type.body, styles.rowLabel, { color: palette.text }]}
 						numberOfLines={1}
 					>
 						{label}
@@ -73,13 +115,17 @@ const Row = ({ icon, label, value, onPress, colors, badge }: any) => {
 				{value ? (
 					<Text
 						numberOfLines={1}
-						style={[styles.rowValue, { color: colors.subtext }]}
+						style={[type.small, styles.rowValue, { color: palette.textMuted }]}
 					>
 						{value}
 					</Text>
 				) : null}
 				{onPress ? (
-					<Ionicons name="chevron-forward" size={18} color={colors.subtext} />
+					<Ionicons
+						name="chevron-forward"
+						size={16}
+						color={palette.textSubtle}
+					/>
 				) : null}
 			</View>
 		</Wrapper>
@@ -87,7 +133,6 @@ const Row = ({ icon, label, value, onPress, colors, badge }: any) => {
 };
 
 export default function AccountScreen() {
-	const { colors } = useTheme();
 	const router = useRouter();
 	const {
 		profile,
@@ -207,15 +252,18 @@ export default function AccountScreen() {
 	const initials = useMemo(() => {
 		const f = (profile?.firstName || '').charAt(0);
 		const l = (profile?.lastName || '').charAt(0);
-		return (f + l || 'U').toUpperCase();
+		const raw = (f + l || 'U').trim();
+		return raw.length > 0 ? raw.toUpperCase() : 'U';
 	}, [profile?.firstName, profile?.lastName]);
 
 	if (loading) {
 		return (
-			<View style={[styles.stateWrap, { backgroundColor: colors.bg }]}>
-				<ActivityIndicator size="large" color={colors.tint} />
-				<Text style={[styles.stateText, { color: colors.subtext }]}>
-					{profile ? 'Loading profile...' : 'Setting up your profile...'}
+			<View style={[styles.stateWrap, { backgroundColor: palette.bg }]}>
+				<ActivityIndicator size="large" color={palette.primary} />
+				<Text
+					style={[type.body, styles.stateText, { color: palette.textMuted }]}
+				>
+					{profile ? 'Loading profile…' : 'Setting up your profile…'}
 				</Text>
 			</View>
 		);
@@ -223,19 +271,26 @@ export default function AccountScreen() {
 
 	if (error) {
 		return (
-			<View style={[styles.stateWrap, { backgroundColor: colors.bg }]}>
-				<Ionicons name="alert-circle-outline" size={48} color={colors.danger} />
-				<Text style={[styles.stateTitle, { color: colors.text }]}>
+			<View style={[styles.stateWrap, { backgroundColor: palette.bg }]}>
+				<Ionicons
+					name="alert-circle-outline"
+					size={48}
+					color={palette.danger}
+				/>
+				<Text style={[type.h2, styles.stateTitle, { color: palette.text }]}>
 					Failed to load profile
 				</Text>
-				<Text style={[styles.stateText, { color: colors.subtext }]}>
+				<Text
+					style={[type.body, styles.stateText, { color: palette.textMuted }]}
+				>
 					{error}
 				</Text>
 				<TouchableOpacity
-					style={[styles.primaryBtn, { backgroundColor: colors.tint }]}
+					style={[styles.primaryBtn, { backgroundColor: palette.primary }]}
+					activeOpacity={0.8}
 					onPress={fetchProfile}
 				>
-					<Text style={styles.primaryBtnText}>Retry</Text>
+					<Text style={[type.body, styles.primaryBtnText]}>Retry</Text>
 				</TouchableOpacity>
 			</View>
 		);
@@ -243,16 +298,17 @@ export default function AccountScreen() {
 
 	if (!profile) {
 		return (
-			<View style={[styles.stateWrap, { backgroundColor: colors.bg }]}>
-				<Ionicons name="person-outline" size={48} color={colors.subtle} />
-				<Text style={[styles.stateTitle, { color: colors.text }]}>
+			<View style={[styles.stateWrap, { backgroundColor: palette.bg }]}>
+				<Ionicons name="person-outline" size={48} color={palette.border} />
+				<Text style={[type.h2, styles.stateTitle, { color: palette.text }]}>
 					No profile found
 				</Text>
 				<TouchableOpacity
-					style={[styles.primaryBtn, { backgroundColor: colors.tint }]}
+					style={[styles.primaryBtn, { backgroundColor: palette.primary }]}
+					activeOpacity={0.8}
 					onPress={fetchProfile}
 				>
-					<Text style={styles.primaryBtnText}>Refresh</Text>
+					<Text style={[type.body, styles.primaryBtnText]}>Refresh</Text>
 				</TouchableOpacity>
 			</View>
 		);
@@ -262,29 +318,33 @@ export default function AccountScreen() {
 
 	return (
 		<ScrollView
-			style={{ flex: 1, backgroundColor: colors.bg }}
+			style={{ flex: 1, backgroundColor: palette.bg }}
 			contentContainerStyle={styles.scrollContent}
 			showsVerticalScrollIndicator={false}
 			refreshControl={
 				<RefreshControl
 					refreshing={refreshing}
 					onRefresh={handleRefresh}
-					tintColor={colors.tint}
-					colors={[colors.tint]}
-					progressBackgroundColor={colors.card}
+					tintColor={palette.primary}
+					colors={[palette.primary]}
+					progressBackgroundColor={palette.surface}
 				/>
 			}
 		>
 			{/* Identity / hero */}
 			<View style={styles.identityRow}>
-				<View style={[styles.avatar, { backgroundColor: colors.slate }]}>
-					<Text style={[styles.avatarLabel, { color: colors.text }]}>
-						{initials || 'U'}
+				<View
+					style={[styles.avatar, { backgroundColor: palette.primarySubtle }]}
+				>
+					<Text
+						style={[type.h2, styles.avatarLabel, { color: palette.primary }]}
+					>
+						{initials}
 					</Text>
 				</View>
 				<View style={styles.identityTextWrap}>
 					<Text
-						style={[styles.identityName, { color: colors.text }]}
+						style={[type.titleMd, styles.identityName, { color: palette.text }]}
 						numberOfLines={1}
 					>
 						{profile.firstName || profile.lastName
@@ -292,7 +352,11 @@ export default function AccountScreen() {
 							: 'Your Name'}
 					</Text>
 					<Text
-						style={[styles.identityEmail, { color: colors.subtext }]}
+						style={[
+							type.small,
+							styles.identityEmail,
+							{ color: palette.textMuted },
+						]}
 						numberOfLines={1}
 					>
 						{user?.email || 'No email set'}
@@ -300,39 +364,45 @@ export default function AccountScreen() {
 				</View>
 				<View style={styles.identityProgress}>
 					<CircularProgress
-						size={50}
+						size={52}
 						strokeWidth={6}
 						value={profileCompletion}
-						trackColor={colors.ringTrack}
-						barColor={colors.success}
+						trackColor={palette.track}
+						barColor={palette.success}
 						label={`${profileCompletion}%`}
-						labelColor={colors.text}
+						labelColor={palette.text}
 					/>
 				</View>
 			</View>
 
 			{/* KPIs */}
 			<View style={styles.kpiRow}>
-				<Card colors={colors} style={styles.kpiCard}>
+				<Card style={styles.kpiCard}>
 					<View style={styles.kpiHeader}>
 						<Ionicons
 							name="checkmark-circle-outline"
 							size={18}
-							color={colors.success}
+							color={palette.success}
 						/>
-						<Text style={[styles.kpiLabel, { color: colors.subtext }]}>
+						<Text
+							style={[
+								type.small,
+								styles.kpiLabel,
+								{ color: palette.textSubtle },
+							]}
+						>
 							Completion
 						</Text>
 					</View>
-					<Text style={[styles.kpiValue, { color: colors.text }]}>
+					<Text style={[type.numLg, styles.kpiValue, { color: palette.text }]}>
 						{profileCompletion}%
 					</Text>
-					<View style={[styles.kpiBar, { backgroundColor: colors.line }]}>
+					<View style={[styles.kpiBar, { backgroundColor: palette.border }]}>
 						<View
 							style={[
 								styles.kpiBarFill,
 								{
-									backgroundColor: colors.success,
+									backgroundColor: palette.success,
 									width: `${profileCompletion}%`,
 								},
 							]}
@@ -340,21 +410,29 @@ export default function AccountScreen() {
 					</View>
 				</Card>
 
-				<Card colors={colors} style={styles.kpiCard}>
+				<Card style={styles.kpiCard}>
 					<View style={styles.kpiHeader}>
 						<Ionicons
 							name="trending-up-outline"
 							size={18}
-							color={colors.tint}
+							color={palette.primary}
 						/>
-						<Text style={[styles.kpiLabel, { color: colors.subtext }]}>
+						<Text
+							style={[
+								type.small,
+								styles.kpiLabel,
+								{ color: palette.textSubtle },
+							]}
+						>
 							Health
 						</Text>
 					</View>
-					<Text style={[styles.kpiValue, { color: colors.text }]}>
+					<Text style={[type.numLg, styles.kpiValue, { color: palette.text }]}>
 						{healthScore}/100
 					</Text>
-					<Text style={[styles.kpiSub, { color: colors.subtext }]}>
+					<Text
+						style={[type.small, styles.kpiSub, { color: palette.textSubtle }]}
+					>
 						{healthScore >= 80
 							? 'Excellent'
 							: healthScore >= 60
@@ -367,8 +445,8 @@ export default function AccountScreen() {
 			</View>
 
 			{/* Account */}
-			<Section title="Account" colors={colors}>
-				<Card colors={colors}>
+			<Section title="Account">
+				<Card>
 					<Row
 						icon="person-outline"
 						label="Name"
@@ -378,14 +456,12 @@ export default function AccountScreen() {
 								: 'Not set'
 						}
 						onPress={() => router.push('/(stack)/settings/profile/editName')}
-						colors={colors}
 					/>
-					<View style={[styles.divider, { backgroundColor: colors.line }]} />
+					<View style={[styles.divider, { backgroundColor: palette.border }]} />
 					<Row
 						icon="mail-outline"
 						label="Email"
 						value={user?.email || 'Not set'}
-						colors={colors}
 					/>
 				</Card>
 			</Section>
@@ -406,8 +482,8 @@ export default function AccountScreen() {
 				)}
 
 			{/* Financial */}
-			<Section title="Financial" colors={colors}>
-				<Card colors={colors}>
+			<Section title="Financial">
+				<Card>
 					<Row
 						icon="cash-outline"
 						label="Monthly Income"
@@ -417,7 +493,6 @@ export default function AccountScreen() {
 						onPress={() =>
 							router.push('/(stack)/settings/profile/editFinancial')
 						}
-						colors={colors}
 						badge={
 							incomeEstimate && (
 								<IncomeSourceBadge
@@ -428,7 +503,7 @@ export default function AccountScreen() {
 							)
 						}
 					/>
-					<View style={[styles.divider, { backgroundColor: colors.line }]} />
+					<View style={[styles.divider, { backgroundColor: palette.border }]} />
 					<Row
 						icon="trending-up-outline"
 						label="Savings & Investments"
@@ -436,12 +511,17 @@ export default function AccountScreen() {
 						onPress={() =>
 							router.push('/(stack)/settings/profile/editFinancial')
 						}
-						colors={colors}
 					/>
-					<Text style={[styles.helperText, { color: colors.subtext }]}>
+					<Text
+						style={[
+							type.small,
+							styles.helperText,
+							{ color: palette.textSubtle },
+						]}
+					>
 						Include cash + investment balances.
 					</Text>
-					<View style={[styles.divider, { backgroundColor: colors.line }]} />
+					<View style={[styles.divider, { backgroundColor: palette.border }]} />
 					<Row
 						icon="trending-down-outline"
 						label="Total Debt"
@@ -449,12 +529,11 @@ export default function AccountScreen() {
 						onPress={() =>
 							router.push('/(stack)/settings/profile/editFinancial')
 						}
-						colors={colors}
 					/>
 					{!!profile.expenses && (
 						<>
 							<View
-								style={[styles.divider, { backgroundColor: colors.line }]}
+								style={[styles.divider, { backgroundColor: palette.border }]}
 							/>
 							<Row
 								icon="card-outline"
@@ -463,7 +542,6 @@ export default function AccountScreen() {
 								onPress={() =>
 									router.push('/(stack)/settings/profile/editExpenses')
 								}
-								colors={colors}
 							/>
 						</>
 					)}
@@ -473,18 +551,24 @@ export default function AccountScreen() {
 			{/* Quick Actions */}
 			<Section
 				title="Quick Actions"
-				colors={colors}
 				right={
 					<TouchableOpacity
 						onPress={handleBackupProfile}
 						style={styles.inlineButton}
+						activeOpacity={0.7}
 					>
 						<Ionicons
 							name="cloud-upload-outline"
 							size={16}
-							color={colors.tint}
+							color={palette.primary}
 						/>
-						<Text style={[styles.inlineButtonText, { color: colors.tint }]}>
+						<Text
+							style={[
+								type.small,
+								styles.inlineButtonText,
+								{ color: palette.primary },
+							]}
+						>
 							Backup
 						</Text>
 					</TouchableOpacity>
@@ -494,14 +578,20 @@ export default function AccountScreen() {
 					<TouchableOpacity
 						style={[
 							styles.quickTile,
-							{ borderColor: colors.line, backgroundColor: colors.card },
+							{
+								borderColor: palette.border,
+								backgroundColor: palette.surface,
+							},
 						]}
+						activeOpacity={0.8}
 						onPress={() =>
 							router.push('/(stack)/settings/profile/editFinancial')
 						}
 					>
-						<Ionicons name="cash-outline" size={20} color={colors.success} />
-						<Text style={[styles.quickLabel, { color: colors.text }]}>
+						<Ionicons name="cash-outline" size={20} color={palette.success} />
+						<Text
+							style={[type.small, styles.quickLabel, { color: palette.text }]}
+						>
 							Financial Info
 						</Text>
 					</TouchableOpacity>
@@ -509,14 +599,20 @@ export default function AccountScreen() {
 					<TouchableOpacity
 						style={[
 							styles.quickTile,
-							{ borderColor: colors.line, backgroundColor: colors.card },
+							{
+								borderColor: palette.border,
+								backgroundColor: palette.surface,
+							},
 						]}
+						activeOpacity={0.8}
 						onPress={() =>
 							router.push('/(stack)/settings/profile/editExpenses')
 						}
 					>
-						<Ionicons name="card-outline" size={20} color={colors.warn} />
-						<Text style={[styles.quickLabel, { color: colors.text }]}>
+						<Ionicons name="card-outline" size={20} color={palette.warning} />
+						<Text
+							style={[type.small, styles.quickLabel, { color: palette.text }]}
+						>
 							Edit Expenses
 						</Text>
 					</TouchableOpacity>
@@ -524,12 +620,18 @@ export default function AccountScreen() {
 					<TouchableOpacity
 						style={[
 							styles.quickTile,
-							{ borderColor: colors.line, backgroundColor: colors.card },
+							{
+								borderColor: palette.border,
+								backgroundColor: palette.surface,
+							},
 						]}
+						activeOpacity={0.8}
 						onPress={() => router.push('/(tabs)/wallet/goals')}
 					>
-						<Ionicons name="flag-outline" size={20} color={colors.tint} />
-						<Text style={[styles.quickLabel, { color: colors.text }]}>
+						<Ionicons name="flag-outline" size={20} color={palette.primary} />
+						<Text
+							style={[type.small, styles.quickLabel, { color: palette.text }]}
+						>
 							Goals
 						</Text>
 					</TouchableOpacity>
@@ -537,12 +639,18 @@ export default function AccountScreen() {
 					<TouchableOpacity
 						style={[
 							styles.quickTile,
-							{ borderColor: colors.line, backgroundColor: colors.card },
+							{
+								borderColor: palette.border,
+								backgroundColor: palette.surface,
+							},
 						]}
+						activeOpacity={0.8}
 						onPress={handleBackupProfile}
 					>
 						<Ionicons name="cloud-upload-outline" size={20} color="#8b5cf6" />
-						<Text style={[styles.quickLabel, { color: colors.text }]}>
+						<Text
+							style={[type.small, styles.quickLabel, { color: palette.text }]}
+						>
 							Backup
 						</Text>
 					</TouchableOpacity>
@@ -553,24 +661,30 @@ export default function AccountScreen() {
 			{aiInsightsPreviewEnabled && (
 				<Section
 					title="AI Insights"
-					colors={colors}
 					right={
 						<TouchableOpacity
 							onPress={() => router.push('/(tabs)/chat')}
 							style={styles.inlineButton}
+							activeOpacity={0.7}
 						>
-							<Text style={[styles.inlineButtonText, { color: colors.tint }]}>
+							<Text
+								style={[
+									type.small,
+									styles.inlineButtonText,
+									{ color: palette.primary },
+								]}
+							>
 								Chat about insights
 							</Text>
 							<Ionicons
 								name="chatbubble-outline"
 								size={15}
-								color={colors.tint}
+								color={palette.primary}
 							/>
 						</TouchableOpacity>
 					}
 				>
-					<Card colors={colors}>
+					<Card>
 						<AIProfileInsights
 							profile={profile}
 							onAction={(a) => {
@@ -598,15 +712,14 @@ export default function AccountScreen() {
 			)}
 
 			{/* Management */}
-			<Section title="Management" colors={colors}>
-				<Card colors={colors}>
+			<Section title="Management">
+				<Card>
 					<Row
 						icon="trash-outline"
 						label="Delete Account"
 						onPress={() =>
 							router.push('/(stack)/settings/profile/deleteAccount')
 						}
-						colors={colors}
 					/>
 				</Card>
 			</Section>
@@ -616,133 +729,128 @@ export default function AccountScreen() {
 
 const styles = StyleSheet.create({
 	scrollContent: {
-		padding: 16,
-		paddingBottom: 28,
+		paddingHorizontal: space.lg,
+		paddingTop: space.lg,
+		paddingBottom: space.xxl,
 	},
 	section: {
-		marginTop: 18,
+		marginTop: space.lg,
 	},
 	sectionHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		marginBottom: 10,
+		marginBottom: space.sm,
 	},
 	sectionTitle: {
-		fontSize: 16,
-		fontWeight: '700',
+		// type.labelSm is applied in-line
 	},
 	sectionBody: {
-		gap: 12,
+		gap: space.sm,
 	},
+
 	card: {
-		borderRadius: 14,
-		padding: 14,
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 1 },
-		shadowRadius: 3,
-		elevation: 1,
+		borderRadius: radius.lg,
+		padding: space.md,
+		borderWidth: StyleSheet.hairlineWidth,
+		...shadow.card,
 	},
+
 	rowContainer: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		paddingVertical: 12,
+		paddingVertical: space.sm,
 	},
 	rowLeft: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		flex: 1,
-		gap: 10,
+		gap: space.sm,
 	},
 	rowIconWrap: {
 		width: 30,
+		height: 30,
+		borderRadius: radius.md,
 		alignItems: 'center',
+		justifyContent: 'center',
 	},
 	rowTextWrap: {
 		flex: 1,
 	},
-	rowLabel: {
-		fontSize: 14,
-		fontWeight: '600',
-	},
+	rowLabel: {},
 	rowRight: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 8,
+		gap: space.xs,
 		maxWidth: '60%',
 		justifyContent: 'flex-end',
 	},
 	rowValue: {
-		fontSize: 13,
 		maxWidth: '90%',
 	},
+
 	divider: {
-		height: 1,
-		marginVertical: 4,
+		height: StyleSheet.hairlineWidth,
+		marginVertical: space.xs,
 	},
+
 	stateWrap: {
 		flex: 1,
 		justifyContent: 'center',
 		alignItems: 'center',
-		paddingHorizontal: 32,
+		paddingHorizontal: space.xl,
 	},
 	stateTitle: {
-		marginTop: 12,
-		fontSize: 18,
-		fontWeight: '700',
+		marginTop: space.sm,
 		textAlign: 'center',
 	},
 	stateText: {
-		marginTop: 6,
-		fontSize: 14,
+		marginTop: space.xs,
 		textAlign: 'center',
 	},
 	primaryBtn: {
-		marginTop: 20,
-		paddingHorizontal: 18,
-		paddingVertical: 10,
-		borderRadius: 8,
+		marginTop: space.lg,
+		paddingHorizontal: space.xl,
+		paddingVertical: space.sm,
+		borderRadius: radius.lg,
 	},
 	primaryBtnText: {
-		color: '#fff',
+		color: palette.primaryTextOn,
 		fontWeight: '700',
 	},
+
 	identityRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		marginBottom: 12,
+		marginBottom: space.md,
 	},
 	avatar: {
-		width: 50,
-		height: 50,
-		borderRadius: 25,
+		width: 52,
+		height: 52,
+		borderRadius: 26,
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
 	avatarLabel: {
-		fontSize: 16,
 		fontWeight: '700',
 	},
 	identityTextWrap: {
 		flex: 1,
-		marginLeft: 12,
+		marginLeft: space.md,
 	},
-	identityName: {
-		fontSize: 18,
-		fontWeight: '700',
-	},
+	identityName: {},
 	identityEmail: {
-		fontSize: 13,
 		marginTop: 2,
 	},
 	identityProgress: {
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
+
 	kpiRow: {
 		flexDirection: 'row',
-		gap: 12,
-		marginTop: 6,
+		gap: space.md,
+		marginBottom: space.sm,
 	},
 	kpiCard: {
 		flex: 1,
@@ -750,17 +858,12 @@ const styles = StyleSheet.create({
 	kpiHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 8,
-		marginBottom: 6,
+		gap: space.xs,
+		marginBottom: space.xs,
 	},
-	kpiLabel: {
-		fontSize: 12,
-		fontWeight: '600',
-	},
+	kpiLabel: {},
 	kpiValue: {
-		fontSize: 22,
-		fontWeight: '800',
-		marginBottom: 8,
+		marginBottom: space.xs,
 	},
 	kpiBar: {
 		height: 6,
@@ -772,39 +875,37 @@ const styles = StyleSheet.create({
 		borderRadius: 3,
 	},
 	kpiSub: {
-		fontSize: 12,
-		fontWeight: '600',
 		marginTop: 4,
 	},
+
 	helperText: {
-		fontSize: 12,
 		marginTop: 4,
 	},
+
 	inlineButton: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 6,
+		gap: 4,
 		paddingHorizontal: 4,
 	},
 	inlineButtonText: {
 		fontWeight: '700',
 	},
+
 	quickGrid: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',
-		gap: 10,
+		gap: space.sm,
 	},
 	quickTile: {
 		width: '48%',
-		paddingVertical: 14,
-		borderRadius: 12,
+		paddingVertical: space.md,
+		borderRadius: radius.lg,
 		borderWidth: 1,
 		alignItems: 'center',
-		gap: 8,
+		gap: space.xs,
 	},
 	quickLabel: {
-		fontSize: 13,
-		fontWeight: '600',
 		textAlign: 'center',
 	},
 });

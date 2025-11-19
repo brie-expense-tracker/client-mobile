@@ -54,7 +54,7 @@ export default function InterfacePanel({
 						style={styles.actionButton}
 						onPress={() => {
 							onClose();
-							router.push('/(stack)/addBudget');
+							router.push('/(stack)/budgets/new');
 						}}
 					>
 						<Ionicons name="add-circle" size={24} color="#3b82f6" />
@@ -65,7 +65,7 @@ export default function InterfacePanel({
 						style={styles.actionButton}
 						onPress={() => {
 							onClose();
-							router.push('/(stack)/addGoal');
+							router.push('/(stack)/goals/new');
 						}}
 					>
 						<Ionicons name="flag" size={24} color="#10b981" />

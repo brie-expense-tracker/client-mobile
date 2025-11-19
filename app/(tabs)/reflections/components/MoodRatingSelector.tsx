@@ -10,6 +10,7 @@ interface MoodRatingSelectorProps {
 	disabled?: boolean;
 	showTrend?: boolean;
 	previousRating?: number;
+	hideHeader?: boolean;
 }
 
 export function MoodRatingSelector({
@@ -18,6 +19,7 @@ export function MoodRatingSelector({
 	disabled = false,
 	showTrend = false,
 	previousRating,
+	hideHeader = false,
 }: MoodRatingSelectorProps) {
 	const handleRatingPress = async (moodRating: number) => {
 		if (disabled) return;
@@ -79,7 +81,7 @@ export function MoodRatingSelector({
 
 	const getTrendIndicator = () => {
 		if (!showTrend || !previousRating || !rating) return null;
-		
+
 		if (rating > previousRating) {
 			return { icon: 'trending-up', color: '#4CAF50', text: 'Improved' };
 		} else if (rating < previousRating) {
@@ -91,13 +93,19 @@ export function MoodRatingSelector({
 
 	return (
 		<View style={styles.container}>
-			<Text style={[styles.title, dynamicTextStyle]}>How was your week?</Text>
-			<Text style={[styles.subtitle, dynamicTextStyle]}>
-				Rate your overall mood and satisfaction
-			</Text>
-			<Text style={[styles.helpText, dynamicTextStyle]}>
-				1 = Very Poor • 2 = Poor • 3 = Neutral • 4 = Good • 5 = Excellent
-			</Text>
+			{!hideHeader && (
+				<>
+					<Text style={[styles.title, dynamicTextStyle]}>
+						How was your week?
+					</Text>
+					<Text style={[styles.subtitle, dynamicTextStyle]}>
+						Rate your overall mood and satisfaction
+					</Text>
+					<Text style={[styles.helpText, dynamicTextStyle]}>
+						1 = Very Poor • 2 = Poor • 3 = Neutral • 4 = Good • 5 = Excellent
+					</Text>
+				</>
+			)}
 
 			<View style={styles.ratingContainer}>
 				{[1, 2, 3, 4, 5].map((moodRating) => (
@@ -158,7 +166,12 @@ export function MoodRatingSelector({
 								size={16}
 								color={getTrendIndicator()!.color}
 							/>
-							<Text style={[styles.trendText, { color: getTrendIndicator()!.color }]}>
+							<Text
+								style={[
+									styles.trendText,
+									{ color: getTrendIndicator()!.color },
+								]}
+							>
 								{getTrendIndicator()!.text} from last week
 							</Text>
 						</View>

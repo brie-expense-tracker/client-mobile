@@ -1,5 +1,7 @@
 // MUST be imported before anything that uses uuid/crypto
 import 'react-native-get-random-values';
+// Reanimated must be imported early, before any components that use it
+import 'react-native-reanimated';
 import { logger } from './utils/logger';
 
 // EventSource polyfill for React Native/Expo

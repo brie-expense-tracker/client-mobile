@@ -179,14 +179,14 @@ const NotificationItem = ({
 			switch (type) {
 				case 'budget':
 					if (entityId) {
-						router.push(`/(stack)/budgetDetails?id=${entityId}` as any);
+						router.push(`/(stack)/budgets/${entityId}` as any);
 					} else {
 						router.push('/(tabs)/wallet/budgets');
 					}
 					break;
 				case 'goal':
 					if (entityId) {
-						router.push(`/(stack)/goalDetails?id=${entityId}` as any);
+						router.push(`/(stack)/goals/${entityId}` as any);
 					} else {
 						router.push('/(tabs)/wallet/goals');
 					}

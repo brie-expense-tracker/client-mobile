@@ -191,7 +191,7 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 	};
 
 	const handleAddRecurringExpense = () => {
-		router.push('/(stack)/addRecurringExpense');
+		router.push('/(stack)/recurring/new');
 	};
 
 	const handleRefresh = async () => {

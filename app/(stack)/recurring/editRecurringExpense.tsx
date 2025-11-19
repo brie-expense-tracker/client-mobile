@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { logger } from '../../src/utils/logger';
+import { logger } from '../../../src/utils/logger';
 import {
 	View,
 	StyleSheet,
@@ -12,15 +12,15 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useRecurringExpense } from '../../src/context/recurringExpenseContext';
-import { RecurringExpense } from '../../src/services';
-import { DateField } from '../../src/components/DateField';
+import { useRecurringExpense } from '../../../src/context/recurringExpenseContext';
+import { RecurringExpense } from '../../../src/services';
+import { DateField } from '../../../src/components/DateField';
 import {
 	BUDGET_ICONS,
 	DEFAULT_BUDGET_ICON,
 	DEFAULT_COLOR,
 	normalizeIconName,
-} from '../../src/constants/uiConstants';
+} from '../../../src/constants/uiConstants';
 import {
 	FormHeader,
 	FormInputGroup,
@@ -30,7 +30,7 @@ import {
 	PeriodSelector,
 	CategorySelector,
 	DeleteButton,
-} from '../../src/components/forms';
+} from '../../../src/components/forms';
 
 // Quick amount presets (same pattern as the other editors)
 const AMOUNT_PRESETS = [10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200] as const;

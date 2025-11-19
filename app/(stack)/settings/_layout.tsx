@@ -11,7 +11,7 @@ export default function Layout() {
 				options={{
 					headerShown: true,
 					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: 'Settings',
+					headerTitle: '',
 					headerShadowVisible: false,
 					headerStyle: {
 						backgroundColor: '#ffffff',
@@ -108,7 +108,33 @@ export default function Layout() {
 				options={{
 					headerShown: true,
 					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: 'Download Data',
+					headerTitle: '',
+					headerShadowVisible: false,
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+					headerLeft: () => (
+						<BorderlessButton
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</BorderlessButton>
+					),
+				}}
+			/>
+
+			<Stack.Screen
+				name="privacyandsecurity/editPassword"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: '',
 					headerShadowVisible: false,
 					headerTitleStyle: {
 						fontSize: 20,
@@ -294,7 +320,7 @@ export default function Layout() {
 				}}
 			/>
 			<Stack.Screen
-				name="security/edit	Password"
+				name="security/editPassword"
 				options={{
 					headerShown: true,
 					headerBackButtonDisplayMode: 'minimal',
@@ -309,6 +335,106 @@ export default function Layout() {
 						backgroundColor: '#ffffff',
 					},
 
+					headerLeft: () => (
+						<BorderlessButton
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</BorderlessButton>
+					),
+				}}
+			/>
+			<Stack.Screen
+				name="security/loginHistory"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Login History',
+					headerShadowVisible: false,
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+					headerLeft: () => (
+						<BorderlessButton
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</BorderlessButton>
+					),
+				}}
+			/>
+			<Stack.Screen
+				name="assistant/index"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Assistant',
+					headerShadowVisible: false,
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+					headerLeft: () => (
+						<BorderlessButton
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</BorderlessButton>
+					),
+				}}
+			/>
+			<Stack.Screen
+				name="privacy/AIPrivacySettings"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'AI Privacy Settings',
+					headerShadowVisible: false,
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+					headerLeft: () => (
+						<BorderlessButton
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</BorderlessButton>
+					),
+				}}
+			/>
+			<Stack.Screen
+				name="notification/consentManagement"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Consent Management',
+					headerShadowVisible: false,
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
 					headerLeft: () => (
 						<BorderlessButton
 							onPress={() => router.back()}
@@ -463,7 +589,7 @@ export default function Layout() {
 				options={{
 					headerShown: true,
 					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: 'Legal Documents',
+					headerTitle: '',
 					headerShadowVisible: false,
 					headerTitleStyle: {
 						fontSize: 20,

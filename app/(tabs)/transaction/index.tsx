@@ -15,6 +15,7 @@ import {
 	ScrollView,
 	ActivityIndicator,
 	TouchableOpacity,
+	Pressable,
 	FlatList,
 	Platform,
 	Keyboard,
@@ -41,28 +42,13 @@ import {
 	DebtRollup,
 } from '../../../src/services/feature/dashboardService';
 import { normalizeIconName } from '../../../src/constants/uiConstants';
+import { palette, radius, shadow, space, type } from '../../../src/ui/theme';
 
 // Create namespaced logger for this service
 const transactionScreenLog = createLogger('TransactionScreen');
 
 // iOS InputAccessoryView ID
 const accessoryId = 'tx-input-accessory';
-
-// =============================================================
-// Design tokens (modern blue accent)
-// =============================================================
-const palette = {
-	bg: '#FFFFFF',
-	surface: '#FFFFFF',
-	text: '#0F172A',
-	sub: '#64748B',
-	line: '#E5E9EF',
-	accent: '#0095FF', // primary blue (brand)
-	accentDark: '#0077CC',
-	danger: '#EF4444',
-	green: '#6CC24A', // for income
-	red: '#EF4444', // for expense
-};
 
 type Frequency = 'None' | 'Daily' | 'Weekly' | 'Monthly';
 
@@ -123,7 +109,7 @@ export default function TransactionScreenProModern() {
 	const insets = useSafeAreaInsets();
 
 	// Dynamic bottom padding from safe area only (no magic numbers)
-	const contentBottomPad = insets.bottom + 24;
+	const contentBottomPad = insets.bottom + space.xl;
 
 	const [mode, setMode] = useState<'income' | 'expense'>(
 		params.mode === 'expense' ? 'expense' : 'expense' // default to Expense
@@ -243,6 +229,14 @@ export default function TransactionScreenProModern() {
 		isValid && !isSubmitting && amountNumber > 0 && !!description?.trim();
 
 	// ---------- Handlers
+	const handleModeChange = useCallback(
+		(newMode: 'income' | 'expense') => {
+			if (!isSubmitting && mode !== newMode) {
+				setMode(newMode);
+			}
+		},
+		[isSubmitting, mode]
+	);
 	const onChangeAmount = useCallback(
 		(text: string) => {
 			const sanitized = sanitizeCurrency(text);
@@ -389,7 +383,7 @@ export default function TransactionScreenProModern() {
 		}) => (
 			<TouchableOpacity
 				onPress={onPress}
-				activeOpacity={onPress ? 0.7 : 1}
+				activeOpacity={onPress ? 0.2 : 1}
 				style={styles.row}
 				accessibilityRole={onPress ? 'button' : undefined}
 				accessibilityLabel={accessibilityLabel || label}
@@ -398,12 +392,16 @@ export default function TransactionScreenProModern() {
 					<View style={styles.rowIconWrap}>
 						<Ionicons name={icon} size={18} color={palette.text} />
 					</View>
-					<Text style={styles.rowLabel}>{label}</Text>
+					<Text style={[type.body, styles.rowLabel]}>{label}</Text>
 				</View>
 				<View style={styles.rowRight}>
 					{right}
 					{onPress && (
-						<Ionicons name="chevron-forward" size={18} color={palette.sub} />
+						<Ionicons
+							name="chevron-forward"
+							size={18}
+							color={palette.textSubtle}
+						/>
 					)}
 				</View>
 			</TouchableOpacity>
@@ -412,7 +410,7 @@ export default function TransactionScreenProModern() {
 	Row.displayName = 'Row';
 
 	const ValueText = ({ children }: { children: React.ReactNode }) => (
-		<Text numberOfLines={1} style={styles.valueText}>
+		<Text numberOfLines={1} style={[type.body, styles.valueText]}>
 			{children}
 		</Text>
 	);
@@ -422,94 +420,6 @@ export default function TransactionScreenProModern() {
 	// =============================================================
 	return (
 		<SafeAreaView style={styles.container} edges={['top']}>
-			{/* Header */}
-			<View style={styles.header}>
-				<Text style={styles.headerTitle}>Add New Transaction</Text>
-			</View>
-
-			{/* Amount hero */}
-			<View style={styles.amountCard} accessibilityRole="summary">
-				<View style={styles.amountRow}>
-					<Text style={styles.dollar}>$</Text>
-					<Controller
-						control={control}
-						name="amount"
-						rules={{
-							required: 'Amount is required*',
-							validate: (v) =>
-								Number(v) > 0 || 'Enter an amount greater than 0',
-						}}
-						render={({ field: { value, onBlur } }) => (
-							<TextInput
-								ref={amountRef}
-								style={styles.amountInput}
-								placeholder="0.00"
-								placeholderTextColor="#A3B3C2"
-								keyboardType="decimal-pad"
-								value={value}
-								onChangeText={onChangeAmount}
-								onBlur={() => {
-									onBlur();
-									onBlurAmount();
-								}}
-								returnKeyType="next"
-								accessibilityLabel="Amount"
-								maxLength={9}
-								inputAccessoryViewID={
-									Platform.OS === 'ios' ? accessoryId : undefined
-								}
-							/>
-						)}
-					/>
-				</View>
-				<View style={styles.amountUnderline} />
-				{errors.amount && (
-					<Text style={styles.errorText}>{String(errors.amount.message)}</Text>
-				)}
-				{selectedDebt && mode === 'expense' && (
-					<View
-						style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}
-					>
-						<View
-							style={{
-								flexDirection: 'row',
-								backgroundColor: '#E0F2FE',
-								paddingHorizontal: 10,
-								paddingVertical: 4,
-								borderRadius: 999,
-								gap: 4,
-							}}
-						>
-							<Ionicons name="card-outline" size={14} color="#0369A1" />
-							<Text style={{ color: '#0369A1', fontWeight: '600' }}>
-								Paying debt: {selectedDebt.debtName}
-							</Text>
-						</View>
-					</View>
-				)}
-			</View>
-
-			{/* Segmented control */}
-			<View style={styles.segmented}>
-				{(['expense', 'income'] as const).map((m) => {
-					const active = mode === m;
-					const label = m.charAt(0).toUpperCase() + m.slice(1);
-					return (
-						<TouchableOpacity
-							key={m}
-							style={[styles.segBtn, active && styles.segBtnActive]}
-							onPress={() => !isSubmitting && setMode(m)}
-							accessibilityRole="button"
-							accessibilityState={{ selected: active }}
-						>
-							<Text style={[styles.segText, active && styles.segTextActive]}>
-								{label}
-							</Text>
-						</TouchableOpacity>
-					);
-				})}
-			</View>
-
 			<ScrollView
 				ref={scrollRef}
 				style={{ flex: 1 }}
@@ -522,7 +432,117 @@ export default function TransactionScreenProModern() {
 				automaticallyAdjustKeyboardInsets
 				showsVerticalScrollIndicator={false}
 			>
-				{/* Category / Note / Recurring / Date */}
+				{/* Hero section: header + amount + type toggle */}
+				<View>
+					<Text style={styles.heroKicker}>New transaction</Text>
+					<Text style={styles.heroTitle}>What happened with your money?</Text>
+					<Text style={styles.heroSubtitle}>
+						Enter an amount, then link it to a budget, goal, or debt.
+					</Text>
+
+					<View style={styles.amountCard} accessibilityRole="summary">
+						<View style={styles.amountRow}>
+							<Text style={styles.dollar}>$</Text>
+							<Controller
+								control={control}
+								name="amount"
+								rules={{
+									required: '*Amount is required',
+									validate: (v) =>
+										Number(v) > 0 || 'Enter an amount greater than 0',
+								}}
+								render={({ field: { value, onBlur } }) => (
+									<TextInput
+										ref={amountRef}
+										style={styles.amountInput}
+										placeholder="0.00"
+										placeholderTextColor={palette.textSubtle}
+										keyboardType="decimal-pad"
+										value={value}
+										onChangeText={onChangeAmount}
+										onBlur={() => {
+											onBlur();
+											onBlurAmount();
+										}}
+										returnKeyType="next"
+										accessibilityLabel="Amount"
+										maxLength={9}
+										inputAccessoryViewID={
+											Platform.OS === 'ios' ? accessoryId : undefined
+										}
+									/>
+								)}
+							/>
+						</View>
+						<View style={styles.amountUnderline} />
+
+						{errors.amount && (
+							<View style={styles.errorContainer}>
+								<Text style={styles.errorText}>
+									{String(errors.amount.message)}
+								</Text>
+							</View>
+						)}
+
+						{selectedDebt && mode === 'expense' && (
+							<View style={styles.debtPillContainer}>
+								<View style={styles.debtPill}>
+									<Ionicons
+										name="card-outline"
+										size={14}
+										color={palette.primaryMuted}
+									/>
+									<Text style={styles.debtPillText}>
+										Paying debt: {selectedDebt.debtName}
+									</Text>
+								</View>
+							</View>
+						)}
+
+						{/* Segmented control inside hero */}
+						<View style={styles.segmented}>
+							{(['expense', 'income'] as const).map((m, index) => {
+								const active = mode === m;
+								const label = m.charAt(0).toUpperCase() + m.slice(1);
+								const isLeft = index === 0;
+								const isRight = index === 1;
+								return (
+									<Pressable
+										key={m}
+										style={({ pressed }) => [
+											styles.segBtn,
+											isLeft && styles.segBtnLeft,
+											isRight && styles.segBtnRight,
+											active && styles.segBtnActive,
+											{
+												backgroundColor: active
+													? palette.surface
+													: palette.borderMuted,
+												opacity: pressed ? 0.7 : 1,
+											},
+										]}
+										onPress={() => handleModeChange(m)}
+										accessibilityRole="button"
+										accessibilityState={{ selected: active }}
+									>
+										<Text
+											style={[
+												styles.segText,
+												{
+													color: active ? palette.text : palette.textMuted,
+												},
+											]}
+										>
+											{label}
+										</Text>
+									</Pressable>
+								);
+							})}
+						</View>
+					</View>
+				</View>
+
+				{/* Details card (Budget / Goal / Debt / Note / Recurring / Date) */}
 				<View style={styles.cardList}>
 					<Row
 						icon={mode === 'expense' ? 'scale-outline' : 'trophy-outline'}
@@ -544,7 +564,6 @@ export default function TransactionScreenProModern() {
 							if (mode === 'expense') {
 								setPickerOpen('budget');
 							} else {
-								// if you want to allow creating a goal when none exist:
 								if (!goals?.length) return navigateToGoalsWithModal();
 								setPickerOpen('goal');
 							}
@@ -554,7 +573,6 @@ export default function TransactionScreenProModern() {
 						}
 					/>
 
-					{/* Debt row, only for expense */}
 					{mode === 'expense' && (
 						<Row
 							icon="card-outline"
@@ -578,7 +596,11 @@ export default function TransactionScreenProModern() {
 					<Row
 						icon="chatbox-ellipses-outline"
 						label="Note"
-						right={<ValueText>{description ? description : '—'}</ValueText>}
+						right={
+							<ValueText>
+								{description ? description : 'Add a short note'}
+							</ValueText>
+						}
 						onPress={() => descRef.current?.focus()}
 						accessibilityLabel="Edit note"
 					/>
@@ -608,7 +630,7 @@ export default function TransactionScreenProModern() {
 
 				{/* Description input */}
 				<View style={styles.inputCard}>
-					<Text style={styles.inputLabel}>Description</Text>
+					<Text style={[type.h2, styles.inputLabel]}>Description</Text>
 					<Controller
 						control={control}
 						name="description"
@@ -622,7 +644,7 @@ export default function TransactionScreenProModern() {
 										? 'e.g., Paycheck, refund…'
 										: 'e.g., Groceries, gas, subscription…'
 								}
-								placeholderTextColor="#A3B3C2"
+								placeholderTextColor={palette.textSubtle}
 								value={value}
 								onChangeText={(t) => onChange(t)}
 								onBlur={() => {
@@ -630,7 +652,6 @@ export default function TransactionScreenProModern() {
 									trigger('description');
 								}}
 								onFocus={() => {
-									// Give layout a frame to update, then scroll the input fully into view
 									requestAnimationFrame(() => {
 										scrollRef.current?.scrollToEnd({ animated: true });
 									});
@@ -665,9 +686,11 @@ export default function TransactionScreenProModern() {
 							size={18}
 							color={palette.text}
 						/>
-						<Text style={styles.previewTitle}>You will create</Text>
+						<Text style={[type.body, styles.previewTitle]}>
+							Review before saving
+						</Text>
 					</View>
-					<Text style={styles.previewLine}>
+					<Text style={[type.body, styles.previewLine]}>
 						<Text style={styles.previewEmph}>
 							{prettyCurrency(amount || '')}
 						</Text>{' '}
@@ -686,7 +709,7 @@ export default function TransactionScreenProModern() {
 					</Text>
 				</View>
 
-				{/* Inline CTA (part of content, so it scrolls with the page) */}
+				{/* Inline CTA */}
 				<View style={styles.inlineCtaWrap}>
 					<TouchableOpacity
 						style={[
@@ -704,7 +727,7 @@ export default function TransactionScreenProModern() {
 					>
 						{isSubmitting ? (
 							<>
-								<ActivityIndicator size="small" color="#fff" />
+								<ActivityIndicator size="small" color={palette.primaryTextOn} />
 								<Text style={styles.inlineCtaText}>Saving…</Text>
 							</>
 						) : (
@@ -714,7 +737,7 @@ export default function TransactionScreenProModern() {
 										? 'Pay Debt'
 										: 'Create Transaction'}
 								</Text>
-								<Ionicons name="add" size={18} color="#fff" />
+								<Ionicons name="add" size={18} color={palette.primaryTextOn} />
 							</>
 						)}
 					</TouchableOpacity>
@@ -730,20 +753,12 @@ export default function TransactionScreenProModern() {
 			{/* (Optional) iOS accessory bar just for a "Done" keyboard dismiss */}
 			{Platform.OS === 'ios' && (
 				<InputAccessoryView nativeID={accessoryId}>
-					<View
-						style={{
-							padding: 8,
-							alignItems: 'flex-end',
-							backgroundColor: '#F7F8FA',
-						}}
-					>
+					<View style={styles.accessoryBar}>
 						<TouchableOpacity
 							onPress={() => Keyboard.dismiss()}
 							hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
 						>
-							<Text style={{ color: palette.accent, fontWeight: '700' }}>
-								Done
-							</Text>
+							<Text style={styles.accessoryDoneText}>Done</Text>
 						</TouchableOpacity>
 					</View>
 				</InputAccessoryView>
@@ -756,14 +771,7 @@ export default function TransactionScreenProModern() {
 				snapPoints={[0.6, 0.4]}
 				initialSnapIndex={0}
 				header={
-					<View
-						style={{
-							flexDirection: 'row',
-							alignItems: 'center',
-							paddingHorizontal: 16,
-							paddingBottom: 8,
-						}}
-					>
+					<View style={styles.sheetHeader}>
 						<Ionicons
 							name={
 								pickerOpen === 'goal'
@@ -773,17 +781,10 @@ export default function TransactionScreenProModern() {
 									: 'wallet-outline'
 							}
 							size={20}
-							color="#0095FF"
-							style={{ marginRight: 12 }}
+							color={palette.primary}
+							style={{ marginRight: space.sm }}
 						/>
-						<Text
-							style={{
-								flex: 1,
-								fontSize: 18,
-								fontWeight: '600',
-								color: '#0F172A',
-							}}
-						>
+						<Text style={[type.h1, styles.sheetTitle]}>
 							{pickerOpen === 'goal'
 								? 'Select Goal'
 								: pickerOpen === 'debt'
@@ -791,7 +792,7 @@ export default function TransactionScreenProModern() {
 								: 'Select Budget'}
 						</Text>
 						<TouchableOpacity onPress={() => setPickerOpen(null)}>
-							<Ionicons name="close" size={24} color="#64748B" />
+							<Ionicons name="close" size={24} color={palette.textMuted} />
 						</TouchableOpacity>
 					</View>
 				}
@@ -826,8 +827,8 @@ export default function TransactionScreenProModern() {
 							});
 						}
 						return (
-							<View style={{ paddingVertical: 16 }}>
-								<Text style={{ color: palette.sub }}>
+							<View style={{ paddingVertical: space.md }}>
+								<Text style={{ color: palette.textMuted }}>
 									{pickerOpen === 'goal'
 										? 'No goals yet. Create one from Goals.'
 										: pickerOpen === 'debt'
@@ -839,13 +840,7 @@ export default function TransactionScreenProModern() {
 					}}
 					renderItem={({ item }) => (
 						<TouchableOpacity
-							style={{
-								flexDirection: 'row',
-								alignItems: 'center',
-								paddingVertical: 14,
-								borderBottomWidth: StyleSheet.hairlineWidth,
-								borderBottomColor: palette.line,
-							}}
+							style={styles.sheetRow}
 							onPress={() => {
 								if (pickerOpen === 'goal') {
 									selectGoal(item as Goal);
@@ -873,9 +868,9 @@ export default function TransactionScreenProModern() {
 										? palette.text
 										: (item as any).color ?? palette.text
 								}
-								style={{ marginRight: 8 }}
+								style={{ marginRight: space.sm }}
 							/>
-							<Text style={{ fontSize: 16, color: palette.text }}>
+							<Text style={[type.body, { color: palette.text }]}>
 								{pickerOpen === 'debt'
 									? (item as DebtRollup).debtName
 									: (item as any).name}
@@ -892,62 +887,30 @@ export default function TransactionScreenProModern() {
 				snapPoints={[0.7, 0.5]}
 				initialSnapIndex={0}
 				header={
-					<View
-						style={{
-							flexDirection: 'row',
-							alignItems: 'center',
-							paddingHorizontal: 16,
-							paddingBottom: 8,
-						}}
-					>
+					<View style={styles.sheetHeader}>
 						<Ionicons
 							name="calendar-outline"
 							size={20}
-							color="#0095FF"
-							style={{ marginRight: 12 }}
+							color={palette.primary}
+							style={{ marginRight: space.sm }}
 						/>
-						<Text
-							style={{
-								flex: 1,
-								fontSize: 18,
-								fontWeight: '600',
-								color: '#0F172A',
-							}}
-						>
-							Select Date
-						</Text>
+						<Text style={[type.h1, styles.sheetTitle]}>Select Date</Text>
 						<TouchableOpacity onPress={() => setDatePickerOpen(false)}>
-							<Ionicons name="close" size={24} color="#64748B" />
+							<Ionicons name="close" size={24} color={palette.textMuted} />
 						</TouchableOpacity>
 					</View>
 				}
 			>
 				{/* Quick actions */}
-				<View
-					style={{
-						flexDirection: 'row',
-						gap: 12,
-						paddingHorizontal: 16,
-						paddingBottom: 12,
-					}}
-				>
+				<View style={styles.quickActions}>
 					<TouchableOpacity
-						style={{
-							flex: 1,
-							paddingVertical: 10,
-							borderRadius: 8,
-							borderWidth: 1,
-							borderColor: palette.line,
-							alignItems: 'center',
-						}}
+						style={styles.quickActionBtn}
 						onPress={() => {
 							setValue('date', getLocalIsoDate(), { shouldValidate: false });
 							setDatePickerOpen(false);
 						}}
 					>
-						<Text style={{ color: palette.text, fontWeight: '600' }}>
-							Today
-						</Text>
+						<Text style={styles.quickActionText}>Today</Text>
 					</TouchableOpacity>
 				</View>
 
@@ -960,8 +923,8 @@ export default function TransactionScreenProModern() {
 					markedDates={{
 						[selectedDate]: {
 							selected: true,
-							selectedColor: palette.accent,
-							selectedTextColor: '#fff',
+							selectedColor: palette.primary,
+							selectedTextColor: palette.primaryTextOn,
 						},
 					}}
 					firstDay={0}
@@ -974,14 +937,14 @@ export default function TransactionScreenProModern() {
 						/>
 					)}
 					theme={{
-						backgroundColor: '#fff',
-						calendarBackground: '#fff',
-						textSectionTitleColor: palette.sub,
-						selectedDayBackgroundColor: palette.accent,
-						selectedDayTextColor: '#fff',
-						todayTextColor: palette.accent,
+						backgroundColor: palette.surface,
+						calendarBackground: palette.surface,
+						textSectionTitleColor: palette.textSubtle,
+						selectedDayBackgroundColor: palette.primary,
+						selectedDayTextColor: palette.primaryTextOn,
+						todayTextColor: palette.primary,
 						dayTextColor: palette.text,
-						textDisabledColor: '#d1d5db',
+						textDisabledColor: palette.borderMuted,
 						monthTextColor: palette.text,
 						arrowColor: palette.text,
 						textDayFontWeight: '500',
@@ -1001,32 +964,18 @@ export default function TransactionScreenProModern() {
 				snapPoints={[0.6, 0.4]}
 				initialSnapIndex={0}
 				header={
-					<View
-						style={{
-							flexDirection: 'row',
-							alignItems: 'center',
-							paddingHorizontal: 16,
-							paddingBottom: 8,
-						}}
-					>
+					<View style={styles.sheetHeader}>
 						<Ionicons
 							name="repeat-outline"
 							size={20}
-							color="#0095FF"
-							style={{ marginRight: 12 }}
+							color={palette.primary}
+							style={{ marginRight: space.sm }}
 						/>
-						<Text
-							style={{
-								flex: 1,
-								fontSize: 18,
-								fontWeight: '600',
-								color: '#0F172A',
-							}}
-						>
+						<Text style={[type.h1, styles.sheetTitle]}>
 							Recurring Transaction
 						</Text>
 						<TouchableOpacity onPress={() => setRecurringOpen(false)}>
-							<Ionicons name="close" size={24} color="#64748B" />
+							<Ionicons name="close" size={24} color={palette.textMuted} />
 						</TouchableOpacity>
 					</View>
 				}
@@ -1036,14 +985,7 @@ export default function TransactionScreenProModern() {
 						(freq) => (
 							<TouchableOpacity
 								key={freq}
-								style={{
-									flexDirection: 'row',
-									alignItems: 'center',
-									justifyContent: 'space-between',
-									paddingVertical: 14,
-									borderBottomWidth: StyleSheet.hairlineWidth,
-									borderBottomColor: palette.line,
-								}}
+								style={styles.recurringRow}
 								onPress={() => {
 									setValue(
 										'recurring',
@@ -1053,11 +995,13 @@ export default function TransactionScreenProModern() {
 									setRecurringOpen(false);
 								}}
 							>
-								<Text style={{ fontSize: 16, color: palette.text }}>
-									{freq}
-								</Text>
+								<Text style={[type.body, { color: palette.text }]}>{freq}</Text>
 								{recurring?.frequency === freq && (
-									<Ionicons name="checkmark" size={22} color={palette.accent} />
+									<Ionicons
+										name="checkmark"
+										size={22}
+										color={palette.primary}
+									/>
 								)}
 							</TouchableOpacity>
 						)
@@ -1067,7 +1011,7 @@ export default function TransactionScreenProModern() {
 
 			{!ready && (
 				<View style={styles.loadingOverlay}>
-					<ActivityIndicator size="large" color={palette.accent} />
+					<ActivityIndicator size="large" color={palette.primary} />
 					<Text style={styles.loadingText}>
 						{mode === 'income' ? 'Loading goals…' : 'Loading budgets…'}
 					</Text>
@@ -1081,178 +1025,212 @@ export default function TransactionScreenProModern() {
 // Styles
 // =============================================================
 const styles = StyleSheet.create({
-	container: { flex: 1, backgroundColor: palette.bg },
-	content: { padding: 16 },
+	container: { flex: 1, backgroundColor: palette.surfaceAlt },
 
-	// Header
-	header: {
-		paddingHorizontal: 16,
-		paddingTop: 6,
-		paddingBottom: 8,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
+	content: {
+		paddingHorizontal: space.lg,
+		paddingTop: space.xl,
 	},
-	headerTitle: { fontSize: 18, fontWeight: '800', color: palette.text },
 
-	// Amount hero
+	heroKicker: {
+		...type.small,
+		color: palette.textSubtle,
+		marginBottom: space.xs,
+	},
+
+	heroTitle: {
+		...type.h1,
+		color: palette.text,
+		marginBottom: space.xs,
+	},
+
+	heroSubtitle: {
+		...type.body,
+		color: palette.textMuted,
+		marginBottom: space.md,
+	},
+
+	// Hero = amount + segmented
 	amountCard: {
-		marginHorizontal: 16,
-		marginTop: 8,
-		paddingHorizontal: 12,
-		paddingVertical: 10,
-		borderRadius: 16,
-		shadowColor: '#0f172a',
-		shadowOpacity: 0.06,
-		elevation: 2, // Android shadow
+		paddingHorizontal: space.lg,
+		paddingVertical: space.md,
+		borderRadius: radius.xl,
+		backgroundColor: palette.surface,
+		...shadow.card,
+		marginBottom: space.lg,
 	},
+
 	amountRow: {
 		flexDirection: 'row',
-		alignItems: 'center',
+		alignItems: 'flex-end',
 		justifyContent: 'center',
 	},
 	dollar: {
 		fontSize: 28,
 		fontWeight: '400',
-		color: palette.accent,
-		marginRight: 6,
-		marginTop: 10,
+		color: palette.primary,
+		marginRight: space.xs,
+		marginBottom: 4,
 	},
 	amountInput: {
 		flexShrink: 1,
-		fontSize: 60,
-		fontWeight: '500',
+		fontSize: 48,
+		fontWeight: '600',
 		color: palette.text,
 		textAlign: 'left',
-		minWidth: 100,
+		minWidth: 120,
 	},
 	amountUnderline: {
-		marginTop: 6,
+		marginTop: space.xs,
 		height: 2,
-		backgroundColor: palette.accent,
-		borderRadius: 999,
+		backgroundColor: palette.primary,
+		borderRadius: radius.pill,
+	},
+	errorContainer: {
+		alignItems: 'flex-end',
+		marginTop: space.xs,
+	},
+	errorText: { color: palette.danger, fontSize: 13, marginTop: space.xs },
+
+	debtPillContainer: {
+		marginTop: space.sm,
+		alignItems: 'flex-start',
+	},
+	debtPill: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: palette.primarySubtle,
+		paddingHorizontal: space.sm,
+		paddingVertical: space.xs,
+		borderRadius: radius.pill,
+		gap: 4,
+	},
+	debtPillText: {
+		color: palette.primaryMuted,
+		fontWeight: '600',
+		fontSize: 12,
 	},
 
-	// Segmented
+	// Segmented (now inside amountCard)
 	segmented: {
-		marginHorizontal: 16,
-		marginTop: 12,
-		backgroundColor: '#F1F5F9',
-		borderRadius: 14,
+		marginTop: space.md,
+		backgroundColor: palette.chipBg,
+		borderRadius: radius.lg,
 		padding: 4,
 		flexDirection: 'row',
 	},
 	segBtn: {
 		flex: 1,
-		paddingVertical: 8,
-		borderRadius: 10,
+		paddingVertical: space.sm,
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
-	segBtnActive: {
-		backgroundColor: palette.surface,
-		shadowColor: '#000',
-		shadowOpacity: 0.07,
-		shadowRadius: 8,
-		shadowOffset: { width: 0, height: 3 },
-		elevation: 2, // Android shadow
+	segBtnLeft: {
+		borderTopLeftRadius: radius.md,
+		borderBottomLeftRadius: radius.md,
 	},
-	segText: { fontSize: 14, fontWeight: '700', color: palette.sub },
-	segTextActive: { color: palette.text },
+	segBtnRight: {
+		borderTopRightRadius: radius.md,
+		borderBottomRightRadius: radius.md,
+	},
+	segBtnActive: {
+		...shadow.card,
+	},
+	segText: {
+		fontSize: 14,
+		fontWeight: '700',
+	},
 
 	// Card list (cells)
 	cardList: {
 		backgroundColor: palette.surface,
-		borderRadius: 16,
+		borderRadius: radius.lg,
 		borderWidth: 1,
-		borderColor: palette.line,
+		borderColor: palette.border,
 		overflow: 'hidden',
-		marginTop: 16,
+		// marginTop: space.md,
 	},
 	row: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		paddingHorizontal: 14,
-		paddingVertical: 14,
+		paddingHorizontal: space.md,
+		paddingVertical: space.md,
 		borderBottomWidth: StyleSheet.hairlineWidth,
-		borderBottomColor: palette.line,
+		borderBottomColor: palette.border,
 	},
-	rowLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+	rowLeft: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
 	rowIconWrap: {
 		width: 28,
 		height: 28,
-		borderRadius: 8,
-		backgroundColor: '#F4F7FA',
+		borderRadius: radius.md,
+		backgroundColor: palette.subtle,
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
-	rowLabel: { fontSize: 15, fontWeight: '700', color: palette.text },
+	rowLabel: { color: palette.text },
 	rowRight: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 8,
+		gap: space.xs,
 		maxWidth: '55%',
 	},
 	valueText: { color: palette.text, fontWeight: '600' },
 
 	// Input card
 	inputCard: {
-		marginTop: 16,
+		marginTop: space.lg,
 		backgroundColor: palette.surface,
-		borderRadius: 16,
+		borderRadius: radius.lg,
 		borderWidth: 1,
-		borderColor: palette.line,
-		padding: 14,
+		borderColor: palette.border,
+		padding: space.md,
 	},
-	inputLabel: { fontWeight: '800', color: palette.text, marginBottom: 8 },
+	inputLabel: { color: palette.text, marginBottom: space.sm },
 	input: {
 		height: 48,
-		borderRadius: 12,
+		borderRadius: radius.md,
 		borderWidth: 1,
-		borderColor: palette.line,
-		paddingHorizontal: 14,
+		borderColor: palette.border,
+		paddingHorizontal: space.md,
 		fontSize: 16,
 		color: palette.text,
 		backgroundColor: palette.surface,
 	},
-	inputError: { borderColor: palette.danger, borderWidth: 2 },
-	errorText: { color: palette.danger, fontSize: 13, marginTop: 6 },
+	inputError: { borderColor: palette.danger, borderWidth: 1.5 },
 
 	// Preview
 	previewCard: {
-		marginTop: 16,
-		backgroundColor: '#F8FAFC',
-		borderRadius: 12,
+		marginTop: space.lg,
+		backgroundColor: palette.surfaceAlt,
+		borderRadius: radius.md,
 		borderWidth: 1,
-		borderColor: palette.line,
-		padding: 14,
-		elevation: 1, // Android shadow
+		borderColor: palette.border,
+		padding: space.md,
 	},
 	previewHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 8,
+		gap: space.xs,
 		marginBottom: 4,
 	},
-	previewTitle: { fontWeight: '800', color: palette.text },
+	previewTitle: { color: palette.text },
 	previewLine: { color: palette.text },
-	previewEmph: { fontWeight: '900' },
+	previewEmph: { fontWeight: '800' },
 
 	// Inline CTA
 	inlineCtaWrap: {
-		marginTop: 16,
-		paddingHorizontal: 16,
+		marginTop: space.lg,
+		paddingBottom: space.xl,
 	},
 	inlineCtaBtn: {
 		minHeight: 52,
-		borderRadius: 14,
-		backgroundColor: palette.accent,
+		borderRadius: radius.lg,
+		backgroundColor: palette.primary,
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'center',
-		gap: 8,
-		// subtle elevation/shadow
+		gap: space.xs,
 		shadowColor: '#000',
 		shadowOpacity: 0.12,
 		shadowRadius: 10,
@@ -1260,14 +1238,81 @@ const styles = StyleSheet.create({
 		elevation: 5,
 	},
 	inlineCtaBtnDisabled: {
-		backgroundColor: '#A7D8FF',
+		backgroundColor: palette.primarySubtle,
 	},
-	inlineCtaText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+	inlineCtaText: {
+		color: palette.primaryTextOn,
+		fontWeight: '700',
+		fontSize: 16,
+	},
 	inlineCtaHint: {
-		marginTop: 8,
+		marginTop: space.xs,
 		textAlign: 'center',
-		color: palette.sub,
+		color: palette.textMuted,
 		fontSize: 12,
+	},
+
+	// Accessory bar
+	accessoryBar: {
+		padding: space.sm,
+		alignItems: 'flex-end',
+		backgroundColor: palette.surfaceAlt,
+	},
+	accessoryDoneText: {
+		color: palette.primary,
+		fontWeight: '700',
+	},
+
+	// BottomSheet shared
+	sheetHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingHorizontal: space.lg,
+		paddingBottom: space.sm,
+	},
+	sheetTitle: {
+		flex: 1,
+		color: palette.text,
+	},
+	sheetRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingVertical: 14,
+		borderBottomWidth: StyleSheet.hairlineWidth,
+		borderBottomColor: palette.border,
+		paddingHorizontal: space.lg,
+	},
+
+	// Date quick action
+	quickActions: {
+		flexDirection: 'row',
+		gap: space.sm,
+		paddingHorizontal: space.lg,
+		paddingBottom: space.sm,
+	},
+	quickActionBtn: {
+		flex: 1,
+		paddingVertical: space.sm,
+		borderRadius: radius.md,
+		borderWidth: 1,
+		borderColor: palette.border,
+		alignItems: 'center',
+		backgroundColor: palette.surface,
+	},
+	quickActionText: {
+		color: palette.text,
+		fontWeight: '600',
+	},
+
+	// Recurring rows
+	recurringRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		paddingVertical: 14,
+		borderBottomWidth: StyleSheet.hairlineWidth,
+		borderBottomColor: palette.border,
+		paddingHorizontal: space.lg,
 	},
 
 	// Loading overlay
@@ -1275,7 +1320,11 @@ const styles = StyleSheet.create({
 		...StyleSheet.absoluteFillObject,
 		alignItems: 'center',
 		justifyContent: 'center',
-		backgroundColor: palette.bg,
+		backgroundColor: palette.surfaceAlt,
 	},
-	loadingText: { marginTop: 12, color: palette.sub, fontWeight: '700' },
+	loadingText: {
+		marginTop: space.sm,
+		color: palette.textMuted,
+		fontWeight: '600',
+	},
 });

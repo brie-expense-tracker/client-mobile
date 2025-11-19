@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { logger } from '../../../../src/utils/logger';
 import {
 	View,
@@ -32,13 +32,7 @@ type DeletionReason = (typeof DELETION_REASONS)[number]['key'];
 
 export default function DeleteAccountScreen() {
 	const router = useRouter();
-	const {
-		firebaseUser,
-		deleteAccountAfterReauth,
-		reauthWithPassword,
-		reauthWithGoogle,
-		refreshUserData,
-	} = useAuth();
+	const { firebaseUser, deleteAccountAfterReauth } = useAuth();
 
 	// Wizard state
 	const [currentStep, setCurrentStep] = useState(0);
@@ -54,50 +48,15 @@ export default function DeleteAccountScreen() {
 	// Step 3: Data export preference
 	const [exportData, setExportData] = useState(false);
 
-	// Step 4: Final verification
+	// Step 4: Final confirmation
 	const [confirmText, setConfirmText] = useState('');
-	const [password, setPassword] = useState('');
-	const [showPassword, setShowPassword] = useState(false);
-	const [reauthComplete, setReauthComplete] = useState(false);
-
-	// Determine user's sign-in providers
-	const providers: string[] = useMemo(() => {
-		const ids =
-			firebaseUser?.providerData
-				?.map((p: any) => p?.providerId)
-				.filter(Boolean) ?? [];
-		return Array.from(new Set(ids));
-	}, [firebaseUser]);
-
-	const usesPassword = providers.includes('password');
-	const usesGoogle = providers.includes('google.com');
-	const usesApple = providers.includes('apple.com');
-
-	// Defensive provider detection - if providerData is empty, refresh user data
-	useEffect(() => {
-		if (
-			firebaseUser &&
-			(!firebaseUser.providerData || firebaseUser.providerData.length === 0)
-		) {
-			(async () => {
-				try {
-					await refreshUserData();
-				} catch (error) {
-					logger.debug(
-						'Failed to refresh user data for provider detection:',
-						error
-					);
-				}
-			})();
-		}
-	}, [firebaseUser, refreshUserData]);
 
 	// Step titles and navigation
 	const stepTitles = [
 		'Why are you leaving?',
 		'Tell us more',
 		'About your data',
-		'Verify & delete',
+		'Confirm deletion',
 	];
 
 	const canProceed = useMemo(() => {
@@ -143,54 +102,8 @@ export default function DeleteAccountScreen() {
 		}
 	}, []);
 
-	const handleVerifyIdentity = async () => {
-		setFormError(null);
-		if (confirmText.trim().toUpperCase() !== 'DELETE') {
-			setFormError('Type DELETE to confirm before verifying your identity.');
-			return;
-		}
-		if (usesPassword && password.trim().length < 6) {
-			setFormError('Please enter your password.');
-			return;
-		}
-
-		try {
-			setBusy(true);
-			if (usesPassword) {
-				await reauthWithPassword(password.trim());
-			} else if (usesGoogle) {
-				await reauthWithGoogle();
-			} else if (usesApple) {
-				throw new Error(
-					'Apple Sign-In reauthentication not yet available. Please contact support.'
-				);
-			} else {
-				throw new Error('Unsupported sign-in method. Please contact support.');
-			}
-			setReauthComplete(true);
-			await submitFeedback();
-			Alert.alert(
-				'Verified',
-				'Identity verified. You can now confirm deletion.'
-			);
-		} catch (e: any) {
-			logger.warn('Reauth failed:', e);
-			setFormError(
-				e?.code === 'auth/wrong-password'
-					? 'Incorrect password. Please try again.'
-					: e?.code === 'auth/popup-closed-by-user' ||
-					  e?.message?.includes('cancel')
-					? 'Verification was cancelled.'
-					: e?.message || 'Verification failed. Please try again.'
-			);
-		} finally {
-			setBusy(false);
-		}
-	};
-
 	const handleFinalDelete = useCallback(() => {
-		if (!(confirmText.trim().toUpperCase() === 'DELETE' && reauthComplete))
-			return;
+		if (confirmText.trim().toUpperCase() !== 'DELETE') return;
 
 		Alert.alert(
 			'Final Confirmation',
@@ -203,6 +116,8 @@ export default function DeleteAccountScreen() {
 					onPress: async () => {
 						try {
 							setBusy(true);
+							setFormError(null);
+							await submitFeedback();
 							await deleteAccountAfterReauth();
 							// Navigate to login immediately to avoid ProfileProvider unmount errors
 							router.replace('/(auth)/login');
@@ -215,20 +130,35 @@ export default function DeleteAccountScreen() {
 							}, 500);
 						} catch (error: any) {
 							logger.error('Delete error:', error);
-							Alert.alert(
-								'Error',
-								error?.code === 'auth/requires-recent-login'
-									? 'Please verify your identity again and retry.'
-									: 'Failed to delete account. Please try again.'
-							);
-							setReauthComplete(false);
+							const errorMessage =
+								error?.message || 'Failed to delete account. Please try again.';
+
+							// If partial deletion occurred (backend deleted but Firebase failed),
+							// log the user out since their backend account is gone
+							if (error?.partial) {
+								setFormError(errorMessage);
+								setBusy(false);
+								Alert.alert('Partial Deletion', errorMessage, [
+									{
+										text: 'OK',
+										onPress: async () => {
+											// Navigate to login since backend account is deleted
+											router.replace('/(auth)/login');
+										},
+									},
+								]);
+								return;
+							}
+
+							setFormError(errorMessage);
 							setBusy(false);
+							Alert.alert('Deletion Failed', errorMessage, [{ text: 'OK' }]);
 						}
 					},
 				},
 			]
 		);
-	}, [confirmText, reauthComplete, deleteAccountAfterReauth, router]);
+	}, [confirmText, deleteAccountAfterReauth, router, submitFeedback]);
 
 	return (
 		<SafeAreaView style={styles.container} edges={['top']}>
@@ -383,12 +313,12 @@ export default function DeleteAccountScreen() {
 						</View>
 					)}
 
-					{/* Step 4: Verification & Deletion */}
+					{/* Step 4: Confirmation & Deletion */}
 					{currentStep === 3 && (
 						<View style={[styles.stepCard, shadowCard]}>
 							<Text style={styles.stepSubtitle}>
-								Type <Text style={styles.monoText}>DELETE</Text> and verify your
-								identity to continue.
+								Type <Text style={styles.monoText}>DELETE</Text> to confirm
+								account deletion.
 							</Text>
 
 							<TextInput
@@ -401,102 +331,30 @@ export default function DeleteAccountScreen() {
 								keyboardType={
 									Platform.OS === 'ios' ? 'ascii-capable' : 'default'
 								}
+								editable={!busy}
 							/>
 
-							{usesPassword ? (
-								<View style={styles.passwordSection}>
-									<Text style={styles.inputLabel}>Password</Text>
-									<View style={styles.passwordContainer}>
-										<TextInput
-											style={styles.passwordInput}
-											value={password}
-											onChangeText={setPassword}
-											placeholder="Enter your password"
-											placeholderTextColor="#9CA3AF"
-											secureTextEntry={!showPassword}
-											autoCapitalize="none"
-										/>
-										<BorderlessButton
-											onPress={() => setShowPassword(!showPassword)}
-											style={styles.eyeButton}
-										>
-											<Ionicons
-												name={showPassword ? 'eye-off' : 'eye'}
-												size={20}
-												color="#6B7280"
-											/>
-										</BorderlessButton>
-									</View>
-
-									<RectButton
-										style={[
-											styles.verifyButton,
-											(!canProceed || password.length < 1 || busy) &&
-												styles.buttonDisabled,
-										]}
-										onPress={handleVerifyIdentity}
-										enabled={canProceed && !busy}
-									>
-										{busy ? (
-											<ActivityIndicator size="small" color="#fff" />
-										) : (
-											<Text style={styles.verifyButtonText}>
-												{reauthComplete ? 'Verified ✓' : 'Verify'}
-											</Text>
-										)}
-									</RectButton>
-								</View>
-							) : (
-								<RectButton
-									style={[
-										styles.providerButton,
-										(!canProceed || busy) && styles.buttonDisabled,
-									]}
-									onPress={handleVerifyIdentity}
-									enabled={canProceed && !busy}
-								>
-									{busy ? (
-										<ActivityIndicator size="small" color="#1F2937" />
-									) : (
-										<>
-											{usesGoogle && (
-												<Ionicons
-													name="logo-google"
-													size={20}
-													color="#1D4ED8"
-												/>
-											)}
-											<Text style={styles.providerButtonText}>
-												Verify with {usesGoogle ? 'Google' : 'your provider'}
-											</Text>
-										</>
-									)}
-								</RectButton>
-							)}
-
 							{formError && <Text style={styles.errorText}>{formError}</Text>}
-
-							{reauthComplete && (
-								<View style={styles.verifiedPill}>
-									<Ionicons name="checkmark-circle" size={18} color="#16A34A" />
-									<Text style={styles.verifiedText}>Identity verified</Text>
-								</View>
-							)}
 
 							<RectButton
 								style={[
 									styles.deleteButton,
-									!(canProceed && reauthComplete) && styles.buttonDisabled,
+									(!canProceed || busy) && styles.buttonDisabled,
 								]}
 								onPress={handleFinalDelete}
-								enabled={canProceed && reauthComplete}
+								enabled={canProceed && !busy}
 							>
-								<Text style={styles.deleteButtonText}>Confirm deletion</Text>
+								{busy ? (
+									<ActivityIndicator size="small" color="#fff" />
+								) : (
+									<Text style={styles.deleteButtonText}>Confirm deletion</Text>
+								)}
 							</RectButton>
 
 							<RectButton
 								style={styles.cancelButton}
 								onPress={() => router.back()}
+								enabled={!busy}
 							>
 								<Text style={styles.cancelButtonText}>Keep account</Text>
 							</RectButton>
@@ -794,65 +652,7 @@ const styles = StyleSheet.create({
 		fontWeight: '800',
 	},
 
-	// Password
-	passwordSection: {
-		marginTop: 12,
-	},
-	passwordContainer: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		height: 48,
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: '#E5E7EB',
-		backgroundColor: '#fff',
-		marginTop: 6,
-	},
-	passwordInput: {
-		flex: 1,
-		height: 48,
-		paddingHorizontal: 16,
-		fontSize: 16,
-		color: '#111827',
-	},
-	eyeButton: {
-		paddingHorizontal: 16,
-		height: 48,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-
 	// Buttons
-	verifyButton: {
-		height: 48,
-		borderRadius: 12,
-		backgroundColor: '#111827',
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginTop: 12,
-	},
-	verifyButtonText: {
-		color: '#fff',
-		fontSize: 16,
-		fontWeight: '800',
-	},
-	providerButton: {
-		height: 48,
-		borderRadius: 12,
-		backgroundColor: '#fff',
-		borderWidth: 1,
-		borderColor: '#E5E7EB',
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginTop: 12,
-		flexDirection: 'row',
-		gap: 10,
-	},
-	providerButtonText: {
-		fontSize: 16,
-		fontWeight: '700',
-		color: '#1F2937',
-	},
 	deleteButton: {
 		height: 48,
 		borderRadius: 12,
@@ -919,24 +719,6 @@ const styles = StyleSheet.create({
 	},
 
 	// Status
-	verifiedPill: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		alignSelf: 'flex-start',
-		marginTop: 12,
-		paddingHorizontal: 12,
-		paddingVertical: 8,
-		borderRadius: 999,
-		backgroundColor: '#ECFDF5',
-		borderWidth: 1,
-		borderColor: '#A7F3D0',
-		gap: 6,
-	},
-	verifiedText: {
-		fontSize: 13,
-		fontWeight: '700',
-		color: '#065F46',
-	},
 	errorText: {
 		color: '#DC2626',
 		fontSize: 12,

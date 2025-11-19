@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { router } from 'expo-router';
 import { useBudget } from '../../../src/context/budgetContext';
@@ -322,20 +323,20 @@ type CardHeaderProps = {
 	title: string;
 	subtitle?: string;
 	actionLabel?: string;
-	accent?: string;
+	icon?: keyof typeof Ionicons.glyphMap;
 };
 
 function CardHeader({
 	title,
 	subtitle,
 	actionLabel,
-	accent = '•',
+	icon = 'ellipse-outline',
 }: CardHeaderProps) {
 	return (
 		<View style={styles.cardHeaderRow}>
 			<View style={styles.cardHeaderLeft}>
 				<View style={styles.cardIcon}>
-					<Text style={styles.cardIconText}>{accent}</Text>
+					<Ionicons name={icon} size={18} color="#0F6FFF" />
 				</View>
 				<View>
 					<Text style={styles.cardTitle}>{title}</Text>
@@ -429,11 +430,6 @@ const styles = StyleSheet.create({
 		backgroundColor: 'rgba(15,111,255,0.12)',
 		alignItems: 'center',
 		justifyContent: 'center',
-	},
-	cardIconText: {
-		color: '#0F6FFF',
-		fontWeight: '700',
-		fontSize: 12,
 	},
 	cardTitle: {
 		fontSize: 18,
@@ -834,7 +830,7 @@ export default function WalletOverviewScreen() {
 								title="Budget Overview"
 								subtitle={budgetSummary.subtitle}
 								actionLabel="View"
-								accent="₿"
+								icon="pie-chart-outline"
 							/>
 
 							<View style={styles.statRow}>
@@ -858,7 +854,7 @@ export default function WalletOverviewScreen() {
 								title="Upcoming Bills"
 								subtitle={recurringSubtitle}
 								actionLabel="Manage"
-								accent="≋"
+								icon="repeat-outline"
 							/>
 
 							<View style={styles.statRow}>
@@ -908,7 +904,7 @@ export default function WalletOverviewScreen() {
 								title="Savings Goals"
 								subtitle={goalsSummary.subtitle}
 								actionLabel="View"
-								accent="★"
+								icon="flag-outline"
 							/>
 
 							<View style={styles.statRow}>
@@ -932,7 +928,7 @@ export default function WalletOverviewScreen() {
 								title="Debt Payoff"
 								subtitle={debtSummary.subtitle}
 								actionLabel="Track"
-								accent="∑"
+								icon="card-outline"
 							/>
 
 							<View style={styles.statRow}>

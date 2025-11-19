@@ -248,15 +248,9 @@ function RootLayoutContent() {
 			// Stack routes don't include the group name in segments, so check for known stack routes
 			const knownStackRoutes = [
 				'settings',
-				'addBudget',
-				'editBudget',
-				'budgetDetails',
-				'addGoal',
-				'editGoal',
-				'goalDetails',
-				'addRecurringExpense',
-				'editRecurringExpense',
-				'recurringExpenseDetails',
+				'budgets',
+				'goals',
+				'recurring',
 				'debts',
 			];
 			const isStackRoute =

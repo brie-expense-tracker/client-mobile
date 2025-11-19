@@ -7,9 +7,8 @@ import {
 	StyleSheet,
 	Alert,
 	SafeAreaView,
-	Image,
 } from 'react-native';
-import { Link, Stack } from 'expo-router';
+import { Link, Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import useAuth from '../../src/context/AuthContext';
 import { BorderlessButton, RectButton } from 'react-native-gesture-handler';
@@ -21,6 +20,7 @@ export default function ForgotPasswordScreen() {
 	const { sendPasswordResetEmail } = useAuth();
 	const [isPressed, setIsPressed] = useState(false);
 	const [emailIsValid, setEmailIsValid] = useState(false);
+	const router = useRouter();
 
 	// Email validator function
 	const isValidEmail = (email: string) => {
@@ -56,14 +56,18 @@ export default function ForgotPasswordScreen() {
 					{
 						text: 'OK',
 						onPress: () => {
-							// Navigate back to login
-							// The router.back() will be handled by the alert
+							router.replace('/login');
 						},
 					},
 				]
 			);
 		} catch (error: any) {
 			logger.error('Password reset error', error);
+			logger.error('Password reset error details', {
+				code: error.code,
+				message: error.message,
+				stack: error.stack,
+			});
 
 			let errorMessage = 'Could not send reset email. Please try again.';
 			if (error.code === 'auth/user-not-found') {
@@ -72,6 +76,9 @@ export default function ForgotPasswordScreen() {
 				errorMessage = 'Invalid email address.';
 			} else if (error.code === 'auth/too-many-requests') {
 				errorMessage = 'Too many failed attempts. Please try again later.';
+			} else if (error.message) {
+				// Include the actual error message for debugging
+				errorMessage = `${errorMessage}\n\nError: ${error.message}`;
 			}
 
 			Alert.alert('Error', errorMessage);
@@ -83,11 +90,6 @@ export default function ForgotPasswordScreen() {
 	return (
 		<SafeAreaView style={styles.safeAreaContainer}>
 			<View style={styles.mainContainer}>
-				<Image
-					source={require('../../src/assets/images/brie-logos.png')}
-					style={styles.logo}
-					resizeMode="contain"
-				/>
 				<View style={styles.formContainer}>
 					<View style={styles.iconContainer}>
 						<Ionicons name="lock-open-outline" size={48} color="#007AFF" />
@@ -164,14 +166,11 @@ const styles = StyleSheet.create({
 	mainContainer: {
 		flex: 1,
 		paddingHorizontal: 24,
-	},
-	logo: {
-		width: 100,
-		height: 40,
-		marginVertical: 20,
+		justifyContent: 'flex-start',
 	},
 	formContainer: {
 		backgroundColor: '#FFF',
+		marginTop: 80,
 	},
 	iconContainer: {
 		alignItems: 'center',

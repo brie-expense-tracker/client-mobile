@@ -93,7 +93,7 @@ function GoalRow({
 			return;
 		}
 		router.push({
-			pathname: '/(stack)/goalDetails',
+			pathname: '/(stack)/goals/[id]',
 			params: {
 				id: goal.id,
 			},
@@ -384,7 +384,7 @@ export default function GoalsFeed({
 								{filterBy === 'all' && (
 									<TouchableOpacity
 										style={styles.addGoalButton}
-										onPress={() => router.push('/(stack)/addGoal')}
+										onPress={() => router.push('/(stack)/goals/new')}
 									>
 										<Ionicons name="add" size={16} color="#007ACC" />
 										<Text style={styles.addGoalButtonText}>Add Goal</Text>

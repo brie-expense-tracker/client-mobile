@@ -47,7 +47,7 @@ function BudgetRow({
 			return;
 		}
 		router.push({
-			pathname: '/(stack)/budgetDetails',
+			pathname: '/(stack)/budgets/[id]',
 			params: {
 				id: budget.id,
 			},

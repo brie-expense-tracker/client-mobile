@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { logger } from '../../src/utils/logger';
+import { logger } from '../../../src/utils/logger';
 import {
 	View,
 	StyleSheet,
@@ -12,14 +12,14 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useBudget, Budget } from '../../src/context/budgetContext';
+import { useBudget, Budget } from '../../../src/context/budgetContext';
 import {
 	BUDGET_ICONS,
 	BUDGET_AMOUNT_PRESETS,
 	DEFAULT_BUDGET_ICON,
 	DEFAULT_COLOR,
 	normalizeIconName,
-} from '../../src/constants/uiConstants';
+} from '../../../src/constants/uiConstants';
 import {
 	FormHeader,
 	FormInputGroup,
@@ -28,7 +28,7 @@ import {
 	AmountPresets,
 	PeriodSelector,
 	DeleteButton,
-} from '../../src/components/forms';
+} from '../../../src/components/forms';
 
 // Helper to clean currency input
 const cleanCurrencyToNumberString = (v: string) =>

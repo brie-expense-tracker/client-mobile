@@ -192,16 +192,14 @@ const RecurringExpensesScreen: React.FC = () => {
 		expense: RecurringExpenseWithPaymentStatus
 	) => {
 		router.push({
-			pathname: '/(stack)/recurringExpenseDetails',
-			params: {
-				patternId: expense.patternId,
-			},
+			pathname: '/(stack)/recurring/[patternId]',
+			params: { patternId: expense.patternId },
 		});
 	};
 
 	const handleEditExpense = (expense: any) => {
 		router.push({
-			pathname: '/(stack)/editRecurringExpense',
+			pathname: '/(stack)/recurring/edit',
 			params: { id: expense.patternId },
 		});
 	};
@@ -222,7 +220,7 @@ const RecurringExpensesScreen: React.FC = () => {
 	};
 
 	const handleAddRecurringExpense = () => {
-		router.push('/(stack)/addRecurringExpense');
+		router.push('/(stack)/recurring/new');
 	};
 
 	// ==========================================

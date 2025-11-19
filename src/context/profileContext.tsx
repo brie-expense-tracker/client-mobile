@@ -18,6 +18,17 @@ import {
 	AssistantConfigChangedEvent,
 } from '../lib/eventBus';
 import { createLogger } from '../utils/sublogger';
+import {
+	type NotificationPreferences,
+	type NotificationSettingsView,
+	type NotificationConsentView,
+	legacyProfileToPreferences,
+	preferencesToLegacyProfile,
+	prefsToSettingsView,
+	applySettingsViewToPrefs,
+	prefsToConsentView,
+	applyConsentViewToPrefs,
+} from '../services';
 
 const profileContextLog = createLogger('ProfileContext');
 
@@ -55,6 +66,13 @@ interface ProfilePreferences {
 			expenseReduction: boolean;
 			incomeSuggestions: boolean;
 		};
+	};
+	marketing?: {
+		enabled: boolean;
+		promotional: boolean;
+		newsletter: boolean;
+		productUpdates: boolean;
+		specialOffers: boolean;
 	};
 	budgetSettings: {
 		cycleType: 'monthly' | 'weekly' | 'biweekly';
@@ -180,7 +198,10 @@ interface ProfileContextType {
 		preferences: Partial<ProfilePreferences>
 	) => Promise<void>;
 	updateNotificationSettings: (
-		settings: Partial<ProfilePreferences['notifications']>
+		settings: Partial<NotificationSettingsView>
+	) => Promise<void>;
+	updateNotificationConsent: (
+		consent: NotificationConsentView
 	) => Promise<void>;
 	updateAssistantSettings: (
 		settings: Partial<ProfilePreferences['assistant']>
@@ -759,48 +780,123 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 		}
 	};
 
+	/**
+	 * Get current notification preferences in canonical format
+	 */
+	const getNotificationPreferences = (): NotificationPreferences | null => {
+		if (!profile) {
+			return null;
+		}
+
+		return legacyProfileToPreferences(
+			profile.preferences.notifications,
+			profile.preferences.aiInsights,
+			profile.preferences.marketing
+		);
+	};
+
 	const updateNotificationSettings = async (
-		settings: Partial<ProfilePreferences['notifications']>
+		settings: Partial<NotificationSettingsView>
 	) => {
 		if (!user || !firebaseUser) {
 			throw new Error('User not authenticated');
 		}
 
+		if (!profile) {
+			throw new Error('Profile not loaded');
+		}
+
 		// Store the previous state for potential rollback
 		const previousProfile = profile;
-
-		// Optimistically update the profile state immediately
-		setProfile((prev) =>
-			prev
-				? {
-						...prev,
-						preferences: {
-							...prev.preferences,
-							notifications: {
-								...prev.preferences.notifications,
-								...settings,
-							},
-						},
-				  }
-				: null
-		);
 
 		try {
 			setError(null);
 
-			const response = await ApiService.put<
-				ProfilePreferences['notifications']
-			>('/profiles/notifications', settings);
+			// Get current preferences in canonical format
+			const currentPrefs = getNotificationPreferences();
+			if (!currentPrefs) {
+				throw new Error('Unable to load current preferences');
+			}
 
-			if (response.success && response.data) {
-				// The optimistic update was correct, no need to update again
-				profileContextLog.debug('Notification settings updated successfully');
-			} else {
-				// API call failed, revert to previous state
-				setProfile(previousProfile);
-				throw new Error(
-					response.error || 'Failed to update notification settings'
+			// Convert to settings view
+			const currentView = prefsToSettingsView(currentPrefs);
+
+			// Apply the changes
+			const updatedView: NotificationSettingsView = {
+				...currentView,
+				...settings,
+			};
+
+			// Convert back to canonical preferences
+			const updatedPrefs = applySettingsViewToPrefs(
+				currentPrefs,
+				updatedView
+			);
+
+			// Convert to legacy format for API
+			const legacyFormat = preferencesToLegacyProfile(updatedPrefs);
+
+			// Check if insights or marketing fields changed
+			const insightsFieldsChanged =
+				settings.aiInsightsEnabled !== undefined ||
+				settings.weeklyDigestEnabled !== undefined ||
+				settings.monthlyReviewEnabled !== undefined;
+			const marketingFieldsChanged =
+				settings.marketingUpdatesEnabled !== undefined;
+
+			// Optimistically update the profile state
+			setProfile((prev) =>
+				prev
+					? {
+							...prev,
+							preferences: {
+								...prev.preferences,
+								notifications: legacyFormat.notifications,
+								aiInsights: legacyFormat.aiInsights,
+								marketing: legacyFormat.marketing,
+							},
+					  }
+					: null
+			);
+
+			// If insights or marketing fields changed, update via preferences endpoint
+			// to ensure all related preferences are updated together
+			if (insightsFieldsChanged || marketingFieldsChanged) {
+				const response = await ApiService.put<ProfilePreferences>(
+					'/api/profiles/preferences',
+					{
+						notifications: legacyFormat.notifications,
+						aiInsights: legacyFormat.aiInsights,
+						marketing: legacyFormat.marketing,
+					}
 				);
+
+				if (response.success && response.data) {
+					profileContextLog.debug(
+						'Notification settings updated successfully (via preferences endpoint)'
+					);
+				} else {
+					// API call failed, revert to previous state
+					setProfile(previousProfile);
+					throw new Error(
+						response.error || 'Failed to update notification settings'
+					);
+				}
+			} else {
+				// Only notifications changed, use the notifications endpoint
+				const response = await ApiService.put<
+					ProfilePreferences['notifications']
+				>('/profiles/notifications', legacyFormat.notifications);
+
+				if (response.success && response.data) {
+					profileContextLog.debug('Notification settings updated successfully');
+				} else {
+					// API call failed, revert to previous state
+					setProfile(previousProfile);
+					throw new Error(
+						response.error || 'Failed to update notification settings'
+					);
+				}
 			}
 		} catch (err) {
 			profileContextLog.error('Error updating notification settings', err);
@@ -810,6 +906,84 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 				err instanceof Error
 					? err.message
 					: 'Failed to update notification settings'
+			);
+			throw err;
+		}
+	};
+
+	const updateNotificationConsent = async (consent: NotificationConsentView) => {
+		if (!user || !firebaseUser) {
+			throw new Error('User not authenticated');
+		}
+
+		if (!profile) {
+			throw new Error('Profile not loaded');
+		}
+
+		// Store the previous state for potential rollback
+		const previousProfile = profile;
+
+		try {
+			setError(null);
+
+			// Get current preferences in canonical format
+			const currentPrefs = getNotificationPreferences();
+			if (!currentPrefs) {
+				throw new Error('Unable to load current preferences');
+			}
+
+			// Apply consent view changes to canonical preferences
+			const updatedPrefs = applyConsentViewToPrefs(currentPrefs, consent);
+
+			// Convert to legacy format for API
+			const legacyFormat = preferencesToLegacyProfile(updatedPrefs);
+
+			// Optimistically update the profile state
+			setProfile((prev) =>
+				prev
+					? {
+							...prev,
+							preferences: {
+								...prev.preferences,
+								aiInsights: legacyFormat.aiInsights,
+								marketing: legacyFormat.marketing,
+								// Also update quiet hours in notifications if needed
+								notifications: {
+									...prev.preferences.notifications,
+									// Note: quiet hours aren't in legacy notifications format,
+									// but we'll preserve other notification settings
+								},
+							},
+					  }
+					: null
+			);
+
+			// Update via API using the preferences endpoint to update all at once
+			const response = await ApiService.put<ProfilePreferences>(
+				'/api/profiles/preferences',
+				{
+					aiInsights: legacyFormat.aiInsights,
+					marketing: legacyFormat.marketing,
+				}
+			);
+
+			if (response.success && response.data) {
+				profileContextLog.debug('Notification consent updated successfully');
+			} else {
+				// API call failed, revert to previous state
+				setProfile(previousProfile);
+				throw new Error(
+					response.error || 'Failed to update notification consent'
+				);
+			}
+		} catch (err) {
+			profileContextLog.error('Error updating notification consent', err);
+			// Revert to previous state on error
+			setProfile(previousProfile);
+			setError(
+				err instanceof Error
+					? err.message
+					: 'Failed to update notification consent'
 			);
 			throw err;
 		}
@@ -1064,6 +1238,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 		updateProfile,
 		updatePreferences,
 		updateNotificationSettings,
+		updateNotificationConsent,
 		updateAssistantSettings,
 		updateBudgetSettings,
 		updateGoalSettings,

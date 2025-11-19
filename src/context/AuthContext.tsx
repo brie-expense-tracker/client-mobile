@@ -722,6 +722,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				'@react-native-firebase/auth'
 			);
 			await sendPasswordResetEmail(getAuth(), email);
+			authContextLog.info('Password reset email sent successfully', {
+				email,
+			});
 			setError(null); // Clear any existing errors
 		} catch (error: any) {
 			authContextLog.error('Error sending password reset email', error);
@@ -802,16 +805,84 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 				// Handle specific Firebase errors
 				if (error.code === 'auth/email-already-in-use') {
-					// An account with this email already exists - don't log them in automatically
-					const signupError = new Error(
-						'An account with this email already exists. Please log in instead.'
+					// An account with this email already exists in Firebase
+					// This could be an orphaned account (Firebase exists but no MongoDB user)
+					// Try to sign in with the provided password to recover the account
+					authContextLog.debug(
+						'Email already in use - attempting to sign in to recover account'
 					);
-					setError({
-						code: 'EMAIL_ALREADY_IN_USE',
-						message: signupError.message,
-						details: error,
-					});
-					throw signupError;
+					try {
+						const { signInWithEmailAndPassword } = await import(
+							'@react-native-firebase/auth'
+						);
+						const signInCredential = await signInWithEmailAndPassword(
+							getAuth(),
+							email,
+							password
+						);
+						const existingFirebaseUser = signInCredential.user;
+
+						// Check if MongoDB user exists
+						try {
+							const mongoUser = await UserService.getUserByFirebaseUID(
+								existingFirebaseUser.uid
+							);
+							if (mongoUser) {
+								// MongoDB user exists - this is a real duplicate account
+								authContextLog.warn(
+									'Account already exists in both Firebase and MongoDB'
+								);
+								const signupError = new Error(
+									'An account with this email already exists. Please log in instead.'
+								);
+								setError({
+									code: 'EMAIL_ALREADY_IN_USE',
+									message: signupError.message,
+									details: error,
+								});
+								// Sign out since we signed in just to check
+								await getAuth().signOut();
+								throw signupError;
+							}
+
+							// MongoDB user doesn't exist - this is an orphaned Firebase account
+							// Use the login flow which will create the MongoDB user
+							authContextLog.info(
+								'Recovering orphaned Firebase account - creating MongoDB user'
+							);
+							await login(existingFirebaseUser);
+							return; // Successfully recovered and logged in
+						} catch (mongoError: any) {
+							// If MongoDB check fails, assume user doesn't exist and try to create
+							if (
+								mongoError?.message?.includes('User not found') ||
+								mongoError?.response?.status === 404
+							) {
+								authContextLog.info(
+									'Recovering orphaned Firebase account - creating MongoDB user'
+								);
+								await login(existingFirebaseUser);
+								return; // Successfully recovered and logged in
+							}
+							// Other MongoDB errors - sign out and throw original error
+							await getAuth().signOut();
+							throw mongoError;
+						}
+					} catch (signInError: any) {
+						// Sign in failed - wrong password or other error
+						authContextLog.debug('Sign in failed during recovery attempt', {
+							code: signInError?.code,
+						});
+						const signupError = new Error(
+							'An account with this email already exists. Please log in instead.'
+						);
+						setError({
+							code: 'EMAIL_ALREADY_IN_USE',
+							message: signupError.message,
+							details: error,
+						});
+						throw signupError;
+					}
 				}
 
 				// If Firebase user was created but MongoDB creation failed, delete the Firebase user
@@ -837,7 +908,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				throw error;
 			}
 		},
-		[createUserInMongoDB]
+		[createUserInMongoDB, login]
 	);
 
 	// Google Sign-In methods
@@ -1473,6 +1544,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	// Delete account after reauthentication (for Google/Apple users)
 	const deleteAccountAfterReauth = useCallback(async () => {
 		setLoading(true);
+		let backendDeleted = false;
 		try {
 			const user = getAuth().currentUser;
 
@@ -1481,10 +1553,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 					code: 'auth/no-current-user',
 				});
 
-			// 1) Delete app backend data
+			// 1) Delete app backend data first (while still authenticated)
 			await UserService.deleteUserAccount();
+			backendDeleted = true;
 
 			// 2) Delete Firebase user (must be within "recent login" window)
+			// Note: This will fail if user hasn't authenticated recently
 			await user.delete();
 
 			// 3) Local cleanup
@@ -1498,12 +1572,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				processingTimeoutRef.current = null;
 			}
 		} catch (error: any) {
+			// If backend was deleted but Firebase deletion failed, we're in a partial state
+			// The user's backend data is gone, but Firebase account still exists
+			if (backendDeleted && error?.code === 'auth/requires-recent-login') {
+				// Clean up local state since backend account is gone
+				await removeItem(UID_KEY);
+				setUser(null);
+				setProfile(null);
+				setFirebaseUser(null);
+				lastProcessedUIDRef.current = null;
+				if (processingTimeoutRef.current) {
+					clearTimeout(processingTimeoutRef.current);
+					processingTimeoutRef.current = null;
+				}
+				throw Object.assign(
+					new Error(
+						'Your account data has been deleted, but Firebase requires recent authentication to complete account deletion. Please sign out and sign back in, then contact support if the issue persists.'
+					),
+					{ code: 'auth/requires-recent-login', partial: true }
+				);
+			}
+
 			const normalized = {
 				code: error?.code || 'auth/delete-failed',
 				message:
 					error?.code === 'auth/requires-recent-login'
-						? 'Please verify your identity again and retry.'
-						: 'Failed to delete account.',
+						? 'Firebase requires recent authentication to delete your account. Please sign out and sign back in, then try again.'
+						: error?.message || 'Failed to delete account.',
 				details: error,
 			};
 			setError(normalized);
