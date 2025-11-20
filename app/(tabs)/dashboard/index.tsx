@@ -1458,7 +1458,9 @@ const styles = StyleSheet.create({
 const heroStyles = StyleSheet.create({
 	card: {
 		borderRadius: 24,
-		padding: 22,
+		paddingHorizontal: 22,
+		paddingBottom: 22,
+		paddingTop: 36,
 		...shadow.card,
 	},
 	topRow: {

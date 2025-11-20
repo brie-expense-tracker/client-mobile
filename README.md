@@ -2,6 +2,10 @@ g# Brie Mobile App
 
 A React Native mobile application built with Expo for personal finance management with AI-powered insights.
 
+## 📸 App Preview
+
+![Brie dashboard preview](<./app/(tabs)/dashboard/brie-preview.png>)
+
 ## 🚀 Quick Start
 
 ### Prerequisites
