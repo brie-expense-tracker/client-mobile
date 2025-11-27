@@ -51,10 +51,30 @@ export const accessibilityProps = {
 };
 
 // Dynamic type support - ensures text scales with system font size
-export const dynamicTextStyle = {
+export const dynamicTextStyleBase = {
   allowFontScaling: true,
   // Use relative font sizes that work well with Dynamic Type
   fontSize: Platform.OS === 'ios' ? undefined : 16, // iOS will use system font sizes
+};
+
+// Function to get text styles with dynamic type support
+import { type } from '../ui/theme';
+
+type TextStyleName = 'title2' | 'footnote' | 'body' | 'caption2' | 'largeTitle';
+
+export const dynamicTextStyle = (styleName: TextStyleName) => {
+  const baseStyle = dynamicTextStyleBase;
+  
+  // Map style names to type styles
+  const styleMap: Record<TextStyleName, any> = {
+    title2: { ...type.h2, ...baseStyle },
+    footnote: { ...type.bodyXs, ...baseStyle },
+    body: { ...type.body, ...baseStyle },
+    caption2: { ...type.bodyXs, ...baseStyle },
+    largeTitle: { ...type.num2xl, ...baseStyle },
+  };
+  
+  return styleMap[styleName] || { ...type.body, ...baseStyle };
 };
 
 // Accessibility label generators for common UI patterns

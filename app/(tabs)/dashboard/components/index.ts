@@ -5,7 +5,7 @@ export { default as QuickFinancialSummary } from './QuickFinancialSummary';
 export { default as TransactionHistory } from './TransactionHistory';
 export { default as SettingsBudgetsGoalsWidget } from './SettingsBudgetsGoalsWidget';
 export { default as AICoachSection } from './AICoachSection';
-export { default as RecurringExpensesList } from '../../wallet/components/RecurringExpensesList';
+export { default as RecurringExpensesList } from '../../wallet/components/shared/RecurringExpensesList';
 export { default as RecurringExpensesSummaryWidget } from './RecurringExpensesSummaryWidget';
 export { default as SpendingForecastCard } from './SpendingForecastCard';
 

@@ -27,7 +27,7 @@ export interface CreateRecurringExpenseData {
 	appearanceMode?: 'custom' | 'brand' | 'default';
 	icon?: string;
 	color?: string;
-	categories?: string[];
+	category?: string; // Single category that will be applied to each generated transaction
 }
 
 export interface UpdateRecurringExpenseData {
@@ -38,7 +38,7 @@ export interface UpdateRecurringExpenseData {
 	appearanceMode?: 'custom' | 'brand' | 'default';
 	icon?: string;
 	color?: string;
-	categories?: string[];
+	category?: string; // Single category that will be applied to each generated transaction
 }
 
 // ==========================================

@@ -2,19 +2,42 @@ import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
 import { palette, radius, space, shadow } from './theme';
 
-export const Card: React.FC<{
+type CardProps = {
 	style?: ViewStyle;
 	children: React.ReactNode;
-}> = ({ style, children }) => (
-	<View style={[styles.card, style]}>{children}</View>
+	inset?: boolean;
+	elevated?: boolean; // 👈 NEW
+};
+
+export const Card: React.FC<CardProps> = ({
+	style,
+	children,
+	inset = true,
+	elevated = false,
+}) => (
+	<View
+		style={[
+			styles.card,
+			elevated && styles.cardElevated,
+			inset && styles.cardInset,
+			style,
+		]}
+	>
+		{children}
+	</View>
 );
 
 const styles = StyleSheet.create({
 	card: {
-		backgroundColor: '#fff',
-		borderRadius: radius.lg,
+		backgroundColor: palette.surface,
+		borderRadius: radius.xl,
 		borderWidth: 1,
-		borderColor: palette.border,
-		padding: space.lg,
+		borderColor: palette.borderMuted,
+	},
+	cardElevated: {
+		...shadow.card,
+	},
+	cardInset: {
+		padding: space.md,
 	},
 });

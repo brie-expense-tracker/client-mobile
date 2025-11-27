@@ -455,6 +455,13 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 		transform: [{ scale: iconScale.value }],
 	}));
 
+	const formattedAmount = useMemo(() => {
+		const safeAmount = isNaN(item.amount) ? 0 : item.amount;
+		const magnitude = Math.abs(safeAmount).toFixed(2);
+		const sign = item.type === 'income' ? '+' : '-';
+		return `${sign}$${magnitude}`;
+	}, [item.amount, item.type]);
+
 	return (
 		<View style={styles.container}>
 			<View style={styles.deleteBackground}>
@@ -577,8 +584,7 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 								item.type === 'income' ? styles.income : styles.expense,
 							]}
 						>
-							{item.type === 'income' ? '+' : '-'}$
-							{(isNaN(item.amount) ? 0 : item.amount).toFixed(2)}
+							{formattedAmount}
 						</Text>
 						<Text style={styles.date}>{formatDateWithoutTime(item.date)}</Text>
 					</View>

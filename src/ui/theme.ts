@@ -14,12 +14,14 @@ export const palette = {
 	primary: '#00A2FF',
 	primaryMuted: '#0EA5E9',
 	primarySubtle: '#E0F2FE',
+	primarySoft: '#EFF6FF',
 	primaryTextOn: '#FFFFFF',
 
 	// Semantic
 	warning: '#F59E0B',
 	danger: '#EF4444',
 	dangerSubtle: '#FEF2F2',
+	dangerSoft: '#FFF1F2',
 	dangerBorder: '#FECACA',
 	success: '#10B981',
 	successSubtle: '#F0FDF4',
@@ -33,6 +35,16 @@ export const palette = {
 	chipBg: '#F8FAFC',
 	chipText: '#0F172A',
 	subtle: '#F3F4F6',
+	iconMuted: '#A1A1AA',
+
+	// Aliases for compatibility
+	accent: '#00A2FF', // same as primary
+	accentSoft: '#EFF6FF', // same as primarySoft
+	textStrong: '#111827', // same as text
+	onAccent: '#FFFFFF', // same as primaryTextOn
+	surfaceSubtle: '#F3F4F6', // same as subtle
+	borderSubtle: '#E5E7EB', // same as border
+	positive: '#10B981', // same as success
 };
 
 export const radius = {
@@ -41,6 +53,7 @@ export const radius = {
 	lg: 16,
 	xl: 20,
 	pill: 999,
+	full: 999,
 };
 
 export const space = {
@@ -67,6 +80,7 @@ export const type = {
 	h2: { fontSize: 16, fontWeight: '600' as const },
 	body: { fontSize: 14, fontWeight: '400' as const },
 	bodySm: { fontSize: 14, fontWeight: '400' as const },
+	bodyXs: { fontSize: 12, fontWeight: '400' as const },
 	small: { fontSize: 12, fontWeight: '500' as const },
 	labelSm: {
 		fontSize: 14,
@@ -75,6 +89,7 @@ export const type = {
 		letterSpacing: 0.5,
 	},
 	titleMd: { fontSize: 20, fontWeight: '600' as const },
+	titleSm: { fontSize: 17, fontWeight: '700' as const },
 	num2xl: { fontSize: 32, fontWeight: '700' as const },
 	numLg: { fontSize: 18, fontWeight: '700' as const },
 	numMd: { fontSize: 16, fontWeight: '600' as const },

@@ -190,7 +190,7 @@ export class RecurringExpenseService {
 		appearanceMode?: 'custom' | 'brand' | 'default';
 		icon?: string;
 		color?: string;
-		categories?: string[];
+		category?: string; // Single category that will be applied to each generated transaction
 	}): Promise<RecurringExpense> {
 		try {
 			const response = await ApiService.post<{

@@ -417,9 +417,17 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 
 			<View accessibilityLabel="Recent transactions list">
 				{recentTransactions.length > 0 ? (
-					recentTransactions.map((t, index) => {
-						const amt = isNaN(t.amount) ? 0 : t.amount;
-						const signed = t.type === 'income' ? amt : -amt;
+					recentTransactions.map((t) => {
+						// Normalize amount from DB/string
+						const raw =
+							typeof t.amount === 'string'
+								? parseFloat(t.amount)
+								: Number(t.amount);
+						const baseAmount = isNaN(raw) ? 0 : Math.abs(raw);
+
+						// Apply sign based on type only
+						const signed = t.type === 'income' ? baseAmount : -baseAmount;
+
 						const amountColor = signed >= 0 ? '#10B981' : '#EF4444';
 						const date = (t.date || '').slice(0, 10);
 						const targetName = getTargetName(t);
@@ -433,7 +441,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 								{...accessibilityProps.button}
 								accessibilityLabel={generateAccessibilityLabel.transactionItem(
 									t.description,
-									`${t.type === 'income' ? '+' : '-'}${currency(amt)}`,
+									`${signed >= 0 ? '+' : '-'}${currency(Math.abs(baseAmount))}`,
 									date
 								)}
 								accessibilityHint={`${targetName}. ${voiceOverHints.navigate}`}
@@ -466,8 +474,8 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 										dynamicTextStyle,
 									]}
 								>
-									{signed >= 0 ? '+' : ''}
-									{currency(Math.abs(signed))}
+									{signed >= 0 ? '+' : '-'}
+									{currency(Math.abs(baseAmount))}
 								</Text>
 							</TouchableOpacity>
 						);

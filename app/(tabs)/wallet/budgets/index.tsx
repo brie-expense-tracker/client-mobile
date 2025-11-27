@@ -1,21 +1,22 @@
-// app/(tabs)/wallet/BudgetScreen.tsx
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ScrollView, Alert, RefreshControl, StyleSheet } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { useBudget } from '../../../src/context/budgetContext';
+import { useBudget } from '../../../../src/context/budgetContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import HeroBudget from './components/budgets/HeroBudget';
-import BudgetsFeed from './components/budgets/BudgetsFeed';
+import HeroBudget from '../components/budgets/HeroBudget';
+import BudgetsFeed from '../components/budgets/BudgetsFeed';
 import {
 	Page,
-	Card,
 	Section,
 	LoadingState,
 	EmptyState,
 	SegmentedControl,
-} from '../../../src/ui';
-import { createLogger } from '../../../src/utils/sublogger';
-import { palette, space } from '../../../src/ui/theme';
+	Card,
+	palette,
+	radius,
+	space,
+} from '../../../../src/ui';
+import { createLogger } from '../../../../src/utils/sublogger';
 
 const budgetsScreenLog = createLogger('BudgetsScreen');
 
@@ -50,8 +51,6 @@ export default function BudgetScreen() {
 		refetch,
 		monthlySummary,
 		weeklySummary,
-		monthlyPercentage,
-		weeklyPercentage,
 		hasLoaded,
 	} = useBudget();
 
@@ -66,7 +65,7 @@ export default function BudgetScreen() {
 	const [refreshing, setRefreshing] = useState(false);
 
 	const showModal = useCallback(() => {
-		router.push('./budgets/new');
+		router.push('/wallet/budgets/new');
 	}, [router]);
 
 	// initial load
@@ -133,7 +132,7 @@ export default function BudgetScreen() {
 		setRefreshing(true);
 
 		try {
-			const { ApiService } = await import('../../../src/services');
+			const { ApiService } = await import('../../../../src/services');
 
 			ApiService.clearCacheByPrefix('/api/budgets');
 
@@ -223,54 +222,36 @@ export default function BudgetScreen() {
 	const heroProps = useMemo(() => {
 		if (activeTab === 'monthly') {
 			return {
-				mode: 'monthly' as const,
-				percent: monthlyPercentage,
-				spent: monthlySummary.totalSpent,
-				total: monthlySummary.totalAllocated,
-				subtitle: periodStats.label,
-				daysLeft: periodStats.daysLeft,
+				periodLabel: periodStats.label,
+				totalBudgets: budgets.filter((b) => b.period === 'monthly').length,
+				totalPlanned: monthlySummary.totalAllocated,
+				totalSpent: monthlySummary.totalSpent,
 			};
 		}
 
 		if (activeTab === 'weekly') {
 			return {
-				mode: 'weekly' as const,
-				percent: weeklyPercentage,
-				spent: weeklySummary.totalSpent,
-				total: weeklySummary.totalAllocated,
-				subtitle: periodStats.label,
-				daysLeft: periodStats.daysLeft,
+				periodLabel: periodStats.label,
+				totalBudgets: budgets.filter((b) => b.period === 'weekly').length,
+				totalPlanned: weeklySummary.totalAllocated,
+				totalSpent: weeklySummary.totalSpent,
 			};
 		}
 
-		const percent =
-			((monthlySummary.totalSpent + weeklySummary.totalSpent) /
-				(monthlySummary.totalAllocated + weeklySummary.totalAllocated || 1)) *
-			100;
-
 		return {
-			mode: 'all' as const,
-			percent: Math.min(percent, 100),
-			spent: combined.spent,
-			total: combined.total,
-			subtitle: periodStats.label,
-			daysLeft: null,
+			periodLabel: periodStats.label,
+			totalBudgets: budgets.length,
+			totalPlanned: combined.total,
+			totalSpent: combined.spent,
 		};
 	}, [
 		activeTab,
-		monthlyPercentage,
-		weeklyPercentage,
+		budgets,
 		monthlySummary,
 		weeklySummary,
 		combined,
 		periodStats,
 	]);
-
-	// ==========================
-
-	// Loading / empty states
-
-	// ==========================
 
 	if (isLoading && !hasLoaded) {
 		return <LoadingState label="Loading budgets..." />;
@@ -288,33 +269,11 @@ export default function BudgetScreen() {
 		);
 	}
 
-	const activeLabel =
-		activeTab === 'all'
-			? 'all view'
-			: activeTab === 'monthly'
-			? 'monthly view'
-			: 'weekly view';
-
 	return (
-		<Page
-			title="Budgets"
-			subtitle={`${budgets.length} ${
-				budgets.length === 1 ? 'budget' : 'budgets'
-			} • ${activeLabel}`}
-			right={
-				<SegmentedControl
-					segments={[
-						{ key: 'all', label: 'All' },
-						{ key: 'monthly', label: 'Monthly' },
-						{ key: 'weekly', label: 'Weekly' },
-					]}
-					value={activeTab}
-					onChange={(k) => setActiveTab(k as any)}
-				/>
-			}
-		>
+		<Page>
 			<ScrollView
 				showsVerticalScrollIndicator={false}
+				style={styles.scroll}
 				contentContainerStyle={styles.scrollContent}
 				refreshControl={
 					<RefreshControl
@@ -326,31 +285,40 @@ export default function BudgetScreen() {
 				}
 				accessibilityLabel="Budgets overview content"
 			>
-				{/* Hero */}
-
-				<Card style={styles.heroCard}>
-					<HeroBudget
-						mode={heroProps.mode}
-						percent={heroProps.percent}
-						spent={heroProps.spent}
-						total={heroProps.total}
-						subtitle={heroProps.subtitle}
-						daysLeft={heroProps.daysLeft}
-						onAddBudget={showModal}
-						variant="compact"
-					/>
-				</Card>
-
-				{/* List */}
-
-				<Section title="Your Budgets">
-					<Card>
-						<BudgetsFeed
-							scrollEnabled={false}
-							budgets={filteredBudgets}
-							activeTab={activeTab}
+				{/* Hero – same structure as Recurring summary */}
+				<Section style={styles.heroSection}>
+					<Card style={styles.heroCard}>
+						<HeroBudget
+							periodLabel={heroProps.periodLabel}
+							totalBudgets={heroProps.totalBudgets}
+							totalPlanned={heroProps.totalPlanned}
+							totalSpent={heroProps.totalSpent}
+							onAddBudget={showModal}
 						/>
 					</Card>
+				</Section>
+
+				{/* List – same pattern as RecurringExpensesScreen */}
+				<Section
+					title="Your budgets"
+					style={styles.budgetsSection}
+					right={
+						<SegmentedControl
+							segments={[
+								{ key: 'all', label: 'All' },
+								{ key: 'monthly', label: 'Monthly' },
+								{ key: 'weekly', label: 'Weekly' },
+							]}
+							value={activeTab}
+							onChange={(k) => setActiveTab(k as any)}
+						/>
+					}
+				>
+					<BudgetsFeed
+						scrollEnabled={false}
+						budgets={filteredBudgets}
+						activeTab={activeTab}
+					/>
 				</Section>
 			</ScrollView>
 		</Page>
@@ -358,13 +326,38 @@ export default function BudgetScreen() {
 }
 
 const styles = StyleSheet.create({
+	scroll: {
+		flex: 1,
+		backgroundColor: palette.surfaceAlt,
+	},
 	scrollContent: {
-		paddingTop: space.lg,
-		paddingBottom: 24,
-		gap: 16,
+		paddingTop: space.sm,
+		paddingBottom: space.xl,
+	},
+	heroSection: {
+		marginTop: space.md,
 	},
 	heroCard: {
-		paddingVertical: 14,
-		paddingHorizontal: 16,
+		paddingHorizontal: space.lg,
+		paddingVertical: space.lg,
+
+		backgroundColor: palette.surface,
+		borderRadius: radius.xl,
+
+		// subtle outline, like Bills summary
+		borderWidth: 1,
+		borderColor: palette.borderMuted,
+
+		// soft floating shadow
+		shadowColor: '#000',
+		shadowOpacity: 0.07,
+		shadowRadius: 18,
+		shadowOffset: { width: 0, height: 8 },
+
+		// Android
+		elevation: 3,
+	},
+	budgetsSection: {
+		marginTop: space.lg,
 	},
 });
