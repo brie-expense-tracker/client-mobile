@@ -806,15 +806,15 @@ export default function WalletOverviewScreen() {
 				<View style={styles.quickActionsRow}>
 					<QuickActionButton
 						label="Add Budget"
-						onPress={() => router.push('/(tabs)/wallet/budgets')}
+						onPress={() => router.push('/(tabs)/wallet/budgets/new')}
 					/>
 					<QuickActionButton
 						label="Add Bill"
-						onPress={() => router.push('/(tabs)/wallet/recurring')}
+						onPress={() => router.push('/(tabs)/wallet/recurring/new')}
 					/>
 					<QuickActionButton
 						label="Add Goal"
-						onPress={() => router.push('/(tabs)/wallet/goals')}
+						onPress={() => router.push('/(tabs)/wallet/goals/new')}
 					/>
 				</View>
 

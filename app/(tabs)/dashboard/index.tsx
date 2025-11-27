@@ -612,7 +612,7 @@ function HeroPro({
 			style={heroStyles.card}
 		>
 			<View style={heroStyles.topRow}>
-				<View>
+				<View style={{ flex: 1 }}>
 					<Text style={heroStyles.label}>Today&apos;s Performance</Text>
 					<Text
 						style={[
@@ -625,23 +625,6 @@ function HeroPro({
 					</Text>
 					<Text style={heroStyles.subLabel}>
 						Live cashflow across logged transactions
-					</Text>
-				</View>
-
-				<View
-					accessible
-					accessibilityLabel={`Day change ${
-						dailyChange >= 0 ? 'up' : 'down'
-					} ${currency(Math.abs(dailyChange))}`}
-					style={[
-						heroStyles.pill,
-						{ backgroundColor: pillBg, borderColor: pillBorder },
-					]}
-				>
-					<Ionicons name={arrow} size={14} color={pillText} />
-					<Text style={[heroStyles.pillText, { color: pillText }]}>
-						{dailyChange >= 0 ? '+' : '-'}
-						{currency(Math.abs(dailyChange))} today
 					</Text>
 				</View>
 			</View>
@@ -682,6 +665,24 @@ function HeroPro({
 
 			<View style={heroStyles.captionRow}>
 				<Text style={heroStyles.caption}>Last 7 days</Text>
+			</View>
+
+			{/* floating pill */}
+			<View
+				accessible
+				accessibilityLabel={`Day change ${
+					dailyChange >= 0 ? 'up' : 'down'
+				} ${currency(Math.abs(dailyChange))}`}
+				style={[
+					heroStyles.floatingPill,
+					{ backgroundColor: pillBg, borderColor: pillBorder },
+				]}
+			>
+				<Ionicons name={arrow} size={14} color={pillText} />
+				<Text style={[heroStyles.pillText, { color: pillText }]}>
+					{dailyChange >= 0 ? '+' : '-'}
+					{currency(Math.abs(dailyChange))} today
+				</Text>
 			</View>
 		</LinearGradient>
 	);
@@ -1461,12 +1462,12 @@ const heroStyles = StyleSheet.create({
 		paddingHorizontal: 22,
 		paddingBottom: 22,
 		paddingTop: 36,
+		overflow: 'hidden',
 		...shadow.card,
 	},
 	topRow: {
 		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
+		alignItems: 'flex-start',
 	},
 	label: { color: palette.textMuted, fontSize: 13, fontWeight: '600' },
 	amount: {
@@ -1482,7 +1483,10 @@ const heroStyles = StyleSheet.create({
 		color: palette.textMuted,
 		fontWeight: '500',
 	},
-	pill: {
+	floatingPill: {
+		position: 'absolute',
+		top: 18,
+		right: 22,
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 6,

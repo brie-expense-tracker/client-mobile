@@ -6,3 +6,5 @@ export { AmountPresets } from './AmountPresets';
 export { PeriodSelector } from './PeriodSelector';
 export { CategorySelector } from './CategorySelector';
 export { DeleteButton } from './DeleteButton';
+export { BudgetCategoriesField } from './BudgetCategoriesField';
+export { BudgetPeriodDetails } from './BudgetPeriodDetails';

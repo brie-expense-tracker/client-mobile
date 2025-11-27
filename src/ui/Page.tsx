@@ -1,6 +1,8 @@
 import React from 'react';
+
 import { View, Text, StyleSheet, ViewStyle, SafeAreaView } from 'react-native';
-import { palette, radius, space, type } from './theme';
+
+import { palette, space, type } from './theme';
 
 type PageProps = {
 	title?: string;
@@ -17,20 +19,30 @@ export const Page: React.FC<PageProps> = ({
 	children,
 	headerStyle,
 }) => {
+	const hasHeader = !!title || !!subtitle || !!right;
+
 	return (
-		<SafeAreaView style={styles.container}>
+		<SafeAreaView style={styles.root}>
 			<View style={styles.container}>
-				{(title || right) && (
+				{hasHeader && (
 					<View style={[styles.header, headerStyle]}>
-						<View style={{ flex: 1 }}>
-							{!!title && <Text style={[type.h1, styles.title]}>{title}</Text>}
+						<View style={styles.headerTopRow}>
+							{!!title && (
+								<Text style={styles.title} numberOfLines={1}>
+									{title}
+								</Text>
+							)}
 							{!!subtitle && (
-								<Text style={[type.body, styles.subtitle]}>{subtitle}</Text>
+								<Text style={styles.subtitleTop} numberOfLines={1}>
+									{subtitle}
+								</Text>
 							)}
 						</View>
-						{right}
+
+						{right && <View style={styles.headerRight}>{right}</View>}
 					</View>
 				)}
+
 				<View style={styles.content}>{children}</View>
 			</View>
 		</SafeAreaView>
@@ -38,21 +50,44 @@ export const Page: React.FC<PageProps> = ({
 };
 
 const styles = StyleSheet.create({
-	container: { flex: 1, backgroundColor: palette.bg },
+	root: {
+		flex: 1,
+		backgroundColor: palette.surfaceAlt,
+	},
+	container: {
+		flex: 1,
+	},
 	header: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingHorizontal: space.xl,
+		paddingTop: space.lg,
 		paddingBottom: space.md,
+		paddingHorizontal: space.xl,
 		borderBottomWidth: 1,
 		borderBottomColor: palette.border,
-		backgroundColor: palette.bg,
+		backgroundColor: palette.surface,
 	},
-	title: { color: palette.text },
-	subtitle: { color: palette.textMuted, marginTop: 4 },
+	// Top row: title left, subtitle right
+	headerTopRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		marginBottom: space.sm,
+	},
+	title: {
+		...type.h1,
+		color: palette.text,
+	},
+	subtitleTop: {
+		...type.bodySm,
+		color: palette.textMuted,
+	},
+	// Second row: full width right content
+	headerRight: {
+		width: '100%', // forces segmented control to match header width
+	},
 	content: {
 		flex: 1,
-		paddingHorizontal: space.xl,
-		paddingTop: space.lg,
+		// ⬇️ key change: let Section handle horizontal padding
+		paddingHorizontal: 0,
+		backgroundColor: palette.surfaceAlt,
 	},
 });

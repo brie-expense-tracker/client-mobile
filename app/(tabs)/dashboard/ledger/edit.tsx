@@ -1,11 +1,5 @@
 import { logger } from '../../../../src/utils/logger';
-import React, {
-	useEffect,
-	useMemo,
-	useState,
-	useCallback,
-	useRef,
-} from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
 	View,
 	Text,
@@ -19,8 +13,6 @@ import {
 	ActivityIndicator,
 	LayoutAnimation,
 	UIManager,
-	NativeSyntheticEvent,
-	TextInputSelectionChangeEventData,
 	AccessibilityInfo,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -275,51 +267,34 @@ const RecurringPicker: React.FC<{
 	);
 };
 
-/** MoneyInput: formats while typing, preserves caret. */
+/** MoneyInput: raw numeric in the field, $ is a stable icon, preview on the right */
 const MoneyInput = ({
 	value,
 	onChange,
 	hasError,
 	type = 'expense',
 }: {
-	value: string;
+	value: string; // numeric string like "1234.56"
 	onChange: (next: string) => void;
 	hasError?: boolean;
 	type?: TxType;
 }) => {
-	const inputRef = useRef<TextInput>(null);
-	const [selection, setSelection] = useState<
-		{ start: number; end: number } | undefined
-	>();
-
-	// Rendered text shows formatted with $ and separators
-	const numeric = value.replace(/[^0-9.]/g, '');
-	const display =
-		numeric.length === 0
-			? ''
-			: `$${Number(numeric).toLocaleString(undefined, {
-					maximumFractionDigits: 2,
-					useGrouping: true,
-			  })}${/\.\d{0,2}$/.test(numeric) && numeric.endsWith('.') ? '.' : ''}`;
-
 	const handleChange = (t: string) => {
-		// Strip formatting back to a numeric string with at most one dot and 2 decimals
+		// Strip to digits + one dot, max 2 decimals
 		const cleaned = t.replace(/[^0-9.]/g, '');
-		const [whole, decimal = ''] = cleaned.split('.');
-		const next =
-			cleaned.indexOf('.') >= 0 ? `${whole}.${decimal.slice(0, 2)}` : whole;
-		onChange(next);
-	};
+		const parts = cleaned.split('.');
+		const whole = parts[0] ?? '';
+		const decimals = parts[1]?.slice(0, 2) ?? '';
+		const next = decimals.length > 0 ? `${whole}.${decimals}` : whole;
 
-	const onSel = (
-		e: NativeSyntheticEvent<TextInputSelectionChangeEventData>
-	) => {
-		setSelection(e.nativeEvent.selection);
+		onChange(next);
 	};
 
 	const iconName =
 		type === 'income' ? 'trending-up-outline' : 'trending-down-outline';
 	const iconColor = type === 'income' ? '#16a34a' : '#ef4444';
+
+	const hasValue = value && value.length > 0;
 
 	return (
 		<View style={[styles.inputRow, hasError && styles.inputError]}>
@@ -329,16 +304,16 @@ const MoneyInput = ({
 				color={iconColor}
 				style={{ marginRight: space.sm }}
 			/>
+			{/* Stable $ icon – no longer part of the TextInput value */}
+			<Text style={styles.currencySymbol}>$</Text>
+
 			<TextInput
-				ref={inputRef}
-				value={display}
+				value={value}
 				onChangeText={handleChange}
-				onSelectionChange={onSel}
-				selection={selection}
 				keyboardType={
 					Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'decimal-pad'
 				}
-				placeholder="$0.00"
+				placeholder="0.00"
 				placeholderTextColor="#9ca3af"
 				style={styles.inputBare}
 				accessibilityLabel="Amount"
@@ -346,7 +321,8 @@ const MoneyInput = ({
 				inputMode="decimal"
 				maxFontSizeMultiplier={1.3}
 			/>
-			{numeric ? (
+
+			{hasValue ? (
 				<Text style={styles.preview}>{fmtMoney(parseMoney(value))}</Text>
 			) : null}
 		</View>
@@ -1332,6 +1308,11 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		color: palette.text,
 		paddingVertical: 10,
+	},
+	currencySymbol: {
+		fontSize: 16,
+		color: palette.text,
+		marginRight: 4,
 	},
 	preview: { fontSize: 13, color: palette.textMuted, marginLeft: space.sm },
 
