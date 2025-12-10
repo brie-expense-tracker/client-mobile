@@ -8,8 +8,6 @@ import {
 	Pressable,
 	Image,
 	SafeAreaView,
-	FlatList,
-	Dimensions,
 	ScrollView,
 	KeyboardAvoidingView,
 	Platform,
@@ -32,8 +30,6 @@ type FieldErrors = {
 	housingExpense?: string;
 	budgetCycleStart?: string;
 };
-
-const { width } = Dimensions.get('window');
 
 // Currency validation utility functions
 const validateCurrencyInput = (value: string): boolean => {
@@ -130,11 +126,9 @@ const OnboardingScreen = () => {
 	});
 	const [submitting, setSubmitting] = useState(false);
 
-	const flatListRef = useRef<FlatList>(null);
 	const firstNameRef = useRef<TextInput>(null);
 	const lastNameRef = useRef<TextInput>(null);
 	const incomeRef = useRef<TextInput>(null);
-	const isManualNavigationRef = useRef(false);
 	const [currentIndex, setCurrentIndex] = useState(0);
 
 	const { updateProfile } = useProfile();
@@ -243,6 +237,102 @@ const OnboardingScreen = () => {
 		housingExpense,
 		budgetCycleStart,
 	]);
+
+	// Helper to determine if a field is required (always visible asterisk)
+	const isFieldRequired = useCallback(
+		(fieldName: string) => {
+			// Always required
+			if (fieldName === 'firstName' || fieldName === 'lastName') return true;
+
+			// Step 2 required
+			if (
+				fieldName === 'financialGoal' ||
+				fieldName === 'housingExpense' ||
+				fieldName === 'budgetCycleStart'
+			) {
+				return true;
+			}
+
+			// Income logic: either monthlyIncome OR (payCadence + netPerPaycheck)
+			if (fieldName === 'payCadence' || fieldName === 'netPerPaycheck') {
+				const hasMonthlyIncome = monthlyIncome && parseFloat(monthlyIncome) > 0;
+				return !hasMonthlyIncome;
+			}
+
+			// monthlyIncome is never strictly required (it's an alternative path)
+			return false;
+		},
+		[monthlyIncome]
+	);
+
+	// Helper to determine if we should show error styling on asterisk (after user interaction)
+	const shouldShowErrorAsterisk = useCallback(
+		(fieldName: string) => {
+			if (currentIndex === 1) {
+				if (
+					fieldName === 'firstName' &&
+					touched.firstName &&
+					!isValidName(firstName)
+				)
+					return true;
+				if (
+					fieldName === 'lastName' &&
+					touched.lastName &&
+					!isValidName(lastName)
+				)
+					return true;
+
+				const hasMonthlyIncome = monthlyIncome && parseFloat(monthlyIncome) > 0;
+
+				if (
+					fieldName === 'payCadence' &&
+					touched.payCadence &&
+					!isValidCadence(payCadence) &&
+					!hasMonthlyIncome
+				)
+					return true;
+				if (
+					fieldName === 'netPerPaycheck' &&
+					touched.netPerPaycheck &&
+					(!netPerPaycheck || parseFloat(netPerPaycheck) <= 0) &&
+					!hasMonthlyIncome
+				)
+					return true;
+			} else if (currentIndex === 2) {
+				if (
+					fieldName === 'financialGoal' &&
+					touched.financialGoal &&
+					!isValidGoal(financialGoal)
+				)
+					return true;
+				if (
+					fieldName === 'housingExpense' &&
+					touched.housingExpense &&
+					(!housingExpense || parseFloat(housingExpense) <= 0)
+				)
+					return true;
+				if (
+					fieldName === 'budgetCycleStart' &&
+					touched.budgetCycleStart &&
+					!isValidCycleStart(budgetCycleStart)
+				)
+					return true;
+			}
+			return false;
+		},
+		[
+			currentIndex,
+			touched,
+			firstName,
+			lastName,
+			payCadence,
+			netPerPaycheck,
+			monthlyIncome,
+			financialGoal,
+			housingExpense,
+			budgetCycleStart,
+		]
+	);
 
 	// Currency input handlers
 	const handleCurrencyInput = useCallback(
@@ -555,8 +645,8 @@ const OnboardingScreen = () => {
 		}
 	}, []);
 
-	const renderItem = ({ item, index }: { item: any; index: number }) => {
-		switch (index) {
+	const renderCurrentStep = () => {
+		switch (currentIndex) {
 			case 0:
 				return (
 					<View style={styles.slide}>
@@ -607,9 +697,27 @@ const OnboardingScreen = () => {
 							<Text style={[styles.title, { color: palette.text }]}>
 								Let&apos;s get to know you
 							</Text>
+							<Text style={styles.subtitle}>
+								Fields marked
+								<Text style={styles.requiredMark}> *</Text> are required to
+								finish setup. You can change everything later in Settings.
+							</Text>
 							<View style={styles.inputContainer}>
 								<Text style={[styles.label, { color: palette.subtext }]}>
 									First name
+									{isFieldRequired('firstName') && (
+										<Text
+											style={[
+												styles.requiredMark,
+												shouldShowErrorAsterisk('firstName') && {
+													fontWeight: '700',
+												},
+											]}
+										>
+											{' '}
+											*
+										</Text>
+									)}
 								</Text>
 								<Text style={[styles.subtext, { color: palette.subtext }]}>
 									We&apos;ll use this to personalize your experience
@@ -640,6 +748,19 @@ const OnboardingScreen = () => {
 							<View style={styles.inputContainer}>
 								<Text style={[styles.label, { color: palette.subtext }]}>
 									Last name
+									{isFieldRequired('lastName') && (
+										<Text
+											style={[
+												styles.requiredMark,
+												shouldShowErrorAsterisk('lastName') && {
+													fontWeight: '700',
+												},
+											]}
+										>
+											{' '}
+											*
+										</Text>
+									)}
 								</Text>
 								<Text style={[styles.subtext, { color: palette.subtext }]}>
 									Helps with account security and support
@@ -670,6 +791,19 @@ const OnboardingScreen = () => {
 							<View style={styles.inputContainer}>
 								<Text style={[styles.label, { color: palette.subtext }]}>
 									How do you get paid?
+									{isFieldRequired('payCadence') && (
+										<Text
+											style={[
+												styles.requiredMark,
+												shouldShowErrorAsterisk('payCadence') && {
+													fontWeight: '700',
+												},
+											]}
+										>
+											{' '}
+											*
+										</Text>
+									)}
 								</Text>
 								<Text style={[styles.subtext, { color: palette.subtext }]}>
 									Choose your pay schedule and net amount per paycheck.
@@ -720,6 +854,19 @@ const OnboardingScreen = () => {
 							<View style={styles.inputContainer}>
 								<Text style={[styles.label, { color: palette.subtext }]}>
 									Net per paycheck
+									{isFieldRequired('netPerPaycheck') && (
+										<Text
+											style={[
+												styles.requiredMark,
+												shouldShowErrorAsterisk('netPerPaycheck') && {
+													fontWeight: '700',
+												},
+											]}
+										>
+											{' '}
+											*
+										</Text>
+									)}
 								</Text>
 								<View style={[styles.inputWithIcon, inputShadow]}>
 									<View style={styles.inputIcon}>
@@ -821,9 +968,27 @@ const OnboardingScreen = () => {
 							<Text style={[styles.title, { color: palette.text }]}>
 								Your primary goal
 							</Text>
+							<Text style={styles.subtitle}>
+								Fields marked
+								<Text style={styles.requiredMark}> *</Text> are required to
+								finish setup. You can refine these in Settings later.
+							</Text>
 							<View style={styles.inputContainer}>
 								<Text style={[styles.label, { color: palette.subtext }]}>
 									Choose one
+									{isFieldRequired('financialGoal') && (
+										<Text
+											style={[
+												styles.requiredMark,
+												shouldShowErrorAsterisk('financialGoal') && {
+													fontWeight: '700',
+												},
+											]}
+										>
+											{' '}
+											*
+										</Text>
+									)}
 								</Text>
 								<Text style={[styles.subtext, { color: palette.subtext }]}>
 									You can add more later
@@ -915,6 +1080,19 @@ const OnboardingScreen = () => {
 							<View style={styles.inputContainer}>
 								<Text style={[styles.label, { color: palette.subtext }]}>
 									Monthly housing expense
+									{isFieldRequired('housingExpense') && (
+										<Text
+											style={[
+												styles.requiredMark,
+												shouldShowErrorAsterisk('housingExpense') && {
+													fontWeight: '700',
+												},
+											]}
+										>
+											{' '}
+											*
+										</Text>
+									)}
 								</Text>
 								<Text style={[styles.subtext, { color: palette.subtext }]}>
 									Track your biggest fixed cost
@@ -951,6 +1129,19 @@ const OnboardingScreen = () => {
 							<View style={styles.inputContainer}>
 								<Text style={[styles.label, { color: palette.subtext }]}>
 									When should your monthly budget cycle reset?
+									{isFieldRequired('budgetCycleStart') && (
+										<Text
+											style={[
+												styles.requiredMark,
+												shouldShowErrorAsterisk('budgetCycleStart') && {
+													fontWeight: '700',
+												},
+											]}
+										>
+											{' '}
+											*
+										</Text>
+									)}
 								</Text>
 								<Text style={[styles.subtext, { color: palette.subtext }]}>
 									Pick the day most bills are due or your paycheck lands.
@@ -1010,21 +1201,9 @@ const OnboardingScreen = () => {
 		}
 
 		if (currentIndex < 2) {
-			// Update state first for immediate UI response
 			const nextIndex = currentIndex + 1;
-			isManualNavigationRef.current = true;
 			setCurrentIndex(nextIndex);
-
-			// Trigger haptics without waiting (fire and forget)
 			Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-			// Scroll after state update with requestAnimationFrame for smooth transition
-			requestAnimationFrame(() => {
-				flatListRef.current?.scrollToIndex({
-					index: nextIndex,
-					animated: true,
-				});
-			});
 		} else {
 			await handleSubmit();
 		}
@@ -1032,18 +1211,9 @@ const OnboardingScreen = () => {
 
 	const handleBack = useCallback(() => {
 		if (currentIndex > 0) {
-			// Update state first for immediate UI response
 			const prevIndex = currentIndex - 1;
-			isManualNavigationRef.current = true;
 			setCurrentIndex(prevIndex);
-
-			// Scroll after state update with requestAnimationFrame for smooth transition
-			requestAnimationFrame(() => {
-				flatListRef.current?.scrollToIndex({
-					index: prevIndex,
-					animated: true,
-				});
-			});
+			Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 		}
 	}, [currentIndex]);
 
@@ -1069,27 +1239,7 @@ const OnboardingScreen = () => {
 						<Text style={styles.skipButtonText}>Skip</Text>
 					</Pressable>
 				</View>
-				<FlatList
-					ref={flatListRef}
-					data={[1, 2, 3]}
-					renderItem={renderItem}
-					horizontal
-					pagingEnabled
-					showsHorizontalScrollIndicator={false}
-					onMomentumScrollEnd={(e) => {
-						// Only update index if this was a user swipe (not manual navigation)
-						if (!isManualNavigationRef.current) {
-							const newIndex = Math.round(
-								e.nativeEvent.contentOffset.x / width
-							);
-							setCurrentIndex(newIndex);
-						}
-						// Reset the flag after scroll ends
-						isManualNavigationRef.current = false;
-					}}
-					style={styles.flatList}
-					keyboardShouldPersistTaps="handled"
-				/>
+				<View style={styles.contentContainer}>{renderCurrentStep()}</View>
 				<View style={styles.paginationContainer}>
 					{[0, 1, 2].map((index) => (
 						<View
@@ -1197,11 +1347,10 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		fontWeight: '600',
 	},
-	flatList: {
+	contentContainer: {
 		flex: 1,
 	},
 	slide: {
-		width,
 		flex: 1,
 	},
 	scrollContent: {
@@ -1260,6 +1409,10 @@ const styles = StyleSheet.create({
 		color: '#DC2626',
 		fontSize: 12,
 		marginTop: 6,
+	},
+	requiredMark: {
+		color: '#DC2626',
+		fontWeight: '600',
 	},
 	inputWithIconText: {
 		flex: 1,
