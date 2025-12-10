@@ -41,10 +41,7 @@ export default function GoalsLayout() {
 				name="[id]"
 				options={createHeaderOptions('Goal details', true)}
 			/>
-			<Stack.Screen
-				name="edit"
-				options={createHeaderOptions('Edit Goal', true)}
-			/>
+			<Stack.Screen name="edit" options={{ headerShown: false }} />
 		</Stack>
 	);
 }

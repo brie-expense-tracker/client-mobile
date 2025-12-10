@@ -7,14 +7,8 @@ import {
 	DebtsService,
 	Debt,
 } from '../../../../src/services/feature/debtsService';
-import {
-	Page,
-	Card,
-	LoadingState,
-	EmptyState,
-	Section,
-} from '../../../../src/ui';
-import { palette, radius, space } from '../../../../src/ui/theme';
+import { Page, LoadingState, EmptyState, Section } from '../../../../src/ui';
+import { palette, space } from '../../../../src/ui/theme';
 
 import DebtsSummaryCard from '../components/debts/DebtsSummaryCard';
 import DebtsFeed from '../components/debts/DebtsFeed';
@@ -87,18 +81,6 @@ export default function DebtsScreen() {
 		return <LoadingState label="Loading debts…" />;
 	}
 
-	if (debts.length === 0) {
-		return (
-			<EmptyState
-				icon="card-outline"
-				title="No debts tracked yet"
-				subtitle="Add your credit cards, loans, or any balances you want the dashboard to calculate against."
-				ctaLabel="Add a debt"
-				onPress={handleAddDebt}
-			/>
-		);
-	}
-
 	return (
 		<Page>
 			<ScrollView
@@ -106,12 +88,17 @@ export default function DebtsScreen() {
 				style={styles.scroll}
 				contentContainerStyle={styles.scrollContent}
 				refreshControl={
-					<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+					<RefreshControl
+						refreshing={refreshing}
+						onRefresh={onRefresh}
+						tintColor={palette.primary}
+						colors={[palette.primary]}
+					/>
 				}
 			>
-				{/* Hero */}
-				<Section style={styles.heroSection}>
-					<Card style={styles.heroCard}>
+				{/* Top-sheet hero, same pattern as budgets/bills/goals */}
+				<View style={styles.heroShell}>
+					<View style={styles.debtSummaryCardWrapper}>
 						<DebtsSummaryCard
 							totalDebt={totalDebt}
 							accountsCount={accountsCount}
@@ -120,8 +107,8 @@ export default function DebtsScreen() {
 							totalMinPayment={totalMinPayment ?? undefined}
 							onAddDebt={handleAddDebt}
 						/>
-					</Card>
-				</Section>
+					</View>
+				</View>
 
 				{/* List */}
 				<Section
@@ -131,9 +118,19 @@ export default function DebtsScreen() {
 					} • ${currencyFmt(totalDebt)}`}
 					style={styles.debtsSection}
 				>
-					<View style={styles.debtsFeedContainer}>
-						<DebtsFeed debts={debts} scrollEnabled={false} />
-					</View>
+					{debts.length === 0 ? (
+						<EmptyState
+							icon="card-outline"
+							title="No debts tracked yet"
+							subtitle="Add your credit cards, loans, or any balances you want the dashboard to calculate against."
+							ctaLabel="Add a debt"
+							onPress={handleAddDebt}
+						/>
+					) : (
+						<View style={styles.debtsFeedContainer}>
+							<DebtsFeed debts={debts} scrollEnabled={false} />
+						</View>
+					)}
 				</Section>
 			</ScrollView>
 		</Page>
@@ -143,37 +140,36 @@ export default function DebtsScreen() {
 const styles = StyleSheet.create({
 	scroll: {
 		flex: 1,
-		backgroundColor: palette.surfaceAlt,
+		backgroundColor: palette.surfaceAlt, // light grey page bg
 	},
 	scrollContent: {
-		paddingTop: space.sm,
 		paddingBottom: space.xl,
 	},
-	heroSection: {
-		marginTop: space.md,
-	},
-	heroCard: {
+
+	// background of the top area – stays light grey now
+	heroShell: {
+		backgroundColor: palette.surfaceAlt,
+		paddingTop: space.lg,
+		paddingBottom: space.lg,
 		paddingHorizontal: space.lg,
-		paddingVertical: space.lg,
-
-		backgroundColor: palette.surface,
-		borderRadius: radius.xl,
-
-		// subtle outline, like Bills summary
-		borderWidth: 1,
-		borderColor: palette.borderMuted,
-
-		// soft floating shadow
-		shadowColor: '#000',
-		shadowOpacity: 0.07,
-		shadowRadius: 18,
-		shadowOffset: { width: 0, height: 8 },
-
-		// Android
-		elevation: 3,
 	},
+
+	// actual white card behind the debt summary
+	debtSummaryCardWrapper: {
+		backgroundColor: palette.surface,
+		borderRadius: 24,
+		padding: space.lg,
+		shadowColor: '#000',
+		shadowOpacity: 0.06,
+		shadowRadius: 18,
+		shadowOffset: { width: 0, height: 10 },
+		elevation: 4,
+	},
+
 	debtsSection: {
 		marginTop: space.lg,
+		paddingHorizontal: space.lg,
+		paddingTop: space.sm,
 	},
 	debtsFeedContainer: {
 		paddingHorizontal: 0,

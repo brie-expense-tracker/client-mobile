@@ -29,7 +29,7 @@ const createHeaderOptions = (
 	),
 });
 
-export default function RecurringLayout() {
+export default function BillsLayout() {
 	return (
 		<Stack screenOptions={{ headerShown: false }}>
 			<Stack.Screen name="index" options={{ headerShown: false }} />
@@ -41,10 +41,7 @@ export default function RecurringLayout() {
 				name="[patternId]"
 				options={createHeaderOptions('Bill details', true)}
 			/>
-			<Stack.Screen
-				name="edit"
-				options={createHeaderOptions('Edit Recurring Expense', true)}
-			/>
+			<Stack.Screen name="edit" options={{ headerShown: false }} />
 		</Stack>
 	);
 }

@@ -2,92 +2,82 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLOR_PALETTE } from '../../constants/uiConstants';
+import { palette, radius, space, type as typography } from '../../ui/theme';
 
 interface ColorPickerProps {
 	selectedColor: string;
 	onColorSelect: (color: string) => void;
 	isOpen: boolean;
 	onToggle: () => void;
+	colors?: string[];
 }
+
+// Flatten COLOR_PALETTE into a single array of all colors
+const getDefaultColors = (): string[] => {
+	const colors: string[] = [];
+	Object.values(COLOR_PALETTE).forEach((colorSet) => {
+		colors.push(colorSet.base, colorSet.pastel, colorSet.dark);
+	});
+	return colors;
+};
 
 export const ColorPicker: React.FC<ColorPickerProps> = ({
 	selectedColor,
 	onColorSelect,
 	isOpen,
 	onToggle,
+	colors = getDefaultColors(),
 }) => {
-	const handleColorSelect = (color: string) => {
-		onColorSelect(color);
-		onToggle();
-	};
-
 	return (
-		<View>
-			<TouchableOpacity style={styles.colorButton} onPress={onToggle}>
-				<View style={styles.colorButtonContent}>
+		<View style={styles.container}>
+			{/* Header row (swatch + label + chevron) */}
+			<TouchableOpacity
+				activeOpacity={0.9}
+				style={styles.header}
+				onPress={onToggle}
+			>
+				<View style={styles.headerLeft}>
 					<View
-						style={[styles.colorPreview, { backgroundColor: selectedColor }]}
+						style={[
+							styles.selectedSwatch,
+							{ backgroundColor: selectedColor || palette.primary },
+						]}
 					/>
-					<Text style={styles.colorButtonText}>Choose Color</Text>
-					<Ionicons
-						name={isOpen ? 'chevron-up' : 'chevron-down'}
-						size={20}
-						color="#757575"
-					/>
+					<Text style={styles.headerLabel}>Choose Color</Text>
 				</View>
+				<Ionicons
+					name={isOpen ? 'chevron-up-outline' : 'chevron-down-outline'}
+					size={18}
+					color={palette.textMuted}
+				/>
 			</TouchableOpacity>
 
+			{/* Swatch grid inside same card */}
 			{isOpen && (
-				<View style={styles.colorGrid}>
-					{Object.entries(COLOR_PALETTE).map(([name, colors]) => (
-						<View key={name} style={styles.colorColumn}>
+				<View style={styles.grid}>
+					{colors.map((color) => {
+						const isSelected = color === selectedColor;
+						return (
 							<TouchableOpacity
-								style={styles.colorOptionContainer}
-								onPress={() => handleColorSelect(colors.base)}
+								key={color}
+								activeOpacity={0.9}
+								onPress={() => {
+									onColorSelect(color);
+									onToggle();
+								}}
+								style={[
+									styles.swatchWrapper,
+									isSelected && styles.swatchWrapperSelected,
+								]}
 							>
-								<View
-									style={[styles.colorSquare, { backgroundColor: colors.base }]}
-								>
-									{selectedColor === colors.base && (
-										<View style={styles.selectedIndicator}>
-											<Ionicons name="checkmark" size={20} color="#FFF" />
-										</View>
+								<View style={[styles.swatch, { backgroundColor: color }]}>
+									{isSelected && (
+										<Ionicons name="checkmark" size={18} color="#FFFFFF" />
 									)}
 								</View>
 							</TouchableOpacity>
-							<TouchableOpacity
-								style={styles.colorOptionContainer}
-								onPress={() => handleColorSelect(colors.pastel)}
-							>
-								<View
-									style={[
-										styles.colorSquare,
-										{ backgroundColor: colors.pastel },
-									]}
-								>
-									{selectedColor === colors.pastel && (
-										<View style={styles.selectedIndicator}>
-											<Ionicons name="checkmark" size={20} color="#000" />
-										</View>
-									)}
-								</View>
-							</TouchableOpacity>
-							<TouchableOpacity
-								style={styles.colorOptionContainer}
-								onPress={() => handleColorSelect(colors.dark)}
-							>
-								<View
-									style={[styles.colorSquare, { backgroundColor: colors.dark }]}
-								>
-									{selectedColor === colors.dark && (
-										<View style={styles.selectedIndicator}>
-											<Ionicons name="checkmark" size={20} color="#FFF" />
-										</View>
-									)}
-								</View>
-							</TouchableOpacity>
-						</View>
-					))}
+						);
+					})}
 				</View>
 			)}
 		</View>
@@ -95,58 +85,60 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
 };
 
 const styles = StyleSheet.create({
-	colorButton: {
-		backgroundColor: '#F5F5F5',
-		borderRadius: 12,
-		padding: 16,
+	container: {
+		borderRadius: radius.lg,
+		backgroundColor: palette.surface,
+		borderWidth: 1,
+		borderColor: palette.border,
+		overflow: 'hidden', // keeps grid inside the rounded card
 	},
-	colorButtonContent: {
+	header: {
+		paddingHorizontal: space.lg,
+		paddingVertical: space.md,
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
 	},
-	colorPreview: {
-		width: 24,
-		height: 24,
-		borderRadius: 6,
-		borderWidth: 1,
-		borderColor: '#E0E0E0',
-	},
-	colorButtonText: {
-		fontSize: 16,
-		color: '#212121',
-		flex: 1,
-		marginLeft: 12,
-	},
-	colorGrid: {
+	headerLeft: {
 		flexDirection: 'row',
-		justifyContent: 'center',
-		marginTop: 4,
-		gap: 8,
+		alignItems: 'center',
+		gap: space.md,
 	},
-	colorColumn: {
+	selectedSwatch: {
+		width: 32,
+		height: 32,
+		borderRadius: radius.md,
+		borderWidth: 2,
+		borderColor: '#FFFFFF',
+	},
+	headerLabel: {
+		fontSize: 16,
+		color: palette.text,
+		fontWeight: '400',
+	},
+	grid: {
+		paddingHorizontal: space.lg,
+		paddingBottom: space.md,
+		paddingTop: space.sm,
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		gap: space.sm,
+	},
+	swatchWrapper: {
+		width: 40,
+		height: 40,
+		borderRadius: radius.md,
+		justifyContent: 'center',
 		alignItems: 'center',
 	},
-	colorOptionContainer: {
-		width: 36,
-		height: 36,
-		marginBottom: 4,
+	swatchWrapperSelected: {
+		borderWidth: 2,
+		borderColor: palette.primary,
 	},
-	colorSquare: {
+	swatch: {
 		width: '100%',
 		height: '100%',
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: '#E0E0E0',
-	},
-	selectedIndicator: {
-		position: 'absolute',
-		top: 0,
-		left: 0,
-		right: 0,
-		bottom: 0,
-		backgroundColor: 'rgba(0, 0, 0, 0.2)',
-		borderRadius: 8,
+		borderRadius: radius.md - 2,
 		justifyContent: 'center',
 		alignItems: 'center',
 	},

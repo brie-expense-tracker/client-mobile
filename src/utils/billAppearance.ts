@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { RecurringExpense } from '../services';
+import { Bill } from '../services';
 import { createLogger } from './sublogger';
 
 const appearanceLog = createLogger('AppearanceResolver');
@@ -92,6 +92,9 @@ function getVendorBrandMapping(vendor: string): {
 	icon: keyof typeof Ionicons.glyphMap;
 	color: string;
 } {
+	if (!vendor || typeof vendor !== 'string') {
+		return { icon: 'repeat-outline', color: '#1E88E5' };
+	}
 	const vendorLower = vendor.toLowerCase();
 
 	// Check for exact match first (case-insensitive)
@@ -111,11 +114,11 @@ function getVendorBrandMapping(vendor: string): {
 }
 
 /**
- * Resolve the appearance (icon & color) for a recurring expense
+ * Resolve the appearance (icon & color) for a bill
  * Respects user's appearanceMode to prevent vendor mapping from overriding custom choices
  */
-export function resolveRecurringExpenseAppearance(
-	expense: RecurringExpense & {
+export function resolveBillAppearance(
+	expense: Bill & {
 		appearanceMode?: 'custom' | 'brand' | 'default';
 	}
 ): {
@@ -123,6 +126,15 @@ export function resolveRecurringExpenseAppearance(
 	color: string;
 	source: 'custom' | 'brand' | 'default';
 } {
+	// Safety check: if expense is invalid, return default
+	if (!expense || typeof expense !== 'object') {
+		return {
+			icon: 'repeat-outline',
+			color: '#1E88E5',
+			source: 'default',
+		};
+	}
+
 	appearanceLog.debug('Resolving appearance', {
 		vendor: expense.vendor,
 		appearanceMode: expense.appearanceMode,
@@ -144,7 +156,7 @@ export function resolveRecurringExpenseAppearance(
 
 	// 2) Brand mapping if enabled (default for most expenses)
 	if (expense.appearanceMode === 'brand' || expense.appearanceMode == null) {
-		const brandMapping = getVendorBrandMapping(expense.vendor);
+		const brandMapping = getVendorBrandMapping(expense.vendor || '');
 		const result = {
 			icon: brandMapping.icon,
 			color: brandMapping.color,

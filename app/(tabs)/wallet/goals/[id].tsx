@@ -253,15 +253,7 @@ export default function GoalSummaryScreen() {
 								</Text>
 							</View>
 
-							<View
-								style={[
-									styles.detailRow,
-									(!goal.categories || goal.categories.length === 0) && {
-										borderBottomWidth: 0,
-										paddingBottom: 0,
-									},
-								]}
-							>
+							<View style={styles.detailRow}>
 								<Text style={styles.detailLabel}>Status</Text>
 								<Text style={styles.detailValue}>
 									{status === 'completed'
@@ -271,24 +263,6 @@ export default function GoalSummaryScreen() {
 										: 'Active'}
 								</Text>
 							</View>
-
-							{goal.categories && goal.categories.length > 0 && (
-								<View
-									style={[
-										styles.detailRow,
-										{ borderBottomWidth: 0, paddingBottom: 0 },
-									]}
-								>
-									<Text style={styles.detailLabel}>Categories</Text>
-									<View style={styles.chipRow}>
-										{goal.categories.map((cat) => (
-											<View key={cat} style={styles.chip}>
-												<Text style={styles.chipText}>{cat}</Text>
-											</View>
-										))}
-									</View>
-								</View>
-							)}
 						</Card>
 					</Section>
 

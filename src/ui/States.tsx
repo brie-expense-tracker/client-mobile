@@ -90,7 +90,6 @@ const styles = StyleSheet.create({
 		flex: 1,
 		alignItems: 'center',
 		justifyContent: 'center',
-		paddingHorizontal: space.lg,
 		backgroundColor: palette.surfaceAlt,
 	},
 	card: {

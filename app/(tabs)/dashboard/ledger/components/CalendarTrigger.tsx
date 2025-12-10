@@ -10,11 +10,16 @@ export default function CalendarTrigger({
 	onPress: () => void;
 }) {
 	const display = dateISO
-		? new Date(dateISO + 'T00:00:00').toLocaleDateString('en-US', {
-				month: 'short',
-				day: 'numeric',
-				year: 'numeric',
-		  })
+		? (() => {
+				// Parse YYYY-MM-DD directly to avoid timezone issues
+				const [year, month, day] = dateISO.split('-').map(Number);
+				const date = new Date(year, month - 1, day);
+				return date.toLocaleDateString('en-US', {
+					month: 'short',
+					day: 'numeric',
+					year: 'numeric',
+				});
+		  })()
 		: 'All Dates';
 
 	return (

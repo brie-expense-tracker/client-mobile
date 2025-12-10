@@ -4,6 +4,7 @@ import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { RectButton } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
+import { palette, space } from '../ui/theme';
 
 // Calendar locale configuration
 LocaleConfig.locales.us = {
@@ -107,26 +108,33 @@ export const DateField: React.FC<DateFieldProps> = ({
 	}, [onChange]);
 
 	return (
-		<View style={[containerStyle]} testID={testID}>
+		<View testID={testID}>
 			{title && <Text style={styles.sectionTitle}>{title}</Text>}
 
-			{/* Trigger */}
+			{/* Trigger (now owns containerStyle instead of wrapper) */}
 			<TouchableOpacity
-				style={styles.dateSelector}
+				style={[styles.dateSelector, containerStyle]}
 				onPress={() => setOpen((s) => !s)}
 				accessibilityLabel="Select date"
 				accessibilityHint={open ? 'Collapse calendar' : 'Expand calendar'}
 				accessibilityState={{ expanded: open }}
 				testID="date-trigger"
 			>
-				<Ionicons name="calendar-outline" size={18} color="#007AFF" />
-				<Text style={styles.dateText}>
-					{value ? new Date(value).toLocaleDateString() : placeholder}
+				<Ionicons name="calendar-outline" size={18} color={palette.textMuted} />
+				<Text style={styles.dateText} numberOfLines={1} ellipsizeMode="tail">
+					{value
+						? (() => {
+								// Parse YYYY-MM-DD directly to avoid timezone issues
+								const [year, month, day] = value.split('-').map(Number);
+								const date = new Date(year, month - 1, day);
+								return date.toLocaleDateString();
+						  })()
+						: placeholder}
 				</Text>
 				<Ionicons
 					name={open ? 'chevron-up' : 'chevron-down'}
 					size={16}
-					color="#666"
+					color={palette.textMuted}
 				/>
 			</TouchableOpacity>
 
@@ -197,26 +205,22 @@ export const DateField: React.FC<DateFieldProps> = ({
 
 const styles = StyleSheet.create({
 	sectionTitle: {
-		fontSize: 16,
-		fontWeight: '700',
-		color: '#111',
-		marginBottom: 10,
+		fontSize: 14,
+		color: palette.textMuted,
+		marginBottom: space.xs,
+		fontWeight: '600',
+		letterSpacing: 0.2,
 	},
 	dateSelector: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 10,
-		paddingVertical: 12,
-		paddingHorizontal: 16,
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: '#e0e0e0',
-		backgroundColor: '#fff',
+		// padding / border / radius now come from containerStyle
 	},
 	dateText: {
 		flex: 1,
 		fontSize: 16,
-		color: '#111',
+		color: palette.text,
 		fontWeight: '500',
 	},
 });

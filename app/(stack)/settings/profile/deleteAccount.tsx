@@ -9,11 +9,12 @@ import {
 	ScrollView,
 	ActivityIndicator,
 	Platform,
+	KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { RectButton, BorderlessButton } from 'react-native-gesture-handler';
+import { RectButton } from 'react-native-gesture-handler';
 import useAuth from '../../../../src/context/AuthContext';
 
 // Account deletion reasons
@@ -32,7 +33,36 @@ type DeletionReason = (typeof DELETION_REASONS)[number]['key'];
 
 export default function DeleteAccountScreen() {
 	const router = useRouter();
-	const { firebaseUser, deleteAccountAfterReauth } = useAuth();
+	const { firebaseUser, authProviderId, deleteAccountFlow } = useAuth();
+
+	const isPasswordUser = authProviderId === 'password';
+
+	// Provider summary text for step 4
+	const providerSummary = useMemo(() => {
+		switch (authProviderId) {
+			case 'password':
+				return "For security, we'll confirm this is you by asking for your password.";
+			case 'google.com':
+				return "You're signed in with Google. We'll confirm with your Google account before deleting.";
+			case 'apple.com':
+				return "You're signed in with Apple. We'll confirm with your Apple account before deleting.";
+			default:
+				return "We'll verify your identity with your sign-in provider before deleting your account.";
+		}
+	}, [authProviderId]);
+
+	const providerLabel = useMemo(() => {
+		switch (authProviderId) {
+			case 'password':
+				return 'Email & password';
+			case 'google.com':
+				return 'Google';
+			case 'apple.com':
+				return 'Apple';
+			default:
+				return 'Your sign-in method';
+		}
+	}, [authProviderId]);
 
 	// Wizard state
 	const [currentStep, setCurrentStep] = useState(0);
@@ -50,6 +80,8 @@ export default function DeleteAccountScreen() {
 
 	// Step 4: Final confirmation
 	const [confirmText, setConfirmText] = useState('');
+	const [password, setPassword] = useState(''); // Password for email/password users
+	const [showPassword, setShowPassword] = useState(false); // Toggle password visibility
 
 	// Step titles and navigation
 	const stepTitles = [
@@ -67,12 +99,22 @@ export default function DeleteAccountScreen() {
 				return true; // Optional feedback
 			case 2:
 				return true; // Optional export
-			case 3:
-				return confirmText.trim().toUpperCase() === 'DELETE';
+			case 3: {
+				const hasConfirm = confirmText.trim().toUpperCase() === 'DELETE';
+				const hasPassword = !isPasswordUser || password.trim().length >= 6;
+				return hasConfirm && hasPassword && !busy;
+			}
 			default:
 				return false;
 		}
-	}, [currentStep, selectedReason, confirmText]);
+	}, [
+		currentStep,
+		selectedReason,
+		confirmText,
+		isPasswordUser,
+		password,
+		busy,
+	]);
 
 	const nextStep = () => {
 		if (canProceed && currentStep < 3) {
@@ -117,11 +159,17 @@ export default function DeleteAccountScreen() {
 						try {
 							setBusy(true);
 							setFormError(null);
+
 							await submitFeedback();
-							await deleteAccountAfterReauth();
-							// Navigate to login immediately to avoid ProfileProvider unmount errors
+
+							// One clean call into AuthContext - handles reauth + deletion
+							await deleteAccountFlow(
+								isPasswordUser ? { password: password.trim() } : {}
+							);
+
+							// Navigate to login; AuthContext should have cleared user
 							router.replace('/(auth)/login');
-							// Show success message after a brief delay to ensure navigation completes
+
 							setTimeout(() => {
 								Alert.alert(
 									'Account deleted',
@@ -130,19 +178,29 @@ export default function DeleteAccountScreen() {
 							}, 500);
 						} catch (error: any) {
 							logger.error('Delete error:', error);
-							const errorMessage =
+							let errorMessage =
 								error?.message || 'Failed to delete account. Please try again.';
 
-							// If partial deletion occurred (backend deleted but Firebase failed),
-							// log the user out since their backend account is gone
+							// Handle specific error codes
+							if (error?.code === 'auth/wrong-password') {
+								errorMessage =
+									'Incorrect password. Please double-check and try again.';
+							} else if (error?.code === 'delete/password-required') {
+								errorMessage =
+									'Password is required to confirm deletion for this account.';
+							} else if (error?.code === 'auth/requires-recent-login') {
+								errorMessage =
+									'For security reasons, please sign in again and then retry deleting your account.';
+							}
+
+							// Partial deletion handling (should not happen with backend Admin SDK, but handle just in case)
 							if (error?.partial) {
 								setFormError(errorMessage);
 								setBusy(false);
 								Alert.alert('Partial Deletion', errorMessage, [
 									{
 										text: 'OK',
-										onPress: async () => {
-											// Navigate to login since backend account is deleted
+										onPress: () => {
 											router.replace('/(auth)/login');
 										},
 									},
@@ -158,19 +216,19 @@ export default function DeleteAccountScreen() {
 				},
 			]
 		);
-	}, [confirmText, deleteAccountAfterReauth, router, submitFeedback]);
+	}, [
+		confirmText,
+		deleteAccountFlow,
+		isPasswordUser,
+		password,
+		router,
+		submitFeedback,
+	]);
 
 	return (
-		<SafeAreaView style={styles.container} edges={['top']}>
+		<SafeAreaView style={styles.container} edges={['top', 'bottom']}>
 			{/* Header */}
 			<View style={styles.header}>
-				<BorderlessButton
-					enabled={!busy}
-					onPress={() => router.back()}
-					style={styles.headerButton}
-				>
-					<Ionicons name="chevron-back" size={24} color="#111827" />
-				</BorderlessButton>
 				<Text style={styles.headerTitle}>{stepTitles[currentStep]}</Text>
 				<View style={{ width: 24 }} />
 			</View>
@@ -186,11 +244,16 @@ export default function DeleteAccountScreen() {
 			</View>
 
 			{/* Main Content Area */}
-			<View style={styles.mainContent}>
+			<KeyboardAvoidingView
+				style={styles.mainContent}
+				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+				keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+			>
 				<ScrollView
 					style={styles.scrollView}
 					contentContainerStyle={styles.scrollContent}
 					showsVerticalScrollIndicator={false}
+					keyboardShouldPersistTaps="handled"
 				>
 					{/* Step Navigation */}
 					{currentStep > 0 && (
@@ -334,6 +397,41 @@ export default function DeleteAccountScreen() {
 								editable={!busy}
 							/>
 
+							{/* Sign-in provider summary */}
+							<View style={styles.providerCard}>
+								<Text style={styles.providerLabel}>{providerLabel}</Text>
+								<Text style={styles.providerSummary}>{providerSummary}</Text>
+							</View>
+
+							{/* Password field for email/password users */}
+							{isPasswordUser && (
+								<>
+									<Text style={styles.inputLabel}>Confirm your password</Text>
+									<View style={styles.passwordInputContainer}>
+										<TextInput
+											style={styles.passwordInput}
+											value={password}
+											onChangeText={setPassword}
+											placeholder="Password"
+											placeholderTextColor="#9CA3AF"
+											secureTextEntry={!showPassword}
+											editable={!busy}
+										/>
+										<RectButton
+											style={styles.eyeButton}
+											onPress={() => setShowPassword(!showPassword)}
+											enabled={!busy}
+										>
+											<Ionicons
+												name={showPassword ? 'eye-off' : 'eye'}
+												size={20}
+												color="#6B7280"
+											/>
+										</RectButton>
+									</View>
+								</>
+							)}
+
 							{formError && <Text style={styles.errorText}>{formError}</Text>}
 
 							<RectButton
@@ -384,7 +482,7 @@ export default function DeleteAccountScreen() {
 						</RectButton>
 					</View>
 				)}
-			</View>
+			</KeyboardAvoidingView>
 		</SafeAreaView>
 	);
 }
@@ -641,6 +739,30 @@ const styles = StyleSheet.create({
 		color: '#111827',
 		marginTop: 12,
 	},
+	passwordInputContainer: {
+		position: 'relative',
+		marginTop: 12,
+	},
+	passwordInput: {
+		height: 48,
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#E5E7EB',
+		backgroundColor: '#fff',
+		paddingHorizontal: 16,
+		paddingRight: 48,
+		fontSize: 16,
+		color: '#111827',
+	},
+	eyeButton: {
+		position: 'absolute',
+		right: 0,
+		top: 0,
+		bottom: 0,
+		width: 48,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
 	inputLabel: {
 		fontSize: 14,
 		fontWeight: '700',
@@ -650,6 +772,27 @@ const styles = StyleSheet.create({
 	monoText: {
 		fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
 		fontWeight: '800',
+	},
+
+	// Provider card
+	providerCard: {
+		marginTop: 16,
+		padding: 12,
+		borderRadius: 12,
+		backgroundColor: '#F9FAFB',
+		borderWidth: 1,
+		borderColor: '#E5E7EB',
+	},
+	providerLabel: {
+		fontSize: 13,
+		fontWeight: '700',
+		color: '#4B5563',
+		marginBottom: 4,
+	},
+	providerSummary: {
+		fontSize: 13,
+		color: '#6B7280',
+		lineHeight: 18,
 	},
 
 	// Buttons
@@ -687,7 +830,7 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		paddingHorizontal: 16,
 		paddingVertical: 12,
-		backgroundColor: '#F8FAFC',
+		backgroundColor: '#fff',
 		borderTopWidth: StyleSheet.hairlineWidth,
 		borderTopColor: '#E5E7EB',
 		gap: 12,

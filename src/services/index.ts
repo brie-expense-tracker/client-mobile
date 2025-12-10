@@ -5,9 +5,11 @@ export { OnboardingService } from './core/onboardingService';
 
 // Feature Services
 export {
-	RecurringExpenseService,
-	type RecurringExpense,
-} from './feature/recurringExpenseService';
+	BillService,
+	type Bill,
+	type BillPattern,
+	type BillAlert,
+} from './feature/billService';
 export { BudgetSuggestionService } from './feature/budgetSuggestionService';
 export { TieredAIService } from './feature/tieredAIService';
 export {

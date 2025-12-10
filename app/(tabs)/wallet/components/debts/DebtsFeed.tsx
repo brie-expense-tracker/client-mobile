@@ -30,100 +30,110 @@ interface Props {
 	isLoading?: boolean;
 }
 
+// ---------- Row component (same flow as other feeds) ----------
+
+function DebtRow({ debt }: { debt: Debt }) {
+	const router = useRouter();
+
+	const typeLabel = DebtsService.formatDebtType(debt.type);
+	const hasMin = typeof debt.minPayment === 'number' && debt.minPayment > 0;
+	const hasApr = debt.interestRate > 0;
+
+	const iconName: keyof typeof Ionicons.glyphMap =
+		debt.type === 'creditCard'
+			? 'card-outline'
+			: debt.type === 'studentLoan'
+			? 'school-outline'
+			: debt.type === 'mortgage'
+			? 'home-outline'
+			: 'cash-outline';
+
+	const handlePress = () => {
+		router.push({
+			pathname: '/(tabs)/wallet/debts/[id]',
+			params: { id: debt._id },
+		});
+	};
+
+	return (
+		<Pressable
+			onPress={handlePress}
+			style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+			android_ripple={{ color: palette.borderMuted, borderless: false }}
+			accessibilityRole="button"
+			accessibilityLabel={`Open debt ${debt.name}`}
+		>
+			{/* Top row — icon + title/subtitle + balance (same as budgets/bills/goals header) */}
+			<View style={styles.headerRow}>
+				<View style={styles.leftCol}>
+					<View style={styles.iconBubble}>
+						<Ionicons name={iconName} size={20} color={palette.primary} />
+					</View>
+
+					<View style={styles.titleBlock}>
+						<Text style={styles.title} numberOfLines={1}>
+							{debt.name}
+						</Text>
+						<Text style={styles.subtitle} numberOfLines={1}>
+							{typeLabel}
+						</Text>
+					</View>
+				</View>
+
+				<View style={styles.amountCol}>
+					<Text style={styles.amountLabel}>Balance</Text>
+					<Text style={styles.amountValue}>
+						{currency(debt.currentBalance)}
+					</Text>
+				</View>
+			</View>
+
+			{/* Bottom row — meta chips on the left, future room on the right */}
+			<View style={styles.metaInlineRow}>
+				<View style={styles.metaChipsRow}>
+					{hasMin && (
+						<View style={[styles.pill, styles.pillSoft]}>
+							<Text style={styles.pillText}>
+								Min {currency(debt.minPayment!)}
+							</Text>
+						</View>
+					)}
+
+					{hasApr && (
+						<View style={[styles.pill, styles.pillSoft]}>
+							<Text style={styles.pillText}>
+								{DebtsService.formatInterestRate(debt.interestRate)} APR
+							</Text>
+						</View>
+					)}
+
+					{debt.isSynthetic && (
+						<View style={[styles.pill, styles.pillAlt]}>
+							<Ionicons
+								name="sparkles-outline"
+								size={14}
+								color={palette.textMuted}
+								style={{ marginRight: 4 }}
+							/>
+							<Text style={styles.pillText}>Auto-tracked</Text>
+						</View>
+					)}
+				</View>
+			</View>
+		</Pressable>
+	);
+}
+
+// ---------- Feed component (matches other feeds) ----------
+
 const DebtsFeed: React.FC<Props> = ({
 	debts,
 	scrollEnabled = true,
 	isLoading = false,
 }) => {
-	const router = useRouter();
+	const isEmpty = debts.length === 0;
 
-	const renderItem = ({ item }: { item: Debt }) => {
-		const typeLabel = DebtsService.formatDebtType(item.type);
-		const hasMin = typeof item.minPayment === 'number' && item.minPayment > 0;
-		const hasApr = item.interestRate > 0;
-
-		const iconName: keyof typeof Ionicons.glyphMap =
-			item.type === 'creditCard'
-				? 'card-outline'
-				: item.type === 'studentLoan'
-				? 'school-outline'
-				: item.type === 'mortgage'
-				? 'home-outline'
-				: 'cash-outline';
-
-		const handlePress = () => {
-			router.push({
-				pathname: '/(tabs)/wallet/debts/[id]',
-				params: { id: item._id },
-			});
-		};
-
-		return (
-			<View style={styles.itemContainer}>
-				<View style={styles.shadowWrapper}>
-					<Pressable
-						onPress={handlePress}
-						style={({ pressed, hovered }) => [
-							styles.card,
-							(pressed || hovered) && styles.cardPressed,
-						]}
-						android_ripple={{ color: `${palette.borderMuted}60` }}
-						accessibilityRole="button"
-						accessibilityLabel={`Open debt ${item.name}`}
-					>
-						{/* Icon + title */}
-						<View style={styles.topRow}>
-							<View style={styles.iconCircle}>
-								<Ionicons name={iconName} size={20} color={palette.primary} />
-							</View>
-
-							<View style={styles.titleBlock}>
-								<Text style={styles.name}>{item.name}</Text>
-								<Text style={styles.subtitle}>{typeLabel}</Text>
-							</View>
-
-							<Text style={styles.balance}>
-								{currency(item.currentBalance)}
-							</Text>
-						</View>
-
-						{/* Meta chips */}
-						<View style={styles.metaRow}>
-							{hasMin && (
-								<View style={[styles.pill, styles.pillSoft]}>
-									<Text style={styles.pillText}>
-										Min {currency(item.minPayment!)}
-									</Text>
-								</View>
-							)}
-
-							{hasApr && (
-								<View style={[styles.pill, styles.pillSoft]}>
-									<Text style={styles.pillText}>
-										{DebtsService.formatInterestRate(item.interestRate)} APR
-									</Text>
-								</View>
-							)}
-
-							{item.isSynthetic && (
-								<View style={[styles.pill, styles.pillAlt]}>
-									<Ionicons
-										name="sparkles-outline"
-										size={14}
-										color={palette.textMuted}
-										style={{ marginRight: 4 }}
-									/>
-									<Text style={styles.pillText}>Auto-tracked</Text>
-								</View>
-							)}
-						</View>
-					</Pressable>
-				</View>
-			</View>
-		);
-	};
-
-	if (isLoading && debts.length === 0) {
+	if (isLoading && isEmpty) {
 		return (
 			<View style={styles.loadingState}>
 				<ActivityIndicator size="small" color={palette.primary} />
@@ -136,14 +146,12 @@ const DebtsFeed: React.FC<Props> = ({
 		<FlatList
 			data={debts}
 			keyExtractor={(d, idx) => d._id ?? `debt-${idx}`}
-			renderItem={renderItem}
+			renderItem={({ item }) => <DebtRow debt={item} />}
 			scrollEnabled={scrollEnabled}
-			ItemSeparatorComponent={() => <View style={styles.separator} />}
-			contentContainerStyle={
-				debts.length === 0
-					? { flexGrow: 1, paddingVertical: space.sm }
-					: { paddingVertical: space.sm }
-			}
+			contentContainerStyle={[
+				styles.listContent,
+				isEmpty && styles.listContentEmpty,
+			]}
 			ListEmptyComponent={
 				<View style={styles.emptyState}>
 					<Ionicons name="card-outline" size={40} color={palette.iconMuted} />
@@ -153,41 +161,41 @@ const DebtsFeed: React.FC<Props> = ({
 					</Text>
 				</View>
 			}
+			ListFooterComponent={
+				!isEmpty ? <View style={styles.footerSpacer} /> : null
+			}
 		/>
 	);
 };
 
 const styles = StyleSheet.create({
-	itemContainer: {
-		// prevents overlapping shadows between rows
-		paddingHorizontal: 0,
-	},
-	shadowWrapper: {
-		borderRadius: radius.xl,
-		backgroundColor: 'transparent',
-		width: '100%',
-	},
+	// Card – same family as budgets/bills/goals
 	card: {
 		backgroundColor: palette.surface,
 		borderRadius: radius.xl,
 		paddingHorizontal: space.lg,
 		paddingVertical: space.lg,
-		overflow: 'hidden',
+		borderWidth: 1,
+		borderColor: palette.borderMuted,
+		marginBottom: space.sm,
 	},
 	cardPressed: {
-		backgroundColor: palette.surfaceAlt,
-		opacity: 0.96,
+		backgroundColor: palette.surfaceSubtle,
+		opacity: 0.98,
 		transform: [{ scale: 0.99 }],
 	},
-	separator: {
-		height: space.sm,
-	},
-	topRow: {
+
+	headerRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		marginBottom: space.sm,
 	},
-	iconCircle: {
+	leftCol: {
+		flex: 1,
+		flexDirection: 'row',
+		alignItems: 'center',
+	},
+	iconBubble: {
 		width: 40,
 		height: 40,
 		borderRadius: 20,
@@ -197,10 +205,9 @@ const styles = StyleSheet.create({
 		marginRight: space.md,
 	},
 	titleBlock: {
-		flex: 1,
+		flexShrink: 1,
 	},
-	name: {
-		...typography.labelSm,
+	title: {
 		color: palette.text,
 		fontWeight: '600',
 	},
@@ -209,17 +216,32 @@ const styles = StyleSheet.create({
 		color: palette.textMuted,
 		marginTop: 2,
 	},
-	balance: {
+	amountCol: {
+		alignItems: 'flex-end',
+		marginLeft: space.md,
+	},
+	amountLabel: {
+		...typography.bodyXs,
+		color: palette.textMuted,
+		marginBottom: 2,
+	},
+	amountValue: {
 		...typography.labelSm,
 		color: palette.text,
 		fontWeight: '600',
-		marginLeft: space.md,
 	},
-	metaRow: {
+
+	metaInlineRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	metaChipsRow: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',
 		gap: 8,
 	},
+
 	pill: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -237,6 +259,7 @@ const styles = StyleSheet.create({
 		...typography.bodyXs,
 		color: palette.textMuted,
 	},
+
 	loadingState: {
 		flex: 1,
 		justifyContent: 'center',
@@ -248,6 +271,7 @@ const styles = StyleSheet.create({
 		color: palette.textMuted,
 		marginTop: 8,
 	},
+
 	emptyState: {
 		flex: 1,
 		justifyContent: 'center',
@@ -267,6 +291,16 @@ const styles = StyleSheet.create({
 		textAlign: 'center',
 		marginTop: 8,
 		lineHeight: 20,
+	},
+
+	listContent: {
+		paddingVertical: space.sm,
+	},
+	listContentEmpty: {
+		flexGrow: 1,
+	},
+	footerSpacer: {
+		height: space.md,
 	},
 });
 

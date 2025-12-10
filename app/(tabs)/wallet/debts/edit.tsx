@@ -1,95 +1,195 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
 	View,
-	Text,
-	TextInput,
 	StyleSheet,
-	TouchableOpacity,
-	ActivityIndicator,
-	Alert,
+	TextInput,
 	ScrollView,
+	Alert,
+	ActivityIndicator,
+	Text,
+	TouchableOpacity,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import {
 	DebtsService,
 	DebtDTO,
 } from '../../../../src/services/feature/debtsService';
-import { Page, Section, LoadingState, Card } from '../../../../src/ui';
-import { palette, radius, space } from '../../../../src/ui/theme';
-import { dynamicTextStyle } from '../../../../src/utils/accessibility';
+import { FormInputGroup } from '../../../../src/components/forms';
+import { Page, Section, Card, LoadingState } from '../../../../src/ui';
+import {
+	palette,
+	radius,
+	space,
+	type as typography,
+} from '../../../../src/ui/theme';
+import { DateField } from '../../../../src/components/DateField';
+
+// Helper to clean currency input
+const cleanCurrencyToNumberString = (v: string) =>
+	v.replace(/[^\d.]/g, '').replace(/^0+(\d)/, '$1');
 
 export default function EditDebtScreen() {
-	const router = useRouter();
-	const { id } = useLocalSearchParams<{ id: string }>();
-	const [debt, setDebt] = useState<DebtDTO | null>(null);
-	const [loading, setLoading] = useState(true);
-	const [saving, setSaving] = useState(false);
+	const params = useLocalSearchParams();
+	const debtId = params.id as string;
 
 	const [name, setName] = useState('');
 	const [balance, setBalance] = useState('');
 	const [apr, setApr] = useState('');
 	const [minPayment, setMinPayment] = useState('');
-	const [dueDay, setDueDay] = useState('');
+	const [dueDay, setDueDay] = useState(''); // still the day-of-month (1–31)
+	const [dueDate, setDueDate] = useState<string>(''); // full YYYY-MM-DD for DateField
+	const [loading, setLoading] = useState(false);
+	const [debt, setDebt] = useState<DebtDTO | null>(null);
+	const [originalValues, setOriginalValues] = useState<{
+		name: string;
+		balance: string;
+		apr: string;
+		minPayment: string;
+		dueDay: string;
+	} | null>(null);
 
+	// Load debt data when component mounts
 	useEffect(() => {
 		let mounted = true;
 		const load = async () => {
 			try {
-				const d = await DebtsService.getById(id);
+				const d = await DebtsService.getById(debtId);
 				if (!mounted) return;
 				setDebt(d);
-				setName(d.name || '');
-				setBalance(d.currentBalance ? String(d.currentBalance) : '');
-				// Interest rate is already in percentage format from DTO
-				setApr(d.interestRate ? String(d.interestRate) : '');
-				setMinPayment(d.minPayment ? String(d.minPayment) : '');
-				setDueDay(d.dueDayOfMonth ? String(d.dueDayOfMonth) : '');
+				const debtName = d.name || '';
+				const debtBalance = d.currentBalance ? String(d.currentBalance) : '';
+				const debtApr = d.interestRate ? String(d.interestRate) : '';
+				const debtMinPayment = d.minPayment ? String(d.minPayment) : '';
+				const debtDueDay = d.dueDayOfMonth ? String(d.dueDayOfMonth) : '';
+
+				setName(debtName);
+				setBalance(debtBalance);
+				setApr(debtApr);
+				setMinPayment(debtMinPayment);
+				setDueDay(debtDueDay);
+
+				// Seed date picker value from dueDayOfMonth using current month/year
+				if (d.dueDayOfMonth) {
+					const today = new Date();
+					const year = today.getFullYear();
+					const month = today.getMonth(); // 0-based
+					const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
+					const day = Math.min(d.dueDayOfMonth, lastDayOfMonth);
+					const seeded = new Date(year, month, day).toISOString().split('T')[0];
+					setDueDate(seeded);
+				} else {
+					setDueDate('');
+				}
+
+				// Store original values for change detection
+				setOriginalValues({
+					name: debtName,
+					balance: debtBalance,
+					apr: debtApr,
+					minPayment: debtMinPayment,
+					dueDay: debtDueDay,
+				});
 			} catch {
-				Alert.alert('Error', 'Could not load debt.');
-				router.back();
-			} finally {
-				if (mounted) setLoading(false);
+				if (mounted) {
+					Alert.alert('Error', 'Could not load debt.');
+					router.back();
+				}
 			}
 		};
 		load();
 		return () => {
 			mounted = false;
 		};
-	}, [id, router]);
+	}, [debtId]);
 
-	const onSave = async () => {
+	// Check if any values have changed
+	const hasChanges = useMemo(() => {
+		if (!originalValues) return false;
+
+		const currentBalanceNum = parseFloat(cleanCurrencyToNumberString(balance));
+		const originalBalanceNum = parseFloat(
+			cleanCurrencyToNumberString(originalValues.balance)
+		);
+		const currentAprNum = apr
+			? parseFloat(cleanCurrencyToNumberString(apr))
+			: null;
+		const originalAprNum = originalValues.apr
+			? parseFloat(cleanCurrencyToNumberString(originalValues.apr))
+			: null;
+		const currentMinPaymentNum = minPayment
+			? parseFloat(cleanCurrencyToNumberString(minPayment))
+			: null;
+		const originalMinPaymentNum = originalValues.minPayment
+			? parseFloat(cleanCurrencyToNumberString(originalValues.minPayment))
+			: null;
+		const currentDueDayNum = dueDay ? Number(dueDay) : null;
+		const originalDueDayNum = originalValues.dueDay
+			? Number(originalValues.dueDay)
+			: null;
+
+		return (
+			name.trim() !== originalValues.name.trim() ||
+			currentBalanceNum !== originalBalanceNum ||
+			currentAprNum !== originalAprNum ||
+			currentMinPaymentNum !== originalMinPaymentNum ||
+			currentDueDayNum !== originalDueDayNum
+		);
+	}, [originalValues, name, balance, apr, minPayment, dueDay]);
+
+	// Memoized validation for save button
+	const saveDisabled = useMemo(() => {
+		const balNum = parseFloat(cleanCurrencyToNumberString(balance));
+		const aprNum = apr ? parseFloat(cleanCurrencyToNumberString(apr)) : null;
+		const minPaymentNum = minPayment
+			? parseFloat(cleanCurrencyToNumberString(minPayment))
+			: null;
+		const dueDayNum = dueDay ? Number(dueDay) : null;
+
+		return (
+			loading ||
+			!name.trim() ||
+			isNaN(balNum) ||
+			balNum < 0 ||
+			(aprNum !== null && (isNaN(aprNum) || aprNum < 0 || aprNum > 100)) ||
+			(minPaymentNum !== null && (isNaN(minPaymentNum) || minPaymentNum < 0)) ||
+			(dueDayNum !== null &&
+				(isNaN(dueDayNum) || dueDayNum < 1 || dueDayNum > 31)) ||
+			!hasChanges
+		);
+	}, [loading, name, balance, apr, minPayment, dueDay, hasChanges]);
+
+	const handleSave = async () => {
 		if (!debt) return;
 
-		// Validation
+		// Validation (unchanged)
 		if (!name.trim()) {
-			return Alert.alert('Missing Information', 'Please enter a debt name.');
+			Alert.alert('Error', 'Please enter a debt name');
+			return;
 		}
 
-		const balNum = Number(balance);
+		const balNum = parseFloat(cleanCurrencyToNumberString(balance));
 		if (isNaN(balNum) || balNum < 0) {
-			return Alert.alert(
-				'Invalid Amount',
-				'Please enter a valid current balance.'
-			);
+			Alert.alert('Error', 'Please enter a valid current balance');
+			return;
 		}
 
-		const aprNum = apr ? Number(apr) : undefined;
+		const aprNum = apr
+			? parseFloat(cleanCurrencyToNumberString(apr))
+			: undefined;
 		if (aprNum !== undefined && (isNaN(aprNum) || aprNum < 0 || aprNum > 100)) {
-			return Alert.alert(
-				'Invalid Interest Rate',
-				'Interest rate must be between 0 and 100%.'
-			);
+			Alert.alert('Error', 'Interest rate must be between 0 and 100%');
+			return;
 		}
 
-		const minPaymentNum = minPayment ? Number(minPayment) : undefined;
+		const minPaymentNum = minPayment
+			? parseFloat(cleanCurrencyToNumberString(minPayment))
+			: undefined;
 		if (
 			minPaymentNum !== undefined &&
 			(isNaN(minPaymentNum) || minPaymentNum < 0)
 		) {
-			return Alert.alert(
-				'Invalid Amount',
-				'Minimum payment must be a positive number.'
-			);
+			Alert.alert('Error', 'Minimum payment must be a positive number');
+			return;
 		}
 
 		const dueDayNum = dueDay ? Number(dueDay) : undefined;
@@ -97,13 +197,11 @@ export default function EditDebtScreen() {
 			dueDayNum !== undefined &&
 			(isNaN(dueDayNum) || dueDayNum < 1 || dueDayNum > 31)
 		) {
-			return Alert.alert(
-				'Invalid Due Day',
-				'Due day must be between 1 and 31.'
-			);
+			Alert.alert('Error', 'Due day must be between 1 and 31');
+			return;
 		}
 
-		setSaving(true);
+		setLoading(true);
 		try {
 			await DebtsService.update(debt._id, {
 				name: name.trim(),
@@ -112,19 +210,23 @@ export default function EditDebtScreen() {
 				minPayment: minPaymentNum,
 				dueDayOfMonth: dueDayNum,
 			});
-			Alert.alert('Saved', 'Debt updated successfully.');
-			router.back();
-		} catch (err: any) {
-			Alert.alert(
-				'Error',
-				err?.message || 'Could not update debt. Please try again.'
-			);
+
+			Alert.alert('Success', 'Debt updated successfully!', [
+				{ text: 'OK', onPress: () => router.back() },
+			]);
+		} catch (error: any) {
+			const errorMessage =
+				error?.response?.data?.message ||
+				error?.message ||
+				'Failed to update debt. Please try again.';
+			Alert.alert('Error', errorMessage);
 		} finally {
-			setSaving(false);
+			setLoading(false);
 		}
 	};
 
-	if (loading) {
+	// When debt isn't loaded yet
+	if (!debt) {
 		return (
 			<Page>
 				<LoadingState label="Loading debt…" />
@@ -136,129 +238,149 @@ export default function EditDebtScreen() {
 		<Page>
 			<View style={styles.layout}>
 				<ScrollView
-					style={styles.scrollView}
+					style={styles.content}
 					contentContainerStyle={styles.scrollContent}
 					showsVerticalScrollIndicator={false}
 				>
-					<Section
-						title="Details"
-						subtitle="Update the basics for this balance."
-					>
+					<Section title="Details" subtitle="Update the basics for this debt.">
 						<Card>
 							<View style={styles.form}>
-								<Label text="Name" required />
+								{/* Debt Name */}
+								<FormInputGroup label="Debt Name">
+									<TextInput
+										style={styles.textInput}
+										value={name}
+										onChangeText={setName}
+										placeholder="e.g., Chase Sapphire, Student Loan"
+										placeholderTextColor={palette.textSubtle}
+										autoCapitalize="words"
+									/>
+								</FormInputGroup>
 
-								<TextInput
-									value={name}
-									onChangeText={setName}
-									style={styles.input}
-									placeholder="e.g., Chase Sapphire, Student Loan"
-									placeholderTextColor="#94A3B8"
-									autoCapitalize="words"
-								/>
-
-								<Label text="Current balance" required />
-
-								<TextInput
-									value={balance}
-									onChangeText={(text) => {
-										const cleaned = text.replace(/[^0-9.]/g, '');
-										setBalance(cleaned);
-									}}
-									style={styles.input}
-									placeholder="0.00"
-									placeholderTextColor="#94A3B8"
-									keyboardType="decimal-pad"
-								/>
-
-								<Label text="Interest rate (APR %)" optional />
-
-								<TextInput
-									value={apr}
-									onChangeText={(text) => {
-										const cleaned = text.replace(/[^0-9.]/g, '');
-										setApr(cleaned);
-									}}
-									style={styles.input}
-									placeholder="e.g., 24.99"
-									placeholderTextColor="#94A3B8"
-									keyboardType="decimal-pad"
-								/>
-
-								<Label text="Minimum payment" optional />
-
-								<TextInput
-									value={minPayment}
-									onChangeText={(text) => {
-										const cleaned = text.replace(/[^0-9.]/g, '');
-										setMinPayment(cleaned);
-									}}
-									style={styles.input}
-									placeholder="0.00"
-									placeholderTextColor="#94A3B8"
-									keyboardType="decimal-pad"
-								/>
-
-								<Label text="Due day of month" optional />
-
-								<TextInput
-									value={dueDay}
-									onChangeText={(text) => {
-										const cleaned = text.replace(/[^0-9]/g, '');
-										if (
-											cleaned === '' ||
-											(Number(cleaned) >= 1 && Number(cleaned) <= 31)
-										) {
-											setDueDay(cleaned);
+								{/* Current Balance */}
+								<FormInputGroup
+									label="Current Balance"
+									subtext="Enter the current outstanding balance"
+								>
+									<TextInput
+										style={styles.textInput}
+										value={balance}
+										onChangeText={(text) =>
+											setBalance(cleanCurrencyToNumberString(text))
 										}
-									}}
-									style={styles.input}
-									placeholder="1–31"
-									placeholderTextColor="#94A3B8"
-									keyboardType="number-pad"
-									maxLength={2}
-								/>
+										placeholder="0.00"
+										placeholderTextColor={palette.textSubtle}
+										keyboardType="decimal-pad"
+									/>
+								</FormInputGroup>
+
+								{/* Interest & Minimum Payment (side‑by‑side for symmetry) */}
+								<View style={styles.inlineRow}>
+									<View style={styles.inlineItem}>
+										<FormInputGroup
+											label="Interest rate (APR %)"
+											subtext="Optional: Annual percentage rate"
+										>
+											<TextInput
+												style={styles.textInput}
+												value={apr}
+												onChangeText={(text) =>
+													setApr(cleanCurrencyToNumberString(text))
+												}
+												placeholder="24.99"
+												placeholderTextColor={palette.textSubtle}
+												keyboardType="decimal-pad"
+											/>
+										</FormInputGroup>
+									</View>
+
+									<View style={styles.inlineItem}>
+										<FormInputGroup
+											label="Minimum payment"
+											subtext="Optional: Minimum monthly payment amount"
+										>
+											<TextInput
+												style={styles.textInput}
+												value={minPayment}
+												onChangeText={(text) =>
+													setMinPayment(cleanCurrencyToNumberString(text))
+												}
+												placeholder="0.00"
+												placeholderTextColor={palette.textSubtle}
+												keyboardType="decimal-pad"
+											/>
+										</FormInputGroup>
+									</View>
+								</View>
+
+								{/* Due Day – now a date picker */}
+								<FormInputGroup
+									label="Due date"
+									subtext="Pick a date; we'll use the day of month (1–31)"
+								>
+									<DateField
+										value={dueDate || ''} // empty string shows placeholder
+										onChange={(iso) => {
+											setDueDate(iso);
+											const parts = iso.split('-');
+											const dayPart =
+												parts.length === 3 ? Number(parts[2]) : NaN;
+											if (!Number.isNaN(dayPart)) {
+												setDueDay(String(dayPart));
+											} else {
+												setDueDay('');
+											}
+										}}
+										placeholder="Select due date"
+										containerStyle={{
+											borderWidth: 1,
+											borderColor: palette.border,
+											borderRadius: radius.md,
+											paddingHorizontal: space.md,
+											paddingVertical: space.sm,
+											backgroundColor: palette.surface ?? '#FFFFFF',
+										}}
+										showQuickActions={true}
+									/>
+								</FormInputGroup>
 							</View>
 						</Card>
 					</Section>
 				</ScrollView>
 
+				{/* Footer Save CTA */}
 				<View style={styles.footer}>
-					<TouchableOpacity
-						style={[styles.cta, saving && styles.ctaDisabled]}
-						onPress={onSave}
-						disabled={saving}
-						activeOpacity={0.85}
-					>
-						{saving ? (
-							<ActivityIndicator color={palette.primaryTextOn} />
-						) : (
-							<Text style={[styles.ctaText, dynamicTextStyle('body')]}>
-								Save changes
-							</Text>
-						)}
-					</TouchableOpacity>
+					<View style={styles.footerCta}>
+						<View style={styles.footerRow}>
+							<TouchableOpacity
+								onPress={() => router.back()}
+								style={styles.footerCancelButton}
+							>
+								<Text style={styles.footerCancel}>Cancel</Text>
+							</TouchableOpacity>
+							<TouchableOpacity
+								onPress={saveDisabled ? undefined : handleSave}
+								style={[
+									styles.footerSaveButton,
+									saveDisabled && styles.footerSaveButtonDisabled,
+								]}
+								disabled={saveDisabled}
+								activeOpacity={0.85}
+							>
+								{loading ? (
+									<ActivityIndicator
+										color={palette.primaryTextOn}
+										size="small"
+									/>
+								) : (
+									<Text style={styles.footerSave}>Save changes</Text>
+								)}
+							</TouchableOpacity>
+						</View>
+					</View>
 				</View>
 			</View>
 		</Page>
-	);
-}
-
-function Label({
-	text,
-	required,
-	optional,
-}: {
-	text: string;
-	required?: boolean;
-	optional?: boolean;
-}) {
-	return (
-		<Text style={[styles.label, dynamicTextStyle('body')]}>
-			{text}
-			{required && <Text style={styles.required}> *</Text>}
-			{optional && <Text style={styles.optional}> (optional)</Text>}
-		</Text>
 	);
 }
 
@@ -266,60 +388,74 @@ const styles = StyleSheet.create({
 	layout: {
 		flex: 1,
 	},
-	scrollView: {
+	content: {
 		flex: 1,
 	},
 	scrollContent: {
 		gap: space.lg,
+		paddingBottom: space.xl,
 	},
 	form: {
-		gap: 10,
+		gap: space.md,
 	},
-	label: {
-		fontWeight: '600',
-		color: palette.text,
-		marginTop: 6,
-		marginBottom: 2,
-		fontSize: 14,
+	inlineRow: {
+		flexDirection: 'row',
+		gap: space.md,
 	},
-	required: {
-		color: '#EF4444',
+	inlineItem: {
+		flex: 1,
 	},
-	optional: {
-		color: palette.textSubtle,
-		fontWeight: '400',
-		fontSize: 12,
-	},
-	input: {
-		height: 44,
-		borderRadius: radius.md,
+	textInput: {
 		borderWidth: 1,
 		borderColor: palette.border,
-		paddingHorizontal: 12,
+		borderRadius: radius.md,
+		paddingHorizontal: space.md,
+		paddingVertical: space.md,
 		fontSize: 16,
 		color: palette.text,
 		backgroundColor: palette.surface ?? '#FFFFFF',
 	},
 	footer: {
-		paddingHorizontal: space.lg,
-		paddingVertical: space.lg,
 		borderTopWidth: StyleSheet.hairlineWidth,
 		borderTopColor: palette.border,
 		backgroundColor: palette.bg,
+		paddingHorizontal: space.lg,
+		paddingVertical: space.md,
 	},
-	cta: {
+	footerCta: {
+		gap: 8,
+	},
+	footerLabel: {
+		...typography.bodyXs,
+		color: palette.textMuted,
+	},
+	footerRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		gap: space.md,
+	},
+	footerCancelButton: {
+		paddingVertical: space.sm,
+	},
+	footerCancel: {
+		...typography.bodySm,
+		color: palette.textMuted,
+	},
+	footerSaveButton: {
+		flex: 1,
 		height: 52,
 		borderRadius: radius.lg,
 		backgroundColor: palette.primary,
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
-	ctaDisabled: {
+	footerSaveButtonDisabled: {
 		opacity: 0.6,
 	},
-	ctaText: {
+	footerSave: {
+		...typography.bodySm,
 		color: palette.primaryTextOn,
 		fontWeight: '600',
-		fontSize: 16,
 	},
 });

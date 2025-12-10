@@ -246,19 +246,6 @@ export default function BudgetSummaryScreen() {
 									{budget.rollover ? 'Enabled' : 'Disabled'}
 								</Text>
 							</View>
-
-							{budget.categories && budget.categories.length > 0 && (
-								<View style={[styles.detailRow, { alignItems: 'flex-start' }]}>
-									<Text style={styles.detailLabel}>Categories</Text>
-									<View style={styles.chipRow}>
-										{budget.categories.map((cat) => (
-											<View key={cat} style={styles.chip}>
-												<Text style={styles.chipText}>{cat}</Text>
-											</View>
-										))}
-									</View>
-								</View>
-							)}
 						</Card>
 					</Section>
 

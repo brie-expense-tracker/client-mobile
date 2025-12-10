@@ -32,6 +32,8 @@ import { Calendar } from 'react-native-calendars';
 import { TransactionContext } from '../../../src/context/transactionContext';
 import { useGoal, Goal } from '../../../src/context/goalContext';
 import { useBudget, Budget } from '../../../src/context/budgetContext';
+import { useBills } from '../../../src/context/billContext';
+import { Bill } from '../../../src/services';
 import { navigateToGoalsWithModal } from '../../../src/utils/navigationUtils';
 import BottomSheet from '../../../src/components/BottomSheet';
 import { isDevMode } from '../../../src/config/environment';
@@ -42,15 +44,15 @@ import {
 	DebtRollup,
 } from '../../../src/services/feature/dashboardService';
 import { normalizeIconName } from '../../../src/constants/uiConstants';
+import { resolveBillAppearance } from '../../../src/utils/billAppearance';
 import { palette, radius, shadow, space, type } from '../../../src/ui/theme';
+import { getItem, setItem, removeItem } from '../../../src/utils/safeStorage';
 
 // Create namespaced logger for this service
 const transactionScreenLog = createLogger('TransactionScreen');
 
 // iOS InputAccessoryView ID
 const accessoryId = 'tx-input-accessory';
-
-type Frequency = 'None' | 'Daily' | 'Weekly' | 'Monthly';
 
 interface TransactionFormData {
 	type?: 'income' | 'expense';
@@ -60,11 +62,7 @@ interface TransactionFormData {
 	budgets?: Budget[];
 	date: string; // yyyy-mm-dd
 	target?: string;
-	targetModel?: 'Budget' | 'Goal' | 'Debt';
-	recurring?: {
-		enabled: boolean;
-		frequency: Frequency;
-	};
+	targetModel?: 'Budget' | 'Goal';
 }
 
 // ---------- Utils
@@ -97,6 +95,16 @@ const prettyCurrency = (value: string): string => {
 	}).format(num);
 };
 
+// Format date string (yyyy-mm-dd) to locale date string without timezone issues
+const formatDateString = (dateString: string): string => {
+	if (!dateString || typeof dateString !== 'string') return '';
+	const datePart = dateString.slice(0, 10);
+	if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return dateString;
+	const [year, month, day] = datePart.split('-').map(Number);
+	const date = new Date(year, month - 1, day); // month is 0-indexed
+	return date.toLocaleDateString();
+};
+
 export default function TransactionScreenProModern() {
 	const router = useRouter();
 	const params = useLocalSearchParams<{
@@ -118,17 +126,18 @@ export default function TransactionScreenProModern() {
 	const [selectedBudgets, setSelectedBudgets] = useState<Budget[]>([]);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [pickerOpen, setPickerOpen] = useState<
-		null | 'goal' | 'budget' | 'debt'
+		null | 'goal' | 'budget' | 'debt' | 'bill'
 	>(null);
 	const [datePickerOpen, setDatePickerOpen] = useState(false);
-	const [recurringOpen, setRecurringOpen] = useState(false);
 	const [debts, setDebts] = useState<DebtRollup[]>([]);
 	const [debtsLoading, setDebtsLoading] = useState(false);
 	const [selectedDebt, setSelectedDebt] = useState<DebtRollup | null>(null);
+	const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
 
 	const { addTransaction } = useContext(TransactionContext);
 	const { goals, isLoading: goalsLoading } = useGoal();
 	const { budgets, isLoading: budgetsLoading } = useBudget();
+	const { expenses: bills, isLoading: billsLoading } = useBills();
 
 	// Debug logging for goals and budgets
 	useEffect(() => {
@@ -200,7 +209,6 @@ export default function TransactionScreenProModern() {
 			date: getLocalIsoDate(),
 			target: undefined,
 			targetModel: undefined,
-			recurring: { enabled: false, frequency: 'None' },
 		},
 		mode: 'onChange',
 	});
@@ -208,13 +216,142 @@ export default function TransactionScreenProModern() {
 	const amount = watch('amount');
 	const description = watch('description');
 	const selectedDate = watch('date');
-	const recurring = watch('recurring');
 
-	// Focus amount on mount for speed entry
+	const FORM_STATE_KEY = 'transaction_form_state';
+	const [isNewForm, setIsNewForm] = useState(true);
+	const [hasRestoredState, setHasRestoredState] = useState(false);
+	const [savedDebtId, setSavedDebtId] = useState<string | null>(null);
+	const [savedBillId, setSavedBillId] = useState<string | null>(null);
+
+	// Restore saved form state on mount
 	useEffect(() => {
-		const t = setTimeout(() => amountRef.current?.focus(), 350);
-		return () => clearTimeout(t);
-	}, []);
+		let isMounted = true;
+		const restoreState = async () => {
+			try {
+				const saved = await getItem(FORM_STATE_KEY);
+				if (saved && isMounted) {
+					const state = JSON.parse(saved);
+					setIsNewForm(false);
+
+					// Restore form values
+					if (state.amount) setValue('amount', state.amount);
+					if (state.description) setValue('description', state.description);
+					if (state.date) setValue('date', state.date);
+					if (state.mode) setMode(state.mode);
+					if (state.selectedGoals) setSelectedGoals(state.selectedGoals);
+					if (state.selectedBudgets) setSelectedBudgets(state.selectedBudgets);
+					if (state.selectedDebtId) setSavedDebtId(state.selectedDebtId);
+					if (state.selectedBillId) setSavedBillId(state.selectedBillId);
+
+					setHasRestoredState(true);
+				} else {
+					setIsNewForm(true);
+					setHasRestoredState(true);
+				}
+			} catch (err) {
+				if (isDevMode) {
+					transactionScreenLog.error('Failed to restore form state', err);
+				}
+				setIsNewForm(true);
+				setHasRestoredState(true);
+			}
+		};
+		restoreState();
+		return () => {
+			isMounted = false;
+		};
+	}, [setValue]);
+
+	// Restore selectedDebt after debts are loaded
+	useEffect(() => {
+		if (savedDebtId && debts.length > 0 && !selectedDebt) {
+			const debt = debts.find((d) => d.debtId === savedDebtId);
+			if (debt) {
+				setSelectedDebt(debt);
+			}
+			setSavedDebtId(null);
+		}
+	}, [savedDebtId, debts, selectedDebt]);
+
+	// Restore selectedBill after bills are loaded
+	useEffect(() => {
+		if (savedBillId && bills.length > 0 && !selectedBill) {
+			const bill = bills.find((b) => {
+				const billId = b.patternId || (b as any).id;
+				return billId === savedBillId;
+			});
+			if (bill) {
+				setSelectedBill(bill);
+			}
+			setSavedBillId(null);
+		}
+	}, [savedBillId, bills, selectedBill]);
+
+	// Focus amount on mount for new forms only
+	useEffect(() => {
+		if (hasRestoredState && isNewForm) {
+			const t = setTimeout(() => amountRef.current?.focus(), 350);
+			return () => clearTimeout(t);
+		}
+	}, [hasRestoredState, isNewForm]);
+
+	// Save form state as user types (debounced)
+	useEffect(() => {
+		if (!hasRestoredState) return; // Don't save during initial restore
+
+		const saveState = async () => {
+			try {
+				const stateToSave = {
+					amount,
+					description,
+					date: selectedDate,
+					mode,
+					selectedGoals,
+					selectedBudgets,
+					selectedDebtId: selectedDebt?.debtId || null,
+					selectedBillId: selectedBill
+						? selectedBill.patternId || (selectedBill as any).id
+						: null,
+				};
+
+				// Only save if there's actual data
+				const hasData =
+					amount ||
+					description ||
+					selectedGoals.length > 0 ||
+					selectedBudgets.length > 0 ||
+					selectedDebt ||
+					selectedBill;
+
+				if (hasData) {
+					await setItem(FORM_STATE_KEY, JSON.stringify(stateToSave));
+					setIsNewForm(false);
+				} else {
+					// Clear saved state if form is empty
+					await removeItem(FORM_STATE_KEY);
+					setIsNewForm(true);
+				}
+			} catch (err) {
+				if (isDevMode) {
+					transactionScreenLog.error('Failed to save form state', err);
+				}
+			}
+		};
+
+		// Debounce saves to avoid too frequent writes
+		const timeoutId = setTimeout(saveState, 500);
+		return () => clearTimeout(timeoutId);
+	}, [
+		amount,
+		description,
+		selectedDate,
+		mode,
+		selectedGoals,
+		selectedBudgets,
+		selectedDebt,
+		selectedBill,
+		hasRestoredState,
+	]);
 
 	// Keep caret at end for manual edits
 	useEffect(() => {
@@ -272,6 +409,18 @@ export default function TransactionScreenProModern() {
 			setSelectedBudgets([b]);
 			setValue('budgets', [b], { shouldValidate: false });
 			setSelectedDebt(null); // Clear debt when budget is selected
+			setSelectedBill(null); // Clear bill when budget is selected
+			setPickerOpen(null);
+		},
+		[setValue]
+	);
+
+	const selectBill = useCallback(
+		(bill: Bill) => {
+			setSelectedBill(bill);
+			setSelectedBudgets([]); // Clear budget when bill is selected
+			setSelectedDebt(null); // Clear debt when bill is selected
+			setValue('budgets', [], { shouldValidate: false });
 			setPickerOpen(null);
 		},
 		[setValue]
@@ -303,7 +452,6 @@ export default function TransactionScreenProModern() {
 				amount: isIncome ? Math.abs(amt) : -Math.abs(amt),
 				date: data.date,
 				type: isIncome ? 'income' : 'expense',
-				recurring: data.recurring,
 			};
 
 			if (isIncome) {
@@ -316,22 +464,46 @@ export default function TransactionScreenProModern() {
 				if (selectedBudgets.length > 0) {
 					payload.target = selectedBudgets[0].id;
 					payload.targetModel = 'Budget';
+				} else if (selectedBill) {
+					// Link bill using recurringPattern.patternId
+					const billId = selectedBill.patternId || (selectedBill as any).id;
+					payload.recurringPattern = {
+						patternId: billId,
+						frequency: selectedBill.frequency,
+						confidence: selectedBill.confidence || 1.0,
+					};
 				} else if (selectedDebt) {
-					// Allow expense to be applied to a debt
-					payload.target = selectedDebt.debtId;
-					payload.targetModel = 'Debt';
+					// Debt payments are matched by description/vendor, not via target/targetModel
+					// Include debt name in description to enable automatic matching
+					const debtName = selectedDebt.debtName;
+					const currentDesc = payload.description.trim();
+					// Only append debt name if it's not already in the description
+					if (!currentDesc.toLowerCase().includes(debtName.toLowerCase())) {
+						payload.description = `${currentDesc} - ${debtName}`.trim();
+					}
+					// Set vendor to debt name for better matching
+					payload.vendor = debtName;
+					// Don't set target/targetModel - server doesn't support 'Debt' as targetModel
 				}
 			}
 
 			await addTransaction(payload);
 
 			const wasDebtPayment =
-				!isIncome && !selectedBudgets.length && selectedDebt;
+				!isIncome && !selectedBudgets.length && !selectedBill && selectedDebt;
+			const wasBillPayment =
+				!isIncome && !selectedBudgets.length && selectedBill;
+
+			// Clear saved form state on successful submit
+			await removeItem(FORM_STATE_KEY);
+			setIsNewForm(true);
 
 			Alert.alert(
 				'Success',
 				wasDebtPayment
 					? `Payment added to ${selectedDebt?.debtName}.`
+					: wasBillPayment
+					? `Payment added to ${selectedBill?.vendor || 'bill'}.`
 					: `${isIncome ? 'Income' : 'Expense'} saved successfully!`,
 				[
 					{
@@ -345,11 +517,11 @@ export default function TransactionScreenProModern() {
 								date: getLocalIsoDate(),
 								target: undefined,
 								targetModel: undefined,
-								recurring: { enabled: false, frequency: 'None' },
 							});
 							setSelectedGoals([]);
 							setSelectedBudgets([]);
 							setSelectedDebt(null);
+							setSelectedBill(null);
 							if (router.canGoBack()) router.back();
 							else router.replace('/(tabs)/dashboard');
 						},
@@ -437,7 +609,7 @@ export default function TransactionScreenProModern() {
 					<Text style={styles.heroKicker}>New transaction</Text>
 					<Text style={styles.heroTitle}>What happened with your money?</Text>
 					<Text style={styles.heroSubtitle}>
-						Enter an amount, then link it to a budget, goal, or debt.
+						Enter an amount, then link it to a budget, goal, bill, or debt.
 					</Text>
 
 					<View style={styles.amountCard} accessibilityRole="summary">
@@ -494,6 +666,21 @@ export default function TransactionScreenProModern() {
 									/>
 									<Text style={styles.debtPillText}>
 										Paying debt: {selectedDebt.debtName}
+									</Text>
+								</View>
+							</View>
+						)}
+
+						{selectedBill && mode === 'expense' && (
+							<View style={styles.debtPillContainer}>
+								<View style={styles.debtPill}>
+									<Ionicons
+										name={resolveBillAppearance(selectedBill).icon}
+										size={14}
+										color={resolveBillAppearance(selectedBill).color}
+									/>
+									<Text style={styles.debtPillText}>
+										Paying bill: {selectedBill.vendor || 'Bill'}
 									</Text>
 								</View>
 							</View>
@@ -593,6 +780,30 @@ export default function TransactionScreenProModern() {
 						/>
 					)}
 
+					{mode === 'expense' && (
+						<Row
+							icon={
+								selectedBill
+									? resolveBillAppearance(selectedBill).icon
+									: 'receipt-outline'
+							}
+							label="Bill"
+							right={
+								billsLoading ? (
+									<ActivityIndicator size="small" />
+								) : selectedBill ? (
+									<ValueText>{selectedBill.vendor || 'Bill'}</ValueText>
+								) : (
+									<ValueText>None</ValueText>
+								)
+							}
+							onPress={() => {
+								setPickerOpen('bill');
+							}}
+							accessibilityLabel="Select Bill"
+						/>
+					)}
+
 					<Row
 						icon="chatbox-ellipses-outline"
 						label="Note"
@@ -606,24 +817,9 @@ export default function TransactionScreenProModern() {
 					/>
 
 					<Row
-						icon="repeat-outline"
-						label="Recurring"
-						right={
-							<ValueText>
-								{recurring?.enabled ? recurring.frequency : 'No'}
-							</ValueText>
-						}
-						onPress={() => setRecurringOpen(true)}
-					/>
-
-					<Row
 						icon="calendar-outline"
 						label="Date"
-						right={
-							<ValueText>
-								{new Date(selectedDate).toLocaleDateString()}
-							</ValueText>
-						}
+						right={<ValueText>{formatDateString(selectedDate)}</ValueText>}
 						onPress={() => setDatePickerOpen(true)}
 					/>
 				</View>
@@ -694,7 +890,7 @@ export default function TransactionScreenProModern() {
 						<Text style={styles.previewEmph}>
 							{prettyCurrency(amount || '')}
 						</Text>{' '}
-						{mode} on {new Date(selectedDate).toLocaleDateString()}{' '}
+						{mode} on {formatDateString(selectedDate)}{' '}
 						{mode === 'income'
 							? selectedGoals.length > 0
 								? ` • Goal: ${selectedGoals[0].name}`
@@ -702,9 +898,11 @@ export default function TransactionScreenProModern() {
 							: mode === 'expense'
 							? selectedBudgets.length > 0
 								? ` • Budget: ${selectedBudgets[0].name}`
+								: selectedBill
+								? ` • Bill: ${selectedBill.vendor || 'Bill'}`
 								: selectedDebt
 								? ` • Debt: ${selectedDebt.debtName}`
-								: ' • No budget or debt selected'
+								: ' • No budget, bill, or debt selected'
 							: ''}
 					</Text>
 				</View>
@@ -735,6 +933,11 @@ export default function TransactionScreenProModern() {
 								<Text style={styles.inlineCtaText}>
 									{mode === 'expense' && !selectedBudgets.length && selectedDebt
 										? 'Pay Debt'
+										: mode === 'expense' &&
+										  !selectedBudgets.length &&
+										  !selectedDebt &&
+										  selectedBill
+										? 'Pay Bill'
 										: 'Create Transaction'}
 								</Text>
 								<Ionicons name="add" size={18} color={palette.primaryTextOn} />
@@ -778,6 +981,8 @@ export default function TransactionScreenProModern() {
 									? 'trophy-outline'
 									: pickerOpen === 'debt'
 									? 'card-outline'
+									: pickerOpen === 'bill'
+									? 'receipt-outline'
 									: 'wallet-outline'
 							}
 							size={20}
@@ -789,6 +994,8 @@ export default function TransactionScreenProModern() {
 								? 'Select Goal'
 								: pickerOpen === 'debt'
 								? 'Select Debt'
+								: pickerOpen === 'bill'
+								? 'Select Bill'
 								: 'Select Budget'}
 						</Text>
 						<TouchableOpacity onPress={() => setPickerOpen(null)}>
@@ -803,11 +1010,17 @@ export default function TransactionScreenProModern() {
 							? (goals as any[])
 							: pickerOpen === 'debt'
 							? debts
+							: pickerOpen === 'bill'
+							? bills
 							: (budgets as any[])
 					}
-					keyExtractor={(item) =>
-						pickerOpen === 'debt' ? item.debtId : (item as any).id
-					}
+					keyExtractor={(item) => {
+						if (pickerOpen === 'debt') return item.debtId;
+						if (pickerOpen === 'bill') {
+							return (item as Bill).patternId || (item as any).id;
+						}
+						return (item as any).id;
+					}}
 					initialNumToRender={12}
 					windowSize={6}
 					maxToRenderPerBatch={12}
@@ -818,6 +1031,8 @@ export default function TransactionScreenProModern() {
 								? goals
 								: pickerOpen === 'debt'
 								? debts
+								: pickerOpen === 'bill'
+								? bills
 								: budgets;
 						if (isDevMode) {
 							transactionScreenLog.debug('Picker Empty', {
@@ -833,50 +1048,85 @@ export default function TransactionScreenProModern() {
 										? 'No goals yet. Create one from Goals.'
 										: pickerOpen === 'debt'
 										? 'No debts yet. Add one from Debts.'
+										: pickerOpen === 'bill'
+										? 'No bills yet. Create one from Bills.'
 										: 'No budgets yet. Create one from Budgets.'}
 								</Text>
 							</View>
 						);
 					}}
-					renderItem={({ item }) => (
-						<TouchableOpacity
-							style={styles.sheetRow}
-							onPress={() => {
-								if (pickerOpen === 'goal') {
-									selectGoal(item as Goal);
-								} else if (pickerOpen === 'debt') {
-									setSelectedDebt(item as DebtRollup);
-									setSelectedBudgets([]); // Clear budget when debt is selected
-									setValue('budgets', [], { shouldValidate: false });
-									setPickerOpen(null);
-								} else {
-									selectBudget(item as Budget);
+					renderItem={({ item }) => {
+						let icon: keyof typeof Ionicons.glyphMap = 'wallet-outline';
+						let color = palette.text;
+						let label = '';
+
+						if (pickerOpen === 'goal') {
+							icon = normalizeIconName((item as any).icon ?? 'trophy-outline');
+							color = (item as any).color ?? palette.text;
+							label = (item as any).name;
+						} else if (pickerOpen === 'debt') {
+							icon = 'card-outline';
+							color = palette.text;
+							label = (item as DebtRollup).debtName;
+						} else if (pickerOpen === 'bill') {
+							const billItem = item as Bill;
+							if (billItem) {
+								if (isDevMode) {
+									transactionScreenLog.debug('Bill item in picker', {
+										vendor: billItem.vendor,
+										name: (billItem as any).name,
+										patternId: billItem.patternId,
+										fullItem: billItem,
+									});
 								}
-							}}
-						>
-							<Ionicons
-								name={
-									pickerOpen === 'goal'
-										? normalizeIconName((item as any).icon ?? 'trophy-outline')
-										: pickerOpen === 'debt'
-										? 'card-outline'
-										: normalizeIconName((item as any).icon ?? 'wallet-outline')
-								}
-								size={18}
-								color={
-									pickerOpen === 'debt'
-										? palette.text
-										: (item as any).color ?? palette.text
-								}
-								style={{ marginRight: space.sm }}
-							/>
-							<Text style={[type.body, { color: palette.text }]}>
-								{pickerOpen === 'debt'
-									? (item as DebtRollup).debtName
-									: (item as any).name}
-							</Text>
-						</TouchableOpacity>
-					)}
+								const billAppearance = resolveBillAppearance(billItem);
+								icon = billAppearance.icon;
+								color = billAppearance.color;
+								// Try vendor first, then check for name field, then fallback
+								label =
+									billItem.vendor ||
+									(billItem as any).name ||
+									(billItem.patternId
+										? `Bill ${billItem.patternId.slice(-4)}`
+										: 'Bill');
+							}
+						} else {
+							icon = normalizeIconName((item as any).icon ?? 'wallet-outline');
+							color = (item as any).color ?? palette.text;
+							label = (item as any).name;
+						}
+
+						return (
+							<TouchableOpacity
+								style={styles.sheetRow}
+								onPress={() => {
+									if (pickerOpen === 'goal') {
+										selectGoal(item as Goal);
+									} else if (pickerOpen === 'debt') {
+										setSelectedDebt(item as DebtRollup);
+										setSelectedBudgets([]); // Clear budget when debt is selected
+										setSelectedBill(null); // Clear bill when debt is selected
+										setValue('budgets', [], { shouldValidate: false });
+										setPickerOpen(null);
+									} else if (pickerOpen === 'bill') {
+										selectBill(item as Bill);
+									} else {
+										selectBudget(item as Budget);
+									}
+								}}
+							>
+								<Ionicons
+									name={icon}
+									size={18}
+									color={color}
+									style={{ marginRight: space.sm }}
+								/>
+								<Text style={[type.body, { color: palette.text }]}>
+									{label}
+								</Text>
+							</TouchableOpacity>
+						);
+					}}
 				/>
 			</BottomSheet>
 
@@ -955,58 +1205,6 @@ export default function TransactionScreenProModern() {
 						textDayHeaderFontSize: 12,
 					}}
 				/>
-			</BottomSheet>
-
-			{/* Recurring Modal */}
-			<BottomSheet
-				isOpen={recurringOpen}
-				onClose={() => setRecurringOpen(false)}
-				snapPoints={[0.6, 0.4]}
-				initialSnapIndex={0}
-				header={
-					<View style={styles.sheetHeader}>
-						<Ionicons
-							name="repeat-outline"
-							size={20}
-							color={palette.primary}
-							style={{ marginRight: space.sm }}
-						/>
-						<Text style={[type.h1, styles.sheetTitle]}>
-							Recurring Transaction
-						</Text>
-						<TouchableOpacity onPress={() => setRecurringOpen(false)}>
-							<Ionicons name="close" size={24} color={palette.textMuted} />
-						</TouchableOpacity>
-					</View>
-				}
-			>
-				<View>
-					{(['None', 'Daily', 'Weekly', 'Monthly'] as Frequency[]).map(
-						(freq) => (
-							<TouchableOpacity
-								key={freq}
-								style={styles.recurringRow}
-								onPress={() => {
-									setValue(
-										'recurring',
-										{ enabled: freq !== 'None', frequency: freq },
-										{ shouldValidate: false }
-									);
-									setRecurringOpen(false);
-								}}
-							>
-								<Text style={[type.body, { color: palette.text }]}>{freq}</Text>
-								{recurring?.frequency === freq && (
-									<Ionicons
-										name="checkmark"
-										size={22}
-										color={palette.primary}
-									/>
-								)}
-							</TouchableOpacity>
-						)
-					)}
-				</View>
 			</BottomSheet>
 
 			{!ready && (
@@ -1302,17 +1500,6 @@ const styles = StyleSheet.create({
 	quickActionText: {
 		color: palette.text,
 		fontWeight: '600',
-	},
-
-	// Recurring rows
-	recurringRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		paddingVertical: 14,
-		borderBottomWidth: StyleSheet.hairlineWidth,
-		borderBottomColor: palette.border,
-		paddingHorizontal: space.lg,
 	},
 
 	// Loading overlay

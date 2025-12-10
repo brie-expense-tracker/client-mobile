@@ -11,41 +11,36 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import {
-	RecurringExpenseService,
-	RecurringExpense,
-} from '../../../../../src/services';
-import { useRecurringExpense } from '../../../../../src/context/recurringExpenseContext';
+import { BillService, Bill } from '../../../../../src/services';
+import { useBills } from '../../../../../src/context/billContext';
+import { useTransactions } from '../../../../../src/context/transactionContext';
 import { createLogger } from '../../../../../src/utils/sublogger';
 import { FilterContext } from '../../../../../src/context/filterContext';
-import RecurringExpenseCard from './RecurringExpenseCard';
-import { resolveRecurringExpenseAppearance } from '../../../../../src/utils/recurringExpenseAppearance';
+import BillCard from './BillCard';
+import { resolveBillAppearance } from '../../../../../src/utils/billAppearance';
 import { isDevMode } from '../../../../../src/config/environment';
 
-const recurringExpensesListLog = createLogger('RecurringExpensesList');
+const billsListLog = createLogger('BillsList');
 
-interface RecurringExpensesListProps {
+interface BillsListProps {
 	title?: string;
 	showUpcomingOnly?: boolean;
 	maxVisibleItems?: number;
-	onExpensePress?: (expense: RecurringExpense) => void;
+	onExpensePress?: (expense: Bill) => void;
 	showAddButton?: boolean;
 }
 
-const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
-	title = 'Recurring Expenses',
+const BillsList: React.FC<BillsListProps> = ({
+	title = 'Bills',
 	showUpcomingOnly = false,
 	maxVisibleItems,
 	onExpensePress,
 	showAddButton = true,
 }) => {
 	const { setSelectedPatternId } = useContext(FilterContext);
-	const {
-		expenses: allExpenses,
-		isLoading: loading,
-		refetch,
-	} = useRecurringExpense();
-	const [expenses, setExpenses] = useState<RecurringExpense[]>([]);
+	const { expenses: allExpenses, isLoading: loading, refetch } = useBills();
+	const { refetch: refetchTransactions } = useTransactions();
+	const [expenses, setExpenses] = useState<Bill[]>([]);
 	const [markingAsPaid, setMarkingAsPaid] = useState<string | null>(null);
 	const [paymentStatuses, setPaymentStatuses] = useState<
 		Record<string, boolean | null>
@@ -56,24 +51,18 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 		if (showUpcomingOnly) {
 			// Filter for expenses due within 7 days
 			const upcoming = allExpenses.filter((expense) => {
-				const daysUntilDue = RecurringExpenseService.getDaysUntilNext(
+				const daysUntilDue = BillService.getDaysUntilNext(
 					expense.nextExpectedDate
 				);
 				return daysUntilDue <= 7;
 			});
 			if (isDevMode) {
-				recurringExpensesListLog.debug(
-					'[RecurringExpensesList] Filtered upcoming expenses:',
-					upcoming
-				);
+				billsListLog.debug('[BillsList] Filtered upcoming bills:', upcoming);
 			}
 			setExpenses(upcoming);
 		} else {
 			if (isDevMode) {
-				recurringExpensesListLog.debug(
-					'[RecurringExpensesList] Setting all expenses:',
-					allExpenses
-				);
+				billsListLog.debug('[BillsList] Setting all bills:', allExpenses);
 			}
 			setExpenses(allExpenses);
 		}
@@ -94,36 +83,31 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 
 				if (patternIds.length === 0) {
 					if (isDevMode) {
-						recurringExpensesListLog.debug(
-							'⚠️ [RecurringExpensesList] No valid ObjectIds to check payment status'
+						billsListLog.debug(
+							'⚠️ [BillsList] No valid ObjectIds to check payment status'
 						);
 					}
 					setPaymentStatuses({});
 					return;
 				}
 
-				const statuses = await RecurringExpenseService.checkBatchPaidStatus(
-					patternIds
-				);
+				const statuses = await BillService.checkBatchPaidStatus(patternIds);
 				setPaymentStatuses(statuses);
 			} catch (error) {
-				recurringExpensesListLog.error(
-					'Error checking payment statuses',
-					error
-				);
+				billsListLog.error('Error checking payment statuses', error);
 			}
 		};
 
 		checkAllPaymentStatuses();
 	}, [expenses]);
 
-	const handleOptionsPress = (expense: RecurringExpense) => {
-		// Show options menu with edit and delete options
+	const handleOptionsPress = (expense: Bill) => {
+		// Show options menu with edit and mark as paid options
 		Alert.alert(
 			expense.vendor,
-			`$${expense.amount.toFixed(
-				2
-			)} - ${RecurringExpenseService.formatFrequency(expense.frequency)}`,
+			`$${expense.amount.toFixed(2)} - ${BillService.formatFrequency(
+				expense.frequency
+			)}`,
 			[
 				{
 					text: 'Edit',
@@ -134,8 +118,8 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 					},
 				},
 				{
-					text: 'Mark as Paid',
-					onPress: () => handleMarkAsPaid(expense),
+					text: 'Pay bill',
+					onPress: () => handlePayBill(expense),
 					style: 'default',
 				},
 				{
@@ -146,21 +130,12 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 		);
 	};
 
-	const handleMarkAsPaid = async (expense: RecurringExpense) => {
+	const handlePayBill = async (expense: Bill) => {
 		try {
 			setMarkingAsPaid(expense.patternId);
 
-			// Calculate period dates
-			const nextDate = new Date(expense.nextExpectedDate);
-			const periodStart = new Date(nextDate);
-			periodStart.setDate(periodStart.getDate() - 30); // Approximate period start
-			const periodEnd = new Date(nextDate);
-
-			await RecurringExpenseService.markRecurringExpensePaid({
-				patternId: expense.patternId,
-				periodStart: periodStart.toISOString(),
-				periodEnd: periodEnd.toISOString(),
-			});
+			// Pay the bill - this creates a transaction and advances the period
+			await BillService.payBill(expense.patternId);
 
 			// Update payment status locally
 			setPaymentStatuses((prev) => ({
@@ -168,20 +143,17 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 				[expense.patternId]: true,
 			}));
 
-			// Refresh the data
-			await refetch();
+			// Refresh the data - both bills and transactions
+			await Promise.all([refetch(), refetchTransactions()]);
 
-			Alert.alert('Success', `${expense.vendor} has been marked as paid`, [
+			Alert.alert('Success', `${expense.vendor} has been paid`, [
 				{ text: 'OK' },
 			]);
-		} catch (error) {
-			recurringExpensesListLog.error(
-				'Error marking recurring expense as paid',
-				error
-			);
+		} catch (error: any) {
+			billsListLog.error('Error paying bill', error);
 			Alert.alert(
 				'Error',
-				'Failed to mark expense as paid. Please try again.',
+				error?.message || 'Failed to pay bill. Please try again.',
 				[{ text: 'OK' }]
 			);
 		} finally {
@@ -189,22 +161,22 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 		}
 	};
 
-	const handleAddRecurringExpense = () => {
-		router.push('../../recurring/new');
+	const handleAddBill = () => {
+		router.push('../../bills/new');
 	};
 
 	const handleRefresh = async () => {
 		try {
 			await refetch();
 		} catch (error) {
-			recurringExpensesListLog.error('Error refreshing expenses', error);
+			billsListLog.error('Error refreshing bills', error);
 			Alert.alert('Error', 'Failed to refresh expenses. Please try again.', [
 				{ text: 'OK' },
 			]);
 		}
 	};
 
-	const handleExpenseSelect = (expense: RecurringExpense) => {
+	const handleExpenseSelect = (expense: Bill) => {
 		// Set the selected pattern ID in the filter context
 		if (setSelectedPatternId) {
 			setSelectedPatternId(expense.patternId);
@@ -217,7 +189,7 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 
 	// Group expenses by frequency
 	const groupExpensesByFrequency = () => {
-		const grouped: Record<string, RecurringExpense[]> = {
+		const grouped: Record<string, Bill[]> = {
 			weekly: [],
 			monthly: [],
 			quarterly: [],
@@ -248,27 +220,24 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 		}
 	};
 
-	const renderExpenseItem = (expense: RecurringExpense) => {
-		const daysUntilDue = RecurringExpenseService.getDaysUntilNext(
-			expense.nextExpectedDate
-		);
-		const frequency = RecurringExpenseService.formatFrequency(
-			expense.frequency
-		);
+	const renderExpenseItem = (expense: Bill) => {
+		const daysUntilDue = BillService.getDaysUntilNext(expense.nextExpectedDate);
+		const frequency = BillService.formatFrequency(expense.frequency);
 
 		// Use actual payment status from the API
 		const isPaid = paymentStatuses[expense.patternId] === true;
 		const isMarkingAsPaid = markingAsPaid === expense.patternId;
+		const autoPay = (expense as any).autoPay === true;
 
 		// Resolve appearance based on appearanceMode (respects user customization)
-		const { icon, color } = resolveRecurringExpenseAppearance(expense);
+		const { icon, color } = resolveBillAppearance(expense);
 
 		return (
 			<TouchableOpacity
 				key={expense.patternId}
 				onPress={() => handleExpenseSelect(expense)}
 			>
-				<RecurringExpenseCard
+				<BillCard
 					vendor={expense.vendor}
 					amount={expense.amount}
 					dueInDays={daysUntilDue}
@@ -277,18 +246,16 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 					iconName={icon}
 					color={color}
 					isPaid={isPaid}
+					autoPay={autoPay}
 					isProcessing={isMarkingAsPaid}
-					onPressMarkPaid={() => handleMarkAsPaid(expense)}
+					onPressMarkPaid={() => handlePayBill(expense)}
 					onPressEdit={() => handleOptionsPress(expense)}
 				/>
 			</TouchableOpacity>
 		);
 	};
 
-	const renderPeriodSection = (
-		frequency: string,
-		expenses: RecurringExpense[]
-	) => {
+	const renderPeriodSection = (frequency: string, expenses: Bill[]) => {
 		if (expenses.length === 0) return null;
 
 		return (
@@ -310,7 +277,7 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 		return (
 			<View style={styles.loadingContainer}>
 				<ActivityIndicator size="large" color="#007ACC" />
-				<Text style={styles.loadingText}>Loading recurring expenses...</Text>
+				<Text style={styles.loadingText}>Loading bills...</Text>
 			</View>
 		);
 	}
@@ -348,7 +315,7 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 						{showAddButton && (
 							<TouchableOpacity
 								style={styles.addButton}
-								onPress={handleAddRecurringExpense}
+								onPress={handleAddBill}
 							>
 								<Ionicons name="add" size={20} color="#007ACC" />
 								<Text style={styles.addButtonText}>Add</Text>
@@ -373,22 +340,20 @@ const RecurringExpensesList: React.FC<RecurringExpensesListProps> = ({
 				{!hasExpenses ? (
 					<View style={styles.emptyContainer}>
 						<Ionicons name="repeat" size={48} color="#ccc" />
-						<Text style={styles.emptyTitle}>No Recurring Expenses</Text>
+						<Text style={styles.emptyTitle}>No Bills</Text>
 						<Text style={styles.emptyText}>
 							{showUpcomingOnly
-								? 'No upcoming recurring expenses in the next 7 days'
-								: 'Add recurring expenses to track your regular payments'}
+								? 'No upcoming bills in the next 7 days'
+								: 'Add bills to track your regular payments'}
 						</Text>
 
 						{showAddButton && (
 							<TouchableOpacity
-								style={styles.addRecurringButton}
-								onPress={handleAddRecurringExpense}
+								style={styles.addBillButton}
+								onPress={handleAddBill}
 							>
 								<Ionicons name="add" size={16} color="#007ACC" />
-								<Text style={styles.addRecurringButtonText}>
-									Add Recurring Expense
-								</Text>
+								<Text style={styles.addBillButtonText}>Add Bill</Text>
 							</TouchableOpacity>
 						)}
 					</View>
@@ -505,7 +470,7 @@ const styles = StyleSheet.create({
 		lineHeight: 20,
 		marginBottom: 20,
 	},
-	addRecurringButton: {
+	addBillButton: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		paddingHorizontal: 16,
@@ -515,7 +480,7 @@ const styles = StyleSheet.create({
 		borderWidth: 1,
 		borderColor: '#007ACC',
 	},
-	addRecurringButtonText: {
+	addBillButtonText: {
 		marginLeft: 6,
 		fontSize: 14,
 		fontWeight: '500',
@@ -579,4 +544,4 @@ const styles = StyleSheet.create({
 	},
 });
 
-export default RecurringExpensesList;
+export default BillsList;

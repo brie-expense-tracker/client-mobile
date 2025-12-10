@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useProfile } from '../../../../src/context/profileContext';
 
-export default function RecurringExpensesSettingsScreen() {
+export default function BillsSettingsScreen() {
 	const router = useRouter();
 	const { profile, loading } = useProfile();
 
@@ -37,10 +37,10 @@ export default function RecurringExpensesSettingsScreen() {
 	const handleSave = async () => {
 		try {
 			setSaving(true);
-			// TODO: Implement updateRecurringExpensesSettings when available in profile context
-			Alert.alert('Success', 'Recurring expenses settings saved successfully');
+			// TODO: Implement updateBillsSettings when available in profile context
+			Alert.alert('Success', 'Bills settings saved successfully');
 		} catch (error) {
-			logger.error('Error saving recurring expenses settings:', error);
+			logger.error('Error saving bills settings:', error);
 			Alert.alert('Error', 'Failed to save settings');
 		} finally {
 			setSaving(false);
@@ -63,9 +63,9 @@ export default function RecurringExpensesSettingsScreen() {
 			<ScrollView contentContainerStyle={styles.container}>
 				{/* Header */}
 				<View style={styles.header}>
-					<Text style={styles.title}>Recurring Expenses</Text>
+					<Text style={styles.title}>Bills</Text>
 					<Text style={styles.subtitle}>
-						Manage how recurring expenses are handled in your app
+						Manage how bills are handled in your app
 					</Text>
 				</View>
 
@@ -75,10 +75,10 @@ export default function RecurringExpensesSettingsScreen() {
 					<View style={styles.settingItem}>
 						<View style={styles.settingContent}>
 							<Text style={styles.settingLabel}>
-								Auto-sync Recurring Expenses
+								Auto-sync Bills
 							</Text>
 							<Text style={styles.settingDescription}>
-								Automatically add recurring expenses to your budget each period
+								Automatically add bills to your budget each period
 							</Text>
 						</View>
 						<Switch
@@ -96,7 +96,7 @@ export default function RecurringExpensesSettingsScreen() {
 						<View style={styles.settingContent}>
 							<Text style={styles.settingLabel}>Reminder Notifications</Text>
 							<Text style={styles.settingDescription}>
-								Get notified before recurring expenses are due
+								Get notified before bills are due
 							</Text>
 						</View>
 						<Switch
@@ -114,7 +114,7 @@ export default function RecurringExpensesSettingsScreen() {
 						<View style={styles.settingContent}>
 							<Text style={styles.settingLabel}>Expense Tracking</Text>
 							<Text style={styles.settingDescription}>
-								Track spending patterns for recurring expenses
+								Track spending patterns for bills
 							</Text>
 						</View>
 						<Switch
@@ -131,22 +131,22 @@ export default function RecurringExpensesSettingsScreen() {
 					<Text style={styles.sectionTitle}>Quick Actions</Text>
 					<TouchableOpacity
 						style={styles.actionButton}
-						onPress={() => router.push('/(tabs)/wallet/recurring')}
+						onPress={() => router.push('/(tabs)/wallet/bills')}
 					>
 						<Ionicons name="list-outline" size={20} color="#007AFF" />
 						<Text style={styles.actionButtonText}>
-							View All Recurring Expenses
+							View All Bills
 						</Text>
 						<Ionicons name="chevron-forward" size={20} color="#007AFF" />
 					</TouchableOpacity>
 
 					<TouchableOpacity
 						style={styles.actionButton}
-						onPress={() => router.push('/(stack)/recurring/new')}
+						onPress={() => router.push('/(tabs)/wallet/bills/new')}
 					>
 						<Ionicons name="add-circle-outline" size={20} color="#007AFF" />
 						<Text style={styles.actionButtonText}>
-							Add New Recurring Expense
+							Add New Bill
 						</Text>
 						<Ionicons name="chevron-forward" size={20} color="#007AFF" />
 					</TouchableOpacity>

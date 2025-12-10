@@ -1,9 +1,15 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { ScrollView, Alert, RefreshControl, StyleSheet } from 'react-native';
+import {
+	ScrollView,
+	Alert,
+	RefreshControl,
+	StyleSheet,
+	View,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useBudget } from '../../../../src/context/budgetContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import HeroBudget from '../components/budgets/HeroBudget';
+import BudgetSummaryCard from '../components/budgets/BudgetSummaryCard';
 import BudgetsFeed from '../components/budgets/BudgetsFeed';
 import {
 	Page,
@@ -11,9 +17,7 @@ import {
 	LoadingState,
 	EmptyState,
 	SegmentedControl,
-	Card,
 	palette,
-	radius,
 	space,
 } from '../../../../src/ui';
 import { createLogger } from '../../../../src/utils/sublogger';
@@ -166,8 +170,12 @@ export default function BudgetScreen() {
 	}, [budgets, activeTab]);
 
 	const periodStats = useMemo(() => {
-		const fmt = (d: Date) =>
+		const fmtShort = (d: Date) =>
 			d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+		const fmtRange = (start: Date, end: Date) =>
+			`${fmtShort(start)} – ${fmtShort(end)}`;
+		const fmtMonthYear = (d: Date) =>
+			d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 
 		if (activeTab === 'monthly') {
 			const periodStart = startOfMonth(now);
@@ -179,7 +187,8 @@ export default function BudgetScreen() {
 			const elapsedDays = Math.min(totalDays, daysBetween(periodStart, now));
 			const daysLeft = Math.max(0, totalDays - elapsedDays);
 			return {
-				label: `${fmt(periodStart)}–${fmt(periodEnd)}`,
+				label: fmtRange(periodStart, periodEnd),
+				title: fmtMonthYear(periodStart),
 				total,
 				spent,
 				remaining,
@@ -197,7 +206,8 @@ export default function BudgetScreen() {
 			const elapsedDays = Math.min(totalDays, daysBetween(periodStart, now));
 			const daysLeft = Math.max(0, totalDays - elapsedDays);
 			return {
-				label: `${fmt(periodStart)}–${fmt(periodEnd)}`,
+				label: fmtRange(periodStart, periodEnd),
+				title: 'This week',
 				total,
 				spent,
 				remaining,
@@ -211,7 +221,8 @@ export default function BudgetScreen() {
 		const spent = combined.spent || 0;
 		const remaining = Math.max(0, total - spent);
 		return {
-			label: `${periodStart.toLocaleDateString()}–${periodEnd.toLocaleDateString()}`,
+			label: fmtRange(periodStart, periodEnd),
+			title: fmtMonthYear(periodEnd),
 			total,
 			spent,
 			remaining,
@@ -223,6 +234,8 @@ export default function BudgetScreen() {
 		if (activeTab === 'monthly') {
 			return {
 				periodLabel: periodStats.label,
+				periodTitle: periodStats.title,
+				periodRangeLabel: periodStats.label,
 				totalBudgets: budgets.filter((b) => b.period === 'monthly').length,
 				totalPlanned: monthlySummary.totalAllocated,
 				totalSpent: monthlySummary.totalSpent,
@@ -232,6 +245,8 @@ export default function BudgetScreen() {
 		if (activeTab === 'weekly') {
 			return {
 				periodLabel: periodStats.label,
+				periodTitle: periodStats.title,
+				periodRangeLabel: periodStats.label,
 				totalBudgets: budgets.filter((b) => b.period === 'weekly').length,
 				totalPlanned: weeklySummary.totalAllocated,
 				totalSpent: weeklySummary.totalSpent,
@@ -240,6 +255,8 @@ export default function BudgetScreen() {
 
 		return {
 			periodLabel: periodStats.label,
+			periodTitle: periodStats.title,
+			periodRangeLabel: periodStats.label,
 			totalBudgets: budgets.length,
 			totalPlanned: combined.total,
 			totalSpent: combined.spent,
@@ -255,18 +272,6 @@ export default function BudgetScreen() {
 
 	if (isLoading && !hasLoaded) {
 		return <LoadingState label="Loading budgets..." />;
-	}
-
-	if (budgets.length === 0 && hasLoaded) {
-		return (
-			<EmptyState
-				icon="wallet-outline"
-				title="No Budgets Yet"
-				subtitle="Create your first budget to start tracking your spending."
-				ctaLabel="Add Budget"
-				onPress={showModal}
-			/>
-		);
 	}
 
 	return (
@@ -285,20 +290,22 @@ export default function BudgetScreen() {
 				}
 				accessibilityLabel="Budgets overview content"
 			>
-				{/* Hero – same structure as Recurring summary */}
-				<Section style={styles.heroSection}>
-					<Card style={styles.heroCard}>
-						<HeroBudget
+				{/* Top sheet hero */}
+				<View style={styles.heroShell}>
+					<View style={styles.budgetSummaryCardWrapper}>
+						<BudgetSummaryCard
 							periodLabel={heroProps.periodLabel}
+							periodTitle={heroProps.periodTitle}
+							periodRangeLabel={heroProps.periodRangeLabel}
 							totalBudgets={heroProps.totalBudgets}
 							totalPlanned={heroProps.totalPlanned}
 							totalSpent={heroProps.totalSpent}
 							onAddBudget={showModal}
 						/>
-					</Card>
-				</Section>
+					</View>
+				</View>
 
-				{/* List – same pattern as RecurringExpensesScreen */}
+				{/* List – unchanged */}
 				<Section
 					title="Your budgets"
 					style={styles.budgetsSection}
@@ -314,11 +321,23 @@ export default function BudgetScreen() {
 						/>
 					}
 				>
-					<BudgetsFeed
-						scrollEnabled={false}
-						budgets={filteredBudgets}
-						activeTab={activeTab}
-					/>
+					{isLoading ? (
+						<LoadingState label="Loading budgets…" />
+					) : filteredBudgets.length === 0 ? (
+						<EmptyState
+							icon="wallet-outline"
+							title="No Budgets Yet"
+							subtitle="Create your first budget to start tracking your spending."
+							ctaLabel="Add Budget"
+							onPress={showModal}
+						/>
+					) : (
+						<BudgetsFeed
+							scrollEnabled={false}
+							budgets={filteredBudgets}
+							activeTab={activeTab}
+						/>
+					)}
 				</Section>
 			</ScrollView>
 		</Page>
@@ -328,36 +347,33 @@ export default function BudgetScreen() {
 const styles = StyleSheet.create({
 	scroll: {
 		flex: 1,
-		backgroundColor: palette.surfaceAlt,
+		backgroundColor: palette.surfaceAlt, // light grey background
 	},
 	scrollContent: {
-		paddingTop: space.sm,
 		paddingBottom: space.xl,
 	},
-	heroSection: {
-		marginTop: space.md,
-	},
-	heroCard: {
+	// background of the top area – stays light grey now
+	heroShell: {
+		backgroundColor: palette.surfaceAlt,
+		paddingTop: space.lg,
+		paddingBottom: space.lg,
 		paddingHorizontal: space.lg,
-		paddingVertical: space.lg,
+	},
 
+	// actual white card behind the budget summary
+	budgetSummaryCardWrapper: {
 		backgroundColor: palette.surface,
-		borderRadius: radius.xl,
-
-		// subtle outline, like Bills summary
-		borderWidth: 1,
-		borderColor: palette.borderMuted,
-
-		// soft floating shadow
+		borderRadius: 24,
+		padding: space.lg,
 		shadowColor: '#000',
-		shadowOpacity: 0.07,
+		shadowOpacity: 0.06,
 		shadowRadius: 18,
-		shadowOffset: { width: 0, height: 8 },
-
-		// Android
-		elevation: 3,
+		shadowOffset: { width: 0, height: 10 },
+		elevation: 4,
 	},
 	budgetsSection: {
 		marginTop: space.lg,
+		paddingHorizontal: space.lg,
+		paddingTop: space.sm,
 	},
 });

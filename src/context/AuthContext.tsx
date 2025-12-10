@@ -50,6 +50,10 @@ export interface AuthState {
 	sessionTimeout: number;
 }
 
+export type DeleteAccountOptions = {
+	password?: string;
+};
+
 export type AuthContextType = {
 	// Core auth state
 	user: User | null;
@@ -58,6 +62,7 @@ export type AuthContextType = {
 	loading: boolean;
 	authState: AuthState;
 	error: AuthError | null;
+	authProviderId: string | null; // 'password', 'google.com', 'apple.com', etc.
 
 	// Auth methods
 	login: (firebaseUser: FirebaseAuthTypes.User) => Promise<void>;
@@ -80,6 +85,7 @@ export type AuthContextType = {
 	// Account management
 	deleteAccount: (password: string) => Promise<void>;
 	deleteAccountAfterReauth: () => Promise<void>;
+	deleteAccountFlow: (options?: DeleteAccountOptions) => Promise<void>;
 	reauthWithPassword: (password: string) => Promise<void>;
 	reauthWithGoogle: () => Promise<void>;
 	refreshUserData: () => Promise<void>;
@@ -101,6 +107,20 @@ export const AuthContext = createContext<AuthContextType | undefined>(
 // Keys for local storage fallbacks
 const UID_KEY = 'firebaseUID';
 
+// Helper to get human-readable auth provider name
+export const getAuthProviderName = (providerId: string | null): string => {
+	switch (providerId) {
+		case 'password':
+			return 'Email & Password';
+		case 'google.com':
+			return 'Google';
+		case 'apple.com':
+			return 'Apple';
+		default:
+			return 'Your account';
+	}
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
 	// Note: Removed render log to reduce noise - use React DevTools Profiler instead
 
@@ -115,6 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const isManualLoginRef = useRef(false);
 	const isReauthInProgressRef = useRef(false);
 	const isGoogleSignInCancelledRef = useRef(false);
+	const isGoogleSignInInProgressRef = useRef(false);
 	const [lastActivity, setLastActivity] = useState<number>(Date.now());
 	const [sessionTimeout] = useState<number>(4 * 60 * 60 * 1000); // 4 hours
 
@@ -140,6 +161,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			sessionTimeout,
 		};
 	}, [firebaseUser, loading, user, profile, lastActivity, sessionTimeout]);
+
+	// Determine the primary auth provider ID
+	const authProviderId = useMemo(() => {
+		return firebaseUser?.providerData?.[0]?.providerId ?? null;
+	}, [firebaseUser]);
 
 	// Subscribe to auth state once
 	useEffect(() => {
@@ -241,45 +267,114 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				}
 				authContextLog.debug('ensureUserExistsLocal completed successfully');
 			} catch (e: any) {
-				authContextLog.warn('Could not verify user with server', e);
-
-				// Network timeouts and auth errors should be treated gracefully
-				// Sign out to avoid orphaned Firebase accounts
-				if (
+				// Check if this is a network/timeout error (should NOT sign out)
+				const isNetworkError =
 					e?.message?.includes('timeout') ||
 					e?.message?.includes('Aborted') ||
 					e?.message?.includes('Network') ||
+					e?.response?.status === 408;
+
+				// Check if this is a user not found error (expected after account deletion)
+				const isUserNotFoundError =
 					e?.message?.includes('User account not found') ||
 					e?.message?.includes('User not found') ||
-					e?.message?.includes('Failed to create') ||
-					e?.response?.status === 404 ||
-					e?.response?.status === 408
-				) {
+					e?.response?.status === 404;
+
+				// For network errors, don't sign out - allow user to continue with Firebase auth
+				// The app should work offline with cached Firebase auth state
+				if (isNetworkError) {
 					authContextLog.warn(
-						'Network/timeout - signing out to prevent orphaned account'
+						'Network/timeout error - keeping Firebase auth state, will retry later'
 					);
-
-					// Sign out of Firebase to clear orphaned state
-					try {
-						await signOut(getAuth());
-						setFirebaseUser(null);
-						setUser(null);
-						setProfile(null);
-						authContextLog.info('Signed out successfully');
-					} catch (signOutError) {
-						authContextLog.warn('Failed to sign out', signOutError);
-					}
-
+					// Don't sign out - Firebase auth is still valid
+					// Just set loading to false so the app can continue
+					setLoading(false);
 					return;
 				}
 
-				// Only log truly unexpected errors
-				authContextLog.error('Unexpected error', { message: e?.message });
+				// For user not found errors, check if Firebase user still exists
+				// If it does, this likely means the account was deleted, so we should sign out
+				// UNLESS we're in the middle of a Google sign-in flow (new user signup)
+				if (isUserNotFoundError) {
+					// Check if Firebase user still exists (might be a race condition after deletion)
+					const currentFirebaseUser = getAuth().currentUser;
+					if (currentFirebaseUser && currentFirebaseUser.uid === fbUser.uid) {
+						// If Google sign-in is in progress, don't sign out - this is a new user signup
+						if (isGoogleSignInInProgressRef.current) {
+							authContextLog.debug(
+								'User not found in MongoDB but Google sign-in in progress - skipping sign-out (new user signup)'
+							);
+							// Don't sign out - let the sign-in flow handle account creation
+							setLoading(false);
+							return;
+						}
+
+						// Firebase user exists but MongoDB user doesn't - account was likely deleted
+						authContextLog.debug(
+							'User not found in MongoDB but Firebase user exists - signing out (likely after account deletion)'
+						);
+						// Sign out to clear the orphaned Firebase auth state
+						// Note: Firebase user may already be deleted by backend, so signOut might fail
+						try {
+							await signOut(getAuth());
+							authContextLog.debug(
+								'Successfully signed out after user not found'
+							);
+						} catch (signOutError: any) {
+							// If signOut fails (e.g., user already deleted), that's expected
+							// Just clear local state
+							if (
+								signOutError?.code === 'auth/user-not-found' ||
+								signOutError?.message?.includes('user-not-found')
+							) {
+								authContextLog.debug(
+									'Firebase user already deleted (expected after account deletion)'
+								);
+							} else {
+								authContextLog.debug('Error signing out after user not found', {
+									code: signOutError?.code,
+									message: signOutError?.message,
+								});
+							}
+						} finally {
+							// Always clear local state regardless of signOut result
+							setUser(null);
+							setProfile(null);
+							setFirebaseUser(null);
+							lastProcessedUIDRef.current = null;
+							await removeItem(UID_KEY).catch(() => undefined);
+						}
+						setLoading(false);
+						return;
+					}
+
+					// Firebase user doesn't exist either - this is expected after deletion or during app startup
+					authContextLog.debug(
+						'User not found in MongoDB - expected after account deletion or during app startup'
+					);
+					// Clear any stale state
+					setUser(null);
+					setProfile(null);
+					setLoading(false);
+					return;
+				}
+
+				// For other errors (like "Failed to create"), log but don't sign out
+				// Only sign out on truly critical errors that indicate auth is invalid
+				authContextLog.warn('Could not verify user with server', {
+					message: e?.message,
+					code: e?.code,
+					type: e?.type || 'SERVER_ERROR',
+					status: e?.status,
+					name: e?.name,
+				});
 				setError({
 					code: 'USER_CREATION_ERROR',
 					message: 'Failed to create or fetch user from database',
 					details: e,
 				});
+				// Don't sign out - allow user to retry or continue with Firebase auth
+				setLoading(false);
 				Sentry.captureException(e);
 			}
 		};
@@ -888,7 +983,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				// If Firebase user was created but MongoDB creation failed, delete the Firebase user
 				if (firebaseUser && error.code !== 'auth/email-already-in-use') {
 					try {
-						await firebaseUser.delete();
+						if (typeof (firebaseUser as any).deleteUser === 'function') {
+							await (firebaseUser as any).deleteUser();
+						} else {
+							await firebaseUser.delete();
+						}
 						authContextLog.info(
 							'Cleaned up Firebase user after MongoDB creation failure'
 						);
@@ -918,6 +1017,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			setLoading(true);
 			setError(null);
 			isGoogleSignInCancelledRef.current = false;
+			isGoogleSignInInProgressRef.current = true;
 
 			// Check if your device supports Google Play
 			authContextLog.debug('Step 1: Checking Google Play Services');
@@ -1021,10 +1121,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 							style: 'cancel',
 							onPress: async () => {
 								authContextLog.debug('User CANCELLED account creation');
+								isGoogleSignInInProgressRef.current = false;
 								// Delete the Firebase user since they don't want to create an account
 								try {
 									authContextLog.debug('Deleting Firebase user');
-									await firebaseUser.delete();
+									if (typeof (firebaseUser as any).deleteUser === 'function') {
+										await (firebaseUser as any).deleteUser();
+									} else {
+										await firebaseUser.delete();
+									}
 									authContextLog.info('Firebase user deleted');
 								} catch (err) {
 									authContextLog.warn('Failed to delete Firebase user', err);
@@ -1046,12 +1151,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 									authContextLog.info(
 										'Login completed! Account creation successful'
 									);
+									isGoogleSignInInProgressRef.current = false;
 									resolve();
 								} catch (err) {
 									authContextLog.error('Fatal error during login()', err);
+									isGoogleSignInInProgressRef.current = false;
 									// Delete Firebase user since account creation failed
 									try {
-										await firebaseUser.delete();
+										if (
+											typeof (firebaseUser as any).deleteUser === 'function'
+										) {
+											await (firebaseUser as any).deleteUser();
+										} else {
+											await firebaseUser.delete();
+										}
 										authContextLog.info(
 											'Cleaned up Firebase user after failed creation'
 										);
@@ -1105,6 +1218,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			// Reset the cancellation flag after a delay to allow auth state changes to settle
 			setTimeout(() => {
 				isGoogleSignInCancelledRef.current = false;
+				isGoogleSignInInProgressRef.current = false;
 			}, 1000);
 		}
 	}, [login]);
@@ -1115,6 +1229,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			setLoading(true);
 			setError(null);
 			isGoogleSignInCancelledRef.current = false;
+			isGoogleSignInInProgressRef.current = true;
 
 			authContextLog.debug('Step 1: Starting Google Sign-Up process');
 
@@ -1253,9 +1368,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 							style: 'cancel',
 							onPress: async () => {
 								authContextLog.debug('User cancelled account creation');
+								isGoogleSignInInProgressRef.current = false;
 								// Delete the Firebase user since they don't want to create an account
 								try {
-									await firebaseUser.delete();
+									if (typeof (firebaseUser as any).deleteUser === 'function') {
+										await (firebaseUser as any).deleteUser();
+									} else {
+										await firebaseUser.delete();
+									}
 								} catch (err) {
 									authContextLog.warn('Failed to delete Firebase user', err);
 								}
@@ -1280,15 +1400,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 									authContextLog.info(
 										'Login completed! Account creation successful!'
 									);
+									isGoogleSignInInProgressRef.current = false;
 									resolve();
 								} catch (err) {
 									authContextLog.error('Fatal error during login()', err);
 									authContextLog.error('Error details', {
 										error: JSON.stringify(err),
 									});
+									isGoogleSignInInProgressRef.current = false;
 									// Delete Firebase user since account creation failed
 									try {
-										await firebaseUser.delete();
+										if (
+											typeof (firebaseUser as any).deleteUser === 'function'
+										) {
+											await (firebaseUser as any).deleteUser();
+										} else {
+											await firebaseUser.delete();
+										}
 										authContextLog.info(
 											'Cleaned up Firebase user after failed creation'
 										);
@@ -1353,6 +1481,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			// Reset the cancellation flag after a delay to allow auth state changes to settle
 			setTimeout(() => {
 				isGoogleSignInCancelledRef.current = false;
+				isGoogleSignInInProgressRef.current = false;
 			}, 1000);
 		}
 	}, [login]);
@@ -1365,16 +1494,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			if (!user) throw new Error('No user is currently signed in');
 			if (!user.email) throw new Error('User email is missing');
 
-			// Re-authenticate
+			// Re-authenticate to verify user knows their password (security measure)
 			const credential = EmailAuthProvider.credential(user.email, password);
-
 			await user.reauthenticateWithCredential(credential);
 
-			// Delete backend data
+			// Delete backend data AND Firebase account (backend handles both)
+			// The backend uses Firebase Admin SDK to delete the Firebase account,
+			// which bypasses the client-side reauthentication requirement
 			await UserService.deleteUserAccount();
-
-			// Delete Firebase user
-			await user.delete();
 
 			// Clear AsyncStorage and context state
 			await removeItem(UID_KEY);
@@ -1542,9 +1669,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	}, []);
 
 	// Delete account after reauthentication (for Google/Apple users)
+	// NOTE: The backend handles Firebase account deletion using Admin SDK,
+	// which bypasses the client-side reauthentication requirement.
+	// This function only needs to call the backend API - no client-side Firebase deletion needed.
 	const deleteAccountAfterReauth = useCallback(async () => {
 		setLoading(true);
-		let backendDeleted = false;
 		try {
 			const user = getAuth().currentUser;
 
@@ -1553,15 +1682,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 					code: 'auth/no-current-user',
 				});
 
-			// 1) Delete app backend data first (while still authenticated)
+			authContextLog.debug('Starting account deletion process');
+
+			// Delete backend data AND Firebase account (backend handles both)
+			// The backend uses Firebase Admin SDK to delete the Firebase account,
+			// which bypasses the client-side reauthentication requirement
 			await UserService.deleteUserAccount();
-			backendDeleted = true;
+			authContextLog.info(
+				'Account deletion completed successfully (backend handled Firebase deletion)'
+			);
 
-			// 2) Delete Firebase user (must be within "recent login" window)
-			// Note: This will fail if user hasn't authenticated recently
-			await user.delete();
-
-			// 3) Local cleanup
+			// Local cleanup
 			await removeItem(UID_KEY);
 			setUser(null);
 			setProfile(null);
@@ -1572,33 +1703,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				processingTimeoutRef.current = null;
 			}
 		} catch (error: any) {
-			// If backend was deleted but Firebase deletion failed, we're in a partial state
-			// The user's backend data is gone, but Firebase account still exists
-			if (backendDeleted && error?.code === 'auth/requires-recent-login') {
-				// Clean up local state since backend account is gone
-				await removeItem(UID_KEY);
-				setUser(null);
-				setProfile(null);
-				setFirebaseUser(null);
-				lastProcessedUIDRef.current = null;
-				if (processingTimeoutRef.current) {
-					clearTimeout(processingTimeoutRef.current);
-					processingTimeoutRef.current = null;
-				}
-				throw Object.assign(
-					new Error(
-						'Your account data has been deleted, but Firebase requires recent authentication to complete account deletion. Please sign out and sign back in, then contact support if the issue persists.'
-					),
-					{ code: 'auth/requires-recent-login', partial: true }
-				);
-			}
-
 			const normalized = {
 				code: error?.code || 'auth/delete-failed',
-				message:
-					error?.code === 'auth/requires-recent-login'
-						? 'Firebase requires recent authentication to delete your account. Please sign out and sign back in, then try again.'
-						: error?.message || 'Failed to delete account.',
+				message: error?.message || 'Failed to delete account.',
 				details: error,
 			};
 			setError(normalized);
@@ -1609,6 +1716,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			setLoading(false);
 		}
 	}, []);
+
+	// High-level orchestration: Reauth (based on provider) → delete backend → delete Firebase
+	const deleteAccountFlow = useCallback(
+		async (options: DeleteAccountOptions = {}) => {
+			const user = firebaseUser;
+			if (!user) {
+				throw Object.assign(
+					new Error('No authenticated user. Please sign in again.'),
+					{ code: 'auth/no-current-user' }
+				);
+			}
+
+			const providerId = user.providerData?.[0]?.providerId ?? null;
+
+			try {
+				authContextLog.debug('deleteAccountFlow: Starting', { providerId });
+
+				// 1) Reauthenticate FIRST based on provider
+				if (providerId === 'password') {
+					if (!options.password) {
+						const err: any = Object.assign(
+							new Error('Password is required to confirm account deletion.'),
+							{ code: 'delete/password-required' }
+						);
+						throw err;
+					}
+
+					authContextLog.debug(
+						'deleteAccountFlow: Reauthenticating with password'
+					);
+					await reauthWithPassword(options.password);
+				} else if (providerId === 'google.com') {
+					authContextLog.debug(
+						'deleteAccountFlow: Reauthenticating with Google'
+					);
+					await reauthWithGoogle();
+				} else {
+					// For other providers (apple.com, etc.), we might not need reauth
+					// or handle them differently. For now, log a warning.
+					authContextLog.warn(
+						'deleteAccountFlow: Unknown providerId, skipping reauth',
+						{ providerId }
+					);
+				}
+
+				// 2) Backend + Firebase deletion (backend handles Firebase via Admin SDK)
+				authContextLog.debug(
+					'deleteAccountFlow: Calling deleteAccountAfterReauth'
+				);
+				await deleteAccountAfterReauth();
+			} catch (error: any) {
+				authContextLog.error('deleteAccountFlow: Error', error);
+				// Re-throw the error so the UI can handle it
+				throw error;
+			}
+		},
+		[
+			firebaseUser,
+			reauthWithPassword,
+			reauthWithGoogle,
+			deleteAccountAfterReauth,
+		]
+	);
 
 	// Enhanced utility methods
 	const isAuthenticated = useCallback((): boolean => {
@@ -1692,6 +1862,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			loading,
 			authState,
 			error,
+			authProviderId,
 
 			// Auth methods
 			login,
@@ -1711,6 +1882,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			// Account management
 			deleteAccount,
 			deleteAccountAfterReauth,
+			deleteAccountFlow,
 			reauthWithPassword,
 			reauthWithGoogle,
 			refreshUserData,
@@ -1731,6 +1903,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			loading,
 			authState,
 			error,
+			authProviderId,
 			login,
 			logout,
 			signup,
@@ -1742,6 +1915,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			updatePasswordToUser,
 			deleteAccount,
 			deleteAccountAfterReauth,
+			deleteAccountFlow,
 			reauthWithPassword,
 			reauthWithGoogle,
 			refreshUserData,

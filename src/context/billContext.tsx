@@ -7,34 +7,32 @@ import React, {
 	useMemo,
 	ReactNode,
 } from 'react';
-import {
-	RecurringExpenseService,
-	RecurringExpense,
-	ApiService,
-} from '../services';
+import { BillService, Bill, ApiService } from '../services';
 import { createLogger } from '../utils/sublogger';
 
-const recurringExpenseContextLog = createLogger('RecurringExpenseContext');
+const billContextLog = createLogger('BillContext');
 
 // ==========================================
 // Types
 // ==========================================
-export interface CreateRecurringExpenseData {
+export interface CreateBillData {
 	vendor: string;
 	amount: number;
 	frequency: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 	nextExpectedDate: string;
+	autoPay?: boolean; // Default to false (manual payment)
 	appearanceMode?: 'custom' | 'brand' | 'default';
 	icon?: string;
 	color?: string;
 	category?: string; // Single category that will be applied to each generated transaction
 }
 
-export interface UpdateRecurringExpenseData {
+export interface UpdateBillData {
 	vendor?: string;
 	amount?: number;
 	frequency?: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 	nextExpectedDate?: string;
+	autoPay?: boolean;
 	appearanceMode?: 'custom' | 'brand' | 'default';
 	icon?: string;
 	color?: string;
@@ -46,13 +44,10 @@ export interface UpdateRecurringExpenseData {
 // ==========================================
 
 /**
- * Get recurring expense ID - handles both patternId and id
+ * Get bill ID - handles both patternId and id
  * Single source of truth for ID access
  */
-export const getRecurringExpenseId = (e: {
-	id?: string;
-	patternId?: string;
-}): string => {
+export const getBillId = (e: { id?: string; patternId?: string }): string => {
 	return (e.id ?? e.patternId)!;
 };
 
@@ -60,39 +55,34 @@ export const getRecurringExpenseId = (e: {
 // Context
 // ==========================================
 
-interface RecurringExpenseContextType {
-	expenses: RecurringExpense[];
+interface BillContextType {
+	expenses: Bill[];
 	isLoading: boolean;
 	hasLoaded: boolean;
 	refetch: () => Promise<void>;
-	addRecurringExpense: (
-		data: CreateRecurringExpenseData
-	) => Promise<RecurringExpense>;
-	updateRecurringExpense: (
-		id: string,
-		data: UpdateRecurringExpenseData
-	) => Promise<RecurringExpense>;
-	deleteRecurringExpense: (id: string) => Promise<void>;
+	addBill: (data: CreateBillData) => Promise<Bill>;
+	updateBill: (id: string, data: UpdateBillData) => Promise<Bill>;
+	deleteBill: (id: string) => Promise<void>;
 }
 
-const RecurringExpenseContext = createContext<RecurringExpenseContextType>({
+const BillContext = createContext<BillContextType>({
 	expenses: [],
 	isLoading: false,
 	hasLoaded: false,
 	refetch: async () => {},
-	addRecurringExpense: async () => {
-		throw new Error('addRecurringExpense not implemented');
+	addBill: async () => {
+		throw new Error('addBill not implemented');
 	},
-	updateRecurringExpense: async () => {
-		throw new Error('updateRecurringExpense not implemented');
+	updateBill: async () => {
+		throw new Error('updateBill not implemented');
 	},
-	deleteRecurringExpense: async () => {},
+	deleteBill: async () => {},
 });
 
-export const RecurringExpenseProvider: React.FC<{ children: ReactNode }> = ({
+export const BillProvider: React.FC<{ children: ReactNode }> = ({
 	children,
 }) => {
-	const [expenses, setExpenses] = useState<RecurringExpense[]>([]);
+	const [expenses, setExpenses] = useState<Bill[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
 	const [hasLoaded, setHasLoaded] = useState(false);
 
@@ -103,7 +93,7 @@ export const RecurringExpenseProvider: React.FC<{ children: ReactNode }> = ({
 		// Cancel any in-flight request
 		if (abortControllerRef.current) {
 			abortControllerRef.current.abort();
-			recurringExpenseContextLog.debug('Aborted previous fetch');
+			billContextLog.debug('Aborted previous fetch');
 		}
 
 		// Create new abort controller for this fetch
@@ -111,14 +101,14 @@ export const RecurringExpenseProvider: React.FC<{ children: ReactNode }> = ({
 
 		setIsLoading(true);
 		try {
-			const data = await RecurringExpenseService.getRecurringExpenses({
+			const data = await BillService.getRecurringExpenses({
 				signal: abortControllerRef.current.signal,
 			});
 
 			// Normalize: Replace manual_* IDs with real server IDs
 			const objectIdRe = /^[0-9a-fA-F]{24}$/;
 			const normalized = data.map((e) => {
-				const currentId = getRecurringExpenseId(e);
+				const currentId = getBillId(e);
 
 				// If ID is already a valid ObjectId, keep it
 				if (currentId && objectIdRe.test(currentId)) {
@@ -128,25 +118,21 @@ export const RecurringExpenseProvider: React.FC<{ children: ReactNode }> = ({
 				// If it's a manual_* ID, try to use _id or id field as real identifier
 				const realId = (e as any)._id || (e as any).id;
 				if (realId) {
-					recurringExpenseContextLog.debug(
-						`Normalizing: ${currentId} → ${realId}`
-					);
+					billContextLog.debug(`Normalizing: ${currentId} → ${realId}`);
 					return { ...e, patternId: realId };
 				}
 
-				recurringExpenseContextLog.warn(
-					`No valid ID found for expense: ${currentId}`
-				);
+				billContextLog.warn(`No valid ID found for bill: ${currentId}`);
 				return e;
 			});
 
 			// Dedupe by patternId to handle server duplicates
 			const seen = new Set<string>();
-			const unique: RecurringExpense[] = [];
+			const unique: Bill[] = [];
 			for (const e of normalized) {
-				const id = getRecurringExpenseId(e);
+				const id = getBillId(e);
 				if (!id || seen.has(id)) {
-					recurringExpenseContextLog.debug(`Skipping duplicate: ${id}`);
+					billContextLog.debug(`Skipping duplicate: ${id}`);
 					continue;
 				}
 				seen.add(id);
@@ -159,13 +145,10 @@ export const RecurringExpenseProvider: React.FC<{ children: ReactNode }> = ({
 		} catch (err: any) {
 			// Ignore abort errors (expected when a new fetch cancels the old one)
 			if (err?.name === 'AbortError') {
-				recurringExpenseContextLog.debug('Fetch aborted (new fetch started)');
+				billContextLog.debug('Fetch aborted (new fetch started)');
 				return;
 			}
-			recurringExpenseContextLog.warn(
-				'Failed to fetch recurring expenses',
-				err
-			);
+			billContextLog.warn('Failed to fetch bills', err);
 			setExpenses(() => []);
 			setHasLoaded(true);
 		} finally {
@@ -175,11 +158,11 @@ export const RecurringExpenseProvider: React.FC<{ children: ReactNode }> = ({
 		}
 	}, []);
 
-	const addRecurringExpense = useCallback(
-		async (data: CreateRecurringExpenseData) => {
+	const addBill = useCallback(
+		async (data: CreateBillData) => {
 			// Create a temporary ID for optimistic update
 			const tempId = `temp-${Date.now()}-${Math.random()}`;
-			const newExpense: RecurringExpense = {
+			const newExpense: Bill = {
 				patternId: tempId,
 				...data,
 				confidence: 1.0,
@@ -190,11 +173,10 @@ export const RecurringExpenseProvider: React.FC<{ children: ReactNode }> = ({
 			setExpenses((prev) => [newExpense, ...prev]);
 
 			try {
-				recurringExpenseContextLog.debug('Creating expense on server...');
-				const serverExpense =
-					await RecurringExpenseService.createRecurringExpense(data);
+				billContextLog.debug('Creating bill on server...');
+				const serverExpense = await BillService.createRecurringExpense(data);
 
-				recurringExpenseContextLog.debug('Expense created, replacing temp ID', {
+				billContextLog.debug('Bill created, replacing temp ID', {
 					tempId,
 					realId: serverExpense.patternId,
 				});
@@ -204,16 +186,16 @@ export const RecurringExpenseProvider: React.FC<{ children: ReactNode }> = ({
 					// Check if temp expense still exists (might have been removed by another operation)
 					const hasTempExpense = prev.some((e) => e.patternId === tempId);
 					if (!hasTempExpense) {
-						recurringExpenseContextLog.warn(
-							'⚠️ [RecurringExpenseContext] Temp expense already removed, adding server expense'
+						billContextLog.warn(
+							'⚠️ [BillContext] Temp bill already removed, adding server bill'
 						);
 						// Ensure we don't duplicate the expense
 						const existingExpense = prev.find(
 							(e) => e.patternId === serverExpense.patternId
 						);
 						if (existingExpense) {
-							recurringExpenseContextLog.warn(
-								'Server expense already exists, updating instead'
+							billContextLog.warn(
+								'Server bill already exists, updating instead'
 							);
 							return prev.map((e) =>
 								e.patternId === serverExpense.patternId ? serverExpense : e
@@ -225,40 +207,32 @@ export const RecurringExpenseProvider: React.FC<{ children: ReactNode }> = ({
 					const updated = prev.map((e) =>
 						e.patternId === tempId ? serverExpense : e
 					);
-					recurringExpenseContextLog.info(
-						'Replaced temp expense with server expense',
-						{
-							tempId,
-							realId: serverExpense.patternId,
-							count: updated.length,
-						}
-					);
+					billContextLog.info('Replaced temp bill with server bill', {
+						tempId,
+						realId: serverExpense.patternId,
+						count: updated.length,
+					});
 					return updated;
 				});
 
-				// Ensure hasLoaded is set to true after first expense creation
+				// Ensure hasLoaded is set to true after first bill creation
 				if (!hasLoaded) {
 					setHasLoaded(true);
 				}
 
 				// Clear cache to ensure fresh data
 				ApiService.clearCacheByPrefix('/api/recurring-expenses');
-				recurringExpenseContextLog.debug(
-					'Cache cleared after expense creation'
-				);
+				billContextLog.debug('Cache cleared after bill creation');
 
 				return serverExpense;
 			} catch (error) {
-				recurringExpenseContextLog.error('Error adding expense', error);
+				billContextLog.error('Error adding bill', error);
 				// Remove the optimistic expense on error
 				setExpenses((prev) => {
 					const updated = prev.filter((e) => e.patternId !== tempId);
-					recurringExpenseContextLog.debug(
-						'Removed optimistic expense on error',
-						{
-							count: updated.length,
-						}
-					);
+					billContextLog.debug('Removed optimistic bill on error', {
+						count: updated.length,
+					});
 					return updated;
 				});
 				throw error;
@@ -267,22 +241,22 @@ export const RecurringExpenseProvider: React.FC<{ children: ReactNode }> = ({
 		[hasLoaded]
 	);
 
-	const updateRecurringExpense = useCallback(
-		async (id: string, updates: UpdateRecurringExpenseData) => {
+	const updateBill = useCallback(
+		async (id: string, updates: UpdateBillData) => {
 			// Guard: If ID is manual_*, force create instead of trying to update
 			const isManualId = id.startsWith('manual_');
 			const objectIdRe = /^[0-9a-fA-F]{24}$/;
 			const isValidObjectId = objectIdRe.test(id);
 
 			if (isManualId || !isValidObjectId) {
-				recurringExpenseContextLog.warn(
+				billContextLog.warn(
 					`Blocking update for invalid ID: ${id}, forcing create...`
 				);
 
 				// Build complete payload from current item + updates
-				let previousExpense: RecurringExpense | undefined;
+				let previousExpense: Bill | undefined;
 				setExpenses((curr) => {
-					previousExpense = curr.find((e) => getRecurringExpenseId(e) === id);
+					previousExpense = curr.find((e) => getBillId(e) === id);
 					return curr;
 				});
 
@@ -293,7 +267,7 @@ export const RecurringExpenseProvider: React.FC<{ children: ReactNode }> = ({
 					nextExpectedDate: new Date().toISOString().split('T')[0],
 				};
 
-				const payload: CreateRecurringExpenseData = {
+				const payload: CreateBillData = {
 					vendor: updates.vendor ?? base.vendor,
 					amount: updates.amount ?? base.amount,
 					frequency: updates.frequency ?? base.frequency,
@@ -302,46 +276,39 @@ export const RecurringExpenseProvider: React.FC<{ children: ReactNode }> = ({
 						updates.appearanceMode ?? (base as any).appearanceMode,
 					icon: updates.icon ?? (base as any).icon,
 					color: updates.color ?? (base as any).color,
-					categories: updates.categories ?? (base as any).categories,
+					category: updates.category ?? (base as any).category,
 				};
 
 				try {
-					const created = await RecurringExpenseService.createRecurringExpense(
-						payload
-					);
+					const created = await BillService.createRecurringExpense(payload);
 
-					recurringExpenseContextLog.debug(
+					billContextLog.debug(
 						`Created with real ID, replacing ${id} with ${created.patternId}`
 					);
 
 					// Replace manual item with server item
 					setExpenses((prev) =>
-						prev.map((e) => (getRecurringExpenseId(e) === id ? created : e))
+						prev.map((e) => (getBillId(e) === id ? created : e))
 					);
 
 					ApiService.clearCacheByPrefix('/api/recurring-expenses');
 					return created;
 				} catch (createErr) {
-					recurringExpenseContextLog.error('Create failed', createErr);
+					billContextLog.error('Create failed', createErr);
 					throw createErr;
 				}
 			}
 
 			// Normal update flow for valid ObjectIds
 			// Optimistic update
-			let previousExpense: RecurringExpense | undefined;
+			let previousExpense: Bill | undefined;
 			setExpenses((curr) => {
-				recurringExpenseContextLog.debug(
-					`Applying optimistic update for ${id}`
-				);
+				billContextLog.debug(`Applying optimistic update for ${id}`);
 				return curr.map((e) => {
-					if (getRecurringExpenseId(e) === id) {
+					if (getBillId(e) === id) {
 						previousExpense = e;
-						const optimisticExpense = { ...e, ...updates } as RecurringExpense;
-						recurringExpenseContextLog.debug(
-							'Optimistic expense',
-							optimisticExpense
-						);
+						const optimisticExpense = { ...e, ...updates } as Bill;
+						billContextLog.debug('Optimistic bill', optimisticExpense);
 						return optimisticExpense;
 					}
 					return e;
@@ -349,36 +316,34 @@ export const RecurringExpenseProvider: React.FC<{ children: ReactNode }> = ({
 			});
 
 			try {
-				const updatedExpense =
-					await RecurringExpenseService.updateRecurringExpense(id, updates);
+				const updatedExpense = await BillService.updateRecurringExpense(
+					id,
+					updates
+				);
 
-				recurringExpenseContextLog.debug('Server returned', updatedExpense);
+				billContextLog.debug('Server returned', updatedExpense);
 
 				// Replace optimistic update with server response
 				setExpenses((prev) => {
 					const updated = prev.map((e) =>
-						getRecurringExpenseId(e) === id ? updatedExpense : e
+						getBillId(e) === id ? updatedExpense : e
 					);
-					recurringExpenseContextLog.debug(
-						`Updated expenses count: ${updated.length}`
-					);
+					billContextLog.debug(`Updated bills count: ${updated.length}`);
 					return updated;
 				});
 
 				// Clear cache to ensure fresh data
 				ApiService.clearCacheByPrefix('/api/recurring-expenses');
-				recurringExpenseContextLog.debug('Cache cleared after expense update');
+				billContextLog.debug('Cache cleared after bill update');
 
 				return updatedExpense;
 			} catch (err: any) {
-				recurringExpenseContextLog.error('Failed to update expense', err);
+				billContextLog.error('Failed to update bill', err);
 
 				// Rollback optimistic update
 				if (previousExpense) {
 					setExpenses((curr) =>
-						curr.map((e) =>
-							getRecurringExpenseId(e) === id ? previousExpense! : e
-						)
+						curr.map((e) => (getBillId(e) === id ? previousExpense! : e))
 					);
 				}
 				throw err;
@@ -387,8 +352,8 @@ export const RecurringExpenseProvider: React.FC<{ children: ReactNode }> = ({
 		[]
 	);
 
-	const deleteRecurringExpense = useCallback(async (id: string) => {
-		recurringExpenseContextLog.debug('Deleting expense', { id });
+	const deleteBill = useCallback(async (id: string) => {
+		billContextLog.debug('Deleting bill', { id });
 
 		// Guard: If ID is manual_*, just remove locally (it doesn't exist on server)
 		const isManualId = id.startsWith('manual_');
@@ -396,43 +361,39 @@ export const RecurringExpenseProvider: React.FC<{ children: ReactNode }> = ({
 		const isValidObjectId = objectIdRe.test(id);
 
 		if (isManualId || !isValidObjectId) {
-			recurringExpenseContextLog.warn(
+			billContextLog.warn(
 				`Invalid ID ${id}, removing locally only (not on server)`
 			);
-			setExpenses((prev) =>
-				prev.filter((e) => getRecurringExpenseId(e) !== id)
-			);
+			setExpenses((prev) => prev.filter((e) => getBillId(e) !== id));
 			ApiService.clearCacheByPrefix('/api/recurring-expenses');
 			return;
 		}
 
 		// Normal delete flow for valid ObjectIds
 		// Save previous state for rollback
-		let previousExpenses: RecurringExpense[] = [];
+		let previousExpenses: Bill[] = [];
 		setExpenses((prev) => {
 			previousExpenses = prev;
 			// Optimistically remove from UI
-			return prev.filter((e) => getRecurringExpenseId(e) !== id);
+			return prev.filter((e) => getBillId(e) !== id);
 		});
 
 		try {
-			recurringExpenseContextLog.debug('Calling API delete...');
-			await RecurringExpenseService.deleteRecurringExpense(id);
+			billContextLog.debug('Calling API delete...');
+			await BillService.deleteRecurringExpense(id);
 
-			recurringExpenseContextLog.debug('Delete successful, clearing cache...');
+			billContextLog.debug('Delete successful, clearing cache...');
 			// Clear cache to ensure fresh data
 			ApiService.clearCacheByPrefix('/api/recurring-expenses');
-			recurringExpenseContextLog.debug('Cache cleared after expense deletion');
+			billContextLog.debug('Cache cleared after bill deletion');
 		} catch (err) {
-			recurringExpenseContextLog.error('Delete failed, rolling back', err);
+			billContextLog.error('Delete failed, rolling back', err);
 			// Rollback to previous state
 			setExpenses(previousExpenses);
 
 			// Re-throw with user-friendly message
 			const errorMsg =
-				err instanceof Error
-					? err.message
-					: 'Failed to delete recurring expense';
+				err instanceof Error ? err.message : 'Failed to delete bill';
 			throw new Error(errorMsg);
 		}
 	}, []);
@@ -451,35 +412,21 @@ export const RecurringExpenseProvider: React.FC<{ children: ReactNode }> = ({
 			isLoading,
 			hasLoaded,
 			refetch,
-			addRecurringExpense,
-			updateRecurringExpense,
-			deleteRecurringExpense,
+			addBill,
+			updateBill,
+			deleteBill,
 		}),
-		[
-			expenses,
-			isLoading,
-			hasLoaded,
-			refetch,
-			addRecurringExpense,
-			updateRecurringExpense,
-			deleteRecurringExpense,
-		]
+		[expenses, isLoading, hasLoaded, refetch, addBill, updateBill, deleteBill]
 	);
 
-	return (
-		<RecurringExpenseContext.Provider value={value}>
-			{children}
-		</RecurringExpenseContext.Provider>
-	);
+	return <BillContext.Provider value={value}>{children}</BillContext.Provider>;
 };
 
-// Hook to use recurring expense context
-export const useRecurringExpense = () => {
-	const context = useContext(RecurringExpenseContext);
+// Hook to use bill context
+export const useBills = () => {
+	const context = useContext(BillContext);
 	if (context === undefined) {
-		throw new Error(
-			'useRecurringExpense must be used within a RecurringExpenseProvider'
-		);
+		throw new Error('useBills must be used within a BillProvider');
 	}
 	return context;
 };
