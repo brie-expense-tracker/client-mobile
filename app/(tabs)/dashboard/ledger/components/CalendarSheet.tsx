@@ -20,9 +20,11 @@ type Props = {
 };
 
 const toISO = (d: Date) => {
-	const off = d.getTimezoneOffset();
-	const local = new Date(d.getTime() - off * 60 * 1000);
-	return local.toISOString().slice(0, 10);
+	// Format date directly from local components to avoid timezone conversion issues
+	const year = d.getFullYear();
+	const month = String(d.getMonth() + 1).padStart(2, '0');
+	const day = String(d.getDate()).padStart(2, '0');
+	return `${year}-${month}-${day}`;
 };
 
 const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);

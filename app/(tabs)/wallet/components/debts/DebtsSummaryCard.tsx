@@ -28,22 +28,18 @@ const DebtsSummaryCard: React.FC<Props> = ({
 			{/* Header */}
 			<View style={styles.header}>
 				<View style={styles.headerContent}>
-					<Text style={styles.overline}>Debt overview</Text>
-					<Text style={styles.headerTitle}>What you owe</Text>
-					<Text style={styles.headerSubtitle}>
-						High-level snapshot of your debt accounts.
-					</Text>
+					<Text style={styles.overline}>Track your debts</Text>
+					<Text style={styles.headerTitle}>Debt Overview</Text>
 				</View>
 
 				<TouchableOpacity
-					style={styles.addButton}
+					activeOpacity={0.85}
 					onPress={onAddDebt}
-					activeOpacity={0.9}
+					style={styles.iconButton}
 					accessibilityRole="button"
 					accessibilityLabel="Add a debt"
 				>
-					<Ionicons name="add" size={18} color={palette.primary} />
-					<Text style={styles.addButtonText}>Add debt</Text>
+					<Ionicons name="add" size={20} color={palette.primary} />
 				</TouchableOpacity>
 			</View>
 
@@ -88,11 +84,15 @@ const DebtsSummaryCard: React.FC<Props> = ({
 
 const styles = StyleSheet.create({
 	container: {
-		paddingVertical: space.md,
+		// hero-style: parent supplies horizontal padding
+		paddingTop: space.xs,
+		paddingBottom: space.lg,
 	},
+
+	/* HEADER */
 	header: {
 		flexDirection: 'row',
-		alignItems: 'center',
+		alignItems: 'flex-start',
 		justifyContent: 'space-between',
 		marginBottom: space.md,
 	},
@@ -102,34 +102,37 @@ const styles = StyleSheet.create({
 	overline: {
 		...typography.labelSm,
 		color: palette.textMuted,
-		marginBottom: 2,
+		marginBottom: 6,
+		letterSpacing: 1.2,
+		textTransform: 'uppercase',
 	},
 	headerTitle: {
 		...typography.titleMd,
+		fontSize: 30,
+		lineHeight: 34,
+		fontWeight: '700',
 		color: palette.text,
 	},
 	headerSubtitle: {
 		...typography.bodySm,
 		color: palette.textMuted,
-		marginTop: 4,
+		marginTop: 8,
 	},
-	addButton: {
-		backgroundColor: palette.surfaceAlt,
-		borderRadius: 999,
-		paddingVertical: space.sm,
-		paddingHorizontal: 12,
-		flexDirection: 'row',
+	iconButton: {
+		width: 44,
+		height: 44,
+		borderRadius: 22,
 		alignItems: 'center',
-		columnGap: 6,
-		marginLeft: space.lg,
-		borderWidth: 1,
-		borderColor: palette.borderMuted,
+		justifyContent: 'center',
+		backgroundColor: palette.primarySoft,
+		shadowColor: '#000',
+		shadowOpacity: 0.06,
+		shadowRadius: 10,
+		shadowOffset: { width: 0, height: 6 },
+		elevation: 3,
 	},
-	addButtonText: {
-		color: palette.primary,
-		fontSize: 14,
-		fontWeight: '600',
-	},
+
+	/* TOTAL ROW */
 	totalRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -144,6 +147,7 @@ const styles = StyleSheet.create({
 		...typography.numLg,
 		color: palette.text,
 	},
+
 	chip: {
 		borderRadius: 999,
 		paddingHorizontal: space.md,
@@ -151,31 +155,38 @@ const styles = StyleSheet.create({
 		backgroundColor: palette.surfaceAlt,
 		alignItems: 'flex-start',
 	},
+
 	chipLabel: {
 		fontSize: 11,
 		color: palette.textMuted,
 		marginBottom: 2,
 	},
+
 	chipValue: {
 		...typography.labelSm,
 		color: palette.text,
 		fontWeight: '600',
 	},
+
+	/* STAT GRID */
 	statsGrid: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',
 		columnGap: space.md,
 		rowGap: space.sm,
 	},
+
 	statCard: {
 		flexBasis: '30%',
 		paddingVertical: space.sm,
 	},
+
 	statLabel: {
 		fontSize: 12,
 		color: palette.textSubtle,
 		marginBottom: 2,
 	},
+
 	statValue: {
 		...typography.labelSm,
 		color: palette.text,
@@ -184,4 +195,3 @@ const styles = StyleSheet.create({
 });
 
 export default DebtsSummaryCard;
-

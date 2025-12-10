@@ -1,9 +1,9 @@
 import { ApiService } from '../core/apiService';
 import { createLogger } from '../../utils/sublogger';
 
-const recurringExpenseLog = createLogger('RecurringExpenseService');
+const billServiceLog = createLogger('BillService');
 
-export interface RecurringPattern {
+export interface BillPattern {
 	patternId: string;
 	vendor: string;
 	amount: number;
@@ -14,13 +14,14 @@ export interface RecurringPattern {
 	transactionCount: number;
 }
 
-export interface RecurringExpense {
+export interface Bill {
 	patternId: string;
 	vendor: string;
 	amount: number;
 	frequency: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 	confidence: number;
 	nextExpectedDate: string;
+	autoPay?: boolean; // Whether this bill is set to auto-pay (default: false)
 	transactions: any[];
 	// Appearance customization
 	appearanceMode?: 'custom' | 'brand' | 'default';
@@ -29,7 +30,7 @@ export interface RecurringExpense {
 	categories?: string[];
 }
 
-export interface RecurringExpenseAlert {
+export interface BillAlert {
 	patternId: string;
 	vendor: string;
 	amount: number;
@@ -37,7 +38,7 @@ export interface RecurringExpenseAlert {
 	notificationId: string;
 }
 
-export class RecurringExpenseService {
+export class BillService {
 	// Cache for payment status checks to prevent duplicate API calls
 	private static paymentStatusCache = new Map<
 		string,
@@ -48,9 +49,9 @@ export class RecurringExpenseService {
 	/**
 	 * Detect recurring patterns for the current user
 	 */
-	static async detectRecurringPatterns(): Promise<RecurringPattern[]> {
+	static async detectRecurringPatterns(): Promise<BillPattern[]> {
 		try {
-			const response = await ApiService.post<{ patterns: RecurringPattern[] }>(
+			const response = await ApiService.post<{ patterns: BillPattern[] }>(
 				'/api/recurring-expenses/detect',
 				{}
 			);
@@ -61,10 +62,7 @@ export class RecurringExpenseService {
 
 			return [];
 		} catch (error) {
-			recurringExpenseLog.error(
-				'[RecurringExpenseService] Error detecting patterns:',
-				error
-			);
+			billServiceLog.error('[BillService] Error detecting patterns:', error);
 			return [];
 		}
 	}
@@ -74,22 +72,67 @@ export class RecurringExpenseService {
 	 */
 	static async getRecurringExpenses(opts?: {
 		signal?: AbortSignal;
-	}): Promise<RecurringExpense[]> {
+		useCache?: boolean;
+	}): Promise<Bill[]> {
 		try {
-			recurringExpenseLog.debug('Fetching recurring expenses');
+			billServiceLog.debug('Fetching bills', {
+				useCache: opts?.useCache !== false,
+			});
 			const response = await ApiService.get<{
-				recurringExpenses: RecurringExpense[];
-			}>('/api/recurring-expenses', { signal: opts?.signal });
+				success: boolean;
+				bills: Bill[];
+				count: number;
+			}>('/api/recurring-expenses', {
+				signal: opts?.signal,
+				useCache: opts?.useCache,
+			});
+
+			billServiceLog.debug('GET bills response', {
+				success: response.success,
+				hasData: !!response.data,
+				dataKeys: response.data ? Object.keys(response.data) : [],
+				dataType: typeof response.data,
+				rawData: JSON.stringify(response.data).substring(0, 500),
+			});
 
 			if (response.success && response.data) {
-				const expenses = response.data.recurringExpenses || [];
-				recurringExpenseLog.info(`Found ${expenses.length} recurring expenses`);
+				// Server returns: { success: true, bills: [...], count: ... }
+				// RequestManager returns raw JSON, ApiService.get wraps as: { success: true, data: <raw JSON> }
+				// So response.data = { success: true, bills: [...], count: ... }
+				const serverResponse = response.data as any;
+
+				// Try multiple paths to find bills array
+				let expenses =
+					serverResponse.bills ||
+					serverResponse.data?.bills ||
+					(response.data as any)?.data?.bills ||
+					[];
+
+				// If serverResponse itself is an array, use it
+				if (Array.isArray(serverResponse) && expenses.length === 0) {
+					expenses = serverResponse;
+				}
+
+				billServiceLog.info(`Found ${expenses.length} bills`, {
+					billsCount: expenses.length,
+					serverHasBills: !!serverResponse.bills,
+					serverBillsCount: serverResponse.bills?.length || 0,
+					serverResponseKeys: serverResponse ? Object.keys(serverResponse) : [],
+					serverResponseType: Array.isArray(serverResponse)
+						? 'array'
+						: typeof serverResponse,
+				});
+
 				return expenses;
 			}
 
+			billServiceLog.warn('No bills found in response', {
+				success: response.success,
+				hasData: !!response.data,
+			});
 			return [];
 		} catch (error) {
-			recurringExpenseLog.error('❌ Error getting recurring expenses:', error);
+			billServiceLog.error('❌ Error getting bills:', error);
 			return [];
 		}
 	}
@@ -97,12 +140,10 @@ export class RecurringExpenseService {
 	/**
 	 * Check for upcoming recurring expenses
 	 */
-	static async checkUpcomingRecurringExpenses(): Promise<
-		RecurringExpenseAlert[]
-	> {
+	static async checkUpcomingRecurringExpenses(): Promise<BillAlert[]> {
 		try {
 			const response = await ApiService.get<{
-				alerts: RecurringExpenseAlert[];
+				alerts: BillAlert[];
 			}>('/api/recurring-expenses/upcoming');
 
 			if (response.success && response.data) {
@@ -111,8 +152,8 @@ export class RecurringExpenseService {
 
 			return [];
 		} catch (error) {
-			recurringExpenseLog.error(
-				'[RecurringExpenseService] Error checking upcoming expenses:',
+			billServiceLog.error(
+				'[BillService] Error checking upcoming expenses:',
 				error
 			);
 			return [];
@@ -187,87 +228,112 @@ export class RecurringExpenseService {
 		amount: number;
 		frequency: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 		nextExpectedDate: string;
+		autoPay?: boolean; // Default to false (manual payment)
 		appearanceMode?: 'custom' | 'brand' | 'default';
 		icon?: string;
 		color?: string;
 		category?: string; // Single category that will be applied to each generated transaction
-	}): Promise<RecurringExpense> {
+	}): Promise<Bill> {
 		try {
+			// Convert single category to categories array for server
+			const requestData = {
+				...data,
+				categories: data.category ? [data.category] : undefined,
+			};
+			// Remove category from request since server expects categories
+			delete (requestData as any).category;
+
+			billServiceLog.debug('Creating recurring expense', {
+				vendor: requestData.vendor,
+				amount: requestData.amount,
+				frequency: requestData.frequency,
+				hasCategories: !!requestData.categories,
+			});
+
 			const response = await ApiService.post<{
-				recurringExpense?: RecurringExpense;
-			}>('/api/recurring-expenses', data);
+				bill?: Bill;
+			}>('/api/recurring-expenses', requestData);
 
-			// Check for recurringExpense in data first, then at top level
-			const recurringExpense =
-				response.data?.recurringExpense ||
-				(response as any).recurringExpense ||
-				((response as any).data as RecurringExpense);
+			// Log the full response structure for debugging
+			// Always use fallback refetch since server response doesn't reliably include bill
+			// The server returns 201 (created) but the bill object is often missing from response
+			billServiceLog.debug('POST response received', {
+				success: response.success,
+				status: 201,
+				hasData: !!response.data,
+				dataKeys: response.data ? Object.keys(response.data) : [],
+			});
 
-			if (response.success && recurringExpense) {
-				recurringExpenseLog.info('Server returned created item', {
-					patternId:
-						recurringExpense.patternId ||
-						(recurringExpense as any).id ||
-						(recurringExpense as any)._id,
-				});
-
-				// WORKAROUND: Backend might not return appearance fields immediately after deploy
-				// Merge them from the request data if missing from response
-				if (!recurringExpense.appearanceMode && data.appearanceMode) {
-					recurringExpenseLog.warn(
-						'⚠️ [RecurringExpenseService] Backend did not return appearanceMode on create, using request data:',
-						data.appearanceMode
-					);
-					recurringExpense.appearanceMode = data.appearanceMode;
-				}
-				if (!recurringExpense.icon && data.icon) {
-					recurringExpenseLog.warn(
-						'⚠️ [RecurringExpenseService] Backend did not return icon field on create, using request data:',
-						data.icon
-					);
-					recurringExpense.icon = data.icon;
-				}
-				if (!recurringExpense.color && data.color) {
-					recurringExpenseLog.warn(
-						'⚠️ [RecurringExpenseService] Backend did not return color field on create, using request data:',
-						data.color
-					);
-					recurringExpense.color = data.color;
-				}
-				if (!recurringExpense.categories && data.categories) {
-					recurringExpenseLog.warn(
-						'⚠️ [RecurringExpenseService] Backend did not return categories field on create, using request data:',
-						data.categories
-					);
-					recurringExpense.categories = data.categories;
-				}
-
-				return recurringExpense;
-			}
-
-			// Fallback: server didn't return the created item → refetch & match
-			recurringExpenseLog.warn(
-				'POST succeeded but no data returned, fetching to resolve ID',
-				{
-					hasData: !!response.data,
-					dataKeys: response.data ? Object.keys(response.data) : [],
-					topLevelKeys: Object.keys(response),
-				}
+			// Since server response is unreliable, always refetch after creation
+			billServiceLog.debug(
+				'Bill creation succeeded, refetching to get the created bill'
 			);
 
+			// Clear cache and refetch to get the created bill
 			ApiService.clearCacheByPrefix('/api/recurring-expenses');
 
-			// Small delay to allow DB persistence
-			await new Promise((resolve) => setTimeout(resolve, 500));
+			// Retry logic: try multiple times with increasing delays
+			let all: Bill[] = [];
+			let created: Bill | undefined;
+			const maxRetries = 3;
 
-			const all = await this.getRecurringExpenses();
-			recurringExpenseLog.debug('Matching created item', {
-				vendor: data.vendor,
-				amount: data.amount,
-				frequency: data.frequency,
-				nextExpectedDate: data.nextExpectedDate,
-				candidateCount: all.length,
-				candidates: all.map((e) => ({
+			for (let attempt = 0; attempt < maxRetries; attempt++) {
+				// Increasing delay: 500ms, 1000ms, 2000ms
+				const delay = 500 * Math.pow(2, attempt);
+				await new Promise((resolve) => setTimeout(resolve, delay));
+
+				// Clear cache and fetch fresh
+				ApiService.clearCacheByPrefix('/api/recurring-expenses');
+				all = await this.getRecurringExpenses({ useCache: false });
+
+				billServiceLog.debug(`Refetch attempt ${attempt + 1}/${maxRetries}`, {
+					vendor: data.vendor,
+					amount: data.amount,
+					frequency: data.frequency,
+					billsFound: all.length,
+					candidates: all.map((e) => ({
+						vendor: e.vendor,
+						amount: e.amount,
+						frequency: e.frequency,
+						date: e.nextExpectedDate?.slice(0, 10),
+						id: e.patternId || (e as any).id || (e as any)._id,
+					})),
+				});
+
+				// Try to find the created bill
+				created = all.find(
+					(e) =>
+						e.vendor?.toLowerCase().trim() ===
+							data.vendor.toLowerCase().trim() &&
+						Math.abs(Number(e.amount) - Number(data.amount)) < 0.01 &&
+						e.frequency === data.frequency &&
+						// Allow same-day string equality
+						e.nextExpectedDate?.slice(0, 10) ===
+							data.nextExpectedDate.slice(0, 10)
+				);
+
+				if (created) {
+					const resolvedId =
+						created.patternId || (created as any).id || (created as any)._id;
+					billServiceLog.info('✅ Found created bill', {
+						resolvedId,
+						vendor: created.vendor,
+						attempt: attempt + 1,
+					});
+					return created;
+				}
+			}
+
+			// If we still can't find it after retries, log detailed error
+			billServiceLog.error('❌ [BillService] No match found after retries!', {
+				searchCriteria: {
+					vendor: data.vendor,
+					amount: data.amount,
+					frequency: data.frequency,
+					nextExpectedDate: data.nextExpectedDate,
+				},
+				fetchedCount: all.length,
+				allBills: all.map((e) => ({
 					vendor: e.vendor,
 					amount: e.amount,
 					frequency: e.frequency,
@@ -276,37 +342,28 @@ export class RecurringExpenseService {
 				})),
 			});
 
-			const created = all.find(
-				(e) =>
-					e.vendor === data.vendor &&
-					Number(e.amount) === Number(data.amount) &&
-					e.frequency === data.frequency &&
-					// Allow same-day string equality OR near-equality on date
-					e.nextExpectedDate?.slice(0, 10) ===
-						data.nextExpectedDate.slice(0, 10)
+			// Don't throw - return a temporary bill object so the UI updates
+			// The bill should appear on the next refresh
+			billServiceLog.warn(
+				'⚠️ Returning temporary bill object - bill will appear on next refresh'
 			);
-
-			if (created) {
-				const resolvedId =
-					created.patternId || (created as any).id || (created as any)._id;
-				recurringExpenseLog.info('Resolved created item', { resolvedId });
-				return created;
-			}
-
-			recurringExpenseLog.error(
-				'❌ [RecurringExpenseService] No match found!',
-				{
-					searchCriteria: data,
-					fetchedCount: all.length,
-				}
-			);
-			throw new Error(
-				response.error ||
-					'Created, but could not resolve new recurring expense ID'
-			);
+			return {
+				patternId: `temp-${Date.now()}`,
+				vendor: data.vendor,
+				amount: data.amount,
+				frequency: data.frequency,
+				nextExpectedDate: data.nextExpectedDate,
+				confidence: 1.0,
+				autoPay: data.autoPay || false,
+				transactions: [],
+				appearanceMode: data.appearanceMode,
+				icon: data.icon,
+				color: data.color,
+				categories: requestData.categories,
+			};
 		} catch (error) {
-			recurringExpenseLog.error(
-				'[RecurringExpenseService] Error creating recurring expense:',
+			billServiceLog.error(
+				'[BillService] Error creating recurring expense:',
 				error
 			);
 			throw error;
@@ -328,15 +385,15 @@ export class RecurringExpenseService {
 			color?: string;
 			categories?: string[];
 		}
-	): Promise<RecurringExpense> {
+	): Promise<Bill> {
 		try {
 			const response = await ApiService.put<{
-				data?: RecurringExpense;
-				recurringExpense?: RecurringExpense;
+				data?: Bill;
+				recurringExpense?: Bill;
 			}>(`/api/recurring-expenses/${encodeURIComponent(patternId)}`, data);
 
-			recurringExpenseLog.debug(
-				'📝 [RecurringExpenseService] Update response:',
+			billServiceLog.debug(
+				'📝 [BillService] Update response:',
 				JSON.stringify(response, null, 2)
 			);
 
@@ -346,51 +403,51 @@ export class RecurringExpenseService {
 					response.data.data || response.data.recurringExpense;
 
 				if (!updatedExpense) {
-					recurringExpenseLog.error(
-						'⚠️ [RecurringExpenseService] No expense found in response:',
+					billServiceLog.error(
+						'⚠️ [BillService] No expense found in response:',
 						response
 					);
 					throw new Error('Server returned success but no expense data');
 				}
 
-				recurringExpenseLog.debug(
-					'✅ [RecurringExpenseService] Extracted expense:',
+				billServiceLog.debug(
+					'✅ [BillService] Extracted expense:',
 					updatedExpense
 				);
 
 				// WORKAROUND: Backend might not return appearance fields immediately after deploy
 				// Merge them from the request data if missing from response
 				if (!updatedExpense.appearanceMode && data.appearanceMode) {
-					recurringExpenseLog.warn(
-						'⚠️ [RecurringExpenseService] Backend did not return appearanceMode, using request data:',
+					billServiceLog.warn(
+						'⚠️ [BillService] Backend did not return appearanceMode, using request data:',
 						data.appearanceMode
 					);
 					updatedExpense.appearanceMode = data.appearanceMode;
 				}
 				if (!updatedExpense.icon && data.icon) {
-					recurringExpenseLog.warn(
-						'⚠️ [RecurringExpenseService] Backend did not return icon field, using request data:',
+					billServiceLog.warn(
+						'⚠️ [BillService] Backend did not return icon field, using request data:',
 						data.icon
 					);
 					updatedExpense.icon = data.icon;
 				}
 				if (!updatedExpense.color && data.color) {
-					recurringExpenseLog.warn(
-						'⚠️ [RecurringExpenseService] Backend did not return color field, using request data:',
+					billServiceLog.warn(
+						'⚠️ [BillService] Backend did not return color field, using request data:',
 						data.color
 					);
 					updatedExpense.color = data.color;
 				}
 				if (!updatedExpense.categories && data.categories) {
-					recurringExpenseLog.warn(
-						'⚠️ [RecurringExpenseService] Backend did not return categories field, using request data:',
+					billServiceLog.warn(
+						'⚠️ [BillService] Backend did not return categories field, using request data:',
 						data.categories
 					);
 					updatedExpense.categories = data.categories;
 				}
 
-				recurringExpenseLog.debug(
-					'✅ [RecurringExpenseService] Final merged expense:',
+				billServiceLog.debug(
+					'✅ [BillService] Final merged expense:',
 					updatedExpense
 				);
 
@@ -407,8 +464,8 @@ export class RecurringExpenseService {
 			error.response = response;
 			throw error;
 		} catch (error: any) {
-			recurringExpenseLog.error(
-				'[RecurringExpenseService] Error updating recurring expense:',
+			billServiceLog.error(
+				'[BillService] Error updating recurring expense:',
 				error
 			);
 			// Re-throw with status preserved
@@ -443,8 +500,8 @@ export class RecurringExpenseService {
 
 			throw new Error(response.error || 'Failed to process recurring expenses');
 		} catch (error) {
-			recurringExpenseLog.error(
-				'[RecurringExpenseService] Error processing recurring expenses:',
+			billServiceLog.error(
+				'[BillService] Error processing recurring expenses:',
 				error
 			);
 			throw error;
@@ -477,8 +534,8 @@ export class RecurringExpenseService {
 				response.error || 'Failed to clean up duplicate expenses'
 			);
 		} catch (error) {
-			recurringExpenseLog.error(
-				'[RecurringExpenseService] Error cleaning up duplicate expenses:',
+			billServiceLog.error(
+				'[BillService] Error cleaning up duplicate expenses:',
 				error
 			);
 			throw error;
@@ -507,8 +564,8 @@ export class RecurringExpenseService {
 
 			throw new Error(response.error || 'Failed to delete recurring expense');
 		} catch (error) {
-			recurringExpenseLog.error(
-				'[RecurringExpenseService] Error deleting recurring expense:',
+			billServiceLog.error(
+				'[BillService] Error deleting recurring expense:',
 				error
 			);
 			throw error;
@@ -516,7 +573,37 @@ export class RecurringExpenseService {
 	}
 
 	/**
+	 * Pay a bill for the current period - creates a transaction and advances the period
+	 */
+	static async payBill(
+		patternId: string,
+		date?: string
+	): Promise<{
+		bill: Bill;
+		transaction: any;
+	}> {
+		try {
+			const response = await ApiService.post<{
+				bill: Bill;
+				transaction: any;
+			}>(`/api/recurring-expenses/${patternId}/pay`, {
+				date, // optional ISO string
+			});
+
+			if (response.success && response.data) {
+				return response.data;
+			}
+
+			throw new Error(response.error || 'Failed to pay bill');
+		} catch (error) {
+			billServiceLog.error('[BillService] Error paying bill:', error);
+			throw error;
+		}
+	}
+
+	/**
 	 * Mark a recurring expense as paid for a specific period
+	 * @deprecated Use payBill instead
 	 */
 	static async markRecurringExpensePaid(data: {
 		patternId: string;
@@ -547,8 +634,8 @@ export class RecurringExpenseService {
 				response.error || 'Failed to mark recurring expense as paid'
 			);
 		} catch (error) {
-			recurringExpenseLog.error(
-				'[RecurringExpenseService] Error marking recurring expense as paid:',
+			billServiceLog.error(
+				'[BillService] Error marking recurring expense as paid:',
 				error
 			);
 			throw error;
@@ -573,8 +660,8 @@ export class RecurringExpenseService {
 
 			return [];
 		} catch (error) {
-			recurringExpenseLog.error(
-				'[RecurringExpenseService] Error getting payment history:',
+			billServiceLog.error(
+				'[BillService] Error getting payment history:',
 				error
 			);
 			return [];
@@ -591,20 +678,18 @@ export class RecurringExpenseService {
 			// Check cache first
 			const cached = this.paymentStatusCache.get(patternId);
 			if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
-				recurringExpenseLog.debug(
-					`🔍 Using cached payment status for ${patternId}`
-				);
+				billServiceLog.debug(`🔍 Using cached payment status for ${patternId}`);
 				return cached.result;
 			}
 
-			recurringExpenseLog.debug(`🔍 Checking payment status for ${patternId}`);
+			billServiceLog.debug(`🔍 Checking payment status for ${patternId}`);
 			const response = await ApiService.get<{ isPaid: boolean | null }>(
 				`/api/recurring-expenses/${patternId}/paid`
 			);
 
 			if (response.success && response.data) {
 				const isPaid = response.data.isPaid;
-				recurringExpenseLog.debug(
+				billServiceLog.debug(
 					`💰 ${patternId}: ${
 						isPaid === null ? 'Unknown' : isPaid ? 'Paid' : 'Unpaid'
 					}`
@@ -621,7 +706,7 @@ export class RecurringExpenseService {
 
 			return null;
 		} catch (error) {
-			recurringExpenseLog.error(
+			billServiceLog.error(
 				`❌ Error checking payment status for ${patternId}:`,
 				error
 			);
@@ -653,13 +738,13 @@ export class RecurringExpenseService {
 
 			// If all are cached, return cached results
 			if (uncachedIds.length === 0) {
-				recurringExpenseLog.debug(
+				billServiceLog.debug(
 					`Using cached payment status for all ${patternIds.length} expenses`
 				);
 				return cachedResults;
 			}
 
-			recurringExpenseLog.debug(
+			billServiceLog.debug(
 				`Batch checking payment status for ${uncachedIds.length} expenses`
 			);
 			const response = await ApiService.get<Record<string, boolean | null>>(
@@ -680,14 +765,14 @@ export class RecurringExpenseService {
 				// Combine cached and new results
 				const allResults = { ...cachedResults, ...batchResults };
 
-				recurringExpenseLog.debug('Batch payment status', allResults);
+				billServiceLog.debug('Batch payment status', allResults);
 				return allResults;
 			}
 
 			// If batch request fails, return cached results only
 			return cachedResults;
 		} catch (error) {
-			recurringExpenseLog.error('Error checking batch payment status', error);
+			billServiceLog.error('Error checking batch payment status', error);
 			// Return cached results if available
 			const cachedResults: Record<string, boolean | null> = {};
 			patternIds.forEach((patternId) => {
@@ -729,8 +814,8 @@ export class RecurringExpenseService {
 				response.error || 'Failed to generate recurring transactions'
 			);
 		} catch (error) {
-			recurringExpenseLog.error(
-				'[RecurringExpenseService] Error generating recurring transactions:',
+			billServiceLog.error(
+				'[BillService] Error generating recurring transactions:',
 				error
 			);
 			throw error;
@@ -764,10 +849,7 @@ export class RecurringExpenseService {
 
 			throw new Error(response.error || 'Failed to link transaction');
 		} catch (error) {
-			recurringExpenseLog.error(
-				'[RecurringExpenseService] Error linking transaction:',
-				error
-			);
+			billServiceLog.error('[BillService] Error linking transaction:', error);
 			throw error;
 		}
 	}
@@ -789,8 +871,8 @@ export class RecurringExpenseService {
 
 			return [];
 		} catch (error) {
-			recurringExpenseLog.error(
-				'[RecurringExpenseService] Error getting pending recurring transactions:',
+			billServiceLog.error(
+				'[BillService] Error getting pending recurring transactions:',
 				error
 			);
 			return [];
@@ -815,8 +897,8 @@ export class RecurringExpenseService {
 
 			return [];
 		} catch (error) {
-			recurringExpenseLog.error(
-				'[RecurringExpenseService] Error getting recurring transactions:',
+			billServiceLog.error(
+				'[BillService] Error getting recurring transactions:',
 				error
 			);
 			return [];
@@ -847,8 +929,8 @@ export class RecurringExpenseService {
 
 			throw new Error(response.error || 'Failed to auto-apply transactions');
 		} catch (error) {
-			recurringExpenseLog.error(
-				'[RecurringExpenseService] Error auto-applying transactions:',
+			billServiceLog.error(
+				'[BillService] Error auto-applying transactions:',
 				error
 			);
 			throw error;

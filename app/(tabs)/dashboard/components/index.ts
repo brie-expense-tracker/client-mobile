@@ -5,8 +5,8 @@ export { default as QuickFinancialSummary } from './QuickFinancialSummary';
 export { default as TransactionHistory } from './TransactionHistory';
 export { default as SettingsBudgetsGoalsWidget } from './SettingsBudgetsGoalsWidget';
 export { default as AICoachSection } from './AICoachSection';
-export { default as RecurringExpensesList } from '../../wallet/components/shared/RecurringExpensesList';
-export { default as RecurringExpensesSummaryWidget } from './RecurringExpensesSummaryWidget';
+export { default as BillsList } from '../../wallet/components/shared/BillsList';
+export { default as BillsSummaryWidget } from './BillsSummaryWidget';
 export { default as SpendingForecastCard } from './SpendingForecastCard';
 
 // Default export for React Router compatibility

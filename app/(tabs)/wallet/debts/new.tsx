@@ -8,10 +8,12 @@ import {
 	ActivityIndicator,
 	Alert,
 	ScrollView,
+	Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { DebtsService } from '../../../../src/services/feature/debtsService';
+import { DateField } from '../../../../src/components/DateField';
 import { palette, radius, space } from '../../../../src/ui/theme';
 
 export default function NewDebtScreen() {
@@ -20,7 +22,7 @@ export default function NewDebtScreen() {
 	const [balance, setBalance] = useState('');
 	const [apr, setApr] = useState('');
 	const [minPayment, setMinPayment] = useState('');
-	const [dueDay, setDueDay] = useState('');
+	const [dueDate, setDueDate] = useState<string>('');
 	const [loading, setLoading] = useState(false);
 
 	const onSave = async () => {
@@ -56,16 +58,7 @@ export default function NewDebtScreen() {
 			);
 		}
 
-		const dueDayNum = dueDay ? Number(dueDay) : undefined;
-		if (
-			dueDayNum !== undefined &&
-			(isNaN(dueDayNum) || dueDayNum < 1 || dueDayNum > 31)
-		) {
-			return Alert.alert(
-				'Invalid due day',
-				'Due day must be between 1 and 31.'
-			);
-		}
+		const dueDayNum = dueDate ? new Date(dueDate).getDate() : undefined;
 
 		setLoading(true);
 		try {
@@ -95,6 +88,8 @@ export default function NewDebtScreen() {
 				showsVerticalScrollIndicator={false}
 				contentInsetAdjustmentBehavior="automatic"
 				keyboardShouldPersistTaps="handled"
+				onScrollBeginDrag={Keyboard.dismiss}
+				automaticallyAdjustKeyboardInsets
 			>
 				{/* Header / Hero */}
 				<View style={styles.header}>
@@ -176,23 +171,12 @@ export default function NewDebtScreen() {
 					</View>
 
 					<View style={styles.fieldGroup}>
-						<Label text="Due day of month" optional />
-						<TextInput
-							style={styles.input}
-							placeholder="1–31"
-							placeholderTextColor={palette.textSubtle}
-							value={dueDay}
-							onChangeText={(text) => {
-								const cleaned = text.replace(/[^0-9]/g, '');
-								if (
-									cleaned === '' ||
-									(Number(cleaned) >= 1 && Number(cleaned) <= 31)
-								) {
-									setDueDay(cleaned);
-								}
-							}}
-							keyboardType="number-pad"
-							maxLength={2}
+						<Label text="Next due date" optional />
+						<DateField
+							value={dueDate}
+							onChange={setDueDate}
+							title=""
+							placeholder="Pick a date"
 						/>
 						<Text style={styles.helperText}>
 							Used for reminders and payoff projections.

@@ -24,6 +24,7 @@ import { useGoal } from '../../../../src/context/goalContext';
 import { TransactionRow } from './components/transactionRow';
 import CalendarSheet from './components/CalendarSheet';
 import CalendarTrigger from './components/CalendarTrigger';
+import { palette, radius, space } from '../../../../src/ui/theme';
 
 // Transaction interface defined inline since we removed the mock data file
 interface Transaction {
@@ -112,11 +113,12 @@ const formatMonthHeader = (monthKey: string) => {
 };
 
 const getLocalIsoDate = (): string => {
+	// Format date directly from local components to avoid timezone conversion issues
 	const today = new Date();
-	// Adjust for timezone offset to ensure we get the correct local date
-	const offset = today.getTimezoneOffset();
-	const localDate = new Date(today.getTime() - offset * 60 * 1000);
-	return localDate.toISOString().split('T')[0];
+	const year = today.getFullYear();
+	const month = String(today.getMonth() + 1).padStart(2, '0');
+	const day = String(today.getDate()).padStart(2, '0');
+	return `${year}-${month}-${day}`;
 };
 
 // =============================================
@@ -443,45 +445,28 @@ export default function TransactionScreen() {
 					{/* Header */}
 					<View style={styles.headerContainer}>
 						<BorderlessButton onPress={() => router.back()}>
-							<Ionicons name="chevron-back" size={24} color="#212121" />
+							<Ionicons name="chevron-back" size={24} color={palette.text} />
 						</BorderlessButton>
 						<View style={styles.headerRight}>
 							<TouchableOpacity
 								style={styles.addButton}
 								onPress={() => router.push('/(tabs)/transaction')}
 							>
-								<Ionicons name="add" size={24} color="#212121" />
+								<Ionicons name="add" size={24} color={palette.text} />
 							</TouchableOpacity>
-							{dateFilterMode === 'day' ? (
-								<View style={{ flex: 1, marginRight: 8 }}>
+							{dateFilterMode === 'day' && (
+								<View style={{ flex: 1, marginRight: space.sm }}>
 									<CalendarTrigger
 										dateISO={selectedDate}
 										onPress={() => setCalendarOpen(true)}
 									/>
 								</View>
-							) : (
-								<TouchableOpacity
-									style={[
-										styles.filterButton,
-										dateFilterMode === 'month' && styles.filterButtonDisabled,
-									]}
-									onPress={() => {
-										// This could trigger a mode change to day mode
-										// For now, we'll keep it as a placeholder
-									}}
-								>
-									<Ionicons
-										name="calendar"
-										size={24}
-										color={dateFilterMode === 'month' ? '#616161' : '#212121'}
-									/>
-								</TouchableOpacity>
 							)}
 							<TouchableOpacity
 								style={styles.filterButton}
 								onPress={handleFilterPress}
 							>
-								<Ionicons name="reorder-three" size={32} color="#212121" />
+								<Ionicons name="reorder-three" size={32} color={palette.text} />
 							</TouchableOpacity>
 						</View>
 					</View>
@@ -490,8 +475,8 @@ export default function TransactionScreen() {
 					<View style={styles.searchContainer}>
 						<Ionicons
 							name="search"
-							size={20}
-							color="#9ca3af"
+							size={18}
+							color={palette.textMuted}
 							style={styles.searchIcon}
 						/>
 						<TextInput
@@ -499,14 +484,18 @@ export default function TransactionScreen() {
 							placeholder="Search transactions..."
 							value={searchQuery}
 							onChangeText={setSearchQuery}
-							placeholderTextColor="#9ca3af"
+							placeholderTextColor={palette.textMuted}
 						/>
 						{searchQuery ? (
 							<TouchableOpacity
 								onPress={() => setSearchQuery('')}
 								style={styles.clearButton}
 							>
-								<Ionicons name="close-circle" size={20} color="#9ca3af" />
+								<Ionicons
+									name="close-circle"
+									size={18}
+									color={palette.textMuted}
+								/>
 							</TouchableOpacity>
 						) : null}
 					</View>
@@ -515,7 +504,7 @@ export default function TransactionScreen() {
 					{selectedPatternId && (
 						<View style={styles.patternFilterContainer}>
 							<View style={styles.patternFilterContent}>
-								<Ionicons name="repeat" size={16} color="#007ACC" />
+								<Ionicons name="repeat" size={16} color={palette.primary} />
 								<Text style={styles.patternFilterText}>
 									Filtered by recurring pattern
 								</Text>
@@ -523,7 +512,7 @@ export default function TransactionScreen() {
 									onPress={() => setSelectedPatternId(null)}
 									style={styles.clearPatternButton}
 								>
-									<Ionicons name="close" size={16} color="#007ACC" />
+									<Ionicons name="close" size={16} color={palette.primary} />
 								</TouchableOpacity>
 							</View>
 						</View>
@@ -556,11 +545,15 @@ export default function TransactionScreen() {
 							ListEmptyComponent={
 								isLoading ? (
 									<View style={styles.loadingContainer}>
-										<Text>Loading…</Text>
+										<Text style={styles.loadingText}>Loading…</Text>
 									</View>
 								) : (
 									<View style={styles.emptyContainer}>
-										<Ionicons name="document-outline" size={48} color="#ccc" />
+										<Ionicons
+											name="document-outline"
+											size={48}
+											color={palette.textSubtle}
+										/>
 										<Text style={styles.emptyText}>No transactions</Text>
 									</View>
 								)
@@ -598,23 +591,24 @@ const styles = StyleSheet.create({
 	},
 	safeArea: {
 		flex: 1,
-		backgroundColor: '#fff',
+		backgroundColor: palette.bg,
 	},
 	mainContainer: {
 		flex: 1,
-		backgroundColor: '#fff',
+		backgroundColor: palette.bg,
 	},
 	headerContainer: {
 		flexDirection: 'row',
-		marginBottom: 16,
+		marginBottom: space.md,
 		justifyContent: 'space-between',
 		alignItems: 'center',
-		paddingHorizontal: 24,
-		backgroundColor: '#fff',
+		paddingHorizontal: space.lg,
+		backgroundColor: palette.bg,
+		paddingTop: space.sm,
 	},
 	listContainer: {
 		flex: 1,
-		backgroundColor: '#fff',
+		backgroundColor: palette.bg,
 	},
 	listContentContainer: {
 		flexGrow: 1,
@@ -626,53 +620,55 @@ const styles = StyleSheet.create({
 		flex: 1,
 		justifyContent: 'center',
 		alignItems: 'center',
+		paddingVertical: space.xxl,
 	},
 	emptyText: {
-		marginTop: 16,
+		marginTop: space.lg,
 		fontSize: 16,
-		color: '#666',
+		color: palette.textMuted,
 		fontWeight: '500',
 	},
 	loadingContainer: {
 		flex: 1,
 		justifyContent: 'center',
 		alignItems: 'center',
+		paddingVertical: space.xxl,
 	},
 	loadingText: {
-		color: '#9ca3af',
+		color: palette.textMuted,
 		fontSize: 16,
 	},
 	empty: {
 		alignItems: 'center',
 	},
 	incomeAmount: {
-		color: '#16a34a',
+		color: palette.success,
 	},
 	expenseAmount: {
-		color: '#dc2626',
+		color: palette.danger,
 	},
 	txDate: {
 		fontSize: 12,
-		color: '#9ca3af',
+		color: palette.textMuted,
 		marginTop: 4,
 	},
 	headerTextContainer: {
 		flexDirection: 'column',
 	},
 	headerText: {
-		color: '#212121',
+		color: palette.text,
 		fontSize: 28,
 		fontWeight: '500',
 	},
 	headerRight: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 12,
+		gap: space.md,
 	},
 	filterButton: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		paddingHorizontal: 8,
+		paddingHorizontal: space.sm,
 	},
 	filterButtonDisabled: {
 		opacity: 0.5,
@@ -680,10 +676,10 @@ const styles = StyleSheet.create({
 	addButton: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		paddingHorizontal: 8,
-		backgroundColor: '#f0f0f0',
-		borderRadius: 8,
-		marginRight: 8,
+		paddingHorizontal: space.sm,
+		backgroundColor: palette.surfaceAlt,
+		borderRadius: radius.md,
+		marginRight: space.sm,
 	},
 	pickerContent: {
 		width: '100%',
@@ -693,44 +689,45 @@ const styles = StyleSheet.create({
 		height: 200,
 	},
 	monthHeader: {
-		paddingVertical: 8,
-		backgroundColor: '#ffffff',
+		paddingVertical: space.sm,
+		backgroundColor: palette.bg,
 	},
 	monthHeaderText: {
 		fontSize: 14,
 		fontWeight: '600',
-		color: '#363636',
-		paddingHorizontal: 24,
+		color: palette.text,
+		paddingHorizontal: space.lg,
+		letterSpacing: 0.2,
 	},
 	dateHeader: {
-		paddingTop: 8,
-		marginTop: 8,
+		paddingTop: space.sm,
+		marginTop: space.sm,
 	},
 	dateHeaderText: {
 		fontSize: 14,
 		fontWeight: '600',
-		color: '#363636',
-		paddingHorizontal: 24,
+		color: palette.text,
+		paddingHorizontal: space.lg,
+		letterSpacing: 0.2,
 	},
 	txRowContainer: {
-		// position: 'relative',
 		overflow: 'hidden',
 	},
 	txRow: {
 		flexDirection: 'row',
-		paddingVertical: 16,
+		paddingVertical: space.md,
 		alignItems: 'center',
-		backgroundColor: '#fff',
-		paddingHorizontal: 24,
+		backgroundColor: palette.surface,
+		paddingHorizontal: space.lg,
 	},
 	txDesc: {
 		fontSize: 16,
 		fontWeight: '500',
-		color: '#212121',
+		color: palette.text,
 	},
 	txCategory: {
 		fontSize: 12,
-		color: '#9ca3af',
+		color: palette.textMuted,
 		marginTop: 4,
 	},
 	txRight: {
@@ -746,59 +743,62 @@ const styles = StyleSheet.create({
 		top: 0,
 		bottom: 0,
 		width: '100%',
-		backgroundColor: '#dc2626',
+		backgroundColor: palette.danger,
 		justifyContent: 'center',
 		alignItems: 'flex-end',
-		paddingRight: 18,
+		paddingRight: space.lg,
 	},
 	iconContainer: {
 		width: 36,
 		height: 36,
-		borderRadius: 8,
+		borderRadius: radius.sm,
 		justifyContent: 'center',
 		alignItems: 'center',
 	},
 	searchContainer: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		backgroundColor: '#f3f4f6',
-		borderRadius: 12,
-		paddingHorizontal: 12,
-		height: 44,
-		marginHorizontal: 24,
+		backgroundColor: palette.surfaceAlt,
+		borderRadius: radius.md,
+		paddingHorizontal: space.md,
+		borderWidth: 1,
+		borderColor: palette.border,
+		minHeight: 44,
+		marginHorizontal: space.lg,
+		marginBottom: space.sm,
 	},
 	searchIcon: {
-		marginRight: 8,
+		marginRight: space.sm,
 	},
 	searchInput: {
 		flex: 1,
 		fontSize: 16,
-		color: '#212121',
-		paddingVertical: 8,
+		color: palette.text,
+		paddingVertical: 10,
 	},
 	clearButton: {
 		padding: 4,
 	},
 	patternFilterContainer: {
-		marginHorizontal: 24,
-		marginVertical: 8,
+		marginHorizontal: space.lg,
+		marginVertical: space.sm,
 	},
 	patternFilterContent: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		backgroundColor: '#e3f2fd',
-		borderRadius: 8,
-		paddingHorizontal: 12,
-		paddingVertical: 8,
+		backgroundColor: palette.infoSubtle,
+		borderRadius: radius.md,
+		paddingHorizontal: space.md,
+		paddingVertical: space.sm,
 		borderWidth: 1,
-		borderColor: '#007ACC',
+		borderColor: palette.primarySubtle,
 	},
 	patternFilterText: {
 		flex: 1,
-		marginLeft: 8,
+		marginLeft: space.sm,
 		fontSize: 14,
-		color: '#007ACC',
-		fontWeight: '500',
+		color: palette.primary,
+		fontWeight: '600',
 	},
 	clearPatternButton: {
 		padding: 4,

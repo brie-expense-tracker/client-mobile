@@ -526,13 +526,14 @@ export class SimpleKnowledgeBase {
 			// App How-Tos
 			{
 				q: 'How do I mark a bill as paid?',
-				a: 'Open Recurring Expenses → select the item → tap "Mark as Paid." This keeps your month-to-date spending accurate and helps track your progress.',
+				a: 'Recurring bills are automatically inputted as transactions when they are due. You don\'t need to manually mark them as paid - the system creates the transaction automatically to prevent duplicate entries.',
 				category: 'app',
 				keywords: [
 					'mark paid',
 					'bill paid',
 					'recurring paid',
 					'subscription paid',
+					'automatic payment',
 				],
 				actions: [
 					{ label: 'Open Recurring Expenses', action: 'OPEN_RECURRING_TAB' },

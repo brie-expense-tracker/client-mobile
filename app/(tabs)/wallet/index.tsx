@@ -21,8 +21,8 @@ import Svg, { Path } from 'react-native-svg';
 import { router } from 'expo-router';
 import { useBudget } from '../../../src/context/budgetContext';
 import { useGoal } from '../../../src/context/goalContext';
-import { useRecurringExpense } from '../../../src/context/recurringExpenseContext';
-import { RecurringExpenseService } from '../../../src/services';
+import { useBills } from '../../../src/context/billContext';
+import { BillService } from '../../../src/services';
 import { DebtsService, Debt } from '../../../src/services/feature/debtsService';
 import { palette, space, shadow } from '../../../src/ui/theme';
 
@@ -515,6 +515,50 @@ const styles = StyleSheet.create({
 	},
 });
 
+function useCardPressAnimation() {
+	const scale = useRef(new Animated.Value(1)).current;
+	const opacity = useRef(new Animated.Value(1)).current;
+
+	const handlePressIn = useCallback(() => {
+		Animated.parallel([
+			Animated.spring(scale, {
+				toValue: 0.97,
+				useNativeDriver: true,
+				speed: 20,
+				bounciness: 6,
+			}),
+			Animated.timing(opacity, {
+				toValue: 0.9,
+				duration: 120,
+				useNativeDriver: true,
+			}),
+		]).start();
+	}, [scale, opacity]);
+
+	const handlePressOut = useCallback(() => {
+		Animated.parallel([
+			Animated.spring(scale, {
+				toValue: 1,
+				useNativeDriver: true,
+				speed: 20,
+				bounciness: 6,
+			}),
+			Animated.timing(opacity, {
+				toValue: 1,
+				duration: 120,
+				useNativeDriver: true,
+			}),
+		]).start();
+	}, [scale, opacity]);
+
+	const animatedStyle: StyleProp<ViewStyle> = {
+		transform: [{ scale }],
+		opacity,
+	};
+
+	return { animatedStyle, handlePressIn, handlePressOut };
+}
+
 type CardWrapperProps = {
 	children: React.ReactNode;
 	onPress?: () => void;
@@ -526,16 +570,24 @@ function CardWrapper({
 	onPress,
 	accessibilityLabel,
 }: CardWrapperProps) {
+	const { animatedStyle, handlePressIn, handlePressOut } =
+		useCardPressAnimation();
+
+	const isPressable = !!onPress;
+
 	return (
 		<TouchableOpacity
-			activeOpacity={0.9}
-			style={styles.card}
+			activeOpacity={1}
 			onPress={onPress}
-			disabled={!onPress}
-			accessibilityRole={onPress ? 'button' : undefined}
+			onPressIn={isPressable ? handlePressIn : undefined}
+			onPressOut={isPressable ? handlePressOut : undefined}
+			disabled={!isPressable}
+			accessibilityRole={isPressable ? 'button' : undefined}
 			accessibilityLabel={accessibilityLabel}
 		>
-			{children}
+			<Animated.View style={[styles.card, animatedStyle]}>
+				{children}
+			</Animated.View>
 		</TouchableOpacity>
 	);
 }
@@ -556,15 +608,15 @@ export default function WalletOverviewScreen() {
 	} = useGoal();
 	const {
 		expenses,
-		hasLoaded: recurringLoaded,
-		isLoading: recurringLoading,
-		refetch: refetchRecurring,
-	} = useRecurringExpense();
+		hasLoaded: billsLoaded,
+		isLoading: billsLoading,
+		refetch: refetchBills,
+	} = useBills();
 
 	const [debts, setDebts] = useState<Debt[]>([]);
 	const [debtsLoading, setDebtsLoading] = useState(true);
 	const budgetsBusy = budgetsLoading && !budgetsLoaded;
-	const recurringBusy = recurringLoading && !recurringLoaded;
+	const billsBusy = billsLoading && !billsLoaded;
 	const goalsBusy = goalsLoading && !goalsLoaded;
 	const debtsBusy = debtsLoading && !debts.length;
 
@@ -581,10 +633,10 @@ export default function WalletOverviewScreen() {
 	}, [goalsLoaded, refetchGoals]);
 
 	useEffect(() => {
-		if (!recurringLoaded) {
-			refetchRecurring();
+		if (!billsLoaded) {
+			refetchBills();
 		}
-	}, [recurringLoaded, refetchRecurring]);
+	}, [billsLoaded, refetchBills]);
 
 	const loadDebts = useCallback(async () => {
 		setDebtsLoading(true);
@@ -649,15 +701,15 @@ export default function WalletOverviewScreen() {
 		dueThisWeekCount,
 		dueThisWeekAmount,
 		upcomingExpenses,
-		recurringSubtitle,
+		billsSubtitle,
 	} = useMemo(() => {
-		const loading = recurringLoading && !recurringLoaded;
+		const loading = billsLoading && !billsLoaded;
 		if (loading) {
 			return {
 				dueThisWeekCount: 0,
 				dueThisWeekAmount: '—',
 				upcomingExpenses: [] as UpcomingExpenseSummary[],
-				recurringSubtitle: 'Loading upcoming bills…',
+				billsSubtitle: 'Loading upcoming bills…',
 			};
 		}
 
@@ -666,15 +718,13 @@ export default function WalletOverviewScreen() {
 				dueThisWeekCount: 0,
 				dueThisWeekAmount: formatCurrency(0),
 				upcomingExpenses: [] as UpcomingExpenseSummary[],
-				recurringSubtitle: 'No recurring expenses yet',
+				billsSubtitle: 'No bills yet',
 			};
 		}
 
 		const dueSoon = expenses.filter((expense) => {
 			if (!expense?.nextExpectedDate) return false;
-			const days = RecurringExpenseService.getDaysUntilNext(
-				expense.nextExpectedDate
-			);
+			const days = BillService.getDaysUntilNext(expense.nextExpectedDate);
 			return days >= 0 && days <= 7;
 		});
 
@@ -701,14 +751,14 @@ export default function WalletOverviewScreen() {
 			dueThisWeekCount: dueSoon.length,
 			dueThisWeekAmount: formatCurrency(amountDue),
 			upcomingExpenses: upcoming,
-			recurringSubtitle:
+			billsSubtitle:
 				dueSoon.length > 0
 					? `${dueSoon.length} ${
 							dueSoon.length === 1 ? 'bill' : 'bills'
 					  } due in the next 7 days`
 					: 'No bills due within 7 days',
 		};
-	}, [recurringLoading, recurringLoaded, expenses, formatCurrency]);
+	}, [billsLoading, billsLoaded, expenses, formatCurrency]);
 
 	const goalsSummary = useMemo(() => {
 		const loading = goalsLoading && !goalsLoaded;
@@ -810,7 +860,7 @@ export default function WalletOverviewScreen() {
 					/>
 					<QuickActionButton
 						label="Add Bill"
-						onPress={() => router.push('/(tabs)/wallet/recurring/new')}
+						onPress={() => router.push('/(tabs)/wallet/bills/new')}
 					/>
 					<QuickActionButton
 						label="Add Goal"
@@ -842,17 +892,17 @@ export default function WalletOverviewScreen() {
 					</CardWrapper>
 				)}
 
-				{recurringBusy ? (
+				{billsBusy ? (
 					<UpcomingBillsSkeleton />
 				) : (
 					<CardWrapper
-						onPress={() => router.push('/(tabs)/wallet/recurring')}
+						onPress={() => router.push('/(tabs)/wallet/bills')}
 						accessibilityLabel="Open upcoming bills"
 					>
 						<View>
 							<CardHeader
 								title="Upcoming Bills"
-								subtitle={recurringSubtitle}
+								subtitle={billsSubtitle}
 								actionLabel="Manage"
 								icon="repeat-outline"
 							/>

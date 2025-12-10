@@ -13,14 +13,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { logger } from '../../../../src/utils/logger';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { RecurringExpenseService } from '../../../../src/services';
+import { BillService } from '../../../../src/services';
 import { DateField } from '../../../../src/components/DateField';
 import { PeriodSelector } from '../../../../src/components/forms';
-import { useBudget } from '../../../../src/context/budgetContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { palette, radius, space, type } from '../../../../src/ui/theme';
-
-const STORAGE_KEY = '@brie:available_categories';
 
 const FREQUENCY_OPTIONS = [
 	{ value: 'weekly', label: 'Weekly', icon: 'time-outline' as const },
@@ -28,7 +24,7 @@ const FREQUENCY_OPTIONS = [
 	{ value: 'yearly', label: 'Yearly', icon: 'calendar-outline' as const },
 ];
 
-const AddRecurringExpenseScreen: React.FC = () => {
+const AddBillScreen: React.FC = () => {
 	const [vendor, setVendor] = useState('');
 	const [amount, setAmount] = useState('');
 	const [frequency, setFrequency] = useState<
@@ -37,34 +33,8 @@ const AddRecurringExpenseScreen: React.FC = () => {
 	const [nextDueDate, setNextDueDate] = useState(
 		new Date().toISOString().split('T')[0]
 	);
-	const [category, setCategory] = useState<string | null>(null);
-	const [storedCategories, setStoredCategories] = useState<string[]>([]);
+	const [autoPay, setAutoPay] = useState(false); // Default to manual payment
 	const [loading, setLoading] = useState(false);
-
-	const { getAllCategories } = useBudget();
-	const budgetCategories = getAllCategories();
-
-	// Load stored categories from AsyncStorage
-	useEffect(() => {
-		const loadStoredCategories = async () => {
-			try {
-				const stored = await AsyncStorage.getItem(STORAGE_KEY);
-				if (stored) {
-					const parsed = JSON.parse(stored);
-					setStoredCategories(Array.isArray(parsed) ? parsed : []);
-				}
-			} catch (error) {
-				console.error('Error loading stored categories:', error);
-			}
-		};
-
-		loadStoredCategories();
-	}, []);
-
-	// Combine budget categories and stored categories, remove duplicates
-	const availableCategories = Array.from(
-		new Set([...budgetCategories, ...storedCategories])
-	).sort();
 
 	const handleSave = async () => {
 		if (!vendor.trim()) {
@@ -79,23 +49,25 @@ const AddRecurringExpenseScreen: React.FC = () => {
 
 		setLoading(true);
 		try {
-			await RecurringExpenseService.createRecurringExpense({
+			await BillService.createRecurringExpense({
 				vendor: vendor.trim(),
 				amount: parseFloat(amount),
 				frequency,
 				nextExpectedDate: new Date(nextDueDate).toISOString(),
-				category: category ?? undefined,
+				autoPay,
+				// Categories are currently disabled in the UI
+				category: undefined,
 			});
 
-			Alert.alert('Success', 'Recurring bill added successfully!', [
+			Alert.alert('Success', 'Bill added successfully!', [
 				{
 					text: 'OK',
 					onPress: () => router.back(),
 				},
 			]);
 		} catch (error) {
-			logger.error('[AddRecurringExpenseScreen] Error saving:', error);
-			Alert.alert('Error', 'Failed to save recurring bill. Please try again.');
+			logger.error('[AddBillScreen] Error saving:', error);
+			Alert.alert('Error', 'Failed to save bill. Please try again.');
 		} finally {
 			setLoading(false);
 		}
@@ -118,7 +90,7 @@ const AddRecurringExpenseScreen: React.FC = () => {
 					<View style={styles.pill}>
 						<Text style={styles.pillText}>New bill</Text>
 					</View>
-					<Text style={styles.title}>Add a recurring bill</Text>
+					<Text style={styles.title}>Add a bill</Text>
 					<Text style={styles.subtitle}>
 						Track subscriptions and regular payments so Brie can remind you
 						before they&apos;re due.
@@ -181,78 +153,48 @@ const AddRecurringExpenseScreen: React.FC = () => {
 							This is when the next payment is expected.
 						</Text>
 					</View>
-				</View>
-
-				{/* Category & Info Card */}
-				<View style={[styles.card, { marginTop: space.lg }]}>
-					<Text style={styles.sectionLabel}>Category & reminders</Text>
 
 					<View style={styles.fieldGroup}>
-						<Label text="Category" optional />
-						<Text style={styles.helperText}>
-							This category will be applied to each payment.
-						</Text>
-
-						{availableCategories.length > 0 ? (
-							<View style={styles.categoryChipContainer}>
-								{availableCategories.map((cat) => (
-									<TouchableOpacity
-										key={cat}
-										style={[
-											styles.categoryChip,
-											category === cat && styles.categoryChipSelected,
-										]}
-										onPress={() =>
-											setCategory((prev) => (prev === cat ? null : cat))
-										}
-										activeOpacity={0.7}
-									>
-										<Text
-											style={[
-												type.body,
-												category === cat
-													? styles.categoryChipTextSelected
-													: styles.categoryChipText,
-											]}
-										>
-											{cat}
-										</Text>
-									</TouchableOpacity>
-								))}
-								<TouchableOpacity
-									style={[styles.categoryChip, styles.newChip]}
-									onPress={() => router.push('/settings/categories')}
-									activeOpacity={0.7}
-								>
-									<Text style={[type.body, styles.newChipText]}>+ New</Text>
-								</TouchableOpacity>
-							</View>
-						) : (
-							<View>
-								<Text style={[type.small, styles.emptyText]}>
-									No categories yet.
+						<View style={styles.toggleRow}>
+							<View style={styles.toggleLabelContainer}>
+								<Label text="Automatic payment" optional />
+								<Text style={styles.helperText}>
+									{autoPay
+										? 'Bill will be automatically inputted as a transaction when due'
+										: 'You will manually mark this bill as paid'}
 								</Text>
-								<TouchableOpacity
-									style={styles.manageButton}
-									onPress={() => router.push('/settings/categories')}
-									activeOpacity={0.7}
-								>
-									<Text style={[type.body, styles.manageButtonText]}>
-										Add your first category
-									</Text>
-								</TouchableOpacity>
 							</View>
-						)}
+							<TouchableOpacity
+								style={[
+									styles.toggle,
+									autoPay && styles.toggleActive,
+								]}
+								onPress={() => setAutoPay(!autoPay)}
+								activeOpacity={0.7}
+							>
+								<View
+									style={[
+										styles.toggleThumb,
+										autoPay && styles.toggleThumbActive,
+									]}
+								/>
+							</TouchableOpacity>
+						</View>
 					</View>
+				</View>
 
-					<View style={[styles.infoCard, { marginTop: space.md }]}>
+				{/* Info Card */}
+				<View style={[styles.card, { marginTop: space.lg }]}>
+					<Text style={styles.sectionLabel}>Reminders</Text>
+
+					<View style={[styles.infoCard, { marginTop: space.xs }]}>
 						<Ionicons
 							name="information-circle"
 							size={20}
 							color={palette.info}
 						/>
 						<Text style={[type.body, styles.infoText]}>
-							This recurring bill will be tracked and you&apos;ll receive
+							This bill will be tracked and you&apos;ll receive
 							notifications when it&apos;s due.
 						</Text>
 					</View>
@@ -489,6 +431,40 @@ const styles = StyleSheet.create({
 		fontWeight: '700',
 		fontSize: 16,
 	},
+	toggleRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'flex-start',
+	},
+	toggleLabelContainer: {
+		flex: 1,
+		marginRight: space.md,
+	},
+	toggle: {
+		width: 50,
+		height: 30,
+		borderRadius: 15,
+		backgroundColor: palette.border,
+		justifyContent: 'center',
+		paddingHorizontal: 2,
+	},
+	toggleActive: {
+		backgroundColor: palette.accent,
+	},
+	toggleThumb: {
+		width: 26,
+		height: 26,
+		borderRadius: 13,
+		backgroundColor: palette.surface,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.2,
+		shadowRadius: 2,
+		elevation: 2,
+	},
+	toggleThumbActive: {
+		transform: [{ translateX: 20 }],
+	},
 });
 
-export default AddRecurringExpenseScreen;
+export default AddBillScreen;

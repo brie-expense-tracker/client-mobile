@@ -50,26 +50,7 @@ export default function TransactionStack() {
 				<Stack.Screen
 					name="edit"
 					options={{
-						headerShown: true,
-						headerBackButtonDisplayMode: 'minimal',
-						headerTitle: 'Edit Transaction',
-						headerShadowVisible: false,
-						headerStyle: {
-							backgroundColor: '#ffffff',
-						},
-						headerTitleStyle: {
-							fontSize: 18,
-							fontWeight: '600',
-							color: '#333',
-						},
-						headerLeft: () => (
-							<BorderlessButton
-								onPress={() => router.back()}
-								style={{ width: 50 }}
-							>
-								<Ionicons name="chevron-back" size={24} color="#333" />
-							</BorderlessButton>
-						),
+						headerShown: false,
 					}}
 				/>
 			</Stack>

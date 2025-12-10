@@ -23,9 +23,9 @@ import {
 	type as typography,
 } from '../../../../src/ui';
 
-import { useRecurringExpense } from '../../../../src/context/recurringExpenseContext';
-import { RecurringExpenseService } from '../../../../src/services';
-import { resolveRecurringExpenseAppearance } from '../../../../src/utils/recurringExpenseAppearance';
+import { useBills } from '../../../../src/context/billContext';
+import { BillService } from '../../../../src/services';
+import { resolveBillAppearance } from '../../../../src/utils/billAppearance';
 import { dynamicTextStyle } from '../../../../src/utils/accessibility';
 
 const formatCurrency = (amount: number): string =>
@@ -44,12 +44,11 @@ const formatDate = (dateString: string | null | undefined) => {
 	});
 };
 
-export default function RecurringSummaryScreen() {
+export default function BillDetailScreen() {
 	const router = useRouter();
 	const { patternId } = useLocalSearchParams<{ patternId: string }>();
 
-	const { expenses, isLoading, hasLoaded, refetch, deleteRecurringExpense } =
-		useRecurringExpense();
+	const { expenses, isLoading, hasLoaded, refetch, deleteBill } = useBills();
 
 	const [refreshing, setRefreshing] = useState(false);
 
@@ -70,7 +69,7 @@ export default function RecurringSummaryScreen() {
 		try {
 			await refetch();
 		} catch {
-			Alert.alert('Error', 'Failed to refresh this recurring expense.');
+			Alert.alert('Error', 'Failed to refresh this bill.');
 		} finally {
 			setRefreshing(false);
 		}
@@ -89,7 +88,7 @@ export default function RecurringSummaryScreen() {
 		if (!expense) return;
 
 		Alert.alert(
-			'Delete recurring expense?',
+			'Delete bill?',
 			`This will remove "${expense.vendor}" and its future tracking.`,
 			[
 				{ text: 'Cancel', style: 'cancel' },
@@ -98,27 +97,27 @@ export default function RecurringSummaryScreen() {
 					style: 'destructive',
 					onPress: async () => {
 						try {
-							await deleteRecurringExpense(expense.patternId);
+							await deleteBill(expense.patternId);
 							router.back();
 						} catch (error) {
 							const msg =
 								error instanceof Error
 									? error.message
-									: 'Failed to delete recurring expense.';
+									: 'Failed to delete bill.';
 							Alert.alert('Delete Failed', msg);
 						}
 					},
 				},
 			]
 		);
-	}, [expense, deleteRecurringExpense, router]);
+	}, [expense, deleteBill, router]);
 
 	// -------- Loading / empty states --------
 
 	if ((isLoading && !hasLoaded) || (!expense && !hasLoaded)) {
 		return (
 			<Page>
-				<LoadingState label="Loading recurring expense..." />
+				<LoadingState label="Loading bill..." />
 			</Page>
 		);
 	}
@@ -128,9 +127,9 @@ export default function RecurringSummaryScreen() {
 			<Page>
 				<EmptyState
 					icon="repeat-outline"
-					title="Recurring expense not found"
-					subtitle="We couldn't find this recurring pattern. It may have been deleted."
-					ctaLabel="Back to recurring"
+					title="Bill not found"
+					subtitle="We couldn't find this bill. It may have been deleted."
+					ctaLabel="Back to bills"
 					onPress={() => router.back()}
 				/>
 			</Page>
@@ -139,9 +138,9 @@ export default function RecurringSummaryScreen() {
 
 	// -------- Derived state --------
 
-	const { icon, color } = resolveRecurringExpenseAppearance(expense);
+	const { icon, color } = resolveBillAppearance(expense);
 	const nextDate = expense.nextExpectedDate;
-	const daysUntil = RecurringExpenseService.getDaysUntilNext(nextDate);
+	const daysUntil = BillService.getDaysUntilNext(nextDate);
 
 	const isOverdue = daysUntil <= 0;
 	const isDueSoon = daysUntil > 0 && daysUntil <= 7;
@@ -215,10 +214,7 @@ export default function RecurringSummaryScreen() {
 					}
 				>
 					{/* Overview / hero */}
-					<Section
-						title="Overview"
-						subtitle="Quick view of this recurring payment."
-					>
+					<Section title="Overview" subtitle="Quick view of this bill.">
 						<Card>
 							{/* Header row */}
 							<View style={styles.heroHeader}>
@@ -292,51 +288,6 @@ export default function RecurringSummaryScreen() {
 						</Card>
 					</Section>
 
-					{/* Metadata / extra info */}
-					<Section title="Details">
-						<Card>
-							<View style={styles.detailRow}>
-								<Text
-									style={[styles.detailLabel, dynamicTextStyle('caption2')]}
-								>
-									Pattern ID
-								</Text>
-								<Text style={[styles.detailValue, dynamicTextStyle('body')]}>
-									{expense.patternId}
-								</Text>
-							</View>
-
-							{expense.confidence != null && (
-								<View style={styles.detailRow}>
-									<Text
-										style={[styles.detailLabel, dynamicTextStyle('caption2')]}
-									>
-										Detection confidence
-									</Text>
-									<Text style={[styles.detailValue, dynamicTextStyle('body')]}>
-										{Math.round((expense.confidence ?? 0) * 100)}%
-									</Text>
-								</View>
-							)}
-
-							{Array.isArray((expense as any).transactions) &&
-								(expense as any).transactions.length > 0 && (
-									<View style={styles.detailRowLast}>
-										<Text
-											style={[styles.detailLabel, dynamicTextStyle('caption2')]}
-										>
-											Linked transactions
-										</Text>
-										<Text
-											style={[styles.detailValue, dynamicTextStyle('body')]}
-										>
-											{(expense as any).transactions.length}
-										</Text>
-									</View>
-								)}
-						</Card>
-					</Section>
-
 					{/* Actions */}
 					<Section>
 						<TouchableOpacity
@@ -345,7 +296,7 @@ export default function RecurringSummaryScreen() {
 							activeOpacity={0.85}
 						>
 							<Text style={[styles.primaryCtaText, dynamicTextStyle('body')]}>
-								Edit expense
+								Edit bill
 							</Text>
 						</TouchableOpacity>
 
@@ -354,7 +305,7 @@ export default function RecurringSummaryScreen() {
 							style={styles.deleteButton}
 							activeOpacity={0.7}
 						>
-							<Text style={styles.deleteText}>Delete recurring expense</Text>
+							<Text style={styles.deleteText}>Delete bill</Text>
 						</TouchableOpacity>
 					</Section>
 				</ScrollView>
@@ -446,23 +397,6 @@ const styles = StyleSheet.create({
 		color: palette.textMuted,
 		marginTop: 2,
 	},
-	detailRow: {
-		paddingVertical: 8,
-		borderBottomWidth: StyleSheet.hairlineWidth,
-		borderBottomColor: palette.borderMuted,
-	},
-	detailRowLast: {
-		paddingVertical: 8,
-	},
-	detailLabel: {
-		...typography.bodyXs,
-		color: palette.textMuted,
-		marginBottom: 2,
-	},
-	detailValue: {
-		...typography.bodySm,
-		color: palette.text,
-	},
 	primaryCta: {
 		height: 52,
 		borderRadius: radius.lg,
@@ -485,4 +419,3 @@ const styles = StyleSheet.create({
 		fontWeight: '500',
 	},
 });
-

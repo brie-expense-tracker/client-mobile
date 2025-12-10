@@ -9,30 +9,28 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { RecurringExpenseService } from '../../../../src/services';
-import { useRecurringExpense } from '../../../../src/context/recurringExpenseContext';
-import { TransformedRecurringExpense } from '../../../../src/hooks/useRecurringExpenses';
+import { BillService } from '../../../../src/services';
+import { useBills } from '../../../../src/context/billContext';
+import { TransformedBill } from '../../../../src/hooks/useRecurringExpenses';
 
-interface RecurringExpensesSummaryWidgetProps {
+interface BillsSummaryWidgetProps {
 	title?: string;
 	maxVisibleItems?: number;
-	onExpensePress?: (expense: TransformedRecurringExpense) => void;
+	onExpensePress?: (expense: TransformedBill) => void;
 	showViewAllButton?: boolean;
 }
 
-const RecurringExpensesSummaryWidget: React.FC<
-	RecurringExpensesSummaryWidgetProps
-> = ({
-	title = 'Recurring Expenses',
+const BillsSummaryWidget: React.FC<BillsSummaryWidgetProps> = ({
+	title = 'Bills',
 	maxVisibleItems = 3,
 	onExpensePress,
 	showViewAllButton = true,
 }) => {
-	const { expenses, isLoading: loading } = useRecurringExpense();
+	const { expenses, isLoading: loading } = useBills();
 
 	// State for payment status
 	const [expensesWithPaymentStatus, setExpensesWithPaymentStatus] = useState<
-		TransformedRecurringExpense[]
+		TransformedBill[]
 	>([]);
 	const [isLoadingPaymentStatus, setIsLoadingPaymentStatus] = useState(false);
 	const [paymentStatusError, setPaymentStatusError] = useState<string | null>(
@@ -41,7 +39,7 @@ const RecurringExpensesSummaryWidget: React.FC<
 	const [retryCount, setRetryCount] = useState(0);
 
 	// Cast expenses to the transformed type since the hook returns transformed data
-	const transformedExpenses = expenses as TransformedRecurringExpense[];
+	const transformedExpenses = expenses as TransformedBill[];
 
 	// Calculate summary stats locally
 	const summaryStats = useMemo(() => {
@@ -76,7 +74,7 @@ const RecurringExpensesSummaryWidget: React.FC<
 
 				if (patternIds.length === 0) {
 					logger.debug(
-						'⚠️ [RecurringExpensesSummaryWidget] No valid ObjectIds to check payment status'
+						'⚠️ [BillsSummaryWidget] No valid ObjectIds to check payment status'
 					);
 					setExpensesWithPaymentStatus(
 						transformedExpenses.map((expense) => ({
@@ -89,8 +87,9 @@ const RecurringExpensesSummaryWidget: React.FC<
 					return;
 				}
 
-				const paymentStatuses =
-					await RecurringExpenseService.checkBatchPaidStatus(patternIds);
+				const paymentStatuses = await BillService.checkBatchPaidStatus(
+					patternIds
+				);
 
 				const expensesWithStatus = transformedExpenses.map((expense) => {
 					try {
@@ -186,10 +185,10 @@ const RecurringExpensesSummaryWidget: React.FC<
 
 	// Debug: Log the current status
 	logger.debug(
-		`🔄 Recurring: ${transformedExpenses.length} expenses, ${expensesWithPaymentStatus.length} with status`
+		`🔄 Bills: ${transformedExpenses.length} bills, ${expensesWithPaymentStatus.length} with status`
 	);
 
-	const handleExpensePress = (expense: TransformedRecurringExpense) => {
+	const handleExpensePress = (expense: TransformedBill) => {
 		if (onExpensePress) {
 			onExpensePress(expense);
 		} else {
@@ -202,9 +201,7 @@ const RecurringExpensesSummaryWidget: React.FC<
 				router.push(
 					`/(tabs)/transaction/expense?description=${encodeURIComponent(
 						expense.vendor
-					)}&amount=${expense.amount}&recurringExpenseId=${
-						expense.patternId
-					}` as any
+					)}&amount=${expense.amount}&billId=${expense.patternId}` as any
 				);
 			} else {
 				// If not due soon, show expense details
@@ -213,16 +210,14 @@ const RecurringExpensesSummaryWidget: React.FC<
 		}
 	};
 
-	const showExpenseActions = (expense: TransformedRecurringExpense) => {
-		// For now, navigate to the recurring expenses detail with this expense selected
+	const showExpenseActions = (expense: TransformedBill) => {
+		// For now, navigate to the bill detail with this bill selected
 		// In the future, this could open a modal with quick actions
-		router.push(
-			`/(stack)/recurring/${expense.patternId}`
-		);
+		router.push(`/(tabs)/wallet/bills/${expense.patternId}` as any);
 	};
 
 	const handleViewAll = () => {
-		router.push('/(tabs)/wallet/recurring');
+		router.push('/(tabs)/wallet/bills');
 	};
 
 	const formatCurrency = (amount: number) => {
@@ -232,7 +227,7 @@ const RecurringExpensesSummaryWidget: React.FC<
 		}).format(amount);
 	};
 
-	const getStatusIcon = (expense: TransformedRecurringExpense) => {
+	const getStatusIcon = (expense: TransformedBill) => {
 		if (expense.isPaid) {
 			return { name: 'checkmark-circle', color: '#10b981' };
 		} else if (expense.isOverdue) {
@@ -244,7 +239,7 @@ const RecurringExpensesSummaryWidget: React.FC<
 		}
 	};
 
-	const getStatusText = (expense: TransformedRecurringExpense) => {
+	const getStatusText = (expense: TransformedBill) => {
 		if (expense.isPaid && expense.paymentDate) {
 			return `Paid: ${expense.paymentDate}`;
 		} else {
@@ -253,9 +248,9 @@ const RecurringExpensesSummaryWidget: React.FC<
 	};
 
 	const renderExpenseItem = (
-		expense: TransformedRecurringExpense,
+		expense: TransformedBill,
 		index: number,
-		array: TransformedRecurringExpense[]
+		array: TransformedBill[]
 	) => {
 		const statusIcon = getStatusIcon(expense);
 		const statusText = getStatusText(expense);
@@ -399,7 +394,7 @@ const RecurringExpensesSummaryWidget: React.FC<
 				{displayExpenses.length === 0 ? (
 					<View style={styles.emptyContainer}>
 						<Ionicons name="repeat" size={32} color="#ccc" />
-						<Text style={styles.emptyText}>No recurring expenses</Text>
+						<Text style={styles.emptyText}>No bills</Text>
 					</View>
 				) : (
 					<>
@@ -692,4 +687,4 @@ const styles = StyleSheet.create({
 	},
 });
 
-export default RecurringExpensesSummaryWidget;
+export default BillsSummaryWidget;

@@ -1,17 +1,17 @@
 import { useMemo, useCallback } from 'react';
 import { useDataFetching } from './useDataFetching';
-import { RecurringExpenseService, RecurringExpense } from '../services';
+import { BillService, Bill } from '../services';
 import { createLogger } from '../utils/sublogger';
 
-const recurringExpensesHookLog = createLogger('useRecurringExpenses');
+const billsHookLog = createLogger('useBills');
 
-// Extended interface for recurring expense with id (required by useDataFetching)
-export interface RecurringExpenseWithId extends RecurringExpense {
+// Extended interface for bill with id (required by useDataFetching)
+export interface BillWithId extends Bill {
 	id: string;
 }
 
-// Extended interface for transformed recurring expense data
-export interface TransformedRecurringExpense extends RecurringExpenseWithId {
+// Extended interface for transformed bill data
+export interface TransformedBill extends BillWithId {
 	daysUntilDue: number;
 	statusColor: string;
 	statusText: string;
@@ -26,8 +26,8 @@ export interface TransformedRecurringExpense extends RecurringExpenseWithId {
 // ==========================================
 // Recurring expense-specific API functions
 // ==========================================
-const fetchRecurringExpenses = async (): Promise<RecurringExpenseWithId[]> => {
-	const expenses = await RecurringExpenseService.getRecurringExpenses();
+const fetchRecurringExpenses = async (): Promise<BillWithId[]> => {
+	const expenses = await BillService.getRecurringExpenses();
 	// Add id property using patternId
 	return expenses.map((expense) => ({
 		...expense,
@@ -40,8 +40,8 @@ const addRecurringExpense = async (data: {
 	amount: number;
 	frequency: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 	nextExpectedDate: string;
-}): Promise<RecurringExpenseWithId> => {
-	const expense = await RecurringExpenseService.createRecurringExpense(data);
+}): Promise<BillWithId> => {
+	const expense = await BillService.createRecurringExpense(data);
 	return {
 		...expense,
 		id: expense.patternId,
@@ -50,9 +50,9 @@ const addRecurringExpense = async (data: {
 
 const updateRecurringExpense = async (
 	id: string,
-	data: Partial<RecurringExpenseWithId>
-): Promise<RecurringExpenseWithId> => {
-	const expense = await RecurringExpenseService.updateRecurringExpense(
+	data: Partial<BillWithId>
+): Promise<BillWithId> => {
+	const expense = await BillService.updateRecurringExpense(
 		id,
 		data as any
 	);
@@ -63,22 +63,22 @@ const updateRecurringExpense = async (
 };
 
 const deleteRecurringExpense = async (id: string): Promise<void> => {
-	await RecurringExpenseService.deleteRecurringExpense(id);
+	await BillService.deleteRecurringExpense(id);
 };
 
 // ==========================================
 // Recurring expense-specific data transformations
 // ==========================================
 const transformRecurringExpenseData = (
-	expenses: RecurringExpenseWithId[]
-): TransformedRecurringExpense[] => {
+	expenses: BillWithId[]
+): TransformedBill[] => {
 	return expenses.map((expense) => {
-		const daysUntilDue = RecurringExpenseService.getDaysUntilNext(
+		const daysUntilDue = BillService.getDaysUntilNext(
 			expense.nextExpectedDate
 		);
-		const statusColor = RecurringExpenseService.getStatusColor(daysUntilDue);
-		const statusText = RecurringExpenseService.getStatusText(daysUntilDue);
-		const frequency = RecurringExpenseService.formatFrequency(
+		const statusColor = BillService.getStatusColor(daysUntilDue);
+		const statusText = BillService.getStatusText(daysUntilDue);
+		const frequency = BillService.formatFrequency(
 			expense.frequency
 		);
 
@@ -112,7 +112,7 @@ export function useRecurringExpenses() {
 		updateItem: updateExpenseItem,
 		deleteItem: deleteExpenseItem,
 		clearError,
-	} = useDataFetching<RecurringExpenseWithId>({
+	} = useDataFetching<BillWithId>({
 		fetchFunction: fetchRecurringExpenses,
 		addFunction: addRecurringExpense,
 		updateFunction: updateRecurringExpense,
@@ -126,8 +126,8 @@ export function useRecurringExpenses() {
 	// Memoized Recurring Expense Calculations
 	// ==========================================
 	const expenseCalculations = useMemo(() => {
-		// Cast expenses to TransformedRecurringExpense since they are transformed
-		const transformedExpenses = expenses as TransformedRecurringExpense[];
+		// Cast expenses to TransformedBill since they are transformed
+		const transformedExpenses = expenses as TransformedBill[];
 
 		// Categorize expenses
 		const overdueExpenses = transformedExpenses.filter(
@@ -189,7 +189,7 @@ export function useRecurringExpenses() {
 	const markAsPaid = useCallback(
 		async (patternId: string, periodStart: string, periodEnd: string) => {
 			try {
-				return await RecurringExpenseService.markRecurringExpensePaid({
+				return await BillService.markRecurringExpensePaid({
 					patternId,
 					periodStart,
 					periodEnd,
@@ -210,7 +210,7 @@ export function useRecurringExpenses() {
 	const getPaymentHistory = useCallback(
 		async (patternId: string, limit: number = 10) => {
 			try {
-				return await RecurringExpenseService.getPaymentHistory(
+				return await BillService.getPaymentHistory(
 					patternId,
 					limit
 				);
@@ -224,7 +224,7 @@ export function useRecurringExpenses() {
 
 	const checkPaymentStatus = useCallback(async (patternId: string) => {
 		try {
-			return await RecurringExpenseService.checkIfCurrentPeriodPaid(patternId);
+			return await BillService.checkIfCurrentPeriodPaid(patternId);
 		} catch (error) {
 			recurringExpensesHookLog.error('Error checking payment status', error);
 			throw error;
@@ -235,24 +235,24 @@ export function useRecurringExpenses() {
 	// Additional RecurringExpenseService features
 	// ==========================================
 	const detectRecurringPatterns = useCallback(async () => {
-		return RecurringExpenseService.detectRecurringPatterns();
+		return BillService.detectRecurringPatterns();
 	}, []);
 
 	const checkUpcomingExpenses = useCallback(async () => {
-		return RecurringExpenseService.checkUpcomingRecurringExpenses();
+		return BillService.checkUpcomingRecurringExpenses();
 	}, []);
 
 	const processRecurringExpenses = useCallback(async () => {
-		return RecurringExpenseService.processRecurringExpenses();
+		return BillService.processRecurringExpenses();
 	}, []);
 
 	const cleanupDuplicateExpenses = useCallback(async () => {
-		return RecurringExpenseService.cleanupDuplicateExpenses();
+		return BillService.cleanupDuplicateExpenses();
 	}, []);
 
 	const generateRecurringTransactions = useCallback(
 		async (patternId: string, cycles?: number) => {
-			return RecurringExpenseService.generateRecurringTransactions({
+			return BillService.generateRecurringTransactions({
 				patternId,
 				cycles,
 			});
@@ -262,7 +262,7 @@ export function useRecurringExpenses() {
 
 	const linkTransactionToRecurring = useCallback(
 		async (transactionId: string, patternId: string) => {
-			return RecurringExpenseService.linkTransactionToRecurring({
+			return BillService.linkTransactionToRecurring({
 				transactionId,
 				patternId,
 			});
@@ -272,14 +272,14 @@ export function useRecurringExpenses() {
 
 	const getPendingRecurringTransactions = useCallback(
 		async (limit: number = 50) => {
-			return RecurringExpenseService.getPendingRecurringTransactions(limit);
+			return BillService.getPendingRecurringTransactions(limit);
 		},
 		[]
 	);
 
 	const getRecurringTransactionsForPattern = useCallback(
 		async (patternId: string, limit: number = 20) => {
-			return RecurringExpenseService.getRecurringTransactionsForPattern(
+			return BillService.getRecurringTransactionsForPattern(
 				patternId,
 				limit
 			);
@@ -288,15 +288,15 @@ export function useRecurringExpenses() {
 	);
 
 	const autoApplyTransactions = useCallback(async () => {
-		return RecurringExpenseService.autoApplyTransactions();
+		return BillService.autoApplyTransactions();
 	}, []);
 
 	const isCurrentPeriodPaid = useCallback(async (patternId: string) => {
-		return RecurringExpenseService.checkIfCurrentPeriodPaid(patternId);
+		return BillService.checkIfCurrentPeriodPaid(patternId);
 	}, []);
 
 	const checkBatchPaidStatus = useCallback(async (patternIds: string[]) => {
-		return RecurringExpenseService.checkBatchPaidStatus(patternIds);
+		return BillService.checkBatchPaidStatus(patternIds);
 	}, []);
 
 	// ==========================================
@@ -308,8 +308,8 @@ export function useRecurringExpenses() {
 			amount: number;
 			frequency: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 			nextExpectedDate: string;
-		}): Promise<RecurringExpenseWithId> => {
-			return addExpenseItem(data as RecurringExpenseWithId);
+		}): Promise<BillWithId> => {
+			return addExpenseItem(data as BillWithId);
 		},
 		[addExpenseItem]
 	);

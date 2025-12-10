@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import {
 	View,
 	StyleSheet,
@@ -14,8 +14,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useBudget } from '../../../../src/context/budgetContext';
 import { createLogger } from '../../../../src/utils/sublogger';
@@ -36,7 +34,6 @@ import {
 import { palette, radius, space, type } from '../../../../src/ui/theme';
 
 const addBudgetLog = createLogger('AddBudget');
-const STORAGE_KEY = '@brie:available_categories';
 
 const PERIOD_OPTIONS = [
 	{ value: 'monthly', label: 'Monthly', icon: 'calendar-outline' as const },
@@ -89,51 +86,9 @@ const AddBudgetScreen: React.FC = () => {
 		| 27
 		| 28
 	>(1);
-	const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-	const [storedCategories, setStoredCategories] = useState<string[]>([]);
+	// Categories are currently hidden in the UI; we always create budgets without categories.
 
-	const { addBudget, getAllCategories } = useBudget();
-	const budgetCategories = getAllCategories();
-
-	// Load stored categories from AsyncStorage
-	const loadStoredCategories = async () => {
-		try {
-			const stored = await AsyncStorage.getItem(STORAGE_KEY);
-			if (stored) {
-				const parsed = JSON.parse(stored);
-				setStoredCategories(Array.isArray(parsed) ? parsed : []);
-			} else {
-				setStoredCategories([]);
-			}
-		} catch (error) {
-			console.error('Error loading stored categories:', error);
-		}
-	};
-
-	// Load on mount
-	useEffect(() => {
-		loadStoredCategories();
-	}, []);
-
-	// Reload when screen comes into focus (e.g., returning from categories screen)
-	useFocusEffect(
-		React.useCallback(() => {
-			loadStoredCategories();
-		}, [])
-	);
-
-	// Combine budget categories and stored categories, remove duplicates
-	const availableCategories = Array.from(
-		new Set([...budgetCategories, ...storedCategories])
-	).sort();
-
-	const toggleCategory = (category: string) => {
-		setSelectedCategories((prev) =>
-			prev.includes(category)
-				? prev.filter((c) => c !== category)
-				: [...prev, category]
-		);
-	};
+	const { addBudget } = useBudget();
 
 	const handleSave = async () => {
 		if (!name.trim() || !amount.trim()) {
@@ -160,7 +115,8 @@ const AddBudgetScreen: React.FC = () => {
 				amount: amountValue,
 				icon,
 				color,
-				categories: selectedCategories,
+				// Categories are disabled in the UI for now.
+				categories: [],
 				period,
 				weekStartDay,
 				monthStartDay,
@@ -368,76 +324,9 @@ const AddBudgetScreen: React.FC = () => {
 					)}
 				</View>
 
-				{/* Categories & Notes Card */}
+				{/* Notes Card (categories hidden for now) */}
 				<View style={[styles.card, { marginTop: space.lg, marginBottom: 0 }]}>
-					<Text style={styles.sectionLabel}>Categories & notes</Text>
-
-					<View style={styles.fieldGroup}>
-						<Label text="Categories" optional />
-						{availableCategories.length > 0 ? (
-							<>
-								<View style={styles.categoryChipContainer}>
-									{availableCategories.map((category) => (
-										<TouchableOpacity
-											key={category}
-											style={[
-												styles.categoryChip,
-												selectedCategories.includes(category) &&
-													styles.categoryChipSelected,
-											]}
-											onPress={() => toggleCategory(category)}
-											activeOpacity={0.7}
-										>
-											<Text
-												style={[
-													type.body,
-													selectedCategories.includes(category)
-														? styles.categoryChipTextSelected
-														: styles.categoryChipText,
-												]}
-											>
-												{category}
-											</Text>
-										</TouchableOpacity>
-									))}
-
-									<TouchableOpacity
-										style={[styles.categoryChip, styles.newChip]}
-										onPress={() => router.push('/settings/categories')}
-										activeOpacity={0.7}
-									>
-										<Text style={[type.body, styles.newChipText]}>+ New</Text>
-									</TouchableOpacity>
-								</View>
-
-								<TouchableOpacity
-									style={styles.manageButton}
-									onPress={() => router.push('/settings/categories')}
-									activeOpacity={0.7}
-								>
-									<Text style={[type.body, styles.manageButtonText]}>
-										Manage categories
-									</Text>
-								</TouchableOpacity>
-							</>
-						) : (
-							<>
-								<Text style={[type.small, styles.emptyText]}>
-									No categories yet.
-								</Text>
-								<TouchableOpacity
-									style={styles.manageButton}
-									onPress={() => router.push('/settings/categories')}
-									activeOpacity={0.7}
-								>
-									<Text style={[type.body, styles.manageButtonText]}>
-										Create categories
-									</Text>
-								</TouchableOpacity>
-							</>
-						)}
-					</View>
-
+					<Text style={styles.sectionLabel}>Notes</Text>
 					<View style={styles.fieldGroup}>
 						<Label text="Description" optional />
 						<TextInput

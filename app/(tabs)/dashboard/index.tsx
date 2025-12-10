@@ -276,6 +276,24 @@ export default function DashboardPro() {
 	const healthScore = useMemo(() => {
 		if (!rollup) return null;
 
+		// Determine if we have any meaningful data to score
+		const hasAnyBudgetData = rollup.budgets.totalBudgets > 0;
+		const hasAnyTransactions = transactions.length > 0;
+		const hasAnyDebtData = (rollup.debts.totalDebt || 0) > 0;
+		const hasAnyCashflowData =
+			(rollup.cashflow.totalIncome || 0) !== 0 ||
+			(rollup.cashflow.totalExpenses || 0) !== 0;
+		const hasAnyData =
+			hasAnyBudgetData ||
+			hasAnyTransactions ||
+			hasAnyDebtData ||
+			hasAnyCashflowData;
+
+		// On a brand new account with no activity, don't show a health score at all
+		if (!hasAnyData) {
+			return null;
+		}
+
 		// Calculate individual scores (0-100)
 		const budgetsTotal = Math.max(1, rollup.budgets.totalBudgets);
 		const budgetScore = (rollup.budgets.budgetsOnTrack / budgetsTotal) * 100; // 0-100
@@ -291,7 +309,9 @@ export default function DashboardPro() {
 			loggingScore * 0.15;
 
 		const reasons: string[] = [];
-		if (budgetScore < 80) reasons.push('Some budgets need attention');
+		if (hasAnyBudgetData && budgetScore < 80) {
+			reasons.push('Some budgets need attention');
+		}
 		if (cashflowScore < 100) reasons.push('Negative cashflow this month');
 		if (!rollup.debts.isHealthy) reasons.push('Debt-to-income ratio is high');
 
@@ -340,7 +360,7 @@ export default function DashboardPro() {
 			<SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
 				<View style={styles.loadingContainer}>
 					<ActivityIndicator size="large" color="#007AFF" />
-					<Text style={[styles.loadingText, dynamicTextStyle]}>
+					<Text style={[styles.loadingText, dynamicTextStyle('body')]}>
 						Loading your dashboard…
 					</Text>
 				</View>
@@ -456,7 +476,7 @@ export default function DashboardPro() {
 					<QuickActionsRow
 						onLogExpense={() => router.push('/(tabs)/transaction?mode=expense')}
 						onLogIncome={() => router.push('/(tabs)/transaction?mode=income')}
-						onReviewCashflow={() => router.push('/(tabs)/dashboard/ledger')}
+						onAddBill={() => router.push('/(tabs)/wallet/bills/new')}
 					/>
 
 					{/* Next Best Action Card */}
@@ -470,6 +490,10 @@ export default function DashboardPro() {
 									router.push('/(tabs)/wallet/budgets');
 								} else if (nextAction.type === 'goal') {
 									router.push('/(tabs)/wallet/goals');
+								} else if (nextAction.type === 'cashflow') {
+									router.push(
+										'/(tabs)/dashboard/ledger?focus=biggest-expenses'
+									);
 								} else {
 									router.push('/(tabs)/transaction');
 								}
@@ -481,7 +505,7 @@ export default function DashboardPro() {
 					{rollupLoading ? (
 						<View style={styles.card}>
 							<ActivityIndicator size="small" color="#3B82F6" />
-							<Text style={[styles.loadingText, dynamicTextStyle]}>
+							<Text style={[styles.loadingText, dynamicTextStyle('body')]}>
 								Loading dashboard data...
 							</Text>
 						</View>
@@ -691,11 +715,11 @@ function HeroPro({
 function QuickActionsRow({
 	onLogExpense,
 	onLogIncome,
-	onReviewCashflow,
+	onAddBill,
 }: {
 	onLogExpense: () => void;
 	onLogIncome: () => void;
-	onReviewCashflow: () => void;
+	onAddBill: () => void;
 }) {
 	return (
 		<View style={styles.qaRow}>
@@ -710,9 +734,9 @@ function QuickActionsRow({
 				onPress={onLogIncome}
 			/>
 			<ActionChip
-				label="Cashflow"
-				icon="analytics-outline"
-				onPress={onReviewCashflow}
+				label="Add Bill"
+				icon="calendar-outline"
+				onPress={onAddBill}
 			/>
 		</View>
 	);
@@ -734,7 +758,9 @@ function ActionChip({
 			{...accessibilityProps.button}
 		>
 			<Ionicons name={icon} size={16} color="#374151" />
-			<Text style={[styles.actionChipText, dynamicTextStyle]}>{label}</Text>
+			<Text style={[styles.actionChipText, dynamicTextStyle('footnote')]}>
+				{label}
+			</Text>
 		</TouchableOpacity>
 	);
 }
@@ -773,7 +799,9 @@ function CashflowCard({
 			{/* header */}
 			<View style={styles.cardHeaderRow}>
 				<View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-					<Text style={[styles.cardTitle, dynamicTextStyle]}>Cashflow</Text>
+					<Text style={[styles.cardTitle, dynamicTextStyle('title2')]}>
+						Cashflow
+					</Text>
 					{onHelp && (
 						<TouchableOpacity
 							onPress={onHelp}
@@ -813,14 +841,14 @@ function CashflowCard({
 							marginBottom: 12,
 						}}
 					>
-						<Text style={[styles.netSavingsLabel, dynamicTextStyle]}>
+						<Text style={[styles.netSavingsLabel, dynamicTextStyle('body')]}>
 							Net this month
 						</Text>
 						<Text
 							style={[
 								styles.netSavingsValue,
 								{ color: netColor, fontSize: 20 },
-								dynamicTextStyle,
+								dynamicTextStyle('body'),
 							]}
 						>
 							{currency(netSavings)}
@@ -830,28 +858,32 @@ function CashflowCard({
 					{/* income / expenses */}
 					<View style={styles.cashflowRow}>
 						<View style={styles.cashflowItem}>
-							<Text style={[styles.cashflowLabel, dynamicTextStyle]}>
+							<Text
+								style={[styles.cashflowLabel, dynamicTextStyle('footnote')]}
+							>
 								Income
 							</Text>
 							<Text
 								style={[
 									styles.cashflowValue,
 									{ color: '#16AE05' },
-									dynamicTextStyle,
+									dynamicTextStyle('body'),
 								]}
 							>
 								{currency(totalIncome)}
 							</Text>
 						</View>
 						<View style={styles.cashflowItem}>
-							<Text style={[styles.cashflowLabel, dynamicTextStyle]}>
+							<Text
+								style={[styles.cashflowLabel, dynamicTextStyle('footnote')]}
+							>
 								Expenses
 							</Text>
 							<Text
 								style={[
 									styles.cashflowValue,
 									{ color: '#DC2626' },
-									dynamicTextStyle,
+									dynamicTextStyle('body'),
 								]}
 							>
 								{currency(totalExpenses)}
@@ -862,10 +894,16 @@ function CashflowCard({
 			) : (
 				// empty / low-data state
 				<View style={{ marginTop: 12 }}>
-					<Text style={[styles.cardSummary, dynamicTextStyle]}>
+					<Text style={[styles.cardSummary, dynamicTextStyle('body')]}>
 						No cashflow yet this month.
 					</Text>
-					<Text style={[styles.hint, { marginTop: 4 }, dynamicTextStyle]}>
+					<Text
+						style={[
+							styles.hint,
+							{ marginTop: 4 },
+							dynamicTextStyle('caption2'),
+						]}
+					>
 						Add income or an expense to see how you&apos;re doing.
 					</Text>
 				</View>
@@ -926,7 +964,9 @@ function SetupPulseCard({
 			accessibilityLabel="Open wallet setup overview"
 		>
 			<View style={styles.cardHeaderRow}>
-				<Text style={[styles.cardTitle, dynamicTextStyle]}>Setup Pulse</Text>
+				<Text style={[styles.cardTitle, dynamicTextStyle('title2')]}>
+					Setup Pulse
+				</Text>
 				<View style={styles.pulseBadge}>
 					<Text style={styles.pulseBadgeText}>Wallet</Text>
 				</View>
@@ -938,8 +978,10 @@ function SetupPulseCard({
 						<Ionicons name="wallet-outline" size={18} color="#2563EB" />
 					</View>
 					<View style={{ flex: 1 }}>
-						<Text style={[styles.pulseLabel, dynamicTextStyle]}>Budgets</Text>
-						<Text style={[styles.pulseValue, dynamicTextStyle]}>
+						<Text style={[styles.pulseLabel, dynamicTextStyle('footnote')]}>
+							Budgets
+						</Text>
+						<Text style={[styles.pulseValue, dynamicTextStyle('body')]}>
 							{budgetLine}
 						</Text>
 					</View>
@@ -951,10 +993,10 @@ function SetupPulseCard({
 						<Ionicons name="calendar-outline" size={18} color="#2563EB" />
 					</View>
 					<View style={{ flex: 1 }}>
-						<Text style={[styles.pulseLabel, dynamicTextStyle]}>
+						<Text style={[styles.pulseLabel, dynamicTextStyle('footnote')]}>
 							Upcoming Bill
 						</Text>
-						<Text style={[styles.pulseValue, dynamicTextStyle]}>
+						<Text style={[styles.pulseValue, dynamicTextStyle('body')]}>
 							{recurringLine}
 						</Text>
 					</View>
@@ -966,8 +1008,10 @@ function SetupPulseCard({
 						<Ionicons name="trending-down-outline" size={18} color="#2563EB" />
 					</View>
 					<View style={{ flex: 1 }}>
-						<Text style={[styles.pulseLabel, dynamicTextStyle]}>Debt</Text>
-						<Text style={[styles.pulseValue, dynamicTextStyle]}>
+						<Text style={[styles.pulseLabel, dynamicTextStyle('footnote')]}>
+							Debt
+						</Text>
+						<Text style={[styles.pulseValue, dynamicTextStyle('body')]}>
 							{debtSummary}
 						</Text>
 					</View>
@@ -1068,7 +1112,7 @@ function FinancialHealthCard({
 			<View style={styles.healthHeader}>
 				<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
 					<Ionicons name={config.icon as any} size={20} color={config.color} />
-					<Text style={[styles.healthTitle, dynamicTextStyle]}>
+					<Text style={[styles.healthTitle, dynamicTextStyle('title2')]}>
 						Financial Health
 					</Text>
 				</View>
@@ -1088,7 +1132,7 @@ function FinancialHealthCard({
 					style={[
 						styles.healthStatus,
 						{ color: config.color },
-						dynamicTextStyle,
+						dynamicTextStyle('body'),
 					]}
 				>
 					{config.label}
@@ -1096,7 +1140,10 @@ function FinancialHealthCard({
 				{reasons.length > 0 && (
 					<View style={{ marginTop: 8, gap: 4 }}>
 						{reasons.slice(0, 2).map((reason, i) => (
-							<Text key={i} style={[styles.healthReason, dynamicTextStyle]}>
+							<Text
+								key={i}
+								style={[styles.healthReason, dynamicTextStyle('caption2')]}
+							>
 								• {reason}
 							</Text>
 						))}
@@ -1138,8 +1185,10 @@ function NextBestActionCard({
 					<Ionicons name={config.icon as any} size={20} color={config.color} />
 				</View>
 				<View style={{ flex: 1 }}>
-					<Text style={[styles.actionTitle, dynamicTextStyle]}>Today</Text>
-					<Text style={[styles.actionMessage, dynamicTextStyle]}>
+					<Text style={[styles.actionTitle, dynamicTextStyle('footnote')]}>
+						Today
+					</Text>
+					<Text style={[styles.actionMessage, dynamicTextStyle('body')]}>
 						{action.message}
 					</Text>
 				</View>

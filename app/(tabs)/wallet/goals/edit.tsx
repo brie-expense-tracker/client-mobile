@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { logger } from '../../../../src/utils/logger';
 import {
 	View,
 	StyleSheet,
@@ -7,9 +8,8 @@ import {
 	Alert,
 	ActivityIndicator,
 	Text,
+	TouchableOpacity,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { logger } from '../../../../src/utils/logger';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useGoal, Goal } from '../../../../src/context/goalContext';
@@ -23,13 +23,18 @@ import {
 } from '../../../../src/constants/uiConstants';
 import { DateField } from '../../../../src/components/DateField';
 import {
-	FormHeader,
 	FormInputGroup,
 	IconPicker,
 	ColorPicker,
 	AmountPresets,
-	DeleteButton,
 } from '../../../../src/components/forms';
+import { Page, Section, Card, LoadingState } from '../../../../src/ui';
+import {
+	palette,
+	radius,
+	space,
+	type as typography,
+} from '../../../../src/ui/theme';
 
 // Helper to clean currency input
 const cleanCurrencyToNumberString = (v: string) =>
@@ -62,43 +67,77 @@ const EditGoalScreen: React.FC = () => {
 	const [showCustomTarget, setShowCustomTarget] = useState(false);
 	const [loading, setLoading] = useState(false);
 	const [goal, setGoal] = useState<Goal | null>(null);
+	const [originalValues, setOriginalValues] = useState<{
+		name: string;
+		target: string;
+		deadline: string;
+		icon: keyof typeof Ionicons.glyphMap;
+		color: string;
+	} | null>(null);
 
-	const { goals, updateGoal, deleteGoal } = useGoal();
+	const { goals, updateGoal } = useGoal();
 
 	// Load goal data when component mounts
 	useEffect(() => {
 		if (goalId && goals.length > 0) {
-			logger.debug('[EditGoalScreen] Looking for goal with ID:', goalId);
-			logger.debug(
-				'[EditGoalScreen] Available goals:',
-				goals.map((g) => ({ id: g.id, name: g.name }))
-			);
 			const foundGoal = goals.find((g) => g.id === goalId);
 			if (foundGoal) {
-				logger.debug('[EditGoalScreen] Found goal:', foundGoal);
 				setGoal(foundGoal);
-				setName(foundGoal.name || '');
-				setTarget(foundGoal.target?.toString() || '');
-				setDeadline(foundGoal.deadline.split('T')[0] || '');
-				// Handle icon - normalize to valid Ionicons name
-				const goalIcon = foundGoal.icon;
-				if (goalIcon) {
-					setIcon(normalizeIconName(goalIcon));
-				} else {
-					setIcon(DEFAULT_GOAL_ICON);
-				}
-				setColor(foundGoal.color || DEFAULT_COLOR);
+				const goalName = foundGoal.name || '';
+				const goalTarget = foundGoal.target?.toString() || '';
+				const goalDeadline = foundGoal.deadline.split('T')[0] || '';
+				// Normalize the icon to ensure it's a valid Ionicons name
+				const normalizedIcon = normalizeIconName(
+					foundGoal.icon || DEFAULT_GOAL_ICON
+				);
+				const goalColor = foundGoal.color || DEFAULT_COLOR;
+
+				setName(goalName);
+				setTarget(goalTarget);
+				setDeadline(goalDeadline);
+				setIcon(normalizedIcon);
+				setColor(goalColor);
+
+				// Store original values for change detection
+				setOriginalValues({
+					name: goalName,
+					target: goalTarget,
+					deadline: goalDeadline,
+					icon: normalizedIcon,
+					color: goalColor,
+				});
+
 				// Auto-detect if custom amount
 				const targetStr = foundGoal.target?.toString() || '';
 				const isPreset = GOAL_TARGET_PRESETS.some(
 					(preset) => preset.toString() === targetStr
 				);
 				setShowCustomTarget(!isPreset && targetStr !== '');
-			} else {
-				logger.debug('[EditGoalScreen] Goal not found with ID:', goalId);
 			}
 		}
 	}, [goalId, goals]);
+
+	// Check if any values have changed
+	const hasChanges = useMemo(() => {
+		if (!originalValues) return false;
+
+		const normalizedCurrentIcon = normalizeIconName(icon);
+		const normalizedOriginalIcon = normalizeIconName(originalValues.icon);
+
+		// Compare amounts as numbers to handle string formatting differences
+		const currentTargetNum = parseFloat(cleanCurrencyToNumberString(target));
+		const originalTargetNum = parseFloat(
+			cleanCurrencyToNumberString(originalValues.target)
+		);
+
+		return (
+			name.trim() !== originalValues.name.trim() ||
+			currentTargetNum !== originalTargetNum ||
+			normalizedCurrentIcon !== normalizedOriginalIcon ||
+			color !== originalValues.color ||
+			deadline !== originalValues.deadline
+		);
+	}, [originalValues, name, target, icon, color, deadline]);
 
 	// Memoized validation for save button
 	const saveDisabled = useMemo(() => {
@@ -109,9 +148,10 @@ const EditGoalScreen: React.FC = () => {
 			!target.trim() ||
 			isNaN(parsedTarget) ||
 			parsedTarget <= 0 ||
-			!validateDate(deadline)
+			!validateDate(deadline) ||
+			!hasChanges
 		);
-	}, [loading, name, target, deadline]);
+	}, [loading, name, target, deadline, hasChanges]);
 
 	const handleSave = async () => {
 		// Validation
@@ -196,37 +236,6 @@ const EditGoalScreen: React.FC = () => {
 		}
 	};
 
-	const handleDelete = () => {
-		if (!goal) return;
-
-		Alert.alert(
-			'Delete Goal',
-			'Are you sure you want to delete this goal? This action cannot be undone.',
-			[
-				{ text: 'Cancel', style: 'cancel' },
-				{
-					text: 'Delete',
-					style: 'destructive',
-					onPress: async () => {
-						try {
-							logger.debug('🗑️ [EditGoal] Deleting goal:', goal.id);
-							await deleteGoal(goal.id);
-							logger.debug('✅ [EditGoal] Goal deleted successfully');
-							router.back();
-						} catch (error) {
-							logger.error('❌ [EditGoal] Delete failed:', error);
-							const errorMsg =
-								error instanceof Error
-									? error.message
-									: 'Failed to delete goal';
-							Alert.alert('Delete Failed', errorMsg);
-						}
-					},
-				},
-			]
-		);
-	};
-
 	const handleDateChange = (isoDate: string) => {
 		setDeadline(isoDate);
 	};
@@ -236,145 +245,195 @@ const EditGoalScreen: React.FC = () => {
 		if (!showCustomTarget) setTarget('');
 	};
 
+	// When goal isn't loaded yet
 	if (!goal) {
 		return (
-			<SafeAreaView style={styles.safeArea} edges={['top']}>
-				<View style={styles.container}>
-					<FormHeader
-						title="Edit Goal"
-						onSave={handleSave}
-						saveDisabled={true}
-						loading={false}
-					/>
-					<View style={styles.loadingContainer}>
-						<ActivityIndicator size="large" color="#007ACC" />
-						<Text style={styles.loadingText}>Loading goal...</Text>
-					</View>
-				</View>
-			</SafeAreaView>
+			<Page>
+				<LoadingState label="Loading goal…" />
+			</Page>
 		);
 	}
 
 	return (
-		<SafeAreaView style={styles.safeArea} edges={['top']}>
-			<View style={styles.container}>
-				<FormHeader
-					title="Edit Goal"
-					onSave={handleSave}
-					saveDisabled={saveDisabled}
-					loading={loading}
-				/>
+		<Page>
+			<View style={styles.layout}>
+				<ScrollView
+					style={styles.content}
+					contentContainerStyle={styles.scrollContent}
+					showsVerticalScrollIndicator={false}
+				>
+					<Section title="Details" subtitle="Update the basics for this goal.">
+						<Card>
+							<View style={styles.form}>
+								{/* Goal Name */}
+								<FormInputGroup label="Goal Name">
+									<TextInput
+										style={styles.textInput}
+										value={name}
+										onChangeText={setName}
+										placeholder="e.g., Emergency Fund"
+										placeholderTextColor={palette.textSubtle}
+									/>
+								</FormInputGroup>
 
-				<ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-					<View style={styles.formContainer}>
-						{/* Goal Name */}
-						<FormInputGroup label="Goal Name">
-							<TextInput
-								style={styles.textInput}
-								value={name}
-								onChangeText={setName}
-								placeholder="e.g., Emergency Fund"
-								placeholderTextColor="#999"
-							/>
-						</FormInputGroup>
+								{/* Target Amount */}
+								<FormInputGroup
+									label="Target Amount"
+									subtext="Set your target amount for this goal"
+								>
+									<AmountPresets
+										presets={GOAL_TARGET_PRESETS}
+										selectedAmount={target}
+										onPresetSelect={(amt) => {
+											setTarget(amt);
+											setShowCustomTarget(false);
+										}}
+										showCustom={showCustomTarget}
+										onToggleCustom={handleToggleCustomTarget}
+										onCustomAmountChange={(v) =>
+											setTarget(cleanCurrencyToNumberString(v))
+										}
+										customPlaceholder="e.g., 10000"
+									/>
+								</FormInputGroup>
 
-						{/* Target Amount */}
-						<FormInputGroup
-							label="Target Amount"
-							subtext="Set your target amount for this goal"
-						>
-							<AmountPresets
-								presets={GOAL_TARGET_PRESETS}
-								selectedAmount={target}
-								onPresetSelect={(amt) => {
-									setTarget(amt);
-									setShowCustomTarget(false);
-								}}
-								showCustom={showCustomTarget}
-								onToggleCustom={handleToggleCustomTarget}
-								onCustomAmountChange={(v) =>
-									setTarget(cleanCurrencyToNumberString(v))
-								}
-								customPlaceholder="e.g., 10000"
-							/>
-						</FormInputGroup>
+								{/* Target Date */}
+								<FormInputGroup label="Target Date">
+									<DateField
+										value={deadline}
+										onChange={handleDateChange}
+										title=""
+										placeholder="Select date"
+										minDate={new Date().toISOString().split('T')[0]}
+									/>
+								</FormInputGroup>
 
-						{/* Target Date */}
-						<FormInputGroup label="Target Date">
-							<DateField
-								value={deadline}
-								onChange={handleDateChange}
-								title=""
-								placeholder="Select date"
-								minDate={new Date().toISOString().split('T')[0]}
-							/>
-						</FormInputGroup>
+								{/* Icon Selection */}
+								<FormInputGroup label="Choose Icon">
+									<IconPicker
+										selectedIcon={icon}
+										selectedColor={color}
+										icons={GOAL_ICONS}
+										onIconSelect={setIcon}
+										isOpen={showIconPicker}
+										onToggle={() => setShowIconPicker(!showIconPicker)}
+									/>
+								</FormInputGroup>
 
-						{/* Icon Selection */}
-						<FormInputGroup label="Choose Icon">
-							<IconPicker
-								selectedIcon={icon}
-								selectedColor={color}
-								icons={GOAL_ICONS}
-								onIconSelect={setIcon}
-								isOpen={showIconPicker}
-								onToggle={() => setShowIconPicker(!showIconPicker)}
-							/>
-						</FormInputGroup>
-
-						{/* Color Selection */}
-						<FormInputGroup label="Choose Color">
-							<ColorPicker
-								selectedColor={color}
-								onColorSelect={setColor}
-								isOpen={showColorPicker}
-								onToggle={() => setShowColorPicker(!showColorPicker)}
-							/>
-						</FormInputGroup>
-
-						{/* Delete Button */}
-						<DeleteButton onPress={handleDelete} text="Delete Goal" />
-					</View>
+								{/* Color Selection */}
+								<ColorPicker
+									selectedColor={color}
+									onColorSelect={setColor}
+									isOpen={showColorPicker}
+									onToggle={() => setShowColorPicker(!showColorPicker)}
+								/>
+							</View>
+						</Card>
+					</Section>
 				</ScrollView>
+
+				{/* Footer Save CTA */}
+				<View style={styles.footer}>
+					<View style={styles.footerCta}>
+						<View style={styles.footerRow}>
+							<TouchableOpacity
+								onPress={() => router.back()}
+								style={styles.footerCancelButton}
+							>
+								<Text style={styles.footerCancel}>Cancel</Text>
+							</TouchableOpacity>
+							<TouchableOpacity
+								onPress={saveDisabled ? undefined : handleSave}
+								style={[
+									styles.footerSaveButton,
+									saveDisabled && styles.footerSaveButtonDisabled,
+								]}
+								disabled={saveDisabled}
+								activeOpacity={0.85}
+							>
+								{loading ? (
+									<ActivityIndicator
+										color={palette.primaryTextOn}
+										size="small"
+									/>
+								) : (
+									<Text style={styles.footerSave}>Save changes</Text>
+								)}
+							</TouchableOpacity>
+						</View>
+					</View>
+				</View>
 			</View>
-		</SafeAreaView>
+		</Page>
 	);
 };
 
 const styles = StyleSheet.create({
-	safeArea: {
+	layout: {
 		flex: 1,
-		backgroundColor: '#ffffff',
-	},
-	container: {
-		flex: 1,
-		backgroundColor: '#F8FAFC',
 	},
 	content: {
 		flex: 1,
 	},
-	formContainer: {
-		padding: 16,
+	scrollContent: {
+		gap: space.lg,
+		paddingBottom: space.xl,
+	},
+	form: {
+		gap: space.md,
 	},
 	textInput: {
 		borderWidth: 1,
-		borderColor: '#e5e7eb',
-		borderRadius: 8,
-		paddingHorizontal: 12,
-		paddingVertical: 12,
+		borderColor: palette.border,
+		borderRadius: radius.md,
+		paddingHorizontal: space.md,
+		paddingVertical: space.md,
 		fontSize: 16,
-		color: '#0a0a0a',
-		backgroundColor: '#ffffff',
+		color: palette.text,
+		backgroundColor: palette.surface ?? '#FFFFFF',
 	},
-	loadingContainer: {
-		flex: 1,
-		justifyContent: 'center',
+	footer: {
+		borderTopWidth: StyleSheet.hairlineWidth,
+		borderTopColor: palette.border,
+		backgroundColor: palette.bg,
+		paddingHorizontal: space.lg,
+		paddingVertical: space.md,
+	},
+	footerCta: {
+		gap: 8,
+	},
+	footerLabel: {
+		...typography.bodyXs,
+		color: palette.textMuted,
+	},
+	footerRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
 		alignItems: 'center',
+		gap: space.md,
 	},
-	loadingText: {
-		marginTop: 16,
-		fontSize: 16,
-		color: '#666',
+	footerCancelButton: {
+		paddingVertical: space.sm,
+	},
+	footerCancel: {
+		...typography.bodySm,
+		color: palette.textMuted,
+	},
+	footerSaveButton: {
+		flex: 1,
+		height: 52,
+		borderRadius: radius.lg,
+		backgroundColor: palette.primary,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	footerSaveButtonDisabled: {
+		opacity: 0.6,
+	},
+	footerSave: {
+		...typography.bodySm,
+		color: palette.primaryTextOn,
+		fontWeight: '600',
 	},
 });
 

@@ -164,7 +164,12 @@ async function processQueue(
 	} catch (error: any) {
 		// Don't retry on 4xx client errors (except 429)
 		if (error.status >= 400 && error.status < 500 && error.status !== 429) {
-			reqLog.warn('Client error, not retrying', { status: error.status });
+			// Log 404s as DEBUG (expected after account deletion or for missing resources)
+			if (error.status === 404) {
+				reqLog.debug('Client error (404), not retrying', { status: error.status });
+			} else {
+				reqLog.warn('Client error, not retrying', { status: error.status });
+			}
 			// Reject all queued requests with the error
 			queue.forEach(({ reject }) => reject(error));
 			return;
@@ -272,7 +277,19 @@ export class RequestManager {
 							: ApiErrorType.SERVER_ERROR,
 						response.status
 					);
-					reqLog.warn('Request failed', { message: error.message });
+					
+					// Log 404s as DEBUG (expected after account deletion or for missing resources)
+					// Log other client errors as WARN, server errors as ERROR
+					if (response.status === 404) {
+						reqLog.debug('Request failed (404 - expected in some cases)', { 
+							message: error.message,
+							url: url.substring(0, 100)
+						});
+					} else if (response.status >= 400 && response.status < 500) {
+						reqLog.warn('Request failed (client error)', { message: error.message });
+					} else {
+						reqLog.warn('Request failed (server error)', { message: error.message });
+					}
 					throw error;
 				}
 
@@ -282,10 +299,24 @@ export class RequestManager {
 				return data;
 			} catch (error: any) {
 				clearTimeout(timeoutId);
-				reqLog.error('Request error', {
-					name: error.name,
-					message: error.message,
-				});
+				
+				// Don't log ApiError instances as ERROR if they're 404s (expected)
+				// These are already logged at the appropriate level above
+				if (error instanceof ApiError && error.status === 404) {
+					// Already logged as DEBUG above, skip duplicate error log
+				} else if (error.name === 'AbortError') {
+					// Abort errors are expected for timeouts, log as debug
+					reqLog.debug('Request aborted', {
+						name: error.name,
+						message: error.message,
+					});
+				} else {
+					reqLog.error('Request error', {
+						name: error.name,
+						message: error.message,
+					});
+				}
+				
 				// Handle abort errors specifically
 				if (error.name === 'AbortError') {
 					const timeoutError = new ApiError(

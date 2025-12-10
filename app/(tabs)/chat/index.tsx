@@ -28,7 +28,7 @@ import { useProfile } from '../../../src/context/profileContext';
 import { useBudget } from '../../../src/context/budgetContext';
 import { useGoal } from '../../../src/context/goalContext';
 import { TransactionContext } from '../../../src/context/transactionContext';
-import { useRecurringExpense } from '../../../src/context/recurringExpenseContext';
+import { useBills } from '../../../src/context/billContext';
 import { MissingInfoChip } from '../../../src/components/assistant/cards/MissingInfoCard';
 import {
 	missingInfoService,
@@ -119,7 +119,7 @@ export default function ChatScreen() {
 	const { transactions } = useContext(TransactionContext) as {
 		transactions: any[];
 	};
-	const { expenses: recurringExpenses } = useRecurringExpense();
+	const { expenses: recurringExpenses } = useBills();
 
 	// Keep local assistant config that reacts instantly to events
 	const [config, setConfig] = useState<AssistantConfig>(() =>

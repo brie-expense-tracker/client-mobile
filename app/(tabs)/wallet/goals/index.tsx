@@ -22,9 +22,7 @@ import {
 	LoadingState,
 	EmptyState,
 	SegmentedControl,
-	Card,
 	palette,
-	radius,
 	space,
 	type as typography,
 } from '../../../../src/ui';
@@ -150,18 +148,6 @@ export default function GoalsScreen() {
 		return <LoadingState label="Loading goals..." />;
 	}
 
-	if (goals.length === 0 && hasLoaded) {
-		return (
-			<EmptyState
-				icon="flag-outline"
-				title="No Goals Yet"
-				subtitle="Create your first goal to start saving towards your dreams."
-				ctaLabel="Add Goal"
-				onPress={showModal}
-			/>
-		);
-	}
-
 	return (
 		<Page>
 			<ScrollView
@@ -177,9 +163,9 @@ export default function GoalsScreen() {
 					/>
 				}
 			>
-				{/* Hero – same pattern as BudgetScreen */}
-				<Section style={styles.heroSection}>
-					<Card style={styles.heroCard}>
+				{/* Hero – same card pattern as Budgets + Bills + Debts */}
+				<View style={styles.heroShell}>
+					<View style={styles.goalsSummaryCardWrapper}>
 						<GoalsSummaryCard
 							totalGoals={summaryStats.totalGoals}
 							completedGoals={summaryStats.completedGoals}
@@ -187,8 +173,8 @@ export default function GoalsScreen() {
 							totalCurrent={summaryStats.totalCurrent}
 							onAddGoal={showModal}
 						/>
-					</Card>
-				</Section>
+					</View>
+				</View>
 
 				{/* List – title above filter */}
 				<Section style={styles.goalsSection}>
@@ -214,7 +200,23 @@ export default function GoalsScreen() {
 							]}
 						/>
 					</View>
-					<GoalsFeed scrollEnabled={false} goals={goals} filterBy={filterBy} />
+					{isLoading ? (
+						<LoadingState label="Loading goals…" />
+					) : goals.length === 0 ? (
+						<EmptyState
+							icon="flag-outline"
+							title="No Goals Yet"
+							subtitle="Create your first goal to start saving towards your dreams."
+							ctaLabel="Add Goal"
+							onPress={showModal}
+						/>
+					) : (
+						<GoalsFeed
+							scrollEnabled={false}
+							goals={goals}
+							filterBy={filterBy}
+						/>
+					)}
 				</Section>
 			</ScrollView>
 
@@ -232,41 +234,42 @@ export default function GoalsScreen() {
 const styles = StyleSheet.create({
 	scroll: {
 		flex: 1,
-		backgroundColor: palette.surfaceAlt,
+		backgroundColor: palette.surfaceAlt, // light grey
 	},
 	scrollContent: {
-		paddingTop: space.sm,
 		paddingBottom: space.xl,
 	},
-	heroSection: {
-		marginTop: space.md,
-	},
-	heroCard: {
+
+	// background of the top area – stays light grey now
+	heroShell: {
+		backgroundColor: palette.surfaceAlt,
+		paddingTop: space.lg,
+		paddingBottom: space.lg,
 		paddingHorizontal: space.lg,
-		paddingVertical: space.lg,
-
-		backgroundColor: palette.surface,
-		borderRadius: radius.xl,
-
-		// subtle outline, like budgets / bills summary
-		borderWidth: 1,
-		borderColor: palette.borderMuted,
-
-		// soft floating shadow
-		shadowColor: '#000',
-		shadowOpacity: 0.07,
-		shadowRadius: 18,
-		shadowOffset: { width: 0, height: 8 },
-
-		// Android
-		elevation: 3,
 	},
+
+	// actual white card behind the goals summary
+	goalsSummaryCardWrapper: {
+		backgroundColor: palette.surface,
+		borderRadius: 24,
+		padding: space.lg,
+		shadowColor: '#000',
+		shadowOpacity: 0.06,
+		shadowRadius: 18,
+		shadowOffset: { width: 0, height: 10 },
+		elevation: 4,
+	},
+
 	goalsSection: {
 		marginTop: space.lg,
+		paddingHorizontal: space.lg,
+		paddingTop: space.sm,
 	},
+
 	goalsHeader: {
 		marginBottom: space.sm,
 	},
+
 	goalsTitle: {
 		...typography.titleSm,
 		color: palette.text,

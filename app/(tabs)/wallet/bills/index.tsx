@@ -1,38 +1,43 @@
-// app/(tabs)/wallet/recurring.tsx
+// app/(tabs)/wallet/bills.tsx
 
-import React, { useState, useMemo, useCallback } from 'react';
-import { ScrollView, Alert, RefreshControl, StyleSheet } from 'react-native';
+import React, { useState, useMemo, useCallback, useContext } from 'react';
+import {
+	ScrollView,
+	View,
+	Alert,
+	RefreshControl,
+	StyleSheet,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
 
-import RecurringExpensesFeed from '../components/recurring/RecurringExpensesFeed';
-import RecurringSummaryCard from '../components/recurring/RecurringSummaryCard';
-import { useRecurringExpense } from '../../../../src/context/recurringExpenseContext';
-import { RecurringExpenseService } from '../../../../src/services';
+import BillsFeed from '../components/bills/BillsFeed';
+import BillsSummaryCard from '../components/bills/BillsSummaryCard';
+import { useBills } from '../../../../src/context/billContext';
+import { TransactionContext } from '../../../../src/context/transactionContext';
+import { BillService } from '../../../../src/services';
 import {
 	Page,
 	Section,
 	LoadingState,
 	EmptyState,
 	SegmentedControl,
-	Card,
 	palette,
-	radius,
 	space,
 } from '../../../../src/ui';
 import { isDevMode } from '../../../../src/config/environment';
 import { createLogger } from '../../../../src/utils/sublogger';
 
-const recurringExpensesScreenLog = createLogger('RecurringExpensesScreen');
+const billsScreenLog = createLogger('BillsScreen');
 
 type ViewFilter = 'all' | 'monthly' | 'weekly';
 
-const RecurringExpensesScreen: React.FC = () => {
+const BillsScreen: React.FC = () => {
 	const [refreshing, setRefreshing] = useState(false);
 	const [activeView, setActiveView] = useState<ViewFilter>('all');
 
-	const { expenses, refetch, deleteRecurringExpense, isLoading, hasLoaded } =
-		useRecurringExpense();
+	const { expenses, refetch, deleteBill, isLoading, hasLoaded } = useBills();
+	const { refetch: refetchTransactions } = useContext(TransactionContext);
 
 	// load on focus
 	useFocusEffect(
@@ -40,9 +45,9 @@ const RecurringExpensesScreen: React.FC = () => {
 			if (!hasLoaded) {
 				refetch().catch((err) => {
 					if (isDevMode) {
-						recurringExpensesScreenLog.error('Failed to load', err);
+						billsScreenLog.error('Failed to load', err);
 					}
-					Alert.alert('Error', 'Unable to load recurring expenses.');
+					Alert.alert('Error', 'Unable to load bills.');
 				});
 			} else {
 				const timer = setTimeout(() => {
@@ -57,11 +62,11 @@ const RecurringExpensesScreen: React.FC = () => {
 		setRefreshing(true);
 		try {
 			const { ApiService } = await import('../../../../src/services');
-			ApiService.clearCacheByPrefix('/api/recurring-expenses');
+			ApiService.clearCacheByPrefix('/api/bills');
 			await refetch();
 		} catch (err) {
 			if (isDevMode) {
-				recurringExpensesScreenLog.error('Refresh failed', err);
+				billsScreenLog.error('Refresh failed', err);
 			}
 		} finally {
 			setRefreshing(false);
@@ -81,7 +86,6 @@ const RecurringExpensesScreen: React.FC = () => {
 		const now = new Date();
 
 		for (const exp of expenses) {
-			// Calculate monthly equivalent
 			const getMonthlyEquivalent = (amount: number, frequency: string) => {
 				switch (frequency) {
 					case 'weekly':
@@ -97,34 +101,32 @@ const RecurringExpensesScreen: React.FC = () => {
 				}
 			};
 
-			totalMonthly += getMonthlyEquivalent(exp.amount || 0, exp.frequency);
+			const monthlyEq = getMonthlyEquivalent(exp.amount || 0, exp.frequency);
+
+			totalMonthly += monthlyEq;
 
 			const nextDate = exp.nextExpectedDate
 				? new Date(exp.nextExpectedDate)
 				: null;
-
 			if (!nextDate) continue;
 
-			const daysUntilDue = RecurringExpenseService.getDaysUntilNext(
-				exp.nextExpectedDate
-			);
+			const daysUntilDue = BillService.getDaysUntilNext(exp.nextExpectedDate);
 
 			if (daysUntilDue <= 0) {
 				overdueCount += 1;
-				overdueAmount += getMonthlyEquivalent(exp.amount || 0, exp.frequency);
+				overdueAmount += monthlyEq;
 			} else if (nextDate >= now) {
 				upcomingCount += 1;
 
 				// treat "due soon" as <= 7 days away
 				if (daysUntilDue <= 7) {
-					dueSoonAmount += getMonthlyEquivalent(exp.amount || 0, exp.frequency);
+					dueSoonAmount += monthlyEq;
 				}
 			}
 		}
 
-		// Note: We don't have payment status in the current context,
-		// so we'll use a simplified approach
-		paidCount = 0; // Would need to check payment status separately
+		// We don't yet track "paid" separately
+		paidCount = 0;
 
 		return {
 			totalMonthly,
@@ -142,14 +144,14 @@ const RecurringExpensesScreen: React.FC = () => {
 	}, [expenses, activeView]);
 
 	const handleAddExpense = () => {
-		router.push('/wallet/recurring/new');
+		router.push('/wallet/bills/new');
 	};
 
 	const handleExpenseMenuPress = (patternId: string) => {
 		const expense = expenses.find((e) => e.patternId === patternId);
 		if (expense) {
 			Alert.alert(
-				'Recurring Expense Options',
+				'Bill Options',
 				`What would you like to do with "${expense.vendor}"?`,
 				[
 					{ text: 'Edit', onPress: () => handleEditExpense(expense) },
@@ -166,7 +168,7 @@ const RecurringExpensesScreen: React.FC = () => {
 
 	const handleExpenseRowPress = (expense: any) => {
 		router.push({
-			pathname: '/(tabs)/wallet/recurring/[patternId]',
+			pathname: '/(tabs)/wallet/bills/[patternId]',
 			params: { patternId: expense.patternId },
 		});
 	};
@@ -180,36 +182,42 @@ const RecurringExpensesScreen: React.FC = () => {
 
 	const handleDeleteExpense = async (patternId: string) => {
 		try {
-			await deleteRecurringExpense(patternId);
+			await deleteBill(patternId);
 		} catch (error) {
 			if (isDevMode) {
-				recurringExpensesScreenLog.error('Error deleting expense', error);
+				billsScreenLog.error('Error deleting expense', error);
 			}
 			const errorMsg =
-				error instanceof Error
-					? error.message
-					: 'Failed to delete recurring expense';
+				error instanceof Error ? error.message : 'Failed to delete bill';
 			Alert.alert('Delete Failed', errorMsg);
 		}
+	};
+
+	const handleBillPaid = async () => {
+		await Promise.all([refetch(), refetchTransactions()]);
 	};
 
 	return (
 		<Page>
 			<ScrollView
+				showsVerticalScrollIndicator={false}
 				style={styles.scroll}
+				contentContainerStyle={styles.scrollContent}
 				refreshControl={
-					<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+					<RefreshControl
+						refreshing={refreshing}
+						onRefresh={onRefresh}
+						tintColor={palette.primary}
+						colors={[palette.primary]}
+					/>
 				}
-				contentContainerStyle={{ paddingBottom: space.xl }}
 			>
-				<Section style={styles.heroSection}>
-					<Card style={styles.heroCard}>
-						<RecurringSummaryCard
-							summary={summary}
-							onAddPress={handleAddExpense}
-						/>
-					</Card>
-				</Section>
+				{/* Top-sheet hero like Budgets / Debts / Goals */}
+				<View style={styles.heroShell}>
+					<View style={styles.billsSummaryCardWrapper}>
+						<BillsSummaryCard summary={summary} onAddPress={handleAddExpense} />
+					</View>
+				</View>
 
 				<Section
 					title="Your expenses"
@@ -227,20 +235,21 @@ const RecurringExpensesScreen: React.FC = () => {
 					}
 				>
 					{isLoading ? (
-						<LoadingState label="Loading recurring expenses…" />
+						<LoadingState label="Loading bills…" />
 					) : filteredExpenses.length === 0 ? (
 						<EmptyState
-							title="No recurring expenses yet"
+							title="No bills yet"
 							subtitle="Add your subscriptions and bills so you never miss a payment."
-							ctaLabel="Add expense"
+							ctaLabel="Add bill"
 							onPress={handleAddExpense}
 						/>
 					) : (
-						<RecurringExpensesFeed
+						<BillsFeed
 							expenses={filteredExpenses}
 							onPressMenu={handleExpenseMenuPress}
 							onPressRow={handleExpenseRowPress}
 							scrollEnabled={false}
+							onPaid={handleBillPaid}
 						/>
 					)}
 				</Section>
@@ -252,34 +261,37 @@ const RecurringExpensesScreen: React.FC = () => {
 const styles = StyleSheet.create({
 	scroll: {
 		flex: 1,
+		backgroundColor: palette.surfaceAlt, // light grey
+	},
+	scrollContent: {
+		paddingBottom: space.xl,
+	},
+
+	// background of the top area – stays light grey now
+	heroShell: {
 		backgroundColor: palette.surfaceAlt,
-	},
-	heroSection: {
-		marginTop: space.md,
-	},
-	heroCard: {
+		paddingTop: space.lg,
+		paddingBottom: space.lg,
 		paddingHorizontal: space.lg,
-		paddingVertical: space.lg,
-
-		backgroundColor: palette.surface,
-		borderRadius: radius.xl,
-
-		// subtle outline, like Bills summary
-		borderWidth: 1,
-		borderColor: palette.borderMuted,
-
-		// soft floating shadow
-		shadowColor: '#000',
-		shadowOpacity: 0.07,
-		shadowRadius: 18,
-		shadowOffset: { width: 0, height: 8 },
-
-		// Android
-		elevation: 3,
 	},
+
+	// actual white card behind the bills summary
+	billsSummaryCardWrapper: {
+		backgroundColor: palette.surface,
+		borderRadius: 24,
+		padding: space.lg,
+		shadowColor: '#000',
+		shadowOpacity: 0.06,
+		shadowRadius: 18,
+		shadowOffset: { width: 0, height: 10 },
+		elevation: 4,
+	},
+
 	expensesSection: {
 		marginTop: space.lg,
+		paddingHorizontal: space.lg,
+		paddingTop: space.sm,
 	},
 });
 
-export default RecurringExpensesScreen;
+export default BillsScreen;

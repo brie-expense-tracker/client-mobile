@@ -33,7 +33,7 @@ import { TransactionProvider } from '../src/context/transactionContext';
 import { TransactionModalProvider } from '../src/context/transactionModalContext';
 import { BudgetProvider } from '../src/context/budgetContext';
 import { GoalProvider } from '../src/context/goalContext';
-import { RecurringExpenseProvider } from '../src/context/recurringExpenseContext';
+import { BillProvider } from '../src/context/billContext';
 import { ThemeProvider } from '../src/context/ThemeContext';
 import { loadLocalOverrides, getResolvedFlags } from '../src/config/features';
 import * as Notifications from 'expo-notifications';
@@ -45,7 +45,8 @@ import { DEV_MODE, isDevMode } from '../src/config/environment';
 const layoutLog = createLogger('Layout');
 
 // Performance tracking - only in non-production
-const PERFORMANCE_TRACKING = __DEV__ || process.env.EXPO_PUBLIC_ENV === 'testflight';
+const PERFORMANCE_TRACKING =
+	__DEV__ || process.env.EXPO_PUBLIC_ENV === 'testflight';
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -254,8 +255,7 @@ function RootLayoutContent() {
 				'debts',
 			];
 			const isStackRoute =
-				inStackGroup ||
-				knownStackRoutes.includes(segments[0] || '');
+				inStackGroup || knownStackRoutes.includes(segments[0] || '');
 			if (firebaseUser && user) {
 				// In dev mode, allow access to onboarding even if completed
 				if (isDevMode && inOnboardingGroup) {
@@ -387,7 +387,7 @@ function RootLayoutContent() {
 					{/* Always mount all providers to ensure onboarding screens have access */}
 					<BudgetProvider>
 						<GoalProvider>
-							<RecurringExpenseProvider>
+							<BillProvider>
 								<TransactionProvider>
 									<TransactionModalProvider>
 										<GestureHandlerRootView style={{ flex: 1 }}>
@@ -418,7 +418,7 @@ function RootLayoutContent() {
 										</GestureHandlerRootView>
 									</TransactionModalProvider>
 								</TransactionProvider>
-							</RecurringExpenseProvider>
+							</BillProvider>
 						</GoalProvider>
 					</BudgetProvider>
 				</ProfileProvider>

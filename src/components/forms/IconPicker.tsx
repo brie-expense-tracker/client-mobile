@@ -2,6 +2,12 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { normalizeIconName } from '../../constants/uiConstants';
+import {
+	palette,
+	radius,
+	space,
+	type as typography,
+} from '../../ui/theme';
 
 interface IconPickerProps {
 	selectedIcon: keyof typeof Ionicons.glyphMap;
@@ -26,8 +32,12 @@ export const IconPicker: React.FC<IconPickerProps> = ({
 	};
 
 	return (
-		<View>
-			<TouchableOpacity style={styles.iconButton} onPress={onToggle}>
+		<View style={styles.container}>
+			<TouchableOpacity
+				style={styles.iconButton}
+				onPress={onToggle}
+				activeOpacity={0.9}
+			>
 				<View style={styles.iconButtonContent}>
 					<View
 						style={[
@@ -45,7 +55,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
 					<Ionicons
 						name={isOpen ? 'chevron-up' : 'chevron-down'}
 						size={20}
-						color="#757575"
+						color={palette.textMuted}
 					/>
 				</View>
 			</TouchableOpacity>
@@ -77,10 +87,16 @@ export const IconPicker: React.FC<IconPickerProps> = ({
 };
 
 const styles = StyleSheet.create({
+	container: {
+		borderRadius: radius.lg,
+		backgroundColor: palette.surface,
+		borderWidth: 1,
+		borderColor: palette.border,
+		overflow: 'hidden',
+	},
 	iconButton: {
-		backgroundColor: '#F5F5F5',
-		borderRadius: 12,
-		padding: 16,
+		paddingHorizontal: space.lg,
+		paddingVertical: space.md,
 	},
 	iconButtonContent: {
 		flexDirection: 'row',
@@ -88,35 +104,36 @@ const styles = StyleSheet.create({
 		justifyContent: 'space-between',
 	},
 	iconPreview: {
-		width: 24,
-		height: 24,
-		borderRadius: 6,
-		borderWidth: 1,
-		borderColor: '#E0E0E0',
+		width: 32,
+		height: 32,
+		borderRadius: radius.md,
+		borderWidth: 2,
+		borderColor: '#FFFFFF',
 		justifyContent: 'center',
 		alignItems: 'center',
 	},
 	iconButtonText: {
-		fontSize: 16,
-		color: '#212121',
+		...typography.body,
+		color: palette.text,
 		flex: 1,
-		marginLeft: 12,
+		marginLeft: space.md,
 	},
 	iconGrid: {
+		paddingHorizontal: space.lg,
+		paddingBottom: space.md,
+		paddingTop: space.sm,
 		flexDirection: 'row',
 		flexWrap: 'wrap',
-		justifyContent: 'center',
-		gap: 8,
-		marginTop: 4,
+		gap: space.sm,
 	},
 	iconOption: {
 		width: 40,
 		height: 40,
-		borderRadius: 20,
-		backgroundColor: 'white',
+		borderRadius: radius.md,
+		backgroundColor: palette.surface,
 		alignItems: 'center',
 		justifyContent: 'center',
 		borderWidth: 1,
-		borderColor: '#E0E0E0',
+		borderColor: palette.border,
 	},
 });

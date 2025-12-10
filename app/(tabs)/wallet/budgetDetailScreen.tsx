@@ -4,7 +4,7 @@ import { ScrollView, Alert, RefreshControl, StyleSheet } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useBudget } from '../../../src/context/budgetContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import HeroBudget from './components/budgets/HeroBudget';
+import BudgetSummaryCard from './components/budgets/BudgetSummaryCard';
 import BudgetsFeed from './components/budgets/BudgetsFeed';
 import {
 	Page,
@@ -329,15 +329,12 @@ export default function BudgetScreen() {
 				{/* Hero */}
 
 				<Card style={styles.heroCard}>
-					<HeroBudget
-						mode={heroProps.mode}
-						percent={heroProps.percent}
-						spent={heroProps.spent}
-						total={heroProps.total}
-						subtitle={heroProps.subtitle}
-						daysLeft={heroProps.daysLeft}
+					<BudgetSummaryCard
+						periodLabel={heroProps.subtitle}
+						totalBudgets={filteredBudgets.length}
+						totalPlanned={heroProps.total}
+						totalSpent={heroProps.spent}
 						onAddBudget={showModal}
-						variant="compact"
 					/>
 				</Card>
 

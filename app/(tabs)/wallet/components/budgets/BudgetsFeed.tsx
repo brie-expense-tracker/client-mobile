@@ -61,11 +61,12 @@ function BudgetRow({
 		<Pressable
 			onPress={handleRowPress}
 			style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-			android_ripple={{ color: `${actualColor}20`, borderless: false }}
+			// neutral ripple, same family as Goals/Debts/Bills
+			android_ripple={{ color: palette.borderMuted, borderless: false }}
 			accessibilityRole="button"
 			accessibilityLabel={`Open ${budget.name} budget`}
 		>
-			{/* Top row */}
+			{/* Top row — same flow as bills/goals (icon + title/subtitle + amount) */}
 			<View style={styles.headerRow}>
 				<View style={styles.leftCol}>
 					<View
@@ -79,8 +80,12 @@ function BudgetRow({
 					</View>
 
 					<View style={styles.titleBlock}>
-						<Text style={styles.title}>{budget.name}</Text>
-						<Text style={styles.subtitleGray}>{subtitleLabel}</Text>
+						<Text style={styles.title} numberOfLines={1}>
+							{budget.name}
+						</Text>
+						<Text style={styles.subtitleGray} numberOfLines={1}>
+							{subtitleLabel}
+						</Text>
 					</View>
 				</View>
 
@@ -92,7 +97,7 @@ function BudgetRow({
 				</View>
 			</View>
 
-			{/* Progress */}
+			{/* Middle row — budgets-only progress */}
 			<View style={styles.progressRow}>
 				<LinearProgressBar
 					percent={percent}
@@ -104,7 +109,7 @@ function BudgetRow({
 				/>
 			</View>
 
-			{/* Bottom row */}
+			{/* Bottom row — meta + status chip */}
 			<View style={styles.metaInlineRow}>
 				<Text style={styles.metaSmall}>
 					Spent {formatCurrency(spent)}{' '}
@@ -235,8 +240,9 @@ const styles = StyleSheet.create({
 		borderRadius: radius.xl,
 		paddingHorizontal: space.lg,
 		paddingVertical: space.lg,
-		borderWidth: StyleSheet.hairlineWidth,
-		borderColor: palette.borderMuted, // match recurring cards
+		// match GoalsFeed border (clear, visible line)
+		borderWidth: 1,
+		borderColor: palette.borderMuted,
 		marginBottom: space.sm,
 	},
 	cardPressed: {
@@ -266,7 +272,6 @@ const styles = StyleSheet.create({
 		flexShrink: 1,
 	},
 	title: {
-		...typography.labelSm,
 		color: palette.text,
 		fontWeight: '600',
 	},

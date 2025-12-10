@@ -17,7 +17,7 @@ export default function WalletLayout() {
 			<Stack.Screen name="budgets" options={{ headerShown: false }} />
 			<Stack.Screen name="goals" options={{ headerShown: false }} />
 			<Stack.Screen name="debts" options={{ headerShown: false }} />
-			<Stack.Screen name="recurring" options={{ headerShown: false }} />
+			<Stack.Screen name="bills" options={{ headerShown: false }} />
 		</Stack>
 	);
 }

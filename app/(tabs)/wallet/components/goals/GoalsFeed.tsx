@@ -1,3 +1,5 @@
+// app/(tabs)/wallet/components/goals/GoalsFeed.tsx
+
 import React, { useMemo, useState } from 'react';
 import {
 	View,
@@ -24,6 +26,9 @@ import {
 const goalsFeedLog = createLogger('GoalsFeed');
 
 type GoalStatus = 'ongoing' | 'completed' | 'cancelled';
+
+const formatCurrency = (n: number) =>
+	`$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
 const daysLeft = (deadline: string) => {
 	const end = new Date(deadline).setHours(0, 0, 0, 0);
@@ -56,11 +61,13 @@ function StatusPill({ status }: { status: GoalStatus }) {
 	return (
 		<View
 			style={[
-				styles.pill,
+				styles.statusChip,
 				{ backgroundColor: colors.bg, borderColor: colors.border },
 			]}
 		>
-			<Text style={[styles.pillText, { color: colors.text }]}>{label}</Text>
+			<Text style={[styles.statusChipText, { color: colors.text }]}>
+				{label}
+			</Text>
 		</View>
 	);
 }
@@ -83,63 +90,77 @@ function GoalRow({ goal }: { goal: Goal }) {
 			? `${dl} day${dl === 1 ? '' : 's'} left`
 			: `${Math.abs(dl)} day${Math.abs(dl) === 1 ? '' : 's'} overdue`;
 
+	const subtitle =
+		goal.categories && goal.categories.length > 0
+			? goal.categories.join(', ')
+			: 'Savings goal';
+
+	const actualColor = goal.color || palette.primary;
+
 	return (
 		<Pressable
 			onPress={handleRowPress}
-			style={({ pressed }) => [
-				styles.rowContainer,
-				pressed && styles.rowContainerPressed,
-			]}
+			style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
 			android_ripple={{ color: palette.borderMuted }}
 			accessibilityRole="button"
 			accessibilityLabel={`Open goal ${goal.name}`}
 		>
-			{/* Icon */}
-			<View
-				style={[
-					styles.iconWrapper,
-					{ backgroundColor: `${goal.color ?? palette.primary}20` },
-				]}
-			>
-				<Ionicons
-					name={normalizeIconName(goal.icon || 'flag-outline')}
-					size={18}
-					color={goal.color || palette.primary}
+			{/* Top row — same flow as Budgets/Bills header */}
+			<View style={styles.headerRow}>
+				<View style={styles.leftCol}>
+					<View
+						style={[styles.iconBubble, { backgroundColor: `${actualColor}20` }]}
+					>
+						<Ionicons
+							name={normalizeIconName(goal.icon || 'flag-outline')}
+							size={18}
+							color={actualColor}
+						/>
+					</View>
+
+					<View style={styles.titleBlock}>
+						<Text style={styles.title} numberOfLines={1}>
+							{goal.name}
+						</Text>
+						<Text style={styles.subtitleGray} numberOfLines={1}>
+							{subtitle}
+						</Text>
+					</View>
+				</View>
+
+				<View style={styles.amountCol}>
+					<Text style={styles.amountLabel}>Goal</Text>
+					<Text style={styles.amountValue}>
+						{formatCurrency(goal.target || 0)}
+					</Text>
+				</View>
+			</View>
+
+			{/* Middle row — progress bar, like budgets */}
+			<View style={styles.progressRow}>
+				<LinearProgressBar
+					percent={progressPercent}
+					height={6}
+					color={actualColor}
+					trackColor={palette.borderMuted}
+					animated
+					style={styles.progressBar}
 				/>
 			</View>
 
-			{/* Content */}
-			<View style={styles.rowMiddle}>
-				<Text style={styles.title} numberOfLines={1}>
-					{goal.name}
-				</Text>
-
-				{goal.categories && goal.categories.length > 0 && (
-					<Text style={styles.subtitleGray} numberOfLines={1}>
-						{goal.categories.join(', ')}
+			{/* Bottom row — meta text on left, status pill on right */}
+			<View style={styles.metaInlineRow}>
+				<View>
+					<Text style={styles.metaSmall}>
+						Saved {formatCurrency(goal.current)}{' '}
+						<Text style={styles.metaFaint}>
+							/ {formatCurrency(goal.target)} · {Math.round(progressPercent)}%
+						</Text>
 					</Text>
-				)}
-
-				<View style={styles.progressSection}>
-					<LinearProgressBar
-						percent={progressPercent}
-						height={6}
-						color={goal.color || palette.primary}
-						trackColor={palette.borderMuted}
-						leftLabel={`$${goal.current.toFixed(0)} / $${goal.target.toFixed(
-							0
-						)}`}
-						rightLabel={`${Math.round(progressPercent)}%`}
-						style={styles.progressBar}
-					/>
-				</View>
-
-				<View style={styles.statusRow}>
-					<View style={styles.statusRowLeft}>
-						<StatusPill status={status} />
-					</View>
 					<Text style={styles.metaDate}>{dateLabel}</Text>
 				</View>
+
+				<StatusPill status={status} />
 			</View>
 		</Pressable>
 	);
@@ -272,7 +293,6 @@ export default function GoalsFeed({
 				styles.listContent,
 				isEmpty && styles.listContentEmpty,
 			]}
-			ItemSeparatorComponent={() => <View style={{ height: space.md }} />}
 			ListFooterComponent={
 				!isEmpty ? <View style={styles.footerSpacer} /> : null
 			}
@@ -281,22 +301,34 @@ export default function GoalsFeed({
 }
 
 const styles = StyleSheet.create({
-	rowContainer: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingHorizontal: space.lg,
-		paddingVertical: space.md,
-		borderRadius: radius.xl,
+	// Card layout – same family as Budgets/Bills
+	card: {
+		flexDirection: 'column',
 		backgroundColor: palette.surface,
+		borderRadius: radius.xl,
+		paddingHorizontal: space.lg,
+		paddingVertical: space.lg,
 		borderWidth: 1,
 		borderColor: palette.borderMuted,
-		// marginBottom removed – spacing is handled by ItemSeparatorComponent
+		marginBottom: space.sm,
 	},
-	rowContainerPressed: {
+	cardPressed: {
 		backgroundColor: palette.surfaceSubtle,
 		opacity: 0.96,
+		transform: [{ scale: 0.99 }],
 	},
-	iconWrapper: {
+
+	headerRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginBottom: space.sm,
+	},
+	leftCol: {
+		flex: 1,
+		flexDirection: 'row',
+		alignItems: 'center',
+	},
+	iconBubble: {
 		width: 36,
 		height: 36,
 		borderRadius: 18,
@@ -304,52 +336,70 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 		alignItems: 'center',
 	},
-	rowMiddle: {
-		flex: 1,
+	titleBlock: {
+		flexShrink: 1,
 	},
 	title: {
-		...typography.labelSm,
 		color: palette.text,
 		fontWeight: '600',
-		textTransform: 'none',
 	},
 	subtitleGray: {
 		...typography.bodyXs,
 		color: palette.textMuted,
 		marginTop: 2,
 	},
-	progressSection: {
-		marginTop: 10,
-		marginBottom: 6,
+	amountCol: {
+		alignItems: 'flex-end',
+		marginLeft: space.md,
+	},
+	amountLabel: {
+		...typography.bodyXs,
+		color: palette.textMuted,
+		marginBottom: 2,
+	},
+	amountValue: {
+		...typography.labelSm,
+		color: palette.text,
+		fontWeight: '600',
+	},
+
+	progressRow: {
+		marginTop: 4,
 	},
 	progressBar: {
-		marginBottom: 4,
+		marginBottom: 8,
 	},
-	statusRow: {
+
+	metaInlineRow: {
 		flexDirection: 'row',
-		alignItems: 'center',
 		justifyContent: 'space-between',
-		marginTop: 6,
+		alignItems: 'flex-end',
+		marginTop: 4,
 	},
-	statusRowLeft: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		columnGap: 6,
+	metaSmall: {
+		...typography.bodyXs,
+		color: palette.text,
 	},
-	pill: {
-		paddingHorizontal: 10,
-		paddingVertical: 4,
-		borderRadius: radius.full,
-		borderWidth: 1,
-	},
-	pillText: {
-		fontSize: 12,
-		fontWeight: '600',
+	metaFaint: {
+		color: palette.textMuted,
 	},
 	metaDate: {
 		...typography.bodyXs,
 		color: palette.textMuted,
+		marginTop: 2,
 	},
+
+	statusChip: {
+		borderRadius: radius.full,
+		paddingHorizontal: 10,
+		paddingVertical: 4,
+		borderWidth: 1,
+	},
+	statusChipText: {
+		fontSize: 12,
+		fontWeight: '600',
+	},
+
 	loadingState: {
 		flex: 1,
 		justifyContent: 'center',

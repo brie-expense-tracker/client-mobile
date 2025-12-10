@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-type RecurringExpenseCardProps = {
+type BillCardProps = {
 	vendor: string;
 	amount: number;
 	dueInDays: number;
@@ -19,10 +19,11 @@ type RecurringExpenseCardProps = {
 	iconName?: keyof typeof Ionicons.glyphMap;
 	color?: string; // category tint (e.g., Netflix = purple)
 	isPaid?: boolean;
+	autoPay?: boolean; // Whether this bill is set to auto-pay
 	isProcessing?: boolean;
 };
 
-const RecurringExpenseCard: React.FC<RecurringExpenseCardProps> = ({
+const BillCard: React.FC<BillCardProps> = ({
 	vendor,
 	amount,
 	dueInDays,
@@ -33,6 +34,7 @@ const RecurringExpenseCard: React.FC<RecurringExpenseCardProps> = ({
 	iconName = 'repeat-outline',
 	color = '#1E88E5', // Default: blue
 	isPaid = false,
+	autoPay = false,
 	isProcessing = false,
 }) => {
 	// Chip color by urgency
@@ -69,12 +71,18 @@ const RecurringExpenseCard: React.FC<RecurringExpenseCardProps> = ({
 						</View>
 					) : (
 						<>
+							{autoPay && (
+								<View style={styles.autoPayChip}>
+									<Ionicons name="flash" size={10} color="#0284c7" />
+									<Text style={styles.autoPayChipText}>Auto</Text>
+								</View>
+							)}
 							<View style={[styles.chip, { backgroundColor: chipColor }]}>
 								<Text style={[styles.chipText, { color: chipText }]}>
 									{dueInDays}d
 								</Text>
 							</View>
-							{onPressMarkPaid && (
+							{!autoPay && onPressMarkPaid && (
 								<TouchableOpacity
 									style={[
 										styles.quickActionButton,
@@ -226,6 +234,21 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 		alignItems: 'center',
 	},
+	autoPayChip: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#EFF6FF',
+		borderRadius: 12,
+		paddingVertical: 2,
+		paddingHorizontal: 6,
+		gap: 4,
+		marginRight: 4,
+	},
+	autoPayChipText: {
+		fontSize: 10,
+		fontWeight: '600',
+		color: '#0284c7',
+	},
 	paidItem: {
 		opacity: 0.7,
 	},
@@ -252,4 +275,4 @@ const styles = StyleSheet.create({
 	},
 });
 
-export default RecurringExpenseCard;
+export default BillCard;

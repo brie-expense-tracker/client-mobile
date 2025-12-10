@@ -11,7 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useBudget } from '../../../../../src/context/budgetContext';
 import { useGoal } from '../../../../../src/context/goalContext';
 import { TransactionContext } from '../../../../../src/context/transactionContext';
-import { useRecurringExpense } from '../../../../../src/context/recurringExpenseContext';
+import { useBills } from '../../../../../src/context/billContext';
 import { useTheme } from '../../../../../src/context/ThemeContext';
 import {
 	View,
@@ -143,7 +143,7 @@ export default function AIProfileInsights({
 	const { transactions } = useContext(TransactionContext) as {
 		transactions: Transaction[];
 	};
-	const { expenses: recurringExpenses } = useRecurringExpense();
+	const { expenses: recurringExpenses } = useBills();
 
 	// Memoized calculations for better performance
 

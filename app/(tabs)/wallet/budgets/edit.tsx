@@ -26,7 +26,7 @@ import {
 	ColorPicker,
 	AmountPresets,
 	PeriodSelector,
-	DeleteButton,
+	BudgetPeriodDetails,
 } from '../../../../src/components/forms';
 import { Page, Section, Card, LoadingState } from '../../../../src/ui';
 import {
@@ -68,8 +68,80 @@ const EditBudgetScreen: React.FC = () => {
 	const [showCustomAmount, setShowCustomAmount] = useState(false);
 	const [loading, setLoading] = useState(false);
 	const [budget, setBudget] = useState<Budget | null>(null);
+	const [rollover, setRollover] = useState(false);
+	const [weekStartDay, setWeekStartDay] = useState<0 | 1>(1);
+	const [monthStartDay, setMonthStartDay] = useState<
+		| 1
+		| 2
+		| 3
+		| 4
+		| 5
+		| 6
+		| 7
+		| 8
+		| 9
+		| 10
+		| 11
+		| 12
+		| 13
+		| 14
+		| 15
+		| 16
+		| 17
+		| 18
+		| 19
+		| 20
+		| 21
+		| 22
+		| 23
+		| 24
+		| 25
+		| 26
+		| 27
+		| 28
+	>(1);
+	const [categories, setCategories] = useState<string[]>([]);
+	const [originalValues, setOriginalValues] = useState<{
+		name: string;
+		amount: string;
+		icon: keyof typeof Ionicons.glyphMap;
+		color: string;
+		period: 'weekly' | 'monthly';
+		rollover: boolean;
+		weekStartDay: 0 | 1;
+		monthStartDay:
+			| 1
+			| 2
+			| 3
+			| 4
+			| 5
+			| 6
+			| 7
+			| 8
+			| 9
+			| 10
+			| 11
+			| 12
+			| 13
+			| 14
+			| 15
+			| 16
+			| 17
+			| 18
+			| 19
+			| 20
+			| 21
+			| 22
+			| 23
+			| 24
+			| 25
+			| 26
+			| 27
+			| 28;
+		categories: string[];
+	} | null>(null);
 
-	const { budgets, updateBudget, deleteBudget } = useBudget();
+	const { budgets, updateBudget } = useBudget();
 
 	// Load budget data when component mounts
 	useEffect(() => {
@@ -77,15 +149,97 @@ const EditBudgetScreen: React.FC = () => {
 			const foundBudget = budgets.find((b) => b.id === budgetId);
 			if (foundBudget) {
 				setBudget(foundBudget);
-				setName(foundBudget.name || '');
-				setAmount(foundBudget.amount?.toString() || '');
+				const budgetName = foundBudget.name || '';
+				const budgetAmount = foundBudget.amount?.toString() || '';
 				// Normalize the icon to ensure it's a valid Ionicons name
 				const normalizedIcon = normalizeIconName(
 					foundBudget.icon || DEFAULT_BUDGET_ICON
 				);
+				const budgetColor = foundBudget.color || DEFAULT_COLOR;
+				const budgetPeriod = foundBudget.period || 'monthly';
+
+				setName(budgetName);
+				setAmount(budgetAmount);
 				setIcon(normalizedIcon);
-				setColor(foundBudget.color || DEFAULT_COLOR);
-				setPeriod(foundBudget.period || 'monthly');
+				setColor(budgetColor);
+				setPeriod(budgetPeriod);
+				setRollover(Boolean(foundBudget.rollover));
+				setWeekStartDay((foundBudget.weekStartDay as 0 | 1) ?? 1);
+				setMonthStartDay(
+					(foundBudget.monthStartDay as
+						| 1
+						| 2
+						| 3
+						| 4
+						| 5
+						| 6
+						| 7
+						| 8
+						| 9
+						| 10
+						| 11
+						| 12
+						| 13
+						| 14
+						| 15
+						| 16
+						| 17
+						| 18
+						| 19
+						| 20
+						| 21
+						| 22
+						| 23
+						| 24
+						| 25
+						| 26
+						| 27
+						| 28) ?? 1
+				);
+				setCategories(foundBudget.categories || []);
+
+				// Store original values for change detection
+				setOriginalValues({
+					name: budgetName,
+					amount: budgetAmount,
+					icon: normalizedIcon,
+					color: budgetColor,
+					period: budgetPeriod,
+					rollover: Boolean(foundBudget.rollover),
+					weekStartDay: (foundBudget.weekStartDay as 0 | 1) ?? 1,
+					monthStartDay:
+						(foundBudget.monthStartDay as
+							| 1
+							| 2
+							| 3
+							| 4
+							| 5
+							| 6
+							| 7
+							| 8
+							| 9
+							| 10
+							| 11
+							| 12
+							| 13
+							| 14
+							| 15
+							| 16
+							| 17
+							| 18
+							| 19
+							| 20
+							| 21
+							| 22
+							| 23
+							| 24
+							| 25
+							| 26
+							| 27
+							| 28) ?? 1,
+					categories: foundBudget.categories || [],
+				});
+
 				// Auto-detect if custom amount
 				const amountStr = foundBudget.amount?.toString() || '';
 				const isPreset = BUDGET_AMOUNT_PRESETS.some(
@@ -96,10 +250,51 @@ const EditBudgetScreen: React.FC = () => {
 		}
 	}, [budgetId, budgets]);
 
+	// Check if any values have changed
+	const hasChanges = useMemo(() => {
+		if (!originalValues) return false;
+
+		const normalizedCurrentIcon = normalizeIconName(icon);
+		const normalizedOriginalIcon = normalizeIconName(originalValues.icon);
+
+		// Compare amounts as numbers to handle string formatting differences
+		const currentAmountNum = parseFloat(cleanCurrencyToNumberString(amount));
+		const originalAmountNum = parseFloat(
+			cleanCurrencyToNumberString(originalValues.amount)
+		);
+
+		const categoriesChanged =
+			categories.length !== originalValues.categories.length ||
+			categories.some((cat, idx) => cat !== originalValues.categories[idx]);
+
+		return (
+			name.trim() !== originalValues.name.trim() ||
+			currentAmountNum !== originalAmountNum ||
+			normalizedCurrentIcon !== normalizedOriginalIcon ||
+			color !== originalValues.color ||
+			period !== originalValues.period ||
+			rollover !== originalValues.rollover ||
+			weekStartDay !== originalValues.weekStartDay ||
+			monthStartDay !== originalValues.monthStartDay ||
+			categoriesChanged
+		);
+	}, [
+		originalValues,
+		name,
+		amount,
+		icon,
+		color,
+		period,
+		rollover,
+		weekStartDay,
+		monthStartDay,
+		categories,
+	]);
+
 	// Memoized validation for save button
 	const saveDisabled = useMemo(() => {
-		return loading || !name.trim() || !isValidMoney(amount);
-	}, [loading, name, amount]);
+		return loading || !name.trim() || !isValidMoney(amount) || !hasChanges;
+	}, [loading, name, amount, hasChanges]);
 
 	const handleSave = async () => {
 		// Validation
@@ -127,11 +322,11 @@ const EditBudgetScreen: React.FC = () => {
 				amount: parsedAmount,
 				icon: normalizeIconName(icon),
 				color,
-				categories: budget.categories || [],
+				categories,
 				period,
-				weekStartDay: budget.weekStartDay || 1,
-				monthStartDay: budget.monthStartDay || 1,
-				rollover: budget.rollover || false,
+				weekStartDay,
+				monthStartDay,
+				rollover,
 			});
 
 			Alert.alert('Success', 'Budget updated successfully!', [
@@ -149,37 +344,6 @@ const EditBudgetScreen: React.FC = () => {
 		}
 	};
 
-	const handleDelete = () => {
-		if (!budget) return;
-
-		Alert.alert(
-			'Delete Budget',
-			'Are you sure you want to delete this budget? This action cannot be undone.',
-			[
-				{ text: 'Cancel', style: 'cancel' },
-				{
-					text: 'Delete',
-					style: 'destructive',
-					onPress: async () => {
-						try {
-							logger.debug('🗑️ [EditBudget] Deleting budget:', budget.id);
-							await deleteBudget(budget.id);
-							logger.debug('✅ [EditBudget] Budget deleted successfully');
-							router.back();
-						} catch (error) {
-							logger.error('❌ [EditBudget] Delete failed:', error);
-							const errorMsg =
-								error instanceof Error
-									? error.message
-									: 'Failed to delete budget';
-							Alert.alert('Delete Failed', errorMsg);
-						}
-					},
-				},
-			]
-		);
-	};
-
 	const handleToggleCustomAmount = () => {
 		setShowCustomAmount(!showCustomAmount);
 		if (!showCustomAmount) setAmount('');
@@ -188,14 +352,14 @@ const EditBudgetScreen: React.FC = () => {
 	// When budget isn't loaded yet
 	if (!budget) {
 		return (
-			<Page title="Edit Budget">
+			<Page>
 				<LoadingState label="Loading budget…" />
 			</Page>
 		);
 	}
 
 	return (
-		<Page title="Edit Budget">
+		<Page>
 			<View style={styles.layout}>
 				<ScrollView
 					style={styles.content}
@@ -252,8 +416,19 @@ const EditBudgetScreen: React.FC = () => {
 									/>
 								</FormInputGroup>
 
+								{/* Period details (start day) */}
+								{(period === 'weekly' || period === 'monthly') && (
+									<BudgetPeriodDetails
+										period={period}
+										weekStartDay={weekStartDay}
+										monthStartDay={monthStartDay}
+										onWeekStartChange={setWeekStartDay}
+										onMonthStartChange={setMonthStartDay}
+									/>
+								)}
+
 								{/* Icon Selection */}
-								<FormInputGroup label="Choose Icon">
+								<FormInputGroup label="Icon">
 									<IconPicker
 										selectedIcon={icon}
 										selectedColor={color}
@@ -265,7 +440,7 @@ const EditBudgetScreen: React.FC = () => {
 								</FormInputGroup>
 
 								{/* Color Selection */}
-								<FormInputGroup label="Choose Color">
+								<FormInputGroup label="Color">
 									<ColorPicker
 										selectedColor={color}
 										onColorSelect={setColor}
@@ -273,13 +448,38 @@ const EditBudgetScreen: React.FC = () => {
 										onToggle={() => setShowColorPicker((prev) => !prev)}
 									/>
 								</FormInputGroup>
-							</View>
-						</Card>
-					</Section>
 
-					<Section>
-						<Card>
-							<DeleteButton onPress={handleDelete} text="Delete Budget" />
+								{/* Rollover toggle */}
+								<FormInputGroup
+									label="Rollover unspent funds"
+									subtext="Carry over unspent money into the next period."
+								>
+									<TouchableOpacity
+										style={styles.toggleContainer}
+										onPress={() => setRollover((prev) => !prev)}
+										activeOpacity={0.9}
+									>
+										<View style={styles.toggleContent}>
+											<Text style={[typography.bodySm, styles.toggleText]}>
+												{rollover ? 'Enabled' : 'Disabled'}
+											</Text>
+											<View
+												style={[
+													styles.toggleSwitch,
+													rollover && styles.toggleSwitchActive,
+												]}
+											>
+												<View
+													style={[
+														styles.toggleThumb,
+														rollover && styles.toggleThumbActive,
+													]}
+												/>
+											</View>
+										</View>
+									</TouchableOpacity>
+								</FormInputGroup>
+							</View>
 						</Card>
 					</Section>
 				</ScrollView>
@@ -287,9 +487,6 @@ const EditBudgetScreen: React.FC = () => {
 				{/* Footer Save CTA */}
 				<View style={styles.footer}>
 					<View style={styles.footerCta}>
-						<Text style={styles.footerLabel}>
-							Changes apply immediately to this budget.
-						</Text>
 						<View style={styles.footerRow}>
 							<TouchableOpacity
 								onPress={() => router.back()}
@@ -389,6 +586,46 @@ const styles = StyleSheet.create({
 		...typography.bodySm,
 		color: palette.primaryTextOn,
 		fontWeight: '600',
+	},
+	toggleContainer: {
+		backgroundColor: palette.surface,
+		borderRadius: radius.lg,
+		padding: space.md,
+		borderWidth: 1,
+		borderColor: palette.border,
+	},
+	toggleContent: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	toggleText: {
+		color: palette.text,
+	},
+	toggleSwitch: {
+		width: 46,
+		height: 28,
+		borderRadius: radius.pill,
+		backgroundColor: palette.subtle,
+		justifyContent: 'center',
+		paddingHorizontal: 2,
+	},
+	toggleSwitchActive: {
+		backgroundColor: palette.primary,
+	},
+	toggleThumb: {
+		width: 22,
+		height: 22,
+		borderRadius: radius.pill,
+		backgroundColor: palette.bg,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.12,
+		shadowRadius: 2,
+		elevation: 2,
+	},
+	toggleThumbActive: {
+		transform: [{ translateX: 18 }],
 	},
 });
 

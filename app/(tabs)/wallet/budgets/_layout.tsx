@@ -41,10 +41,7 @@ export default function BudgetsLayout() {
 				name="[id]"
 				options={createHeaderOptions('Budget details', true)}
 			/>
-			<Stack.Screen
-				name="edit"
-				options={createHeaderOptions('Edit Budget', true)}
-			/>
+			<Stack.Screen name="edit" options={{ headerShown: false }} />
 		</Stack>
 	);
 }

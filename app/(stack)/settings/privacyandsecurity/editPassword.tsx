@@ -7,6 +7,9 @@ import {
 	StyleSheet,
 	Alert,
 	SafeAreaView,
+	KeyboardAvoidingView,
+	ScrollView,
+	Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -82,56 +85,69 @@ export default function EditPasswordScreen() {
 
 	return (
 		<SafeAreaView style={styles.safeAreaContainer}>
-			<View style={styles.mainContainer}>
-				<View style={styles.formContainer}>
-					<View style={styles.iconContainer}>
-						<Ionicons name="lock-open-outline" size={48} color="#007AFF" />
+			<KeyboardAvoidingView
+				style={styles.keyboardAvoidingView}
+				behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+				keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+			>
+				<ScrollView
+					style={styles.scrollView}
+					contentContainerStyle={styles.scrollContent}
+					keyboardShouldPersistTaps="handled"
+					showsVerticalScrollIndicator={false}
+				>
+					<View style={styles.mainContainer}>
+						<View style={styles.formContainer}>
+							<View style={styles.iconContainer}>
+								<Ionicons name="lock-open-outline" size={48} color="#007AFF" />
+							</View>
+							<Text style={styles.title}>Change Your Password</Text>
+							<Text style={styles.subtitle}>
+								Enter your email address and we&apos;ll send you a link to
+								change your password.
+							</Text>
+
+							<Text style={styles.label}>Email Address</Text>
+							<TextInput
+								style={[styles.input]}
+								placeholder="Enter your email"
+								placeholderTextColor="#888"
+								value={email}
+								onChangeText={handleEmailChange}
+								keyboardType="email-address"
+								autoCapitalize="none"
+								autoCorrect={false}
+								autoComplete="email"
+							/>
+
+							<RectButton
+								style={[
+									styles.actionButton,
+									!emailIsValid && styles.buttonDisabled,
+								]}
+								onPress={handlePasswordChange}
+								enabled={!loading && emailIsValid}
+							>
+								<Text style={styles.actionButtonText}>
+									{loading ? 'Sending...' : 'Send Password Change Email'}
+								</Text>
+							</RectButton>
+
+							<View style={styles.infoContainer}>
+								<Ionicons
+									name="information-circle-outline"
+									size={16}
+									color="#666"
+								/>
+								<Text style={styles.infoText}>
+									The password change link will expire in 1 hour for security
+									reasons.
+								</Text>
+							</View>
+						</View>
 					</View>
-					<Text style={styles.title}>Change Your Password</Text>
-					<Text style={styles.subtitle}>
-						Enter your email address and we&apos;ll send you a link to change
-						your password.
-					</Text>
-
-					<Text style={styles.label}>Email Address</Text>
-					<TextInput
-						style={[styles.input]}
-						placeholder="Enter your email"
-						placeholderTextColor="#888"
-						value={email}
-						onChangeText={handleEmailChange}
-						keyboardType="email-address"
-						autoCapitalize="none"
-						autoCorrect={false}
-						autoComplete="email"
-					/>
-
-					<RectButton
-						style={[
-							styles.actionButton,
-							!emailIsValid && styles.buttonDisabled,
-						]}
-						onPress={handlePasswordChange}
-						enabled={!loading && emailIsValid}
-					>
-						<Text style={styles.actionButtonText}>
-							{loading ? 'Sending...' : 'Send Password Change Email'}
-						</Text>
-					</RectButton>
-
-					<View style={styles.infoContainer}>
-						<Ionicons
-							name="information-circle-outline"
-							size={16}
-							color="#666"
-						/>
-						<Text style={styles.infoText}>
-							The password change link will expire in 1 hour for security
-							reasons.
-						</Text>
-					</View>
-				</View>
-			</View>
+				</ScrollView>
+			</KeyboardAvoidingView>
 		</SafeAreaView>
 	);
 }
@@ -141,16 +157,26 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: '#ffffff',
 	},
+	keyboardAvoidingView: {
+		flex: 1,
+	},
+	scrollView: {
+		flex: 1,
+	},
+	scrollContent: {
+		flexGrow: 1,
+	},
 	mainContainer: {
 		flex: 1,
 		paddingHorizontal: 24,
 		justifyContent: 'center',
-		marginBottom: 100,
+		minHeight: '100%',
 	},
 
 	formContainer: {
 		flex: 1,
-		justifyContent: 'center',
+		justifyContent: 'flex-start',
+		paddingVertical: 20,
 	},
 	iconContainer: {
 		alignItems: 'center',

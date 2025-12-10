@@ -2,12 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import LinearProgressBar from '../shared/LinearProgressBar';
-import {
-	palette,
-	radius,
-	space,
-	type as typography,
-} from '../../../../../src/ui';
+import { palette, space, type as typography } from '../../../../../src/ui';
 import { currency } from '../../../../../src/utils/format';
 
 interface Props {
@@ -33,21 +28,17 @@ const GoalsSummaryCard: React.FC<Props> = ({
 			{/* Header */}
 			<View style={styles.header}>
 				<View style={styles.headerContent}>
-					<Text style={styles.overline}>Savings goals</Text>
-					<Text style={styles.headerTitle}>Goals overview</Text>
-					<Text style={styles.headerSubtitle}>
-						Track your progress across all goals.
-					</Text>
+					<Text style={styles.overline}>Track Your Goals</Text>
+					<Text style={styles.headerTitle}>Your Goals</Text>
 				</View>
 				<TouchableOpacity
-					style={styles.addButton}
+					activeOpacity={0.85}
 					onPress={onAddGoal}
+					style={styles.iconButton}
 					accessibilityRole="button"
 					accessibilityLabel="Add new goal"
-					activeOpacity={0.9}
 				>
-					<Ionicons name="add" size={18} color={palette.primary} />
-					<Text style={styles.addButtonText}>Add goal</Text>
+					<Ionicons name="add" size={20} color={palette.primary} />
 				</TouchableOpacity>
 			</View>
 
@@ -92,61 +83,69 @@ const GoalsSummaryCard: React.FC<Props> = ({
 
 const styles = StyleSheet.create({
 	container: {
-		paddingVertical: space.md,
+		// hero-style: parent supplies horizontal padding
+		paddingTop: space.xs,
+		paddingBottom: space.lg,
 	},
+
 	/* HEADER */
 	header: {
 		flexDirection: 'row',
 		alignItems: 'flex-start',
 		justifyContent: 'space-between',
-		marginBottom: space.md,
 	},
+
 	headerContent: {
 		flex: 1,
 	},
+
 	overline: {
 		...typography.labelSm,
 		color: palette.textMuted,
-		marginBottom: 2,
-		letterSpacing: 0.3,
+		marginBottom: 6,
+		letterSpacing: 1.2,
 		textTransform: 'uppercase',
 	},
+
 	headerTitle: {
 		...typography.titleMd,
+		fontSize: 30,
+		lineHeight: 34,
+		fontWeight: '700',
 		color: palette.text,
 	},
+
 	headerSubtitle: {
 		...typography.bodySm,
 		color: palette.textMuted,
-		marginTop: 4,
+		marginTop: 8,
 		maxWidth: '80%',
 	},
-	/* ADD GOAL BUTTON (pill) */
-	addButton: {
-		backgroundColor: palette.surfaceAlt,
-		borderRadius: radius.full,
-		paddingVertical: 8,
-		paddingHorizontal: 16,
-		flexDirection: 'row',
+
+	iconButton: {
+		width: 44,
+		height: 44,
+		borderRadius: 22,
 		alignItems: 'center',
-		gap: 6,
-		borderWidth: 1,
-		borderColor: palette.borderMuted,
-		marginLeft: space.md,
+		justifyContent: 'center',
+		backgroundColor: palette.primarySoft,
+		shadowColor: '#000',
+		shadowOpacity: 0.06,
+		shadowRadius: 10,
+		shadowOffset: { width: 0, height: 6 },
+		elevation: 3,
 	},
-	addButtonText: {
-		color: palette.primary,
-		fontSize: 14,
-		fontWeight: '600',
-	},
+
 	/* PROGRESS */
 	progressSection: {
+		marginTop: space.md,
 		marginBottom: space.lg,
-		marginTop: space.sm,
 	},
+
 	progressBar: {
 		marginBottom: 0,
 	},
+
 	/* STAT GRID */
 	statsGrid: {
 		flexDirection: 'row',
@@ -154,14 +153,17 @@ const styles = StyleSheet.create({
 		columnGap: 24,
 		rowGap: space.md,
 	},
+
 	statCard: {
 		flexBasis: '45%',
 	},
+
 	statValue: {
 		...typography.numMd,
 		color: palette.text,
 		marginBottom: 4,
 	},
+
 	statLabel: {
 		...typography.bodyXs,
 		color: palette.textSubtle,

@@ -27,7 +27,7 @@ export function detectLang(text: string): Lang {
 export const copy = {
 	en: {
 		openRecurring: 'Open Recurring Expenses',
-		markAsPaid: 'Select the item → tap "Mark as Paid."',
+		markAsPaid: 'Bills are automatically inputted when due.',
 		createBudget: 'Create Budget',
 		openGoals: 'Open Goals',
 		emergencyFund: 'Emergency Fund',
@@ -35,7 +35,7 @@ export const copy = {
 	},
 	es: {
 		openRecurring: 'Abrir Gastos Recurrentes',
-		markAsPaid: 'Selecciona el elemento → toca "Marcar como pagado".',
+		markAsPaid: 'Las facturas se ingresan automáticamente cuando vencen.',
 		createBudget: 'Crear Presupuesto',
 		openGoals: 'Abrir Metas',
 		emergencyFund: 'Fondo de Emergencia',

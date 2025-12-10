@@ -140,6 +140,8 @@ const AddGoalScreen: React.FC = () => {
 				showsVerticalScrollIndicator={false}
 				contentInsetAdjustmentBehavior="automatic"
 				keyboardShouldPersistTaps="handled"
+				onScrollBeginDrag={Keyboard.dismiss}
+				automaticallyAdjustKeyboardInsets
 			>
 				{/* Header / Hero */}
 				<View style={styles.header}>
