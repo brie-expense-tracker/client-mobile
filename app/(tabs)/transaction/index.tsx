@@ -287,11 +287,13 @@ export default function TransactionScreenProModern() {
 		}
 	}, [savedBillId, bills, selectedBill]);
 
-	// Focus amount on mount for new forms only
+	// Ensure scroll position is at top for new forms
 	useEffect(() => {
 		if (hasRestoredState && isNewForm) {
-			const t = setTimeout(() => amountRef.current?.focus(), 350);
-			return () => clearTimeout(t);
+			// Scroll to top to maintain consistent positioning
+			requestAnimationFrame(() => {
+				scrollRef.current?.scrollTo({ y: 0, animated: false });
+			});
 		}
 	}, [hasRestoredState, isNewForm]);
 
@@ -613,7 +615,10 @@ export default function TransactionScreenProModern() {
 					</Text>
 
 					<View style={styles.amountCard} accessibilityRole="summary">
-						<View style={styles.amountRow}>
+						<Pressable
+							style={styles.amountRow}
+							onPress={() => amountRef.current?.focus()}
+						>
 							<Text style={styles.dollar}>$</Text>
 							<Controller
 								control={control}
@@ -645,7 +650,7 @@ export default function TransactionScreenProModern() {
 									/>
 								)}
 							/>
-						</View>
+						</Pressable>
 						<View style={styles.amountUnderline} />
 
 						{errors.amount && (
@@ -748,6 +753,7 @@ export default function TransactionScreenProModern() {
 							)
 						}
 						onPress={() => {
+							Keyboard.dismiss();
 							if (mode === 'expense') {
 								setPickerOpen('budget');
 							} else {
@@ -774,6 +780,7 @@ export default function TransactionScreenProModern() {
 								)
 							}
 							onPress={() => {
+								Keyboard.dismiss();
 								setPickerOpen('debt');
 							}}
 							accessibilityLabel="Select Debt"
@@ -798,23 +805,12 @@ export default function TransactionScreenProModern() {
 								)
 							}
 							onPress={() => {
+								Keyboard.dismiss();
 								setPickerOpen('bill');
 							}}
 							accessibilityLabel="Select Bill"
 						/>
 					)}
-
-					<Row
-						icon="chatbox-ellipses-outline"
-						label="Note"
-						right={
-							<ValueText>
-								{description ? description : 'Add a short note'}
-							</ValueText>
-						}
-						onPress={() => descRef.current?.focus()}
-						accessibilityLabel="Edit note"
-					/>
 
 					<Row
 						icon="calendar-outline"
@@ -1227,7 +1223,7 @@ const styles = StyleSheet.create({
 
 	content: {
 		paddingHorizontal: space.lg,
-		paddingTop: space.xl,
+		paddingTop: space.sm,
 	},
 
 	heroKicker: {
@@ -1429,11 +1425,6 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 		gap: space.xs,
-		shadowColor: '#000',
-		shadowOpacity: 0.12,
-		shadowRadius: 10,
-		shadowOffset: { width: 0, height: 6 },
-		elevation: 5,
 	},
 	inlineCtaBtnDisabled: {
 		backgroundColor: palette.primarySubtle,
