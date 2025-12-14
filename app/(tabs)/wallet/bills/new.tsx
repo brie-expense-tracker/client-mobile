@@ -165,10 +165,7 @@ const AddBillScreen: React.FC = () => {
 								</Text>
 							</View>
 							<TouchableOpacity
-								style={[
-									styles.toggle,
-									autoPay && styles.toggleActive,
-								]}
+								style={[styles.toggle, autoPay && styles.toggleActive]}
 								onPress={() => setAutoPay(!autoPay)}
 								activeOpacity={0.7}
 							>
@@ -180,23 +177,6 @@ const AddBillScreen: React.FC = () => {
 								/>
 							</TouchableOpacity>
 						</View>
-					</View>
-				</View>
-
-				{/* Info Card */}
-				<View style={[styles.card, { marginTop: space.lg }]}>
-					<Text style={styles.sectionLabel}>Reminders</Text>
-
-					<View style={[styles.infoCard, { marginTop: space.xs }]}>
-						<Ionicons
-							name="information-circle"
-							size={20}
-							color={palette.info}
-						/>
-						<Text style={[type.body, styles.infoText]}>
-							This bill will be tracked and you&apos;ll receive
-							notifications when it&apos;s due.
-						</Text>
 					</View>
 				</View>
 			</ScrollView>
@@ -351,21 +331,6 @@ const styles = StyleSheet.create({
 		marginTop: 4,
 		fontSize: 12,
 		color: palette.textMuted,
-	},
-	infoCard: {
-		flexDirection: 'row',
-		alignItems: 'flex-start',
-		backgroundColor: palette.infoSubtle,
-		padding: space.md,
-		borderRadius: radius.md,
-		borderLeftWidth: 4,
-		borderLeftColor: palette.info,
-	},
-	infoText: {
-		flex: 1,
-		marginLeft: space.sm,
-		color: palette.textMuted,
-		lineHeight: 20,
 	},
 	categoryChipContainer: {
 		flexDirection: 'row',

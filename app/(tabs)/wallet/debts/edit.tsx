@@ -287,7 +287,7 @@ export default function EditDebtScreen() {
 												onChangeText={(text) =>
 													setApr(cleanCurrencyToNumberString(text))
 												}
-												placeholder="24.99"
+												placeholder="0.00"
 												placeholderTextColor={palette.textSubtle}
 												keyboardType="decimal-pad"
 											/>
@@ -296,7 +296,7 @@ export default function EditDebtScreen() {
 
 									<View style={styles.inlineItem}>
 										<FormInputGroup
-											label="Minimum payment"
+											label="Minimum payment ($)"
 											subtext="Optional: Minimum monthly payment amount"
 										>
 											<TextInput

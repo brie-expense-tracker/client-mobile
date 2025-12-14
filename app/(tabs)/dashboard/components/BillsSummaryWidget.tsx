@@ -41,13 +41,19 @@ const BillsSummaryWidget: React.FC<BillsSummaryWidgetProps> = ({
 	// Cast expenses to the transformed type since the hook returns transformed data
 	const transformedExpenses = expenses as TransformedBill[];
 
-	// Calculate summary stats locally
+	// Calculate summary stats locally - use expensesWithPaymentStatus if available, otherwise use transformedExpenses
 	const summaryStats = useMemo(() => {
-		const totalAmount = transformedExpenses.reduce(
+		// Use expensesWithPaymentStatus if available (has updated isOverdue based on payment status)
+		const expensesToUse =
+			expensesWithPaymentStatus.length > 0
+				? expensesWithPaymentStatus
+				: transformedExpenses;
+
+		const totalAmount = expensesToUse.reduce(
 			(sum, expense) => sum + expense.amount,
 			0
 		);
-		const overdueCount = transformedExpenses.filter(
+		const overdueCount = expensesToUse.filter(
 			(expense) => expense.isOverdue
 		).length;
 
@@ -55,7 +61,7 @@ const BillsSummaryWidget: React.FC<BillsSummaryWidgetProps> = ({
 			totalAmount,
 			overdueCount,
 		};
-	}, [transformedExpenses]);
+	}, [transformedExpenses, expensesWithPaymentStatus]);
 
 	// Check payment status for all expenses
 	useEffect(() => {
@@ -117,6 +123,8 @@ const BillsSummaryWidget: React.FC<BillsSummaryWidgetProps> = ({
 							isPaid: isPaidWithinTwoWeeks,
 							paymentDate,
 							nextDueDate,
+							// If bill is paid, it should not be marked as overdue
+							isOverdue: isPaidWithinTwoWeeks ? false : expense.isOverdue,
 						};
 					} catch (error) {
 						const expenseId = expense.patternId || (expense as any).id;

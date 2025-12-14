@@ -8,7 +8,6 @@ import {
 	Text,
 	TouchableOpacity,
 	Keyboard,
-	findNodeHandle,
 	ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -42,10 +41,8 @@ const PERIOD_OPTIONS = [
 
 const AddBudgetScreen: React.FC = () => {
 	const scrollViewRef = useRef<ScrollView>(null);
-	const descriptionInputRef = useRef<TextInput>(null);
 	const [name, setName] = useState('');
 	const [amount, setAmount] = useState('');
-	const [description, setDescription] = useState('');
 	const [icon, setIcon] =
 		useState<keyof typeof Ionicons.glyphMap>(DEFAULT_BUDGET_ICON);
 	const [color, setColor] = useState<string>(DEFAULT_COLOR);
@@ -161,16 +158,6 @@ const AddBudgetScreen: React.FC = () => {
 	const handleToggleCustomAmount = () => {
 		setShowCustomAmount((prev) => !prev);
 		if (!showCustomAmount) setAmount('');
-	};
-
-	const scrollToDescription = () => {
-		const nodeHandle = findNodeHandle(descriptionInputRef.current);
-		if (!scrollViewRef.current || !nodeHandle) return;
-
-		// Move the input above the keyboard
-		(scrollViewRef.current as any)
-			.getScrollResponder()
-			.scrollResponderScrollNativeHandleToKeyboard(nodeHandle, 120, true);
 	};
 
 	return (
@@ -323,29 +310,6 @@ const AddBudgetScreen: React.FC = () => {
 						</View>
 					)}
 				</View>
-
-				{/* Notes Card (categories hidden for now) */}
-				<View style={[styles.card, { marginTop: space.lg, marginBottom: 0 }]}>
-					<Text style={styles.sectionLabel}>Notes</Text>
-					<View style={styles.fieldGroup}>
-						<Label text="Description" optional />
-						<TextInput
-							ref={descriptionInputRef}
-							style={[styles.input, styles.textArea]}
-							value={description}
-							onChangeText={setDescription}
-							onFocus={scrollToDescription}
-							placeholder="e.g., Monthly grocery budget, entertainment expenses..."
-							placeholderTextColor={palette.textSubtle}
-							multiline
-							numberOfLines={3}
-							textAlignVertical="top"
-						/>
-						<Text style={styles.helperText}>
-							Optional notes about how you plan to use this budget.
-						</Text>
-					</View>
-				</View>
 			</ScrollView>
 
 			{/* Footer CTA */}
@@ -470,9 +434,6 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		color: palette.text,
 		backgroundColor: palette.surface,
-	},
-	textArea: {
-		height: 96,
 	},
 	helperText: {
 		marginTop: 4,

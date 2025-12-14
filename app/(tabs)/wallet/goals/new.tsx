@@ -32,12 +32,10 @@ import { palette, radius, space } from '../../../../src/ui/theme';
 const AddGoalScreen: React.FC = () => {
 	const params = useLocalSearchParams();
 	const scrollViewRef = useRef<ScrollView>(null);
-	const descriptionInputRef = useRef<TextInput>(null);
 
 	const [name, setName] = useState('');
 	const [target, setTarget] = useState('');
 	const [deadline, setDeadline] = useState('');
-	const [description, setDescription] = useState('');
 	const [icon, setIcon] =
 		useState<keyof typeof Ionicons.glyphMap>(DEFAULT_GOAL_ICON);
 	const [color, setColor] = useState<string>(DEFAULT_COLOR);
@@ -62,10 +60,14 @@ const AddGoalScreen: React.FC = () => {
 	}, [params]);
 
 	const validateDate = (dateString: string): boolean => {
-		const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-		if (!dateRegex.test(dateString)) return false;
-		const date = new Date(dateString);
-		return date instanceof Date && !isNaN(date.getTime());
+		if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return false;
+		const [y, m, d] = dateString.split('-').map(Number);
+		const dt = new Date(Date.UTC(y, m - 1, d));
+		return (
+			dt.getUTCFullYear() === y &&
+			dt.getUTCMonth() === m - 1 &&
+			dt.getUTCDate() === d
+		);
 	};
 
 	const handleSave = async () => {
@@ -78,6 +80,20 @@ const AddGoalScreen: React.FC = () => {
 			Alert.alert(
 				'Invalid date',
 				'Please enter a valid date in YYYY-MM-DD format (e.g., 2024-12-31).'
+			);
+			return;
+		}
+
+		// Check if deadline is in the past
+		const todayISO = new Date(
+			Date.now() - new Date().getTimezoneOffset() * 60000
+		)
+			.toISOString()
+			.split('T')[0];
+		if (deadline < todayISO) {
+			Alert.alert(
+				'Invalid date',
+				'Goal deadline must be today or in the future'
 			);
 			return;
 		}
@@ -99,7 +115,7 @@ const AddGoalScreen: React.FC = () => {
 				deadline,
 				icon,
 				color,
-				// description can be wired into API later if supported
+				categories: [],
 			});
 
 			Alert.alert('Success', 'Goal added successfully!', [
@@ -123,12 +139,6 @@ const AddGoalScreen: React.FC = () => {
 	const handleToggleCustomTarget = () => {
 		setShowCustomTarget((prev) => !prev);
 		if (!showCustomTarget) setTarget('');
-	};
-
-	const handleDescriptionFocus = () => {
-		setTimeout(() => {
-			scrollViewRef.current?.scrollToEnd({ animated: true });
-		}, 300);
 	};
 
 	return (
@@ -240,25 +250,6 @@ const AddGoalScreen: React.FC = () => {
 								setShowColorPicker((prev) => !prev);
 							}}
 						/>
-					</View>
-
-					<View style={styles.fieldGroup}>
-						<Label text="Description" optional />
-						<TextInput
-							ref={descriptionInputRef}
-							style={[styles.input, styles.textArea]}
-							value={description}
-							onChangeText={setDescription}
-							onFocus={handleDescriptionFocus}
-							placeholder="e.g., 3–6 months of expenses, honeymoon trip..."
-							placeholderTextColor={palette.textSubtle}
-							multiline
-							numberOfLines={3}
-							textAlignVertical="top"
-						/>
-						<Text style={styles.helperText}>
-							Optional notes to remind yourself what this goal is for.
-						</Text>
 					</View>
 				</View>
 			</ScrollView>
@@ -385,9 +376,6 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		color: palette.text,
 		backgroundColor: palette.surface,
-	},
-	textArea: {
-		height: 96,
 	},
 	helperText: {
 		marginTop: 4,
