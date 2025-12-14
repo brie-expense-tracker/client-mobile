@@ -17,6 +17,7 @@ import {
 	LayoutAnimation,
 	UIManager,
 	TouchableOpacity,
+	Pressable,
 } from 'react-native';
 import Animated, {
 	useSharedValue,
@@ -35,7 +36,7 @@ import { MoodRatingSelector } from './components/MoodRatingSelector';
 import { BaseTextArea } from './components/BaseTextArea';
 import { FinancialMetricsCard } from './components/FinancialMetricsCard';
 import { ReflectionStatsCard } from './components/ReflectionStatsCard';
-import { dynamicTextStyle } from '../../../src/utils/accessibility';
+import { dynamicTextStyleBase } from '../../../src/utils/accessibility';
 import { isDevMode } from '../../../src/config/environment';
 
 if (
@@ -48,34 +49,29 @@ if (
 // -----------------------------------------------------------------------------
 // Helpers
 // -----------------------------------------------------------------------------
+const TOTAL_STEPS = 4;
+
 const weekRangeLabel = (
 	weekStartDate?: string | Date,
 	weekEndDate?: string | Date
 ) => {
 	if (!weekStartDate) return 'This week';
 
-	// Parse dates correctly to avoid timezone issues
-	// Extract date part (YYYY-MM-DD) and create date in local timezone
 	const parseDate = (dateInput: string | Date): Date => {
 		if (dateInput instanceof Date) {
-			// If already a Date, extract date components to avoid timezone issues
 			return new Date(
 				dateInput.getFullYear(),
 				dateInput.getMonth(),
 				dateInput.getDate()
 			);
 		}
-		// Extract date part from ISO string (YYYY-MM-DD)
-		const dateStr = dateInput; // dateInput is string here
-		const datePart = dateStr.split('T')[0]; // Get YYYY-MM-DD part
+		const dateStr = dateInput;
+		const datePart = dateStr.split('T')[0];
 		const [year, month, day] = datePart.split('-').map(Number);
-		// Create date in local timezone (month is 0-indexed)
 		return new Date(year, month - 1, day);
 	};
 
 	const start = parseDate(weekStartDate);
-	// If weekEndDate is provided, use it directly (it represents the end of the week)
-	// Otherwise calculate end from start (7 days later)
 	const end = weekEndDate
 		? parseDate(weekEndDate)
 		: new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7);
@@ -120,12 +116,10 @@ const findIncompletePreviousWeekReflection = (
 ): WeeklyReflection | null => {
 	const currentWeekStart = getCurrentWeekStart();
 
-	// Check all reflections (current + recent) for incomplete ones from previous weeks
 	const allReflections = currentReflection
 		? [currentReflection, ...recentReflections]
 		: recentReflections;
 
-	// Filter for incomplete reflections that are NOT from the current week
 	const incompletePreviousWeek = allReflections
 		.filter((r) => {
 			if (r.completed) return false;
@@ -133,7 +127,6 @@ const findIncompletePreviousWeekReflection = (
 			return reflectionWeekStart.getTime() < currentWeekStart.getTime();
 		})
 		.sort((a, b) => {
-			// Sort by weekStartDate descending (most recent incomplete first)
 			const dateA = normalizeWeekStartDate(a.weekStartDate).getTime();
 			const dateB = normalizeWeekStartDate(b.weekStartDate).getTime();
 			return dateB - dateA;
@@ -215,9 +208,12 @@ function buildAIInsight(opts: {
 // -----------------------------------------------------------------------------
 // ReflectionWizard
 // -----------------------------------------------------------------------------
+type Mode = 'hub' | 'wizard';
+
 export default function ReflectionWizard() {
 	const router = useRouter();
 	const params = useLocalSearchParams<{ editReflectionId?: string }>();
+
 	const {
 		currentReflection,
 		recentReflections,
@@ -226,58 +222,61 @@ export default function ReflectionWizard() {
 		saving,
 		error,
 		saveReflection,
-		updateMoodRating,
-		updateWinOfTheWeek,
-		updateReflectionNotes,
 		refreshReflection,
 	} = useWeeklyReflection();
 
-	// Find incomplete previous week reflection that needs to be completed
-	const incompletePreviousWeekReflection = useMemo(() => {
-		return findIncompletePreviousWeekReflection(
-			currentReflection,
-			recentReflections
-		);
-	}, [currentReflection, recentReflections]);
+	// Incomplete previous week ref (if any)
+	const incompletePreviousWeekReflection = useMemo(
+		() =>
+			findIncompletePreviousWeekReflection(
+				currentReflection,
+				recentReflections
+			),
+		[currentReflection, recentReflections]
+	);
 
-	// Find the reflection to edit if editReflectionId is provided
-	// If there's an incomplete previous week reflection and no explicit editReflectionId,
-	// force editing the incomplete previous week reflection
+	// Editing target (explicit id, or forced incomplete previous week)
 	const editingReflection = useMemo(() => {
-		// If there's an incomplete previous week reflection and we're not explicitly editing another one,
-		// force the incomplete previous week reflection
 		if (incompletePreviousWeekReflection && !params.editReflectionId) {
 			return incompletePreviousWeekReflection;
 		}
-
 		if (!params.editReflectionId) return null;
-
 		if (currentReflection?._id === params.editReflectionId) {
 			return currentReflection;
 		}
-
 		return (
-			recentReflections?.find((r) => r._id === params.editReflectionId) || null
+			recentReflections.find((r) => r._id === params.editReflectionId) || null
 		);
 	}, [
+		incompletePreviousWeekReflection,
 		params.editReflectionId,
 		currentReflection,
 		recentReflections,
-		incompletePreviousWeekReflection,
 	]);
 
-	// Track if we're being forced to complete a previous week reflection
 	const isForcedToCompletePreviousWeek =
 		!!incompletePreviousWeekReflection && !params.editReflectionId;
 
-	type Mode = 'hub' | 'wizard';
 	const [mode, setMode] = useState<Mode>('hub');
 	const [step, setStep] = useState(0); // 0..3
 	const [busy, setBusy] = useState(false);
 	const [showSuccessBanner, setShowSuccessBanner] = useState(false);
 
-	// Use editingReflection if available, otherwise use currentReflection
-	const reflectionToEdit = editingReflection || currentReflection;
+	// Lock the reflection being edited when entering wizard, so it doesn't swap
+	const lockedEditingReflectionRef = useRef<WeeklyReflection | null>(null);
+
+	// Choose which reflection the wizard is editing
+	const reflectionToEdit =
+		(mode === 'wizard' && lockedEditingReflectionRef.current) ||
+		editingReflection ||
+		currentReflection;
+
+	// Local wizard state (only persisted on final save)
+	const [localMood, setLocalMood] = useState<number | null>(
+		typeof reflectionToEdit?.moodRating === 'number'
+			? reflectionToEdit.moodRating
+			: null
+	);
 	const [localWin, setLocalWin] = useState(
 		reflectionToEdit?.winOfTheWeek || ''
 	);
@@ -285,64 +284,70 @@ export default function ReflectionWizard() {
 		reflectionToEdit?.reflectionNotes || ''
 	);
 
-	// Shared value for banner animation
+	// Banner animation
 	const bannerProgress = useSharedValue(0);
-
 	const lastReflectionIdRef = useRef<string | null>(null);
 	const successBannerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
 		null
 	);
 
-	// Sync local state with reflection data
+	// Sync local wizard state when the reflection changes (e.g., editing a different week)
 	useEffect(() => {
 		const reflectionId = reflectionToEdit?._id;
+
 		if (reflectionId && reflectionId !== lastReflectionIdRef.current) {
 			lastReflectionIdRef.current = reflectionId;
+			setLocalMood(
+				typeof reflectionToEdit?.moodRating === 'number'
+					? reflectionToEdit.moodRating
+					: null
+			);
 			setLocalWin(reflectionToEdit?.winOfTheWeek || '');
 			setLocalNotes(reflectionToEdit?.reflectionNotes || '');
 		} else if (!reflectionId && lastReflectionIdRef.current !== null) {
 			lastReflectionIdRef.current = null;
+			setLocalMood(null);
 			setLocalWin('');
 			setLocalNotes('');
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [reflectionToEdit?._id]);
 
-	// Auto-enter wizard mode when editing a reflection or when forced to complete previous week
+	// Auto-enter wizard when editing or forced to complete previous week
 	useEffect(() => {
-		if (
-			isForcedToCompletePreviousWeek ||
-			(editingReflection && mode === 'hub')
-		) {
-			// Always start at step 0 (beginning of wizard) when editing
-			setStep(0);
+		if (isForcedToCompletePreviousWeek || editingReflection) {
+			if (editingReflection) {
+				lockedEditingReflectionRef.current = editingReflection;
+			}
 			setMode('wizard');
+			setStep(0);
+		} else if (mode === 'hub') {
+			lockedEditingReflectionRef.current = null;
 		}
-	}, [editingReflection, mode, isForcedToCompletePreviousWeek]);
+	}, [editingReflection, isForcedToCompletePreviousWeek, mode]);
 
-	// Sync banner progress with showSuccessBanner state
+	// Animate success banner
 	useEffect(() => {
 		bannerProgress.value = withTiming(showSuccessBanner ? 1 : 0, {
 			duration: 260,
 		});
 	}, [showSuccessBanner, bannerProgress]);
 
-	// Cleanup success banner timeout on unmount
-	useEffect(() => {
-		return () => {
+	// Cleanup timeout
+	useEffect(
+		() => () => {
 			if (successBannerTimeoutRef.current) {
 				clearTimeout(successBannerTimeoutRef.current);
 			}
-		};
-	}, []);
+		},
+		[]
+	);
 
-	// Filter out current reflection from recent reflections to avoid duplicates
+	// Past reflections (exclude current week)
 	const pastReflections = useMemo(() => {
 		if (!currentReflection || !Array.isArray(recentReflections)) {
 			return recentReflections || [];
 		}
-
-		// Filter out reflections that match the current week
 		const currentWeekStart = new Date(currentReflection.weekStartDate);
 		currentWeekStart.setHours(0, 0, 0, 0);
 
@@ -353,18 +358,16 @@ export default function ReflectionWizard() {
 		});
 	}, [currentReflection, recentReflections]);
 
-	const previousReflection = useMemo(() => {
-		if (pastReflections.length > 0) {
-			return pastReflections[0];
-		}
-		return null;
-	}, [pastReflections]);
+	const previousReflection = useMemo(
+		() => (pastReflections.length > 0 ? pastReflections[0] : null),
+		[pastReflections]
+	);
 
+	// Step gating
 	const canContinue = useMemo(() => {
-		if (!reflectionToEdit) return false;
 		switch (step) {
 			case 0:
-				return !!reflectionToEdit.moodRating;
+				return localMood !== null;
 			case 1:
 			case 2:
 			case 3:
@@ -372,48 +375,69 @@ export default function ReflectionWizard() {
 			default:
 				return false;
 		}
-	}, [step, reflectionToEdit]);
+	}, [step, localMood]);
 
-	const progressPct = ((step + 1) / 4) * 100;
+	const progressPct = ((step + 1) / TOTAL_STEPS) * 100;
 
-	const next = useCallback(async () => {
-		if (!canContinue) return;
-
-		if (step === 1 && localWin !== undefined) {
+	// Navigation: start wizard at a specific step (from hub quick actions)
+	const startWizardAt = useCallback(
+		async (targetStep: number) => {
 			try {
-				await updateWinOfTheWeek(localWin);
-			} catch (error) {
-				if (isDevMode) logger.debug('Failed to save win of the week:', error);
-			}
-		} else if (step === 2 && localNotes !== undefined) {
-			try {
-				await updateReflectionNotes(localNotes);
-			} catch (error) {
-				if (isDevMode) logger.debug('Failed to save reflection notes:', error);
-			}
-		}
-
-		LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-		setStep((s) => Math.min(3, s + 1));
-	}, [
-		canContinue,
-		step,
-		localWin,
-		localNotes,
-		updateWinOfTheWeek,
-		updateReflectionNotes,
-	]);
-
-	const handleMoodChange = useCallback(
-		async (rating: number) => {
-			try {
-				await updateMoodRating(rating);
-			} catch {
-				Alert.alert('Error', 'Failed to update mood rating. Please try again.');
+				await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+			} catch {}
+			LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+			setMode('wizard');
+			setStep(Math.max(0, Math.min(TOTAL_STEPS - 1, targetStep)));
+			// When starting from hub, lock onto the current reflection
+			if (!lockedEditingReflectionRef.current && currentReflection) {
+				lockedEditingReflectionRef.current = currentReflection;
 			}
 		},
-		[updateMoodRating]
+		[currentReflection]
 	);
+
+	// Go to next step
+	const next = useCallback(() => {
+		if (!canContinue) return;
+		LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+		setStep((s) => Math.min(TOTAL_STEPS - 1, s + 1));
+	}, [canContinue]);
+
+	// Back logic (used by footer Back)
+	const handleBackPress = useCallback(() => {
+		if (mode !== 'wizard') return;
+
+		if (step === 0) {
+			// Step 0: only allow exiting if we're NOT in a forced previous-week flow
+			if (isForcedToCompletePreviousWeek) {
+				return; // can't leave the wizard until the reflection is completed
+			}
+
+			// Exit wizard
+			lockedEditingReflectionRef.current = null;
+			if (editingReflection && params.editReflectionId) {
+				router.back();
+			} else {
+				setMode('hub');
+			}
+		} else {
+			// Step > 0: always allow going back one step
+			LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+			setStep((s) => Math.max(0, s - 1));
+		}
+	}, [
+		mode,
+		step,
+		isForcedToCompletePreviousWeek,
+		editingReflection,
+		params.editReflectionId,
+		router,
+	]);
+
+	// Field handlers
+	const handleMoodChange = useCallback((rating: number) => {
+		setLocalMood(rating);
+	}, []);
 
 	const handleWinChange = useCallback((val: string) => {
 		setLocalWin(val);
@@ -423,87 +447,79 @@ export default function ReflectionWizard() {
 		setLocalNotes(val);
 	}, []);
 
-	const startWizardAt = useCallback(async (targetStep: number) => {
-		try {
-			await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-		} catch {}
-		LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-		setMode('wizard');
-		setStep(Math.max(0, Math.min(3, targetStep)));
-	}, []);
-
+	// Final save – only place we hit the API
 	const handleSave = useCallback(async () => {
 		if (!reflectionToEdit) {
 			if (isDevMode) logger.debug('No reflection available');
 			return;
 		}
 
-		if (!reflectionToEdit.moodRating) {
+		if (localMood === null) {
 			Alert.alert(
 				'Missing mood rating',
 				'Please select a mood rating before saving.'
 			);
 			return;
 		}
+
 		try {
 			setBusy(true);
 			if (isDevMode) {
 				logger.debug('Starting save with data:', {
-					moodRating: reflectionToEdit.moodRating,
+					moodRating: localMood,
 					winOfTheWeek: localWin,
 					reflectionNotes: localNotes,
 				});
 			}
+
 			try {
 				await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 			} catch {}
+
 			const saved = await saveReflection({
-				moodRating: reflectionToEdit.moodRating,
+				moodRating: localMood,
 				winOfTheWeek: localWin,
 				reflectionNotes: localNotes,
 				markCompleted: true,
-				// Pass reflectionId if editing a specific reflection (not current week)
 				reflectionId:
 					reflectionToEdit?._id !== currentReflection?._id
 						? reflectionToEdit?._id
 						: undefined,
 			});
+
 			if (isDevMode) logger.debug('Save successful, received:', saved);
 
-			// Show success banner
 			setShowSuccessBanner(true);
 
-			// If we're in edit mode, navigate back to the detail page
 			if (editingReflection && params.editReflectionId) {
+				// Editing a specific reflection detail
 				refreshReflection();
-				// Small delay to show success, then navigate back
 				setTimeout(() => {
 					router.back();
 				}, 500);
 			} else if (isForcedToCompletePreviousWeek) {
-				// If we just completed a forced previous week reflection, refresh
+				// Just completed a forced reflection; go back to hub
 				await refreshReflection();
-				// After refresh, transition to hub mode (the component will handle showing current week)
-				// Use a small delay to allow the refresh to complete
+				lockedEditingReflectionRef.current = null;
 				setTimeout(() => {
 					LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 					setMode('hub');
 					setStep(0);
 				}, 100);
 			} else {
-				// Otherwise, return to Hub
+				// Normal current-week save: go to hub
 				LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 				setMode('hub');
 				setStep(0);
 				refreshReflection();
 			}
 
-			// Auto-dismiss banner after 3 seconds
+			// Auto-dismiss banner
 			if (successBannerTimeoutRef.current) {
 				clearTimeout(successBannerTimeoutRef.current);
 			}
 			successBannerTimeoutRef.current = setTimeout(() => {
-				setShowSuccessBanner(false); // this triggers the collapse animation
+				setShowSuccessBanner(false);
 				successBannerTimeoutRef.current = null;
 			}, 3000);
 		} catch (error) {
@@ -517,10 +533,13 @@ export default function ReflectionWizard() {
 		}
 	}, [
 		reflectionToEdit,
-		editingReflection,
-		params.editReflectionId,
+		currentReflection,
+		localMood,
 		localWin,
 		localNotes,
+		editingReflection,
+		params.editReflectionId,
+		isForcedToCompletePreviousWeek,
 		saveReflection,
 		refreshReflection,
 		router,
@@ -529,53 +548,16 @@ export default function ReflectionWizard() {
 	// Animated style for success banner
 	const successBannerAnimatedStyle = useAnimatedStyle(() => {
 		const p = bannerProgress.value;
-
-		// fixed height for the pill + padding; tweak if needed
 		const maxHeight = 40;
 
 		return {
 			height: maxHeight * p,
 			opacity: p,
-			transform: [
-				{
-					// starts slightly above and slides down as it appears
-					translateY: (1 - p) * -10,
-				},
-			],
+			transform: [{ translateY: (1 - p) * -10 }],
 			marginTop: 8 * p,
 			marginBottom: 8 * p,
 		};
 	});
-
-	const handleHeaderBack = useCallback(() => {
-		if (mode === 'wizard') {
-			// If forced to complete previous week, prevent going back
-			if (isForcedToCompletePreviousWeek) {
-				return;
-			}
-
-			if (step === 0) {
-				// If we're in edit mode, navigate back to the detail page
-				if (editingReflection && params.editReflectionId) {
-					router.back();
-				} else {
-					// Otherwise, return to hub
-					setMode('hub');
-				}
-			} else {
-				LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-				setStep((s) => Math.max(0, s - 1));
-			}
-		}
-	}, [
-		mode,
-		step,
-		setMode,
-		editingReflection,
-		params.editReflectionId,
-		router,
-		isForcedToCompletePreviousWeek,
-	]);
 
 	// ---------------- Loading / empty ----------------
 	if (loading && !reflectionToEdit && !params.editReflectionId) {
@@ -583,7 +565,7 @@ export default function ReflectionWizard() {
 			<SafeAreaView style={styles.container} edges={['top']}>
 				<View style={styles.loadingWrap}>
 					<ActivityIndicator size="large" color="#0EA5E9" />
-					<Text style={[styles.loadingText, dynamicTextStyle]}>
+					<Text style={[styles.loadingText, dynamicTextStyleBase]}>
 						Loading weekly reflection…
 					</Text>
 				</View>
@@ -594,20 +576,20 @@ export default function ReflectionWizard() {
 	if (!currentReflection) {
 		return (
 			<SafeAreaView style={styles.container} edges={['top']}>
-				<Header mode="hub" setMode={setMode} />
+				<Header mode="hub" />
 				<ScrollView
 					style={styles.body}
 					contentContainerStyle={{ paddingBottom: 80 }}
 					showsVerticalScrollIndicator={false}
 				>
 					<View style={[styles.card, shadowCard]}>
-						<Text style={[styles.kicker, dynamicTextStyle]}>
+						<Text style={[styles.kicker, dynamicTextStyleBase]}>
 							Weekly reflection
 						</Text>
-						<Text style={[styles.title, dynamicTextStyle]}>
+						<Text style={[styles.title, dynamicTextStyleBase]}>
 							Welcome to your Reflection Hub
 						</Text>
-						<Text style={[styles.subtitle, dynamicTextStyle]}>
+						<Text style={[styles.subtitle, dynamicTextStyleBase]}>
 							Start your first weekly check-in to unlock insights and trends
 							over time.
 						</Text>
@@ -631,19 +613,13 @@ export default function ReflectionWizard() {
 	});
 
 	const { title: stepTitle, subtitle: stepSubtitle } = wizardMeta[step];
-
-	const primaryCtaLabel = step < 3 ? 'Continue' : 'Save reflection';
+	const primaryCtaLabel =
+		step < TOTAL_STEPS - 1 ? 'Continue' : 'Save reflection';
 
 	// ---------------- Render ----------------
 	return (
 		<SafeAreaView style={styles.container} edges={['top']}>
-			<Header
-				mode={mode}
-				setMode={setMode}
-				step={step}
-				onBack={handleHeaderBack}
-				isForcedToCompletePreviousWeek={isForcedToCompletePreviousWeek}
-			/>
+			<Header mode={mode} step={step} />
 
 			{/* Error banner */}
 			{error ? (
@@ -654,7 +630,7 @@ export default function ReflectionWizard() {
 					]}
 				>
 					<Ionicons name="warning" size={18} color="#B91C1C" />
-					<Text style={[styles.errorText, dynamicTextStyle]}>{error}</Text>
+					<Text style={[styles.errorText, dynamicTextStyleBase]}>{error}</Text>
 					<RectButton style={styles.retryPill} onPress={refreshReflection}>
 						<Text style={styles.retryPillText}>Retry</Text>
 					</RectButton>
@@ -670,7 +646,7 @@ export default function ReflectionWizard() {
 					]}
 				>
 					<Ionicons name="alert-circle" size={18} color="#B45309" />
-					<Text style={[styles.forcedCompletionText, dynamicTextStyle]}>
+					<Text style={[styles.forcedCompletionText, dynamicTextStyleBase]}>
 						Please complete your reflection for{' '}
 						{weekRangeLabel(
 							editingReflection.weekStartDate,
@@ -688,23 +664,23 @@ export default function ReflectionWizard() {
 					contentContainerStyle={{ paddingBottom: 120 }}
 					showsVerticalScrollIndicator={false}
 				>
-					{/* Success banner - at top of body container */}
+					{/* Success banner */}
 					<Animated.View
 						style={[styles.successBannerContainer, successBannerAnimatedStyle]}
 						pointerEvents={showSuccessBanner ? 'auto' : 'none'}
 					>
-						{/* Inner pill is always rendered; the container animates it in/out */}
 						<View style={styles.successBanner}>
 							<Ionicons name="checkmark-circle" size={18} color="#065F46" />
-							<Text style={[styles.successBannerText, dynamicTextStyle]}>
+							<Text style={[styles.successBannerText, dynamicTextStyleBase]}>
 								Reflection saved successfully!
 							</Text>
 						</View>
 					</Animated.View>
+
 					{/* Hero */}
 					<View style={[styles.card, shadowCard]}>
 						<View style={styles.kickerRow}>
-							<Text style={[styles.kicker, dynamicTextStyle]}>
+							<Text style={[styles.kicker, dynamicTextStyleBase]}>
 								{weekRangeLabel(
 									currentReflection?.weekStartDate,
 									currentReflection?.weekEndDate
@@ -722,8 +698,10 @@ export default function ReflectionWizard() {
 								</View>
 							)}
 						</View>
-						<Text style={[styles.title, dynamicTextStyle]}>Reflection hub</Text>
-						<Text style={[styles.subtitle, dynamicTextStyle]}>
+						<Text style={[styles.title, dynamicTextStyleBase]}>
+							Reflection hub
+						</Text>
+						<Text style={[styles.subtitle, dynamicTextStyleBase]}>
 							Capture a quick mood, add a win, or take the full review. Your
 							check-ins live here.
 						</Text>
@@ -762,7 +740,7 @@ export default function ReflectionWizard() {
 					{/* At a glance */}
 					<View style={[styles.card, shadowCard]}>
 						<View style={styles.glanceHeaderRow}>
-							<Text style={[styles.sectionTitle, dynamicTextStyle]}>
+							<Text style={[styles.sectionTitle, dynamicTextStyleBase]}>
 								This week at a glance
 							</Text>
 						</View>
@@ -773,16 +751,13 @@ export default function ReflectionWizard() {
 
 						<View style={{ height: 10 }} />
 
-						{/* Week summary cards (Completion, Mood, etc.) */}
 						<ReflectionStatsCard
 							reflection={currentReflection}
 							variant="embedded"
 						/>
 
-						{/* Soft divider between summary + money */}
 						<View style={styles.sectionDivider} />
 
-						{/* Compact financial metrics */}
 						<FinancialMetricsCard
 							metrics={currentReflection.financialMetrics as any}
 							variant="embedded"
@@ -797,37 +772,33 @@ export default function ReflectionWizard() {
 					{/* Past reflections */}
 					{pastReflections.length > 0 && (
 						<View style={[styles.card, shadowCard]}>
-							<Text style={[styles.sectionTitle, dynamicTextStyle]}>
+							<Text style={[styles.sectionTitle, dynamicTextStyleBase]}>
 								Past reflections
 							</Text>
 
-							{pastReflections
-								.slice(0, 5)
-								.map((r: WeeklyReflection, idx: number) => (
-									<HistoryRow
-										key={r._id || idx}
-										title={weekRangeLabel(r?.weekStartDate, r?.weekEndDate)}
-										mood={r?.moodRating ?? undefined}
-										win={
-											r?.winOfTheWeek ? truncate(r.winOfTheWeek, 64) : undefined
-										}
-										completed={!!r?.completed}
-										onPress={() => {
-											if (!r._id) return;
-											router.push({
-												pathname: '/(tabs)/reflections/[reflectionId]',
-												params: { reflectionId: r._id },
-											});
-										}}
-									/>
-								))}
+							{pastReflections.slice(0, 5).map((r, idx) => (
+								<HistoryRow
+									key={r._id || idx}
+									title={weekRangeLabel(r?.weekStartDate, r?.weekEndDate)}
+									mood={r?.moodRating ?? undefined}
+									win={
+										r?.winOfTheWeek ? truncate(r.winOfTheWeek, 64) : undefined
+									}
+									onPress={() => {
+										if (!r._id) return;
+										router.push({
+											pathname: '/(tabs)/reflections/[reflectionId]',
+											params: { reflectionId: r._id },
+										});
+									}}
+								/>
+							))}
 						</View>
 					)}
 				</ScrollView>
 			) : (
 				// ---------------- Wizard mode ----------------
 				<>
-					{/* Progress */}
 					<View style={styles.progressWrap}>
 						<View style={[styles.progressBar, { width: `${progressPct}%` }]} />
 					</View>
@@ -840,15 +811,15 @@ export default function ReflectionWizard() {
 						{/* Step 0 – Mood */}
 						{step === 0 && (
 							<View style={[styles.card, shadowCard, styles.firstWizardCard]}>
-								<Text style={[styles.headerTitle, dynamicTextStyle]}>
+								<Text style={[styles.headerTitle, dynamicTextStyleBase]}>
 									{stepTitle}
 								</Text>
-								<Text style={[styles.headerSubtitle, dynamicTextStyle]}>
+								<Text style={[styles.headerSubtitle, dynamicTextStyleBase]}>
 									{stepSubtitle}
 								</Text>
 								<View style={{ height: 12 }} />
 								<MoodRatingSelector
-									rating={reflectionToEdit?.moodRating}
+									rating={localMood ?? undefined}
 									onRatingChange={handleMoodChange}
 									disabled={saving || busy}
 									showTrend={false}
@@ -860,10 +831,10 @@ export default function ReflectionWizard() {
 						{/* Step 1 – Win */}
 						{step === 1 && (
 							<View style={[styles.card, shadowCard, styles.firstWizardCard]}>
-								<Text style={[styles.headerTitle, dynamicTextStyle]}>
+								<Text style={[styles.headerTitle, dynamicTextStyleBase]}>
 									{stepTitle}
 								</Text>
-								<Text style={[styles.headerSubtitle, dynamicTextStyle]}>
+								<Text style={[styles.headerSubtitle, dynamicTextStyleBase]}>
 									{stepSubtitle}
 								</Text>
 								<View style={{ height: 12 }} />
@@ -882,10 +853,10 @@ export default function ReflectionWizard() {
 						{/* Step 2 – Notes */}
 						{step === 2 && (
 							<View style={[styles.card, shadowCard, styles.firstWizardCard]}>
-								<Text style={[styles.headerTitle, dynamicTextStyle]}>
+								<Text style={[styles.headerTitle, dynamicTextStyleBase]}>
 									{stepTitle}
 								</Text>
-								<Text style={[styles.headerSubtitle, dynamicTextStyle]}>
+								<Text style={[styles.headerSubtitle, dynamicTextStyleBase]}>
 									{stepSubtitle}
 								</Text>
 								<View style={{ height: 12 }} />
@@ -904,74 +875,82 @@ export default function ReflectionWizard() {
 						{/* Step 3 – Review */}
 						{step === 3 && (
 							<View style={[styles.card, shadowCard, styles.firstWizardCard]}>
-								<Text style={[styles.headerTitle, dynamicTextStyle]}>
+								<Text style={[styles.headerTitle, dynamicTextStyleBase]}>
 									{stepTitle}
 								</Text>
-								<Text style={[styles.headerSubtitle, dynamicTextStyle]}>
+								<Text style={[styles.headerSubtitle, dynamicTextStyleBase]}>
 									{stepSubtitle}
 								</Text>
 
 								<View style={{ height: 14 }} />
 
-								<Text style={[styles.reviewHeader, dynamicTextStyle]}>
+								<Text style={[styles.reviewHeader, dynamicTextStyleBase]}>
 									Summary
 								</Text>
 
 								<View style={styles.reviewRow}>
-									<Text style={[styles.reviewLabel, dynamicTextStyle]}>
+									<Text style={[styles.reviewLabel, dynamicTextStyleBase]}>
 										Mood
 									</Text>
-									<Text style={[styles.reviewValueStrong, dynamicTextStyle]}>
-										{reflectionToEdit?.moodRating
-											? `${reflectionToEdit.moodRating}/5`
-											: 'Not set'}
+									<Text
+										style={[styles.reviewValueStrong, dynamicTextStyleBase]}
+									>
+										{localMood !== null ? `${localMood}/5` : 'Not set'}
 									</Text>
 								</View>
 								<View style={styles.divider} />
 								<View style={styles.reviewRow}>
-									<Text style={[styles.reviewLabel, dynamicTextStyle]}>
+									<Text style={[styles.reviewLabel, dynamicTextStyleBase]}>
 										Win of the week
 									</Text>
-									<Text style={[styles.reviewValue, dynamicTextStyle]}>
+									<Text style={[styles.reviewValue, dynamicTextStyleBase]}>
 										{localWin || '—'}
 									</Text>
 								</View>
 								<View style={styles.divider} />
 								<View style={styles.reviewRow}>
-									<Text style={[styles.reviewLabel, dynamicTextStyle]}>
+									<Text style={[styles.reviewLabel, dynamicTextStyleBase]}>
 										Notes
 									</Text>
-									<Text style={[styles.reviewValue, dynamicTextStyle]}>
+									<Text style={[styles.reviewValue, dynamicTextStyleBase]}>
 										{localNotes || '—'}
 									</Text>
 								</View>
 
-								<Text style={[styles.disclaimer, dynamicTextStyle]}>
+								<Text style={[styles.disclaimer, dynamicTextStyleBase]}>
 									You can revisit and edit this reflection anytime.
 								</Text>
 							</View>
 						)}
 					</ScrollView>
 
-					{/* Footer - single primary button */}
-					{mode === 'wizard' && (
-						<View style={styles.footer}>
-							<RectButton
-								style={[
-									styles.primaryBtn,
-									(!canContinue || busy || saving) && styles.btnDisabled,
-								]}
-								onPress={step < 3 ? next : handleSave}
-								enabled={canContinue && !busy && !saving}
+					{/* Footer - Back + primary CTA */}
+					<View style={styles.footer}>
+						{step > 0 && (
+							<Pressable
+								style={[styles.backButton, shadowCard]}
+								onPress={handleBackPress}
+								disabled={busy || saving}
 							>
-								{busy || saving ? (
-									<ActivityIndicator size="small" color="#FFFFFF" />
-								) : (
-									<Text style={styles.primaryBtnText}>{primaryCtaLabel}</Text>
-								)}
-							</RectButton>
-						</View>
-					)}
+								<Text style={styles.backButtonText}>← Back</Text>
+							</Pressable>
+						)}
+
+						<RectButton
+							style={[
+								styles.primaryBtn,
+								(!canContinue || busy || saving) && styles.btnDisabled,
+							]}
+							onPress={step < TOTAL_STEPS - 1 ? next : handleSave}
+							enabled={canContinue && !busy && !saving}
+						>
+							{busy || saving ? (
+								<ActivityIndicator size="small" color="#FFFFFF" />
+							) : (
+								<Text style={styles.primaryBtnText}>{primaryCtaLabel}</Text>
+							)}
+						</RectButton>
+					</View>
 				</>
 			)}
 		</SafeAreaView>
@@ -979,66 +958,33 @@ export default function ReflectionWizard() {
 }
 
 // -----------------------------------------------------------------------------
-// Header - contextual based on mode
+// Header (no back button; back is in footer like onboarding)
 // -----------------------------------------------------------------------------
-function Header({
-	mode,
-	setMode,
-	step,
-	onBack,
-	isForcedToCompletePreviousWeek,
-}: {
-	mode: 'hub' | 'wizard';
-	setMode: (m: 'hub' | 'wizard') => void;
-	step?: number;
-	onBack?: () => void;
-	isForcedToCompletePreviousWeek?: boolean;
-}) {
+function Header({ mode, step }: { mode: Mode; step?: number }) {
 	if (mode === 'hub') {
 		return (
 			<View style={styles.header}>
+				<View style={{ width: 44 }} />
 				<View style={styles.headerTitleContainer}>
 					<Text style={styles.headerTitleMain}>Weekly reflection</Text>
 				</View>
+				<View style={{ width: 44 }} />
 			</View>
 		);
 	}
 
-	const backLabel =
-		typeof step === 'number' && step === 0
-			? isForcedToCompletePreviousWeek
-				? 'Required'
-				: 'Back to hub'
-			: typeof step === 'number' && step > 0
-			? `Back to step ${step}`
-			: 'Back';
-
-	const isForcedToComplete = isForcedToCompletePreviousWeek || false;
-
 	return (
 		<View style={styles.header}>
-			<TouchableOpacity
-				onPress={onBack}
-				style={[
-					styles.backButton,
-					isForcedToComplete && styles.backButtonDisabled,
-				]}
-				accessibilityLabel={backLabel}
-				accessibilityRole="button"
-				disabled={isForcedToComplete}
-			>
-				<Ionicons
-					name="chevron-back"
-					size={22}
-					color={isForcedToComplete ? '#9CA3AF' : '#111827'}
-				/>
-			</TouchableOpacity>
+			{/* Empty left side so title stays centered */}
+			<View style={{ width: 44 }} />
 			<View style={styles.headerTitleContainer}>
 				<Text style={styles.headerTitleMain}>Weekly review</Text>
 			</View>
 			<View style={styles.headerRight}>
 				{typeof step === 'number' ? (
-					<Text style={styles.stepIndicator}>{step + 1} of 4</Text>
+					<Text style={styles.stepIndicator}>
+						{step + 1} of {TOTAL_STEPS}
+					</Text>
 				) : (
 					<View style={{ width: 44 }} />
 				)}
@@ -1071,13 +1017,11 @@ function HistoryRow({
 	title,
 	mood,
 	win,
-	completed,
 	onPress,
 }: {
 	title: string;
 	mood?: number;
 	win?: string;
-	completed?: boolean;
 	onPress?: () => void;
 }) {
 	return (
@@ -1123,16 +1067,6 @@ const styles = StyleSheet.create({
 		fontSize: 24,
 		fontWeight: '700',
 		color: '#111827',
-	},
-	backButton: {
-		width: 44,
-		height: 44,
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginLeft: -12,
-	},
-	backButtonDisabled: {
-		opacity: 0.5,
 	},
 	headerRight: {
 		width: 44,
@@ -1280,24 +1214,6 @@ const styles = StyleSheet.create({
 	},
 	streakBadgeText: { color: '#B45309', fontWeight: '700', fontSize: 12 },
 
-	rowBetween: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-
-	miniStat: {
-		width: 84,
-		backgroundColor: '#F9FAFB',
-		borderRadius: 12,
-		borderWidth: StyleSheet.hairlineWidth,
-		borderColor: '#E5E7EB',
-		paddingVertical: 8,
-		alignItems: 'center',
-	},
-	miniStatLabel: { fontSize: 11, color: '#6B7280', marginBottom: 2 },
-	miniStatValue: { fontSize: 16, fontWeight: '800', color: '#111827' },
-
 	aiInsight: {
 		marginTop: 10,
 		flexDirection: 'row',
@@ -1421,16 +1337,21 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 	primaryBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
-	secondaryBtn: {
+	backButton: {
 		height: 48,
 		borderRadius: 12,
 		backgroundColor: '#FFFFFF',
-		borderWidth: 1,
-		borderColor: '#E5E7EB',
 		alignItems: 'center',
 		justifyContent: 'center',
+		paddingHorizontal: 18,
+		minWidth: 100,
+		marginRight: 8,
 	},
-	secondaryBtnText: { color: '#111827', fontSize: 16, fontWeight: '700' },
+	backButtonText: {
+		color: '#444444',
+		fontSize: 16,
+		fontWeight: '600',
+	},
 	btnDisabled: { opacity: 0.55 },
 
 	loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },

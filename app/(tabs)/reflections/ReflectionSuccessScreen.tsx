@@ -13,10 +13,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { WeeklyReflection } from '../../../src/services';
 import { ReflectionStatsCard } from './components/ReflectionStatsCard';
 import { FinancialMetricsCard } from './components/FinancialMetricsCard';
-import { MoodRatingSelector } from './components/MoodRatingSelector';
 import {
 	accessibilityProps,
-	dynamicTextStyle,
+	dynamicTextStyleBase,
 } from '../../../src/utils/accessibility';
 
 interface ReflectionSuccessScreenProps {
@@ -51,10 +50,10 @@ export default function ReflectionSuccessScreen({
 		<SafeAreaView style={styles.container}>
 			{/* Header */}
 			<View style={styles.header}>
-				<Text style={[styles.headerTitle, dynamicTextStyle]}>
+				<Text style={[styles.headerTitle, dynamicTextStyleBase]}>
 					Reflection Complete!
 				</Text>
-				<Text style={[styles.headerSubtitle, dynamicTextStyle]}>
+				<Text style={[styles.headerSubtitle, dynamicTextStyleBase]}>
 					Great job taking time to reflect on your week
 				</Text>
 			</View>
@@ -69,10 +68,10 @@ export default function ReflectionSuccessScreen({
 					<View style={styles.successIcon}>
 						<Ionicons name="checkmark-circle" size={48} color="#10B981" />
 					</View>
-					<Text style={[styles.successTitle, dynamicTextStyle]}>
-						Week's Reflection Saved
+					<Text style={[styles.successTitle, dynamicTextStyleBase]}>
+						Week&apos;s Reflection Saved
 					</Text>
-					<Text style={[styles.successSubtitle, dynamicTextStyle]}>
+					<Text style={[styles.successSubtitle, dynamicTextStyleBase]}>
 						Your insights and progress have been recorded for this week
 					</Text>
 				</View>
@@ -80,15 +79,17 @@ export default function ReflectionSuccessScreen({
 				{/* Mood Summary */}
 				{reflection.moodRating && (
 					<View style={[styles.card, shadowCard]}>
-						<Text style={[styles.cardTitle, dynamicTextStyle]}>Your Mood</Text>
+						<Text style={[styles.cardTitle, dynamicTextStyleBase]}>
+							Your Mood
+						</Text>
 						<View style={styles.moodSummary}>
 							<Text style={styles.moodEmoji}>
 								{getMoodEmoji(reflection.moodRating)}
 							</Text>
-							<Text style={[styles.moodRating, dynamicTextStyle]}>
+							<Text style={[styles.moodRating, dynamicTextStyleBase]}>
 								{reflection.moodRating}/5
 							</Text>
-							<Text style={[styles.moodLabel, dynamicTextStyle]}>
+							<Text style={[styles.moodLabel, dynamicTextStyleBase]}>
 								{reflection.moodRating === 1 && 'Not great'}
 								{reflection.moodRating === 2 && 'Could be better'}
 								{reflection.moodRating === 3 && 'Alright'}
@@ -102,12 +103,12 @@ export default function ReflectionSuccessScreen({
 				{/* Win of the Week */}
 				{reflection.winOfTheWeek && (
 					<View style={[styles.card, shadowCard]}>
-						<Text style={[styles.cardTitle, dynamicTextStyle]}>
+						<Text style={[styles.cardTitle, dynamicTextStyleBase]}>
 							Win of the Week
 						</Text>
 						<View style={styles.winContainer}>
 							<Ionicons name="trophy" size={24} color="#F59E0B" />
-							<Text style={[styles.winText, dynamicTextStyle]}>
+							<Text style={[styles.winText, dynamicTextStyleBase]}>
 								{reflection.winOfTheWeek}
 							</Text>
 						</View>
@@ -117,12 +118,12 @@ export default function ReflectionSuccessScreen({
 				{/* Notes */}
 				{reflection.reflectionNotes && (
 					<View style={[styles.card, shadowCard]}>
-						<Text style={[styles.cardTitle, dynamicTextStyle]}>
+						<Text style={[styles.cardTitle, dynamicTextStyleBase]}>
 							Reflection Notes
 						</Text>
 						<View style={styles.notesContainer}>
 							<Ionicons name="document-text" size={24} color="#6B7280" />
-							<Text style={[styles.notesText, dynamicTextStyle]}>
+							<Text style={[styles.notesText, dynamicTextStyleBase]}>
 								{reflection.reflectionNotes}
 							</Text>
 						</View>
@@ -131,15 +132,15 @@ export default function ReflectionSuccessScreen({
 
 				{/* Financial Metrics */}
 				<View style={[styles.card, shadowCard]}>
-					<Text style={[styles.cardTitle, dynamicTextStyle]}>
-						Week's Financial Summary
+					<Text style={[styles.cardTitle, dynamicTextStyleBase]}>
+						Week&apos;s Financial Summary
 					</Text>
 					<FinancialMetricsCard metrics={reflection.financialMetrics} />
 				</View>
 
 				{/* Stats */}
 				<View style={[styles.card, shadowCard]}>
-					<Text style={[styles.cardTitle, dynamicTextStyle]}>
+					<Text style={[styles.cardTitle, dynamicTextStyleBase]}>
 						Reflection Stats
 					</Text>
 					<ReflectionStatsCard reflection={reflection} />
@@ -147,14 +148,16 @@ export default function ReflectionSuccessScreen({
 
 				{/* Week Info */}
 				<View style={[styles.card, shadowCard]}>
-					<Text style={[styles.cardTitle, dynamicTextStyle]}>Week Details</Text>
+					<Text style={[styles.cardTitle, dynamicTextStyleBase]}>
+						Week Details
+					</Text>
 					<View style={styles.weekInfo}>
 						<View style={styles.weekInfoRow}>
 							<Ionicons name="calendar" size={20} color="#6B7280" />
-							<Text style={[styles.weekInfoLabel, dynamicTextStyle]}>
+							<Text style={[styles.weekInfoLabel, dynamicTextStyleBase]}>
 								Week of:
 							</Text>
-							<Text style={[styles.weekInfoValue, dynamicTextStyle]}>
+							<Text style={[styles.weekInfoValue, dynamicTextStyleBase]}>
 								{new Date(reflection.weekStartDate).toLocaleDateString(
 									'en-US',
 									{
@@ -167,10 +170,10 @@ export default function ReflectionSuccessScreen({
 						</View>
 						<View style={styles.weekInfoRow}>
 							<Ionicons name="time" size={20} color="#6B7280" />
-							<Text style={[styles.weekInfoLabel, dynamicTextStyle]}>
+							<Text style={[styles.weekInfoLabel, dynamicTextStyleBase]}>
 								Completed:
 							</Text>
-							<Text style={[styles.weekInfoValue, dynamicTextStyle]}>
+							<Text style={[styles.weekInfoValue, dynamicTextStyleBase]}>
 								{new Date(
 									reflection.completedAt || reflection.updatedAt
 								).toLocaleDateString('en-US', {
