@@ -87,7 +87,7 @@ import {
 	shouldEnrichPrompts,
 } from '../../../src/state/assistantConfig';
 import { useFeature } from '../../../src/config/features';
-import { FooterBar } from '../../../src/ui';
+import { FooterBar, palette } from '../../../src/ui';
 import ChatComposer from './components/ChatComposer';
 
 // New components
@@ -1985,113 +1985,117 @@ export default function ChatScreen() {
 
 	return (
 		<SafeAreaView style={styles.safeArea}>
-			<DevHud modeState={modeState} />
-			<View style={styles.header}>
-				<TouchableOpacity
-					onPress={() => router.push('/(stack)/settings/aiInsights')}
-					style={styles.headerIconButton}
-					activeOpacity={0.7}
-				>
-					<Ionicons name="settings-outline" size={20} color="#4B5563" />
-				</TouchableOpacity>
-
-				<View style={styles.headerLogoContainer}>
-					<Image
-						source={require('../../../src/assets/logos/brieai-logo.png')}
-						style={styles.logo}
-						contentFit="contain"
-						accessibilityRole="image"
-						accessibilityLabel="Brie app logo"
-					/>
-				</View>
-
-				{/* Pills row - right side */}
-				<View style={styles.headerPillsRow}>
-					<View
-						style={[
-							styles.modePill,
-							personalizationEnabled
-								? styles.modePillPersonalized
-								: styles.modePillPrivate,
-						]}
-					>
-						<View
-							style={[
-								styles.modeDot,
-								personalizationEnabled
-									? styles.modeDotPersonalized
-									: styles.modeDotPrivate,
-							]}
-						/>
-						<Text
-							style={[
-								styles.modePillText,
-								personalizationEnabled
-									? styles.modePillTextPersonalized
-									: styles.modePillTextPrivate,
-							]}
-						>
-							{personalizationEnabled ? 'Personalized' : 'Private mode'}
-						</Text>
-					</View>
-
-					{budgetStatus && (
-						<View style={styles.budgetPill}>
-							<Text style={styles.budgetPillLabel}>Monthly budget</Text>
-							<Text style={styles.budgetPillValue}>
-								{Math.round(budgetStatus.percentage)}% used ·{' '}
-								{Math.round(budgetStatus.remaining)} left
-							</Text>
-						</View>
-					)}
-				</View>
-			</View>
-
-			<View style={styles.container}>
-				<MessagesList
-					messages={messages}
-					streamingMessageId={streamingMessageId}
-					traceData={traceData}
-					performanceData={performanceData}
-					showExpandButton={showExpandButton}
-					onExpandPress={handleExpand}
-					contentPaddingBottom={composerH + insets.bottom + 12}
-				>
-					<AssistantListFooter
-						aiInsightsEnabled={aiInsightsEnabled}
-						allowProactive={allowProactive(config)}
-						isStreaming={isStreaming}
-						hasStreamingId={!!streamingMessageId}
-						dataInitialized={dataInitialized}
-						conversationContext={currentConversationContext}
-						onInsightPress={handleInsightPress}
-						onAskAboutInsight={handleAskAboutInsight}
-						debugInfo={debugInfo}
-						streamingRef={streamingRef}
-						messagesCount={messages.length}
-						lastProcessedMessage={lastProcessedMessage}
-						onTestStreaming={testStreaming}
-						showFallback={showFallback}
-						fallbackData={fallbackData}
-						onRetry={handleRetry}
-						onRefresh={handleRefresh}
-						isRetrying={isRetrying}
-						showServiceStatus={__DEV__}
-						onMissingInfoComplete={handleMissingInfoComplete}
-						onIntentMissingInfoComplete={handleIntentMissingInfoComplete}
-						missingInfoState={missingInfoState}
-						intentMissingInfoState={intentMissingInfoState}
-						onChipPress={handleChipPress}
-						onValueSubmit={handleValueSubmit}
-					/>
-				</MessagesList>
-			</View>
-
-			{/* KeyboardAvoidingView only around the footer/composer */}
 			<KeyboardAvoidingView
-				behavior={Platform.OS === 'ios' ? 'position' : undefined}
+				style={{ flex: 1 }}
+				behavior={Platform.OS === 'ios' ? 'padding' : undefined}
 				keyboardVerticalOffset={0}
 			>
+				<DevHud modeState={modeState} />
+				<View style={styles.header}>
+					<TouchableOpacity
+						onPress={() => router.push('/(stack)/settings/aiInsights')}
+						style={styles.headerIconButton}
+						activeOpacity={0.7}
+					>
+						<Ionicons
+							name="settings-outline"
+							size={20}
+							color={palette.textMuted}
+						/>
+					</TouchableOpacity>
+
+					<View style={styles.headerLogoContainer}>
+						<Image
+							source={require('../../../src/assets/logos/brieai-logo.png')}
+							style={styles.logo}
+							contentFit="contain"
+							accessibilityRole="image"
+							accessibilityLabel="Brie app logo"
+						/>
+					</View>
+
+					{/* Pills row - right side */}
+					<View style={styles.headerPillsRow}>
+						<View
+							style={[
+								styles.modePill,
+								personalizationEnabled
+									? styles.modePillPersonalized
+									: styles.modePillPrivate,
+							]}
+						>
+							<View
+								style={[
+									styles.modeDot,
+									personalizationEnabled
+										? styles.modeDotPersonalized
+										: styles.modeDotPrivate,
+								]}
+							/>
+							<Text
+								style={[
+									styles.modePillText,
+									personalizationEnabled
+										? styles.modePillTextPersonalized
+										: styles.modePillTextPrivate,
+								]}
+							>
+								{personalizationEnabled ? 'Personalized' : 'Private mode'}
+							</Text>
+						</View>
+
+						{budgetStatus && (
+							<View style={styles.budgetPill}>
+								<Text style={styles.budgetPillLabel}>Monthly budget</Text>
+								<Text style={styles.budgetPillValue}>
+									{Math.round(budgetStatus.percentage)}% used ·{' '}
+									{Math.round(budgetStatus.remaining)} left
+								</Text>
+							</View>
+						)}
+					</View>
+				</View>
+
+				<View style={styles.container}>
+					<MessagesList
+						messages={messages}
+						streamingMessageId={streamingMessageId}
+						traceData={traceData}
+						performanceData={performanceData}
+						showExpandButton={showExpandButton}
+						onExpandPress={handleExpand}
+						contentPaddingBottom={12 + insets.bottom}
+					>
+						<AssistantListFooter
+							aiInsightsEnabled={aiInsightsEnabled}
+							allowProactive={allowProactive(config)}
+							isStreaming={isStreaming}
+							hasStreamingId={!!streamingMessageId}
+							dataInitialized={dataInitialized}
+							conversationContext={currentConversationContext}
+							onInsightPress={handleInsightPress}
+							onAskAboutInsight={handleAskAboutInsight}
+							debugInfo={debugInfo}
+							streamingRef={streamingRef}
+							messagesCount={messages.length}
+							lastProcessedMessage={lastProcessedMessage}
+							onTestStreaming={testStreaming}
+							showFallback={showFallback}
+							fallbackData={fallbackData}
+							onRetry={handleRetry}
+							onRefresh={handleRefresh}
+							isRetrying={isRetrying}
+							showServiceStatus={__DEV__}
+							onMissingInfoComplete={handleMissingInfoComplete}
+							onIntentMissingInfoComplete={handleIntentMissingInfoComplete}
+							missingInfoState={missingInfoState}
+							intentMissingInfoState={intentMissingInfoState}
+							onChipPress={handleChipPress}
+							onValueSubmit={handleValueSubmit}
+						/>
+					</MessagesList>
+				</View>
+
 				<View onLayout={onComposerLayout}>
 					<FooterBar style={styles.inputContainer}>
 						<ChatComposer onSend={sendFromComposer} isSending={isStreaming} />

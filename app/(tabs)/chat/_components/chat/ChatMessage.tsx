@@ -3,6 +3,13 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import WhyThisTray from '../../components/WhyThisTray';
 import type { Message } from '../../../../../src/hooks/useMessagesReducerV2';
 import { logger } from '../../../../../src/utils/logger';
+import {
+	palette,
+	radius,
+	space,
+	type as typography,
+	shadow,
+} from '../../../../../src/ui/theme';
 
 type Props = {
 	message: Message;
@@ -191,88 +198,119 @@ export const ChatMessage = memo(function ChatMessage({
 export default ChatMessage;
 
 const styles = StyleSheet.create({
-	message: { maxWidth: '80%', marginBottom: 16, padding: 12, borderRadius: 18 },
+	message: {
+		maxWidth: '86%',
+		marginBottom: space.md,
+		paddingHorizontal: space.md,
+		paddingVertical: space.sm,
+		borderRadius: radius.lg,
+	},
 	userMessage: {
 		alignSelf: 'flex-end',
-		backgroundColor: '#3b82f6',
-		borderBottomRightRadius: 4,
+		backgroundColor: palette.primary,
+		borderBottomRightRadius: radius.sm,
+		...shadow.soft,
 	},
 	aiMessage: {
 		alignSelf: 'flex-start',
-		backgroundColor: '#ffffff',
-		borderBottomLeftRadius: 4,
-		borderWidth: 1,
-		borderColor: '#E5E7EB',
+		backgroundColor: palette.surface,
+		borderBottomLeftRadius: radius.sm,
+		borderWidth: StyleSheet.hairlineWidth,
+		borderColor: palette.borderSubtle,
+		...shadow.card,
 	},
 	deterministicMessage: {
-		backgroundColor: '#ffffff',
+		backgroundColor: palette.surfaceAlt,
 		borderWidth: 1,
-		borderColor: '#d4d4d8',
+		borderColor: palette.borderAccent,
 		borderStyle: 'dashed',
-		paddingTop: 10,
+		paddingTop: space.sm,
 	},
 	deterministicHeader: {
-		marginBottom: 8,
+		marginBottom: space.xs,
 	},
 	deterministicBadge: {
-		color: '#111827',
-		fontSize: 12,
-		fontWeight: '600',
+		...typography.labelXs,
+		color: palette.textStrong,
 		marginBottom: 2,
 	},
 	deterministicNote: {
-		color: '#6b7280',
-		fontSize: 12,
+		...typography.labelXs,
+		color: palette.textMuted,
 	},
-	messageText: { fontSize: 16, lineHeight: 22 },
-	userMessageText: { color: '#ffffff' },
-	aiMessageText: { color: '#111827' },
-	streamingCursor: { color: '#3b82f6', fontWeight: 'bold' },
+	messageText: {
+		...typography.bodySm,
+		lineHeight: 20,
+	},
+	userMessageText: {
+		color: palette.onPrimary,
+	},
+	aiMessageText: {
+		color: palette.text,
+	},
+	streamingCursor: {
+		color: palette.primary,
+		fontWeight: 'bold',
+	},
 	debugText: {
-		fontSize: 12,
-		color: '#92400e',
-		fontFamily: 'monospace',
+		...typography.labelXs,
+		color: palette.warningStrong,
 		marginTop: 4,
+		fontFamily: 'monospace',
 	},
 	performanceInfo: {
-		marginTop: 8,
-		paddingTop: 8,
-		borderTopWidth: 1,
-		borderTopColor: '#e5e7eb',
+		marginTop: space.xs,
+		paddingTop: space.xs,
+		borderTopWidth: StyleSheet.hairlineWidth,
+		borderTopColor: palette.borderSubtle,
 	},
-	performanceText: { fontSize: 12, color: '#6b7280', fontStyle: 'italic' },
-	parallelInfo: {
-		fontSize: 11,
-		color: '#9ca3af',
+	performanceText: {
+		...typography.labelXs,
+		color: palette.textMuted,
 		fontStyle: 'italic',
+	},
+	parallelInfo: {
+		...typography.labelXs,
+		color: palette.textMuted,
 		marginTop: 2,
+		fontStyle: 'italic',
 	},
 	optimizationInfo: {
-		fontSize: 10,
-		color: '#10b981',
-		fontStyle: 'italic',
+		...typography.labelXs,
+		color: palette.success,
 		marginTop: 2,
-		fontWeight: '500',
+		fontStyle: 'italic',
 	},
-	timeToFirstToken: { fontSize: 11, color: '#10b981', fontWeight: '500' },
+	timeToFirstToken: {
+		...typography.labelXs,
+		color: palette.success,
+	},
 	showWorkButton: {
-		backgroundColor: '#f3f4f6',
-		borderRadius: 8,
-		padding: 8,
-		marginTop: 8,
+		backgroundColor: palette.surfaceAlt,
+		borderRadius: radius.md,
+		paddingVertical: space.xs,
+		paddingHorizontal: space.sm,
+		marginTop: space.xs,
 		alignItems: 'center',
-		borderWidth: 1,
-		borderColor: '#e5e7eb',
+		borderWidth: StyleSheet.hairlineWidth,
+		borderColor: palette.borderSubtle,
 	},
-	showWorkButtonText: { color: '#374151', fontSize: 14, fontWeight: '500' },
+	showWorkButtonText: {
+		...typography.labelSm,
+		color: palette.text,
+	},
 	expandButton: {
-		backgroundColor: '#f0f9ff',
-		borderRadius: 8,
-		padding: 8,
-		marginTop: 8,
+		backgroundColor: palette.primarySoft,
+		borderRadius: radius.md,
+		paddingVertical: space.xs,
+		paddingHorizontal: space.sm,
+		marginTop: space.xs,
 		alignItems: 'center',
-		borderWidth: 1,
-		borderColor: '#0ea5e9',
+		borderWidth: StyleSheet.hairlineWidth,
+		borderColor: palette.primary,
 	},
-	expandButtonText: { color: '#0369a1', fontSize: 14, fontWeight: '500' },
+	expandButtonText: {
+		...typography.labelSm,
+		color: palette.primaryMuted,
+	},
 });
