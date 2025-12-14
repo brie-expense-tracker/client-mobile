@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useWeeklyReflection } from '../../../src/hooks/useWeeklyReflection';
 import { WeeklyReflection } from '../../../src/services';
-import { dynamicTextStyle } from '../../../src/utils/accessibility';
+import { dynamicTextStyleBase } from '../../../src/utils/accessibility';
 
 const weekRangeLabel = (
 	weekStartDate?: string | Date,
@@ -86,7 +86,7 @@ export default function ReflectionDetailScreen() {
 			<SafeAreaView style={styles.container} edges={['top']}>
 				<View style={styles.loadingWrap}>
 					<ActivityIndicator size="large" color="#0EA5E9" />
-					<Text style={[styles.loadingText, dynamicTextStyle]}>
+					<Text style={[styles.loadingText, dynamicTextStyleBase]}>
 						Loading reflection…
 					</Text>
 				</View>
@@ -111,10 +111,10 @@ export default function ReflectionDetailScreen() {
 				</View>
 
 				<View style={styles.emptyWrap}>
-					<Text style={[styles.emptyTitle, dynamicTextStyle]}>
+					<Text style={[styles.emptyTitle, dynamicTextStyleBase]}>
 						Reflection not found
 					</Text>
-					<Text style={[styles.emptySubtitle, dynamicTextStyle]}>
+					<Text style={[styles.emptySubtitle, dynamicTextStyleBase]}>
 						Try going back and selecting a different week.
 					</Text>
 				</View>
@@ -160,14 +160,16 @@ export default function ReflectionDetailScreen() {
 				showsVerticalScrollIndicator={false}
 			>
 				<View style={[styles.card, shadowCard]}>
-					<Text style={[styles.kicker, dynamicTextStyle]}>
+					<Text style={[styles.kicker, dynamicTextStyleBase]}>
 						{weekRangeLabel(reflection.weekStartDate, reflection.weekEndDate)}
 					</Text>
-					<Text style={[styles.title, dynamicTextStyle]}>Review Summary</Text>
+					<Text style={[styles.title, dynamicTextStyleBase]}>
+						Review Summary
+					</Text>
 
 					<View style={styles.reviewRow}>
-						<Text style={[styles.reviewLabel, dynamicTextStyle]}>Mood</Text>
-						<Text style={[styles.reviewValueStrong, dynamicTextStyle]}>
+						<Text style={[styles.reviewLabel, dynamicTextStyleBase]}>Mood</Text>
+						<Text style={[styles.reviewValueStrong, dynamicTextStyleBase]}>
 							{typeof reflection.moodRating === 'number'
 								? `${reflection.moodRating}/5`
 								: 'Not set'}
@@ -177,10 +179,10 @@ export default function ReflectionDetailScreen() {
 					<View style={styles.divider} />
 
 					<View style={styles.reviewRow}>
-						<Text style={[styles.reviewLabel, dynamicTextStyle]}>
+						<Text style={[styles.reviewLabel, dynamicTextStyleBase]}>
 							Win of the week
 						</Text>
-						<Text style={[styles.reviewValue, dynamicTextStyle]}>
+						<Text style={[styles.reviewValue, dynamicTextStyleBase]}>
 							{reflection.winOfTheWeek || '—'}
 						</Text>
 					</View>
@@ -188,13 +190,15 @@ export default function ReflectionDetailScreen() {
 					<View style={styles.divider} />
 
 					<View style={styles.reviewRow}>
-						<Text style={[styles.reviewLabel, dynamicTextStyle]}>Notes</Text>
-						<Text style={[styles.reviewValue, dynamicTextStyle]}>
+						<Text style={[styles.reviewLabel, dynamicTextStyleBase]}>
+							Notes
+						</Text>
+						<Text style={[styles.reviewValue, dynamicTextStyleBase]}>
 							{reflection.reflectionNotes || '—'}
 						</Text>
 					</View>
 
-					<Text style={[styles.disclaimer, dynamicTextStyle]}>
+					<Text style={[styles.disclaimer, dynamicTextStyleBase]}>
 						This is a read-only summary of your past week.
 					</Text>
 				</View>
