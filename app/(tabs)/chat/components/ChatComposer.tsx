@@ -8,6 +8,12 @@ import {
 	Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import {
+	palette,
+	radius,
+	space,
+	type as typography,
+} from '../../../../src/ui/theme';
 
 type Props = {
 	onSend: (text: string) => Promise<void> | void;
@@ -47,7 +53,7 @@ export default function ChatComposer({
 				value={text}
 				onChangeText={setText}
 				placeholder={placeholder}
-				placeholderTextColor="#9ca3af"
+				placeholderTextColor={palette.textMuted}
 				style={styles.input}
 				multiline
 				autoCorrect={false}
@@ -67,9 +73,9 @@ export default function ChatComposer({
 				activeOpacity={0.7}
 			>
 				{isSending ? (
-					<ActivityIndicator size="small" color="#fff" />
+					<ActivityIndicator size="small" color={palette.onPrimary} />
 				) : (
-					<Ionicons name="send" size={18} color="#fff" />
+					<Ionicons name="send" size={18} color={palette.onPrimary} />
 				)}
 			</TouchableOpacity>
 		</View>
@@ -80,29 +86,31 @@ const styles = StyleSheet.create({
 	bar: {
 		flexDirection: 'row',
 		alignItems: 'flex-end',
-		padding: 12,
-		gap: 12,
+		padding: space.md,
+		gap: space.md,
 	},
 	input: {
 		flex: 1,
+		minHeight: 48,
 		maxHeight: 120,
-		borderWidth: 1,
-		borderColor: '#e5e7eb',
-		backgroundColor: '#f9fafb',
-		borderRadius: 18,
-		paddingHorizontal: 14,
-		paddingVertical: 10,
-		fontSize: 16,
+		borderWidth: StyleSheet.hairlineWidth,
+		borderColor: palette.borderSubtle,
+		backgroundColor: palette.surfaceAlt,
+		borderRadius: radius.pill,
+		paddingHorizontal: space.lg,
+		paddingVertical: space.md,
+		...typography.body,
+		color: palette.text,
 	},
 	sendBtn: {
-		width: 42,
-		height: 42,
-		borderRadius: 21,
-		backgroundColor: '#3b82f6',
+		width: 48,
+		height: 48,
+		borderRadius: radius.full,
+		backgroundColor: palette.primary,
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
 	sendBtnDisabled: {
-		backgroundColor: '#cbd5e1',
+		backgroundColor: palette.iconMuted,
 	},
 });

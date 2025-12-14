@@ -88,6 +88,60 @@ const weekRangeLabel = (
 const truncate = (s: string, n: number) =>
 	s.length > n ? s.slice(0, n - 1) + '…' : s;
 
+/**
+ * Helper to get the current week's start date (Monday)
+ */
+const getCurrentWeekStart = (): Date => {
+	const now = new Date();
+	const dayOfWeek = now.getDay();
+	const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+	const monday = new Date(now);
+	monday.setDate(now.getDate() - daysToMonday);
+	monday.setHours(0, 0, 0, 0);
+	return monday;
+};
+
+/**
+ * Helper to normalize a date string to a Date object for comparison
+ */
+const normalizeWeekStartDate = (dateStr: string | Date): Date => {
+	const date = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
+	const normalized = new Date(date);
+	normalized.setHours(0, 0, 0, 0);
+	return normalized;
+};
+
+/**
+ * Find the most recent incomplete reflection from a previous week (not current week)
+ */
+const findIncompletePreviousWeekReflection = (
+	currentReflection: WeeklyReflection | null,
+	recentReflections: WeeklyReflection[]
+): WeeklyReflection | null => {
+	const currentWeekStart = getCurrentWeekStart();
+
+	// Check all reflections (current + recent) for incomplete ones from previous weeks
+	const allReflections = currentReflection
+		? [currentReflection, ...recentReflections]
+		: recentReflections;
+
+	// Filter for incomplete reflections that are NOT from the current week
+	const incompletePreviousWeek = allReflections
+		.filter((r) => {
+			if (r.completed) return false;
+			const reflectionWeekStart = normalizeWeekStartDate(r.weekStartDate);
+			return reflectionWeekStart.getTime() < currentWeekStart.getTime();
+		})
+		.sort((a, b) => {
+			// Sort by weekStartDate descending (most recent incomplete first)
+			const dateA = normalizeWeekStartDate(a.weekStartDate).getTime();
+			const dateB = normalizeWeekStartDate(b.weekStartDate).getTime();
+			return dateB - dateA;
+		});
+
+	return incompletePreviousWeek.length > 0 ? incompletePreviousWeek[0] : null;
+};
+
 /** Tiny copy helper for each wizard step. */
 const wizardMeta = [
 	{
@@ -178,8 +232,24 @@ export default function ReflectionWizard() {
 		refreshReflection,
 	} = useWeeklyReflection();
 
+	// Find incomplete previous week reflection that needs to be completed
+	const incompletePreviousWeekReflection = useMemo(() => {
+		return findIncompletePreviousWeekReflection(
+			currentReflection,
+			recentReflections
+		);
+	}, [currentReflection, recentReflections]);
+
 	// Find the reflection to edit if editReflectionId is provided
+	// If there's an incomplete previous week reflection and no explicit editReflectionId,
+	// force editing the incomplete previous week reflection
 	const editingReflection = useMemo(() => {
+		// If there's an incomplete previous week reflection and we're not explicitly editing another one,
+		// force the incomplete previous week reflection
+		if (incompletePreviousWeekReflection && !params.editReflectionId) {
+			return incompletePreviousWeekReflection;
+		}
+
 		if (!params.editReflectionId) return null;
 
 		if (currentReflection?._id === params.editReflectionId) {
@@ -189,7 +259,16 @@ export default function ReflectionWizard() {
 		return (
 			recentReflections?.find((r) => r._id === params.editReflectionId) || null
 		);
-	}, [params.editReflectionId, currentReflection, recentReflections]);
+	}, [
+		params.editReflectionId,
+		currentReflection,
+		recentReflections,
+		incompletePreviousWeekReflection,
+	]);
+
+	// Track if we're being forced to complete a previous week reflection
+	const isForcedToCompletePreviousWeek =
+		!!incompletePreviousWeekReflection && !params.editReflectionId;
 
 	type Mode = 'hub' | 'wizard';
 	const [mode, setMode] = useState<Mode>('hub');
@@ -229,14 +308,17 @@ export default function ReflectionWizard() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [reflectionToEdit?._id]);
 
-	// Auto-enter wizard mode when editing a reflection
+	// Auto-enter wizard mode when editing a reflection or when forced to complete previous week
 	useEffect(() => {
-		if (editingReflection && mode === 'hub') {
+		if (
+			isForcedToCompletePreviousWeek ||
+			(editingReflection && mode === 'hub')
+		) {
 			// Always start at step 0 (beginning of wizard) when editing
 			setStep(0);
 			setMode('wizard');
 		}
-	}, [editingReflection, mode]);
+	}, [editingReflection, mode, isForcedToCompletePreviousWeek]);
 
 	// Sync banner progress with showSuccessBanner state
 	useEffect(() => {
@@ -380,8 +462,11 @@ export default function ReflectionWizard() {
 				winOfTheWeek: localWin,
 				reflectionNotes: localNotes,
 				markCompleted: true,
-				// Pass reflectionId if editing a specific reflection
-				reflectionId: editingReflection?._id,
+				// Pass reflectionId if editing a specific reflection (not current week)
+				reflectionId:
+					reflectionToEdit?._id !== currentReflection?._id
+						? reflectionToEdit?._id
+						: undefined,
 			});
 			if (isDevMode) logger.debug('Save successful, received:', saved);
 
@@ -395,6 +480,16 @@ export default function ReflectionWizard() {
 				setTimeout(() => {
 					router.back();
 				}, 500);
+			} else if (isForcedToCompletePreviousWeek) {
+				// If we just completed a forced previous week reflection, refresh
+				await refreshReflection();
+				// After refresh, transition to hub mode (the component will handle showing current week)
+				// Use a small delay to allow the refresh to complete
+				setTimeout(() => {
+					LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+					setMode('hub');
+					setStep(0);
+				}, 100);
 			} else {
 				// Otherwise, return to Hub
 				LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -454,6 +549,11 @@ export default function ReflectionWizard() {
 
 	const handleHeaderBack = useCallback(() => {
 		if (mode === 'wizard') {
+			// If forced to complete previous week, prevent going back
+			if (isForcedToCompletePreviousWeek) {
+				return;
+			}
+
 			if (step === 0) {
 				// If we're in edit mode, navigate back to the detail page
 				if (editingReflection && params.editReflectionId) {
@@ -467,7 +567,15 @@ export default function ReflectionWizard() {
 				setStep((s) => Math.max(0, s - 1));
 			}
 		}
-	}, [mode, step, setMode, editingReflection, params.editReflectionId, router]);
+	}, [
+		mode,
+		step,
+		setMode,
+		editingReflection,
+		params.editReflectionId,
+		router,
+		isForcedToCompletePreviousWeek,
+	]);
 
 	// ---------------- Loading / empty ----------------
 	if (loading && !reflectionToEdit && !params.editReflectionId) {
@@ -534,6 +642,7 @@ export default function ReflectionWizard() {
 				setMode={setMode}
 				step={step}
 				onBack={handleHeaderBack}
+				isForcedToCompletePreviousWeek={isForcedToCompletePreviousWeek}
 			/>
 
 			{/* Error banner */}
@@ -552,7 +661,27 @@ export default function ReflectionWizard() {
 				</View>
 			) : null}
 
-			{mode === 'hub' ? (
+			{/* Forced completion warning banner */}
+			{isForcedToCompletePreviousWeek && editingReflection ? (
+				<View
+					style={[
+						styles.forcedCompletionBanner,
+						{ marginHorizontal: 16, marginBottom: 8 },
+					]}
+				>
+					<Ionicons name="alert-circle" size={18} color="#B45309" />
+					<Text style={[styles.forcedCompletionText, dynamicTextStyle]}>
+						Please complete your reflection for{' '}
+						{weekRangeLabel(
+							editingReflection.weekStartDate,
+							editingReflection.weekEndDate
+						)}{' '}
+						before continuing.
+					</Text>
+				</View>
+			) : null}
+
+			{mode === 'hub' && !isForcedToCompletePreviousWeek ? (
 				// ---------------- Hub mode ----------------
 				<ScrollView
 					style={styles.body}
@@ -857,11 +986,13 @@ function Header({
 	setMode,
 	step,
 	onBack,
+	isForcedToCompletePreviousWeek,
 }: {
 	mode: 'hub' | 'wizard';
 	setMode: (m: 'hub' | 'wizard') => void;
 	step?: number;
 	onBack?: () => void;
+	isForcedToCompletePreviousWeek?: boolean;
 }) {
 	if (mode === 'hub') {
 		return (
@@ -875,20 +1006,32 @@ function Header({
 
 	const backLabel =
 		typeof step === 'number' && step === 0
-			? 'Back to hub'
+			? isForcedToCompletePreviousWeek
+				? 'Required'
+				: 'Back to hub'
 			: typeof step === 'number' && step > 0
 			? `Back to step ${step}`
 			: 'Back';
+
+	const isForcedToComplete = isForcedToCompletePreviousWeek || false;
 
 	return (
 		<View style={styles.header}>
 			<TouchableOpacity
 				onPress={onBack}
-				style={styles.backButton}
+				style={[
+					styles.backButton,
+					isForcedToComplete && styles.backButtonDisabled,
+				]}
 				accessibilityLabel={backLabel}
 				accessibilityRole="button"
+				disabled={isForcedToComplete}
 			>
-				<Ionicons name="chevron-back" size={22} color="#111827" />
+				<Ionicons
+					name="chevron-back"
+					size={22}
+					color={isForcedToComplete ? '#9CA3AF' : '#111827'}
+				/>
 			</TouchableOpacity>
 			<View style={styles.headerTitleContainer}>
 				<Text style={styles.headerTitleMain}>Weekly review</Text>
@@ -987,6 +1130,9 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 		marginLeft: -12,
+	},
+	backButtonDisabled: {
+		opacity: 0.5,
 	},
 	headerRight: {
 		width: 44,
@@ -1208,6 +1354,24 @@ const styles = StyleSheet.create({
 		backgroundColor: '#FCA5A5',
 	},
 	retryPillText: { color: '#7F1D1D', fontWeight: '700', fontSize: 12 },
+
+	forcedCompletionBanner: {
+		flexDirection: 'row',
+		alignItems: 'flex-start',
+		gap: 8,
+		backgroundColor: '#FFFBEB',
+		borderColor: '#FCD34D',
+		borderWidth: 1,
+		borderRadius: 10,
+		paddingVertical: 10,
+		paddingHorizontal: 12,
+	},
+	forcedCompletionText: {
+		color: '#92400E',
+		fontSize: 13,
+		flex: 1,
+		lineHeight: 18,
+	},
 
 	successBannerContainer: {
 		overflow: 'hidden',

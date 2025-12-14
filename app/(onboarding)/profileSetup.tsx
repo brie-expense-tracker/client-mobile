@@ -1,4 +1,10 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, {
+	useState,
+	useRef,
+	useCallback,
+	useMemo,
+	useEffect,
+} from 'react';
 import { logger } from '../../src/utils/logger';
 import {
 	View,
@@ -130,6 +136,31 @@ const OnboardingScreen = () => {
 	const lastNameRef = useRef<TextInput>(null);
 	const incomeRef = useRef<TextInput>(null);
 	const [currentIndex, setCurrentIndex] = useState(0);
+
+	// Refs for ScrollViews to manage scroll position per step
+	const scrollViewRefs = useRef<{
+		0: ScrollView | null;
+		1: ScrollView | null;
+		2: ScrollView | null;
+	}>({
+		0: null,
+		1: null,
+		2: null,
+	});
+
+	// Reset scroll position to top when step changes
+	useEffect(() => {
+		const scrollView =
+			scrollViewRefs.current[
+				currentIndex as keyof typeof scrollViewRefs.current
+			];
+		if (scrollView) {
+			// Use setTimeout to ensure the ScrollView is rendered before scrolling
+			setTimeout(() => {
+				scrollView.scrollTo({ y: 0, animated: false });
+			}, 0);
+		}
+	}, [currentIndex]);
 
 	const { updateProfile } = useProfile();
 
@@ -651,6 +682,9 @@ const OnboardingScreen = () => {
 				return (
 					<View style={styles.slide}>
 						<ScrollView
+							ref={(ref) => {
+								scrollViewRefs.current[0] = ref;
+							}}
 							contentContainerStyle={styles.scrollContent}
 							showsVerticalScrollIndicator={false}
 							keyboardShouldPersistTaps="handled"
@@ -689,6 +723,9 @@ const OnboardingScreen = () => {
 				return (
 					<View style={styles.slide}>
 						<ScrollView
+							ref={(ref) => {
+								scrollViewRefs.current[1] = ref;
+							}}
 							contentContainerStyle={styles.scrollContent}
 							showsVerticalScrollIndicator={false}
 							keyboardShouldPersistTaps="handled"
@@ -960,6 +997,9 @@ const OnboardingScreen = () => {
 				return (
 					<View style={styles.slide}>
 						<ScrollView
+							ref={(ref) => {
+								scrollViewRefs.current[2] = ref;
+							}}
 							contentContainerStyle={styles.scrollContent}
 							showsVerticalScrollIndicator={false}
 							keyboardShouldPersistTaps="handled"
@@ -1099,7 +1139,7 @@ const OnboardingScreen = () => {
 								</Text>
 								<View style={[styles.inputWithIcon, inputShadow]}>
 									<View style={styles.inputIcon}>
-										<Ionicons name="home-outline" size={18} color="#6b7280" />
+										<Ionicons name="logo-usd" size={18} color="#6b7280" />
 									</View>
 									<TextInput
 										value={housingExpense}
@@ -1325,6 +1365,7 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		paddingHorizontal: 24,
 		position: 'relative',
+		paddingVertical: 4,
 	},
 	logoContainer: {
 		position: 'absolute',

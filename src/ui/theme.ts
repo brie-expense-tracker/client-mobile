@@ -24,6 +24,8 @@ export const palette = {
 	dangerSoft: '#FFF1F2',
 	dangerBorder: '#FECACA',
 	success: '#10B981',
+	successSoft: '#DCFCE7',
+	successStrong: '#166534',
 	successSubtle: '#F0FDF4',
 	info: '#00A2FF',
 	infoSubtle: '#F0F8FF',
@@ -42,9 +44,12 @@ export const palette = {
 	accentSoft: '#EFF6FF', // same as primarySoft
 	textStrong: '#111827', // same as text
 	onAccent: '#FFFFFF', // same as primaryTextOn
+	onPrimary: '#FFFFFF', // same as primaryTextOn
 	surfaceSubtle: '#F3F4F6', // same as subtle
 	borderSubtle: '#E5E7EB', // same as border
+	borderAccent: '#D4D4D8', // for dashed borders
 	positive: '#10B981', // same as success
+	warningStrong: '#92400E', // for warning text
 };
 
 export const radius = {
@@ -73,6 +78,20 @@ export const shadow = {
 		shadowOffset: { width: 0, height: 4 },
 		elevation: 2,
 	},
+	soft: {
+		shadowColor: '#000',
+		shadowOpacity: 0.04,
+		shadowRadius: 8,
+		shadowOffset: { width: 0, height: 2 },
+		elevation: 1,
+	},
+	toolbar: {
+		shadowColor: '#000',
+		shadowOpacity: 0.05,
+		shadowRadius: 8,
+		shadowOffset: { width: 0, height: -2 },
+		elevation: 3,
+	},
 };
 
 export const type = {
@@ -82,6 +101,10 @@ export const type = {
 	bodySm: { fontSize: 14, fontWeight: '400' as const },
 	bodyXs: { fontSize: 12, fontWeight: '400' as const },
 	small: { fontSize: 12, fontWeight: '500' as const },
+	labelXs: {
+		fontSize: 11,
+		fontWeight: '500' as const,
+	},
 	labelSm: {
 		fontSize: 14,
 		fontWeight: '600' as const,
