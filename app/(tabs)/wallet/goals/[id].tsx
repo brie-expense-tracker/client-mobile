@@ -9,9 +9,16 @@ import {
 	TouchableOpacity,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
 import { useGoal, Goal } from '../../../../src/context/goalContext';
-import { Page, Section, Card, LoadingState, EmptyState } from '../../../../src/ui';
+import {
+	Page,
+	Section,
+	Card,
+	LoadingState,
+	EmptyState,
+} from '../../../../src/ui';
 import LinearProgressBar from '../components/shared/LinearProgressBar';
 import {
 	palette,
@@ -20,6 +27,7 @@ import {
 	type as typography,
 } from '../../../../src/ui/theme';
 import { dynamicTextStyle } from '../../../../src/utils/accessibility';
+import { normalizeIconName } from '../../../../src/constants/uiConstants';
 
 // --- Helpers (can be shared with GoalsFeed later) ---
 
@@ -38,35 +46,6 @@ const getGoalStatus = (goal: Goal): GoalStatus => {
 	if (dl != null && dl < 0) return 'cancelled';
 	return 'ongoing';
 };
-
-function StatusPill({ status }: { status: GoalStatus }) {
-	const label =
-		status === 'completed'
-			? 'Completed'
-			: status === 'cancelled'
-			? 'Overdue'
-			: 'Active';
-
-	const colors =
-		status === 'completed'
-			? { bg: '#ECFDF5', text: '#059669', border: '#D1FAE5' }
-			: status === 'cancelled'
-			? { bg: '#FFF1F2', text: '#e11d48', border: '#FFE4E6' }
-			: { bg: '#EFF6FF', text: '#0284c7', border: '#DBEAFE' };
-
-	return (
-		<View
-			style={[
-				styles.statusPill,
-				{ backgroundColor: colors.bg, borderColor: colors.border },
-			]}
-		>
-			<Text style={[styles.statusPillText, { color: colors.text }]}>
-				{label}
-			</Text>
-		</View>
-	);
-}
 
 // --- Screen ---
 
@@ -187,6 +166,42 @@ export default function GoalSummaryScreen() {
 					{/* Overview / hero card */}
 					<Section title="Overview" subtitle="Snapshot of your goal.">
 						<Card>
+							{/* Title row with icon */}
+							<View style={styles.heroHeader}>
+								<View
+									style={[
+										styles.iconWrapper,
+										{ backgroundColor: `${goal.color ?? palette.primary}12` },
+									]}
+								>
+									<Ionicons
+										name={normalizeIconName(
+											(goal.icon as any) ?? 'flag-outline'
+										)}
+										size={24}
+										color={goal.color ?? palette.primary}
+									/>
+								</View>
+								<View style={{ flex: 1 }}>
+									<Text style={[styles.heroTitle, dynamicTextStyle('title2')]}>
+										{goal.name}
+									</Text>
+									<Text style={styles.heroSubtitle}>
+										{status === 'completed'
+											? 'Completed'
+											: status === 'cancelled'
+											? 'Overdue'
+											: 'Active'}
+										{typeof dl === 'number' &&
+											` • ${
+												dl >= 0
+													? `${dl} days left`
+													: `${Math.abs(dl)} days overdue`
+											}`}
+									</Text>
+								</View>
+							</View>
+
 							<View style={styles.heroTopRow}>
 								<View>
 									<Text
@@ -226,17 +241,6 @@ export default function GoalSummaryScreen() {
 								<Text style={styles.remainingText}>
 									${remaining.toFixed(0)} remaining
 								</Text>
-							</View>
-
-							<View style={styles.statusRow}>
-								<StatusPill status={status} />
-								{typeof dl === 'number' && (
-									<Text style={styles.metaText}>
-										{dl >= 0
-											? `${dl} days left`
-											: `${Math.abs(dl)} days overdue`}
-									</Text>
-								)}
 							</View>
 						</Card>
 					</Section>
@@ -302,6 +306,28 @@ const styles = StyleSheet.create({
 		gap: space.lg,
 		paddingBottom: space.xl,
 	},
+	heroHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginBottom: 16,
+		columnGap: 12,
+	},
+	iconWrapper: {
+		width: 48,
+		height: 48,
+		borderRadius: 24,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	heroTitle: {
+		...typography.titleSm,
+		color: palette.text,
+	},
+	heroSubtitle: {
+		...typography.bodyXs,
+		color: palette.textMuted,
+		marginTop: 2,
+	},
 	heroTopRow: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
@@ -326,26 +352,6 @@ const styles = StyleSheet.create({
 		...typography.bodyXs,
 		color: palette.textMuted,
 		marginTop: 6,
-	},
-	statusRow: {
-		marginTop: 8,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-	statusPill: {
-		paddingHorizontal: 10,
-		paddingVertical: 4,
-		borderRadius: radius.full,
-		borderWidth: 1,
-	},
-	statusPillText: {
-		fontSize: 12,
-		fontWeight: '600',
-	},
-	metaText: {
-		...typography.bodyXs,
-		color: palette.textMuted,
 	},
 	detailRow: {
 		flexDirection: 'row',

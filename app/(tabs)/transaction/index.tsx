@@ -133,6 +133,7 @@ export default function TransactionScreenProModern() {
 	const [debtsLoading, setDebtsLoading] = useState(false);
 	const [selectedDebt, setSelectedDebt] = useState<DebtRollup | null>(null);
 	const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
+	const [isAmountLocked, setIsAmountLocked] = useState(false);
 
 	const { addTransaction } = useContext(TransactionContext);
 	const { goals, isLoading: goalsLoading } = useGoal();
@@ -378,6 +379,7 @@ export default function TransactionScreenProModern() {
 	);
 	const onChangeAmount = useCallback(
 		(text: string) => {
+			if (isAmountLocked) return; // Don't allow changes when locked
 			const sanitized = sanitizeCurrency(text);
 			// Check if the number exceeds the limit
 			const num = Number(sanitized);
@@ -387,7 +389,7 @@ export default function TransactionScreenProModern() {
 			}
 			setValue('amount', sanitized, { shouldValidate: true });
 		},
-		[setValue]
+		[setValue, isAmountLocked]
 	);
 
 	const onBlurAmount = useCallback(() => {
@@ -399,33 +401,67 @@ export default function TransactionScreenProModern() {
 
 	const selectGoal = useCallback(
 		(g: Goal) => {
-			setSelectedGoals([g]);
-			setValue('goals', [g], { shouldValidate: false });
+			// Toggle: if already selected, deselect it
+			if (selectedGoals[0]?.id === g.id) {
+				setSelectedGoals([]);
+				setValue('goals', [], { shouldValidate: false });
+			} else {
+				setSelectedGoals([g]);
+				setValue('goals', [g], { shouldValidate: false });
+			}
 			setPickerOpen(null);
 		},
-		[setValue]
+		[setValue, selectedGoals]
 	);
 
 	const selectBudget = useCallback(
 		(b: Budget) => {
-			setSelectedBudgets([b]);
-			setValue('budgets', [b], { shouldValidate: false });
-			setSelectedDebt(null); // Clear debt when budget is selected
-			setSelectedBill(null); // Clear bill when budget is selected
+			// Toggle: if already selected, deselect it
+			if (selectedBudgets[0]?.id === b.id) {
+				setSelectedBudgets([]);
+				setValue('budgets', [], { shouldValidate: false });
+			} else {
+				setSelectedBudgets([b]);
+				setValue('budgets', [b], { shouldValidate: false });
+				setSelectedDebt(null); // Clear debt when budget is selected
+				setSelectedBill(null); // Clear bill when budget is selected
+				setIsAmountLocked(false); // Unlock amount when bill is cleared
+			}
 			setPickerOpen(null);
 		},
-		[setValue]
+		[setValue, selectedBudgets]
 	);
 
 	const selectBill = useCallback(
 		(bill: Bill) => {
-			setSelectedBill(bill);
-			setSelectedBudgets([]); // Clear budget when bill is selected
-			setSelectedDebt(null); // Clear debt when bill is selected
-			setValue('budgets', [], { shouldValidate: false });
+			const billId = bill.patternId || (bill as any).id;
+			const currentBillId =
+				selectedBill?.patternId || (selectedBill as any)?.id;
+
+			// Toggle: if already selected, deselect it
+			if (currentBillId && currentBillId === billId) {
+				setSelectedBill(null);
+				setIsAmountLocked(false);
+				// Clear amount if it was locked from this bill
+				if (isAmountLocked && selectedBill?.amount) {
+					setValue('amount', '', { shouldValidate: true });
+				}
+			} else {
+				setSelectedBill(bill);
+				setSelectedBudgets([]); // Clear budget when bill is selected
+				setSelectedDebt(null); // Clear debt when bill is selected
+				setValue('budgets', [], { shouldValidate: false });
+
+				// Fill in amount and lock it
+				if (bill.amount) {
+					setValue('amount', bill.amount.toFixed(2), { shouldValidate: true });
+					setIsAmountLocked(true);
+				}
+			}
+
 			setPickerOpen(null);
 		},
-		[setValue]
+		[setValue, selectedBill, isAmountLocked]
 	);
 
 	const onSubmit = async (data: TransactionFormData) => {
@@ -524,6 +560,7 @@ export default function TransactionScreenProModern() {
 							setSelectedBudgets([]);
 							setSelectedDebt(null);
 							setSelectedBill(null);
+							setIsAmountLocked(false);
 							if (router.canGoBack()) router.back();
 							else router.replace('/(tabs)/dashboard');
 						},
@@ -615,43 +652,76 @@ export default function TransactionScreenProModern() {
 					</Text>
 
 					<View style={styles.amountCard} accessibilityRole="summary">
-						<Pressable
-							style={styles.amountRow}
-							onPress={() => amountRef.current?.focus()}
-						>
-							<Text style={styles.dollar}>$</Text>
-							<Controller
-								control={control}
-								name="amount"
-								rules={{
-									required: '*Amount is required',
-									validate: (v) =>
-										Number(v) > 0 || 'Enter an amount greater than 0',
-								}}
-								render={({ field: { value, onBlur } }) => (
-									<TextInput
-										ref={amountRef}
-										style={styles.amountInput}
-										placeholder="0.00"
-										placeholderTextColor={palette.textSubtle}
-										keyboardType="decimal-pad"
-										value={value}
-										onChangeText={onChangeAmount}
-										onBlur={() => {
-											onBlur();
-											onBlurAmount();
-										}}
-										returnKeyType="next"
-										accessibilityLabel="Amount"
-										maxLength={9}
-										inputAccessoryViewID={
-											Platform.OS === 'ios' ? accessoryId : undefined
-										}
+						<View style={styles.amountRow}>
+							<Pressable
+								style={styles.amountInputContainer}
+								onPress={() => !isAmountLocked && amountRef.current?.focus()}
+								disabled={isAmountLocked}
+							>
+								<Text style={styles.dollar}>$</Text>
+								<Controller
+									control={control}
+									name="amount"
+									rules={{
+										required: '*Amount is required',
+										validate: (v) =>
+											Number(v) > 0 || 'Enter an amount greater than 0',
+									}}
+									render={({ field: { value, onBlur } }) => (
+										<TextInput
+											ref={amountRef}
+											style={[
+												styles.amountInput,
+												isAmountLocked && styles.amountInputLocked,
+											]}
+											placeholder="0.00"
+											placeholderTextColor={palette.textSubtle}
+											keyboardType="decimal-pad"
+											value={value}
+											onChangeText={onChangeAmount}
+											onBlur={() => {
+												onBlur();
+												onBlurAmount();
+											}}
+											returnKeyType="next"
+											accessibilityLabel="Amount"
+											maxLength={9}
+											editable={!isAmountLocked}
+											inputAccessoryViewID={
+												Platform.OS === 'ios' ? accessoryId : undefined
+											}
+										/>
+									)}
+								/>
+							</Pressable>
+							{isAmountLocked && selectedBill && (
+								<TouchableOpacity
+									style={styles.unlockButton}
+									onPress={() => setIsAmountLocked(false)}
+									accessibilityLabel="Unlock amount for manual override"
+								>
+									<Ionicons
+										name="lock-closed"
+										size={18}
+										color={palette.primary}
 									/>
-								)}
-							/>
-						</Pressable>
+								</TouchableOpacity>
+							)}
+						</View>
 						<View style={styles.amountUnderline} />
+						{isAmountLocked && selectedBill && (
+							<View style={styles.lockHintContainer}>
+								<Text style={styles.lockHintText}>
+									Amount locked from bill. Tap{' '}
+									<Ionicons
+										name="lock-closed"
+										size={12}
+										color={palette.primary}
+									/>{' '}
+									to override
+								</Text>
+							</View>
+						)}
 
 						{errors.amount && (
 							<View style={styles.errorContainer}>
@@ -1099,10 +1169,17 @@ export default function TransactionScreenProModern() {
 									if (pickerOpen === 'goal') {
 										selectGoal(item as Goal);
 									} else if (pickerOpen === 'debt') {
-										setSelectedDebt(item as DebtRollup);
-										setSelectedBudgets([]); // Clear budget when debt is selected
-										setSelectedBill(null); // Clear bill when debt is selected
-										setValue('budgets', [], { shouldValidate: false });
+										const debtItem = item as DebtRollup;
+										// Toggle: if already selected, deselect it
+										if (selectedDebt?.debtId === debtItem.debtId) {
+											setSelectedDebt(null);
+										} else {
+											setSelectedDebt(debtItem);
+											setSelectedBudgets([]); // Clear budget when debt is selected
+											setSelectedBill(null); // Clear bill when debt is selected
+											setIsAmountLocked(false); // Unlock amount when bill is cleared
+											setValue('budgets', [], { shouldValidate: false });
+										}
 										setPickerOpen(null);
 									} else if (pickerOpen === 'bill') {
 										selectBill(item as Bill);
@@ -1258,6 +1335,13 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'flex-end',
 		justifyContent: 'center',
+		gap: space.sm,
+	},
+	amountInputContainer: {
+		flexDirection: 'row',
+		alignItems: 'flex-end',
+		flex: 1,
+		justifyContent: 'center',
 	},
 	dollar: {
 		fontSize: 28,
@@ -1273,6 +1357,24 @@ const styles = StyleSheet.create({
 		color: palette.text,
 		textAlign: 'left',
 		minWidth: 120,
+	},
+	amountInputLocked: {
+		opacity: 0.7,
+	},
+	unlockButton: {
+		padding: space.xs,
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginBottom: 4,
+	},
+	lockHintContainer: {
+		marginTop: space.xs,
+		alignItems: 'center',
+	},
+	lockHintText: {
+		...type.small,
+		color: palette.textMuted,
+		fontSize: 11,
 	},
 	amountUnderline: {
 		marginTop: space.xs,

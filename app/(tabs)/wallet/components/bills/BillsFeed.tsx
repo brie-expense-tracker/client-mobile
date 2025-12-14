@@ -62,7 +62,7 @@ const calculateNextDueDate = (
 	return date.toISOString();
 };
 
-function buildMeta(bill: Bill) {
+function buildMeta(bill: Bill | BillWithPaymentStatus) {
 	const frequencyLabel =
 		bill.frequency === 'weekly'
 			? 'Weekly'
@@ -75,6 +75,9 @@ function buildMeta(bill: Bill) {
 	let nextDueLabel = 'No date';
 	let daysLabel = '';
 	let isOverdue = false;
+
+	// If bill is paid, it should not be marked as overdue
+	const isPaid = 'isPaid' in bill && bill.isPaid === true;
 
 	if (bill.nextExpectedDate) {
 		const next = new Date(bill.nextExpectedDate);
@@ -89,7 +92,8 @@ function buildMeta(bill: Bill) {
 		const diffMs = next.setHours(0, 0, 0, 0) - now.setHours(0, 0, 0, 0);
 		const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
 
-		if (diffDays < 0) {
+		// Only mark as overdue if the bill is not paid
+		if (diffDays < 0 && !isPaid) {
 			isOverdue = true;
 			const abs = Math.abs(diffDays);
 			daysLabel = abs === 0 ? '' : ` · ${abs}d late`;
@@ -102,8 +106,8 @@ function buildMeta(bill: Bill) {
 		}
 	}
 
-	// Double-check overdue
-	if (bill.nextExpectedDate) {
+	// Double-check overdue (only if not paid)
+	if (bill.nextExpectedDate && !isPaid) {
 		const next = new Date(bill.nextExpectedDate);
 		const now = new Date();
 		const diffMs = next.setHours(0, 0, 0, 0) - now.setHours(0, 0, 0, 0);

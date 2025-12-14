@@ -143,7 +143,7 @@ export default function NewDebtScreen() {
 							<Label text="Interest rate (APR %)" optional />
 							<TextInput
 								style={styles.input}
-								placeholder="24.99"
+								placeholder="0.00"
 								placeholderTextColor={palette.textSubtle}
 								value={apr}
 								onChangeText={(text) => {
@@ -155,7 +155,7 @@ export default function NewDebtScreen() {
 						</View>
 
 						<View style={[styles.fieldGroup, styles.inlineItem]}>
-							<Label text="Minimum payment" optional />
+							<Label text="Minimum payment ($)" optional />
 							<TextInput
 								style={styles.input}
 								placeholder="0.00"
