@@ -255,10 +255,10 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 	const TRANSLATE_THRESHOLD = -70;
 	const DELETE_WIDTH = 60;
 
-	// Get budget, goal, and recurring expense contexts
+	// Get budget, goal, and bill contexts
 	const { budgets } = useBudget();
 	const { goals } = useGoal();
-	const { expenses: recurringExpenses } = useBills();
+	const { expenses: bills } = useBills();
 
 	// Memoize the transaction context calculation to prevent unnecessary recalculations
 	const transactionContext = useMemo(() => {
@@ -347,16 +347,34 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 		goals,
 	]);
 
-	// Get recurring expense information if linked
-	const recurringExpenseInfo = useMemo(() => {
+	// Get bill information if linked
+	const billInfo = useMemo(() => {
 		if (item.recurringPattern?.patternId) {
-			const recurringExpense = recurringExpenses.find(
-				(exp) => exp.patternId === item.recurringPattern?.patternId
+			const bill = bills.find(
+				(b) => b.patternId === item.recurringPattern?.patternId
 			);
-			return recurringExpense;
+			return bill;
 		}
 		return null;
-	}, [item.recurringPattern?.patternId, recurringExpenses]);
+	}, [item.recurringPattern?.patternId, bills]);
+
+	// Clean description by removing " - Recurring Expense" or " - Bill" suffix
+	const cleanDescription = useMemo(() => {
+		if (!item.description) return '';
+		// Remove " - Recurring Expense", " - recurring expense", or " - Bill" (case insensitive)
+		return item.description
+			.replace(/\s*-\s*Recurring\s+Expense/gi, '')
+			.replace(/\s*-\s*Bill/gi, '')
+			.trim();
+	}, [item.description]);
+
+	// Get display description: use vendor name if bill, otherwise use cleaned description
+	const displayDescription = useMemo(() => {
+		if (billInfo?.vendor) {
+			return billInfo.vendor;
+		}
+		return cleanDescription || item.description;
+	}, [billInfo, cleanDescription, item.description]);
 
 	const triggerHaptic = useCallback(() => {
 		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -488,7 +506,7 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 					</View>
 					<View style={styles.textContainer}>
 						<View style={styles.descriptionContainer}>
-							<Text style={styles.description}>{item.description}</Text>
+							<Text style={styles.description}>{displayDescription}</Text>
 							{item.recurringPattern && (
 								<View style={styles.recurringBadge}>
 									<Ionicons name="repeat" size={12} color="#007ACC" />
@@ -498,7 +516,7 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 
 						{/* Enhanced linked data display */}
 						<View style={styles.linkedDataContainer}>
-							{/* Budget/Goal information */}
+							{/* Budget payment information */}
 							{transactionContext.type === 'budget' && (
 								<View style={styles.linkedItem}>
 									<View
@@ -514,12 +532,11 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 										/>
 									</View>
 									<Text style={styles.linkedText}>
-										<Text style={styles.linkedName}>
-											{transactionContext.name}
-										</Text>
+										<Text style={styles.linkedName}>Budget payment</Text>
 										<Text style={styles.linkedDetails}>
 											{' '}
-											• +{transactionContext.progress.toFixed(1)}% to budget
+											• {transactionContext.name} • +
+											{transactionContext.progress.toFixed(1)}%
 										</Text>
 									</Text>
 								</View>
@@ -540,19 +557,18 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 										/>
 									</View>
 									<Text style={styles.linkedText}>
-										<Text style={styles.linkedName}>
-											{transactionContext.name}
-										</Text>
+										<Text style={styles.linkedName}>Goal payment</Text>
 										<Text style={styles.linkedDetails}>
 											{' '}
-											• +{transactionContext.progress.toFixed(1)}% to goal
+											• {transactionContext.name} • +
+											{transactionContext.progress.toFixed(1)}%
 										</Text>
 									</Text>
 								</View>
 							)}
 
-							{/* Recurring expense information */}
-							{recurringExpenseInfo && (
+							{/* Bill payment information */}
+							{billInfo && (
 								<View style={styles.linkedItem}>
 									<View
 										style={[styles.linkedIcon, { backgroundColor: '#e0f2fe' }]}
@@ -560,19 +576,23 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 										<Ionicons name="repeat" size={12} color="#0ea5e9" />
 									</View>
 									<Text style={styles.linkedText}>
-										<Text style={styles.linkedName}>
-											{recurringExpenseInfo.vendor || 'Recurring'}
-										</Text>
+										<Text style={styles.linkedName}>Bill payment</Text>
 										<Text style={styles.linkedDetails}>
 											{' '}
-											• {recurringExpenseInfo.frequency || 'monthly'}
+											•{' '}
+											{billInfo.frequency
+												? `${billInfo.frequency
+														.charAt(0)
+														.toUpperCase()}${billInfo.frequency.slice(1)}`
+												: 'Monthly'}
+											{billInfo.amount && <> • ${billInfo.amount.toFixed(2)}</>}
 										</Text>
 									</Text>
 								</View>
 							)}
 
 							{/* Fallback for general transactions */}
-							{transactionContext.type === 'general' && (
+							{transactionContext.type === 'general' && !billInfo && (
 								<Text style={styles.category}>{transactionContext.name}</Text>
 							)}
 						</View>

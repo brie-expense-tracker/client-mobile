@@ -264,16 +264,18 @@ export class WeeklyReflectionService {
 			monday.getMonth(),
 			monday.getDate()
 		);
+		// Week ends on Sunday (6 days after Monday), inclusive end
 		const weekEnd = new Date(
 			monday.getFullYear(),
 			monday.getMonth(),
-			monday.getDate() + 7
+			monday.getDate() + 6
 		);
+		weekEnd.setHours(23, 59, 59, 999);
 
-		// Filter transactions for the current week
+		// Filter transactions for the current week (inclusive end)
 		const weekTransactions = transactions.filter((tx) => {
 			const txDate = new Date(tx.date);
-			return txDate >= weekStart && txDate < weekEnd;
+			return txDate >= weekStart && txDate <= weekEnd;
 		});
 
 		const totalIncome = weekTransactions

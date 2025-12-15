@@ -151,11 +151,36 @@ const BillsList: React.FC<BillsListProps> = ({
 			]);
 		} catch (error: any) {
 			billsListLog.error('Error paying bill', error);
-			Alert.alert(
-				'Error',
-				error?.message || 'Failed to pay bill. Please try again.',
-				[{ text: 'OK' }]
-			);
+			
+			// Extract error message from multiple possible locations
+			const errorMessage =
+				error?.message ||
+				error?.error ||
+				error?.toString?.() ||
+				(typeof error === 'string' ? error : '') ||
+				'';
+			
+			// Handle the case where the bill is already paid gracefully
+			const isAlreadyPaid =
+				errorMessage.includes('already been paid') ||
+				errorMessage.includes('already paid') ||
+				errorMessage.toLowerCase().includes('already paid');
+			
+			if (isAlreadyPaid) {
+				// Refresh data to ensure UI is up to date
+				await Promise.all([refetch(), refetchTransactions()]);
+				Alert.alert(
+					'Already Paid',
+					`${expense.vendor} has already been paid for this period.`,
+					[{ text: 'OK' }]
+				);
+			} else {
+				Alert.alert(
+					'Error',
+					errorMessage || 'Failed to pay bill. Please try again.',
+					[{ text: 'OK' }]
+				);
+			}
 		} finally {
 			setMarkingAsPaid(null);
 		}

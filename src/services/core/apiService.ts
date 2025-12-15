@@ -547,15 +547,30 @@ export class ApiService {
 						throw error;
 					}
 
-					apiLog.error('HTTP error response', {
-						status: response.status,
-						statusText: response.statusText,
-						error: data.error,
-						message: data.message,
-					});
+					const errorMessage = data.error || data.message || '';
+					const isAlreadyPaid =
+						errorMessage.includes('already been paid') ||
+						errorMessage.includes('already paid') ||
+						errorMessage.toLowerCase().includes('already paid');
+
+					// Log at appropriate level - DEBUG for expected "already paid" case, ERROR for actual errors
+					if (isAlreadyPaid) {
+						apiLog.debug('HTTP error response (already paid)', {
+							status: response.status,
+							statusText: response.statusText,
+							error: errorMessage,
+						});
+					} else {
+						apiLog.error('HTTP error response', {
+							status: response.status,
+							statusText: response.statusText,
+							error: data.error,
+							message: data.message,
+						});
+					}
 					return {
 						success: false,
-						error: data.error || `HTTP error! status: ${response.status}`,
+						error: errorMessage || `HTTP error! status: ${response.status}`,
 					};
 				}
 

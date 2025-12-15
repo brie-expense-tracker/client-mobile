@@ -139,8 +139,53 @@ export const BillProvider: React.FC<{ children: ReactNode }> = ({
 				unique.push(e);
 			}
 
-			// Use functional update to avoid dropping concurrent optimistic updates
-			setExpenses(() => unique);
+			// Check payment status for bills to ensure paid bills don't show as overdue
+			try {
+				const objectIdRe = /^[0-9a-fA-F]{24}$/;
+				const patternIds = unique
+					.map((e) => getBillId(e))
+					.filter((id) => id && objectIdRe.test(id));
+
+				if (patternIds.length > 0) {
+					const paymentStatuses = await BillService.checkBatchPaidStatus(
+						patternIds
+					);
+
+					// Enrich bills with payment status and update isOverdue
+					const enriched = unique.map((bill) => {
+						const billId = getBillId(bill);
+						const isPaid = paymentStatuses[billId] === true;
+
+						// Calculate isOverdue: only overdue if not paid and past due date
+						let isOverdue = false;
+						if (bill.nextExpectedDate && !isPaid) {
+							const next = new Date(bill.nextExpectedDate);
+							const now = new Date();
+							const diffMs =
+								next.setHours(0, 0, 0, 0) - now.setHours(0, 0, 0, 0);
+							const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+							isOverdue = diffDays < 0;
+						}
+
+						return {
+							...bill,
+							isPaid,
+							isOverdue,
+						} as Bill & { isPaid: boolean; isOverdue: boolean };
+					});
+
+					// Use functional update to avoid dropping concurrent optimistic updates
+					setExpenses(() => enriched);
+				} else {
+					// No valid ObjectIds, just set expenses as-is
+					setExpenses(() => unique);
+				}
+			} catch (paymentError) {
+				// If payment status check fails, still set expenses but log the error
+				billContextLog.warn('Failed to check payment status', paymentError);
+				setExpenses(() => unique);
+			}
+
 			setHasLoaded(true);
 		} catch (err: any) {
 			// Ignore abort errors (expected when a new fetch cancels the old one)

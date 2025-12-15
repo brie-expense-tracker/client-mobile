@@ -28,7 +28,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { RectButton } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 
 import { useWeeklyReflection } from '../../../src/hooks/useWeeklyReflection';
 import { WeeklyReflection } from '../../../src/services';
@@ -72,9 +72,13 @@ const weekRangeLabel = (
 	};
 
 	const start = parseDate(weekStartDate);
-	const end = weekEndDate
-		? parseDate(weekEndDate)
-		: new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7);
+	// Week always ends on Sunday (start + 6 days), so calculate end date from start
+	// This ensures consistent display regardless of how weekEndDate is stored
+	const end = new Date(
+		start.getFullYear(),
+		start.getMonth(),
+		start.getDate() + 6
+	);
 
 	const fmt = (x: Date) =>
 		x.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -343,19 +347,41 @@ export default function ReflectionWizard() {
 		[]
 	);
 
+	// Refresh reflection when screen comes into focus to ensure latest data
+	useFocusEffect(
+		useCallback(() => {
+			// Refresh current reflection to get latest financial metrics
+			refreshReflection();
+		}, [refreshReflection])
+	);
+
 	// Past reflections (exclude current week)
 	const pastReflections = useMemo(() => {
-		if (!currentReflection || !Array.isArray(recentReflections)) {
-			return recentReflections || [];
+		if (!Array.isArray(recentReflections)) {
+			return [];
 		}
-		const currentWeekStart = new Date(currentReflection.weekStartDate);
-		currentWeekStart.setHours(0, 0, 0, 0);
 
-		return recentReflections.filter((r) => {
-			const reflectionWeekStart = new Date(r.weekStartDate);
-			reflectionWeekStart.setHours(0, 0, 0, 0);
-			return reflectionWeekStart.getTime() !== currentWeekStart.getTime();
-		});
+		// If we have a current reflection, exclude it by ID and date
+		if (currentReflection) {
+			const currentWeekStart = new Date(currentReflection.weekStartDate);
+			currentWeekStart.setHours(0, 0, 0, 0);
+			const currentReflectionId = currentReflection._id;
+
+			return recentReflections.filter((r) => {
+				// Exclude by ID first (most reliable)
+				if (r._id === currentReflectionId) {
+					return false;
+				}
+
+				// Also exclude by date comparison (backup check)
+				const reflectionWeekStart = new Date(r.weekStartDate);
+				reflectionWeekStart.setHours(0, 0, 0, 0);
+				return reflectionWeekStart.getTime() !== currentWeekStart.getTime();
+			});
+		}
+
+		// If no current reflection, return all recent reflections
+		return recentReflections;
 	}, [currentReflection, recentReflections]);
 
 	const previousReflection = useMemo(
