@@ -594,10 +594,67 @@ export class BillService {
 				return response.data;
 			}
 
-			throw new Error(response.error || 'Failed to pay bill');
-		} catch (error) {
-			billServiceLog.error('[BillService] Error paying bill:', error);
-			throw error;
+			// Check if it's an "already paid" case before throwing
+			const errorMessage = response.error || 'Failed to pay bill';
+			const isAlreadyPaid =
+				errorMessage.includes('already been paid') ||
+				errorMessage.includes('already paid') ||
+				errorMessage.toLowerCase().includes('already paid');
+
+			// Log at appropriate level before throwing - DEBUG for expected "already paid" case
+			if (isAlreadyPaid) {
+				billServiceLog.debug('[BillService] Bill already paid:', {
+					message: errorMessage,
+				});
+			} else {
+				billServiceLog.error('[BillService] Error paying bill:', {
+					message: errorMessage,
+				});
+			}
+
+			// Throw error with message - mark it so we know we already logged
+			const err = new Error(errorMessage);
+			(err as any)._alreadyLogged = true;
+			(err as any)._isAlreadyPaid = isAlreadyPaid;
+			throw err;
+		} catch (error: any) {
+			// If we already logged above (when response.success was false), just re-throw
+			// Check for our marker to avoid double logging
+			if (error instanceof Error && (error as any)._alreadyLogged) {
+				// Error was already logged above, just re-throw
+				throw error;
+			}
+
+			// This is an unexpected error (network error, etc.) - extract and check message
+			const errorMessage =
+				error?.message ||
+				error?.error ||
+				error?.toString?.() ||
+				(typeof error === 'string' ? error : 'Failed to pay bill');
+
+			// Check if it's an "already paid" case even for unexpected errors
+			const isAlreadyPaid =
+				errorMessage.includes('already been paid') ||
+				errorMessage.includes('already paid') ||
+				errorMessage.toLowerCase().includes('already paid');
+
+			// Log at appropriate level
+			if (isAlreadyPaid) {
+				billServiceLog.debug(
+					'[BillService] Bill already paid (unexpected path):',
+					{
+						message: errorMessage,
+					}
+				);
+			} else {
+				billServiceLog.error('[BillService] Unexpected error paying bill:', {
+					message: errorMessage,
+					error: error?.error,
+					toString: error?.toString?.(),
+				});
+			}
+
+			throw new Error(errorMessage);
 		}
 	}
 

@@ -183,8 +183,50 @@ function BillRow({
 			onPaid?.();
 			Alert.alert('Paid', 'Bill marked as paid for this period.');
 		} catch (err: any) {
-			billsFeedLog.error('[BillRow] payBill error:', err);
-			Alert.alert('Error', err?.message ?? 'Failed to pay bill.');
+			// Extract error message from multiple possible locations
+			const errorMessage =
+				err?.message ||
+				err?.error ||
+				err?.toString?.() ||
+				(typeof err === 'string' ? err : '') ||
+				'';
+			
+			// Handle the case where the bill is already paid gracefully
+			const isAlreadyPaid =
+				errorMessage.includes('already been paid') ||
+				errorMessage.includes('already paid') ||
+				errorMessage.toLowerCase().includes('already paid');
+			
+			// Log at appropriate level - DEBUG for expected "already paid" case, ERROR for actual errors
+			if (isAlreadyPaid) {
+				billsFeedLog.debug('[BillRow] Bill already paid:', {
+					message: errorMessage,
+					errorType: err?.constructor?.name,
+				});
+			} else {
+				billsFeedLog.error('[BillRow] payBill error:', {
+					message: errorMessage,
+					errorType: err?.constructor?.name,
+					hasMessage: !!err?.message,
+					rawError: err,
+				});
+			}
+			
+			if (isAlreadyPaid) {
+				// Refresh data to ensure UI is up to date
+				onPaid?.();
+				Alert.alert(
+					'Already Paid',
+					'This bill has already been paid for this period.',
+					[{ text: 'OK' }]
+				);
+			} else {
+				// Log if we didn't detect "already paid" to help debug
+				if (isDevMode && errorMessage) {
+					billsFeedLog.debug('[BillRow] Error message did not match "already paid":', errorMessage);
+				}
+				Alert.alert('Error', errorMessage || 'Failed to pay bill.');
+			}
 		}
 	};
 

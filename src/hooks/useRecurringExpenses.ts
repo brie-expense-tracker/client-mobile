@@ -3,7 +3,7 @@ import { useDataFetching } from './useDataFetching';
 import { BillService, Bill } from '../services';
 import { createLogger } from '../utils/sublogger';
 
-const billsHookLog = createLogger('useBills');
+const recurringExpensesHookLog = createLogger('useRecurringExpenses');
 
 // Extended interface for bill with id (required by useDataFetching)
 export interface BillWithId extends Bill {
@@ -52,10 +52,7 @@ const updateRecurringExpense = async (
 	id: string,
 	data: Partial<BillWithId>
 ): Promise<BillWithId> => {
-	const expense = await BillService.updateRecurringExpense(
-		id,
-		data as any
-	);
+	const expense = await BillService.updateRecurringExpense(id, data as any);
 	return {
 		...expense,
 		id: expense.patternId,
@@ -73,14 +70,16 @@ const transformRecurringExpenseData = (
 	expenses: BillWithId[]
 ): TransformedBill[] => {
 	return expenses.map((expense) => {
-		const daysUntilDue = BillService.getDaysUntilNext(
-			expense.nextExpectedDate
-		);
+		const daysUntilDue = BillService.getDaysUntilNext(expense.nextExpectedDate);
 		const statusColor = BillService.getStatusColor(daysUntilDue);
 		const statusText = BillService.getStatusText(daysUntilDue);
-		const frequency = BillService.formatFrequency(
-			expense.frequency
-		);
+		const frequency = BillService.formatFrequency(expense.frequency);
+
+		// Check if bill is paid (from BillContext or other sources)
+		const isPaid = (expense as any).isPaid === true;
+
+		// Only mark as overdue if not paid and past due date
+		const isOverdue = !isPaid && daysUntilDue < 0;
 
 		return {
 			...expense,
@@ -88,9 +87,9 @@ const transformRecurringExpenseData = (
 			statusColor,
 			statusText,
 			formattedFrequency: frequency,
-			isOverdue: daysUntilDue < 0,
+			isOverdue,
 			isDueSoon: daysUntilDue <= 7 && daysUntilDue >= 0,
-			isPaid: false, // Will be updated by the widget
+			isPaid: isPaid || false, // Use existing isPaid if available, otherwise false
 			paymentDate: undefined, // Will be updated by the widget
 			nextDueDate: expense.nextExpectedDate, // Will be updated by the widget
 		};
@@ -210,10 +209,7 @@ export function useRecurringExpenses() {
 	const getPaymentHistory = useCallback(
 		async (patternId: string, limit: number = 10) => {
 			try {
-				return await BillService.getPaymentHistory(
-					patternId,
-					limit
-				);
+				return await BillService.getPaymentHistory(patternId, limit);
 			} catch (error) {
 				recurringExpensesHookLog.error('Error getting payment history', error);
 				throw error;
@@ -279,10 +275,7 @@ export function useRecurringExpenses() {
 
 	const getRecurringTransactionsForPattern = useCallback(
 		async (patternId: string, limit: number = 20) => {
-			return BillService.getRecurringTransactionsForPattern(
-				patternId,
-				limit
-			);
+			return BillService.getRecurringTransactionsForPattern(patternId, limit);
 		},
 		[]
 	);

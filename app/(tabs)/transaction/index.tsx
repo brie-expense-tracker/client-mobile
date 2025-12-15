@@ -731,36 +731,6 @@ export default function TransactionScreenProModern() {
 							</View>
 						)}
 
-						{selectedDebt && mode === 'expense' && (
-							<View style={styles.debtPillContainer}>
-								<View style={styles.debtPill}>
-									<Ionicons
-										name="card-outline"
-										size={14}
-										color={palette.primaryMuted}
-									/>
-									<Text style={styles.debtPillText}>
-										Paying debt: {selectedDebt.debtName}
-									</Text>
-								</View>
-							</View>
-						)}
-
-						{selectedBill && mode === 'expense' && (
-							<View style={styles.debtPillContainer}>
-								<View style={styles.debtPill}>
-									<Ionicons
-										name={resolveBillAppearance(selectedBill).icon}
-										size={14}
-										color={resolveBillAppearance(selectedBill).color}
-									/>
-									<Text style={styles.debtPillText}>
-										Paying bill: {selectedBill.vendor || 'Bill'}
-									</Text>
-								</View>
-							</View>
-						)}
-
 						{/* Segmented control inside hero */}
 						<View style={styles.segmented}>
 							{(['expense', 'income'] as const).map((m, index) => {
@@ -1387,25 +1357,6 @@ const styles = StyleSheet.create({
 		marginTop: space.xs,
 	},
 	errorText: { color: palette.danger, fontSize: 13, marginTop: space.xs },
-
-	debtPillContainer: {
-		marginTop: space.sm,
-		alignItems: 'flex-start',
-	},
-	debtPill: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: palette.primarySubtle,
-		paddingHorizontal: space.sm,
-		paddingVertical: space.xs,
-		borderRadius: radius.pill,
-		gap: 4,
-	},
-	debtPillText: {
-		color: palette.primaryMuted,
-		fontWeight: '600',
-		fontSize: 12,
-	},
 
 	// Segmented (now inside amountCard)
 	segmented: {
