@@ -10,6 +10,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useBudget } from '../../../../src/context/budgetContext';
 import { useGoal } from '../../../../src/context/goalContext';
+import { useBills } from '../../../../src/context/billContext';
 import {
 	accessibilityProps,
 	dynamicTextStyle,
@@ -216,6 +217,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 }) => {
 	const { budgets } = useBudget();
 	const { goals } = useGoal();
+	const { expenses: bills } = useBills();
 
 	// Helper function to get today's date in local timezone
 	const getTodayDate = (): Date => {
@@ -269,7 +271,17 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 
 	// Helper function to get target name and percentage
 	const getTargetName = (transaction: Transaction): string => {
-		// Special handling for recurring expense placeholders
+		// Check if transaction is linked to a bill via recurringPattern
+		if (transaction.recurringPattern?.patternId) {
+			const bill = bills.find(
+				(b) => b.patternId === transaction.recurringPattern?.patternId
+			);
+			if (bill?.vendor) {
+				return bill.vendor;
+			}
+		}
+
+		// Special handling for recurring expense placeholders (only if not linked to a bill)
 		if (transaction.description.includes('Recurring Expense')) {
 			return 'Recurring Expense';
 		}
@@ -303,7 +315,21 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 
 	// Helper function to get transaction context (icon and color from target)
 	const getTransactionContext = (transaction: Transaction) => {
-		// Special handling for recurring expense placeholders
+		// Check if transaction is linked to a bill via recurringPattern
+		if (transaction.recurringPattern?.patternId) {
+			const bill = bills.find(
+				(b) => b.patternId === transaction.recurringPattern?.patternId
+			);
+			if (bill) {
+				// Use bill icon/color if available, otherwise use calendar icon for bills
+				return {
+					icon: 'calendar-outline' as keyof typeof Ionicons.glyphMap,
+					color: '#2563EB', // Blue for bills
+				};
+			}
+		}
+
+		// Special handling for recurring expense placeholders (only if not linked to a bill)
 		if (transaction.description.includes('Recurring Expense')) {
 			return {
 				icon: 'refresh-outline' as keyof typeof Ionicons.glyphMap,
@@ -379,7 +405,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 		return (
 			<View style={styles.card}>
 				<Text
-					style={[styles.cardTitle, dynamicTextStyle]}
+					style={[styles.cardTitle, dynamicTextStyle('body')]}
 					accessibilityRole="header"
 					accessibilityLabel="Recent Transactions section"
 				>
@@ -396,7 +422,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 		<View style={styles.card}>
 			<View style={styles.cardHeaderRow}>
 				<Text
-					style={[styles.cardTitle, dynamicTextStyle]}
+					style={[styles.cardTitle, dynamicTextStyle('body')]}
 					accessibilityRole="header"
 					accessibilityLabel="Recent Transactions section"
 				>
@@ -433,6 +459,27 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 						const targetName = getTargetName(t);
 						const iconData = getTransactionContext(t);
 
+						// Get bill information if linked
+						const billInfo = t.recurringPattern?.patternId
+							? bills.find((b) => b.patternId === t.recurringPattern?.patternId)
+							: null;
+
+						// Clean description: use bill vendor if description contains "Recurring Expense", otherwise use transaction description
+						const cleanDescription = (() => {
+							// If description contains "Recurring Expense", use bill vendor name if available
+							if (t.description.includes('Recurring Expense')) {
+								if (billInfo?.vendor) {
+									return billInfo.vendor;
+								}
+								// Remove " - Recurring Expense" suffix
+								return t.description
+									.replace(/\s*-\s*Recurring Expense/gi, '')
+									.trim();
+							}
+							// Otherwise, use the transaction description as-is (user's custom description)
+							return t.description;
+						})();
+
 						return (
 							<TouchableOpacity
 								key={t.id}
@@ -440,7 +487,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 								style={styles.txRow}
 								{...accessibilityProps.button}
 								accessibilityLabel={generateAccessibilityLabel.transactionItem(
-									t.description,
+									cleanDescription,
 									`${signed >= 0 ? '+' : '-'}${currency(Math.abs(baseAmount))}`,
 									date
 								)}
@@ -460,18 +507,20 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 								</View>
 								<View style={{ flex: 1 }}>
 									<Text
-										style={[styles.txTitle, dynamicTextStyle]}
+										style={[styles.txTitle, dynamicTextStyle('body')]}
 										numberOfLines={1}
 									>
-										{t.description}
+										{cleanDescription}
 									</Text>
-									<Text style={[styles.txMeta, dynamicTextStyle]}>{date}</Text>
+									<Text style={[styles.txMeta, dynamicTextStyle('caption2')]}>
+										{date}
+									</Text>
 								</View>
 								<Text
 									style={[
 										styles.txAmount,
 										{ color: amountColor },
-										dynamicTextStyle,
+										dynamicTextStyle('body'),
 									]}
 								>
 									{signed >= 0 ? '+' : '-'}
@@ -482,7 +531,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 					})
 				) : (
 					<View style={{ paddingVertical: 16 }}>
-						<Text style={[styles.emptyText, dynamicTextStyle]}>
+						<Text style={[styles.emptyText, dynamicTextStyle('body')]}>
 							No transactions yet. Add your first expense to get started.
 						</Text>
 					</View>

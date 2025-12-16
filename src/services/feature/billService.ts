@@ -182,6 +182,27 @@ export class BillService {
 	 * Get days until next occurrence
 	 */
 	static getDaysUntilNext(nextExpectedDate: string): number {
+		// Parse date-only string (YYYY-MM-DD) as local date to avoid timezone issues
+		const datePart = nextExpectedDate.slice(0, 10);
+		if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+			const [year, month, day] = datePart.split('-').map(Number);
+			const next = new Date(year, month - 1, day); // month is 0-indexed
+			const now = new Date();
+			// Set now to start of day for accurate day comparison
+			const nowStartOfDay = new Date(
+				now.getFullYear(),
+				now.getMonth(),
+				now.getDate()
+			);
+			const nextStartOfDay = new Date(
+				next.getFullYear(),
+				next.getMonth(),
+				next.getDate()
+			);
+			const diffTime = nextStartOfDay.getTime() - nowStartOfDay.getTime();
+			return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+		}
+		// Fallback for ISO strings with time
 		const next = new Date(nextExpectedDate);
 		const now = new Date();
 		const diffTime = next.getTime() - now.getTime();
@@ -769,6 +790,17 @@ export class BillService {
 			);
 			return null;
 		}
+	}
+
+	/**
+	 * Clear payment status cache for a specific patternId
+	 * Useful when transactions linked to a bill are deleted
+	 */
+	static clearPaymentStatusCache(patternId: string): void {
+		this.paymentStatusCache.delete(patternId);
+		billServiceLog.debug(
+			`Cleared payment status cache for patternId: ${patternId}`
+		);
 	}
 
 	/**

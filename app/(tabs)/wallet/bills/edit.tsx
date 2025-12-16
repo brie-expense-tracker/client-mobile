@@ -243,11 +243,17 @@ const EditBillScreen: React.FC = () => {
 			return;
 		}
 
+		// Convert YYYY-MM-DD to ISO string with local time at noon to avoid timezone issues
+		// Parse as local date first, then convert to ISO
+		const [year, month, day] = nextDueDate.split('-').map(Number);
+		const localDate = new Date(year, month - 1, day, 12, 0, 0); // noon local time
+		const isoDate = localDate.toISOString();
+
 		const updateData = {
 			vendor: vendor.trim(),
 			amount: amt,
 			frequency,
-			nextExpectedDate: nextDueDate,
+			nextExpectedDate: isoDate,
 			autoPay,
 			appearanceMode,
 			icon: normalizeIconName(icon),

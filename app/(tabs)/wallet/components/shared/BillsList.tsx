@@ -262,20 +262,33 @@ const BillsList: React.FC<BillsListProps> = ({
 				key={expense.patternId}
 				onPress={() => handleExpenseSelect(expense)}
 			>
-				<BillCard
-					vendor={expense.vendor}
-					amount={expense.amount}
-					dueInDays={daysUntilDue}
-					nextDueDate={new Date(expense.nextExpectedDate).toLocaleDateString()}
-					frequency={frequency}
-					iconName={icon}
-					color={color}
-					isPaid={isPaid}
-					autoPay={autoPay}
-					isProcessing={isMarkingAsPaid}
-					onPressMarkPaid={() => handlePayBill(expense)}
-					onPressEdit={() => handleOptionsPress(expense)}
-				/>
+				{(() => {
+					// Parse date-only string (YYYY-MM-DD) as local date to avoid timezone issues
+					const datePart = expense.nextExpectedDate.slice(0, 10);
+					let date: Date;
+					if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+						const [year, month, day] = datePart.split('-').map(Number);
+						date = new Date(year, month - 1, day); // month is 0-indexed
+					} else {
+						date = new Date(expense.nextExpectedDate);
+					}
+					return (
+						<BillCard
+							vendor={expense.vendor}
+							amount={expense.amount}
+							dueInDays={daysUntilDue}
+							nextDueDate={date.toLocaleDateString()}
+							frequency={frequency}
+							iconName={icon}
+							color={color}
+							isPaid={isPaid}
+							autoPay={autoPay}
+							isProcessing={isMarkingAsPaid}
+							onPressMarkPaid={() => handlePayBill(expense)}
+							onPressEdit={() => handleOptionsPress(expense)}
+						/>
+					);
+				})()}
 			</TouchableOpacity>
 		);
 	};

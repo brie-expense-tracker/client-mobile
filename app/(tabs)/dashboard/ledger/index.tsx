@@ -42,6 +42,14 @@ interface Transaction {
 		confidence: number;
 		nextExpectedDate: string;
 	};
+	notes?: string;
+	source?: 'manual' | 'plaid' | 'import' | 'ai';
+	vendor?: string;
+	metadata?: {
+		location?: string;
+		paymentMethod?: string;
+		originalDescription?: string;
+	};
 }
 
 // =============================================
@@ -448,12 +456,6 @@ export default function TransactionScreen() {
 							<Ionicons name="chevron-back" size={24} color={palette.text} />
 						</BorderlessButton>
 						<View style={styles.headerRight}>
-							<TouchableOpacity
-								style={styles.addButton}
-								onPress={() => router.push('/(tabs)/transaction')}
-							>
-								<Ionicons name="add" size={24} color={palette.text} />
-							</TouchableOpacity>
 							{dateFilterMode === 'day' && (
 								<View style={{ flex: 1, marginRight: space.sm }}>
 									<CalendarTrigger
@@ -672,14 +674,6 @@ const styles = StyleSheet.create({
 	},
 	filterButtonDisabled: {
 		opacity: 0.5,
-	},
-	addButton: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingHorizontal: space.sm,
-		backgroundColor: palette.surfaceAlt,
-		borderRadius: radius.md,
-		marginRight: space.sm,
 	},
 	pickerContent: {
 		width: '100%',

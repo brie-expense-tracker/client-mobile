@@ -49,11 +49,17 @@ const AddBillScreen: React.FC = () => {
 
 		setLoading(true);
 		try {
+			// Convert YYYY-MM-DD to ISO string with local time at noon to avoid timezone issues
+			// Parse as local date first, then convert to ISO
+			const [year, month, day] = nextDueDate.split('-').map(Number);
+			const localDate = new Date(year, month - 1, day, 12, 0, 0); // noon local time
+			const isoDate = localDate.toISOString();
+			
 			await BillService.createRecurringExpense({
 				vendor: vendor.trim(),
 				amount: parseFloat(amount),
 				frequency,
-				nextExpectedDate: new Date(nextDueDate).toISOString(),
+				nextExpectedDate: isoDate,
 				autoPay,
 				// Categories are currently disabled in the UI
 				category: undefined,
