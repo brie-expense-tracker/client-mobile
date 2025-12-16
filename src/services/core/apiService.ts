@@ -299,7 +299,9 @@ export class ApiService {
 		}
 	}
 
-	private static async getAuthHeaders(): Promise<Record<string, string>> {
+	private static async getAuthHeaders(
+		retryCount = 0
+	): Promise<Record<string, string>> {
 		try {
 			// Import Firebase modular auth
 			const { getAuth, getIdToken } = await import(
@@ -315,7 +317,24 @@ export class ApiService {
 			}
 
 			const firebaseUID = currentUser.uid;
-			const idToken = await getIdToken(currentUser);
+			
+			// Try to get the token with retry logic for timing issues
+			let idToken: string;
+			try {
+				idToken = await getIdToken(currentUser);
+			} catch (tokenError: any) {
+				// If token fetch fails and we haven't retried yet, wait and retry once
+				// This handles cases where the token isn't ready immediately after auth
+				if (retryCount === 0 && currentUser) {
+					apiLog.debug('Token fetch failed, retrying after delay', {
+						error: tokenError?.message || tokenError,
+					});
+					await new Promise((resolve) => setTimeout(resolve, 500));
+					return this.getAuthHeaders(1);
+				}
+				// Re-throw if retry also failed or no retries left
+				throw tokenError;
+			}
 
 			const headers: Record<string, string> = {
 				'Content-Type': 'application/json',

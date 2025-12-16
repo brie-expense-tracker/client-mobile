@@ -261,8 +261,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 						} else {
 							authContextLog.debug('No profile found for user');
 						}
-					} catch (profileError) {
-						authContextLog.debug('Profile fetch failed', profileError);
+					} catch (profileError: any) {
+						// Profile fetch failure shouldn't break authentication
+						// User is still authenticated and can use the app
+						authContextLog.debug('Profile fetch failed', {
+							error: profileError?.message || profileError,
+							type: profileError?.type || profileError?.name,
+							code: profileError?.code,
+						});
+						// Continue without profile - it can be fetched later or created if needed
+						// Don't throw - user is still authenticated
 					}
 				}
 				authContextLog.debug('ensureUserExistsLocal completed successfully');
@@ -719,10 +727,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 						// User exists, fetch their profile
 						authContextLog.debug('Existing user found in MongoDB');
 						setUser(mongoUser);
-						const userProfile = await UserService.getProfileByUserId(
-							mongoUser._id
-						);
-						setProfile(userProfile);
+						try {
+							const userProfile = await UserService.getProfileByUserId(
+								mongoUser._id
+							);
+							if (userProfile) {
+								setProfile(userProfile);
+							}
+						} catch (profileError: any) {
+							// Profile fetch failure shouldn't break login
+							// User is still authenticated and can use the app
+							authContextLog.debug('Profile fetch failed during login', {
+								error: profileError?.message || profileError,
+								type: profileError?.type || profileError?.name,
+							});
+							// Continue without profile - it can be fetched later
+						}
 					}
 
 					// Set loading to false to trigger navigation logic
@@ -1328,19 +1348,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				);
 
 				if (existingMongoUser) {
-					// User already has a Brie account - direct them to login
-					authContextLog.warn('Account already exists in MongoDB', {
-						userId: existingMongoUser._id,
-					});
-					await signOut(getAuth());
-					setLoading(false);
-					Alert.alert(
-						'Account Already Exists',
-						`An account with ${
-							firebaseUser.email || 'this Google account'
-						} already exists. Please use the Sign In screen instead.`,
-						[{ text: 'OK' }]
+					// Account already exists — treat "Google Sign-Up" as a login and route to dashboard.
+					// This keeps the Firebase session and lets RootLayout handle navigation once user/profile are hydrated.
+					authContextLog.info(
+						'Account already exists in MongoDB during Google sign-up; logging in',
+						{ userId: existingMongoUser._id }
 					);
+					await login(firebaseUser);
 					return;
 				}
 				authContextLog.debug('MongoDB query returned but no user found');
