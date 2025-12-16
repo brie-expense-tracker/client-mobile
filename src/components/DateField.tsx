@@ -4,7 +4,7 @@ import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { RectButton } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
-import { palette, space } from '../ui/theme';
+import { palette, space, radius } from '../ui/theme';
 
 // Calendar locale configuration
 LocaleConfig.locales.us = {
@@ -115,6 +115,7 @@ export const DateField: React.FC<DateFieldProps> = ({
 			<TouchableOpacity
 				style={[styles.dateSelector, containerStyle]}
 				onPress={() => setOpen((s) => !s)}
+				activeOpacity={0.7}
 				accessibilityLabel="Select date"
 				accessibilityHint={open ? 'Collapse calendar' : 'Expand calendar'}
 				accessibilityState={{ expanded: open }}
@@ -218,7 +219,12 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 10,
-		// padding / border / radius now come from containerStyle
+		backgroundColor: palette.surface,
+		borderWidth: 1,
+		borderColor: palette.border,
+		borderRadius: radius.md,
+		paddingVertical: space.md,
+		paddingHorizontal: space.md,
 	},
 	dateText: {
 		flex: 1,
@@ -232,7 +238,7 @@ const styles = StyleSheet.create({
 const calendarStyles = StyleSheet.create({
 	card: {
 		marginTop: 10,
-		borderRadius: 12,
+		borderRadius: radius.md,
 		borderWidth: 1,
 		borderColor: '#eee',
 		backgroundColor: '#fff',
@@ -241,6 +247,8 @@ const calendarStyles = StyleSheet.create({
 		shadowRadius: 8,
 		shadowOffset: { width: 0, height: 4 },
 		elevation: 2,
+		overflow: 'hidden',
+		paddingBottom: space.sm,
 	},
 	quickRow: {
 		flexDirection: 'row',

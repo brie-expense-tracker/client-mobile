@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
-
 import BillsFeed from '../components/bills/BillsFeed';
 import BillsSummaryCard from '../components/bills/BillsSummaryCard';
 import { useBills } from '../../../../src/context/billContext';
