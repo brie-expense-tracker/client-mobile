@@ -34,6 +34,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { TransactionContext } from '../../../src/context/transactionContext';
 import { useNotification } from '../../../src/context/notificationContext';
 import { useGoal } from '../../../src/context/goalContext';
+import useAuth from '../../../src/context/AuthContext';
 import { TransactionHistory } from './components';
 import {
 	DashboardService,
@@ -62,6 +63,7 @@ export default function DashboardPro() {
 	const { transactions, isLoading, refetch } = useContext(TransactionContext);
 	const { unreadCount } = useNotification();
 	const { goals } = useGoal();
+	const { firebaseUser, user } = useAuth();
 	const params = useLocalSearchParams<{ transactionImpact?: string }>();
 	const [refreshing, setRefreshing] = useState(false);
 	const [rollup, setRollup] = useState<DashboardRollup | null>(null);
@@ -76,6 +78,13 @@ export default function DashboardPro() {
 	);
 
 	const fetchRollup = useCallback(async () => {
+		// Don't fetch if user is not authenticated
+		if (!firebaseUser || !user) {
+			setRollup(null);
+			setRollupLoading(false);
+			return;
+		}
+
 		try {
 			setRollupLoading(true);
 			const data = await DashboardService.getDashboardRollup();
@@ -92,13 +101,19 @@ export default function DashboardPro() {
 				console.error('Invalid rollup data structure:', data);
 				setRollup(null);
 			}
-		} catch (error) {
+		} catch (error: any) {
+			// Silently handle auth errors (expected on logout)
+			if (error?.isAuthError || error?.message === 'User not authenticated') {
+				setRollup(null);
+				return;
+			}
+			// Only log non-auth errors
 			console.error('Error fetching dashboard rollup:', error);
 			setRollup(null);
 		} finally {
 			setRollupLoading(false);
 		}
-	}, []);
+	}, [firebaseUser, user]);
 
 	const onRefresh = useCallback(async () => {
 		setRefreshing(true);

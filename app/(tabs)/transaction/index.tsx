@@ -33,6 +33,7 @@ import { TransactionContext } from '../../../src/context/transactionContext';
 import { useGoal, Goal } from '../../../src/context/goalContext';
 import { useBudget, Budget } from '../../../src/context/budgetContext';
 import { useBills } from '../../../src/context/billContext';
+import useAuth from '../../../src/context/AuthContext';
 import { Bill } from '../../../src/services';
 import { navigateToGoalsWithModal } from '../../../src/utils/navigationUtils';
 import BottomSheet from '../../../src/components/BottomSheet';
@@ -139,6 +140,7 @@ export default function TransactionScreenProModern() {
 	const { goals, isLoading: goalsLoading } = useGoal();
 	const { budgets, isLoading: budgetsLoading } = useBudget();
 	const { expenses: bills, isLoading: billsLoading } = useBills();
+	const { firebaseUser, user } = useAuth();
 
 	// Debug logging for goals and budgets
 	useEffect(() => {
@@ -165,13 +167,23 @@ export default function TransactionScreenProModern() {
 	useEffect(() => {
 		let isMounted = true;
 		const loadDebts = async () => {
+			// Don't fetch if user is not authenticated
+			if (!firebaseUser || !user) {
+				if (isMounted) setDebtsLoading(false);
+				return;
+			}
+
 			try {
 				setDebtsLoading(true);
 				const rollup: DashboardRollup =
 					await DashboardService.getDashboardRollup();
 				if (!isMounted) return;
 				setDebts(rollup.debts?.debts || []);
-			} catch (err) {
+			} catch (err: any) {
+				// Silently handle auth errors (expected on logout)
+				if (err?.isAuthError || err?.message === 'User not authenticated') {
+					return;
+				}
 				if (isDevMode) {
 					transactionScreenLog.error('Failed to load debts', err);
 				}
@@ -183,7 +195,7 @@ export default function TransactionScreenProModern() {
 		return () => {
 			isMounted = false;
 		};
-	}, []);
+	}, [firebaseUser, user]);
 
 	const ready = mode === 'income' ? !goalsLoading : !budgetsLoading;
 

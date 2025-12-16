@@ -92,7 +92,15 @@ export class DashboardService {
 		}>(endpoint);
 
 		if (!response.success || !response.data) {
-			throw new Error(response.error || 'Failed to fetch dashboard rollup');
+			const errorMessage = response.error || 'Failed to fetch dashboard rollup';
+			// Create error with auth flag for graceful handling
+			const error = new Error(errorMessage) as Error & {
+				isAuthError?: boolean;
+			};
+			if (errorMessage === 'User not authenticated') {
+				error.isAuthError = true;
+			}
+			throw error;
 		}
 
 		// response.data is the API response body: { success: true, data: rollup }
