@@ -102,12 +102,14 @@ export default function Signup() {
 			await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 
 			let errorMessage = 'An error occurred during signup.';
+			let shouldRedirectToLogin = false;
 			if (
 				e?.code === 'auth/email-already-in-use' ||
 				e?.message?.includes('already exists')
 			) {
 				errorMessage =
 					'An account with this email already exists. Please log in instead.';
+				shouldRedirectToLogin = true;
 			} else if (e?.code === 'auth/weak-password') {
 				errorMessage = 'Password is too weak.';
 			} else if (e?.code === 'auth/invalid-email') {
@@ -122,6 +124,13 @@ export default function Signup() {
 			// Show a compact inline error message at the top of the form
 			signupScreenLog.warn('Signup error', { error: e, message: errorMessage });
 			setFormError(errorMessage);
+
+			// If the account already exists, guide them straight to login.
+			if (shouldRedirectToLogin) {
+				setTimeout(() => {
+					router.replace('/login');
+				}, 800);
+			}
 		} finally {
 			setIsLoading(false);
 		}

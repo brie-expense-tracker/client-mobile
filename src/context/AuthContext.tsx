@@ -8,7 +8,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import { AppState, AppStateStatus, Alert } from 'react-native';
+import { AppState, AppStateStatus } from 'react-native';
 import {
 	FirebaseAuthTypes,
 	getAuth,
@@ -76,6 +76,9 @@ export type AuthContextType = {
 	// Google Sign-In methods
 	signInWithGoogle: () => Promise<void>;
 	signUpWithGoogle: () => Promise<void>;
+
+	// Account linking
+	linkPassword: (email: string, password: string) => Promise<void>;
 
 	// Password management
 	sendPasswordResetEmail: (email: string) => Promise<void>;
@@ -797,6 +800,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		}
 	}, []);
 
+	const reauthWithGoogle = useCallback(async () => {
+		try {
+			setError(null);
+			isReauthInProgressRef.current = true;
+
+			const currentUser = getAuth().currentUser;
+			if (!currentUser) {
+				throw Object.assign(new Error('No authenticated user'), {
+					code: 'auth/no-current-user',
+				});
+			}
+
+			authContextLog.debug('Starting Google reauthentication');
+
+			// Ensure Google Sign-In is configured (safe to call multiple times)
+			configureGoogleSignIn();
+
+			// Get fresh Google token
+			const signInResult = await GoogleSignin.signInSilently().catch(
+				async () => {
+					return await GoogleSignin.signIn();
+				}
+			);
+
+			const idToken =
+				(signInResult as any)?.idToken ||
+				(signInResult as any)?.data?.idToken ||
+				undefined;
+
+			if (!idToken) {
+				throw Object.assign(new Error('No Google ID token received'), {
+					code: 'auth/no-id-token',
+				});
+			}
+
+			const googleCredential = GoogleAuthProvider.credential(idToken);
+			await currentUser.reauthenticateWithCredential(googleCredential);
+			await currentUser.reload();
+			authContextLog.info('Google reauthentication successful');
+		} catch (error: any) {
+			authContextLog.error('Google reauthentication error', error);
+			const normalized = {
+				code: error?.code || 'auth/reauth-failed',
+				message: error?.message || 'Failed to reauthenticate.',
+				details: error,
+			};
+			setError(normalized);
+			throw Object.assign(new Error(normalized.message), {
+				code: normalized.code,
+			});
+		} finally {
+			isReauthInProgressRef.current = false;
+		}
+	}, []);
+
 	const logout = useCallback(async () => {
 		try {
 			await signOut(getAuth());
@@ -916,89 +974,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				// Create user in MongoDB
 				await createUserInMongoDB(firebaseUser, name);
 			} catch (error: any) {
-				authContextLog.error('Signup error', error);
-
 				// Handle specific Firebase errors
 				if (error.code === 'auth/email-already-in-use') {
-					// An account with this email already exists in Firebase
-					// This could be an orphaned account (Firebase exists but no MongoDB user)
-					// Try to sign in with the provided password to recover the account
-					authContextLog.debug(
-						'Email already in use - attempting to sign in to recover account'
+					// This is an expected outcome for signup; log as warn (not error)
+					authContextLog.warn('Signup attempted with existing email', {
+						code: error?.code,
+					});
+					/**
+					 * IMPORTANT: Do not attempt a "recovery sign-in" here.
+					 *
+					 * Signing in (then signing out) during a signup flow causes auth-state
+					 * churn and race conditions with our auth listeners, which can surface as
+					 * `auth/no-current-user` and redbox errors in dev.
+					 *
+					 * If the user already has an account, they should use the normal login flow.
+					 * If the account is "orphaned" (Firebase exists, MongoDB missing), our login
+					 * flow already handles creating the MongoDB record on successful sign-in.
+					 */
+					const signupError = new Error(
+						'An account with this email already exists. Please log in instead.'
 					);
-					try {
-						const { signInWithEmailAndPassword } = await import(
-							'@react-native-firebase/auth'
-						);
-						const signInCredential = await signInWithEmailAndPassword(
-							getAuth(),
-							email,
-							password
-						);
-						const existingFirebaseUser = signInCredential.user;
-
-						// Check if MongoDB user exists
-						try {
-							const mongoUser = await UserService.getUserByFirebaseUID(
-								existingFirebaseUser.uid
-							);
-							if (mongoUser) {
-								// MongoDB user exists - this is a real duplicate account
-								authContextLog.warn(
-									'Account already exists in both Firebase and MongoDB'
-								);
-								const signupError = new Error(
-									'An account with this email already exists. Please log in instead.'
-								);
-								setError({
-									code: 'EMAIL_ALREADY_IN_USE',
-									message: signupError.message,
-									details: error,
-								});
-								// Sign out since we signed in just to check
-								await getAuth().signOut();
-								throw signupError;
-							}
-
-							// MongoDB user doesn't exist - this is an orphaned Firebase account
-							// Use the login flow which will create the MongoDB user
-							authContextLog.info(
-								'Recovering orphaned Firebase account - creating MongoDB user'
-							);
-							await login(existingFirebaseUser);
-							return; // Successfully recovered and logged in
-						} catch (mongoError: any) {
-							// If MongoDB check fails, assume user doesn't exist and try to create
-							if (
-								mongoError?.message?.includes('User not found') ||
-								mongoError?.response?.status === 404
-							) {
-								authContextLog.info(
-									'Recovering orphaned Firebase account - creating MongoDB user'
-								);
-								await login(existingFirebaseUser);
-								return; // Successfully recovered and logged in
-							}
-							// Other MongoDB errors - sign out and throw original error
-							await getAuth().signOut();
-							throw mongoError;
-						}
-					} catch (signInError: any) {
-						// Sign in failed - wrong password or other error
-						authContextLog.debug('Sign in failed during recovery attempt', {
-							code: signInError?.code,
-						});
-						const signupError = new Error(
-							'An account with this email already exists. Please log in instead.'
-						);
-						setError({
-							code: 'EMAIL_ALREADY_IN_USE',
-							message: signupError.message,
-							details: error,
-						});
-						throw signupError;
-					}
+					setError({
+						code: 'EMAIL_ALREADY_IN_USE',
+						message: signupError.message,
+						details: error,
+					});
+					throw signupError;
 				}
+
+				authContextLog.error('Signup error', error);
 
 				// If Firebase user was created but MongoDB creation failed, delete the Firebase user
 				if (firebaseUser && error.code !== 'auth/email-already-in-use') {
@@ -1027,7 +1031,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				throw error;
 			}
 		},
-		[createUserInMongoDB, login]
+		[createUserInMongoDB]
 	);
 
 	// Google Sign-In methods
@@ -1094,115 +1098,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			authContextLog.info('Firebase auth successful', {
 				uid: firebaseUser.uid.substring(0, 12) + '...',
 			});
-			authContextLog.debug('Step 5: Checking if MongoDB user exists');
-
-			// Check if MongoDB user exists (regardless of Firebase's isNewUser flag)
-			try {
-				authContextLog.debug('Calling UserService.getUserByFirebaseUID');
-				const existingMongoUser = await UserService.getUserByFirebaseUID(
-					firebaseUser.uid
-				);
-
-				if (existingMongoUser) {
-					// User exists in both Firebase and MongoDB - proceed with login
-					authContextLog.info('MongoDB user EXISTS', {
-						userId: existingMongoUser._id,
-					});
-					authContextLog.debug('Step 6: Calling login() function');
-					await login(firebaseUser);
-					authContextLog.info('Login completed successfully');
-					return;
-				}
-				authContextLog.debug('MongoDB query returned but no user found');
-			} catch (error: any) {
-				// User doesn't exist in MongoDB - this is okay, we'll create it
-				authContextLog.debug('MongoDB user NOT FOUND', {
-					message: error.message,
-					code: error.code,
-				});
-			}
-
-			// No MongoDB user exists - ask user if they want to create an account
-			authContextLog.debug(
-				'Step 7: No MongoDB user - showing confirmation prompt'
-			);
-
-			// Show confirmation prompt
-			return new Promise<void>((resolve, reject) => {
-				authContextLog.debug('Showing Alert dialog');
-				Alert.alert(
-					'Sign In',
-					`No account found for ${
-						firebaseUser.email || 'this Google account'
-					}. Would you like to create a new account?`,
-					[
-						{
-							text: 'Cancel',
-							style: 'cancel',
-							onPress: async () => {
-								authContextLog.debug('User CANCELLED account creation');
-								isGoogleSignInInProgressRef.current = false;
-								// Delete the Firebase user since they don't want to create an account
-								try {
-									authContextLog.debug('Deleting Firebase user');
-									if (typeof (firebaseUser as any).deleteUser === 'function') {
-										await (firebaseUser as any).deleteUser();
-									} else {
-										await firebaseUser.delete();
-									}
-									authContextLog.info('Firebase user deleted');
-								} catch (err) {
-									authContextLog.warn('Failed to delete Firebase user', err);
-								}
-								setLoading(false);
-								reject(new Error('Account creation cancelled'));
-							},
-						},
-						{
-							text: 'Create Account',
-							onPress: async () => {
-								authContextLog.info('User CONFIRMED account creation');
-								try {
-									// Keep the Firebase user and create MongoDB user through login function
-									authContextLog.debug(
-										'Calling login() to create MongoDB user'
-									);
-									await login(firebaseUser);
-									authContextLog.info(
-										'Login completed! Account creation successful'
-									);
-									isGoogleSignInInProgressRef.current = false;
-									resolve();
-								} catch (err) {
-									authContextLog.error('Fatal error during login()', err);
-									isGoogleSignInInProgressRef.current = false;
-									// Delete Firebase user since account creation failed
-									try {
-										if (
-											typeof (firebaseUser as any).deleteUser === 'function'
-										) {
-											await (firebaseUser as any).deleteUser();
-										} else {
-											await firebaseUser.delete();
-										}
-										authContextLog.info(
-											'Cleaned up Firebase user after failed creation'
-										);
-									} catch (deleteErr) {
-										authContextLog.error(
-											'Failed to clean up Firebase user during sign-in',
-											deleteErr
-										);
-									}
-									setLoading(false);
-									reject(err);
-								}
-							},
-						},
-					],
-					{ cancelable: false }
-				);
-			});
+			// Always proceed: the backend bootstrap + RootLayout onboarding gate is the "truth".
+			// `login()` will auto-provision the MongoDB user if missing.
+			await login(firebaseUser);
+			authContextLog.info('Google Continue completed successfully');
 		} catch (error: any) {
 			authContextLog.error('ERROR in signInWithGoogle', {
 				code: error.code,
@@ -1220,11 +1119,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				return; // Exit silently without showing error
 			}
 
-			// Handle account creation cancellation gracefully
-			if (error.message?.includes('Account creation cancelled')) {
-				authContextLog.debug('User declined account creation');
+			// Handle account-exists-with-different-credential (email exists with password, etc.)
+			if (error?.code === 'auth/account-exists-with-different-credential') {
+				const email = error?.email || error?.customData?.email;
+				setError({
+					code: 'ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL',
+					message:
+						'This email is already using a different sign-in method. Sign in with that method first, then you can link Google in Settings.',
+					details: { ...error, email },
+				});
 				setLoading(false);
-				return; // Exit silently without showing error
+				return;
 			}
 
 			setError({
@@ -1339,116 +1244,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			authContextLog.debug('Firebase auth successful', {
 				uid: firebaseUser.uid.substring(0, 12) + '...',
 			});
-
-			// Check if MongoDB user exists (regardless of Firebase's isNewUser flag)
-			authContextLog.debug('Step 8: Checking if MongoDB user already exists');
-			try {
-				const existingMongoUser = await UserService.getUserByFirebaseUID(
-					firebaseUser.uid
-				);
-
-				if (existingMongoUser) {
-					// Account already exists — treat "Google Sign-Up" as a login and route to dashboard.
-					// This keeps the Firebase session and lets RootLayout handle navigation once user/profile are hydrated.
-					authContextLog.info(
-						'Account already exists in MongoDB during Google sign-up; logging in',
-						{ userId: existingMongoUser._id }
-					);
-					await login(firebaseUser);
-					return;
-				}
-				authContextLog.debug('MongoDB query returned but no user found');
-			} catch (error: any) {
-				// User doesn't exist in MongoDB - this is what we want for signup
-				authContextLog.debug('MongoDB user NOT FOUND (good for signup)', {
-					message: error.message,
-				});
-			}
-
-			// No MongoDB user exists - show confirmation prompt to create account
-			authContextLog.debug(
-				'Step 9: Showing confirmation prompt to create account'
-			);
-
-			return new Promise<void>((resolve, reject) => {
-				Alert.alert(
-					'Sign Up',
-					`Welcome! We'll create your Brie account with ${
-						firebaseUser.email || 'this Google account'
-					}.`,
-					[
-						{
-							text: 'Cancel',
-							style: 'cancel',
-							onPress: async () => {
-								authContextLog.debug('User cancelled account creation');
-								isGoogleSignInInProgressRef.current = false;
-								// Delete the Firebase user since they don't want to create an account
-								try {
-									if (typeof (firebaseUser as any).deleteUser === 'function') {
-										await (firebaseUser as any).deleteUser();
-									} else {
-										await firebaseUser.delete();
-									}
-								} catch (err) {
-									authContextLog.warn('Failed to delete Firebase user', err);
-								}
-								setLoading(false);
-								reject(
-									Object.assign(new Error('Account creation cancelled'), {
-										code: 'GOOGLE_SIGNUP_CANCELED',
-									})
-								);
-							},
-						},
-						{
-							text: 'Continue',
-							onPress: async () => {
-								authContextLog.info('User confirmed account creation');
-								try {
-									// Proceed with account creation
-									authContextLog.debug(
-										'Calling login() to create MongoDB user'
-									);
-									await login(firebaseUser);
-									authContextLog.info(
-										'Login completed! Account creation successful!'
-									);
-									isGoogleSignInInProgressRef.current = false;
-									resolve();
-								} catch (err) {
-									authContextLog.error('Fatal error during login()', err);
-									authContextLog.error('Error details', {
-										error: JSON.stringify(err),
-									});
-									isGoogleSignInInProgressRef.current = false;
-									// Delete Firebase user since account creation failed
-									try {
-										if (
-											typeof (firebaseUser as any).deleteUser === 'function'
-										) {
-											await (firebaseUser as any).deleteUser();
-										} else {
-											await firebaseUser.delete();
-										}
-										authContextLog.info(
-											'Cleaned up Firebase user after failed creation'
-										);
-									} catch (deleteErr) {
-										authContextLog.error(
-											'Failed to clean up Firebase user',
-											deleteErr
-										);
-									}
-									setLoading(false);
-									reject(err);
-								}
-							},
-						},
-					],
-					{ cancelable: false }
-				);
-			});
+			// Treat Google "sign up" as "continue with Google" too.
+			// `login()` will create MongoDB user if missing; RootLayout routes based on onboardingVersion.
+			await login(firebaseUser);
 		} catch (error: any) {
 			authContextLog.error('Google Sign-Up error', error);
 			authContextLog.error('Error details', {
@@ -1467,11 +1265,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				return; // Exit silently without showing error
 			}
 
-			// Handle account creation cancellation gracefully
-			if (error.code === 'GOOGLE_SIGNUP_CANCELED') {
-				authContextLog.debug('User cancelled account creation');
+			// Handle account-exists-with-different-credential (email exists with password, etc.)
+			if (error?.code === 'auth/account-exists-with-different-credential') {
+				const email = error?.email || error?.customData?.email;
+				setError({
+					code: 'ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL',
+					message:
+						'This email is already using a different sign-in method. Sign in with that method first, then you can link Google in Settings.',
+					details: { ...error, email },
+				});
 				setLoading(false);
-				return; // Exit silently without showing error
+				return;
 			}
 
 			// Handle specific error cases
@@ -1499,6 +1303,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			}, 1000);
 		}
 	}, [login]);
+
+	const linkPassword = useCallback(
+		async (email: string, password: string) => {
+			const auth = getAuth();
+			const currentUser = auth.currentUser;
+			if (!currentUser) {
+				throw Object.assign(new Error('No authenticated user'), {
+					code: 'auth/no-current-user',
+				});
+			}
+
+			const normalizedEmail = email.trim().toLowerCase();
+			const normalizedPassword = password.trim();
+			if (!normalizedEmail || !normalizedPassword) {
+				throw Object.assign(new Error('Email and password are required'), {
+					code: 'link/missing-fields',
+				});
+			}
+
+			try {
+				await currentUser.reload();
+			} catch {
+				// non-fatal
+			}
+
+			const credential = EmailAuthProvider.credential(
+				normalizedEmail,
+				normalizedPassword
+			);
+
+			try {
+				await currentUser.linkWithCredential(credential);
+				await currentUser.reload();
+				// Refresh state so Security screen can update immediately
+				setFirebaseUser(auth.currentUser);
+				authContextLog.info('Password provider linked successfully');
+			} catch (err: any) {
+				// If Firebase requires a recent login, do Google reauth then retry once.
+				if (err?.code === 'auth/requires-recent-login') {
+					authContextLog.debug(
+						'linkPassword requires recent login; attempting Google reauth'
+					);
+					await reauthWithGoogle();
+					await currentUser.linkWithCredential(credential);
+					await currentUser.reload();
+					setFirebaseUser(auth.currentUser);
+					authContextLog.info(
+						'Password provider linked successfully (after reauth)'
+					);
+					return;
+				}
+				throw err;
+			}
+		},
+		[reauthWithGoogle]
+	);
 
 	const deleteAccount = useCallback(async (password: string) => {
 		setLoading(true);
@@ -1582,95 +1442,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 						: error?.code === 'auth/user-mismatch'
 						? 'This credential does not match the current user.'
 						: error?.message || 'Failed to reauthenticate.',
-				details: error,
-			};
-			setError(normalized);
-			throw Object.assign(new Error(normalized.message), {
-				code: normalized.code,
-			});
-		} finally {
-			isReauthInProgressRef.current = false;
-		}
-	}, []);
-
-	// Google reauthentication for account deletion
-	const reauthWithGoogle = useCallback(async () => {
-		try {
-			setError(null);
-			isReauthInProgressRef.current = true;
-
-			authContextLog.debug('Starting Google reauthentication');
-
-			// 1) Configure and sign-in to get an ID token
-			configureGoogleSignIn();
-
-			// Check if your device supports Google Play
-			await GoogleSignin.hasPlayServices({
-				showPlayServicesUpdateDialog: true,
-			});
-
-			// Sign out from any previous Google session to ensure clean state
-			try {
-				await GoogleSignin.signOut();
-			} catch {
-				authContextLog.debug('No previous Google session to sign out from');
-			}
-
-			// Get the users ID token
-			const signInResult = await GoogleSignin.signIn();
-			authContextLog.debug('Google reauth result', { type: signInResult.type });
-
-			// Handle the actual data structure returned by Google Sign-In
-			let idToken;
-
-			if (signInResult.type === 'success' && signInResult.data) {
-				// Success case - data is in signInResult.data
-				({ idToken } = signInResult.data);
-			} else if (signInResult.type === 'cancelled') {
-				throw Object.assign(
-					new Error('Google reauthentication was cancelled'),
-					{ code: 'auth/popup-closed-by-user' }
-				);
-			} else {
-				// Direct access for other cases
-				({ idToken } = signInResult);
-			}
-
-			if (!idToken) {
-				// Try to get the token separately
-				authContextLog.debug('Attempting to get ID token separately');
-				const tokens = await GoogleSignin.getTokens();
-				if (tokens.idToken) {
-					idToken = tokens.idToken;
-				} else {
-					throw Object.assign(
-						new Error('No ID token received from Google reauthentication'),
-						{ code: 'auth/no-id-token' }
-					);
-				}
-			}
-
-			// 2) Use RN Firebase's auth.GoogleAuthProvider
-			const googleCredential = GoogleAuthProvider.credential(idToken);
-
-			const currentUser = getAuth().currentUser;
-			if (!currentUser) {
-				throw Object.assign(new Error('No authenticated user'), {
-					code: 'auth/no-current-user',
-				});
-			}
-
-			await currentUser.reauthenticateWithCredential(googleCredential);
-			await currentUser.reload(); // Force refresh to maintain "recent login" state
-			authContextLog.info('Google reauthentication successful');
-		} catch (error: any) {
-			authContextLog.error('Google reauthentication error', error);
-			const normalized = {
-				code: error?.code || 'auth/google-reauth-failed',
-				message:
-					error?.code === 'auth/popup-closed-by-user'
-						? 'Verification was cancelled.'
-						: error?.message || 'Failed to reauthenticate with Google.',
 				details: error,
 			};
 			setError(normalized);
@@ -1888,6 +1659,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			signInWithGoogle,
 			signUpWithGoogle,
 
+			// Account linking
+			linkPassword,
+
 			// Password management
 			sendPasswordResetEmail: sendPasswordResetEmailToUser,
 			confirmPasswordReset: confirmPasswordResetCode,
@@ -1924,6 +1698,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			createUserInMongoDB,
 			signInWithGoogle,
 			signUpWithGoogle,
+			linkPassword,
 			sendPasswordResetEmailToUser,
 			confirmPasswordResetCode,
 			updatePasswordToUser,

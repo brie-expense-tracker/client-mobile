@@ -320,6 +320,31 @@ export default function Layout() {
 				}}
 			/>
 			<Stack.Screen
+				name="security/linkPassword"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Add Password',
+					headerShadowVisible: false,
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: '#333',
+					},
+					headerStyle: {
+						backgroundColor: '#ffffff',
+					},
+					headerLeft: () => (
+						<BorderlessButton
+							onPress={() => router.back()}
+							style={{ width: 50 }}
+						>
+							<Ionicons name="chevron-back" size={24} color="#333" />
+						</BorderlessButton>
+					),
+				}}
+			/>
+			<Stack.Screen
 				name="security/loginHistory"
 				options={{
 					headerShown: true,
