@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
 	View,
 	StyleSheet,
@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { logger } from '../../../../src/utils/logger';
-import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { BillService } from '../../../../src/services';
 import { DateField } from '../../../../src/components/DateField';
@@ -54,7 +53,7 @@ const AddBillScreen: React.FC = () => {
 			const [year, month, day] = nextDueDate.split('-').map(Number);
 			const localDate = new Date(year, month - 1, day, 12, 0, 0); // noon local time
 			const isoDate = localDate.toISOString();
-			
+
 			await BillService.createRecurringExpense({
 				vendor: vendor.trim(),
 				amount: parseFloat(amount),
