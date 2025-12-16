@@ -766,33 +766,6 @@ export default function Layout() {
 					),
 				}}
 			/>
-
-			<Stack.Screen
-				name="recurringExpenses/index"
-				options={{
-					headerShown: true,
-					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: 'Recurring Expenses',
-					headerShadowVisible: false,
-					headerTitleStyle: {
-						fontSize: 20,
-						fontWeight: '600',
-						color: '#333',
-					},
-					headerStyle: {
-						backgroundColor: '#ffffff',
-					},
-
-					headerLeft: () => (
-						<BorderlessButton
-							onPress={() => router.back()}
-							style={{ width: 50 }}
-						>
-							<Ionicons name="chevron-back" size={24} color="#333" />
-						</BorderlessButton>
-					),
-				}}
-			/>
 		</Stack>
 	);
 }
