@@ -34,6 +34,14 @@ interface Transaction {
 		confidence: number;
 		nextExpectedDate: string;
 	};
+	notes?: string;
+	source?: 'manual' | 'plaid' | 'import' | 'ai';
+	vendor?: string;
+	metadata?: {
+		location?: string;
+		paymentMethod?: string;
+		originalDescription?: string;
+	};
 }
 
 // Helper function to format date without time
@@ -358,12 +366,11 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 		return null;
 	}, [item.recurringPattern?.patternId, bills]);
 
-	// Clean description by removing " - Recurring Expense" or " - Bill" suffix
+	// Clean description by removing " - Bill" suffix
 	const cleanDescription = useMemo(() => {
 		if (!item.description) return '';
-		// Remove " - Recurring Expense", " - recurring expense", or " - Bill" (case insensitive)
+		// Remove " - Bill" (case insensitive)
 		return item.description
-			.replace(/\s*-\s*Recurring\s+Expense/gi, '')
 			.replace(/\s*-\s*Bill/gi, '')
 			.trim();
 	}, [item.description]);
@@ -507,11 +514,6 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 					<View style={styles.textContainer}>
 						<View style={styles.descriptionContainer}>
 							<Text style={styles.description}>{displayDescription}</Text>
-							{item.recurringPattern && (
-								<View style={styles.recurringBadge}>
-									<Ionicons name="repeat" size={12} color="#007ACC" />
-								</View>
-							)}
 						</View>
 
 						{/* Enhanced linked data display */}
@@ -596,6 +598,70 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 								<Text style={styles.category}>{transactionContext.name}</Text>
 							)}
 						</View>
+
+						{/* Transaction Details */}
+						{(item.notes ||
+							item.source ||
+							item.metadata?.location ||
+							item.metadata?.paymentMethod) && (
+							<View style={styles.detailsContainer}>
+								{item.notes && (
+									<View style={styles.detailRow}>
+										<Ionicons
+											name="document-text-outline"
+											size={12}
+											color="#6b7280"
+										/>
+										<Text style={styles.detailText}>{item.notes}</Text>
+									</View>
+								)}
+								<View style={styles.detailsRow}>
+									{item.metadata?.location && (
+										<View style={styles.detailBadge}>
+											<Ionicons
+												name="location-outline"
+												size={10}
+												color="#6b7280"
+											/>
+											<Text style={styles.detailBadgeText}>
+												{item.metadata.location}
+											</Text>
+										</View>
+									)}
+									{item.metadata?.paymentMethod && (
+										<View style={styles.detailBadge}>
+											<Ionicons
+												name="card-outline"
+												size={10}
+												color="#6b7280"
+											/>
+											<Text style={styles.detailBadgeText}>
+												{item.metadata.paymentMethod}
+											</Text>
+										</View>
+									)}
+									{item.source && item.source !== 'manual' && (
+										<View style={styles.detailBadge}>
+											<Ionicons
+												name={
+													item.source === 'plaid'
+														? 'link-outline'
+														: item.source === 'ai'
+														? 'sparkles-outline'
+														: 'download-outline'
+												}
+												size={10}
+												color="#6b7280"
+											/>
+											<Text style={styles.detailBadgeText}>
+												{item.source.charAt(0).toUpperCase() +
+													item.source.slice(1)}
+											</Text>
+										</View>
+									)}
+								</View>
+							</View>
+						)}
 					</View>
 					<View style={styles.amountDate}>
 						<Text
@@ -695,15 +761,6 @@ const styles = StyleSheet.create({
 		color: '#212121',
 		flex: 1,
 	},
-	recurringBadge: {
-		marginLeft: 8,
-		paddingHorizontal: 6,
-		paddingVertical: 2,
-		backgroundColor: '#e3f2fd',
-		borderRadius: 4,
-		borderWidth: 1,
-		borderColor: '#007ACC',
-	},
 	linkedDataContainer: {
 		marginTop: 4,
 		gap: 4,
@@ -757,5 +814,41 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		color: '#9ca3af',
 		marginTop: 4,
+	},
+	detailsContainer: {
+		marginTop: 6,
+		gap: 4,
+	},
+	detailRow: {
+		flexDirection: 'row',
+		alignItems: 'flex-start',
+		gap: 6,
+		marginTop: 2,
+	},
+	detailText: {
+		fontSize: 11,
+		color: '#6b7280',
+		flex: 1,
+		lineHeight: 14,
+	},
+	detailsRow: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		gap: 6,
+		marginTop: 2,
+	},
+	detailBadge: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+		paddingHorizontal: 6,
+		paddingVertical: 2,
+		backgroundColor: '#f3f4f6',
+		borderRadius: 4,
+	},
+	detailBadgeText: {
+		fontSize: 10,
+		color: '#6b7280',
+		fontWeight: '500',
 	},
 });

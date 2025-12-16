@@ -9,7 +9,6 @@ import {
 	Pressable,
 	ActivityIndicator,
 	TouchableOpacity,
-	Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -80,7 +79,15 @@ function buildMeta(bill: Bill | BillWithPaymentStatus) {
 	const isPaid = 'isPaid' in bill && bill.isPaid === true;
 
 	if (bill.nextExpectedDate) {
-		const next = new Date(bill.nextExpectedDate);
+		// Parse date-only string (YYYY-MM-DD) as local date to avoid timezone issues
+		const datePart = bill.nextExpectedDate.slice(0, 10);
+		let next: Date;
+		if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+			const [year, month, day] = datePart.split('-').map(Number);
+			next = new Date(year, month - 1, day); // month is 0-indexed
+		} else {
+			next = new Date(bill.nextExpectedDate);
+		}
 		const now = new Date();
 
 		nextDueLabel = `Next due: ${next.toLocaleDateString('en-US', {
@@ -108,7 +115,15 @@ function buildMeta(bill: Bill | BillWithPaymentStatus) {
 
 	// Double-check overdue (only if not paid)
 	if (bill.nextExpectedDate && !isPaid) {
-		const next = new Date(bill.nextExpectedDate);
+		// Parse date-only string (YYYY-MM-DD) as local date to avoid timezone issues
+		const datePart = bill.nextExpectedDate.slice(0, 10);
+		let next: Date;
+		if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+			const [year, month, day] = datePart.split('-').map(Number);
+			next = new Date(year, month - 1, day); // month is 0-indexed
+		} else {
+			next = new Date(bill.nextExpectedDate);
+		}
 		const now = new Date();
 		const diffMs = next.setHours(0, 0, 0, 0) - now.setHours(0, 0, 0, 0);
 		const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
@@ -176,59 +191,6 @@ function BillRow({
 		}
 	};
 
-	const handlePayPress = async (e: any) => {
-		e.stopPropagation();
-		try {
-			await BillService.payBill(bill.patternId);
-			onPaid?.();
-			Alert.alert('Paid', 'Bill marked as paid for this period.');
-		} catch (err: any) {
-			// Extract error message from multiple possible locations
-			const errorMessage =
-				err?.message ||
-				err?.error ||
-				err?.toString?.() ||
-				(typeof err === 'string' ? err : '') ||
-				'';
-			
-			// Handle the case where the bill is already paid gracefully
-			const isAlreadyPaid =
-				errorMessage.includes('already been paid') ||
-				errorMessage.includes('already paid') ||
-				errorMessage.toLowerCase().includes('already paid');
-			
-			// Log at appropriate level - DEBUG for expected "already paid" case, ERROR for actual errors
-			if (isAlreadyPaid) {
-				billsFeedLog.debug('[BillRow] Bill already paid:', {
-					message: errorMessage,
-					errorType: err?.constructor?.name,
-				});
-			} else {
-				billsFeedLog.error('[BillRow] payBill error:', {
-					message: errorMessage,
-					errorType: err?.constructor?.name,
-					hasMessage: !!err?.message,
-					rawError: err,
-				});
-			}
-			
-			if (isAlreadyPaid) {
-				// Refresh data to ensure UI is up to date
-				onPaid?.();
-				Alert.alert(
-					'Already Paid',
-					'This bill has already been paid for this period.',
-					[{ text: 'OK' }]
-				);
-			} else {
-				// Log if we didn't detect "already paid" to help debug
-				if (isDevMode && errorMessage) {
-					billsFeedLog.debug('[BillRow] Error message did not match "already paid":', errorMessage);
-				}
-				Alert.alert('Error', errorMessage || 'Failed to pay bill.');
-			}
-		}
-	};
 
 	return (
 		<Pressable
@@ -305,18 +267,10 @@ function BillRow({
 						</View>
 					)}
 
-					{isAuto ? (
+					{isAuto && (
 						<View style={styles.autoChip}>
 							<Text style={styles.autoChipText}>Auto</Text>
 						</View>
-					) : (
-						<TouchableOpacity
-							onPress={handlePayPress}
-							style={styles.payChip}
-							activeOpacity={0.8}
-						>
-							<Text style={styles.payChipText}>Pay bill</Text>
-						</TouchableOpacity>
 					)}
 				</View>
 			</View>
@@ -634,17 +588,6 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: space.sm,
-	},
-	payChip: {
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		borderRadius: radius.pill,
-		backgroundColor: palette.primarySubtle,
-	},
-	payChipText: {
-		color: palette.primary,
-		fontWeight: '600',
-		fontSize: 12,
 	},
 	autoChip: {
 		paddingHorizontal: 10,

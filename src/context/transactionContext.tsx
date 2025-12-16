@@ -7,9 +7,10 @@ import React, {
 	useRef,
 	ReactNode,
 } from 'react';
-import { ApiService } from '../services';
+import { ApiService, BillService } from '../services';
 import { useBudget } from './budgetContext';
 import { useGoal } from './goalContext';
+import { useBills } from './billContext';
 import { setCacheInvalidationFlags } from '../services/utility/cacheInvalidationUtils';
 import { createLogger } from '../utils/sublogger';
 
@@ -30,6 +31,14 @@ export interface Transaction {
 		frequency: string;
 		confidence: number;
 		nextExpectedDate: string;
+	};
+	notes?: string;
+	source?: 'manual' | 'plaid' | 'import' | 'ai';
+	vendor?: string;
+	metadata?: {
+		location?: string;
+		paymentMethod?: string;
+		originalDescription?: string;
 	};
 }
 
@@ -69,13 +78,15 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 	const [isLoading, setIsLoading] = useState<boolean>(false); // Changed from true to false
 	const [hasLoaded, setHasLoaded] = useState<boolean>(false); // Track if data has been loaded
 
-	// Get budget and goal context functions
+	// Get budget, goal, and bill context functions
 	const { refetch: refetchBudgets } = useBudget();
 	const { refetch: refetchGoals } = useGoal();
+	const { refetch: refetchBills } = useBills();
 
 	// Use refs to store the refetch functions to avoid dependency issues
 	const refetchBudgetsRef = useRef(refetchBudgets);
 	const refetchGoalsRef = useRef(refetchGoals);
+	const refetchBillsRef = useRef(refetchBills);
 
 	// Update refs when functions change
 	useEffect(() => {
@@ -85,6 +96,10 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 	useEffect(() => {
 		refetchGoalsRef.current = refetchGoals;
 	}, [refetchGoals]);
+
+	useEffect(() => {
+		refetchBillsRef.current = refetchBills;
+	}, [refetchBills]);
 
 	const refetch = useCallback(async () => {
 		setIsLoading(true);
@@ -145,6 +160,26 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 						target: targetId,
 						targetModel: targetModel,
 						updatedAt: tx.updatedAt ?? tx.createdAt ?? new Date().toISOString(),
+						recurringPattern: tx.recurringPattern
+							? {
+									patternId: tx.recurringPattern.patternId ?? '',
+									frequency: tx.recurringPattern.frequency ?? '',
+									confidence: tx.recurringPattern.confidence ?? 0,
+									nextExpectedDate:
+										tx.recurringPattern.nextExpectedDate ??
+										new Date().toISOString(),
+							  }
+							: undefined,
+						notes: tx.notes,
+						source: tx.source,
+						vendor: tx.vendor,
+						metadata: tx.metadata
+							? {
+									location: tx.metadata.location,
+									paymentMethod: tx.metadata.paymentMethod,
+									originalDescription: tx.metadata.originalDescription,
+							  }
+							: undefined,
 					};
 
 					return transaction;
@@ -323,6 +358,27 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 							response.data.updatedAt ??
 							response.data.createdAt ??
 							new Date().toISOString(),
+						recurringPattern: response.data.recurringPattern
+							? {
+									patternId: response.data.recurringPattern.patternId ?? '',
+									frequency: response.data.recurringPattern.frequency ?? '',
+									confidence: response.data.recurringPattern.confidence ?? 0,
+									nextExpectedDate:
+										response.data.recurringPattern.nextExpectedDate ??
+										new Date().toISOString(),
+							  }
+							: undefined,
+						notes: response.data.notes,
+						source: response.data.source,
+						vendor: response.data.vendor,
+						metadata: response.data.metadata
+							? {
+									location: response.data.metadata.location,
+									paymentMethod: response.data.metadata.paymentMethod,
+									originalDescription:
+										response.data.metadata.originalDescription,
+							  }
+							: undefined,
 					};
 
 					// Replace the temporary transaction with the real one
@@ -358,13 +414,27 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 	const deleteTransaction = useCallback(
 		async (id: string) => {
 			// Store the transaction being deleted to check if it affects budgets/goals
-			const transactionToDelete = transactionsRef.current.find((t) => t.id === id);
+			const transactionToDelete = transactionsRef.current.find(
+				(t) => t.id === id
+			);
 
 			// Optimistically update UI
 			setTransactions((prev) => prev.filter((t) => t.id !== id));
 
 			try {
 				await ApiService.delete(`/api/transactions/${id}`);
+
+				// If the deleted transaction was linked to a bill via recurringPattern.patternId,
+				// clear the payment status cache and refetch bills so the bill is no longer marked as paid
+				if (transactionToDelete?.recurringPattern?.patternId) {
+					const patternId = transactionToDelete.recurringPattern.patternId;
+					transactionContextLog.debug(
+						`Transaction deleted that was linked to bill patternId ${patternId}, clearing payment status cache and refetching bills...`
+					);
+					BillService.clearPaymentStatusCache(patternId);
+					// Force a fresh pull of bills so "Paid / Unpaid" + nextExpectedDate reflects backend changes
+					await refetchBillsRef.current();
+				}
 
 				// Refresh budgets and goals if the deleted transaction had a target
 				// The backend updates budgets/goals when deleting, so we need to refresh client state
@@ -540,6 +610,27 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 							response.data.updatedAt ??
 							response.data.createdAt ??
 							new Date().toISOString(),
+						recurringPattern: response.data.recurringPattern
+							? {
+									patternId: response.data.recurringPattern.patternId ?? '',
+									frequency: response.data.recurringPattern.frequency ?? '',
+									confidence: response.data.recurringPattern.confidence ?? 0,
+									nextExpectedDate:
+										response.data.recurringPattern.nextExpectedDate ??
+										new Date().toISOString(),
+							  }
+							: undefined,
+						notes: response.data.notes,
+						source: response.data.source,
+						vendor: response.data.vendor,
+						metadata: response.data.metadata
+							? {
+									location: response.data.metadata.location,
+									paymentMethod: response.data.metadata.paymentMethod,
+									originalDescription:
+										response.data.metadata.originalDescription,
+							  }
+							: undefined,
 					};
 
 					transactionContextLog.debug('Updated transaction with target data', {

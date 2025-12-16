@@ -144,20 +144,22 @@ export const DateField: React.FC<DateFieldProps> = ({
 					{/* Quick actions */}
 					{showQuickActions && (
 						<View style={calendarStyles.quickRow}>
-							<RectButton
-								style={calendarStyles.quickBtn}
-								onPress={setToday}
-								testID="quick-today"
-							>
-								<Text style={calendarStyles.quickText}>Today</Text>
-							</RectButton>
-							<RectButton
-								style={calendarStyles.quickBtn}
-								onPress={clearDate}
-								testID="quick-clear"
-							>
-								<Text style={calendarStyles.quickText}>Clear</Text>
-							</RectButton>
+							<View style={calendarStyles.quickActionsGroup}>
+								<RectButton
+									style={calendarStyles.quickBtn}
+									onPress={setToday}
+									testID="quick-today"
+								>
+									<Text style={calendarStyles.quickText}>Today</Text>
+								</RectButton>
+								<RectButton
+									style={calendarStyles.quickBtn}
+									onPress={clearDate}
+									testID="quick-clear"
+								>
+									<Text style={calendarStyles.quickText}>Clear</Text>
+								</RectButton>
+							</View>
 						</View>
 					)}
 
@@ -165,6 +167,7 @@ export const DateField: React.FC<DateFieldProps> = ({
 					<Calendar
 						onDayPress={handleDayPress}
 						markedDates={marked}
+						current={value || dayjs().format('YYYY-MM-DD')}
 						firstDay={0} // Sunday start
 						enableSwipeMonths
 						renderArrow={(direction) => (
@@ -241,9 +244,13 @@ const calendarStyles = StyleSheet.create({
 	},
 	quickRow: {
 		flexDirection: 'row',
-		justifyContent: 'space-between',
+		justifyContent: 'flex-end',
 		paddingHorizontal: 12,
 		paddingTop: 12,
+	},
+	quickActionsGroup: {
+		flexDirection: 'row',
+		gap: 8,
 	},
 	quickBtn: {
 		borderWidth: 1,

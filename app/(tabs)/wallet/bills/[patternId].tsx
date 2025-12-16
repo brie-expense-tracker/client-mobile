@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useContext } from 'react';
 import {
 	View,
 	Text,
@@ -24,9 +24,12 @@ import {
 } from '../../../../src/ui';
 
 import { useBills } from '../../../../src/context/billContext';
+import { TransactionContext } from '../../../../src/context/transactionContext';
+import { FilterContext } from '../../../../src/context/filterContext';
 import { BillService } from '../../../../src/services';
 import { resolveBillAppearance } from '../../../../src/utils/billAppearance';
 import { dynamicTextStyle } from '../../../../src/utils/accessibility';
+import { currency } from '../../../../src/utils/format';
 
 const formatCurrency = (amount: number): string =>
 	new Intl.NumberFormat('en-US', {
@@ -36,6 +39,18 @@ const formatCurrency = (amount: number): string =>
 
 const formatDate = (dateString: string | null | undefined) => {
 	if (!dateString) return 'Unknown';
+	// Parse date-only string (YYYY-MM-DD) as local date to avoid timezone issues
+	const datePart = dateString.slice(0, 10);
+	if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+		const [year, month, day] = datePart.split('-').map(Number);
+		const date = new Date(year, month - 1, day); // month is 0-indexed
+		return date.toLocaleDateString(undefined, {
+			month: 'short',
+			day: 'numeric',
+			year: 'numeric',
+		});
+	}
+	// Fallback for ISO strings with time
 	const date = new Date(dateString);
 	return date.toLocaleDateString(undefined, {
 		month: 'short',
@@ -49,6 +64,8 @@ export default function BillDetailScreen() {
 	const { patternId } = useLocalSearchParams<{ patternId: string }>();
 
 	const { expenses, isLoading, hasLoaded, refetch, deleteBill } = useBills();
+	const { transactions } = useContext(TransactionContext);
+	const { setSelectedPatternId } = useContext(FilterContext);
 
 	const [refreshing, setRefreshing] = useState(false);
 
@@ -56,6 +73,18 @@ export default function BillDetailScreen() {
 		() => expenses.find((e) => e.patternId === patternId) ?? null,
 		[expenses, patternId]
 	);
+
+	// Get transactions linked to this bill - must be called before early returns
+	const billTransactions = useMemo(() => {
+		if (!patternId) return [];
+		return transactions
+			.filter((tx) => tx.recurringPattern?.patternId === patternId)
+			.sort((a, b) => {
+				const dateA = new Date(a.date).getTime();
+				const dateB = new Date(b.date).getTime();
+				return dateB - dateA; // Newest first
+			});
+	}, [transactions, patternId]);
 
 	// Make sure data is loaded
 	useEffect(() => {
@@ -111,6 +140,13 @@ export default function BillDetailScreen() {
 			]
 		);
 	}, [expense, deleteBill, router]);
+
+	const handleTransactionPress = useCallback(() => {
+		if (patternId) {
+			setSelectedPatternId(patternId);
+			router.push('/(tabs)/dashboard/ledger');
+		}
+	}, [patternId, setSelectedPatternId, router]);
 
 	// -------- Loading / empty states --------
 
@@ -177,6 +213,41 @@ export default function BillDetailScreen() {
 			: `${Math.abs(daysUntil)} day${Math.abs(daysUntil) === 1 ? '' : 's'} ${
 					daysUntil < 0 ? 'overdue' : 'remaining'
 			  }`;
+
+	const formatTransactionDate = (dateString: string) => {
+		// Parse date string correctly to avoid timezone issues
+		// Extract date part (YYYY-MM-DD) and parse as local date
+		const datePart = dateString.slice(0, 10);
+		let date: Date;
+		if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+			// Parse as local date to avoid timezone shifts
+			const [year, month, day] = datePart.split('-').map(Number);
+			date = new Date(year, month - 1, day); // month is 0-indexed
+		} else {
+			// Fallback for ISO strings with time
+			date = new Date(dateString);
+		}
+
+		// Get today and yesterday as local dates (start of day)
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+		const yesterday = new Date(today);
+		yesterday.setDate(yesterday.getDate() - 1);
+
+		// Compare dates (start of day for accurate comparison)
+		const dateStartOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+		if (dateStartOfDay.getTime() === today.getTime()) {
+			return 'Today';
+		}
+		if (dateStartOfDay.getTime() === yesterday.getTime()) {
+			return 'Yesterday';
+		}
+		return date.toLocaleDateString('en-US', {
+			month: 'short',
+			day: 'numeric',
+		});
+	};
 
 	return (
 		<Page
@@ -287,6 +358,75 @@ export default function BillDetailScreen() {
 							</View>
 						</Card>
 					</Section>
+
+					{/* Recent Payments */}
+					{billTransactions.length > 0 && (
+						<Section
+							title="Recent payments"
+							subtitle={`${billTransactions.length} payment${billTransactions.length === 1 ? '' : 's'} recorded`}
+							right={
+								<TouchableOpacity onPress={handleTransactionPress}>
+									<Text style={styles.viewAllText}>View all</Text>
+								</TouchableOpacity>
+							}
+						>
+							<Card>
+								{billTransactions.slice(0, 5).map((tx, index) => (
+									<TouchableOpacity
+										key={`${tx.id}-${index}`}
+										style={[
+											styles.transactionRow,
+											index < Math.min(billTransactions.length, 5) - 1 &&
+												styles.transactionRowWithBorder,
+										]}
+										onPress={handleTransactionPress}
+										activeOpacity={0.7}
+									>
+										<View style={styles.transactionLeft}>
+											<View
+												style={[
+													styles.transactionIcon,
+													{ backgroundColor: `${color}1A` },
+												]}
+											>
+												<Ionicons
+													name="receipt"
+													size={18}
+													color={color}
+												/>
+											</View>
+											<View style={styles.transactionInfo}>
+												<Text
+													style={[
+														styles.transactionDescription,
+														dynamicTextStyle('body'),
+													]}
+												>
+													{tx.description || expense.vendor}
+												</Text>
+												<Text
+													style={[
+														styles.transactionDate,
+														dynamicTextStyle('caption2'),
+													]}
+												>
+													{formatTransactionDate(tx.date)}
+												</Text>
+											</View>
+										</View>
+										<Text
+											style={[
+												styles.transactionAmount,
+												dynamicTextStyle('body'),
+											]}
+										>
+											{currency(Math.abs(tx.amount))}
+										</Text>
+									</TouchableOpacity>
+								))}
+							</Card>
+						</Section>
+					)}
 
 					{/* Actions */}
 					<Section>
@@ -417,5 +557,52 @@ const styles = StyleSheet.create({
 		...typography.bodySm,
 		color: '#EF4444',
 		fontWeight: '500',
+	},
+	viewAllText: {
+		...typography.bodySm,
+		color: palette.primary,
+		fontWeight: '600',
+	},
+	transactionRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		paddingVertical: 12,
+	},
+	transactionRowWithBorder: {
+		borderBottomWidth: StyleSheet.hairlineWidth,
+		borderBottomColor: palette.borderMuted,
+	},
+	transactionLeft: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		flex: 1,
+	},
+	transactionIcon: {
+		width: 36,
+		height: 36,
+		borderRadius: 18,
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginRight: 12,
+	},
+	transactionInfo: {
+		flex: 1,
+	},
+	transactionDescription: {
+		...typography.bodySm,
+		color: palette.text,
+		fontWeight: '500',
+		marginBottom: 2,
+	},
+	transactionDate: {
+		...typography.bodyXs,
+		color: palette.textMuted,
+	},
+	transactionAmount: {
+		...typography.bodySm,
+		color: palette.danger,
+		fontWeight: '600',
+		marginLeft: 12,
 	},
 });

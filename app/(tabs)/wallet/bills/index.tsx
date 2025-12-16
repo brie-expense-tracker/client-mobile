@@ -37,7 +37,8 @@ const BillsScreen: React.FC = () => {
 	const [activeView, setActiveView] = useState<ViewFilter>('all');
 
 	const { expenses, refetch, deleteBill, isLoading, hasLoaded } = useBills();
-	const { refetch: refetchTransactions } = useContext(TransactionContext);
+	const { transactions, refetch: refetchTransactions } =
+		useContext(TransactionContext);
 
 	// load on focus
 	useFocusEffect(
@@ -73,6 +74,24 @@ const BillsScreen: React.FC = () => {
 		}
 	};
 
+	// Get transactions linked to bills
+	const billTransactions = useMemo(() => {
+		const billPatternIds = new Set(
+			expenses.map((exp) => exp.patternId).filter(Boolean)
+		);
+
+		return transactions.filter((tx) => {
+			// Check if transaction is linked to a bill via patternId
+			if (
+				tx.recurringPattern?.patternId &&
+				billPatternIds.has(tx.recurringPattern.patternId)
+			) {
+				return true;
+			}
+			return false;
+		});
+	}, [transactions, expenses]);
+
 	// Simple aggregates to feed into the hero
 	const summary = useMemo(() => {
 		let totalMonthly = 0;
@@ -84,6 +103,21 @@ const BillsScreen: React.FC = () => {
 		let overdueCount = 0;
 
 		const now = new Date();
+		const billPatternIds = new Set(
+			expenses.map((exp) => exp.patternId).filter(Boolean)
+		);
+
+		// Group transactions by bill patternId
+		const transactionsByBill = new Map<string, typeof transactions>();
+		billTransactions.forEach((tx) => {
+			const patternId = tx.recurringPattern?.patternId;
+			if (patternId) {
+				if (!transactionsByBill.has(patternId)) {
+					transactionsByBill.set(patternId, []);
+				}
+				transactionsByBill.get(patternId)!.push(tx);
+			}
+		});
 
 		for (const exp of expenses) {
 			const getMonthlyEquivalent = (amount: number, frequency: string) => {
@@ -112,7 +146,20 @@ const BillsScreen: React.FC = () => {
 
 			const daysUntilDue = BillService.getDaysUntilNext(exp.nextExpectedDate);
 
-			if (daysUntilDue <= 0) {
+			// Check if bill has been paid (has recent transactions)
+			const billTxns = transactionsByBill.get(exp.patternId) || [];
+			const hasRecentPayment = billTxns.some((tx) => {
+				const txDate = new Date(tx.date);
+				const daysDiff = Math.floor(
+					(now.getTime() - txDate.getTime()) / (1000 * 60 * 60 * 24)
+				);
+				// Consider paid if transaction is within the last 30 days
+				return daysDiff >= 0 && daysDiff <= 30;
+			});
+
+			if (hasRecentPayment) {
+				paidCount += 1;
+			} else if (daysUntilDue <= 0) {
 				overdueCount += 1;
 				overdueAmount += monthlyEq;
 			} else if (nextDate >= now) {
@@ -125,9 +172,6 @@ const BillsScreen: React.FC = () => {
 			}
 		}
 
-		// We don't yet track "paid" separately
-		paidCount = 0;
-
 		return {
 			totalMonthly,
 			overdueAmount,
@@ -136,7 +180,7 @@ const BillsScreen: React.FC = () => {
 			upcomingCount,
 			overdueCount,
 		};
-	}, [expenses]);
+	}, [expenses, billTransactions]);
 
 	const filteredExpenses = useMemo(() => {
 		if (activeView === 'all') return expenses;

@@ -504,16 +504,6 @@ export default function EditTransactionScreen() {
 				</View>
 			)}
 
-			{/* Recurring info banner (read-only) */}
-			{!!tx.recurringPattern && (
-				<View style={styles.banner}>
-					<Ionicons name="repeat" size={16} color={palette.primary} />
-					<Text style={styles.bannerText}>
-						Linked to a recurring {tx.recurringPattern.frequency} payment
-					</Text>
-				</View>
-			)}
-
 			<ScrollView
 				contentContainerStyle={[
 					styles.content,
@@ -920,7 +910,7 @@ export default function EditTransactionScreen() {
 					<View style={styles.groupedSection}>
 						<View style={styles.cardHeaderRow}>
 							<View style={{ flex: 1 }}>
-								<Text style={styles.cardTitle}>Recurring expense</Text>
+								<Text style={styles.cardTitle}>Bill</Text>
 								<Text style={styles.cardSubtitle}>
 									Link this to a repeating bill or subscription so Brie can
 									track it for you.
@@ -946,7 +936,7 @@ export default function EditTransactionScreen() {
 									</View>
 									<View style={{ flex: 1 }}>
 										<Text style={styles.recInputTitle}>
-											No recurring expenses yet
+											No bills yet
 										</Text>
 										<Text style={styles.recInputSub}>
 											Create a bill and you&apos;ll be able to link it here.
@@ -1009,7 +999,7 @@ export default function EditTransactionScreen() {
 										<View style={styles.recSheetInline}>
 											{recurringPickerItems.length === 0 ? (
 												<Text style={styles.recEmptyListText}>
-													No recurring expenses available.
+													No bills available.
 												</Text>
 											) : (
 												recurringPickerItems.map((exp) => {
@@ -1046,7 +1036,7 @@ export default function EditTransactionScreen() {
 																	style={styles.optionTitle}
 																	numberOfLines={1}
 																>
-																	{exp.vendor || 'Recurring expense'}
+																	{exp.vendor || 'Bill'}
 																</Text>
 																<Text
 																	style={styles.optionSub}
@@ -1206,21 +1196,6 @@ const styles = StyleSheet.create({
 		gap: space.xs,
 	},
 	errorBannerText: { color: palette.danger, fontWeight: '600', flex: 1 },
-
-	banner: {
-		marginHorizontal: space.lg,
-		marginTop: space.sm,
-		paddingVertical: space.sm + 2,
-		paddingHorizontal: space.md,
-		borderRadius: radius.lg,
-		borderWidth: 1,
-		borderColor: palette.primarySubtle,
-		backgroundColor: palette.infoSubtle,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: space.sm,
-	},
-	bannerText: { color: palette.primary, fontWeight: '600' },
 
 	content: {
 		paddingHorizontal: space.lg,
