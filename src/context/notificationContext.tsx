@@ -14,6 +14,7 @@ import {
 	NotificationConsent,
 } from '../services';
 import useAuth from './AuthContext';
+import { useOnboarding } from './OnboardingContext';
 import { createLogger } from '../utils/sublogger';
 
 const notificationContextLog = createLogger('NotificationContext');
@@ -156,12 +157,20 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 		}
 	}, []);
 
+	const hasInitializedRef = useRef(false);
+
 	// Initialize notification service
 	const initialize = useCallback(async () => {
+		if (hasInitializedRef.current) {
+			notificationContextLog.debug('Notifications already initialized, skipping');
+			return;
+		}
+
 		try {
 			setError(null);
 			const token = await notificationService.initialize();
 			setExpoPushToken(token);
+			hasInitializedRef.current = true;
 
 			// Set up notification service listeners (includes navigation logic)
 			notificationService.setupNotificationListeners();
@@ -194,7 +203,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 					: new Error('Failed to initialize notifications')
 			);
 		}
-	}, [refreshUnreadCount, startPeriodicRefresh]);
+	}, [refreshUnreadCount, startPeriodicRefresh, markAsRead]);
 
 	const getNotifications = useCallback(
 		async (page: number = 1, limit: number = 20) => {
@@ -379,7 +388,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 				err instanceof Error
 					? err
 					: new Error('Failed to delete all notifications')
-			);
+				);
 		}
 	}, []);
 
@@ -436,17 +445,22 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 
 	// Defer notification initialization until user is authenticated
 	const { user, isAuthenticated } = useAuth();
-	const hasInitializedRef = React.useRef(false);
+	const { onboardingVersion } = useOnboarding();
 
 	useEffect(() => {
 		// Only initialize notifications when user is authenticated AND has a real MongoDB ID (not 'temp')
 		// AND has completed onboarding (to avoid requesting permissions during onboarding)
 		// And only initialize once
+		const isVersionComplete =
+			onboardingVersion !== null
+				? onboardingVersion >= 1
+				: (user?.onboardingVersion ?? 0) >= 1;
+
 		if (
 			isAuthenticated &&
 			user &&
 			user._id !== 'temp' &&
-			user.onboardingVersion >= 1 &&
+			isVersionComplete &&
 			!hasInitializedRef.current
 		) {
 			notificationContextLog.debug(
@@ -458,7 +472,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 			notificationContextLog.debug(
 				'Waiting for MongoDB user creation before initializing'
 			);
-		} else if (user && user.onboardingVersion < 1) {
+		} else if (!isVersionComplete) {
 			notificationContextLog.debug(
 				'Waiting for onboarding completion before initializing notifications'
 			);
@@ -476,7 +490,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 			// Reset on cleanup
 			hasInitializedRef.current = false;
 		};
-	}, [initialize, stopPeriodicRefresh, isAuthenticated, user]);
+	}, [initialize, stopPeriodicRefresh, isAuthenticated, user, onboardingVersion]);
 
 	useEffect(() => {
 		if (expoPushToken) {

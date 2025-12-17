@@ -431,7 +431,9 @@ export default function Login() {
 								keyboardType="email-address"
 								autoCapitalize="none"
 								autoCorrect={false}
-								textContentType="username"
+								textContentType="emailAddress"
+								autoComplete="email"
+								importantForAutofill="yes"
 								accessibilityLabel="Email address input"
 								returnKeyType="next"
 								onSubmitEditing={() => {
@@ -465,6 +467,8 @@ export default function Login() {
 									autoCapitalize="none"
 									autoCorrect={false}
 									textContentType="password"
+									autoComplete="password"
+									importantForAutofill="yes"
 									accessibilityLabel="Password input"
 									returnKeyType="done"
 									onSubmitEditing={handleLogin}
