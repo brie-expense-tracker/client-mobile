@@ -56,18 +56,21 @@ SplashScreen.preventAutoHideAsync();
 const styles = StyleSheet.create({
 	devIndicator: {
 		position: 'absolute',
-		top: 50,
+		top: 55,
 		right: 20,
-		backgroundColor: '#4CAF50',
-		paddingHorizontal: 12,
+		backgroundColor: '#FFFFFF',
+		paddingHorizontal: 10,
 		paddingVertical: 6,
-		borderRadius: 20,
+		borderRadius: 999,
+		borderWidth: 1,
+		borderColor: '#10B981',
 		zIndex: 1000,
 	},
 	devText: {
-		color: 'white',
-		fontSize: 12,
-		fontWeight: 'bold',
+		color: '#10B981',
+		fontSize: 11,
+		fontWeight: '700',
+		letterSpacing: 0.6,
 	},
 });
 

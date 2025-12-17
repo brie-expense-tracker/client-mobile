@@ -4,26 +4,34 @@ import {
 	Text,
 	StyleSheet,
 	TouchableOpacity,
+	Pressable,
 	ScrollView,
 	ActivityIndicator,
 	Alert,
 	Share,
 	RefreshControl,
+	Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useProfile } from '../../../../src/context/profileContext';
 import useAuth from '../../../../src/context/AuthContext';
 import AIProfileInsights from './components/AIProfileInsights';
-import CircularProgress from '../../../../src/components/CircularProgress';
 import { useFeature } from '../../../../src/config/features';
 import { IncomeSourceBadge } from '../../../../src/components/IncomeSourceBadge';
 import { IncomeDivergenceWarning } from '../../../../src/components/IncomeDivergenceWarning';
 import { logger } from '../../../../src/utils/logger';
 import { palette, radius, space, type, shadow } from '../../../../src/ui/theme';
 
+const usd = new Intl.NumberFormat('en-US', {
+	style: 'currency',
+	currency: 'USD',
+	minimumFractionDigits: 0,
+	maximumFractionDigits: 2,
+});
+
 const currency = (n?: number) =>
-	typeof n === 'number' && !Number.isNaN(n) ? `$${n.toLocaleString()}` : '$0';
+	typeof n === 'number' && !Number.isNaN(n) ? usd.format(n) : usd.format(0);
 
 const Section = ({
 	title,
@@ -36,15 +44,7 @@ const Section = ({
 }) => (
 	<View style={styles.section}>
 		<View style={styles.sectionHeader}>
-			<Text
-				style={[
-					type.labelSm,
-					styles.sectionTitle,
-					{ color: palette.textSubtle },
-				]}
-			>
-				{title}
-			</Text>
+			<Text style={styles.sectionTitle}>{title.toUpperCase()}</Text>
 			{right}
 		</View>
 		<View style={styles.sectionBody}>{children}</View>
@@ -57,25 +57,7 @@ const Card = ({
 }: {
 	children: React.ReactNode;
 	style?: any;
-}) => (
-	<View
-		style={[
-			styles.card,
-			{
-				backgroundColor: palette.surface,
-				borderColor: palette.border,
-				shadowOpacity: shadow.card.shadowOpacity,
-				shadowRadius: shadow.card.shadowRadius,
-				shadowColor: shadow.card.shadowColor,
-				shadowOffset: shadow.card.shadowOffset,
-				elevation: shadow.card.elevation,
-			},
-			style,
-		]}
-	>
-		{children}
-	</View>
-);
+}) => <View style={[styles.card, style]}>{children}</View>;
 
 const Row = ({
 	icon,
@@ -83,52 +65,88 @@ const Row = ({
 	value,
 	onPress,
 	badge,
+	rightMeta,
+	iconColor,
+	iconBgColor,
+	labelColor,
 }: {
 	icon: keyof typeof Ionicons.glyphMap;
 	label: string;
 	value?: string;
 	onPress?: () => void;
 	badge?: React.ReactNode;
+	rightMeta?: React.ReactNode;
+	iconColor?: string;
+	iconBgColor?: string;
+	labelColor?: string;
 }) => {
-	const Wrapper = onPress ? TouchableOpacity : View;
 	return (
-		<Wrapper
-			activeOpacity={onPress ? 0.7 : 1}
+		<Pressable
 			onPress={onPress}
-			style={styles.rowContainer}
+			disabled={!onPress}
+			style={({ pressed }) => [
+				styles.rowContainer,
+				pressed && onPress ? styles.pressed : null,
+				!onPress && { opacity: 0.98 },
+			]}
 		>
 			<View style={styles.rowLeft}>
-				<View style={[styles.rowIconWrap, { backgroundColor: palette.subtle }]}>
-					<Ionicons name={icon} size={18} color={palette.textMuted} />
+				<View
+					style={[
+						styles.rowIconWrap,
+						{ backgroundColor: iconBgColor || palette.subtle },
+					]}
+				>
+					<Ionicons
+						name={icon}
+						size={18}
+						color={iconColor || palette.textMuted}
+					/>
 				</View>
+
 				<View style={styles.rowTextWrap}>
 					<Text
-						style={[type.body, styles.rowLabel, { color: palette.text }]}
+						style={[
+							type.body,
+							styles.rowLabel,
+							{ color: labelColor || palette.text },
+						]}
 						numberOfLines={1}
 					>
 						{label}
 					</Text>
-					{badge}
+
+					{!!badge && <View style={{ marginTop: 4 }}>{badge}</View>}
 				</View>
 			</View>
+
 			<View style={styles.rowRight}>
-				{value ? (
+				{!!value && (
 					<Text
 						numberOfLines={1}
-						style={[type.small, styles.rowValue, { color: palette.textMuted }]}
+						style={[
+							type.small,
+							styles.rowValue,
+							styles.tabularNums,
+							{ color: palette.textSecondary },
+						]}
 					>
 						{value}
 					</Text>
-				) : null}
-				{onPress ? (
+				)}
+
+				{!!rightMeta && <View style={styles.rowMeta}>{rightMeta}</View>}
+
+				{!!onPress && (
 					<Ionicons
 						name="chevron-forward"
 						size={16}
 						color={palette.textSubtle}
+						style={styles.chevron}
 					/>
-				) : null}
+				)}
 			</View>
-		</Wrapper>
+		</Pressable>
 	);
 };
 
@@ -167,8 +185,8 @@ export default function AccountScreen() {
 			profileData.savings,
 			profileData.debt,
 			profileData.expenses?.housing,
-			profileData.expenses?.transportation,
-			profileData.expenses?.food,
+			profileData.expenses?.loans,
+			profileData.expenses?.subscriptions,
 			profileData.financialGoal,
 		];
 		const filled = fields.filter(
@@ -176,6 +194,74 @@ export default function AccountScreen() {
 		).length;
 		return Math.round((filled / fields.length) * 100);
 	}, []);
+
+	const getFinancialHealthScore = useCallback(() => {
+		if (!profile) return 0;
+		let score = 0;
+		const income = profile.monthlyIncome || 0;
+		const savings = profile.savings || 0;
+		const debt = profile.debt || 0;
+
+		if (savings >= income * 6) score += 40;
+		else if (savings >= income * 3) score += 30;
+		else if (savings >= income * 1) score += 20;
+		else if (savings > 0) score += 10;
+
+		if (income > 0) {
+			const debtRatio = debt / income;
+			if (debtRatio <= 0.2) score += 30;
+			else if (debtRatio <= 0.4) score += 20;
+			else if (debtRatio <= 0.6) score += 10;
+		}
+
+		score += Math.round((profileCompletion / 100) * 30);
+		return Math.min(score, 100);
+	}, [profile, profileCompletion]);
+
+	const healthScore = getFinancialHealthScore();
+	const healthStatus = useMemo(() => {
+		if (healthScore >= 80)
+			return { label: 'Excellent', color: palette.success };
+		if (healthScore >= 60) return { label: 'Good', color: palette.primary };
+		if (healthScore >= 40) return { label: 'Fair', color: palette.warning };
+		return { label: 'Needs work', color: palette.danger };
+	}, [healthScore]);
+
+	const profileStats = useMemo(() => {
+		if (!profile) return { filled: 0, total: 0, missing: 0 };
+
+		const fields = [
+			profile.firstName,
+			profile.lastName,
+			profile.monthlyIncome,
+			profile.savings,
+			profile.debt,
+			profile.expenses?.housing,
+			profile.expenses?.loans,
+			profile.expenses?.subscriptions,
+			profile.financialGoal,
+		];
+
+		const filled = fields.filter(
+			(f) => f !== undefined && f !== null && f !== ''
+		).length;
+		const total = fields.length;
+		const missing = Math.max(0, total - filled);
+
+		return { filled, total, missing };
+	}, [profile]);
+
+	const completionSub =
+		profileCompletion === 100
+			? 'Profile complete'
+			: `${profileStats.missing} fields left`;
+
+	const healthSub =
+		healthScore >= 80
+			? 'Keep it up'
+			: healthScore >= 60
+			? 'On track'
+			: 'Improve by adding savings';
 
 	useEffect(() => {
 		fetchProfile();
@@ -225,29 +311,6 @@ export default function AccountScreen() {
 			]
 		);
 	};
-
-	const getFinancialHealthScore = useCallback(() => {
-		if (!profile) return 0;
-		let score = 0;
-		const income = profile.monthlyIncome || 0;
-		const savings = profile.savings || 0;
-		const debt = profile.debt || 0;
-
-		if (savings >= income * 6) score += 40;
-		else if (savings >= income * 3) score += 30;
-		else if (savings >= income * 1) score += 20;
-		else if (savings > 0) score += 10;
-
-		if (income > 0) {
-			const debtRatio = debt / income;
-			if (debtRatio <= 0.2) score += 30;
-			else if (debtRatio <= 0.4) score += 20;
-			else if (debtRatio <= 0.6) score += 10;
-		}
-
-		score += Math.round((profileCompletion / 100) * 30);
-		return Math.min(score, 100);
-	}, [profile, profileCompletion]);
 
 	const initials = useMemo(() => {
 		const f = (profile?.firstName || '').charAt(0);
@@ -314,11 +377,9 @@ export default function AccountScreen() {
 		);
 	}
 
-	const healthScore = getFinancialHealthScore();
-
 	return (
 		<ScrollView
-			style={{ flex: 1, backgroundColor: palette.bg }}
+			style={{ flex: 1, backgroundColor: palette.surfaceAlt }}
 			contentContainerStyle={styles.scrollContent}
 			showsVerticalScrollIndicator={false}
 			refreshControl={
@@ -332,121 +393,171 @@ export default function AccountScreen() {
 			}
 		>
 			{/* Identity / hero */}
-			<View style={styles.identityRow}>
-				<View
-					style={[styles.avatar, { backgroundColor: palette.primarySubtle }]}
-				>
-					<Text
-						style={[type.h2, styles.avatarLabel, { color: palette.primary }]}
+			<Card style={styles.heroCard}>
+				<View style={styles.identityRow}>
+					<View style={styles.avatar}>
+						<Text
+							style={[type.h2, styles.avatarLabel, { color: palette.primary }]}
+						>
+							{initials}
+						</Text>
+					</View>
+					<View style={styles.identityTextWrap}>
+						<Text
+							style={[
+								type.titleMd,
+								styles.identityName,
+								{ color: palette.text },
+							]}
+							numberOfLines={1}
+						>
+							{profile.firstName || profile.lastName
+								? `${profile.firstName ?? ''} ${profile.lastName ?? ''}`.trim()
+								: 'Your Name'}
+						</Text>
+						<Text
+							style={[type.bodyXs, { color: palette.textSubtle, marginTop: 2 }]}
+							numberOfLines={1}
+						>
+							{user?.email || 'No email set'}
+						</Text>
+						<View style={styles.identityMeta}>
+							<View
+								style={[
+									styles.healthPill,
+									{ backgroundColor: 'rgba(14,165,233,0.08)' },
+								]}
+							>
+								<View
+									style={[
+										styles.healthDot,
+										{ backgroundColor: healthStatus.color },
+									]}
+								/>
+								<Text
+									style={[styles.healthPillText, { color: healthStatus.color }]}
+								>
+									Health: {healthStatus.label}
+								</Text>
+							</View>
+						</View>
+					</View>
+					<TouchableOpacity
+						onPress={() => router.push('/(stack)/settings/profile/editName')}
+						activeOpacity={0.7}
+						style={styles.editPill}
 					>
-						{initials}
-					</Text>
+						<Ionicons name="pencil" size={14} color={palette.primary} />
+						<Text
+							style={[
+								type.small,
+								styles.editPillText,
+								{ color: palette.primary },
+							]}
+						>
+							Edit
+						</Text>
+					</TouchableOpacity>
 				</View>
-				<View style={styles.identityTextWrap}>
-					<Text
-						style={[type.titleMd, styles.identityName, { color: palette.text }]}
-						numberOfLines={1}
-					>
-						{profile.firstName || profile.lastName
-							? `${profile.firstName ?? ''} ${profile.lastName ?? ''}`.trim()
-							: 'Your Name'}
-					</Text>
-					<Text
-						style={[
-							type.small,
-							styles.identityEmail,
-							{ color: palette.textMuted },
-						]}
-						numberOfLines={1}
-					>
-						{user?.email || 'No email set'}
-					</Text>
-				</View>
-				<View style={styles.identityProgress}>
-					<CircularProgress
-						size={52}
-						strokeWidth={6}
-						value={profileCompletion}
-						trackColor={palette.track}
-						barColor={palette.success}
-						label={`${profileCompletion}%`}
-						labelColor={palette.text}
-					/>
-				</View>
-			</View>
+			</Card>
 
 			{/* KPIs */}
-			<View style={styles.kpiRow}>
-				<Card style={styles.kpiCard}>
-					<View style={styles.kpiHeader}>
-						<Ionicons
-							name="checkmark-circle-outline"
-							size={18}
-							color={palette.success}
-						/>
-						<Text
-							style={[
-								type.small,
-								styles.kpiLabel,
-								{ color: palette.textSubtle },
-							]}
-						>
-							Completion
-						</Text>
+			<Card style={styles.kpiModule}>
+				<View style={styles.kpiTopRow}>
+					<View style={styles.kpiTopLeft}>
+						<Text style={styles.kpiEyebrow}>Profile</Text>
+						<Text style={styles.kpiTitle}>Your snapshot</Text>
 					</View>
-					<Text style={[type.numLg, styles.kpiValue, { color: palette.text }]}>
-						{profileCompletion}%
-					</Text>
-					<View style={[styles.kpiBar, { backgroundColor: palette.border }]}>
+
+					<View style={styles.kpiTopRight}>
 						<View
 							style={[
-								styles.kpiBarFill,
-								{
-									backgroundColor: palette.success,
-									width: `${profileCompletion}%`,
-								},
-							]}
-						/>
-					</View>
-				</Card>
-
-				<Card style={styles.kpiCard}>
-					<View style={styles.kpiHeader}>
-						<Ionicons
-							name="trending-up-outline"
-							size={18}
-							color={palette.primary}
-						/>
-						<Text
-							style={[
-								type.small,
-								styles.kpiLabel,
-								{ color: palette.textSubtle },
+								styles.healthPill,
+								{ backgroundColor: 'rgba(14,165,233,0.10)' }, // tint from primary
 							]}
 						>
-							Health
-						</Text>
+							<View
+								style={[
+									styles.healthDot,
+									{ backgroundColor: healthStatus.color },
+								]}
+							/>
+							<Text
+								style={[styles.healthPillText, { color: healthStatus.color }]}
+							>
+								{healthStatus.label}
+							</Text>
+						</View>
 					</View>
-					<Text style={[type.numLg, styles.kpiValue, { color: palette.text }]}>
-						{healthScore}/100
-					</Text>
-					<Text
-						style={[type.small, styles.kpiSub, { color: palette.textSubtle }]}
-					>
-						{healthScore >= 80
-							? 'Excellent'
-							: healthScore >= 60
-							? 'Good'
-							: healthScore >= 40
-							? 'Fair'
-							: 'Needs work'}
-					</Text>
-				</Card>
-			</View>
+				</View>
+
+				<View style={styles.kpiGrid}>
+					{/* Completion lane */}
+					<View style={styles.kpiLane}>
+						<View style={styles.kpiLaneHeader}>
+							<Ionicons
+								name="checkmark-circle-outline"
+								size={18}
+								color={palette.success}
+							/>
+							<Text style={styles.kpiLaneLabel}>Completion</Text>
+						</View>
+
+						<View style={styles.kpiValueRow}>
+							<Text style={styles.kpiValue}>{profileCompletion}%</Text>
+							<Text style={styles.kpiSub}>{completionSub}</Text>
+						</View>
+
+						<View style={styles.kpiTrack}>
+							<View
+								style={[
+									styles.kpiFill,
+									{
+										width: `${profileCompletion}%`,
+										backgroundColor: palette.success,
+									},
+								]}
+							/>
+						</View>
+					</View>
+
+					<View style={styles.kpiDivider} />
+
+					{/* Health lane */}
+					<View style={styles.kpiLane}>
+						<View style={styles.kpiLaneHeader}>
+							<Ionicons
+								name="trending-up-outline"
+								size={18}
+								color={healthStatus.color}
+							/>
+							<Text style={styles.kpiLaneLabel}>Health</Text>
+						</View>
+
+						<View style={styles.kpiValueRow}>
+							<Text style={styles.kpiValue}>{healthScore}</Text>
+							<Text style={styles.kpiValueSuffix}>/100</Text>
+							<Text style={styles.kpiSub}>{healthSub}</Text>
+						</View>
+
+						<View style={styles.kpiTrack}>
+							<View
+								style={[
+									styles.kpiFill,
+									{
+										width: `${healthScore}%`,
+										backgroundColor: healthStatus.color,
+									},
+								]}
+							/>
+						</View>
+					</View>
+				</View>
+			</Card>
 
 			{/* Account */}
 			<Section title="Account">
-				<Card>
+				<Card style={[styles.cardSoft, styles.listCard]}>
 					<Row
 						icon="person-outline"
 						label="Name"
@@ -457,7 +568,6 @@ export default function AccountScreen() {
 						}
 						onPress={() => router.push('/(stack)/settings/profile/editName')}
 					/>
-					<View style={[styles.divider, { backgroundColor: palette.border }]} />
 					<View style={[styles.divider, { backgroundColor: palette.border }]} />
 					<Row
 						icon="call-outline"
@@ -491,7 +601,7 @@ export default function AccountScreen() {
 
 			{/* Financial */}
 			<Section title="Financial">
-				<Card>
+				<Card style={[styles.cardSoft, styles.listCard]}>
 					<Row
 						icon="cash-outline"
 						label="Monthly Income"
@@ -501,12 +611,13 @@ export default function AccountScreen() {
 						onPress={() =>
 							router.push('/(stack)/settings/profile/editFinancial')
 						}
-						badge={
+						rightMeta={
 							incomeEstimate && (
 								<IncomeSourceBadge
 									source={incomeEstimate.source}
 									confidence={incomeEstimate.confidence}
 									compact
+									tone="ghost"
 								/>
 							)
 						}
@@ -520,11 +631,26 @@ export default function AccountScreen() {
 							router.push('/(stack)/settings/profile/editFinancial')
 						}
 					/>
+					{profile.savings === 0 && (
+						<Text
+							style={[
+								type.labelXs,
+								{
+									color: palette.warning,
+									marginLeft: 52,
+									marginBottom: 2,
+									fontWeight: '600',
+								},
+							]}
+						>
+							Adding savings improves your health score
+						</Text>
+					)}
 					<Text
 						style={[
 							type.small,
 							styles.helperText,
-							{ color: palette.textSubtle },
+							{ color: palette.textSubtle, marginLeft: 52, marginTop: 2 },
 						]}
 					>
 						Include cash + investment balances.
@@ -583,85 +709,89 @@ export default function AccountScreen() {
 				}
 			>
 				<View style={styles.quickGrid}>
-					<TouchableOpacity
-						style={[
+					<Pressable
+						android_ripple={{ color: 'rgba(0,0,0,0.04)', borderless: false }}
+						style={({ pressed }) => [
 							styles.quickTile,
-							{
-								borderColor: palette.border,
-								backgroundColor: palette.surface,
-							},
+							pressed && { transform: [{ scale: 0.985 }], opacity: 0.96 },
+							pressed && Platform.OS === 'ios' ? { shadowOpacity: 0.03 } : null,
 						]}
-						activeOpacity={0.8}
 						onPress={() =>
 							router.push('/(stack)/settings/profile/editFinancial')
 						}
 					>
-						<Ionicons name="cash-outline" size={20} color={palette.success} />
+						<View style={styles.quickIconWrap}>
+							<Ionicons name="cash-outline" size={20} color={palette.success} />
+						</View>
 						<Text
-							style={[type.small, styles.quickLabel, { color: palette.text }]}
+							style={[type.body, styles.quickLabel, { color: palette.text }]}
 						>
 							Financial Info
 						</Text>
-					</TouchableOpacity>
+						<Text style={styles.quickSub}>Adjust income</Text>
+					</Pressable>
 
-					<TouchableOpacity
-						style={[
+					<Pressable
+						android_ripple={{ color: 'rgba(0,0,0,0.04)', borderless: false }}
+						style={({ pressed }) => [
 							styles.quickTile,
-							{
-								borderColor: palette.border,
-								backgroundColor: palette.surface,
-							},
+							pressed && { transform: [{ scale: 0.985 }], opacity: 0.96 },
+							pressed && Platform.OS === 'ios' ? { shadowOpacity: 0.03 } : null,
 						]}
-						activeOpacity={0.8}
 						onPress={() =>
 							router.push('/(stack)/settings/profile/editExpenses')
 						}
 					>
-						<Ionicons name="card-outline" size={20} color={palette.warning} />
+						<View style={styles.quickIconWrap}>
+							<Ionicons name="card-outline" size={20} color={palette.warning} />
+						</View>
 						<Text
-							style={[type.small, styles.quickLabel, { color: palette.text }]}
+							style={[type.body, styles.quickLabel, { color: palette.text }]}
 						>
 							Edit Expenses
 						</Text>
-					</TouchableOpacity>
+						<Text style={styles.quickSub}>Monthly costs</Text>
+					</Pressable>
 
-					<TouchableOpacity
-						style={[
+					<Pressable
+						android_ripple={{ color: 'rgba(0,0,0,0.04)', borderless: false }}
+						style={({ pressed }) => [
 							styles.quickTile,
-							{
-								borderColor: palette.border,
-								backgroundColor: palette.surface,
-							},
+							pressed && { transform: [{ scale: 0.985 }], opacity: 0.96 },
+							pressed && Platform.OS === 'ios' ? { shadowOpacity: 0.03 } : null,
 						]}
-						activeOpacity={0.8}
 						onPress={() => router.push('/(tabs)/wallet/goals')}
 					>
-						<Ionicons name="flag-outline" size={20} color={palette.primary} />
+						<View style={styles.quickIconWrap}>
+							<Ionicons name="flag-outline" size={20} color={palette.primary} />
+						</View>
 						<Text
-							style={[type.small, styles.quickLabel, { color: palette.text }]}
+							style={[type.body, styles.quickLabel, { color: palette.text }]}
 						>
 							Goals
 						</Text>
-					</TouchableOpacity>
+						<Text style={styles.quickSub}>Set targets</Text>
+					</Pressable>
 
-					<TouchableOpacity
-						style={[
+					<Pressable
+						android_ripple={{ color: 'rgba(0,0,0,0.04)', borderless: false }}
+						style={({ pressed }) => [
 							styles.quickTile,
-							{
-								borderColor: palette.border,
-								backgroundColor: palette.surface,
-							},
+							pressed && { transform: [{ scale: 0.985 }], opacity: 0.96 },
+							pressed && Platform.OS === 'ios' ? { shadowOpacity: 0.03 } : null,
 						]}
-						activeOpacity={0.8}
 						onPress={handleBackupProfile}
 					>
-						<Ionicons name="cloud-upload-outline" size={20} color="#8b5cf6" />
+						<View style={styles.quickIconWrap}>
+							<Ionicons name="cloud-upload-outline" size={20} color="#8b5cf6" />
+						</View>
 						<Text
-							style={[type.small, styles.quickLabel, { color: palette.text }]}
+							style={[type.body, styles.quickLabel, { color: palette.text }]}
 						>
 							Backup
 						</Text>
-					</TouchableOpacity>
+						<Text style={styles.quickSub}>Export data</Text>
+					</Pressable>
 				</View>
 			</Section>
 
@@ -692,7 +822,7 @@ export default function AccountScreen() {
 						</TouchableOpacity>
 					}
 				>
-					<Card>
+					<Card style={[styles.cardSoft, styles.listCard]}>
 						<AIProfileInsights
 							profile={profile}
 							onAction={(a) => {
@@ -721,10 +851,13 @@ export default function AccountScreen() {
 
 			{/* Management */}
 			<Section title="Management">
-				<Card>
+				<Card style={[styles.cardSoft, styles.listCard]}>
 					<Row
 						icon="trash-outline"
 						label="Delete Account"
+						iconColor={palette.danger}
+						iconBgColor={palette.dangerSoft}
+						labelColor={palette.danger}
 						onPress={() =>
 							router.push('/(stack)/settings/profile/deleteAccount')
 						}
@@ -738,36 +871,56 @@ export default function AccountScreen() {
 const styles = StyleSheet.create({
 	scrollContent: {
 		paddingHorizontal: space.lg,
-		paddingTop: space.lg,
+		paddingTop: space.md, // slightly tighter
 		paddingBottom: space.xxl,
 	},
 	section: {
-		marginTop: space.lg,
+		marginTop: 22, // slightly less than xl
 	},
 	sectionHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		marginBottom: space.sm,
+		marginBottom: 10,
 	},
 	sectionTitle: {
-		// type.labelSm is applied in-line
+		letterSpacing: 1.4,
+		fontSize: 11,
+		fontWeight: '700',
+		textTransform: 'uppercase',
+		color: palette.textSubtle,
 	},
 	sectionBody: {
 		gap: space.sm,
 	},
 
 	card: {
-		borderRadius: radius.lg,
-		padding: space.md,
-		borderWidth: StyleSheet.hairlineWidth,
-		...shadow.card,
+		borderRadius: radius.xl,
+		padding: space.lg,
+		borderWidth: 1,
+		borderColor: 'rgba(229,231,235,0.45)', // lighter
+		backgroundColor: palette.surface,
+		...shadow.soft, // use soft by default
+	},
+	cardSoft: {
+		borderRadius: radius.xl,
+		marginHorizontal: 0, // remove inset; it reads cleaner
+		backgroundColor: palette.surface,
+		...shadow.soft,
+	},
+	listCard: {
+		paddingVertical: space.xs,
+		paddingHorizontal: space.md,
 	},
 
 	rowContainer: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		paddingVertical: space.sm,
+		paddingVertical: 12,
+	},
+	pressed: {
+		opacity: 0.92,
+		transform: [{ scale: 0.995 }],
 	},
 	rowLeft: {
 		flexDirection: 'row',
@@ -776,9 +929,10 @@ const styles = StyleSheet.create({
 		gap: space.sm,
 	},
 	rowIconWrap: {
-		width: 30,
-		height: 30,
-		borderRadius: radius.md,
+		width: 34,
+		height: 34,
+		borderRadius: 17,
+		backgroundColor: palette.subtle,
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
@@ -789,17 +943,32 @@ const styles = StyleSheet.create({
 	rowRight: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: space.xs,
-		maxWidth: '60%',
 		justifyContent: 'flex-end',
+		gap: 10,
+		flexShrink: 0,
 	},
 	rowValue: {
-		maxWidth: '90%',
+		maxWidth: 120,
+		textAlign: 'right',
+		flexShrink: 1,
+		fontWeight: '500',
+	},
+	rowMeta: {
+		flexShrink: 0,
+	},
+	tabularNums: {
+		// makes currency columns feel “designed”
+		fontVariant: ['tabular-nums'],
+	},
+	chevron: {
+		marginLeft: 0,
 	},
 
 	divider: {
-		height: StyleSheet.hairlineWidth,
-		marginVertical: space.xs,
+		height: 1,
+		opacity: 0.45,
+		backgroundColor: 'rgba(229,231,235,0.5)',
+		marginLeft: 52, // aligns under text, not under icon
 	},
 
 	stateWrap: {
@@ -827,17 +996,24 @@ const styles = StyleSheet.create({
 		fontWeight: '700',
 	},
 
+	heroCard: {
+		padding: 14,
+		borderRadius: radius.xl,
+		...shadow.card, // only hero gets stronger shadow
+	},
 	identityRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		marginBottom: space.md,
 	},
 	avatar: {
-		width: 52,
-		height: 52,
-		borderRadius: 26,
+		width: 58,
+		height: 58,
+		borderRadius: 29,
 		alignItems: 'center',
 		justifyContent: 'center',
+		borderWidth: 1.5,
+		borderColor: 'rgba(229,231,235,0.9)',
+		backgroundColor: palette.primarySubtle,
 	},
 	avatarLabel: {
 		fontWeight: '700',
@@ -847,47 +1023,148 @@ const styles = StyleSheet.create({
 		marginLeft: space.md,
 	},
 	identityName: {},
-	identityEmail: {
-		marginTop: 2,
-	},
-	identityProgress: {
+	identityMeta: {
+		marginTop: 6,
+		flexDirection: 'row',
 		alignItems: 'center',
-		justifyContent: 'center',
+		gap: 8,
+	},
+	statusDot: {
+		width: 8,
+		height: 8,
+		borderRadius: 4,
+	},
+	editPill: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+		paddingHorizontal: 10,
+		paddingVertical: 8,
+		borderRadius: 999,
+		backgroundColor: palette.primarySubtle,
+	},
+	editPillText: {
+		fontWeight: '700',
 	},
 
-	kpiRow: {
-		flexDirection: 'row',
-		gap: space.md,
-		marginBottom: space.sm,
+	kpiModule: {
+		padding: space.lg,
+		borderRadius: radius.xl,
+		borderWidth: 1,
+		borderColor: 'rgba(229,231,235,0.45)',
+		backgroundColor: 'rgba(255,255,255,0.96)',
+		...shadow.soft,
 	},
-	kpiCard: {
-		flex: 1,
-	},
-	kpiHeader: {
+
+	kpiTopRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: space.xs,
-		marginBottom: space.xs,
+		justifyContent: 'space-between',
+		marginBottom: space.md,
 	},
-	kpiLabel: {},
+	kpiTopLeft: {
+		flex: 1,
+	},
+	kpiEyebrow: {
+		fontSize: 11,
+		fontWeight: '700',
+		letterSpacing: 1.1,
+		textTransform: 'uppercase',
+		color: palette.textSubtle,
+	},
+	kpiTitle: {
+		marginTop: 4,
+		fontSize: 16,
+		fontWeight: '700',
+		color: palette.text,
+	},
+	kpiTopRight: {
+		marginLeft: space.md,
+	},
+
+	healthPill: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+		paddingHorizontal: 9,
+		paddingVertical: 5,
+		borderRadius: 999,
+		marginTop: 2, // optical alignment
+	},
+	healthDot: {
+		width: 8,
+		height: 8,
+		borderRadius: 4,
+	},
+	healthPillText: {
+		fontSize: 11,
+		fontWeight: '700',
+	},
+
+	kpiGrid: {
+		flexDirection: 'row',
+		alignItems: 'stretch',
+	},
+	kpiLane: {
+		flex: 1,
+	},
+	kpiLaneHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+		marginBottom: 8,
+	},
+	kpiLaneLabel: {
+		fontSize: 12,
+		fontWeight: '700',
+		color: palette.textSubtle,
+	},
+
+	kpiValueRow: {
+		flexDirection: 'row',
+		alignItems: 'baseline',
+		flexWrap: 'wrap',
+		gap: 6,
+		marginBottom: 10,
+	},
 	kpiValue: {
-		marginBottom: space.xs,
+		fontSize: 22,
+		fontWeight: '800',
+		color: palette.text,
+		fontVariant: ['tabular-nums'],
 	},
-	kpiBar: {
-		height: 6,
-		borderRadius: 3,
-		overflow: 'hidden',
-	},
-	kpiBarFill: {
-		height: '100%',
-		borderRadius: 3,
+	kpiValueSuffix: {
+		fontSize: 12,
+		fontWeight: '700',
+		color: palette.textSubtle,
+		marginLeft: -4,
 	},
 	kpiSub: {
-		marginTop: 4,
+		fontSize: 12,
+		fontWeight: '600',
+		color: palette.textSubtle,
+	},
+
+	kpiTrack: {
+		height: 7,
+		borderRadius: 999,
+		backgroundColor: palette.track,
+		overflow: 'hidden',
+	},
+	kpiFill: {
+		height: '100%',
+		borderRadius: 999,
+	},
+
+	kpiDivider: {
+		width: 1,
+		backgroundColor: 'rgba(229,231,235,0.7)',
+		marginHorizontal: space.lg,
 	},
 
 	helperText: {
-		marginTop: 4,
+		marginTop: 2,
+		marginBottom: 6,
 	},
 
 	inlineButton: {
@@ -906,14 +1183,34 @@ const styles = StyleSheet.create({
 		gap: space.sm,
 	},
 	quickTile: {
-		width: '48%',
-		paddingVertical: space.md,
-		borderRadius: radius.lg,
+		flexBasis: '48%',
+		flexGrow: 1,
+		paddingVertical: space.sm,
+		paddingHorizontal: space.md,
+		borderRadius: radius.xl,
 		borderWidth: 1,
+		borderColor: 'rgba(229,231,235,0.6)',
+		backgroundColor: palette.surface,
 		alignItems: 'center',
-		gap: space.xs,
+		justifyContent: 'center',
+		gap: 8,
+	},
+	quickIconWrap: {
+		width: 42,
+		height: 42,
+		borderRadius: 21,
+		backgroundColor: palette.surfaceAlt, // a bit stronger than subtle
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
 	quickLabel: {
 		textAlign: 'center',
+		fontWeight: '700',
+	},
+	quickSub: {
+		marginTop: -2,
+		color: palette.textSubtle,
+		fontSize: 11,
+		fontWeight: '500',
 	},
 });
