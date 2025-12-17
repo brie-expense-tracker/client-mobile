@@ -433,14 +433,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				});
 			}
 
-			// Skip processing if we're handling manual login, reauthentication, or cancelled Google Sign-In
+			// Skip processing if we're handling manual login, reauthentication, or Google Sign-In
 			if (
 				isManualLoginRef.current ||
 				isReauthInProgressRef.current ||
-				isGoogleSignInCancelledRef.current
+				isGoogleSignInCancelledRef.current ||
+				isGoogleSignInInProgressRef.current
 			) {
 				authContextLog.debug(
-					'Manual login, reauthentication, or cancelled Google Sign-In in progress, skipping auth state change processing'
+					'Manual login, reauthentication, or Google Sign-In in progress, skipping auth state change processing'
 				);
 				return;
 			}
@@ -521,7 +522,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				if (isDevMode) {
 					authContextLog.debug('ID token refreshed');
 				}
-			} catch (err) {
+			} catch (err: any) {
+				// Silently handle token refresh failures during logout/deletion
+				const isUserDeleted =
+					err?.code === 'auth/user-not-found' ||
+					err?.message?.includes('user-not-found') ||
+					err?.code === 'auth/user-token-expired';
+
+				if (isUserDeleted) {
+					authContextLog.debug(
+						'ID token refresh failed because user no longer exists or token expired'
+					);
+					return;
+				}
+
 				authContextLog.error('Failed to refresh ID token', err);
 				Sentry.captureException(err);
 			}
@@ -960,6 +974,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			let firebaseUser: FirebaseAuthTypes.User | null = null;
 
 			try {
+				authContextLog.debug('Starting email signup flow');
+				isManualLoginRef.current = true;
+				setLoading(true);
+
 				// Create user in Firebase first
 				const { createUserWithEmailAndPassword } = await import(
 					'@react-native-firebase/auth'
@@ -971,8 +989,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				);
 				firebaseUser = userCredential.user;
 
+				authContextLog.debug('Firebase user created, setting in state');
+				setFirebaseUser(firebaseUser);
+
 				// Create user in MongoDB
+				authContextLog.debug('Creating user in MongoDB');
 				await createUserInMongoDB(firebaseUser, name);
+
+				authContextLog.info('Signup process completed successfully');
+				setLoading(false);
 			} catch (error: any) {
 				// Handle specific Firebase errors
 				if (error.code === 'auth/email-already-in-use') {
@@ -999,6 +1024,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 						message: signupError.message,
 						details: error,
 					});
+					setLoading(false);
 					throw signupError;
 				}
 
@@ -1028,7 +1054,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 					message: 'Failed to create account',
 					details: error,
 				});
+				setLoading(false);
 				throw error;
+			} finally {
+				// Reset manual login flag with a small delay to allow auth state changes to settle
+				setTimeout(() => {
+					isManualLoginRef.current = false;
+				}, 1000);
 			}
 		},
 		[createUserInMongoDB]
@@ -1038,6 +1070,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const signInWithGoogle = useCallback(async () => {
 		try {
 			authContextLog.debug('Starting Google Sign-In flow');
+			isManualLoginRef.current = true;
 			setLoading(true);
 			setError(null);
 			isGoogleSignInCancelledRef.current = false;
@@ -1144,6 +1177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			setTimeout(() => {
 				isGoogleSignInCancelledRef.current = false;
 				isGoogleSignInInProgressRef.current = false;
+				isManualLoginRef.current = false;
 			}, 1000);
 		}
 	}, [login]);
@@ -1151,6 +1185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const signUpWithGoogle = useCallback(async () => {
 		try {
 			authContextLog.debug('Starting Google Sign-Up flow');
+			isManualLoginRef.current = true;
 			setLoading(true);
 			setError(null);
 			isGoogleSignInCancelledRef.current = false;
@@ -1300,6 +1335,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			setTimeout(() => {
 				isGoogleSignInCancelledRef.current = false;
 				isGoogleSignInInProgressRef.current = false;
+				isManualLoginRef.current = false;
 			}, 1000);
 		}
 	}, [login]);
@@ -1376,6 +1412,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			// The backend uses Firebase Admin SDK to delete the Firebase account,
 			// which bypasses the client-side reauthentication requirement
 			await UserService.deleteUserAccount();
+
+			// Clear Firebase client state explicitly
+			try {
+				await signOut(getAuth());
+			} catch (signOutError) {
+				// Expected if user was already deleted on server
+				authContextLog.debug(
+					'Sign out after deletion failed (expected)',
+					signOutError
+				);
+			}
 
 			// Clear AsyncStorage and context state
 			await removeItem(UID_KEY);
@@ -1477,6 +1524,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				'Account deletion completed successfully (backend handled Firebase deletion)'
 			);
 
+			// Clear Firebase client state explicitly
+			try {
+				await signOut(getAuth());
+			} catch (signOutError) {
+				// Expected if user was already deleted on server
+				authContextLog.debug(
+					'Sign out after deletion failed (expected)',
+					signOutError
+				);
+			}
+
 			// Local cleanup
 			await removeItem(UID_KEY);
 			setUser(null);
@@ -1516,6 +1574,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			const providerId = user.providerData?.[0]?.providerId ?? null;
 
 			try {
+				// Prevent onAuthStateChanged from interfering during the deletion flow
+				isManualLoginRef.current = true;
 				authContextLog.debug('deleteAccountFlow: Starting', { providerId });
 
 				// 1) Reauthenticate FIRST based on provider
@@ -1555,6 +1615,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				authContextLog.error('deleteAccountFlow: Error', error);
 				// Re-throw the error so the UI can handle it
 				throw error;
+			} finally {
+				// Reset the manual login flag after deletion flow completes
+				// Use a small delay to allow any pending auth state changes to settle
+				setTimeout(() => {
+					isManualLoginRef.current = false;
+				}, 1000);
 			}
 		},
 		[
