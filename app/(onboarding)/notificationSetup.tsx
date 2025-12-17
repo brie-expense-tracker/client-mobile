@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNotification } from '../../src/context/notificationContext';
 import { useProfile } from '../../src/context/profileContext';
 import { useOnboarding } from '../../src/context/OnboardingContext';
-import { NotificationConsent } from '../../src/services';
+import { NotificationConsent, notificationService } from '../../src/services';
 
 type PresetKey = 'essential' | 'recommended' | 'quiet';
 
@@ -155,14 +155,36 @@ export default function NotificationPermissionScreen() {
 			await markOnboardingComplete();
 			logger.debug('✅ [NotificationSetup] Onboarding marked as complete');
 
+			// Send a welcome notification if permissions were granted
+			if (granted) {
+				logger.debug('🔔 [NotificationSetup] Sending welcome notification');
+				try {
+					await notificationService.sendNotification(
+						'Welcome to Brie! 👋',
+						"You're all set. We'll notify you about important budget updates and insights.",
+						'system'
+					);
+					logger.debug('✅ [NotificationSetup] Welcome notification sent');
+				} catch (notifError) {
+					logger.error(
+						'❌ [NotificationSetup] Failed to send welcome notification:',
+						notifError
+					);
+				}
+			}
+
 			logger.debug('🎉 [NotificationSetup] Navigating to dashboard...');
 			router.replace('/(tabs)/dashboard');
-			
+
 			// Show alert about denied permissions AFTER navigation
 			if (!granted) {
-				logger.debug('⏰ [NotificationSetup] Scheduling notification alert after 1000ms');
+				logger.debug(
+					'⏰ [NotificationSetup] Scheduling notification alert after 1000ms'
+				);
 				setTimeout(() => {
-					logger.debug('🔔 [NotificationSetup] Showing notification disabled alert');
+					logger.debug(
+						'🔔 [NotificationSetup] Showing notification disabled alert'
+					);
 					Alert.alert(
 						'Notifications Disabled',
 						"You haven't allowed notifications. You can enable them later in your device settings to receive budget alerts and insights.",

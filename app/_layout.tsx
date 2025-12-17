@@ -552,11 +552,11 @@ export default function RootLayout() {
 							translucent={false}
 						/>
 						<AuthProvider>
-							<NotificationProvider>
-								<OnboardingProvider>
+							<OnboardingProvider>
+								<NotificationProvider>
 									<RootLayoutContent />
-								</OnboardingProvider>
-							</NotificationProvider>
+								</NotificationProvider>
+							</OnboardingProvider>
 						</AuthProvider>
 					</ThemeProvider>
 				</QueryClientProvider>

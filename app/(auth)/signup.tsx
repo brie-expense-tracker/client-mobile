@@ -212,7 +212,9 @@ export default function Signup() {
 								keyboardType="email-address"
 								autoCapitalize="none"
 								autoCorrect={false}
-								textContentType="username"
+								textContentType="emailAddress"
+								autoComplete="email"
+								importantForAutofill="yes"
 								accessibilityLabel="Email address input"
 								returnKeyType="next"
 								onSubmitEditing={() => {
@@ -245,7 +247,10 @@ export default function Signup() {
 									secureTextEntry={!showPassword}
 									autoCapitalize="none"
 									autoCorrect={false}
-									textContentType="password"
+									textContentType="newPassword"
+									autoComplete="password-new"
+									importantForAutofill="yes"
+									passwordRules="minlength: 6;"
 									accessibilityLabel="Password input"
 									returnKeyType="done"
 									onSubmitEditing={handleSignup}
