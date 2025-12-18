@@ -150,11 +150,6 @@ export default function NotificationPermissionScreen() {
 			});
 			logger.debug('✅ [NotificationSetup] Preferences saved successfully');
 
-			// Mark onboarding as complete
-			logger.debug('🎯 [NotificationSetup] Marking onboarding as complete...');
-			await markOnboardingComplete();
-			logger.debug('✅ [NotificationSetup] Onboarding marked as complete');
-
 			// Send a welcome notification if permissions were granted
 			if (granted) {
 				logger.debug('🔔 [NotificationSetup] Sending welcome notification');
@@ -173,7 +168,10 @@ export default function NotificationPermissionScreen() {
 				}
 			}
 
-			logger.debug('🎉 [NotificationSetup] Navigating to dashboard...');
+			logger.debug(
+				'🎉 [NotificationSetup] Marking onboarding complete and navigating to dashboard...'
+			);
+			await markOnboardingComplete();
 			router.replace('/(tabs)/dashboard');
 
 			// Show alert about denied permissions AFTER navigation
@@ -223,15 +221,13 @@ export default function NotificationPermissionScreen() {
 									'⚠️ [NotificationSetup] Continuing despite error, marking onboarding complete...'
 								);
 								await markOnboardingComplete();
-								logger.debug(
-									'✅ [NotificationSetup] Onboarding marked complete, navigating...'
-								);
 								router.replace('/(tabs)/dashboard');
 							} catch (fallbackError) {
 								logger.error(
 									'❌ [NotificationSetup] Error in fallback:',
 									fallbackError
 								);
+								await markOnboardingComplete();
 								router.replace('/(tabs)/dashboard');
 							}
 						},
@@ -280,12 +276,10 @@ export default function NotificationPermissionScreen() {
 			});
 			logger.debug('✅ [NotificationSetup] Preferences saved successfully');
 
-			// Mark onboarding as complete even when skipping
-			logger.debug('🎯 [NotificationSetup] Marking onboarding as complete...');
+			logger.debug(
+				'🎉 [NotificationSetup] Marking onboarding complete and navigating to dashboard...'
+			);
 			await markOnboardingComplete();
-			logger.debug('✅ [NotificationSetup] Onboarding marked as complete');
-
-			logger.debug('🎉 [NotificationSetup] Navigating to dashboard...');
 			router.replace('/(tabs)/dashboard');
 		} catch (error) {
 			logger.error('❌ [NotificationSetup] Error in skip handler:', error);
@@ -296,22 +290,8 @@ export default function NotificationPermissionScreen() {
 				logger.error('❌ [NotificationSetup] Error stack:', error.stack);
 			}
 
-			// Even on error, mark onboarding complete and continue
-			try {
-				logger.debug(
-					'⚠️ [NotificationSetup] Error occurred, still marking onboarding complete...'
-				);
-				await markOnboardingComplete();
-				logger.debug(
-					'✅ [NotificationSetup] Onboarding marked complete despite error'
-				);
-			} catch (markError) {
-				logger.error(
-					'❌ [NotificationSetup] Failed to mark onboarding complete:',
-					markError
-				);
-			}
-
+			// Even on error, mark complete and navigate to dashboard
+			await markOnboardingComplete();
 			router.replace('/(tabs)/dashboard');
 		} finally {
 			logger.debug('🏁 [NotificationSetup] Skip handler complete');

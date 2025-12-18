@@ -54,10 +54,30 @@ The onboarding process has been optimized to provide maximum value with minimal 
 - Enables push notification delivery
 - Configures AI insight scheduling
 
+### 3. **Onboarding Summary** (`summary.tsx`)
+
+**Purpose:** Provide a final snapshot of the user's profile and health before entering the app.
+
+**What it shows:**
+
+- Profile completion percentage
+- Initial financial health score
+- Snapshot of key financial data (income, savings, debt, housing)
+
+**Value to user:**
+
+- One-time confirmation checkpoint
+- Encouragement through health score
+- Last chance to verify data before the dashboard
+
+**Server integration:**
+
+- Marks onboarding as complete via `markOnboardingComplete`
+
 ## User Journey
 
 ```
-New User → Profile Setup → Notification Setup → Main App
+New User → Profile Setup → Notification Setup → Onboarding Summary → Main App
 ```
 
 ### Entry Points
@@ -69,7 +89,8 @@ New User → Profile Setup → Notification Setup → Main App
 ### Exit Points
 
 - Profile setup completion → Notification setup
-- Notification setup completion → Main app dashboard
+- Notification setup completion → Onboarding summary
+- Onboarding summary completion → Main app dashboard
 - Skip options available at each step
 
 ## Technical Implementation
@@ -101,12 +122,13 @@ New User → Profile Setup → Notification Setup → Main App
 3. Profile setup (valuable)
 4. Notification setup (valuable)
 
-### After (2 screens):
+### After (3 screens):
 
 1. Profile setup (valuable)
 2. Notification setup (valuable)
+3. Onboarding summary (valuable - confirmation & momentum)
 
-**Result:** 50% reduction in onboarding steps while maintaining all valuable functionality.
+**Result:** Better momentum and a clear finish line for the user.
 
 ## Future Enhancements
 
