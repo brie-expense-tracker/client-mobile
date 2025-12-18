@@ -93,7 +93,7 @@ const queryClient = new QueryClient({
 // Refactored RootLayoutContent to conditionally mount providers
 function RootLayoutContent() {
 	const { user, firebaseUser, loading } = useAuth();
-	const { hasSeenOnboarding } = useOnboarding();
+	const { hasSeenOnboarding, isEditingOnboarding } = useOnboarding();
 	const router = useRouter();
 	const segments = useSegments();
 	const [isMounted, setIsMounted] = useState(false);
@@ -116,12 +116,21 @@ function RootLayoutContent() {
 					inTabsGroup: segments[0] === '(tabs)',
 					inOnboardingGroup: segments[0] === '(onboarding)',
 					inStackGroup: segments[0] === '(stack)',
+					isEditingOnboarding,
 					DEV_MODE,
 					isDevMode,
 				});
 			}
 		},
-		[loading, loadingTimeout, firebaseUser, user, hasSeenOnboarding, segments]
+		[
+			loading,
+			loadingTimeout,
+			firebaseUser,
+			user,
+			hasSeenOnboarding,
+			isEditingOnboarding,
+			segments,
+		]
 	);
 
 	useEffect(() => {
@@ -249,6 +258,30 @@ function RootLayoutContent() {
 			const inTabsGroup = segments[0] === '(tabs)';
 			const inOnboardingGroup = segments[0] === '(onboarding)';
 			const inStackGroup = segments[0] === '(stack)';
+			const isNotFound = (segments[0] as string) === '+not-found';
+			const isRoot =
+				(segments.length as number) === 0 ||
+				(segments.length === 1 && (segments[0] as string) === '');
+
+			// segments example inside onboarding: ['(onboarding)', 'edit', 'income']
+			// so segments[1] is 'edit' or 'profileSetup'
+			const onboardingRoute = (segments[1] || '').toString();
+			const isEdit = inOnboardingGroup && onboardingRoute === 'edit';
+			const isProfileSetup =
+				inOnboardingGroup && onboardingRoute === 'profileSetup';
+			const isNotificationSetup =
+				inOnboardingGroup && onboardingRoute === 'notificationSetup';
+
+			// "Wizard routes" (only valid when onboarding is incomplete)
+			const isWizardRoute = isProfileSetup || isNotificationSetup;
+
+			// "Review/Edit routes" (valid anytime)
+			const isReviewOrEditRoute = isEdit;
+
+			// Only routes we allow inside onboarding without forcing profileSetup
+			const allowOnboardingRoute =
+				isWizardRoute || isReviewOrEditRoute || isEditingOnboarding;
+
 			// Stack routes don't include the group name in segments, so check for known stack routes
 			const knownStackRoutes = [
 				'settings',
@@ -260,18 +293,35 @@ function RootLayoutContent() {
 			const isStackRoute =
 				inStackGroup || knownStackRoutes.includes(segments[0] || '');
 			if (firebaseUser && user) {
-				// In dev mode, allow access to onboarding even if completed
-				if (isDevMode && inOnboardingGroup) {
-					// Allow staying on onboarding screens in dev mode
-					return;
+				// If we're on a 404 page, let it be shown if it's NOT just the initial root loading
+				if (isNotFound && !isRoot) return;
+
+				// If we're inside onboarding:
+				// - In dev mode: allow any onboarding screens
+				// - In prod: allow ONLY edit routes to prevent "wizard reset"
+				if (inOnboardingGroup) {
+					if (isDevMode) return;
+					if (isReviewOrEditRoute || isEditingOnboarding) return;
+
+					// If user is in onboarding wizard routes in production,
+					// let the normal needsOnboarding logic handle it below (don't early return)
 				}
 
-				// Check if user needs onboarding (use hasSeenOnboarding === false explicitly)
-				// If hasSeenOnboarding is null and timeout reached, still check it - don't assume completed
+				// Explicit onboarding states
 				const needsOnboarding = hasSeenOnboarding === false;
 				const hasCompletedOnboarding = hasSeenOnboarding === true;
 
-				if (needsOnboarding && !inOnboardingGroup) {
+				// If user still needs onboarding:
+				// - If they're already in onboarding (wizard OR edit), do NOT redirect them to the start again.
+				// - If they're outside onboarding, send them to the wizard start.
+				if (needsOnboarding) {
+					// Allowstaying in onboarding group OR if we're in edit mode (even if temporarily +not-found)
+					if (
+						(inOnboardingGroup && allowOnboardingRoute) ||
+						isEditingOnboarding
+					)
+						return;
+
 					logState('nav-effect:redirecting-to-onboarding');
 					if (isDevMode) {
 						layoutLog.debug(
@@ -283,13 +333,16 @@ function RootLayoutContent() {
 					} catch (error) {
 						layoutLog.warn('Failed to navigate to onboarding:', error);
 					}
-				} else if (
-					hasCompletedOnboarding &&
-					!inTabsGroup &&
-					!isStackRoute &&
-					!inOnboardingGroup
-				) {
-					// Only redirect to dashboard if onboarding is confirmed complete
+					return;
+				}
+
+				// If onboarding is complete:
+				// - Allow tabs and stack routes
+				// - Allow onboarding edit routes (prod) (dev allowed above)
+				if (hasCompletedOnboarding) {
+					if (inTabsGroup || isStackRoute) return;
+					if (isReviewOrEditRoute || isEditingOnboarding) return;
+
 					logState('nav-effect:redirecting-to-dashboard');
 					if (isDevMode) {
 						layoutLog.debug(
@@ -301,14 +354,13 @@ function RootLayoutContent() {
 					} catch (error) {
 						layoutLog.warn('Failed to navigate to dashboard:', error);
 					}
-				} else if (
-					hasSeenOnboarding === null &&
-					loadingTimeout &&
-					!inTabsGroup &&
-					!isStackRoute &&
-					!inOnboardingGroup
-				) {
-					// Timeout reached and status still null - assume completed for now to unblock
+					return;
+				}
+
+				// If onboarding status is still null but timeout reached, avoid hijacking edit
+				if (hasSeenOnboarding === null && loadingTimeout) {
+					if (isReviewOrEditRoute || isEditingOnboarding) return;
+
 					logState('nav-effect:timeout-redirect');
 					if (isDevMode) {
 						layoutLog.debug(
@@ -320,6 +372,7 @@ function RootLayoutContent() {
 					} catch (error) {
 						layoutLog.warn('Failed to navigate to dashboard:', error);
 					}
+					return;
 				}
 			} else if (firebaseUser && !user) {
 				if (!inAuthGroup) {
@@ -346,6 +399,7 @@ function RootLayoutContent() {
 		firebaseUser,
 		loading,
 		hasSeenOnboarding,
+		isEditingOnboarding,
 		loadingTimeout,
 		segments,
 		isMounted,

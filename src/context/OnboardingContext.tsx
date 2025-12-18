@@ -14,6 +14,8 @@ const onboardingContextLog = createLogger('OnboardingContext');
 interface OnboardingContextType {
 	hasSeenOnboarding: boolean | null;
 	onboardingVersion: number | null;
+	isEditingOnboarding: boolean;
+	setIsEditingOnboarding: (val: boolean) => void;
 	markOnboardingComplete: () => Promise<void>;
 	refreshOnboardingStatus: () => Promise<void>;
 	resetOnboardingStatus: () => Promise<void>;
@@ -33,6 +35,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
 	const [onboardingVersion, setOnboardingVersion] = useState<number | null>(
 		null
 	);
+	const [isEditingOnboarding, setIsEditingOnboarding] = useState(false);
 	const { user, loading: authLoading } = useAuth(); // Get user and loading
 
 	const refreshOnboardingStatus = useCallback(async () => {
@@ -100,6 +103,8 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
 			value={{
 				hasSeenOnboarding,
 				onboardingVersion,
+				isEditingOnboarding,
+				setIsEditingOnboarding,
 				markOnboardingComplete,
 				refreshOnboardingStatus,
 				resetOnboardingStatus,

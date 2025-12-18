@@ -162,7 +162,27 @@ const OnboardingScreen = () => {
 		}
 	}, [currentIndex]);
 
-	const { updateProfile } = useProfile();
+	const { profile, updateProfile } = useProfile();
+
+	// Hydrate form from existing profile on mount
+	useEffect(() => {
+		if (profile) {
+			if (profile.firstName) setFirstName(profile.firstName);
+			if (profile.lastName) setLastName(profile.lastName);
+			if (profile.monthlyIncome)
+				setMonthlyIncome(profile.monthlyIncome.toString());
+			if (profile.pay?.cadence) setPayCadence(profile.pay.cadence as any);
+			if (profile.pay?.netPerPaycheck)
+				setNetPerPaycheck(profile.pay.netPerPaycheck.toString());
+			if (profile.financialGoal) setFinancialGoal(profile.financialGoal);
+			if (profile.expenses?.housing)
+				setHousingExpense(profile.expenses.housing.toString());
+			if (profile.preferences?.budgetSettings?.cycleStart)
+				setBudgetCycleStart(profile.preferences.budgetSettings.cycleStart);
+			if (profile.emergencyFundMonths)
+				setEmergencyFundMonths(profile.emergencyFundMonths);
+		}
+	}, [profile]);
 
 	const palette = useMemo(
 		() => ({
