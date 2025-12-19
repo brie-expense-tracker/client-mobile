@@ -132,6 +132,16 @@ export function startSSE({
 					cleanup();
 					onError('Stream error');
 				},
+				onMeta: (meta: any) => {
+					lastTick = Date.now();
+					resetInactivityTimer('meta');
+					onMeta?.(meta);
+				},
+				onLimit: (lim: any) => {
+					lastTick = Date.now();
+					resetInactivityTimer('limit');
+					onMeta?.({ type: 'limit', ...lim }); // forward as meta with limit type
+				},
 			});
 			eventSource = managerResult || null;
 		} else {
