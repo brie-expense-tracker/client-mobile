@@ -237,8 +237,13 @@ export class DebtsService {
 
 	/**
 	 * Format interest rate as percentage
+	 * Accepts either decimal (0.20) or percentage (20) format
 	 */
 	static formatInterestRate(rate: number): string {
+		// If rate is > 1, assume it's already a percentage; otherwise it's a decimal
+		if (rate > 1) {
+			return `${rate.toFixed(2)}%`;
+		}
 		return `${(rate * 100).toFixed(2)}%`;
 	}
 
@@ -309,10 +314,10 @@ export class DebtsService {
 			updateInput.minPayment = payload.minPayment;
 		}
 
-		// Use PATCH for partial updates
+		// Use PUT for updates (server supports PUT, not PATCH)
 		try {
 			debtsLog.debug(`Updating debt ${id}:`, updateInput);
-			const response = await ApiService.patch<{
+			const response = await ApiService.put<{
 				success: boolean;
 				data: Debt;
 			}>(`/api/debts/${encodeURIComponent(id)}`, updateInput);
@@ -329,10 +334,24 @@ export class DebtsService {
 				return this.toDTO(debt as Debt);
 			}
 
-			throw new Error(response.error || 'Failed to update debt');
+			// Provide more detailed error message
+			const errorMessage = response.error || 
+				(response as any)?.details || 
+				'Failed to update debt';
+			debtsLog.error(`Error updating debt ${id}:`, {
+				error: errorMessage,
+				response: response,
+			});
+			throw new Error(errorMessage);
 		} catch (error) {
-			debtsLog.error(`Error updating debt ${id}:`, error);
-			throw error;
+			const errorMessage = error instanceof Error 
+				? error.message 
+				: 'Failed to update debt';
+			debtsLog.error(`Error updating debt ${id}:`, {
+				error: errorMessage,
+				originalError: error,
+			});
+			throw error instanceof Error ? error : new Error(errorMessage);
 		}
 	}
 

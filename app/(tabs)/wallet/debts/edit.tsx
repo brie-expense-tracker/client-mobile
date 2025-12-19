@@ -145,17 +145,37 @@ export default function EditDebtScreen() {
 			: null;
 		const dueDayNum = dueDay ? Number(dueDay) : null;
 
-		return (
-			loading ||
-			!name.trim() ||
-			isNaN(balNum) ||
-			balNum < 0 ||
-			(aprNum !== null && (isNaN(aprNum) || aprNum < 0 || aprNum > 100)) ||
-			(minPaymentNum !== null && (isNaN(minPaymentNum) || minPaymentNum < 0)) ||
-			(dueDayNum !== null &&
-				(isNaN(dueDayNum) || dueDayNum < 1 || dueDayNum > 31)) ||
-			!hasChanges
-		);
+		// Validate balance
+		if (isNaN(balNum) || balNum < 0) {
+			return true;
+		}
+
+		// Validate APR (0-100%)
+		if (aprNum !== null && (isNaN(aprNum) || aprNum < 0 || aprNum > 100)) {
+			return true;
+		}
+
+		// Validate minimum payment: must be positive, not exceed balance, and not be outrageous (>50% of balance)
+		if (minPaymentNum !== null) {
+			if (
+				isNaN(minPaymentNum) ||
+				minPaymentNum < 0 ||
+				minPaymentNum > balNum ||
+				minPaymentNum > balNum * 0.5
+			) {
+				return true;
+			}
+		}
+
+		// Validate due day (1-31)
+		if (
+			dueDayNum !== null &&
+			(isNaN(dueDayNum) || dueDayNum < 1 || dueDayNum > 31)
+		) {
+			return true;
+		}
+
+		return loading || !name.trim() || !hasChanges;
 	}, [loading, name, balance, apr, minPayment, dueDay, hasChanges]);
 
 	const handleSave = async () => {
@@ -169,36 +189,53 @@ export default function EditDebtScreen() {
 
 		const balNum = parseFloat(cleanCurrencyToNumberString(balance));
 		if (isNaN(balNum) || balNum < 0) {
-			Alert.alert('Error', 'Please enter a valid current balance');
+			Alert.alert(
+				'Error',
+				'Please enter a valid current balance (must be 0 or greater)'
+			);
 			return;
 		}
 
 		const aprNum = apr
 			? parseFloat(cleanCurrencyToNumberString(apr))
 			: undefined;
-		if (aprNum !== undefined && (isNaN(aprNum) || aprNum < 0 || aprNum > 100)) {
-			Alert.alert('Error', 'Interest rate must be between 0 and 100%');
-			return;
+		if (aprNum !== undefined) {
+			if (isNaN(aprNum) || aprNum < 0 || aprNum > 100) {
+				Alert.alert('Error', 'Interest rate must be between 0 and 100%');
+				return;
+			}
 		}
 
 		const minPaymentNum = minPayment
 			? parseFloat(cleanCurrencyToNumberString(minPayment))
 			: undefined;
-		if (
-			minPaymentNum !== undefined &&
-			(isNaN(minPaymentNum) || minPaymentNum < 0)
-		) {
-			Alert.alert('Error', 'Minimum payment must be a positive number');
-			return;
+		if (minPaymentNum !== undefined) {
+			if (isNaN(minPaymentNum) || minPaymentNum < 0) {
+				Alert.alert('Error', 'Minimum payment must be a positive number');
+				return;
+			}
+			if (minPaymentNum > balNum) {
+				Alert.alert(
+					'Error',
+					'Minimum payment cannot exceed the current balance'
+				);
+				return;
+			}
+			if (minPaymentNum > balNum * 0.5) {
+				Alert.alert(
+					'Error',
+					'Minimum payment seems too high. It should not exceed 50% of the current balance'
+				);
+				return;
+			}
 		}
 
 		const dueDayNum = dueDay ? Number(dueDay) : undefined;
-		if (
-			dueDayNum !== undefined &&
-			(isNaN(dueDayNum) || dueDayNum < 1 || dueDayNum > 31)
-		) {
-			Alert.alert('Error', 'Due day must be between 1 and 31');
-			return;
+		if (dueDayNum !== undefined) {
+			if (isNaN(dueDayNum) || dueDayNum < 1 || dueDayNum > 31) {
+				Alert.alert('Error', 'Due day must be between 1 and 31');
+				return;
+			}
 		}
 
 		setLoading(true);
