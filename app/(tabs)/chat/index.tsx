@@ -55,18 +55,13 @@ import {
 	CachedTransaction,
 } from '../../../src/services/resilience/fallbackService';
 import { TraceEventData } from '../../../src/services/feature/enhancedStreamingService';
-import DevHud from './_components/DevHud';
 import {
 	useMessagesReducerV2,
 	Message,
 } from '../../../src/hooks/useMessagesReducerV2';
 import { useBulletproofStreamV3 } from '../../../src/hooks/useBulletproofStreamV3';
 import { modeStateService } from '../../../src/services/assistant/modeStateService';
-import {
-	buildTestSseUrl,
-	API_BASE_URL,
-} from '../../../src/networking/endpoints';
-import { startStreaming } from '../../../src/services/streaming';
+import { API_BASE_URL } from '../../../src/networking/endpoints';
 import { Image } from 'expo-image';
 import {
 	InsightsContextService,
@@ -94,7 +89,6 @@ import ChatComposer from './components/ChatComposer';
 import { MessagesList } from './_components/MessagesList';
 import { AssistantListFooter } from './_components/AssistantListFooter';
 import { useComposerHeight } from '../../../src/hooks/useComposerHeight';
-import { isDevMode } from '../../../src/config/environment';
 import { authService } from '../../../src/services/authService';
 
 const chatScreenLog = createLogger('ChatScreen');
@@ -142,9 +136,6 @@ export default function ChatScreen() {
 	// React instantly to assistant config changes from anywhere in the app
 	useEffect(() => {
 		const handler = ({ config: newConfig }: AssistantConfigChangedEvent) => {
-			if (isDevMode) {
-				chatScreenLog.debug('Chat config event received', { newConfig });
-			}
 			setConfig(newConfig);
 
 			// Clear context when personalization is disabled
@@ -164,11 +155,6 @@ export default function ChatScreen() {
 	// Legacy support for AI insights events
 	useEffect(() => {
 		const handler = ({ enabled }: AIInsightsChangedEvent) => {
-			if (isDevMode) {
-				chatScreenLog.debug('Legacy AI insights event received', {
-					enabled,
-				});
-			}
 			// Convert to new config format
 			const newConfig = enabled
 				? { ...config, mode: 'personalized' as const }
@@ -181,19 +167,6 @@ export default function ChatScreen() {
 			AppEvents.off(EVT_AI_INSIGHTS_CHANGED, handler);
 		};
 	}, [config]);
-
-	// Debug: Log config changes
-	useEffect(() => {
-		if (isDevMode) {
-			chatScreenLog.debug('Chat config changed', {
-				config,
-				hasProfile: !!profile,
-				isPersonalizationOn: isPersonalizationOn(config),
-				allowProactive: allowProactive(config),
-				timestamp: new Date().toISOString(),
-			});
-		}
-	}, [config, profile]);
 
 	// Initialize messages with reducer
 	const initialMessages: Message[] = [
@@ -239,7 +212,6 @@ export default function ChatScreen() {
 			currentIntent: null,
 			refusalMessage: '',
 		});
-	const [debugInfo, setDebugInfo] = useState<string>('');
 	const [uiTimeout, setUiTimeout] = useState<NodeJS.Timeout | null>(null);
 	const [isRetrying, setIsRetrying] = useState(false);
 	const [showFallback, setShowFallback] = useState(false);
@@ -283,9 +255,6 @@ export default function ChatScreen() {
 			}),
 		[]
 	);
-
-	// Mode state management
-	const [modeState, setModeState] = useState(modeStateService.getState());
 
 	const personalizationEnabled = isPersonalizationOn(config);
 
@@ -436,7 +405,6 @@ export default function ChatScreen() {
 									'idle',
 									'deterministic preview replaced'
 								);
-								setDebugInfo('Snapshot preview replaced with final response');
 								break;
 							}
 						}
@@ -451,7 +419,6 @@ export default function ChatScreen() {
 							seenAsyncMessageIdsRef.current.add(messageId);
 						}
 						modeStateService.transitionTo('idle', 'async analysis completed');
-						setDebugInfo('Async analysis completed');
 					}
 					break;
 				}
@@ -471,14 +438,12 @@ export default function ChatScreen() {
 							});
 							asyncJobsRef.current.delete(jobId);
 							modeStateService.transitionTo('idle', 'async analysis failed');
-							setDebugInfo('Async analysis failed');
 							return;
 						}
 					}
 
 					addAssistantMessage(`I ran into an issue: ${errorMessage}`);
 					modeStateService.transitionTo('idle', 'async analysis failed');
-					setDebugInfo('Async analysis failed');
 					break;
 				}
 				case 'assistant_replace': {
@@ -505,12 +470,10 @@ export default function ChatScreen() {
 					break;
 				}
 				default:
-					if (isDevMode) {
-						chatScreenLog.debug('Unhandled async payload', payload);
-					}
+					break;
 			}
 		},
-		[addAssistantMessage, updateMessage, setDebugInfo]
+		[addAssistantMessage, updateMessage]
 	);
 
 	useEffect(() => {
@@ -544,9 +507,7 @@ export default function ChatScreen() {
 				asyncEventSourceRef.current = es;
 
 				es.addEventListener('ready', () => {
-					if (isDevMode) {
-						chatScreenLog.debug('[AsyncStream] ready', { sessionId });
-					}
+					// Stream ready
 				});
 
 				es.onmessage = (event) => {
@@ -587,21 +548,6 @@ export default function ChatScreen() {
 		};
 	}, [sessionId, handleAsyncPayload]);
 
-	// Debug: Log messages state changes
-	useEffect(() => {
-		if (isDevMode) {
-			chatScreenLog.debug('Messages state changed', {
-				count: messages.length,
-				ids: messages.map((m) => ({
-					id: m.id,
-					isUser: m.isUser,
-					isStreaming: m.isStreaming,
-				})),
-				timestamp: new Date().toISOString(),
-			});
-		}
-	}, [messages]);
-
 	// Load insights context (only if personalization is enabled)
 	const loadInsightsContext = useCallback(async () => {
 		if (!isPersonalizationOn(config)) return; // Guard: don't load if disabled
@@ -621,13 +567,6 @@ export default function ChatScreen() {
 				filteredGoals,
 				filteredTransactions
 			);
-
-			if (isDevMode) {
-				chatScreenLog.debug(
-					'[Chat] Loaded insights context and data with config:',
-					config
-				);
-			}
 		} catch (error) {
 			chatScreenLog.error('Failed to load insights context', error);
 		}
@@ -689,57 +628,16 @@ export default function ChatScreen() {
 		return () => clearTimeout(timer);
 	}, []);
 
-	// Subscribe to mode state changes
-	useEffect(() => {
-		const unsubscribe = modeStateService.subscribe((state) => {
-			setModeState(state);
-		});
-		return unsubscribe;
-	}, []);
-
 	// Proactively clear cached insights when the user turns the toggle OFF
 	useEffect(() => {
 		const personalizationEnabled = isPersonalizationOn(config);
-		if (isDevMode) {
-			chatScreenLog.debug('Config change effect triggered', {
-				config,
-				personalizationEnabled,
-				willClearContext: !personalizationEnabled,
-			});
-		}
 
 		if (!personalizationEnabled) {
-			if (isDevMode) {
-				chatScreenLog.debug(
-					'🧹 [DEBUG] Clearing insights context and conversation context'
-				);
-			}
 			insightsService.clearInsights(); // Wipe any lingering context/insights
 			setCurrentConversationContext(''); // Clear conversation-derived context
 			setHasSharedContext(false);
 		}
 	}, [config, insightsService]);
-
-	// Track critical state changes only
-	useEffect(() => {
-		const lastMessage = messages[messages.length - 1];
-		if (lastMessage && lastMessage.isStreaming) {
-			if (isDevMode) {
-				chatScreenLog.debug(
-					'🔄 [Chat] Stream started for message:',
-					lastMessage.id
-				);
-			}
-		} else if (lastMessage && !lastMessage.isStreaming && lastMessage.text) {
-			if (isDevMode) {
-				chatScreenLog.debug('✅ [Chat] Message completed:', {
-					id: lastMessage.id,
-					length: lastMessage.text.length,
-					isUser: lastMessage.isUser,
-				});
-			}
-		}
-	}, [messages]);
 
 	// Reset snapshot sharing when conversation resets
 	useEffect(() => {
@@ -803,13 +701,12 @@ export default function ChatScreen() {
 
 	// Handle missing info chip press
 	const handleChipPress = (chip: MissingInfoChip) => {
-		chatScreenLog.debug('Chip pressed', { label: chip.label });
+		// Chip pressed
 	};
 
 	// Handle missing info value submission
 	const handleValueSubmit = (chipId: string, value: string) => {
 		missingInfoService.submitValue(chipId, value);
-		chatScreenLog.debug('Value submitted', { chipId, value });
 	};
 
 	// Handle intent missing info value submission (currently unused but kept for future use)
@@ -928,7 +825,6 @@ export default function ChatScreen() {
 		if (!orchestratorService) return;
 
 		const collectedData = missingInfoService.getCollectedDataForAPI();
-		chatScreenLog.debug('Missing info collection complete', { collectedData });
 
 		// Send collected data to AI for processing
 		const followUpMessage = `I've provided the missing information: ${JSON.stringify(
@@ -963,9 +859,6 @@ export default function ChatScreen() {
 		if (!orchestratorService) return;
 
 		const collectedData = intentMissingInfoService.getCollectedDataForAPI();
-		chatScreenLog.debug('Intent missing info collection complete', {
-			collectedData,
-		});
 
 		// Send collected data to AI for processing
 		const followUpMessage = `I've provided the missing information: ${JSON.stringify(
@@ -1014,7 +907,6 @@ export default function ChatScreen() {
 		// Prevent duplicate message processing
 		if (lastProcessedMessage === trimmedInput) {
 			chatScreenLog.warn('Duplicate message detected, ignoring');
-			setDebugInfo('Duplicate message ignored');
 			return;
 		}
 
@@ -1043,7 +935,6 @@ export default function ChatScreen() {
 					// Force clear streaming state
 					clearStreaming();
 					stopStream();
-					setDebugInfo('Recovered from stuck streaming state');
 				}
 			}
 		}
@@ -1056,10 +947,7 @@ export default function ChatScreen() {
 		modeStateService.transitionTo('thinking', 'user input received');
 
 		// Add user message using reducer
-		const userMessageId = addUserMessage(trimmedInput);
-		if (isDevMode) {
-			chatScreenLog.debug('User message added', { userMessageId });
-		}
+		addUserMessage(trimmedInput);
 
 		// Track this message to prevent duplicates
 		setLastProcessedMessage(trimmedInput);
@@ -1353,13 +1241,7 @@ export default function ChatScreen() {
 
 			// Show missing info UI instead of sending to AI
 			// Add a message explaining what's needed using reducer
-			const missingInfoMessageId = addUserMessage(
-				sufficiencyResult.refusalMessage
-			);
-			chatScreenLog.info(
-				'🤖 [Chat] Added missing info message with ID:',
-				missingInfoMessageId
-			);
+			addUserMessage(sufficiencyResult.refusalMessage);
 			return;
 		}
 
@@ -1375,7 +1257,6 @@ export default function ChatScreen() {
 				"I'm having trouble reaching the assistant right now. Please try again in a bit."
 			);
 			modeStateService.transitionTo('idle', 'handshake failed');
-			setDebugInfo('Handshake with assistant failed');
 			setShowFallback(true);
 			await loadFallbackData();
 			return;
@@ -1399,7 +1280,6 @@ export default function ChatScreen() {
 			}
 			setShowExpandButton(false);
 			modeStateService.transitionTo('processing', 'async analysis queued');
-			setDebugInfo('Running deeper analysis asynchronously');
 			return;
 		}
 
@@ -1411,19 +1291,12 @@ export default function ChatScreen() {
 				'processing',
 				'async mode unavailable, falling back to stream'
 			);
-			setDebugInfo('Async mode unavailable, falling back to stream');
 		}
 
 		streamingRef.current.sessionId = handshakeResult.sessionId;
 
 		// Create streaming AI message using reducer with proper synchronization
 		let aiMessageId = (Date.now() + 1).toString();
-		if (isDevMode) {
-			chatScreenLog.debug(
-				'🔍 [DEBUG] Creating AI placeholder with ID:',
-				aiMessageId
-			);
-		}
 
 		// Add the AI placeholder message
 		addAIPlaceholder(aiMessageId);
@@ -1441,15 +1314,6 @@ export default function ChatScreen() {
 			// Use the ref to get the latest messages state
 			verifyMessage = messagesRef.current.find((m) => m.id === aiMessageId);
 			attempts++;
-
-			if (!verifyMessage && attempts < maxAttempts) {
-				chatScreenLog.debug(
-					`🔍 [DEBUG] Verification attempt ${attempts}/${maxAttempts} for message:`,
-					aiMessageId,
-					'Available IDs:',
-					messagesRef.current.map((m) => m.id)
-				);
-			}
 		}
 
 		if (!verifyMessage) {
@@ -1464,12 +1328,6 @@ export default function ChatScreen() {
 
 			// Try one more time with a new ID
 			const newAiMessageId = (Date.now() + 2).toString();
-			if (isDevMode) {
-				chatScreenLog.debug(
-					'🔄 [Chat] Creating new message with ID:',
-					newAiMessageId
-				);
-			}
 
 			addAIPlaceholder(newAiMessageId);
 
@@ -1491,11 +1349,6 @@ export default function ChatScreen() {
 			// Update the aiMessageId to use the new one
 			aiMessageId = newAiMessageId;
 		}
-
-		chatScreenLog.debug(
-			'✅ [DEBUG] Message verified after adding placeholder:',
-			verifyMessage.id
-		);
 
 		// Transition to processing mode
 		modeStateService.transitionTo('processing', 'AI processing started');
@@ -1529,74 +1382,26 @@ export default function ChatScreen() {
 				);
 			}
 
-			setDebugInfo('UI fallback timeout - stream should have completed');
 			stopStream();
 			clearStreaming();
 		}, 180000); // 3 minute fallback timeout (stream layer handles real timeouts)
 		setUiTimeout(timeout as any);
-
-		if (isDevMode) {
-			chatScreenLog.debug(
-				'🚀 [Chat] Starting stream for message:',
-				aiMessageId
-			);
-		}
 
 		// Ensure the streaming ref is set to the correct message ID and sessionId
 		streamingRef.current.messageId = aiMessageId;
 		if (!streamingRef.current.sessionId) {
 			streamingRef.current.sessionId = `session_${Date.now()}`;
 		}
-		if (isDevMode) {
-			chatScreenLog.debug(
-				'🔍 [DEBUG] Set streamingRef.messageId to:',
-				aiMessageId
-			);
-			chatScreenLog.debug(
-				'🔍 [DEBUG] Set streamingRef.sessionId to:',
-				streamingRef.current.sessionId
-			);
-			chatScreenLog.debug(
-				'🔍 [DEBUG] Current messages before streaming:',
-				messages.map((m) => ({
-					id: m.id,
-					isUser: m.isUser,
-					isStreaming: m.isStreaming,
-				}))
-			);
-		}
 
 		try {
-			if (isDevMode) {
-				chatScreenLog.debug('🔍 [DEBUG] About to call startStream with:', {
-					message: enhancedInput,
-					messageId: aiMessageId,
-					messageLength: enhancedInput.length,
-					sessionId: streamingRef.current.sessionId,
-					currentMessages: messagesRef.current.map((m) => ({
-						id: m.id,
-						isUser: m.isUser,
-						isStreaming: m.isStreaming,
-					})),
-				});
-
-				chatScreenLog.debug('🚀 [Chat] Calling startStream function...');
-			}
 			await startStream(
 				enhancedInput,
 				{
 					onMeta: (data) => {
-						if (data.timeToFirstToken) {
-							chatScreenLog.debug(
-								'⚡ [Chat] First token received:',
-								data.timeToFirstToken + 'ms'
-							);
-						}
 						// Update budget status from meta data
 						if (data.budget) {
 							setBudgetStatus(data.budget);
 						}
-						setDebugInfo(`Meta: ${JSON.stringify(data).substring(0, 100)}...`);
 					},
 					onDelta: (data, bufferedText) => {
 						// Transition to streaming mode on first delta
@@ -1605,19 +1410,6 @@ export default function ChatScreen() {
 								'streaming',
 								'first delta received'
 							);
-						}
-
-						if (isDevMode) {
-							chatScreenLog.debug(
-								'[CALLBACK onDelta] len=',
-								data.text?.length || 0
-							);
-							chatScreenLog.debug('📝 [Chat] Stream delta received:', {
-								chars: bufferedText.length,
-								messageId: aiMessageId,
-								deltaText: data.text?.substring(0, 50) + '...',
-								fullBufferedText: bufferedText.substring(0, 100) + '...',
-							});
 						}
 
 						// Ensure we're updating the correct message using the ref
@@ -1634,11 +1426,6 @@ export default function ChatScreen() {
 							);
 
 							// Try to create the message if it doesn't exist
-							if (isDevMode) {
-								chatScreenLog.debug(
-									'🔄 [Chat] Creating missing message for delta'
-								);
-							}
 							addAIPlaceholder(aiMessageId);
 							// Add a small delay to ensure the message is created
 							setTimeout(() => {
@@ -1649,20 +1436,8 @@ export default function ChatScreen() {
 
 						// Add delta to the message
 						addDelta(aiMessageId, data.text || '');
-
-						setDebugInfo(
-							`Streaming: ${
-								bufferedText.length
-							} chars - "${bufferedText.substring(0, 50)}..."`
-						);
 					},
 					onFinal: (data) => {
-						if (isDevMode) {
-							chatScreenLog.debug('✅ [Chat] Stream completed:', {
-								responseLength: data.response?.length || 0,
-								messageId: aiMessageId,
-							});
-						}
 						setPerformanceData(data.performance);
 
 						// Show expand button for short responses if user has budget
@@ -1689,20 +1464,6 @@ export default function ChatScreen() {
 						// Now transition to idle (works from streaming, processing, or if already streaming)
 						modeStateService.transitionTo('idle', 'stream completed');
 
-						// Debug: Log current state before finalization
-						if (isDevMode) {
-							chatScreenLog.debug('🔍 [DEBUG] Finalization state:', {
-								streamingMessageId,
-								aiMessageId,
-								availableMessages: messagesRef.current.map((m) => ({
-									id: m.id,
-									isUser: m.isUser,
-									isStreaming: m.isStreaming,
-									hasBufferedText: !!(m.buffered && m.buffered.length > 0),
-								})),
-							});
-						}
-
 						// Find the correct message to finalize - prioritize the AI message ID
 						const messageIdToFinalize = aiMessageId; // Use the AI message ID we created
 						let currentMessage = messagesRef.current.find(
@@ -1724,18 +1485,9 @@ export default function ChatScreen() {
 								(m) => m.isStreaming
 							);
 							if (streamingMessage) {
-								if (isDevMode) {
-									chatScreenLog.debug(
-										'🔄 [Chat] Recovery: Found streaming message:',
-										streamingMessage.id
-									);
-								}
 								currentMessage = streamingMessage;
 							} else {
 								// Last resort: create a new message with the buffered text
-								if (isDevMode) {
-									chatScreenLog.debug('🔄 [Chat] Creating recovery message');
-								}
 								addAIPlaceholder(messageIdToFinalize);
 								// Wait a moment for the message to be created
 								setTimeout(() => {
@@ -1756,28 +1508,13 @@ export default function ChatScreen() {
 								: currentMessage.text ||
 								  'Response received but content not found';
 
-						if (isDevMode) {
-							chatScreenLog.debug('✅ [Chat] Finalizing message:', {
-								id: messageIdToFinalize,
-								length: finalText.length,
-								hasContent: finalText.length > 0,
-								bufferedLength: currentMessage.buffered?.length || 0,
-								textLength: currentMessage.text?.length || 0,
-							});
-						}
-
 						finalizeMessage(
 							messageIdToFinalize,
 							finalText,
 							currentMessage.performance
 						);
 
-						setDebugInfo('Stream completed');
-
 						// Clear streaming state with safety check
-						if (isDevMode) {
-							chatScreenLog.debug('🔍 [DEBUG] Clearing streaming state');
-						}
 						clearStreaming();
 
 						// Reset expand button state
@@ -1809,18 +1546,6 @@ export default function ChatScreen() {
 							timeout: !!uiTimeout,
 						});
 
-						if (isDevMode) {
-							chatScreenLog.debug('🔍 [DEBUG] Error state:', {
-								aiMessageId,
-								availableMessages: messagesRef.current.map((m) => ({
-									id: m.id,
-									isUser: m.isUser,
-									isStreaming: m.isStreaming,
-									hasBufferedText: !!(m.buffered && m.buffered.length > 0),
-								})),
-							});
-						}
-
 						setError(aiMessageId, error);
 						setShowFallback(true);
 						loadFallbackData();
@@ -1840,10 +1565,6 @@ export default function ChatScreen() {
 					messageId: aiMessageId,
 				}
 			);
-
-			if (isDevMode) {
-				chatScreenLog.debug('✅ [Chat] Stream call completed successfully');
-			}
 		} catch (error) {
 			chatScreenLog.error('💥 [Chat] Failed to start stream:', {
 				error: error instanceof Error ? error.message : String(error),
@@ -1891,8 +1612,6 @@ export default function ChatScreen() {
 
 	// Handle insight press
 	const handleInsightPress = (insight: Insight) => {
-		chatScreenLog.info('Insight pressed:', insight.title);
-
 		// Route to appropriate screen based on action
 		if (insight.action) {
 			if (insight.action === 'create_budget') {
@@ -1915,8 +1634,6 @@ export default function ChatScreen() {
 
 	// Handle asking about insight
 	const handleAskAboutInsight = async (insight: Insight) => {
-		chatScreenLog.info('Ask about insight:', insight.title);
-
 		// Create a contextual question about the insight
 		const question = `Can you help me understand this insight: "${insight.title}" - ${insight.message}`;
 
@@ -1943,46 +1660,6 @@ export default function ChatScreen() {
 		}
 	};
 
-	// Test streaming function
-	const testStreaming = async () => {
-		chatScreenLog.debug('🧪 [Test] Starting streaming test');
-		const testUrl = buildTestSseUrl();
-
-		try {
-			startStreaming({
-				url: testUrl,
-				token: 'test-token',
-				onDelta: (text: string) => {
-					chatScreenLog.debug('🧪 [Test] Received delta:', text);
-					// Add test message to chat
-					const testMessageId = (Date.now() + 1).toString();
-					addAIPlaceholder(testMessageId);
-					addDelta(testMessageId, text);
-				},
-				onDone: () => {
-					chatScreenLog.debug('🧪 [Test] Stream completed');
-					// Finalize the test message
-					const lastMessage = messages[messages.length - 1];
-					if (lastMessage && lastMessage.isStreaming) {
-						finalizeMessage(
-							lastMessage.id,
-							lastMessage.buffered || lastMessage.text || 'Test completed'
-						);
-					}
-				},
-				onError: (error: string) => {
-					chatScreenLog.error('🧪 [Test] Stream error:', error);
-					setError('test', error);
-				},
-				onMeta: (data: any) => {
-					chatScreenLog.debug('🧪 [Test] Meta data:', data);
-				},
-			});
-		} catch (error) {
-			chatScreenLog.error('🧪 [Test] Failed to start test stream:', error);
-		}
-	};
-
 	return (
 		<SafeAreaView style={styles.safeArea}>
 			<KeyboardAvoidingView
@@ -1990,7 +1667,6 @@ export default function ChatScreen() {
 				behavior={Platform.OS === 'ios' ? 'padding' : undefined}
 				keyboardVerticalOffset={0}
 			>
-				<DevHud modeState={modeState} />
 				<View style={styles.header}>
 					<TouchableOpacity
 						onPress={() => router.push('/(stack)/settings/aiInsights')}
@@ -2064,7 +1740,7 @@ export default function ChatScreen() {
 						performanceData={performanceData}
 						showExpandButton={showExpandButton}
 						onExpandPress={handleExpand}
-						contentPaddingBottom={12 + insets.bottom}
+						contentPaddingBottom={composerH + 12 + insets.bottom}
 					>
 						<AssistantListFooter
 							aiInsightsEnabled={aiInsightsEnabled}
@@ -2075,17 +1751,11 @@ export default function ChatScreen() {
 							conversationContext={currentConversationContext}
 							onInsightPress={handleInsightPress}
 							onAskAboutInsight={handleAskAboutInsight}
-							debugInfo={debugInfo}
-							streamingRef={streamingRef}
-							messagesCount={messages.length}
-							lastProcessedMessage={lastProcessedMessage}
-							onTestStreaming={testStreaming}
 							showFallback={showFallback}
 							fallbackData={fallbackData}
 							onRetry={handleRetry}
 							onRefresh={handleRefresh}
 							isRetrying={isRetrying}
-							showServiceStatus={__DEV__}
 							onMissingInfoComplete={handleMissingInfoComplete}
 							onIntentMissingInfoComplete={handleIntentMissingInfoComplete}
 							missingInfoState={missingInfoState}
@@ -2211,8 +1881,5 @@ const styles = StyleSheet.create({
 	inputContainer: {
 		flexDirection: 'row',
 		alignItems: 'flex-end',
-		backgroundColor: '#FFFFFF',
-		borderTopWidth: 1,
-		borderTopColor: '#E5E7EB',
 	},
 });
