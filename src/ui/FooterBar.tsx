@@ -50,9 +50,8 @@ export function FooterBar({ style, children }: FooterBarProps) {
 
 const styles = StyleSheet.create({
 	container: {
-		// Try relative positioning to eliminate gap
 		paddingHorizontal: 16,
-		padding: 8,
+		paddingVertical: 8,
 		backgroundColor: '#fff',
 		borderTopWidth: 1,
 		borderTopColor: '#e5e7eb',

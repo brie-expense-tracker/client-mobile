@@ -2,17 +2,16 @@ import { useState, useCallback } from 'react';
 import type { LayoutChangeEvent } from 'react-native';
 
 export function useComposerHeight(
-    initial = 56
+	initial = 56
 ): [number, (e: LayoutChangeEvent) => void] {
-    const [h, setH] = useState(initial);
-    const onLayout = useCallback(
-        (e: LayoutChangeEvent) => {
-            const next = e.nativeEvent.layout.height;
-            if (next && Math.abs(next - h) > 1) setH(next);
-        },
-        [h]
-    );
-    return [h, onLayout];
+	const [h, setH] = useState(initial);
+
+	const onLayout = useCallback((e: LayoutChangeEvent) => {
+		const next = Math.round(e.nativeEvent.layout.height);
+		if (!next) return;
+
+		setH((prev) => (Math.abs(next - prev) > 1 ? next : prev));
+	}, []);
+
+	return [h, onLayout];
 }
-
-

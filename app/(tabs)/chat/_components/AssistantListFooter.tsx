@@ -8,7 +8,6 @@ import {
 } from 'react-native';
 import ContextualInsightsPanel from '../../../../src/components/assistant/panels/ContextualInsightsPanel';
 import FallbackCard from '../../../../src/components/assistant/cards/FallbackCard';
-import ServiceStatusIndicator from '../../../../src/components/assistant/indicators/ServiceStatusIndicator';
 import MissingInfoCard from '../../../../src/components/assistant/cards/MissingInfoCard';
 import IntentMissingInfoCard from '../../../../src/components/assistant/cards/IntentMissingInfoCard';
 import { Insight } from '../../../../src/services/insights/insightsContextService';
@@ -31,14 +30,6 @@ type Props = {
 	conversationContext: string;
 	onInsightPress: (insight: Insight) => void;
 	onAskAboutInsight: (insight: Insight) => void;
-	debugInfo: string;
-	streamingRef: React.MutableRefObject<{
-		messageId?: string | null;
-		sessionId?: string | null;
-	}>;
-	messagesCount: number;
-	lastProcessedMessage: string;
-	onTestStreaming: () => void;
 	showFallback: boolean;
 	fallbackData: {
 		spendPlan?: CachedSpendPlan | null;
@@ -49,7 +40,6 @@ type Props = {
 	onRetry: () => void;
 	onRefresh: () => void;
 	isRetrying: boolean;
-	showServiceStatus: boolean;
 	onMissingInfoComplete: () => void;
 	onIntentMissingInfoComplete: () => void;
 	missingInfoState: MissingInfoState;
@@ -67,17 +57,11 @@ export function AssistantListFooter({
 	conversationContext,
 	onInsightPress,
 	onAskAboutInsight,
-	debugInfo,
-	streamingRef,
-	messagesCount,
-	lastProcessedMessage,
-	onTestStreaming,
 	showFallback,
 	fallbackData,
 	onRetry,
 	onRefresh,
 	isRetrying,
-	showServiceStatus,
 	onMissingInfoComplete,
 	onIntentMissingInfoComplete,
 	missingInfoState,
@@ -103,37 +87,6 @@ export function AssistantListFooter({
 			{/* Loading States */}
 			{/* Only show "AI is responding..." when we have a streaming message ID and content is actually streaming */}
 			{hasStreamingId && isStreaming && <Row text="AI is responding..." color="#10b981" />}
-
-			{/* Debug Panel */}
-			{__DEV__ && (
-				<View style={styles.debugContainer}>
-					<Text style={styles.debugText}>
-						Debug: {debugInfo || 'No debug info'}
-					</Text>
-					<Text style={styles.debugText}>
-						Streaming: {isStreaming ? 'true' : 'false'}
-					</Text>
-					<Text style={styles.debugText}>
-						Streaming ID: {streamingRef.current.messageId || 'none'}
-					</Text>
-					<Text style={styles.debugText}>
-						Session ID: {streamingRef.current.sessionId || 'none'}
-					</Text>
-					<Text style={styles.debugText}>
-						Connected: {isStreaming ? 'true' : 'false'}
-					</Text>
-					<Text style={styles.debugText}>
-						Connecting: {isStreaming ? 'true' : 'false'}
-					</Text>
-					<Text style={styles.debugText}>Messages: {messagesCount}</Text>
-					<Text style={styles.debugText}>
-						Last processed: {lastProcessedMessage.substring(0, 30)}...
-					</Text>
-					<TouchableOpacity style={styles.testButton} onPress={onTestStreaming}>
-						<Text style={styles.testButtonText}>🧪 Test Streaming</Text>
-					</TouchableOpacity>
-				</View>
-			)}
 
 			{/* Missing Info Cards */}
 			{missingInfoState.isCollecting && missingInfoState.chips.length > 0 && (
@@ -189,10 +142,6 @@ export function AssistantListFooter({
 				/>
 			)}
 
-			{/* Service Status */}
-			{showServiceStatus && (
-				<ServiceStatusIndicator onRetry={onRetry} isRetrying={isRetrying} />
-			)}
 		</View>
 	);
 }
@@ -224,23 +173,6 @@ const styles = StyleSheet.create({
 		padding: 16,
 	},
 	rowText: { marginLeft: 8, fontSize: 14, fontWeight: '500' },
-	debugContainer: {
-		backgroundColor: '#fef3c7',
-		borderRadius: 8,
-		padding: 8,
-		marginTop: 8,
-		borderWidth: 1,
-		borderColor: '#f59e0b',
-	},
-	debugText: { fontSize: 12, color: '#92400e', fontFamily: 'monospace' },
-	testButton: {
-		backgroundColor: '#3b82f6',
-		borderRadius: 8,
-		padding: 8,
-		marginTop: 8,
-		alignItems: 'center',
-	},
-	testButtonText: { color: '#fff', fontSize: 14, fontWeight: '600' },
 	missingInfoContainer: { marginTop: 16 },
 	completeButton: {
 		backgroundColor: '#10b981',
