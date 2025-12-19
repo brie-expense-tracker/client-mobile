@@ -3,6 +3,18 @@ import { createLogger } from '../utils/sublogger';
 
 const messagesReducerV2Log = createLogger('useMessagesReducerV2');
 
+const MAX_ASSISTANT_CHARS = 8000;
+const MAX_STREAM_BUFFER_CHARS = 8000;
+const MAX_DELTA_CHARS = 1000;
+
+function truncateWithNotice(text: string, max: number) {
+	if (!text) return text;
+	if (text.length <= max) return text;
+	const suffix = '\n\n…(truncated to keep chat fast)';
+	const sliceLen = Math.max(0, max - suffix.length);
+	return text.slice(0, sliceLen) + suffix;
+}
+
 export type MessageAction = any; // Simplified for now
 
 export type MessagePhase = 'deterministic' | 'llm' | 'final';
@@ -55,13 +67,19 @@ type State = {
 
 const initial: State = { byId: {}, order: [], streamingId: null };
 
-function upsert(state: State, msg: Message) {
-	if (!state.byId[msg.id]) {
-		state.byId[msg.id] = msg;
-		state.order.push(msg.id);
-	} else {
-		state.byId[msg.id] = { ...state.byId[msg.id], ...msg };
+function upsertImmutable(state: State, msg: Message): State {
+	const exists = !!state.byId[msg.id];
+	if (!exists) {
+		return {
+			...state,
+			byId: { ...state.byId, [msg.id]: msg },
+			order: [...state.order, msg.id],
+		};
 	}
+	return {
+		...state,
+		byId: { ...state.byId, [msg.id]: { ...state.byId[msg.id], ...msg } },
+	};
 }
 
 export const messagesReducerV2 = (state = initial, action: any): State => {
@@ -73,57 +91,51 @@ export const messagesReducerV2 = (state = initial, action: any): State => {
 	switch (action.type) {
 		case 'ADD_USER': {
 			const id = action.id as string;
-			const msg: Message = {
+			return upsertImmutable(state, {
 				id,
 				isUser: true,
 				text: action.text,
 				isStreaming: false,
 				timestamp: new Date(),
-			};
-			upsert(state, msg);
-			return { ...state };
+			});
 		}
+
 		case 'ADD_AI_PLACEHOLDER': {
 			const id = action.id as string;
-			const msg: Message = {
+			const next = upsertImmutable(state, {
 				id,
 				isUser: false,
 				buffered: '',
 				isStreaming: true,
 				timestamp: new Date(),
-			};
-			upsert(state, msg);
-			return { ...state, streamingId: id };
+			});
+			return { ...next, streamingId: id };
 		}
+
 		case 'ADD_ASSISTANT': {
 			const id = action.id as string;
-			const msg: Message = {
+			return upsertImmutable(state, {
 				id,
 				isUser: false,
-				text: action.text,
+				text: truncateWithNotice(action.text ?? '', MAX_ASSISTANT_CHARS),
 				isStreaming: false,
 				timestamp: new Date(),
 				performance: action.performance,
 				phase: action.phase,
 				meta: action.meta,
-			};
-			upsert(state, msg);
-			return { ...state };
+			});
 		}
+
 		case 'APPEND_DELTA': {
 			const { id, text } = action as { id: string; text: string };
-			messagesReducerV2Log.debug('APPEND_DELTA', {
-				msgId: id,
-				len: text.length,
-				preview: text.slice(0, 30),
-			});
 
-			if (!state.byId[id]) {
+			let baseState = state;
+			if (!baseState.byId[id]) {
 				messagesReducerV2Log.warn('APPEND_DELTA upserting missing message', {
 					id,
-					keys: Object.keys(state.byId),
+					keys: Object.keys(baseState.byId),
 				});
-				upsert(state, {
+				baseState = upsertImmutable(baseState, {
 					id,
 					isUser: false,
 					buffered: '',
@@ -132,97 +144,151 @@ export const messagesReducerV2 = (state = initial, action: any): State => {
 				});
 			}
 
-			// Ensure the message exists before appending
-			if (state.byId[id]) {
-				state.byId[id].buffered = (state.byId[id].buffered ?? '') + text;
-			} else {
-				messagesReducerV2Log.error('APPEND_DELTA failed to create message', {
-					id,
-				});
-			}
-			return { ...state };
+			const m = baseState.byId[id];
+			const safeDelta = (text ?? '').slice(0, MAX_DELTA_CHARS);
+			const prev = m.buffered ?? '';
+			const combined = prev + safeDelta;
+			const nextBuffered = combined.slice(0, MAX_STREAM_BUFFER_CHARS);
+
+			const nextMeta =
+				combined.length > MAX_STREAM_BUFFER_CHARS
+					? {
+							...(m.meta || {}),
+							truncated: true,
+							truncatedAt: MAX_STREAM_BUFFER_CHARS,
+					  }
+					: m.meta;
+
+			return {
+				...baseState,
+				byId: {
+					...baseState.byId,
+					[id]: {
+						...m,
+						buffered: nextBuffered,
+						isStreaming: true,
+						meta: nextMeta,
+					},
+				},
+			};
 		}
+
 		case 'FINALIZE': {
 			const id = action.id as string;
+			const existing = state.byId[id];
 
-			// Guard: check if message already finalized (idempotent)
-			if (state.byId[id] && !state.byId[id].isStreaming) {
-				messagesReducerV2Log.debug('FINALIZE already completed', { id });
-				return state;
-			}
+			// idempotent
+			if (existing && existing.isStreaming === false) return state;
 
-			if (!state.byId[id]) {
+			// recovery: finalize any streaming message
+			if (!existing) {
 				messagesReducerV2Log.error('FINALIZE missing message', { id });
-				// Try to find any streaming message to finalize
 				const streamingMessage = Object.values(state.byId).find(
 					(m) => m.isStreaming
 				);
-				if (streamingMessage) {
-					messagesReducerV2Log.debug(
-						'FINALIZE recovery: found streaming message',
-						{
-							id: streamingMessage.id,
-						}
-					);
-					state.byId[streamingMessage.id] = {
-						...streamingMessage,
-						text:
-							streamingMessage.buffered ||
-							streamingMessage.text ||
-							'Response incomplete',
+				if (!streamingMessage) return { ...state, streamingId: null };
+
+				const recoveryRaw =
+					action.finalText ||
+					streamingMessage.buffered ||
+					streamingMessage.text ||
+					'Response incomplete';
+
+				const recoveryText = truncateWithNotice(
+					recoveryRaw,
+					MAX_ASSISTANT_CHARS
+				);
+
+				return {
+					...state,
+					byId: {
+						...state.byId,
+						[streamingMessage.id]: {
+							...streamingMessage,
+							text: recoveryText,
+							buffered: '',
+							isStreaming: false,
+							performance: action.performance || streamingMessage.performance,
+							evidence: action.evidence || streamingMessage.evidence,
+						},
+					},
+					streamingId: null,
+				};
+			}
+
+			const rawFinal =
+				action.finalText ||
+				existing.buffered ||
+				existing.text ||
+				'Response completed';
+			const finalText = truncateWithNotice(rawFinal, MAX_ASSISTANT_CHARS);
+
+			return {
+				...state,
+				byId: {
+					...state.byId,
+					[id]: {
+						...existing,
+						text: finalText,
 						buffered: '',
 						isStreaming: false,
-					};
-				}
-				return { ...state, streamingId: null };
-			}
-			const m = state.byId[id];
-			state.byId[id] = {
-				...m,
-				text: m.buffered || m.text || 'Response completed',
-				buffered: '',
-				isStreaming: false,
+						performance: action.performance || existing.performance,
+						evidence: action.evidence || existing.evidence,
+					},
+				},
+				streamingId: null,
 			};
-			return { ...state, streamingId: null };
 		}
+
 		case 'CLEAR_STREAMING': {
 			const id = action.id;
-			if (!id) {
-				messagesReducerV2Log.warn('CLEAR_STREAMING without id — ignored');
-				return state;
-			}
-			if (state.streamingId && state.byId[state.streamingId]) {
-				state.byId[state.streamingId].isStreaming = false;
+			if (!id) return state;
+
+			const sid = state.streamingId;
+			if (sid && state.byId[sid]) {
+				return {
+					...state,
+					byId: {
+						...state.byId,
+						[sid]: { ...state.byId[sid], isStreaming: false },
+					},
+					streamingId: null,
+				};
 			}
 			return { ...state, streamingId: null };
 		}
+
 		case 'SET_ERROR': {
-			const { id, error } = action as { id: string; error: string };
-			if (state.byId[id]) {
-				state.byId[id] = {
-					...state.byId[id],
-					isStreaming: false,
-					text: "I'm having trouble reaching the AI model right now. Please try again.",
-					buffered: '',
-				};
-			}
-			return { ...state, streamingId: null };
-		}
-		case 'UPDATE_MESSAGE': {
-			const { id, patch } = action as {
-				id: string;
-				patch: Partial<Message>;
+			const { id } = action as { id: string; error: string };
+			const m = state.byId[id];
+			if (!m) return { ...state, streamingId: null };
+
+			return {
+				...state,
+				byId: {
+					...state.byId,
+					[id]: {
+						...m,
+						isStreaming: false,
+						text: "I'm having trouble reaching the AI model right now. Please try again.",
+						buffered: '',
+					},
+				},
+				streamingId: null,
 			};
-			if (state.byId[id]) {
-				state.byId[id] = {
-					...state.byId[id],
-					...patch,
-				};
-			}
-			return { ...state };
 		}
+
+		case 'UPDATE_MESSAGE': {
+			const { id, patch } = action as { id: string; patch: Partial<Message> };
+			const m = state.byId[id];
+			if (!m) return state;
+			return {
+				...state,
+				byId: { ...state.byId, [id]: { ...m, ...patch } },
+			};
+		}
+
 		default:
-			messagesReducerV2Log.warn('Unknown action type', { type: action.type });
 			return state;
 	}
 };

@@ -2,7 +2,8 @@ import { useRef, useCallback, useEffect, useState, useMemo } from 'react';
 import { Message, MessageAction } from './useMessagesReducerV2';
 import { startStreaming, stopStreaming } from '../services/streaming';
 import { cancelSSE } from '../services/streamManager';
-import { buildSseUrl } from '../networking/endpoints';
+import { buildSseUrlWithStreamKey } from '../networking/endpoints';
+import { setupStream } from '../networking/streamingApi';
 import { authService } from '../services/authService';
 import { ErrorService } from '../services/errorService';
 import { createLogger } from '../utils/sublogger';
@@ -75,6 +76,7 @@ export function useBulletproofStreamV3({
 	const healthCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
 		null
 	);
+	const finalizedRef = useRef<Set<string>>(new Set());
 
 	// Enhanced state management
 	const [streamState, setStreamState] = useState<StreamState>({
@@ -156,6 +158,27 @@ export function useBulletproofStreamV3({
 		stopHealthMonitoring();
 	}, [stopHealthMonitoring]);
 
+	// Safe finalize guard to prevent double-finalization
+	const safeFinalize = useCallback(
+		(
+			id: string,
+			text: string,
+			performance?: Message['performance'],
+			evidence?: string[]
+		) => {
+			if (finalizedRef.current.has(id)) {
+				bulletproofStreamV3Log.warn(
+					'Attempted to finalize already-finalized message',
+					{ id }
+				);
+				return;
+			}
+			finalizedRef.current.add(id);
+			finalizeMessage(id, text, performance, evidence);
+		},
+		[finalizeMessage]
+	);
+
 	// Cleanup on unmount
 	useEffect(() => {
 		return () => {
@@ -229,12 +252,15 @@ export function useBulletproofStreamV3({
 			}
 
 			try {
-				// Get Firebase UID for SSE authentication
+				// Get Firebase UID for SSE authentication (store for retry consistency)
 				const firebaseUID = await authService.getCurrentUserUID();
 
 				if (!firebaseUID) {
 					throw new Error('No authenticated user found');
 				}
+
+				// Clear finalized ref for this message on new stream attempt
+				finalizedRef.current.delete(messageId);
 
 				if (__DEV__) {
 					bulletproofStreamV3Log.debug('Using Firebase UID for auth', {
@@ -242,16 +268,31 @@ export function useBulletproofStreamV3({
 					});
 				}
 
-				// Build URL using the centralized buildSseUrl function
-				const url = buildSseUrl({
-					sessionId,
+				// Step 1: POST setup to store large payload + get streamKey
+				const setup = await setupStream({
 					message: message.trim(),
+					sessionId,
+					clientMessageId: messageId,
+					// Include these if you have them available in this hook.
+					// If you don't, omit them for now (server already supports optional).
+					dialogFrame: undefined,
+					groundingContext: undefined,
+				});
+
+				bulletproofStreamV3Log.debug('Stream setup successful', {
+					streamKey: setup.streamKey.substring(0, 8) + '...',
+				});
+
+				// Step 2: Build SSE URL that uses streamKey (no big message in URL)
+				const url = buildSseUrlWithStreamKey({
+					sessionId,
+					streamKey: setup.streamKey,
 					uid: firebaseUID,
 					clientMessageId: messageId,
 					expand: options?.expand || false,
 				});
 
-				bulletproofStreamV3Log.debug('Built URL with UID', {
+				bulletproofStreamV3Log.debug('Built URL with streamKey', {
 					url: url.substring(0, 100) + '...',
 					hasUID: !!firebaseUID,
 					fullUrl: url,
@@ -262,11 +303,11 @@ export function useBulletproofStreamV3({
 				// Start health monitoring
 				startHealthMonitoring();
 
-				// Start streaming with stream key for deduplication
+				// Start streaming with server-issued stream key for deduplication
 				const connection = startStreaming({
 					url,
 					token: '', // Not needed for UID-based auth
-					streamKey: `${firebaseUID}:${messageId}`, // Use stable stream key
+					streamKey: setup.streamKey, // ✅ real server-issued key
 					clientMessageId: messageId, // Pass message ID for filtering
 					onDelta: (text: string) => {
 						// Update activity timestamp
@@ -311,19 +352,19 @@ export function useBulletproofStreamV3({
 							lastActivity: endTime,
 						}));
 
-						currentMessageId.current = null;
-						streamingRef.current.messageId = null;
-						clearStreaming();
-						stopHealthMonitoring();
-
-						// Finalize the message with performance data
-						finalizeMessage(messageId, bufferedText.current, {
+						// Finalize BEFORE clearing streaming state (correct order)
+						safeFinalize(messageId, bufferedText.current, {
 							totalLatency: duration,
 							timeToFirstToken: duration,
 							cacheHit: false,
 							modelUsed: 'streaming',
 							tokensUsed: bufferedText.current.length,
 						});
+
+						currentMessageId.current = null;
+						streamingRef.current.messageId = null;
+						clearStreaming();
+						stopHealthMonitoring();
 						callbacks.onDone?.();
 					},
 					onError: (error: string) => {
@@ -387,24 +428,32 @@ export function useBulletproofStreamV3({
 							// Schedule retry with a new attempt
 							retryTimeoutRef.current = setTimeout(async () => {
 								try {
-									// Get fresh auth token
-									const token = await authService.getAuthToken();
-									if (!token) {
-										throw new Error('No authentication token available');
+									// Use same Firebase UID (not token) for consistent auth
+									const retryFirebaseUID =
+										await authService.getCurrentUserUID();
+									if (!retryFirebaseUID) {
+										throw new Error('No authenticated user found');
 									}
 
-									// Build URL using the centralized buildSseUrl function
-									const url = buildSseUrl({
-										sessionId,
+									// Retry with setup endpoint (two-step handshake)
+									const retrySetup = await setupStream({
 										message: message.trim(),
-										uid: token,
+										sessionId,
+										clientMessageId: messageId,
+									});
+
+									const retryUrl = buildSseUrlWithStreamKey({
+										sessionId,
+										streamKey: retrySetup.streamKey,
+										uid: retryFirebaseUID,
 										clientMessageId: messageId,
 									});
 
 									// Start new connection
 									startStreaming({
-										url,
-										token,
+										url: retryUrl,
+										token: '', // Not needed for UID-based auth
+										streamKey: retrySetup.streamKey, // ✅ real server-issued key
 										clientMessageId: messageId, // Pass message ID for filtering
 										onDelta: (text: string) => {
 											setStreamState((prev) => ({
@@ -419,12 +468,31 @@ export function useBulletproofStreamV3({
 											callbacks.onMeta?.({ type: 'delta', len: text.length });
 										},
 										onDone: () => {
+											const retryEndTime = Date.now();
+											const retryStartTime =
+												streamState.startTime || retryEndTime;
+											const retryDuration = retryEndTime - retryStartTime;
+
 											setStreamState((prev) => ({
 												...prev,
 												isStreaming: false,
 												isConnecting: false,
+												lastActivity: retryEndTime,
 											}));
-											finalizeMessage(messageId, bufferedText.current);
+
+											// Finalize BEFORE clearing streaming state
+											safeFinalize(messageId, bufferedText.current, {
+												totalLatency: retryDuration,
+												timeToFirstToken: retryDuration,
+												cacheHit: false,
+												modelUsed: 'streaming',
+												tokensUsed: bufferedText.current.length,
+											});
+
+											currentMessageId.current = null;
+											streamingRef.current.messageId = null;
+											clearStreaming();
+											stopHealthMonitoring();
 											callbacks.onDone?.();
 										},
 										onError: (error: string) => {
@@ -564,7 +632,7 @@ export function useBulletproofStreamV3({
 		[
 			streamingRef,
 			addDelta,
-			finalizeMessage,
+			safeFinalize,
 			setError,
 			clearStreaming,
 			onDeltaReceived,

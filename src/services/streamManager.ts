@@ -19,11 +19,9 @@ function resetInactivityTimer(reason: string, streamKey: string) {
 
 	clearTimeout(activeRef.current.inactivityTimer);
 	activeRef.current.inactivityTimer = setTimeout(() => {
-		logger.warn(
-			'🚨 [StreamManager] Stream timeout after inactivity:',
-			reason,
-			{ streamKey }
-		);
+		logger.warn('🚨 [StreamManager] Stream timeout after inactivity:', reason, {
+			streamKey,
+		});
 		cancelSSE(); // abort controller + es.close()
 	}, INACTIVITY_MS);
 }
@@ -35,14 +33,13 @@ export function startSSE(
 		onDelta: (d: { text: string; seq?: number }) => void;
 		onDone: (full?: string) => void;
 		onError: (e: any) => void;
+		onMeta?: (data: any) => void;
+		onLimit?: (data: any) => void;
 	}
 ): EventSource | null {
 	// If this exact stream is already open, ignore.
 	if (activeRef.current?.key === streamKey) {
-		logger.warn(
-			'🚫 [StreamManager] Stream already active for key:',
-			streamKey
-		);
+		logger.warn('🚫 [StreamManager] Stream already active for key:', streamKey);
 		return null;
 	}
 
@@ -80,10 +77,22 @@ export function startSSE(
 	// Add meta and limit event listeners
 	es.addEventListener('meta', (e: MessageEvent) => {
 		resetInactivityTimer('meta', streamKey);
+		try {
+			const data = JSON.parse(e.data);
+			handlers.onMeta?.(data);
+		} catch (error) {
+			logger.warn('⚠️ [StreamManager] Failed to parse meta event:', error);
+		}
 	});
 
 	es.addEventListener('limit', (e: MessageEvent) => {
 		resetInactivityTimer('limit', streamKey);
+		try {
+			const data = JSON.parse(e.data);
+			handlers.onLimit?.(data);
+		} catch (error) {
+			logger.warn('⚠️ [StreamManager] Failed to parse limit event:', error);
+		}
 	});
 
 	es.addEventListener('done', (e: MessageEvent) => {
