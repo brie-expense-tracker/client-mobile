@@ -168,8 +168,13 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 
 		try {
 			setError(null);
-			const token = await notificationService.initialize();
-			setExpoPushToken(token);
+			const result = await notificationService.initialize();
+			// Only set token if permissions were granted
+			if (result.granted) {
+				setExpoPushToken(result.token);
+			} else {
+				setExpoPushToken(null);
+			}
 			hasInitializedRef.current = true;
 
 			// Set up notification service listeners (includes navigation logic)

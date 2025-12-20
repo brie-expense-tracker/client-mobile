@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Link, Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import auth from '@react-native-firebase/auth';
 import useAuth from '../../src/context/AuthContext';
 import { BorderlessButton, RectButton } from 'react-native-gesture-handler';
 import { logger } from '../../src/utils/logger';
@@ -47,7 +48,53 @@ export default function ForgotPasswordScreen() {
 
 		try {
 			setLoading(true);
-			await sendPasswordResetEmail(email.trim());
+			const emailTrimmed = email.trim().toLowerCase();
+
+			// CRITICAL: Check if the account exists before sending password reset email
+			// Firebase's sendPasswordResetEmail may not throw an error for non-existent accounts
+			// (to prevent email enumeration attacks), so we must verify account existence first.
+			// This prevents users from creating accounts via the forgot password flow.
+			// Password reset links can only reset passwords for existing accounts, never create new ones.
+			try {
+				await auth().fetchSignInMethodsForEmail(emailTrimmed);
+				// If we get here, the account exists (even if signInMethods is empty)
+				// Empty array might mean user exists but no methods are available (edge case)
+			} catch (fetchError: any) {
+				// fetchSignInMethodsForEmail throws auth/user-not-found if account doesn't exist
+				if (fetchError?.code === 'auth/user-not-found') {
+					const errorMessage =
+						'No account found with this email address. Please sign up to create an account.';
+					logger.warn('Password reset attempted for non-existent account', {
+						email: emailTrimmed,
+					});
+					Alert.alert('Account Not Found', errorMessage, [
+						{
+							text: 'Sign Up',
+							onPress: () => {
+								router.replace('/signup');
+							},
+						},
+						{ text: 'Cancel', style: 'cancel' },
+					]);
+					return;
+				}
+				// For other errors (network, etc.), we cannot verify account existence
+				// Don't proceed - this prevents sending reset emails for non-existent accounts
+				logger.error('Error verifying account existence', {
+					error: fetchError,
+					email: emailTrimmed,
+				});
+				Alert.alert(
+					'Verification Error',
+					'Unable to verify if this account exists. Please check your connection and try again.',
+					[{ text: 'OK' }]
+				);
+				return;
+			}
+
+			// Account exists - verified by fetchSignInMethodsForEmail above
+			// Proceed with sending password reset email
+			await sendPasswordResetEmail(emailTrimmed);
 
 			Alert.alert(
 				'Reset Email Sent',
@@ -71,7 +118,8 @@ export default function ForgotPasswordScreen() {
 
 			let errorMessage = 'Could not send reset email. Please try again.';
 			if (error.code === 'auth/user-not-found') {
-				errorMessage = 'No account found with this email address.';
+				errorMessage =
+					'No account found with this email address. Please sign up to create an account.';
 			} else if (error.code === 'auth/invalid-email') {
 				errorMessage = 'Invalid email address.';
 			} else if (error.code === 'auth/too-many-requests') {

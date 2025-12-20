@@ -134,7 +134,6 @@ const OnboardingScreen = () => {
 
 	const firstNameRef = useRef<TextInput>(null);
 	const lastNameRef = useRef<TextInput>(null);
-	const incomeRef = useRef<TextInput>(null);
 	const [currentIndex, setCurrentIndex] = useState(0);
 
 	// Refs for ScrollViews to manage scroll position per step
@@ -261,18 +260,23 @@ const OnboardingScreen = () => {
 	const stepValid = useMemo(() => {
 		if (currentIndex === 0) return true; // welcome screen
 		if (currentIndex === 1) {
+			const hasMonthlyIncome = monthlyIncome && parseFloat(monthlyIncome) > 0;
+			const hasPayInfo =
+				isValidCadence(payCadence) &&
+				netPerPaycheck &&
+				parseFloat(netPerPaycheck) > 0;
 			return (
 				isValidName(firstName) &&
 				isValidName(lastName) &&
 				// either a valid manual monthly income OR a valid cadence + net per paycheck
-				(isValidCurrency(monthlyIncome) ||
-					(isValidCadence(payCadence) && isValidCurrency(netPerPaycheck)))
+				(hasMonthlyIncome || hasPayInfo)
 			);
 		}
 		if (currentIndex === 2) {
 			return (
 				isValidGoal(financialGoal) &&
-				isValidCurrency(housingExpense) &&
+				housingExpense &&
+				parseFloat(housingExpense) > 0 &&
 				isValidCycleStart(budgetCycleStart)
 			);
 		}
@@ -827,7 +831,7 @@ const OnboardingScreen = () => {
 									value={lastName}
 									onChangeText={setLastName}
 									onBlur={() => onBlurField('lastName')}
-									onSubmitEditing={() => incomeRef.current?.focus()}
+									onSubmitEditing={() => Keyboard.dismiss()}
 									style={[styles.input, inputShadow]}
 									placeholderTextColor="#94A3B8"
 									placeholder="Enter your last name"
@@ -963,52 +967,6 @@ const OnboardingScreen = () => {
 										})}
 									</Text>
 								) : null}
-							</View>
-							<View style={[styles.inputContainer, { marginTop: 8 }]}>
-								<Text style={[styles.label, { color: palette.subtext }]}>
-									Or enter total monthly income
-								</Text>
-								{monthlyIncome &&
-									parseFloat(monthlyIncome) > 0 &&
-									derivedMonthlyIncome > 0 && (
-										<Text style={[styles.helperPositive, { marginBottom: 4 }]}>
-											ℹ️ Using monthly income (pay schedule will be ignored)
-										</Text>
-									)}
-								<View style={[styles.inputWithIcon, inputShadow]}>
-									<View style={styles.inputIcon}>
-										<Ionicons name="logo-usd" size={18} color="#6b7280" />
-									</View>
-									<TextInput
-										value={monthlyIncome}
-										onChangeText={(text) =>
-											handleCurrencyInput(text, setMonthlyIncome)
-										}
-										onBlur={() => onBlurField('monthlyIncome')}
-										onSubmitEditing={() => {
-											if (stepValid) {
-												handleNext();
-											}
-										}}
-										keyboardType={
-											Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'
-										}
-										inputMode="decimal"
-										returnKeyType="done"
-										style={styles.inputWithIconText}
-										placeholderTextColor="#94A3B8"
-										placeholder="0.00"
-										accessibilityLabel="Monthly income"
-									/>
-								</View>
-								{!!errors.monthlyIncome && (
-									<Text
-										style={styles.errorText}
-										accessibilityLiveRegion="polite"
-									>
-										{errors.monthlyIncome}
-									</Text>
-								)}
 							</View>
 						</ScrollView>
 					</View>
@@ -1171,6 +1129,7 @@ const OnboardingScreen = () => {
 											Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'
 										}
 										inputMode="decimal"
+										returnKeyType="done"
 										style={styles.inputWithIconText}
 										placeholderTextColor="#94A3B8"
 										placeholder="0.00"
