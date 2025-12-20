@@ -25,6 +25,7 @@ import { useBills } from '../../../src/context/billContext';
 import { BillService } from '../../../src/services';
 import { DebtsService, Debt } from '../../../src/services/feature/debtsService';
 import { palette, space, shadow } from '../../../src/ui/theme';
+import { getItem, setItem } from '../../../src/utils/safeStorage';
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
 	style: 'currency',
@@ -33,7 +34,7 @@ const currencyFormatter = new Intl.NumberFormat('en-US', {
 
 function WalletHero({
 	total = 0,
-	percentChange = 0.042,
+	percentChange = 0,
 }: {
 	total?: number | null;
 	percentChange?: number;
@@ -615,6 +616,8 @@ export default function WalletOverviewScreen() {
 
 	const [debts, setDebts] = useState<Debt[]>([]);
 	const [debtsLoading, setDebtsLoading] = useState(true);
+	const [previousMonthTrackedBalance, setPreviousMonthTrackedBalance] =
+		useState<number | null>(null);
 	const budgetsBusy = budgetsLoading && !budgetsLoaded;
 	const billsBusy = billsLoading && !billsLoaded;
 	const goalsBusy = goalsLoading && !goalsLoaded;
@@ -655,6 +658,68 @@ export default function WalletOverviewScreen() {
 			loadDebts();
 		}, [loadDebts])
 	);
+
+	// Load previous month's tracked balance for percentage calculation
+	useEffect(() => {
+		const loadPreviousMonthBalance = async () => {
+			try {
+				const now = new Date();
+				const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+				const key = `trackedBalance_${lastMonth.getFullYear()}_${lastMonth.getMonth()}`;
+				const stored = await getItem(key);
+				if (stored) {
+					setPreviousMonthTrackedBalance(parseFloat(stored));
+				}
+			} catch (error) {
+				console.warn('Failed to load previous month balance', error);
+			}
+		};
+
+		loadPreviousMonthBalance();
+	}, []);
+
+	// Calculate tracked balance (budgets allocated + goals current + debts total)
+	const trackedBalance = useMemo(() => {
+		const budgetsAmount = monthlySummary?.totalAllocated ?? 0;
+		const goalsAmount = goals.reduce(
+			(sum, goal) => sum + (goal.current || 0),
+			0
+		);
+		const debtsAmount = DebtsService.calculateTotalDebt(debts);
+		return budgetsAmount + goalsAmount + debtsAmount;
+	}, [monthlySummary?.totalAllocated, goals, debts]);
+
+	// Store current month's tracked balance for next month's comparison
+	useEffect(() => {
+		const storeCurrentMonthBalance = async () => {
+			try {
+				const now = new Date();
+				const key = `trackedBalance_${now.getFullYear()}_${now.getMonth()}`;
+				await setItem(key, trackedBalance.toString());
+			} catch (error) {
+				console.warn('Failed to store current month balance', error);
+			}
+		};
+
+		if (trackedBalance > 0 && !budgetsBusy && !goalsBusy && !debtsBusy) {
+			storeCurrentMonthBalance();
+		}
+	}, [trackedBalance, budgetsBusy, goalsBusy, debtsBusy]);
+
+	// Calculate percentage change from previous month
+	const percentChange = useMemo(() => {
+		if (
+			previousMonthTrackedBalance === null ||
+			previousMonthTrackedBalance === 0 ||
+			!Number.isFinite(previousMonthTrackedBalance)
+		) {
+			return 0;
+		}
+		const change =
+			(trackedBalance - previousMonthTrackedBalance) /
+			previousMonthTrackedBalance;
+		return Number.isFinite(change) ? change : 0;
+	}, [trackedBalance, previousMonthTrackedBalance]);
 
 	const formatCurrency = useCallback((amount?: number | null) => {
 		if (typeof amount !== 'number' || Number.isNaN(amount)) {
@@ -847,10 +912,10 @@ export default function WalletOverviewScreen() {
 				showsVerticalScrollIndicator={false}
 				contentContainerStyle={styles.content}
 			>
-				{budgetsBusy ? (
+				{budgetsBusy || goalsBusy || debtsBusy ? (
 					<WalletHeroSkeleton />
 				) : (
-					<WalletHero total={monthlySummary?.totalAllocated ?? 0} />
+					<WalletHero total={trackedBalance} percentChange={percentChange} />
 				)}
 
 				<View style={styles.quickActionsRow}>

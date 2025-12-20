@@ -84,32 +84,38 @@ export interface NotificationConsent {
 	};
 }
 
+export type NotificationInitResult =
+	| { granted: true; token: string | null }
+	| { granted: false; token: null; canAskAgain: boolean };
+
 class NotificationService {
 	private expoPushToken: string | null = null;
 	private consentSettings: NotificationConsent | null = null;
 
 	// Initialize the notification service
-	async initialize(): Promise<string | null> {
+	async initialize(): Promise<NotificationInitResult> {
 		try {
 			// Check if running on a physical device
 			if (!Device.isDevice) {
 				notificationServiceLog.warn('Notifications require a physical device');
-				return null;
+				return { granted: false, token: null, canAskAgain: true };
 			}
 
 			// Request permissions
-			const { status: existingStatus } =
-				await Notifications.getPermissionsAsync();
-			let finalStatus = existingStatus;
+			const perms = await Notifications.getPermissionsAsync();
+			let final = perms;
 
-			if (existingStatus !== 'granted') {
-				const { status } = await Notifications.requestPermissionsAsync();
-				finalStatus = status;
+			if (perms.status !== 'granted') {
+				final = await Notifications.requestPermissionsAsync(); // OS prompt here
 			}
 
-			if (finalStatus !== 'granted') {
+			if (final.status !== 'granted') {
 				notificationServiceLog.warn('Notification permissions not granted');
-				return null;
+				return {
+					granted: false,
+					token: null,
+					canAskAgain: final.canAskAgain ?? true,
+				};
 			}
 
 			// Set up Android channels and iOS categories
@@ -121,28 +127,35 @@ class NotificationService {
 				Constants?.easConfig?.projectId;
 			if (!projectId) {
 				notificationServiceLog.warn('Project ID not found');
-				return null;
+				// Permissions granted but token fetch failed - still return granted=true
+				return { granted: true, token: null };
 			}
 
 			// Get the push token
-			const tokenData = await Notifications.getExpoPushTokenAsync({
-				projectId,
-			});
+			try {
+				const tokenData = await Notifications.getExpoPushTokenAsync({
+					projectId,
+				});
 
-			this.expoPushToken = tokenData.data;
-			notificationServiceLog.info('Push token obtained', {
-				token: this.expoPushToken?.substring(0, 20) + '...',
-			});
+				this.expoPushToken = tokenData.data;
+				notificationServiceLog.info('Push token obtained', {
+					token: this.expoPushToken?.substring(0, 20) + '...',
+				});
 
-			// Update the token on the backend
-			if (this.expoPushToken) {
-				await this.updatePushToken(this.expoPushToken);
+				// Update the token on the backend
+				if (this.expoPushToken) {
+					await this.updatePushToken(this.expoPushToken);
+				}
+
+				return { granted: true, token: this.expoPushToken };
+			} catch (tokenError) {
+				notificationServiceLog.error('Error getting push token', tokenError);
+				// Permissions granted but token fetch failed - still return granted=true
+				return { granted: true, token: null };
 			}
-
-			return this.expoPushToken;
 		} catch (error) {
 			notificationServiceLog.error('Error initializing notifications', error);
-			return null;
+			return { granted: false, token: null, canAskAgain: true };
 		}
 	}
 
@@ -1056,7 +1069,7 @@ class NotificationService {
 			import('expo-router').then(({ router }) => {
 				// If a specific route is provided, use it
 				if (route) {
-					router.push(route);
+					router.push(route as any);
 					return;
 				}
 
@@ -1064,21 +1077,21 @@ class NotificationService {
 				switch (type) {
 					case 'budget':
 						if (entityId) {
-							router.push(`/(stack)/budgets/${entityId}`);
+							router.push(`/(stack)/budgets/${entityId}` as any);
 						} else {
 							router.push('/(tabs)/wallet/budgets');
 						}
 						break;
 					case 'goal':
 						if (entityId) {
-							router.push(`/(stack)/goals/${entityId}`);
+							router.push(`/(stack)/goals/${entityId}` as any);
 						} else {
 							router.push('/(tabs)/wallet/goals');
 						}
 						break;
 					case 'transaction':
 						if (entityId) {
-							router.push(`/(stack)/transactionDetails?id=${entityId}`);
+							router.push(`/(stack)/transactionDetails?id=${entityId}` as any);
 						} else {
 							router.push('/(tabs)/transaction');
 						}
@@ -1398,10 +1411,10 @@ class NotificationService {
 	}
 
 	// Initialize notification service with background task registration
-	async initializeWithBackgroundTasks(): Promise<string | null> {
+	async initializeWithBackgroundTasks(): Promise<NotificationInitResult> {
 		try {
 			// Initialize the basic notification service
-			const token = await this.initialize();
+			const result = await this.initialize();
 
 			// Set up notification listeners
 			this.setupNotificationListeners();
@@ -1419,13 +1432,13 @@ class NotificationService {
 				);
 			}
 
-			return token;
+			return result;
 		} catch (error) {
 			notificationServiceLog.error(
 				'Error initializing with background tasks',
 				error
 			);
-			return null;
+			return { granted: false, token: null, canAskAgain: true };
 		}
 	}
 

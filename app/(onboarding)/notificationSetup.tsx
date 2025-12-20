@@ -12,7 +12,6 @@ import {
 import { logger } from '../../src/utils/logger';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useNotification } from '../../src/context/notificationContext';
 import { useProfile } from '../../src/context/profileContext';
 import { useOnboarding } from '../../src/context/OnboardingContext';
 import { NotificationConsent, notificationService } from '../../src/services';
@@ -90,7 +89,6 @@ const PRESETS: Record<PresetKey, NotificationConsent> = {
 
 export default function NotificationPermissionScreen() {
 	const router = useRouter();
-	const { initialize } = useNotification();
 	const { updatePreferences } = useProfile();
 	const { markOnboardingComplete } = useOnboarding();
 
@@ -112,17 +110,29 @@ export default function NotificationPermissionScreen() {
 		setLoading(true);
 		try {
 			// Only ask for OS permission when user explicitly continues
+			// This will trigger the native OS permission popup
 			logger.debug(
 				'📱 [NotificationSetup] Requesting notification permissions...'
 			);
-			const pushToken = await initialize();
-			// Check if permissions were actually granted
-			const granted = pushToken !== null;
+			// Call notificationService directly to get the push token and trigger OS popup
+			const result = await notificationService.initialize(); // triggers OS prompt
+			// Set up listeners only (no permission request)
+			notificationService.setupNotificationListeners();
+
+			const granted = result.granted;
 
 			if (granted) {
 				logger.debug('✅ [NotificationSetup] Permissions granted successfully');
 			} else {
 				logger.debug('⚠️ [NotificationSetup] Permissions denied');
+				// Optional: guide user if they denied
+				if (!result.canAskAgain) {
+					Alert.alert(
+						'Notifications are off',
+						'You can enable notifications later in Settings.',
+						[{ text: 'OK' }]
+					);
+				}
 			}
 
 			logger.debug('💾 [NotificationSetup] Saving notification preferences...');
@@ -150,49 +160,31 @@ export default function NotificationPermissionScreen() {
 			});
 			logger.debug('✅ [NotificationSetup] Preferences saved successfully');
 
-			// Send a welcome notification if permissions were granted
-			if (granted) {
-				logger.debug('🔔 [NotificationSetup] Sending welcome notification');
-				try {
-					await notificationService.sendNotification(
-						'Welcome to Brie! 👋',
-						"You're all set. We'll notify you about important budget updates and insights.",
-						'system'
-					);
-					logger.debug('✅ [NotificationSetup] Welcome notification sent');
-				} catch (notifError) {
-					logger.error(
-						'❌ [NotificationSetup] Failed to send welcome notification:',
-						notifError
-					);
-				}
-			}
-
 			logger.debug(
 				'🎉 [NotificationSetup] Marking onboarding complete and navigating to dashboard...'
 			);
 			await markOnboardingComplete();
 			router.replace('/(tabs)/dashboard');
 
-			// Show alert about denied permissions AFTER navigation
-			if (!granted) {
-				logger.debug(
-					'⏰ [NotificationSetup] Scheduling notification alert after 1000ms'
-				);
-				setTimeout(() => {
-					logger.debug(
-						'🔔 [NotificationSetup] Showing notification disabled alert'
-					);
-					Alert.alert(
-						'Notifications Disabled',
-						"You haven't allowed notifications. You can enable them later in your device settings to receive budget alerts and insights.",
-						[
-							{
-								text: 'OK',
-								style: 'default',
-							},
-						]
-					);
+			// Send one welcome notification after navigation (only if permissions granted)
+			if (granted) {
+				setTimeout(async () => {
+					logger.debug('🔔 [NotificationSetup] Sending welcome notification');
+					try {
+						await notificationService.sendNotification(
+							'Notifications Enabled ✅',
+							"You're all set! You'll receive important budget alerts and insights.",
+							'system',
+							undefined,
+							'high'
+						);
+						logger.debug('✅ [NotificationSetup] Welcome notification sent');
+					} catch (notifError) {
+						logger.error(
+							'❌ [NotificationSetup] Failed to send welcome notification:',
+							notifError
+						);
+					}
 				}, 1000); // Delay to ensure navigation completes
 			}
 		} catch (error) {
