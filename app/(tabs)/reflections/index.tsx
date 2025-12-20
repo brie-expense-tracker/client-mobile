@@ -1096,7 +1096,7 @@ const styles = StyleSheet.create({
 	},
 	headerRight: {
 		width: 44,
-		alignItems: 'flex-end',
+		alignItems: 'flex-start',
 		justifyContent: 'center',
 		marginRight: -12,
 	},
@@ -1104,6 +1104,7 @@ const styles = StyleSheet.create({
 		fontSize: 13,
 		fontWeight: '600',
 		color: '#6B7280',
+		paddingLeft: 2,
 	},
 
 	progressWrap: {
