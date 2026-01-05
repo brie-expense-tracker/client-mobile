@@ -26,6 +26,7 @@ import { BillService } from '../../../src/services';
 import { DebtsService, Debt } from '../../../src/services/feature/debtsService';
 import { palette, space, shadow } from '../../../src/ui/theme';
 import { getItem, setItem } from '../../../src/utils/safeStorage';
+import BottomSheet from '../../../src/components/BottomSheet';
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
 	style: 'currency',
@@ -34,28 +35,37 @@ const currencyFormatter = new Intl.NumberFormat('en-US', {
 
 function WalletHero({
 	total = 0,
-	percentChange = 0,
+	setupNetChange = 0,
+	onPress,
 }: {
 	total?: number | null;
-	percentChange?: number;
+	setupNetChange?: number;
+	onPress?: () => void;
 }) {
-	const formattedChange = `${percentChange >= 0 ? '+' : ''}${(
-		percentChange * 100
-	).toFixed(1)}%`;
+	const formatted = `${
+		setupNetChange >= 0 ? '+' : ''
+	}${currencyFormatter.format(Math.abs(setupNetChange))} this month`;
 
-	return (
+	const isPositive = setupNetChange >= 0;
+
+	const content = (
 		<View style={heroStyles.container}>
 			<View>
 				<Text style={heroStyles.overline}>Your setup</Text>
-				<Text style={heroStyles.label}>Tracked Balance</Text>
+				<Text style={heroStyles.label}>Total Tracked</Text>
 				<Text style={heroStyles.amount}>
 					{currencyFormatter.format(total ?? 0)}
 				</Text>
-				<Text style={heroStyles.sub}>Across budgets, goals & debts</Text>
+				<Text style={heroStyles.sub}>
+					Everything you&apos;re currently tracking
+				</Text>
 			</View>
 			<View style={heroStyles.heroRight}>
 				<View style={heroStyles.deltaPill}>
-					<Text style={heroStyles.deltaText}>{formattedChange}</Text>
+					<Text style={heroStyles.deltaText}>
+						{isPositive ? '↑ ' : '↓ '}
+						{formatted}
+					</Text>
 				</View>
 				<View style={heroStyles.heroSparklineWrapper}>
 					<Svg width={90} height={40}>
@@ -71,6 +81,16 @@ function WalletHero({
 			</View>
 		</View>
 	);
+
+	if (onPress) {
+		return (
+			<TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+				{content}
+			</TouchableOpacity>
+		);
+	}
+
+	return content;
 }
 
 const heroStyles = StyleSheet.create({
@@ -81,7 +101,6 @@ const heroStyles = StyleSheet.create({
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
-		marginBottom: 16,
 		gap: 20,
 		...shadow.card,
 	},
@@ -384,7 +403,7 @@ const styles = StyleSheet.create({
 		backgroundColor: palette.surfaceAlt,
 	},
 	scroll: {
-		backgroundColor: '#f5f6f3',
+		backgroundColor: '#F1F5F9',
 	},
 	header: {
 		paddingHorizontal: space.xl,
@@ -616,8 +635,19 @@ export default function WalletOverviewScreen() {
 
 	const [debts, setDebts] = useState<Debt[]>([]);
 	const [debtsLoading, setDebtsLoading] = useState(true);
-	const [previousMonthTrackedBalance, setPreviousMonthTrackedBalance] =
-		useState<number | null>(null);
+
+	type WalletBaseline = {
+		budgetsAllocated: number;
+		goalsCurrent: number;
+		debtTotal: number;
+		trackedBalance: number;
+		createdAt: string;
+	};
+
+	const [monthBaseline, setMonthBaseline] = useState<WalletBaseline | null>(
+		null
+	);
+	const [showBreakdown, setShowBreakdown] = useState(false);
 	const budgetsBusy = budgetsLoading && !budgetsLoaded;
 	const billsBusy = billsLoading && !billsLoaded;
 	const goalsBusy = goalsLoading && !goalsLoaded;
@@ -659,67 +689,81 @@ export default function WalletOverviewScreen() {
 		}, [loadDebts])
 	);
 
-	// Load previous month's tracked balance for percentage calculation
-	useEffect(() => {
-		const loadPreviousMonthBalance = async () => {
-			try {
-				const now = new Date();
-				const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-				const key = `trackedBalance_${lastMonth.getFullYear()}_${lastMonth.getMonth()}`;
-				const stored = await getItem(key);
-				if (stored) {
-					setPreviousMonthTrackedBalance(parseFloat(stored));
-				}
-			} catch (error) {
-				console.warn('Failed to load previous month balance', error);
-			}
-		};
-
-		loadPreviousMonthBalance();
+	// Helper functions for month keys
+	const getMonthKey = useCallback((d = new Date()) => {
+		return `${d.getFullYear()}_${d.getMonth()}`;
 	}, []);
+
+	const baselineKeyForMonth = useCallback(
+		(d = new Date()) => {
+			return `walletBaseline_${getMonthKey(d)}`;
+		},
+		[getMonthKey]
+	);
+
+	// Extract current values for tracked balance and baseline comparison
+	const budgetsAmount = monthlySummary?.totalAllocated ?? 0;
+	const goalsAmount = goals.reduce((sum, goal) => sum + (goal.current || 0), 0);
+	const debtsAmount = DebtsService.calculateTotalDebt(debts);
 
 	// Calculate tracked balance (budgets allocated + goals current + debts total)
 	const trackedBalance = useMemo(() => {
-		const budgetsAmount = monthlySummary?.totalAllocated ?? 0;
-		const goalsAmount = goals.reduce(
-			(sum, goal) => sum + (goal.current || 0),
-			0
-		);
-		const debtsAmount = DebtsService.calculateTotalDebt(debts);
 		return budgetsAmount + goalsAmount + debtsAmount;
-	}, [monthlySummary?.totalAllocated, goals, debts]);
+	}, [budgetsAmount, goalsAmount, debtsAmount]);
 
-	// Store current month's tracked balance for next month's comparison
+	// Load or create the baseline once data is ready
 	useEffect(() => {
-		const storeCurrentMonthBalance = async () => {
+		const loadOrCreateBaseline = async () => {
 			try {
-				const now = new Date();
-				const key = `trackedBalance_${now.getFullYear()}_${now.getMonth()}`;
-				await setItem(key, trackedBalance.toString());
-			} catch (error) {
-				console.warn('Failed to store current month balance', error);
+				const key = baselineKeyForMonth();
+				const stored = await getItem(key);
+
+				if (stored) {
+					setMonthBaseline(JSON.parse(stored));
+					return;
+				}
+
+				// Create baseline at first "stable load" of the month
+				const baseline: WalletBaseline = {
+					budgetsAllocated: budgetsAmount,
+					goalsCurrent: goalsAmount,
+					debtTotal: debtsAmount,
+					trackedBalance: budgetsAmount + goalsAmount + debtsAmount,
+					createdAt: new Date().toISOString(),
+				};
+
+				await setItem(key, JSON.stringify(baseline));
+				setMonthBaseline(baseline);
+			} catch (e) {
+				console.warn('Failed to load/create wallet baseline', e);
 			}
 		};
 
-		if (trackedBalance > 0 && !budgetsBusy && !goalsBusy && !debtsBusy) {
-			storeCurrentMonthBalance();
+		// only do this when data is actually loaded and stable
+		if (!budgetsBusy && !goalsBusy && !debtsBusy) {
+			loadOrCreateBaseline();
 		}
-	}, [trackedBalance, budgetsBusy, goalsBusy, debtsBusy]);
+	}, [
+		budgetsBusy,
+		goalsBusy,
+		debtsBusy,
+		budgetsAmount,
+		goalsAmount,
+		debtsAmount,
+		baselineKeyForMonth,
+	]);
 
-	// Calculate percentage change from previous month
-	const percentChange = useMemo(() => {
-		if (
-			previousMonthTrackedBalance === null ||
-			previousMonthTrackedBalance === 0 ||
-			!Number.isFinite(previousMonthTrackedBalance)
-		) {
-			return 0;
-		}
-		const change =
-			(trackedBalance - previousMonthTrackedBalance) /
-			previousMonthTrackedBalance;
-		return Number.isFinite(change) ? change : 0;
-	}, [trackedBalance, previousMonthTrackedBalance]);
+	// Compute "this month" setup change
+	const setupNetChange = useMemo(() => {
+		if (!monthBaseline) return 0;
+
+		const budgetsDelta = budgetsAmount - monthBaseline.budgetsAllocated;
+		const goalsDelta = goalsAmount - monthBaseline.goalsCurrent;
+		const debtDelta = debtsAmount - monthBaseline.debtTotal; // positive means debt increased
+
+		// debt going down is GOOD -> subtract debt delta
+		return budgetsDelta + goalsDelta - debtDelta;
+	}, [monthBaseline, budgetsAmount, goalsAmount, debtsAmount]);
 
 	const formatCurrency = useCallback((amount?: number | null) => {
 		if (typeof amount !== 'number' || Number.isNaN(amount)) {
@@ -903,7 +947,7 @@ export default function WalletOverviewScreen() {
 	return (
 		<SafeAreaView style={styles.container}>
 			<View style={styles.header}>
-				<Text style={styles.title}>Financial Setup</Text>
+				<Text style={styles.title}>Wallet Overview</Text>
 				<Text style={styles.subtitle}>Manage what you&apos;re tracking</Text>
 			</View>
 
@@ -915,7 +959,11 @@ export default function WalletOverviewScreen() {
 				{budgetsBusy || goalsBusy || debtsBusy ? (
 					<WalletHeroSkeleton />
 				) : (
-					<WalletHero total={trackedBalance} percentChange={percentChange} />
+					<WalletHero
+						total={trackedBalance}
+						setupNetChange={setupNetChange}
+						onPress={() => setShowBreakdown(true)}
+					/>
 				)}
 
 				<View style={styles.quickActionsRow}>
@@ -1057,6 +1105,201 @@ export default function WalletOverviewScreen() {
 
 				<View style={styles.footerSpacer} />
 			</ScrollView>
+
+			{/* Breakdown Modal */}
+			<BottomSheet
+				isOpen={showBreakdown}
+				onClose={() => setShowBreakdown(false)}
+				snapPoints={[0.5, 0.4]}
+				header={
+					<View
+						style={{
+							flexDirection: 'row',
+							alignItems: 'center',
+							justifyContent: 'space-between',
+							paddingHorizontal: 20,
+							paddingBottom: 12,
+						}}
+					>
+						<Text
+							style={{
+								fontSize: 20,
+								fontWeight: '700',
+								color: '#0F172A',
+							}}
+						>
+							Total Tracked
+						</Text>
+						<TouchableOpacity onPress={() => setShowBreakdown(false)}>
+							<Ionicons name="close" size={24} color="#64748B" />
+						</TouchableOpacity>
+					</View>
+				}
+			>
+				<ScrollView
+					showsVerticalScrollIndicator={false}
+					contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
+				>
+					<Text
+						style={{
+							fontSize: 32,
+							fontWeight: '700',
+							color: '#0F172A',
+							marginBottom: 24,
+						}}
+					>
+						{currencyFormatter.format(trackedBalance)}
+					</Text>
+
+					<View style={{ gap: 16 }}>
+						<View
+							style={{
+								flexDirection: 'row',
+								justifyContent: 'space-between',
+								alignItems: 'center',
+								paddingVertical: 12,
+								borderBottomWidth: 1,
+								borderBottomColor: '#E5E7EB',
+							}}
+						>
+							<View
+								style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
+							>
+								<View
+									style={{
+										width: 40,
+										height: 40,
+										borderRadius: 12,
+										backgroundColor: 'rgba(15,111,255,0.12)',
+										alignItems: 'center',
+										justifyContent: 'center',
+									}}
+								>
+									<Ionicons
+										name="pie-chart-outline"
+										size={20}
+										color="#0F6FFF"
+									/>
+								</View>
+								<View>
+									<Text
+										style={{
+											fontSize: 16,
+											fontWeight: '600',
+											color: '#0F172A',
+										}}
+									>
+										Budgets (monthly)
+									</Text>
+									<Text
+										style={{
+											fontSize: 13,
+											color: '#64748B',
+											marginTop: 2,
+										}}
+									>
+										{formatCurrency(budgetsAmount)}
+									</Text>
+								</View>
+							</View>
+						</View>
+
+						<View
+							style={{
+								flexDirection: 'row',
+								justifyContent: 'space-between',
+								alignItems: 'center',
+								paddingVertical: 12,
+								borderBottomWidth: 1,
+								borderBottomColor: '#E5E7EB',
+							}}
+						>
+							<View
+								style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
+							>
+								<View
+									style={{
+										width: 40,
+										height: 40,
+										borderRadius: 12,
+										backgroundColor: 'rgba(15,111,255,0.12)',
+										alignItems: 'center',
+										justifyContent: 'center',
+									}}
+								>
+									<Ionicons name="flag-outline" size={20} color="#0F6FFF" />
+								</View>
+								<View>
+									<Text
+										style={{
+											fontSize: 16,
+											fontWeight: '600',
+											color: '#0F172A',
+										}}
+									>
+										Goals saved
+									</Text>
+									<Text
+										style={{
+											fontSize: 13,
+											color: '#64748B',
+											marginTop: 2,
+										}}
+									>
+										{formatCurrency(goalsAmount)}
+									</Text>
+								</View>
+							</View>
+						</View>
+
+						<View
+							style={{
+								flexDirection: 'row',
+								justifyContent: 'space-between',
+								alignItems: 'center',
+								paddingVertical: 12,
+							}}
+						>
+							<View
+								style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
+							>
+								<View
+									style={{
+										width: 40,
+										height: 40,
+										borderRadius: 12,
+										backgroundColor: 'rgba(15,111,255,0.12)',
+										alignItems: 'center',
+										justifyContent: 'center',
+									}}
+								>
+									<Ionicons name="card-outline" size={20} color="#0F6FFF" />
+								</View>
+								<View>
+									<Text
+										style={{
+											fontSize: 16,
+											fontWeight: '600',
+											color: '#0F172A',
+										}}
+									>
+										Debt remaining
+									</Text>
+									<Text
+										style={{
+											fontSize: 13,
+											color: '#64748B',
+											marginTop: 2,
+										}}
+									>
+										{formatCurrency(debtsAmount)}
+									</Text>
+								</View>
+							</View>
+						</View>
+					</View>
+				</ScrollView>
+			</BottomSheet>
 		</SafeAreaView>
 	);
 }
