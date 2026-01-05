@@ -35,6 +35,7 @@ import { BudgetProvider } from '../src/context/budgetContext';
 import { GoalProvider } from '../src/context/goalContext';
 import { BillProvider } from '../src/context/billContext';
 import { ThemeProvider } from '../src/context/ThemeContext';
+import { SubscriptionProvider } from '../src/context/SubscriptionContext';
 import { loadLocalOverrides, getResolvedFlags } from '../src/config/features';
 import * as Notifications from 'expo-notifications';
 import { ensureBgPushRegistered } from '../src/services/notifications/backgroundTaskService';
@@ -609,11 +610,13 @@ export default function RootLayout() {
 							translucent={false}
 						/>
 						<AuthProvider>
-							<OnboardingProvider>
-								<NotificationProvider>
-									<RootLayoutContent />
-								</NotificationProvider>
-							</OnboardingProvider>
+							<SubscriptionProvider>
+								<OnboardingProvider>
+									<NotificationProvider>
+										<RootLayoutContent />
+									</NotificationProvider>
+								</OnboardingProvider>
+							</SubscriptionProvider>
 						</AuthProvider>
 					</ThemeProvider>
 				</QueryClientProvider>

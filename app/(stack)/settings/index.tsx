@@ -213,6 +213,11 @@ export default function SettingsScreen() {
 			icon: 'shield-outline',
 			onPress: () => router.push('/(stack)/settings/privacyandsecurity'),
 		},
+		{
+			label: 'Subscription',
+			icon: 'card-outline',
+			onPress: () => router.push('/(stack)/settings/subscription'),
+		},
 	];
 
 	const notificationItems: Item[] = [
