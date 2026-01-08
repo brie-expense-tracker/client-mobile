@@ -34,7 +34,7 @@ export default function Layout() {
 			<Stack.Screen
 				name="upgrade/index"
 				options={{
-					headerShown: true,
+					headerShown: false,
 					headerBackButtonDisplayMode: 'minimal',
 					headerTitle: 'Upgrade',
 					headerShadowVisible: false,

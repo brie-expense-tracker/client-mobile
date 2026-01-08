@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { getRevenueCatUI } from '../services/subscriptions/revenueCatUIImports';
-import useSubscription from '../context/SubscriptionContext';
+import { useSubscription } from '../context/SubscriptionContext';
 import { useBriePro } from '../hooks/useBriePro';
 import * as Haptics from 'expo-haptics';
 

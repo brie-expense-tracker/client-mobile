@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import useSubscription from '../context/SubscriptionContext';
+import { useSubscription } from '../context/SubscriptionContext';
 import { BRIE_PRO_ENTITLEMENT } from '../services/subscriptions/revenueCatService';
 
 /**

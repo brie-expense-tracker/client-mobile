@@ -18,6 +18,7 @@ import {
 	voiceOverHints,
 } from '../../../../src/utils/accessibility';
 import { normalizeIconName } from '../../../../src/constants/uiConstants';
+import { palette, shadow } from '../../../../src/ui/theme';
 
 interface Transaction {
 	id: string;
@@ -543,15 +544,10 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 
 const styles = StyleSheet.create({
 	card: {
-		backgroundColor: '#FFFFFF',
-		borderRadius: 16,
-		padding: 16,
-		borderWidth: 1,
-		borderColor: '#E5E7EB',
-		shadowColor: '#000',
-		shadowOpacity: 0.03,
-		shadowRadius: 6,
-		elevation: 1,
+		backgroundColor: palette.surface,
+		borderRadius: 22,
+		padding: 18,
+		...shadow.card,
 	},
 	cardHeaderRow: {
 		flexDirection: 'row',

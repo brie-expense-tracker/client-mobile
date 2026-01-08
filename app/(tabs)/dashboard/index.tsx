@@ -638,10 +638,13 @@ function HeroPro({
 
 	const isPositive = total >= 0;
 	const mainLine = isPositive ? '#2563EB' : '#DC2626';
-	const pillBg = isPositive ? '#ECFDF5' : '#FEF2F2';
-	const pillBorder = isPositive ? '#10B981' : '#EF4444';
-	const pillText = isPositive ? '#065F46' : '#991B1B';
-	const arrow = isPositive ? 'arrow-up' : 'arrow-down';
+
+	// Pill styling based on dailyChange, not total
+	const isDailyChangePositive = dailyChange >= 0;
+	const pillBg = isDailyChangePositive ? '#ECFDF5' : '#FEF2F2';
+	const pillBorder = isDailyChangePositive ? '#10B981' : '#EF4444';
+	const pillText = isDailyChangePositive ? '#065F46' : '#991B1B';
+	const arrow = isDailyChangePositive ? 'arrow-up' : 'arrow-down';
 
 	return (
 		<LinearGradient
