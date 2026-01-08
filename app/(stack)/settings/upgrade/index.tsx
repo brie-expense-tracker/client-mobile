@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
 	View,
 	Text,
@@ -16,7 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { getRevenueCatUI } from '../../../../src/services/subscriptions/revenueCatUIImports';
-import useSubscription from '../../../../src/context/SubscriptionContext';
+import { useSubscription } from '../../../../src/context/SubscriptionContext';
 import { useBriePro } from '../../../../src/hooks/useBriePro';
 import { PurchasesPackage } from 'react-native-purchases';
 
@@ -35,16 +35,34 @@ export default function UpgradeScreen() {
 	const { subscriptionStatus } = useBriePro();
 
 	const [loading, setLoading] = useState(false);
-	const [showPaywall, setShowPaywall] = useState(false);
 	const [selectedPackage, setSelectedPackage] =
 		useState<PurchasesPackage | null>(null);
 	const [restoring, setRestoring] = useState(false);
 
 	useEffect(() => {
 		// Refresh subscription status when screen loads
-		refreshSubscription();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, []);
+		refreshSubscription().catch(() => {
+			// Silently handle errors - they're already shown via subscriptionError state
+		});
+	}, [refreshSubscription]);
+
+	// Get the best available offering (fallback to test_default if default has no packages)
+	const bestOffering = useMemo(() => {
+		if (!offerings) return null;
+
+		// Use current offering if it has packages
+		if (offerings.current?.availablePackages?.length) {
+			return offerings.current;
+		}
+
+		// Fallback to test_default if available
+		const testDefault = offerings.all?.['test_default'];
+		if (testDefault?.availablePackages?.length) {
+			return testDefault;
+		}
+
+		return offerings.current || null;
+	}, [offerings]);
 
 	// Handle purchase
 	const handlePurchase = async (pkg: PurchasesPackage) => {
@@ -115,11 +133,6 @@ export default function UpgradeScreen() {
 		}
 	};
 
-	// Show RevenueCat Paywall UI
-	const handleShowPaywall = () => {
-		setShowPaywall(true);
-	};
-
 	// Format price
 
 	// Get package display name
@@ -145,7 +158,7 @@ export default function UpgradeScreen() {
 	};
 
 	// If user already has Pro, show success state
-	if (isPro && !showPaywall) {
+	if (isPro) {
 		const expirationDate = subscriptionStatus.expirationDate;
 		const willRenew = subscriptionStatus.willRenew;
 
@@ -182,59 +195,54 @@ export default function UpgradeScreen() {
 		);
 	}
 
-	// Show RevenueCat Paywall if available and requested
-	if (showPaywall && offerings?.current) {
-		const { PurchasesPaywall: PaywallComponent, isUIAvailable: uiAvailable } =
+	// Show RevenueCat Paywall directly if available (skip custom UI step)
+	if (bestOffering) {
+		const { Paywall: PaywallComponent, isUIAvailable: uiAvailable } =
 			getRevenueCatUI();
 
 		if (uiAvailable && PaywallComponent) {
 			return (
-				<View style={styles.paywallContainer}>
-					<SafeAreaView style={styles.container}>
-						<View style={styles.paywallHeader}>
-							<TouchableOpacity
-								onPress={() => setShowPaywall(false)}
-								style={styles.closeButton}
-							>
-								<Ionicons name="close" size={24} color="#000" />
-							</TouchableOpacity>
-						</View>
-						<PaywallComponent
-							offering={offerings.current}
-							onPurchaseCompleted={(customerInfo: any) => {
-								setShowPaywall(false);
-								refreshSubscription();
-								Haptics.notificationAsync(
-									Haptics.NotificationFeedbackType.Success
-								);
-								Alert.alert(
-									'Welcome to Brie Pro!',
-									'Your subscription is now active.',
-									[{ text: 'Get Started', onPress: () => router.back() }]
-								);
-							}}
-							onPurchaseError={(error: any) => {
-								if (error.userCancelled) {
-									return;
-								}
-								Alert.alert('Purchase Failed', error.message);
-							}}
-							onRestoreCompleted={(customerInfo: any) => {
-								setShowPaywall(false);
-								refreshSubscription();
-								if (isPro) {
-									Alert.alert(
-										'Purchases Restored',
-										'Your subscription has been restored.'
-									);
-								}
-							}}
-							onRestoreError={(error: any) => {
-								Alert.alert('Restore Failed', error.message);
-							}}
-						/>
-					</SafeAreaView>
-				</View>
+				<PaywallComponent
+					offering={bestOffering}
+					onDismiss={() => {
+						refreshSubscription();
+						router.back();
+					}}
+					onPurchaseCompleted={(customerInfo: any) => {
+						refreshSubscription();
+						Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+						Alert.alert(
+							'Welcome to Brie Pro!',
+							'Your subscription is now active.',
+							[{ text: 'Get Started', onPress: () => router.back() }]
+						);
+					}}
+					onPurchaseError={(error: any) => {
+						if (error.userCancelled) {
+							return;
+						}
+						Alert.alert('Purchase Failed', error.message);
+					}}
+					onRestoreCompleted={(customerInfo: any) => {
+						refreshSubscription();
+						if (isPro) {
+							Alert.alert(
+								'Purchases Restored',
+								'Your subscription has been restored.',
+								[{ text: 'OK', onPress: () => router.back() }]
+							);
+						} else {
+							Alert.alert(
+								'No Purchases Found',
+								"We couldn't find any active subscriptions to restore.",
+								[{ text: 'OK' }]
+							);
+						}
+					}}
+					onRestoreError={(error: any) => {
+						Alert.alert('Restore Failed', error.message);
+					}}
+				/>
 			);
 		}
 		// If UI components not available, fall through to show custom fallback UI
@@ -360,17 +368,6 @@ export default function UpgradeScreen() {
 								);
 							})}
 						</View>
-
-						{/* Use RevenueCat Paywall Button */}
-						{offerings?.current && getRevenueCatUI().isUIAvailable && (
-							<TouchableOpacity
-								onPress={handleShowPaywall}
-								style={styles.paywallButton}
-							>
-								<Ionicons name="apps" size={18} color="#fff" />
-								<Text style={styles.paywallButtonText}>View Full Paywall</Text>
-							</TouchableOpacity>
-						)}
 
 						{/* Restore Purchases */}
 						<TouchableOpacity
@@ -630,27 +627,6 @@ const styles = StyleSheet.create({
 	},
 
 	/* Buttons */
-	paywallButton: {
-		marginHorizontal: 16,
-		marginTop: 16,
-		backgroundColor: '#4F46E5',
-		paddingVertical: 14,
-		paddingHorizontal: 20,
-		borderRadius: 12,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
-		gap: 8,
-		shadowColor: '#4F46E5',
-		shadowOpacity: 0.25,
-		shadowRadius: 10,
-		shadowOffset: { width: 0, height: 4 },
-	},
-	paywallButtonText: {
-		color: '#fff',
-		fontWeight: '700',
-		fontSize: 16,
-	},
 	restoreButton: {
 		marginHorizontal: 16,
 		marginTop: 12,
@@ -674,19 +650,5 @@ const styles = StyleSheet.create({
 		color: '#94A3B8',
 		fontSize: 11,
 		lineHeight: 16,
-	},
-
-	/* Paywall */
-	paywallContainer: {
-		flex: 1,
-		backgroundColor: '#fff',
-	},
-	paywallHeader: {
-		flexDirection: 'row',
-		justifyContent: 'flex-end',
-		padding: 16,
-	},
-	closeButton: {
-		padding: 8,
 	},
 });

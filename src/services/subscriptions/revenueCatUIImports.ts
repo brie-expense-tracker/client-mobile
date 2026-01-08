@@ -1,52 +1,53 @@
 /**
- * Conditional imports for RevenueCat UI components
- * These may not be available if native modules aren't linked yet
+ * Lazy import for RevenueCat UI (react-native-purchases-ui)
+ *
+ * RevenueCat UI exports a default object (RevenueCatUI) that contains:
+ * - Paywall component at RevenueCatUI.Paywall
+ * - Methods like presentPaywall() and presentPaywallIfNeeded()
  */
 
-let PurchasesPaywall: any = null;
-let PurchasesCustomerInfo: any = null;
+let RevenueCatUI: any = null;
+let Paywall: any = null;
+
 let isUIAvailable = false;
 let isUILoading = false;
 
-// Lazy load RevenueCat UI components to avoid NativeEventEmitter errors on initial load
 const loadUIModules = () => {
-	if (isUILoading || isUIAvailable) {
-		return { PurchasesPaywall, PurchasesCustomerInfo, isUIAvailable };
-	}
+	if (isUILoading) return { RevenueCatUI, Paywall, isUIAvailable };
+	if (isUIAvailable) return { RevenueCatUI, Paywall, isUIAvailable };
 
 	isUILoading = true;
-	
+
 	try {
-		// Use dynamic import to avoid issues during module initialization
-		const uiModule = require('react-native-purchases-ui');
-		
-		// Check if the module has the expected exports
-		if (uiModule && (uiModule.default || uiModule.PurchasesPaywall || uiModule.PurchasesCustomerInfo)) {
-			PurchasesPaywall = uiModule.default || uiModule.PurchasesPaywall;
-			PurchasesCustomerInfo = uiModule.default || uiModule.PurchasesCustomerInfo;
-			
-			// Verify the components are actually available (not just placeholder)
-			if (PurchasesPaywall || PurchasesCustomerInfo) {
-				isUIAvailable = true;
-			}
-		}
-	} catch (error: any) {
-		// UI components not available - this is okay during development
+		// eslint-disable-next-line @typescript-eslint/no-require-imports
+		const mod = require('react-native-purchases-ui');
+
+		// Some builds export { default: RevenueCatUI }, some export RevenueCatUI directly.
+		const rcui = mod?.default ?? mod;
+
+		// Paywall is a property on the default export
+		const paywall = rcui?.Paywall;
+
+		RevenueCatUI = rcui;
+		Paywall = paywall;
+
+		// Consider UI "available" if we have either Paywall component or the presentation methods
+		isUIAvailable =
+			!!Paywall ||
+			typeof RevenueCatUI?.presentPaywall === 'function' ||
+			typeof RevenueCatUI?.presentPaywallIfNeeded === 'function';
+	} catch (e: any) {
+		// In Expo Go / dev situations, this can fail due to native module availability
 		// The error might be from NativeEventEmitter initialization
-		if (error?.message && !error.message.includes('NativeEventEmitter')) {
-			console.warn('[RevenueCat UI] Failed to load UI components:', error.message);
+		if (e?.message && !e.message.includes('NativeEventEmitter')) {
+			console.warn('[RevenueCat UI] Failed to load UI components:', e.message);
 		}
 		isUIAvailable = false;
 	} finally {
 		isUILoading = false;
 	}
 
-	return { PurchasesPaywall, PurchasesCustomerInfo, isUIAvailable };
+	return { RevenueCatUI, Paywall, isUIAvailable };
 };
 
-// Export getter function that lazily loads modules
 export const getRevenueCatUI = () => loadUIModules();
-
-// Export constants (will be set when modules load)
-export { PurchasesPaywall, PurchasesCustomerInfo, isUIAvailable };
-

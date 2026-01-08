@@ -113,7 +113,7 @@ function MyComponent() {
 ### Purchase a Package
 
 ```typescript
-import useSubscription from '../context/SubscriptionContext';
+import { useSubscription } from '../context/SubscriptionContext';
 
 function UpgradeScreen() {
   const { availablePackages, purchasePackage } = useSubscription();

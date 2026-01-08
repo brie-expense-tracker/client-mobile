@@ -11,7 +11,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import CustomerCenter from '../../../../src/components/CustomerCenter';
 import { useBriePro } from '../../../../src/hooks/useBriePro';
-import useSubscription from '../../../../src/context/SubscriptionContext';
 
 export default function SubscriptionSettingsScreen() {
 	const router = useRouter();
@@ -32,7 +31,11 @@ export default function SubscriptionSettingsScreen() {
 							{isPro ? (
 								<>
 									<View style={styles.statusHeader}>
-										<Ionicons name="checkmark-circle" size={32} color="#10B981" />
+										<Ionicons
+											name="checkmark-circle"
+											size={32}
+											color="#10B981"
+										/>
 										<View style={styles.statusHeaderText}>
 											<Text style={styles.statusTitle}>Brie Pro Active</Text>
 											<Text style={styles.statusSubtitle}>
@@ -42,7 +45,11 @@ export default function SubscriptionSettingsScreen() {
 									</View>
 									{expirationDate && (
 										<View style={styles.statusInfo}>
-											<Ionicons name="calendar-outline" size={16} color="#6B7280" />
+											<Ionicons
+												name="calendar-outline"
+												size={16}
+												color="#6B7280"
+											/>
 											<Text style={styles.statusInfoText}>
 												{willRenew
 													? `Renews on ${expirationDate.toLocaleDateString()}`
@@ -54,7 +61,11 @@ export default function SubscriptionSettingsScreen() {
 							) : (
 								<>
 									<View style={styles.statusHeader}>
-										<Ionicons name="information-circle" size={32} color="#6B7280" />
+										<Ionicons
+											name="information-circle"
+											size={32}
+											color="#6B7280"
+										/>
 										<View style={styles.statusHeaderText}>
 											<Text style={styles.statusTitle}>Free Plan</Text>
 											<Text style={styles.statusSubtitle}>
@@ -70,7 +81,7 @@ export default function SubscriptionSettingsScreen() {
 					{/* Actions Section */}
 					<View style={styles.section}>
 						<Text style={styles.sectionTitle}>Manage Subscription</Text>
-						
+
 						{!isPro && (
 							<TouchableOpacity
 								style={styles.actionCard}
@@ -117,9 +128,9 @@ export default function SubscriptionSettingsScreen() {
 								color="#6B7280"
 							/>
 							<Text style={styles.infoText}>
-								Subscriptions auto-renew unless cancelled. Manage your subscription
-								through the Customer Center or your App Store/Google Play account
-								settings.
+								Subscriptions auto-renew unless cancelled. Manage your
+								subscription through the Customer Center or your App
+								Store/Google Play account settings.
 							</Text>
 						</View>
 					</View>
@@ -242,5 +253,3 @@ const styles = StyleSheet.create({
 		lineHeight: 18,
 	},
 });
-
-
