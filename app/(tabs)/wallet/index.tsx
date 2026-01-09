@@ -718,6 +718,23 @@ export default function WalletOverviewScreen() {
 				const key = baselineKeyForMonth();
 				const stored = await getItem(key);
 
+				const currentTotal = budgetsAmount + goalsAmount + debtsAmount;
+
+				// If all current values are zero, reset the baseline to zero
+				// This prevents showing false positive changes from stale baseline data
+				if (currentTotal === 0) {
+					const zeroBaseline: WalletBaseline = {
+						budgetsAllocated: 0,
+						goalsCurrent: 0,
+						debtTotal: 0,
+						trackedBalance: 0,
+						createdAt: new Date().toISOString(),
+					};
+					await setItem(key, JSON.stringify(zeroBaseline));
+					setMonthBaseline(zeroBaseline);
+					return;
+				}
+
 				if (stored) {
 					setMonthBaseline(JSON.parse(stored));
 					return;
@@ -756,6 +773,12 @@ export default function WalletOverviewScreen() {
 	// Compute "this month" setup change
 	const setupNetChange = useMemo(() => {
 		if (!monthBaseline) return 0;
+
+		// If all current values are zero, there's no meaningful change to show
+		const currentTotal = budgetsAmount + goalsAmount + debtsAmount;
+		if (currentTotal === 0 && monthBaseline.trackedBalance === 0) {
+			return 0;
+		}
 
 		const budgetsDelta = budgetsAmount - monthBaseline.budgetsAllocated;
 		const goalsDelta = goalsAmount - monthBaseline.goalsCurrent;

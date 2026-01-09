@@ -9,10 +9,6 @@ export default function WalletLayout() {
 			}}
 		>
 			<Stack.Screen name="index" options={{ headerShown: false }} />
-			<Stack.Screen
-				name="budgetDetailScreen"
-				options={{ headerShown: false }}
-			/>
 			{/* Nested routes are handled by their own _layout.tsx files */}
 			<Stack.Screen name="budgets" options={{ headerShown: false }} />
 			<Stack.Screen name="goals" options={{ headerShown: false }} />
