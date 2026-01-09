@@ -415,7 +415,7 @@ export class HybridAIService {
 
 		switch (type) {
 			case 'categorization':
-				if (data?.description && data?.amount) {
+				if (data?.amount) {
 					return await this.localMLService.categorizeTransaction(
 						data.description,
 						data.amount,

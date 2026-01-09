@@ -114,10 +114,10 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 	};
 
 	const handleSubmit = async () => {
-		if (!transaction.amount || !transaction.description) {
+		if (!transaction.amount) {
 			Alert.alert(
 				'Missing Information',
-				'Please enter both amount and description.'
+				'Please enter an amount.'
 			);
 			return;
 		}
@@ -147,7 +147,7 @@ const QuickAddTransaction: React.FC<QuickAddTransactionProps> = ({
 
 			// Create transaction data with goal linking
 			const transactionData: Omit<Transaction, 'id'> = {
-				description: transaction.description,
+				description: transaction.description || undefined,
 				amount: amount,
 				date: transaction.date,
 				type: transaction.type,

@@ -120,7 +120,7 @@ export class LocalMLService {
 	 * Categorize transaction using local ML with enhanced features
 	 */
 	async categorizeTransaction(
-		description: string,
+		description: string | undefined,
 		amount: number,
 		userId: string,
 		userBudgets: any[]
@@ -129,11 +129,19 @@ export class LocalMLService {
 		this.predictionCount++;
 
 		try {
-			// Validate inputs
-			this.validateTransactionInputs(description, amount, userId);
+			// Normalize description to empty string if undefined/null
+			const normalizedDescription = description?.trim() || '';
+			
+			// Validate inputs (description is now optional)
+			if (typeof amount !== 'number' || amount < 0) {
+				throw new Error('Valid amount is required');
+			}
+			if (!userId || typeof userId !== 'string') {
+				throw new Error('Valid userId is required');
+			}
 
 			// Extract features from transaction (with caching)
-			const features = this.extractFeaturesWithCache(description, amount);
+			const features = this.extractFeaturesWithCache(normalizedDescription, amount);
 
 			// Get vendor-based prediction
 			const vendorPrediction = this.predictFromVendor(features.vendor, userId);
@@ -456,16 +464,15 @@ export class LocalMLService {
 	// Private helper methods
 
 	private validateTransactionInputs(
-		description: string,
+		description: string | undefined,
 		amount: number,
 		userId: string
 	): void {
-		if (
-			!description ||
-			typeof description !== 'string' ||
-			description.trim().length === 0
-		) {
-			throw new Error('Valid description is required');
+		// Description is now optional, so only validate if provided
+		if (description !== undefined && description !== null) {
+			if (typeof description !== 'string') {
+				throw new Error('Description must be a string if provided');
+			}
 		}
 		if (typeof amount !== 'number' || amount < 0) {
 			throw new Error('Valid amount is required');
@@ -479,14 +486,16 @@ export class LocalMLService {
 		description: string,
 		amount: number
 	): TransactionFeatures {
-		const cacheKey = `${description}_${amount}`;
+		// Use empty string for cache key if description is missing
+		const normalizedDesc = description || '';
+		const cacheKey = `${normalizedDesc}_${amount}`;
 
 		const cached = this.featureCache.get(cacheKey);
 		if (cached) {
 			return cached;
 		}
 
-		const features = this.extractFeatures(description, amount);
+		const features = this.extractFeatures(normalizedDesc, amount);
 
 		// Cache the features (with size limit)
 		if (this.featureCache.size >= this.CACHE_SIZE_LIMIT) {
@@ -504,11 +513,13 @@ export class LocalMLService {
 		description: string,
 		amount: number
 	): TransactionFeatures {
-		const vendor = this.extractVendor(description);
+		// Handle empty or undefined description
+		const normalizedDesc = description || '';
+		const vendor = this.extractVendor(normalizedDesc);
 		const date = new Date();
 
 		return {
-			description,
+			description: normalizedDesc,
 			amount,
 			vendor,
 			dayOfWeek: date.getDay(),
@@ -516,13 +527,17 @@ export class LocalMLService {
 			month: date.getMonth(),
 			isWeekend: date.getDay() === 0 || date.getDay() === 6,
 			amountCategory: this.categorizeAmount(amount),
-			descriptionLength: description.length,
-			hasNumbers: /\d/.test(description),
-			commonKeywords: this.extractKeywords(description),
+			descriptionLength: normalizedDesc.length,
+			hasNumbers: /\d/.test(normalizedDesc),
+			commonKeywords: this.extractKeywords(normalizedDesc),
 		};
 	}
 
 	private extractVendor(description: string): string {
+		// Handle empty description
+		if (!description || description.trim().length === 0) {
+			return '';
+		}
 		// Common patterns for vendor extraction
 		const patterns = [
 			/^([A-Z\s]+)\s*/, // All caps at start
@@ -548,6 +563,10 @@ export class LocalMLService {
 	}
 
 	private extractKeywords(description: string): string[] {
+		// Handle empty description
+		if (!description || description.trim().length === 0) {
+			return [];
+		}
 		const commonKeywords = [
 			'grocery',
 			'food',

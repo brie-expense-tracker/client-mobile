@@ -259,7 +259,7 @@ export const useMLServices = () => {
 	 */
 	const categorizeTransaction = useCallback(
 		async (
-			description: string,
+			description: string | undefined,
 			amount: number
 		): Promise<{ category: string; confidence: number; reason: string }> => {
 			if (!user?._id || !status.isInitialized) {
@@ -267,9 +267,10 @@ export const useMLServices = () => {
 			}
 
 			try {
+				const normalizedDescription = description || '';
 				const request: AIRequest = {
 					type: 'categorization',
-					query: `Categorize transaction: ${description}`,
+					query: normalizedDescription ? `Categorize transaction: ${normalizedDescription}` : `Categorize transaction`,
 					userId: user._id,
 					priority: 'medium',
 					data: {

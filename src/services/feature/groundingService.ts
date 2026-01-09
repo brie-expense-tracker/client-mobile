@@ -545,24 +545,12 @@ export class GroundingService {
 	}
 
 	async categorizeTransaction(
-		description: string,
+		description: string | undefined,
 		amount: number
 	): Promise<GroundedResponse> {
 		try {
-			// Validate inputs
-			if (
-				!description ||
-				typeof description !== 'string' ||
-				description.trim().length === 0
-			) {
-				return {
-					type: 'fallback',
-					payload: {
-						error: 'Description is required and must be a non-empty string',
-					},
-					confidence: 0,
-				};
-			}
+			// Description is now optional - normalize to empty string if missing
+			const normalizedDescription = description?.trim() || '';
 
 			const amountValidation = this.validateAmount(amount);
 			if (!amountValidation.isValid) {
@@ -601,7 +589,16 @@ export class GroundingService {
 				},
 			];
 
-			const desc = description.toLowerCase();
+			// If no description, return fallback with lower confidence
+			if (!normalizedDescription) {
+				return {
+					type: 'fallback',
+					payload: { category: 'Other', reason: 'No description provided' },
+					confidence: 0.2,
+				};
+			}
+
+			const desc = normalizedDescription.toLowerCase();
 			let bestMatch = { category: 'Other', confidence: 0.3 };
 
 			for (const rule of rules) {

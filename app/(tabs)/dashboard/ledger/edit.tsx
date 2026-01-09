@@ -209,7 +209,6 @@ export default function EditTransactionScreen() {
 	// validation
 	const errors = useMemo(() => {
 		const e: Record<string, string> = {};
-		if (!description.trim()) e.description = 'Please enter a description.';
 		if (parseMoney(amountInput) <= 0)
 			e.amount = 'Enter a valid amount greater than 0.';
 		const parsedDate = date ? new Date(`${date}T00:00:00`) : new Date('');
@@ -272,7 +271,7 @@ export default function EditTransactionScreen() {
 		}
 
 		return (
-			description.trim() !== (tx.description ?? '').trim() ||
+			(description.trim() || undefined) !== (tx.description?.trim() || undefined) ||
 			signedAmount !== origAmount ||
 			type !== origType ||
 			(date ?? '') !==
@@ -376,7 +375,7 @@ export default function EditTransactionScreen() {
 			const currentHasTarget = !!(targetId && targetModel);
 
 			const payload: Partial<Transaction> = {
-				description: description.trim(),
+				description: description.trim() || undefined,
 				amount: signedAmount,
 				type,
 				date,
