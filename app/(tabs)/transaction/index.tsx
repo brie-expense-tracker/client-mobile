@@ -378,7 +378,7 @@ export default function TransactionScreenProModern() {
 
 	const amountNumber = useMemo(() => Number(amount), [amount]);
 	const canSubmit =
-		isValid && !isSubmitting && amountNumber > 0 && !!description?.trim();
+		isValid && !isSubmitting && amountNumber > 0;
 
 	// ---------- Handlers
 	const handleModeChange = useCallback(
@@ -481,11 +481,6 @@ export default function TransactionScreenProModern() {
 
 		if (!data.amount?.trim())
 			return Alert.alert('Missing amount', 'Please enter an amount.');
-		if (!data.description?.trim())
-			return Alert.alert(
-				'Missing description',
-				'Please add a short description.'
-			);
 
 		try {
 			setIsSubmitting(true);
@@ -498,7 +493,7 @@ export default function TransactionScreenProModern() {
 			const isExpense = mode === 'expense';
 
 			const payload: any = {
-				description: data.description.trim(),
+				description: data.description?.trim() || undefined,
 				amount: isIncome ? Math.abs(amt) : -Math.abs(amt),
 				date: data.date,
 				type: isIncome ? 'income' : 'expense',
@@ -526,10 +521,12 @@ export default function TransactionScreenProModern() {
 					// Debt payments are matched by description/vendor, not via target/targetModel
 					// Include debt name in description to enable automatic matching
 					const debtName = selectedDebt.debtName;
-					const currentDesc = payload.description.trim();
+					const currentDesc = payload.description?.trim() || '';
 					// Only append debt name if it's not already in the description
 					if (!currentDesc.toLowerCase().includes(debtName.toLowerCase())) {
-						payload.description = `${currentDesc} - ${debtName}`.trim();
+						payload.description = currentDesc 
+							? `${currentDesc} - ${debtName}`.trim()
+							: debtName;
 					}
 					// Set vendor to debt name for better matching
 					payload.vendor = debtName;
@@ -878,7 +875,7 @@ export default function TransactionScreenProModern() {
 					<Controller
 						control={control}
 						name="description"
-						rules={{ required: 'Please enter a short description' }}
+						rules={{}}
 						render={({ field: { value, onChange, onBlur } }) => (
 							<TextInput
 								ref={descRef}
@@ -995,7 +992,7 @@ export default function TransactionScreenProModern() {
 
 					{!canSubmit && (
 						<Text style={styles.inlineCtaHint}>
-							Enter amount and description to continue.
+							Enter amount to continue.
 						</Text>
 					)}
 				</View>

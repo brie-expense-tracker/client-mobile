@@ -19,7 +19,7 @@ const transactionContextLog = createLogger('TransactionContext');
 // Transaction interface defined inline since we removed the mock data file
 export interface Transaction {
 	id: string;
-	description: string;
+	description?: string;
 	amount: number;
 	date: string; // ISO string
 	type: 'income' | 'expense';
@@ -153,7 +153,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 
 					const transaction = {
 						id: tx._id ?? tx.id,
-						description: tx.description ?? '',
+						description: tx.description || undefined,
 						amount: amount,
 						date: tx.date ?? new Date().toISOString().split('T')[0],
 						type: tx.type ?? 'expense',
@@ -348,7 +348,9 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 					const serverTransaction: Transaction = {
 						id: response.data._id ?? response.data.id ?? tempId,
 						description:
-							response.data.description ?? transactionData.description,
+							response.data.description ||
+							transactionData.description ||
+							undefined,
 						amount: amount,
 						date: response.data.date ?? transactionData.date,
 						type: response.data.type ?? transactionData.type,
@@ -600,7 +602,9 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 					const updatedTransaction: Transaction = {
 						id: response.data._id ?? response.data.id ?? id,
 						description:
-							response.data.description ?? transactionData.description,
+							response.data.description ||
+							transactionData.description ||
+							undefined,
 						amount: response.data.amount ?? transactionData.amount,
 						date: response.data.date ?? transactionData.date,
 						type: response.data.type ?? transactionData.type,
