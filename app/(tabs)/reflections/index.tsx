@@ -112,6 +112,45 @@ const normalizeWeekStartDate = (dateStr: string | Date): Date => {
 };
 
 /**
+ * Check if a reflection is from the current week
+ */
+const isReflectionFromCurrentWeek = (
+	reflection: WeeklyReflection | null
+): boolean => {
+	if (!reflection) return false;
+	const currentWeekStart = getCurrentWeekStart();
+	const reflectionWeekStart = normalizeWeekStartDate(reflection.weekStartDate);
+	return reflectionWeekStart.getTime() === currentWeekStart.getTime();
+};
+
+/**
+ * Create a blank reflection for the current week
+ */
+const createBlankCurrentWeekReflection = (): WeeklyReflection => {
+	const currentWeekStart = getCurrentWeekStart();
+	const currentWeekEnd = new Date(currentWeekStart);
+	currentWeekEnd.setDate(currentWeekStart.getDate() + 6);
+	currentWeekEnd.setHours(23, 59, 59, 999);
+
+	return {
+		_id: 'temp-current-week',
+		userId: 'temp',
+		weekStartDate: currentWeekStart.toISOString(),
+		weekEndDate: currentWeekEnd.toISOString(),
+		financialMetrics: {
+			totalIncome: 0,
+			totalExpenses: 0,
+			netSavings: 0,
+			budgetUtilization: 0,
+			goalProgress: 0,
+		},
+		completed: false,
+		createdAt: new Date().toISOString(),
+		updatedAt: new Date().toISOString(),
+	};
+};
+
+/**
  * Find the most recent incomplete reflection from a previous week (not current week)
  */
 const findIncompletePreviousWeekReflection = (
@@ -219,7 +258,7 @@ export default function ReflectionWizard() {
 	const params = useLocalSearchParams<{ editReflectionId?: string }>();
 
 	const {
-		currentReflection,
+		currentReflection: rawCurrentReflection,
 		recentReflections,
 		streakCount,
 		loading,
@@ -229,14 +268,29 @@ export default function ReflectionWizard() {
 		refreshReflection,
 	} = useWeeklyReflection();
 
+	// Filter to only use currentReflection if it's from the current week
+	// If it's from a previous week, treat it as if there's no current reflection
+	// and create a blank one for the current week
+	const currentReflection = useMemo(() => {
+		if (!rawCurrentReflection) {
+			// No reflection at all - create a blank one for current week
+			return createBlankCurrentWeekReflection();
+		}
+
+		if (isReflectionFromCurrentWeek(rawCurrentReflection)) {
+			// This reflection is from the current week - use it
+			return rawCurrentReflection;
+		}
+
+		// Reflection is from a previous week - create a blank one for current week
+		return createBlankCurrentWeekReflection();
+	}, [rawCurrentReflection]);
+
 	// Incomplete previous week ref (if any)
+	// Only look in recentReflections, not currentReflection (since we've filtered it)
 	const incompletePreviousWeekReflection = useMemo(
-		() =>
-			findIncompletePreviousWeekReflection(
-				currentReflection,
-				recentReflections
-			),
-		[currentReflection, recentReflections]
+		() => findIncompletePreviousWeekReflection(null, recentReflections),
+		[recentReflections]
 	);
 
 	// Editing target (explicit id, or forced incomplete previous week)
@@ -361,28 +415,15 @@ export default function ReflectionWizard() {
 			return [];
 		}
 
-		// If we have a current reflection, exclude it by ID and date
-		if (currentReflection) {
-			const currentWeekStart = new Date(currentReflection.weekStartDate);
-			currentWeekStart.setHours(0, 0, 0, 0);
-			const currentReflectionId = currentReflection._id;
+		const currentWeekStart = getCurrentWeekStart();
 
-			return recentReflections.filter((r) => {
-				// Exclude by ID first (most reliable)
-				if (r._id === currentReflectionId) {
-					return false;
-				}
-
-				// Also exclude by date comparison (backup check)
-				const reflectionWeekStart = new Date(r.weekStartDate);
-				reflectionWeekStart.setHours(0, 0, 0, 0);
-				return reflectionWeekStart.getTime() !== currentWeekStart.getTime();
-			});
-		}
-
-		// If no current reflection, return all recent reflections
-		return recentReflections;
-	}, [currentReflection, recentReflections]);
+		// Filter out any reflections from the current week
+		return recentReflections.filter((r) => {
+			const reflectionWeekStart = normalizeWeekStartDate(r.weekStartDate);
+			// Only include reflections from previous weeks
+			return reflectionWeekStart.getTime() < currentWeekStart.getTime();
+		});
+	}, [recentReflections]);
 
 	const previousReflection = useMemo(
 		() => (pastReflections.length > 0 ? pastReflections[0] : null),
@@ -502,15 +543,21 @@ export default function ReflectionWizard() {
 				await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 			} catch {}
 
+			// If reflectionToEdit has a temporary ID (starts with 'temp'), don't pass it
+			// so a new reflection will be created
+			const reflectionIdToUse =
+				reflectionToEdit?._id &&
+				!reflectionToEdit._id.startsWith('temp') &&
+				reflectionToEdit?._id !== currentReflection?._id
+					? reflectionToEdit?._id
+					: undefined;
+
 			const saved = await saveReflection({
 				moodRating: localMood,
 				winOfTheWeek: localWin,
 				reflectionNotes: localNotes,
 				markCompleted: true,
-				reflectionId:
-					reflectionToEdit?._id !== currentReflection?._id
-						? reflectionToEdit?._id
-						: undefined,
+				reflectionId: reflectionIdToUse,
 			});
 
 			if (isDevMode) logger.debug('Save successful, received:', saved);
