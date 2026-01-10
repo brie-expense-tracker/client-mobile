@@ -22,7 +22,7 @@ import { palette, shadow } from '../../../../src/ui/theme';
 
 interface Transaction {
 	id: string;
-	description: string;
+	description?: string;
 	amount: number;
 	date: string; // ISO string
 	type: 'income' | 'expense';
@@ -49,8 +49,8 @@ const currency = new Intl.NumberFormat('en-US', {
 }).format;
 
 // Smart fallback function to infer icon and color from transaction description
-const getSmartFallback = (description: string, type: 'income' | 'expense') => {
-	const desc = description.toLowerCase();
+const getSmartFallback = (description: string | undefined, type: 'income' | 'expense') => {
+	const desc = (description || '').toLowerCase();
 
 	// Income categories
 	if (type === 'income') {
@@ -245,9 +245,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 		.sort((a, b) => {
 			// First, prioritize actual transactions over recurring placeholders
 			const aIsRecurringPlaceholder =
-				a.description.includes('Recurring Expense');
+				(a.description || '').includes('Recurring Expense');
 			const bIsRecurringPlaceholder =
-				b.description.includes('Recurring Expense');
+				(b.description || '').includes('Recurring Expense');
 
 			if (aIsRecurringPlaceholder !== bIsRecurringPlaceholder) {
 				// Actual transactions come first
@@ -283,7 +283,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 		}
 
 		// Special handling for recurring expense placeholders (only if not linked to a bill)
-		if (transaction.description.includes('Recurring Expense')) {
+		if ((transaction.description || '').includes('Recurring Expense')) {
 			return 'Recurring Expense';
 		}
 
@@ -331,7 +331,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 		}
 
 		// Special handling for recurring expense placeholders (only if not linked to a bill)
-		if (transaction.description.includes('Recurring Expense')) {
+		if ((transaction.description || '').includes('Recurring Expense')) {
 			return {
 				icon: 'refresh-outline' as keyof typeof Ionicons.glyphMap,
 				color: '#f59e0b', // Amber for recurring
@@ -467,18 +467,19 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 
 						// Clean description: use bill vendor if description contains "Recurring Expense", otherwise use transaction description
 						const cleanDescription = (() => {
+							const desc = t.description || '';
 							// If description contains "Recurring Expense", use bill vendor name if available
-							if (t.description.includes('Recurring Expense')) {
+							if (desc.includes('Recurring Expense')) {
 								if (billInfo?.vendor) {
 									return billInfo.vendor;
 								}
 								// Remove " - Recurring Expense" suffix
-								return t.description
+								return desc
 									.replace(/\s*-\s*Recurring Expense/gi, '')
 									.trim();
 							}
 							// Otherwise, use the transaction description as-is (user's custom description)
-							return t.description;
+							return desc || 'Transaction';
 						})();
 
 						return (

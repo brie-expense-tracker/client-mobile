@@ -89,7 +89,7 @@ const sanitizeCurrency = (value: string): string => {
 
 const prettyCurrency = (value: string): string => {
 	const num = Number(value);
-	if (!isFinite(num) || num <= 0) return '$0.00';
+	if (!isFinite(num) || num <= 0) return '$0';
 	return new Intl.NumberFormat('en-US', {
 		style: 'currency',
 		currency: 'USD',
@@ -246,8 +246,15 @@ export default function TransactionScreenProModern() {
 					const state = JSON.parse(saved);
 					setIsNewForm(false);
 
-					// Restore form values
-					if (state.amount) setValue('amount', state.amount);
+					// Restore form values (treat 0 / 0.00 as empty)
+					const restoredAmount =
+						typeof state.amount === 'string' ? state.amount.trim() : '';
+
+					if (restoredAmount && Number(restoredAmount) > 0) {
+						setValue('amount', restoredAmount);
+					} else {
+						setValue('amount', '');
+					}
 					if (state.description) setValue('description', state.description);
 					if (state.date) setValue('date', state.date);
 					if (state.mode) setMode(state.mode);
@@ -316,8 +323,10 @@ export default function TransactionScreenProModern() {
 
 		const saveState = async () => {
 			try {
+				const amountHasValue = Number(amount) > 0;
+
 				const stateToSave = {
-					amount,
+					amount: amountHasValue ? amount : '',
 					description,
 					date: selectedDate,
 					mode,
@@ -331,12 +340,12 @@ export default function TransactionScreenProModern() {
 
 				// Only save if there's actual data
 				const hasData =
-					amount ||
-					description ||
+					amountHasValue ||
+					!!description ||
 					selectedGoals.length > 0 ||
 					selectedBudgets.length > 0 ||
-					selectedDebt ||
-					selectedBill;
+					!!selectedDebt ||
+					!!selectedBill;
 
 				if (hasData) {
 					await setItem(FORM_STATE_KEY, JSON.stringify(stateToSave));
@@ -377,8 +386,7 @@ export default function TransactionScreenProModern() {
 	}, [amount]);
 
 	const amountNumber = useMemo(() => Number(amount), [amount]);
-	const canSubmit =
-		isValid && !isSubmitting && amountNumber > 0;
+	const canSubmit = isValid && !isSubmitting && amountNumber > 0;
 
 	// ---------- Handlers
 	const handleModeChange = useCallback(
@@ -524,7 +532,7 @@ export default function TransactionScreenProModern() {
 					const currentDesc = payload.description?.trim() || '';
 					// Only append debt name if it's not already in the description
 					if (!currentDesc.toLowerCase().includes(debtName.toLowerCase())) {
-						payload.description = currentDesc 
+						payload.description = currentDesc
 							? `${currentDesc} - ${debtName}`.trim()
 							: debtName;
 					}
@@ -683,7 +691,7 @@ export default function TransactionScreenProModern() {
 												styles.amountInput,
 												isAmountLocked && styles.amountInputLocked,
 											]}
-											placeholder="0.00"
+											placeholder="0"
 											placeholderTextColor={palette.textSubtle}
 											keyboardType="decimal-pad"
 											value={value}
@@ -991,9 +999,7 @@ export default function TransactionScreenProModern() {
 					</TouchableOpacity>
 
 					{!canSubmit && (
-						<Text style={styles.inlineCtaHint}>
-							Enter amount to continue.
-						</Text>
+						<Text style={styles.inlineCtaHint}>Enter amount to continue.</Text>
 					)}
 				</View>
 			</ScrollView>
@@ -1326,16 +1332,18 @@ const styles = StyleSheet.create({
 		fontSize: 28,
 		fontWeight: '400',
 		color: palette.primary,
-		marginRight: space.xs,
-		marginBottom: 4,
+		marginRight: 6,
+		marginBottom: 6,
 	},
 	amountInput: {
+		flexGrow: 0,
 		flexShrink: 1,
 		fontSize: 48,
 		fontWeight: '600',
 		color: palette.text,
-		textAlign: 'left',
-		minWidth: 120,
+		textAlign: 'center',
+		minWidth: 30,
+		paddingHorizontal: 0,
 	},
 	amountInputLocked: {
 		opacity: 0.7,
@@ -1505,7 +1513,7 @@ const styles = StyleSheet.create({
 
 	// Accessory bar
 	accessoryBar: {
-		padding: space.sm,
+		padding: space.md,
 		alignItems: 'flex-end',
 		backgroundColor: palette.surfaceAlt,
 	},
