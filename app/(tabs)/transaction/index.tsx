@@ -20,14 +20,12 @@ import {
 	Platform,
 	Keyboard,
 	InputAccessoryView,
+	InteractionManager,
 } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import {
-	SafeAreaView,
-	useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Calendar } from 'react-native-calendars';
 import { TransactionContext } from '../../../src/context/transactionContext';
 import { useGoal, Goal } from '../../../src/context/goalContext';
@@ -115,10 +113,8 @@ export default function TransactionScreenProModern() {
 	const descRef = useRef<TextInput>(null);
 	const scrollRef = useRef<ScrollView>(null);
 
-	const insets = useSafeAreaInsets();
-
-	// Dynamic bottom padding from safe area only (no magic numbers)
-	const contentBottomPad = insets.bottom + space.xl;
+	// Stable bottom padding for tab screens (tab bar already handles bottom inset)
+	const contentBottomPad = space.xl;
 
 	const [mode, setMode] = useState<'income' | 'expense'>(
 		params.mode === 'expense' ? 'expense' : 'expense' // default to Expense
@@ -130,11 +126,13 @@ export default function TransactionScreenProModern() {
 		null | 'goal' | 'budget' | 'debt' | 'bill'
 	>(null);
 	const [datePickerOpen, setDatePickerOpen] = useState(false);
+	const [mountCalendar, setMountCalendar] = useState(false);
 	const [debts, setDebts] = useState<DebtRollup[]>([]);
 	const [debtsLoading, setDebtsLoading] = useState(false);
 	const [selectedDebt, setSelectedDebt] = useState<DebtRollup | null>(null);
 	const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
 	const [isAmountLocked, setIsAmountLocked] = useState(false);
+	const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
 	const { addTransaction } = useContext(TransactionContext);
 	const { goals, isLoading: goalsLoading } = useGoal();
@@ -199,8 +197,32 @@ export default function TransactionScreenProModern() {
 
 	const ready = mode === 'income' ? !goalsLoading : !budgetsLoading;
 
-	// Keep URL in sync without navigation transition
+	// Track first load to prevent loading overlay on refetch
 	useEffect(() => {
+		if (ready && !hasLoadedOnce) {
+			setHasLoadedOnce(true);
+		}
+	}, [ready, hasLoadedOnce]);
+
+	// Defer Calendar mount until after interactions settle
+	useEffect(() => {
+		if (!datePickerOpen) {
+			setMountCalendar(false);
+			return;
+		}
+		const task = InteractionManager.runAfterInteractions(() => {
+			setMountCalendar(true);
+		});
+		return () => task.cancel();
+	}, [datePickerOpen]);
+
+	// Keep URL in sync without navigation transition (skip first mount to prevent layout shift)
+	const didMountRef = useRef(false);
+	useEffect(() => {
+		if (!didMountRef.current) {
+			didMountRef.current = true;
+			return;
+		}
 		if ((params.mode ?? 'expense') !== mode) router.setParams({ mode });
 	}, [mode, params.mode, router]);
 
@@ -236,47 +258,44 @@ export default function TransactionScreenProModern() {
 	const [savedDebtId, setSavedDebtId] = useState<string | null>(null);
 	const [savedBillId, setSavedBillId] = useState<string | null>(null);
 
-	// Restore saved form state on mount
+	// Restore saved form state on mount (immediate, no deferral)
 	useEffect(() => {
 		let isMounted = true;
-		const restoreState = async () => {
+
+		(async () => {
 			try {
 				const saved = await getItem(FORM_STATE_KEY);
-				if (saved && isMounted) {
+
+				if (!isMounted) return;
+
+				if (saved) {
 					const state = JSON.parse(saved);
 					setIsNewForm(false);
 
-					// Restore form values (treat 0 / 0.00 as empty)
 					const restoredAmount =
 						typeof state.amount === 'string' ? state.amount.trim() : '';
 
-					if (restoredAmount && Number(restoredAmount) > 0) {
-						setValue('amount', restoredAmount);
-					} else {
-						setValue('amount', '');
-					}
-					if (state.description) setValue('description', state.description);
-					if (state.date) setValue('date', state.date);
+					setValue(
+						'amount',
+						restoredAmount && Number(restoredAmount) > 0 ? restoredAmount : ''
+					);
+					setValue('description', state.description ?? '');
+					setValue('date', state.date ?? getLocalIsoDate());
 					if (state.mode) setMode(state.mode);
 					if (state.selectedGoals) setSelectedGoals(state.selectedGoals);
 					if (state.selectedBudgets) setSelectedBudgets(state.selectedBudgets);
 					if (state.selectedDebtId) setSavedDebtId(state.selectedDebtId);
 					if (state.selectedBillId) setSavedBillId(state.selectedBillId);
-
-					setHasRestoredState(true);
 				} else {
 					setIsNewForm(true);
-					setHasRestoredState(true);
 				}
-			} catch (err) {
-				if (isDevMode) {
-					transactionScreenLog.error('Failed to restore form state', err);
-				}
+			} catch {
 				setIsNewForm(true);
-				setHasRestoredState(true);
+			} finally {
+				if (isMounted) setHasRestoredState(true);
 			}
-		};
-		restoreState();
+		})();
+
 		return () => {
 			isMounted = false;
 		};
@@ -306,16 +325,6 @@ export default function TransactionScreenProModern() {
 			setSavedBillId(null);
 		}
 	}, [savedBillId, bills, selectedBill]);
-
-	// Ensure scroll position is at top for new forms
-	useEffect(() => {
-		if (hasRestoredState && isNewForm) {
-			// Scroll to top to maintain consistent positioning
-			requestAnimationFrame(() => {
-				scrollRef.current?.scrollTo({ y: 0, animated: false });
-			});
-		}
-	}, [hasRestoredState, isNewForm]);
 
 	// Save form state as user types (debounced)
 	useEffect(() => {
@@ -646,6 +655,17 @@ export default function TransactionScreenProModern() {
 	// =============================================================
 	// Render
 	// =============================================================
+	// Gate rendering until state is restored to prevent layout shifts
+	if (!hasRestoredState) {
+		return (
+			<SafeAreaView style={styles.container} edges={['top']}>
+				<View style={styles.loadingOverlay}>
+					<ActivityIndicator size="large" color={palette.primary} />
+				</View>
+			</SafeAreaView>
+		);
+	}
+
 	return (
 		<SafeAreaView style={styles.container} edges={['top']}>
 			<ScrollView
@@ -657,7 +677,10 @@ export default function TransactionScreenProModern() {
 				]}
 				keyboardShouldPersistTaps="handled"
 				keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-				automaticallyAdjustKeyboardInsets
+				// 🔻 prevent iOS from doing a delayed inset animation
+				automaticallyAdjustContentInsets={false}
+				contentInsetAdjustmentBehavior="never"
+				automaticallyAdjustKeyboardInsets={false}
 				showsVerticalScrollIndicator={false}
 			>
 				{/* Hero section: header + amount + type toggle */}
@@ -740,13 +763,14 @@ export default function TransactionScreenProModern() {
 							</View>
 						)}
 
-						{errors.amount && (
-							<View style={styles.errorContainer}>
+						{/* Reserve space for error to prevent layout shift */}
+						<View style={styles.errorContainer}>
+							{errors.amount && (
 								<Text style={styles.errorText}>
 									{String(errors.amount.message)}
 								</Text>
-							</View>
-						)}
+							)}
+						</View>
 
 						{/* Segmented control inside hero */}
 						<View style={styles.segmented}>
@@ -916,11 +940,14 @@ export default function TransactionScreenProModern() {
 							/>
 						)}
 					/>
-					{errors.description && (
-						<Text style={styles.errorText}>
-							{String(errors.description.message)}
-						</Text>
-					)}
+					{/* Reserve space for error to prevent layout shift */}
+					<View style={{ minHeight: 18, marginTop: space.xs }}>
+						{errors.description && (
+							<Text style={styles.errorText}>
+								{String(errors.description.message)}
+							</Text>
+						)}
+					</View>
 				</View>
 
 				{/* Preview */}
@@ -1222,50 +1249,52 @@ export default function TransactionScreenProModern() {
 					</TouchableOpacity>
 				</View>
 
-				{/* Calendar */}
-				<Calendar
-					onDayPress={(day) => {
-						setValue('date', day.dateString, { shouldValidate: false });
-						setDatePickerOpen(false);
-					}}
-					markedDates={{
-						[selectedDate]: {
-							selected: true,
-							selectedColor: palette.primary,
-							selectedTextColor: palette.primaryTextOn,
-						},
-					}}
-					firstDay={0}
-					enableSwipeMonths
-					renderArrow={(direction) => (
-						<Ionicons
-							name={direction === 'left' ? 'chevron-back' : 'chevron-forward'}
-							size={18}
-							color={palette.text}
-						/>
-					)}
-					theme={{
-						backgroundColor: palette.surface,
-						calendarBackground: palette.surface,
-						textSectionTitleColor: palette.textSubtle,
-						selectedDayBackgroundColor: palette.primary,
-						selectedDayTextColor: palette.primaryTextOn,
-						todayTextColor: palette.primary,
-						dayTextColor: palette.text,
-						textDisabledColor: palette.borderMuted,
-						monthTextColor: palette.text,
-						arrowColor: palette.text,
-						textDayFontWeight: '500',
-						textMonthFontWeight: '700',
-						textDayHeaderFontWeight: '600',
-						textDayFontSize: 14,
-						textMonthFontSize: 16,
-						textDayHeaderFontSize: 12,
-					}}
-				/>
+				{/* Calendar - only mount after interactions settle */}
+				{datePickerOpen && mountCalendar ? (
+					<Calendar
+						onDayPress={(day) => {
+							setValue('date', day.dateString, { shouldValidate: false });
+							setDatePickerOpen(false);
+						}}
+						markedDates={{
+							[selectedDate]: {
+								selected: true,
+								selectedColor: palette.primary,
+								selectedTextColor: palette.primaryTextOn,
+							},
+						}}
+						firstDay={0}
+						enableSwipeMonths
+						renderArrow={(direction) => (
+							<Ionicons
+								name={direction === 'left' ? 'chevron-back' : 'chevron-forward'}
+								size={18}
+								color={palette.text}
+							/>
+						)}
+						theme={{
+							backgroundColor: palette.surface,
+							calendarBackground: palette.surface,
+							textSectionTitleColor: palette.textSubtle,
+							selectedDayBackgroundColor: palette.primary,
+							selectedDayTextColor: palette.primaryTextOn,
+							todayTextColor: palette.primary,
+							dayTextColor: palette.text,
+							textDisabledColor: palette.borderMuted,
+							monthTextColor: palette.text,
+							arrowColor: palette.text,
+							textDayFontWeight: '500',
+							textMonthFontWeight: '700',
+							textDayHeaderFontWeight: '600',
+							textDayFontSize: 14,
+							textMonthFontSize: 16,
+							textDayHeaderFontSize: 12,
+						}}
+					/>
+				) : null}
 			</BottomSheet>
 
-			{!ready && (
+			{!ready && !hasLoadedOnce && (
 				<View style={styles.loadingOverlay}>
 					<ActivityIndicator size="large" color={palette.primary} />
 					<Text style={styles.loadingText}>
@@ -1372,6 +1401,7 @@ const styles = StyleSheet.create({
 	errorContainer: {
 		alignItems: 'flex-end',
 		marginTop: space.xs,
+		minHeight: 18, // Reserve space to prevent layout shift
 	},
 	errorText: { color: palette.danger, fontSize: 13, marginTop: space.xs },
 

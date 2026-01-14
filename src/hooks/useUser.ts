@@ -18,6 +18,7 @@ export function useUser() {
 		staleTime: 5 * 60 * 1000, // 5 minutes
 		refetchOnWindowFocus: false,
 		refetchOnMount: false,
+		placeholderData: (previousData) => previousData, // Keep previous data during refetch
 		retry: (failureCount, error: any) => {
 			// Don't retry on 429 rate limit errors
 			if (error?.response?.status === 429 || error?.status === 429) {
@@ -48,6 +49,7 @@ export function useUserProfile() {
 		staleTime: 5 * 60 * 1000, // 5 minutes
 		refetchOnWindowFocus: false,
 		refetchOnMount: false,
+		placeholderData: (previousData) => previousData, // Keep previous data during refetch
 		retry: (failureCount, error: any) => {
 			// Don't retry on 429 rate limit errors
 			if (error?.response?.status === 429 || error?.status === 429) {

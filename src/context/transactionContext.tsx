@@ -188,20 +188,27 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 				setTransactions(formatted);
 				setHasLoaded(true); // Mark as loaded
 			} else {
-				setTransactions([]);
+				// Empty response: only clear if this is first load
+				if (!hasLoaded) {
+					setTransactions([]);
+				}
 				setHasLoaded(true); // Mark as loaded even if empty
 			}
 		} catch (err) {
 			transactionContextLog.warn(
-				'Failed to fetch transactions, using empty array',
+				'Failed to fetch transactions, keeping previous data',
 				err
 			);
-			setTransactions([]);
+			// Don't clear transactions on error - keep last known good data
+			// Only mark as loaded if this was the first attempt
+			if (!hasLoaded) {
+				setTransactions([]);
+			}
 			setHasLoaded(true); // Mark as loaded even on error
 		} finally {
 			setIsLoading(false);
 		}
-	}, []);
+	}, [hasLoaded]);
 
 	// Helper function to update budgets and goals
 	const updateBudgetsAndGoals = useCallback(

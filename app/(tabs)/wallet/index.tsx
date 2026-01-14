@@ -7,13 +7,13 @@ import React, {
 } from 'react';
 import {
 	Animated,
-	SafeAreaView,
 	ScrollView,
 	View,
 	Text,
 	StyleSheet,
 	TouchableOpacity,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -672,6 +672,9 @@ export default function WalletOverviewScreen() {
 	}, [billsLoaded, refetchBills]);
 
 	const loadDebts = useCallback(async () => {
+		// Don't flip to skeleton on refocus if we already have data
+		if (debts.length > 0) return;
+		
 		setDebtsLoading(true);
 		try {
 			const data = await DebtsService.getDebts();
@@ -681,7 +684,7 @@ export default function WalletOverviewScreen() {
 		} finally {
 			setDebtsLoading(false);
 		}
-	}, []);
+	}, [debts.length]);
 
 	useFocusEffect(
 		useCallback(() => {
@@ -968,7 +971,7 @@ export default function WalletOverviewScreen() {
 	}, [debtsLoading, debts, formatCurrency]);
 
 	return (
-		<SafeAreaView style={styles.container}>
+		<SafeAreaView style={styles.container} edges={['top']}>
 			<View style={styles.header}>
 				<Text style={styles.title}>Wallet Overview</Text>
 				<Text style={styles.subtitle}>Manage what you&apos;re tracking</Text>
@@ -978,6 +981,9 @@ export default function WalletOverviewScreen() {
 				style={styles.scroll}
 				showsVerticalScrollIndicator={false}
 				contentContainerStyle={styles.content}
+				contentInsetAdjustmentBehavior="never"
+				automaticallyAdjustContentInsets={false}
+				automaticallyAdjustKeyboardInsets={false}
 			>
 				{budgetsBusy || goalsBusy || debtsBusy ? (
 					<WalletHeroSkeleton />
