@@ -150,34 +150,6 @@ const createBlankCurrentWeekReflection = (): WeeklyReflection => {
 	};
 };
 
-/**
- * Find the most recent incomplete reflection from a previous week (not current week)
- */
-const findIncompletePreviousWeekReflection = (
-	currentReflection: WeeklyReflection | null,
-	recentReflections: WeeklyReflection[]
-): WeeklyReflection | null => {
-	const currentWeekStart = getCurrentWeekStart();
-
-	const allReflections = currentReflection
-		? [currentReflection, ...recentReflections]
-		: recentReflections;
-
-	const incompletePreviousWeek = allReflections
-		.filter((r) => {
-			if (r.completed) return false;
-			const reflectionWeekStart = normalizeWeekStartDate(r.weekStartDate);
-			return reflectionWeekStart.getTime() < currentWeekStart.getTime();
-		})
-		.sort((a, b) => {
-			const dateA = normalizeWeekStartDate(a.weekStartDate).getTime();
-			const dateB = normalizeWeekStartDate(b.weekStartDate).getTime();
-			return dateB - dateA;
-		});
-
-	return incompletePreviousWeek.length > 0 ? incompletePreviousWeek[0] : null;
-};
-
 /** Tiny copy helper for each wizard step. */
 const wizardMeta = [
 	{
@@ -268,36 +240,95 @@ export default function ReflectionWizard() {
 		refreshReflection,
 	} = useWeeklyReflection();
 
+	// Track the most recently saved reflection to ensure it's displayed even if week calculation differs
+	// This must be declared before useMemo that uses it
+	const lastSavedReflectionRef = useRef<WeeklyReflection | null>(null);
+
 	// Filter to only use currentReflection if it's from the current week
 	// If it's from a previous week, treat it as if there's no current reflection
 	// and create a blank one for the current week
 	const currentReflection = useMemo(() => {
+		const currentWeekStart = getCurrentWeekStart();
+
+		// Debug logging to help understand week calculation
+		if (isDevMode && rawCurrentReflection) {
+			const reflectionWeekStart = normalizeWeekStartDate(
+				rawCurrentReflection.weekStartDate
+			);
+			logger.debug('Week determination', {
+				today: new Date().toISOString(),
+				clientCalculatedCurrentWeekStart: currentWeekStart.toISOString(),
+				serverReturnedReflectionWeekStart: reflectionWeekStart.toISOString(),
+				reflectionWeekRange: `${weekRangeLabel(
+					rawCurrentReflection.weekStartDate,
+					rawCurrentReflection.weekEndDate
+				)}`,
+				isFromCurrentWeek: isReflectionFromCurrentWeek(rawCurrentReflection),
+			});
+		}
+
+		// If we have a recently saved reflection, use it even if week calculation differs slightly
+		// This ensures the UI updates immediately after saving
+		if (lastSavedReflectionRef.current && rawCurrentReflection) {
+			const savedWeekStart = normalizeWeekStartDate(
+				lastSavedReflectionRef.current.weekStartDate
+			);
+			const rawWeekStart = normalizeWeekStartDate(
+				rawCurrentReflection.weekStartDate
+			);
+			// If the raw reflection matches the saved one, use it (it's the most up-to-date)
+			if (
+				rawWeekStart.getTime() === savedWeekStart.getTime() &&
+				rawCurrentReflection._id === lastSavedReflectionRef.current._id
+			) {
+				if (isDevMode) {
+					logger.debug('Using saved reflection that matches server response');
+				}
+				return rawCurrentReflection;
+			}
+		}
+
 		if (!rawCurrentReflection) {
 			// No reflection at all - create a blank one for current week
+			if (isDevMode) {
+				logger.debug('No reflection from server, creating blank current week', {
+					currentWeekStart: currentWeekStart.toISOString(),
+				});
+			}
 			return createBlankCurrentWeekReflection();
 		}
 
 		if (isReflectionFromCurrentWeek(rawCurrentReflection)) {
 			// This reflection is from the current week - use it
+			if (isDevMode) {
+				logger.debug('Using server reflection for current week');
+			}
 			return rawCurrentReflection;
 		}
 
 		// Reflection is from a previous week - create a blank one for current week
+		if (isDevMode) {
+			logger.debug(
+				'Server reflection is from previous week, creating blank current week',
+				{
+					serverWeek: weekRangeLabel(
+						rawCurrentReflection.weekStartDate,
+						rawCurrentReflection.weekEndDate
+					),
+					currentWeek: weekRangeLabel(
+						currentWeekStart.toISOString(),
+						new Date(
+							currentWeekStart.getTime() + 6 * 24 * 60 * 60 * 1000
+						).toISOString()
+					),
+				}
+			);
+		}
 		return createBlankCurrentWeekReflection();
 	}, [rawCurrentReflection]);
 
-	// Incomplete previous week ref (if any)
-	// Only look in recentReflections, not currentReflection (since we've filtered it)
-	const incompletePreviousWeekReflection = useMemo(
-		() => findIncompletePreviousWeekReflection(null, recentReflections),
-		[recentReflections]
-	);
-
-	// Editing target (explicit id, or forced incomplete previous week)
+	// Editing target (only explicit id, never force incomplete previous week)
 	const editingReflection = useMemo(() => {
-		if (incompletePreviousWeekReflection && !params.editReflectionId) {
-			return incompletePreviousWeekReflection;
-		}
 		if (!params.editReflectionId) return null;
 		if (currentReflection?._id === params.editReflectionId) {
 			return currentReflection;
@@ -305,15 +336,7 @@ export default function ReflectionWizard() {
 		return (
 			recentReflections.find((r) => r._id === params.editReflectionId) || null
 		);
-	}, [
-		incompletePreviousWeekReflection,
-		params.editReflectionId,
-		currentReflection,
-		recentReflections,
-	]);
-
-	const isForcedToCompletePreviousWeek =
-		!!incompletePreviousWeekReflection && !params.editReflectionId;
+	}, [params.editReflectionId, currentReflection, recentReflections]);
 
 	const [mode, setMode] = useState<Mode>('hub');
 	const [step, setStep] = useState(0); // 0..3
@@ -371,18 +394,16 @@ export default function ReflectionWizard() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [reflectionToEdit?._id]);
 
-	// Auto-enter wizard when editing or forced to complete previous week
+	// Auto-enter wizard only when explicitly editing a reflection (not forced)
 	useEffect(() => {
-		if (isForcedToCompletePreviousWeek || editingReflection) {
-			if (editingReflection) {
-				lockedEditingReflectionRef.current = editingReflection;
-			}
+		if (editingReflection) {
+			lockedEditingReflectionRef.current = editingReflection;
 			setMode('wizard');
 			setStep(0);
 		} else if (mode === 'hub') {
 			lockedEditingReflectionRef.current = null;
 		}
-	}, [editingReflection, isForcedToCompletePreviousWeek, mode]);
+	}, [editingReflection, mode]);
 
 	// Animate success banner
 	useEffect(() => {
@@ -475,11 +496,6 @@ export default function ReflectionWizard() {
 		if (mode !== 'wizard') return;
 
 		if (step === 0) {
-			// Step 0: only allow exiting if we're NOT in a forced previous-week flow
-			if (isForcedToCompletePreviousWeek) {
-				return; // can't leave the wizard until the reflection is completed
-			}
-
 			// Exit wizard
 			lockedEditingReflectionRef.current = null;
 			if (editingReflection && params.editReflectionId) {
@@ -492,14 +508,7 @@ export default function ReflectionWizard() {
 			LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 			setStep((s) => Math.max(0, s - 1));
 		}
-	}, [
-		mode,
-		step,
-		isForcedToCompletePreviousWeek,
-		editingReflection,
-		params.editReflectionId,
-		router,
-	]);
+	}, [mode, step, editingReflection, params.editReflectionId, router]);
 
 	// Field handlers
 	const handleMoodChange = useCallback((rating: number) => {
@@ -562,29 +571,35 @@ export default function ReflectionWizard() {
 
 			if (isDevMode) logger.debug('Save successful, received:', saved);
 
+			// Store the saved reflection to ensure it's displayed even if week calculation differs
+			lastSavedReflectionRef.current = saved;
+
 			setShowSuccessBanner(true);
+
+			// Clear API cache to ensure fresh data on next fetch
+			const { ApiService } = await import('../../../src/services');
+			ApiService.clearCacheByPrefix('/api/weekly-reflections');
 
 			if (editingReflection && params.editReflectionId) {
 				// Editing a specific reflection detail
-				refreshReflection();
+				// Refresh after a short delay to ensure server has processed the update
+				setTimeout(() => {
+					refreshReflection();
+				}, 300);
 				setTimeout(() => {
 					router.back();
 				}, 500);
-			} else if (isForcedToCompletePreviousWeek) {
-				// Just completed a forced reflection; go back to hub
-				await refreshReflection();
-				lockedEditingReflectionRef.current = null;
-				setTimeout(() => {
-					LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-					setMode('hub');
-					setStep(0);
-				}, 100);
 			} else {
-				// Normal current-week save: go to hub
+				// Normal save (current week or any week): go to hub
 				LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 				setMode('hub');
 				setStep(0);
-				refreshReflection();
+				// Don't refresh immediately - the saveReflection hook already updates currentReflection state
+				// Refresh in the background after a delay to get updated financial metrics without
+				// overwriting the saved reflection data
+				setTimeout(() => {
+					refreshReflection();
+				}, 500);
 			}
 
 			// Auto-dismiss banner
@@ -612,7 +627,6 @@ export default function ReflectionWizard() {
 		localNotes,
 		editingReflection,
 		params.editReflectionId,
-		isForcedToCompletePreviousWeek,
 		saveReflection,
 		refreshReflection,
 		router,
@@ -710,27 +724,7 @@ export default function ReflectionWizard() {
 				</View>
 			) : null}
 
-			{/* Forced completion warning banner */}
-			{isForcedToCompletePreviousWeek && editingReflection ? (
-				<View
-					style={[
-						styles.forcedCompletionBanner,
-						{ marginHorizontal: 16, marginBottom: 8 },
-					]}
-				>
-					<Ionicons name="alert-circle" size={18} color="#B45309" />
-					<Text style={[styles.forcedCompletionText, dynamicTextStyleBase]}>
-						Please complete your reflection for{' '}
-						{weekRangeLabel(
-							editingReflection.weekStartDate,
-							editingReflection.weekEndDate
-						)}{' '}
-						before continuing.
-					</Text>
-				</View>
-			) : null}
-
-			{mode === 'hub' && !isForcedToCompletePreviousWeek ? (
+			{mode === 'hub' ? (
 				// ---------------- Hub mode ----------------
 				<ScrollView
 					style={styles.body}

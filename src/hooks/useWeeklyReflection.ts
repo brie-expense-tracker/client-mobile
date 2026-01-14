@@ -146,6 +146,10 @@ export function useWeeklyReflection(): UseWeeklyReflectionReturn {
 				const updatedReflection =
 					await WeeklyReflectionService.saveWeeklyReflection(data);
 				
+				// Clear cache to ensure fresh data on next fetch
+				const { ApiService } = await import('../services');
+				ApiService.clearCacheByPrefix('/api/weekly-reflections');
+				
 				// If we're updating a specific reflection (not current week), update it in recentReflections
 				// Otherwise, update currentReflection
 				if (data.reflectionId && data.reflectionId !== currentReflection?._id) {
@@ -155,11 +159,10 @@ export function useWeeklyReflection(): UseWeeklyReflectionReturn {
 							r._id === data.reflectionId ? updatedReflection : r
 						)
 					);
-					// Clear cache and refresh to ensure we have the latest data
-					const { ApiService } = await import('../services');
-					ApiService.clearCacheByPrefix('/api/weekly-reflections');
 					await fetchRecentReflections();
 				} else {
+					// Update current reflection immediately with saved data
+					// This ensures the UI updates right away with the saved reflection
 					setCurrentReflection(updatedReflection);
 					// Refresh recent reflections after saving current week
 					await fetchRecentReflections();
