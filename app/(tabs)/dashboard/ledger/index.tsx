@@ -17,7 +17,10 @@ import {
 	BorderlessButton,
 	GestureHandlerRootView,
 } from 'react-native-gesture-handler';
-import { TransactionContext } from '../../../../src/context/transactionContext';
+import {
+	TransactionContext,
+	type Transaction,
+} from '../../../../src/context/transactionContext';
 import { FilterContext } from '../../../../src/context/filterContext';
 import { useBudget } from '../../../../src/context/budgetContext';
 import { useGoal } from '../../../../src/context/goalContext';
@@ -25,32 +28,6 @@ import { TransactionRow } from './components/transactionRow';
 import CalendarSheet from './components/CalendarSheet';
 import CalendarTrigger from './components/CalendarTrigger';
 import { palette, radius, space } from '../../../../src/ui/theme';
-
-// Transaction interface defined inline since we removed the mock data file
-interface Transaction {
-	id: string;
-	description: string;
-	amount: number;
-	date: string; // ISO string
-	type: 'income' | 'expense';
-	target?: string; // ObjectId of the target Budget or Goal
-	targetModel?: 'Budget' | 'Goal';
-	updatedAt?: string; // ISO string for sorting by time when dates are the same
-	recurringPattern?: {
-		patternId: string;
-		frequency: string;
-		confidence: number;
-		nextExpectedDate: string;
-	};
-	notes?: string;
-	source?: 'manual' | 'plaid' | 'import' | 'ai';
-	vendor?: string;
-	metadata?: {
-		location?: string;
-		paymentMethod?: string;
-		originalDescription?: string;
-	};
-}
 
 // =============================================
 // Utility Functions
@@ -343,7 +320,7 @@ export default function TransactionScreen() {
 				// search match
 				const text = searchQuery.toLowerCase();
 				const searchMatch =
-					!text || tx.description.toLowerCase().includes(text);
+					!text || (tx.description?.toLowerCase().includes(text) ?? false);
 
 				if (!searchMatch) {
 					logger.debug(

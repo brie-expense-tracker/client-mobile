@@ -26,7 +26,6 @@ import {
 	ColorPicker,
 	AmountPresets,
 	PeriodSelector,
-	BudgetPeriodDetails,
 } from '../../../../src/components/forms';
 import { Page, Section, Card, LoadingState } from '../../../../src/ui';
 import {
@@ -69,38 +68,9 @@ const EditBudgetScreen: React.FC = () => {
 	const [loading, setLoading] = useState(false);
 	const [budget, setBudget] = useState<Budget | null>(null);
 	const [rollover, setRollover] = useState(false);
-	const [weekStartDay, setWeekStartDay] = useState<0 | 1>(1);
-	const [monthStartDay, setMonthStartDay] = useState<
-		| 1
-		| 2
-		| 3
-		| 4
-		| 5
-		| 6
-		| 7
-		| 8
-		| 9
-		| 10
-		| 11
-		| 12
-		| 13
-		| 14
-		| 15
-		| 16
-		| 17
-		| 18
-		| 19
-		| 20
-		| 21
-		| 22
-		| 23
-		| 24
-		| 25
-		| 26
-		| 27
-		| 28
-	>(1);
-	const [categories, setCategories] = useState<string[]>([]);
+	// MVP: Hardcode period start days (weekStartDay = 1 = Monday, monthStartDay = 1)
+	const weekStartDay = 1 as const;
+	const monthStartDay = 1 as const;
 	const [originalValues, setOriginalValues] = useState<{
 		name: string;
 		amount: string;
@@ -108,37 +78,6 @@ const EditBudgetScreen: React.FC = () => {
 		color: string;
 		period: 'weekly' | 'monthly';
 		rollover: boolean;
-		weekStartDay: 0 | 1;
-		monthStartDay:
-			| 1
-			| 2
-			| 3
-			| 4
-			| 5
-			| 6
-			| 7
-			| 8
-			| 9
-			| 10
-			| 11
-			| 12
-			| 13
-			| 14
-			| 15
-			| 16
-			| 17
-			| 18
-			| 19
-			| 20
-			| 21
-			| 22
-			| 23
-			| 24
-			| 25
-			| 26
-			| 27
-			| 28;
-		categories: string[];
 	} | null>(null);
 
 	const { budgets, updateBudget } = useBudget();
@@ -164,39 +103,6 @@ const EditBudgetScreen: React.FC = () => {
 				setColor(budgetColor);
 				setPeriod(budgetPeriod);
 				setRollover(Boolean(foundBudget.rollover));
-				setWeekStartDay((foundBudget.weekStartDay as 0 | 1) ?? 1);
-				setMonthStartDay(
-					(foundBudget.monthStartDay as
-						| 1
-						| 2
-						| 3
-						| 4
-						| 5
-						| 6
-						| 7
-						| 8
-						| 9
-						| 10
-						| 11
-						| 12
-						| 13
-						| 14
-						| 15
-						| 16
-						| 17
-						| 18
-						| 19
-						| 20
-						| 21
-						| 22
-						| 23
-						| 24
-						| 25
-						| 26
-						| 27
-						| 28) ?? 1
-				);
-				setCategories(foundBudget.categories || []);
 
 				// Store original values for change detection
 				setOriginalValues({
@@ -206,38 +112,6 @@ const EditBudgetScreen: React.FC = () => {
 					color: budgetColor,
 					period: budgetPeriod,
 					rollover: Boolean(foundBudget.rollover),
-					weekStartDay: (foundBudget.weekStartDay as 0 | 1) ?? 1,
-					monthStartDay:
-						(foundBudget.monthStartDay as
-							| 1
-							| 2
-							| 3
-							| 4
-							| 5
-							| 6
-							| 7
-							| 8
-							| 9
-							| 10
-							| 11
-							| 12
-							| 13
-							| 14
-							| 15
-							| 16
-							| 17
-							| 18
-							| 19
-							| 20
-							| 21
-							| 22
-							| 23
-							| 24
-							| 25
-							| 26
-							| 27
-							| 28) ?? 1,
-					categories: foundBudget.categories || [],
 				});
 
 				// Auto-detect if custom amount
@@ -263,20 +137,13 @@ const EditBudgetScreen: React.FC = () => {
 			cleanCurrencyToNumberString(originalValues.amount)
 		);
 
-		const categoriesChanged =
-			categories.length !== originalValues.categories.length ||
-			categories.some((cat, idx) => cat !== originalValues.categories[idx]);
-
 		return (
 			name.trim() !== originalValues.name.trim() ||
 			currentAmountNum !== originalAmountNum ||
 			normalizedCurrentIcon !== normalizedOriginalIcon ||
 			color !== originalValues.color ||
 			period !== originalValues.period ||
-			rollover !== originalValues.rollover ||
-			weekStartDay !== originalValues.weekStartDay ||
-			monthStartDay !== originalValues.monthStartDay ||
-			categoriesChanged
+			rollover !== originalValues.rollover
 		);
 	}, [
 		originalValues,
@@ -286,9 +153,6 @@ const EditBudgetScreen: React.FC = () => {
 		color,
 		period,
 		rollover,
-		weekStartDay,
-		monthStartDay,
-		categories,
 	]);
 
 	// Memoized validation for save button
@@ -322,11 +186,11 @@ const EditBudgetScreen: React.FC = () => {
 				amount: parsedAmount,
 				icon: normalizeIconName(icon),
 				color,
-				categories,
+				categories: [], // MVP: Categories are disabled
 				period,
-				weekStartDay,
-				monthStartDay,
-				rollover,
+				weekStartDay, // MVP: Hardcoded to 1 (Monday)
+				monthStartDay, // MVP: Hardcoded to 1
+				rollover, // MVP: Keep in model but hidden from UI
 			});
 
 			Alert.alert('Success', 'Budget updated successfully!', [
@@ -416,17 +280,6 @@ const EditBudgetScreen: React.FC = () => {
 									/>
 								</FormInputGroup>
 
-								{/* Period details (start day) */}
-								{(period === 'weekly' || period === 'monthly') && (
-									<BudgetPeriodDetails
-										period={period}
-										weekStartDay={weekStartDay}
-										monthStartDay={monthStartDay}
-										onWeekStartChange={setWeekStartDay}
-										onMonthStartChange={setMonthStartDay}
-									/>
-								)}
-
 								{/* Icon Selection */}
 								<FormInputGroup label="Icon">
 									<IconPicker
@@ -449,36 +302,7 @@ const EditBudgetScreen: React.FC = () => {
 									/>
 								</FormInputGroup>
 
-								{/* Rollover toggle */}
-								<FormInputGroup
-									label="Rollover unspent funds"
-									subtext="Carry over unspent money into the next period."
-								>
-									<TouchableOpacity
-										style={styles.toggleContainer}
-										onPress={() => setRollover((prev) => !prev)}
-										activeOpacity={0.9}
-									>
-										<View style={styles.toggleContent}>
-											<Text style={[typography.bodySm, styles.toggleText]}>
-												{rollover ? 'Enabled' : 'Disabled'}
-											</Text>
-											<View
-												style={[
-													styles.toggleSwitch,
-													rollover && styles.toggleSwitchActive,
-												]}
-											>
-												<View
-													style={[
-														styles.toggleThumb,
-														rollover && styles.toggleThumbActive,
-													]}
-												/>
-											</View>
-										</View>
-									</TouchableOpacity>
-								</FormInputGroup>
+								{/* MVP: Rollover hidden - keep in model but don't expose in UI */}
 							</View>
 						</Card>
 					</Section>

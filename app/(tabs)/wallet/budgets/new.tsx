@@ -28,7 +28,6 @@ import {
 	ColorPicker,
 	AmountPresets,
 	PeriodSelector,
-	BudgetPeriodDetails,
 } from '../../../../src/components/forms';
 import { palette, radius, space, type } from '../../../../src/ui/theme';
 
@@ -51,38 +50,11 @@ const AddBudgetScreen: React.FC = () => {
 	const [showColorPicker, setShowColorPicker] = useState(false);
 	const [showCustomAmount, setShowCustomAmount] = useState(false);
 	const [loading, setLoading] = useState(false);
-	const [rollover, setRollover] = useState(false);
-	const [weekStartDay, setWeekStartDay] = useState<0 | 1>(1);
-	const [monthStartDay, setMonthStartDay] = useState<
-		| 1
-		| 2
-		| 3
-		| 4
-		| 5
-		| 6
-		| 7
-		| 8
-		| 9
-		| 10
-		| 11
-		| 12
-		| 13
-		| 14
-		| 15
-		| 16
-		| 17
-		| 18
-		| 19
-		| 20
-		| 21
-		| 22
-		| 23
-		| 24
-		| 25
-		| 26
-		| 27
-		| 28
-	>(1);
+	// MVP: Rollover hidden - keep in model but don't expose in UI
+	const rollover = false;
+	// MVP: Hardcode period start days (weekStartDay = 1 = Monday, monthStartDay = 1)
+	const weekStartDay = 1 as const;
+	const monthStartDay = 1 as const;
 	// Categories are currently hidden in the UI; we always create budgets without categories.
 
 	const { addBudget } = useBudget();
@@ -112,12 +84,12 @@ const AddBudgetScreen: React.FC = () => {
 				amount: amountValue,
 				icon,
 				color,
-				// Categories are disabled in the UI for now.
+				// MVP: Categories are disabled
 				categories: [],
 				period,
-				weekStartDay,
-				monthStartDay,
-				rollover,
+				weekStartDay, // MVP: Hardcoded to 1 (Monday)
+				monthStartDay, // MVP: Hardcoded to 1
+				rollover, // MVP: Hidden from UI, default to false
 			});
 
 			if (isDevMode) {
@@ -167,10 +139,11 @@ const AddBudgetScreen: React.FC = () => {
 				style={styles.scrollView}
 				contentContainerStyle={styles.scrollContent}
 				showsVerticalScrollIndicator={false}
-				contentInsetAdjustmentBehavior="automatic"
+				contentInsetAdjustmentBehavior="never"
 				keyboardShouldPersistTaps="handled"
 				onScrollBeginDrag={Keyboard.dismiss}
-				automaticallyAdjustKeyboardInsets
+				automaticallyAdjustContentInsets={false}
+				automaticallyAdjustKeyboardInsets={false}
 			>
 				{/* Header / Hero */}
 				<View style={styles.header}>
@@ -265,50 +238,8 @@ const AddBudgetScreen: React.FC = () => {
 						/>
 					</View>
 
-					<View style={styles.fieldGroup}>
-						<Label text="Rollover unspent funds" optional />
-						<TouchableOpacity
-							style={styles.toggleContainer}
-							onPress={() => setRollover((prev) => !prev)}
-							activeOpacity={0.9}
-						>
-							<View style={styles.toggleContent}>
-								<Text style={[type.body, styles.toggleText]}>
-									{rollover ? 'Enabled' : 'Disabled'}
-								</Text>
-								<View
-									style={[
-										styles.toggleSwitch,
-										rollover && styles.toggleSwitchActive,
-									]}
-								>
-									<View
-										style={[
-											styles.toggleThumb,
-											rollover && styles.toggleThumbActive,
-										]}
-									/>
-								</View>
-							</View>
-						</TouchableOpacity>
-						<Text style={styles.helperText}>
-							Carry over unspent money into the next period.
-						</Text>
-					</View>
-
-					{/* Period details (start day) */}
-					{(period === 'weekly' || period === 'monthly') && (
-						<View style={styles.fieldGroup}>
-							<Label text="Period details" optional />
-							<BudgetPeriodDetails
-								period={period}
-								weekStartDay={weekStartDay}
-								monthStartDay={monthStartDay}
-								onWeekStartChange={setWeekStartDay}
-								onMonthStartChange={setMonthStartDay}
-							/>
-						</View>
-					)}
+					{/* MVP: Rollover hidden - keep in model but don't expose in UI */}
+					{/* MVP: Period details hidden - hardcoded to weekStartDay=1, monthStartDay=1 */}
 				</View>
 			</ScrollView>
 

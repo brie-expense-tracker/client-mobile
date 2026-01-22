@@ -87,6 +87,18 @@ export const isDev =
 // This controls DevHud, debug logs, and dev-only features
 export const isDevMode = isDevelopment && DEV_MODE;
 
+// Internal build detection: development or testflight, but NOT production
+// Internal builds are for testing/internal distribution (TestFlight, internal testing)
+// This is true when:
+// - NODE_ENV is not 'production' (i.e., development builds)
+// - OR EXPO_PUBLIC_ENV indicates a non-production environment (testflight, staging, dev)
+export const isInternalBuild =
+	!isProduction ||
+	ENV.EXPO_PUBLIC_ENV === 'testflight' ||
+	ENV.EXPO_PUBLIC_ENV === 'staging' ||
+	ENV.EXPO_PUBLIC_ENV === 'development' ||
+	ENV.EXPO_PUBLIC_ENV === 'dev';
+
 // Debug logging - only when dev mode is enabled
 if (isDevMode) {
 	envLog.debug('Environment configuration', {
@@ -94,6 +106,7 @@ if (isDevMode) {
 		EXPO_PUBLIC_ENV: ENV.EXPO_PUBLIC_ENV,
 		DEV_MODE,
 		isDevMode,
+		isInternalBuild,
 		platform: Platform.OS,
 		isDevice: Device.isDevice,
 		isSimulator: isSimulator(),

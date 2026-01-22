@@ -17,32 +17,7 @@ import { useBudget } from '../../../../../src/context/budgetContext';
 import { useGoal } from '../../../../../src/context/goalContext';
 import { useBills } from '../../../../../src/context/billContext';
 import { normalizeIconName } from '../../../../../src/constants/uiConstants';
-
-// Transaction interface defined inline since we removed the mock data file
-interface Transaction {
-	id: string;
-	description: string;
-	amount: number;
-	date: string; // ISO string
-	type: 'income' | 'expense';
-	target?: string; // ObjectId of the target Budget or Goal
-	targetModel?: 'Budget' | 'Goal';
-	updatedAt?: string; // ISO string for sorting by time when dates are the same
-	recurringPattern?: {
-		patternId: string;
-		frequency: string;
-		confidence: number;
-		nextExpectedDate: string;
-	};
-	notes?: string;
-	source?: 'manual' | 'plaid' | 'import' | 'ai';
-	vendor?: string;
-	metadata?: {
-		location?: string;
-		paymentMethod?: string;
-		originalDescription?: string;
-	};
-}
+import type { Transaction } from '../../../../../src/context/transactionContext';
 
 // Helper function to format date without time
 const formatDateWithoutTime = (dateString: string): string => {
@@ -84,7 +59,21 @@ const formatDateWithoutTime = (dateString: string): string => {
 };
 
 // Smart fallback function to infer icon and color from transaction description
-const getSmartFallback = (description: string, type: 'income' | 'expense') => {
+const getSmartFallback = (description: string | undefined, type: 'income' | 'expense') => {
+	// Handle undefined/null descriptions
+	if (!description || typeof description !== 'string') {
+		// Return default icon/color based on type
+		if (type === 'income') {
+			return {
+				icon: 'trending-up-outline' as keyof typeof Ionicons.glyphMap,
+				color: '#43A047',
+			};
+		}
+		return {
+			icon: 'trending-down-outline' as keyof typeof Ionicons.glyphMap,
+			color: '#E53935',
+		};
+	}
 	const desc = description.toLowerCase();
 
 	// Income categories
@@ -380,7 +369,7 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 		if (billInfo?.vendor) {
 			return billInfo.vendor;
 		}
-		return cleanDescription || item.description;
+		return cleanDescription || item.description || 'Transaction';
 	}, [billInfo, cleanDescription, item.description]);
 
 	const triggerHaptic = useCallback(() => {

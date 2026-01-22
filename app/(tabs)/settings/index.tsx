@@ -1,12 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { logger } from '../../../src/utils/logger';
-import {
-	View,
-	Text,
-	StyleSheet,
-	ScrollView,
-	TouchableOpacity,
-} from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import useAuth from '../../../src/context/AuthContext';
@@ -18,6 +12,14 @@ import {
 	debugFeatureFlags,
 } from '../../../src/config/features';
 import { palette, radius, space, type, shadow } from '../../../src/ui/theme';
+import { useBriePro } from '../../../src/hooks/useBriePro';
+import {
+	AppScreen,
+	AppCard,
+	AppText,
+	AppButton,
+	AppRow,
+} from '../../../src/ui/primitives';
 
 // Development mode toggle - controls visibility of debug/testing features
 const SHOW_DEBUG_SECTION = false;
@@ -29,67 +31,28 @@ type Item = {
 	icon: keyof typeof Ionicons.glyphMap;
 	route?: string;
 	onPress?: () => void;
-	// Optional subtitle if you want to mirror Legal descriptions later
 	description?: string;
 };
 
 function Section({ title, items }: { title: string; items: Item[] }) {
 	return (
 		<View style={styles.section}>
-			<Text style={[type.labelSm, { color: palette.textSubtle }]}>{title}</Text>
+			<AppText.Label color="subtle" style={styles.sectionTitle}>
+				{title}
+			</AppText.Label>
 
-			{/* Legal-style card */}
-			<View style={styles.settingsContainer}>
-				{items.map((item) => (
-					<TouchableOpacity
+			<AppCard padding={0} borderRadius={12}>
+				{items.map((item, index) => (
+					<AppRow
 						key={item.label}
-						style={[
-							styles.settingItem,
-							{
-								borderBottomWidth: 1,
-								borderBottomColor: '#f0f0f0',
-							},
-						]}
+						icon={item.icon}
+						label={item.label}
+						description={item.description}
 						onPress={item.onPress}
-						activeOpacity={0.7}
-						accessibilityRole="button"
-						accessibilityLabel={item.label}
-						accessibilityHint={`Open ${item.label} settings`}
-					>
-						<Ionicons
-							name={item.icon}
-							size={24}
-							color={palette.textMuted}
-							accessibilityElementsHidden
-							importantForAccessibility="no"
-						/>
-						<View style={styles.settingContent}>
-							<Text
-								style={[styles.settingText, { color: palette.textSecondary }]}
-							>
-								{item.label}
-							</Text>
-							{item.description ? (
-								<Text
-									style={[
-										styles.settingDescription,
-										{ color: palette.textSubtle },
-									]}
-								>
-									{item.description}
-								</Text>
-							) : null}
-						</View>
-						<Ionicons
-							name="chevron-forward"
-							size={18}
-							color="#BEBEBE"
-							accessibilityElementsHidden
-							importantForAccessibility="no"
-						/>
-					</TouchableOpacity>
+						bordered={index < items.length - 1}
+					/>
 				))}
-			</View>
+			</AppCard>
 		</View>
 	);
 }
@@ -99,6 +62,7 @@ function Section({ title, items }: { title: string; items: Item[] }) {
 export default function SettingsScreen() {
 	const router = useRouter();
 	const { logout } = useAuth();
+	const { isPro } = useBriePro();
 	const aiInsightsEnabled = useFeature('aiInsights');
 	const aiInsightsPreviewEnabled = useFeature('aiInsightsPreview');
 	const newBudgetsV2Enabled = useFeature('newBudgetsV2');
@@ -209,11 +173,6 @@ export default function SettingsScreen() {
 			onPress: () => router.push('/(stack)/settings/profile'),
 		},
 		{
-			label: 'Privacy & Security',
-			icon: 'shield-outline',
-			onPress: () => router.push('/(stack)/settings/privacyandsecurity'),
-		},
-		{
 			label: 'Subscription',
 			icon: 'card-outline',
 			onPress: () => router.push('/(stack)/settings/subscription'),
@@ -228,54 +187,29 @@ export default function SettingsScreen() {
 
 	const notificationItems: Item[] = [
 		{
-			label: 'Notification Settings',
+			label: 'Notifications',
 			icon: 'notifications-outline',
 			onPress: () => router.push('/(stack)/settings/notification'),
 		},
 	];
 
-	const supportItems: Item[] = [
+	const dataItems: Item[] = [
 		{
-			label: 'About',
-			icon: 'information-circle-outline',
-			onPress: () => router.push('/(stack)/settings/about'),
-		},
-		{
-			label: 'FAQ',
-			icon: 'help-circle-outline',
-			onPress: () => router.push('/(stack)/settings/faq'),
-		},
-	];
-
-	const legalItems: Item[] = [
-		{
-			label: 'Legal Documents',
-			icon: 'document-text-outline',
-			onPress: () => router.push('/(stack)/settings/legal'),
+			label: 'Data Export',
+			icon: 'download-outline',
+			description: 'Plus',
+			onPress: () => router.push('/(stack)/settings/privacyandsecurity/downloadData'),
 		},
 	];
 
 	return (
-		<ScrollView
-			key={refreshKey}
-			style={[styles.container, { backgroundColor: palette.bg }]}
-			contentContainerStyle={styles.scrollContent}
-			showsVerticalScrollIndicator={false}
-		>
-			{/* Optional header to match LegalDocumentsScreen vibe more */}
+		<AppScreen key={refreshKey}>
+			{/* Header */}
 			<View style={styles.headerSection}>
-				<Text style={[styles.headerTitle, { color: palette.text }]}>
-					Settings
-				</Text>
-				<Text
-					style={[
-						type.bodySm,
-						styles.headerDescription,
-						{ color: palette.textSubtle },
-					]}
-				>
-					Manage your account, notifications, privacy, and app preferences.
-				</Text>
+				<AppText.Title>Settings</AppText.Title>
+				<AppText.Subtitle color="subtle" style={styles.headerDescription}>
+					Manage your account and preferences.
+				</AppText.Subtitle>
 			</View>
 
 			{/* Debug / Testing - Only show when enabled */}
@@ -525,65 +459,37 @@ export default function SettingsScreen() {
 				</View>
 			)}
 
-			{/* Sections (now styled like Legal) */}
+			{/* Sections */}
 			<Section title="Account" items={accountItems} />
 			<Section title="Notifications" items={notificationItems} />
-			<Section title="Support" items={supportItems} />
-			<Section title="Legal" items={legalItems} />
+			{isPro && <Section title="Data" items={dataItems} />}
 
 			{/* Logout */}
-			<View style={[styles.logoutContainer, { paddingHorizontal: space.lg }]}>
-				<TouchableOpacity
-					style={[
-						styles.logoutButton,
-						{
-							borderColor: palette.border,
-							backgroundColor: palette.surface,
-						},
-					]}
+			<View style={styles.logoutContainer}>
+				<AppButton
+					label="Logout"
+					variant="secondary"
+					icon="log-out-outline"
+					iconPosition="left"
 					onPress={handleLogout}
-					activeOpacity={0.8}
-				>
-					<Ionicons
-						name="log-out-outline"
-						size={18}
-						color={palette.textMuted}
-					/>
-					<Text
-						style={[type.body, styles.logoutText, { color: palette.textMuted }]}
-					>
-						Logout
-					</Text>
-				</TouchableOpacity>
+					fullWidth
+				/>
 			</View>
-		</ScrollView>
+		</AppScreen>
 	);
 }
 
 /* ----------------------------- Styles ----------------------------- */
 
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-	},
-	scrollContent: {
-		paddingBottom: space.xxl,
-		paddingHorizontal: space.lg,
-	},
-
 	/* Header */
 	headerSection: {
 		paddingHorizontal: space.sm,
 		paddingTop: space.lg,
 		paddingBottom: space.sm,
 	},
-	headerTitle: {
-		fontSize: 28,
-		fontWeight: '700',
-		marginBottom: space.xs,
-	},
 	headerDescription: {
-		lineHeight: 20,
+		marginTop: space.xs,
 	},
 
 	/* Sections */
@@ -591,35 +497,8 @@ const styles = StyleSheet.create({
 		marginHorizontal: space.sm,
 		marginTop: space.md,
 	},
-
 	sectionTitle: {
 		marginBottom: space.xs,
-	},
-
-	/* Card container */
-	settingsContainer: {
-		backgroundColor: '#fff',
-		borderRadius: 12,
-	},
-
-	settingItem: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		padding: 8,
-		minHeight: 64,
-	},
-	settingContent: {
-		flex: 1,
-		marginLeft: 12,
-	},
-	settingText: {
-		fontSize: 16,
-		fontWeight: '500',
-		marginBottom: 2,
-	},
-	settingDescription: {
-		fontSize: 14,
-		lineHeight: 18,
 	},
 
 	/* Legacy card for debug block (no row dividers) */
@@ -634,17 +513,6 @@ const styles = StyleSheet.create({
 	logoutContainer: {
 		marginTop: space.lg,
 		marginBottom: space.xl,
-	},
-	logoutButton: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
-		paddingVertical: space.md,
-		borderRadius: radius.lg,
-		borderWidth: 1,
-	},
-	logoutText: {
-		marginLeft: space.sm,
 	},
 
 	/* Debug Toggle / Labs */

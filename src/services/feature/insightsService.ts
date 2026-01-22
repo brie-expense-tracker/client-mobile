@@ -78,7 +78,7 @@ export class InsightsService {
 	): Promise<InsightsResponse> {
 		try {
 			logger.debug(`🧠 Fetching ${period} insights...`);
-			const response = await ApiService.get<any>(`/insights/${period}`);
+			const response = await ApiService.get<any>(`/api/insights/${period}`);
 
 			// Simplified response processing
 			let insightsArray: AIInsight[] = [];
@@ -126,7 +126,7 @@ export class InsightsService {
 
 	// Get insight detail by ID
 	static async getInsightDetail(id: string): Promise<InsightDetailResponse> {
-		return ApiService.get<AIInsight>(`/insights/detail/${id}`);
+		return ApiService.get<AIInsight>(`/api/insights/detail/${id}`);
 	}
 
 	// Generate new insights for a period
@@ -137,7 +137,7 @@ export class InsightsService {
 			logger.debug(`🚀 Generating ${period} insights...`);
 
 			const response = await ApiService.post<any>(
-				`/insights/generate/${period}`,
+				`/api/insights/generate/${period}`,
 				{}
 			);
 
@@ -197,7 +197,7 @@ export class InsightsService {
 			);
 
 			const response = await ApiService.post<any>(
-				'/insights/profile-based/weekly',
+				'/api/insights/profile-based/weekly',
 				{}
 			);
 
@@ -267,12 +267,12 @@ export class InsightsService {
 
 	// Mark insight as read
 	static async markInsightAsRead(id: string): Promise<InsightDetailResponse> {
-		return ApiService.put<AIInsight>(`/insights/read/${id}`, {});
+		return ApiService.put<AIInsight>(`/api/insights/read/${id}`, {});
 	}
 
 	// Get unread insights count
 	static async getUnreadCount(): Promise<UnreadCountResponse> {
-		return ApiService.get<{ unreadCount: number }>('/insights/unread/count');
+		return ApiService.get<{ unreadCount: number }>('/api/insights/unread/count');
 	}
 
 	// Refresh insights after actions are completed

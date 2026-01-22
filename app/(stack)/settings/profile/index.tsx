@@ -16,10 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useProfile } from '../../../../src/context/profileContext';
 import useAuth from '../../../../src/context/AuthContext';
-import AIProfileInsights from './components/AIProfileInsights';
 import { useFeature } from '../../../../src/config/features';
-import { IncomeSourceBadge } from '../../../../src/components/IncomeSourceBadge';
-import { IncomeDivergenceWarning } from '../../../../src/components/IncomeDivergenceWarning';
 import { logger } from '../../../../src/utils/logger';
 import { palette, radius, space, type, shadow } from '../../../../src/ui/theme';
 
@@ -30,8 +27,14 @@ const usd = new Intl.NumberFormat('en-US', {
 	maximumFractionDigits: 2,
 });
 
-const currency = (n?: number) =>
-	typeof n === 'number' && !Number.isNaN(n) ? usd.format(n) : usd.format(0);
+const currency = (n?: number | null) => {
+	if (typeof n === 'number' && !Number.isNaN(n)) {
+		return usd.format(n);
+	}
+	// Should not reach here if we check for null/undefined before calling
+	// But as a safety fallback, format 0
+	return usd.format(0);
+};
 
 const Section = ({
 	title,
@@ -80,10 +83,16 @@ const Row = ({
 	iconBgColor?: string;
 	labelColor?: string;
 }) => {
+	const accessibilityLabel = value 
+		? `${label}, ${value}` 
+		: label;
+	
 	return (
 		<Pressable
 			onPress={onPress}
 			disabled={!onPress}
+			accessibilityRole={onPress ? "button" : undefined}
+			accessibilityLabel={onPress ? accessibilityLabel : undefined}
 			style={({ pressed }) => [
 				styles.rowContainer,
 				pressed && onPress ? styles.pressed : null,
@@ -157,122 +166,103 @@ export default function AccountScreen() {
 		loading,
 		error,
 		fetchProfile,
-		incomeEstimate,
-		incomeComparison,
-		fetchIncomeComparison,
 	} = useProfile();
 	const { user } = useAuth();
 	const aiInsightsPreviewEnabled = useFeature('aiInsightsPreview');
-	const [profileCompletion, setProfileCompletion] = useState(0);
 	const [refreshing, setRefreshing] = useState(false);
 
 	const handleRefresh = useCallback(async () => {
 		setRefreshing(true);
 		try {
 			await fetchProfile();
-			await fetchIncomeComparison();
 		} finally {
 			setRefreshing(false);
 		}
-	}, [fetchProfile, fetchIncomeComparison]);
+	}, [fetchProfile]);
 
-	const calculateProfileCompletion = useCallback((profileData: any) => {
-		if (!profileData) return 0;
-		const fields = [
-			profileData.firstName,
-			profileData.lastName,
-			profileData.monthlyIncome,
-			profileData.savings,
-			profileData.debt,
-			profileData.expenses?.housing,
-			profileData.expenses?.loans,
-			profileData.expenses?.subscriptions,
-			profileData.financialGoal,
-		];
-		const filled = fields.filter(
-			(f: any) => f !== undefined && f !== null && f !== ''
-		).length;
-		return Math.round((filled / fields.length) * 100);
-	}, []);
-
-	const getFinancialHealthScore = useCallback(() => {
-		if (!profile) return 0;
-		let score = 0;
-		const income = profile.monthlyIncome || 0;
-		const savings = profile.savings || 0;
-		const debt = profile.debt || 0;
-
-		if (savings >= income * 6) score += 40;
-		else if (savings >= income * 3) score += 30;
-		else if (savings >= income * 1) score += 20;
-		else if (savings > 0) score += 10;
-
-		if (income > 0) {
-			const debtRatio = debt / income;
-			if (debtRatio <= 0.2) score += 30;
-			else if (debtRatio <= 0.4) score += 20;
-			else if (debtRatio <= 0.6) score += 10;
+	// MVP completion: only count fields that are easily editable from this screen (1-2 taps)
+	// Fields: firstName, lastName, monthlyIncome, savings, expenses.housing, phone
+	const computeProfileCompletion = useCallback((profileData: any) => {
+		if (!profileData) {
+			return { filled: 0, total: 0, missing: 0, percentage: 0, missingItems: [] };
 		}
 
-		score += Math.round((profileCompletion / 100) * 30);
-		return Math.min(score, 100);
-	}, [profile, profileCompletion]);
+		// Helper to check if a value is set (including 0, which is intentional)
+		const isSet = (val: any): boolean => {
+			if (typeof val === 'number') {
+				// 0 is considered set (intentional), only null/undefined means not set
+				return val !== null && val !== undefined;
+			}
+			return val !== undefined && val !== null && val !== '';
+		};
 
-	const healthScore = getFinancialHealthScore();
-	const healthStatus = useMemo(() => {
-		if (healthScore >= 80)
-			return { label: 'Excellent', color: palette.success };
-		if (healthScore >= 60) return { label: 'Good', color: palette.primary };
-		if (healthScore >= 40) return { label: 'Fair', color: palette.warning };
-		return { label: 'Needs work', color: palette.danger };
-	}, [healthScore]);
+		// Check individual fields
+		const hasFirstName = isSet(profileData.firstName);
+		const hasLastName = isSet(profileData.lastName);
+		const hasName = hasFirstName && hasLastName; // Both required for "name" to be complete
+		const hasMonthlyIncome = isSet(profileData.monthlyIncome);
+		const hasSavings = isSet(profileData.savings);
+		const hasHousing = isSet(profileData.expenses?.housing);
+		const hasPhone = isSet(profileData.phone);
+
+		// Count filled fields (name counts as 2 fields but one completion item)
+		const filled = (hasName ? 2 : (hasFirstName || hasLastName ? 1 : 0)) +
+			(hasMonthlyIncome ? 1 : 0) +
+			(hasSavings ? 1 : 0) +
+			(hasHousing ? 1 : 0) +
+			(hasPhone ? 1 : 0);
+
+		const total = 6; // firstName, lastName, monthlyIncome, savings, housing, phone
+		const missing = Math.max(0, total - filled);
+		const percentage = Math.round((filled / total) * 100);
+
+		// Generate missing fields list, ordered by impact:
+		// 1. Income (most critical for financial planning)
+		// 2. Housing (major expense)
+		// 3. Savings (important for goals)
+		// 4. Name/Contact (identity, less critical for financial features)
+		const missingItems: { label: string; route: string }[] = [];
+
+		if (!hasMonthlyIncome) {
+			missingItems.push({ label: 'Set your income', route: '/(stack)/settings/profile/editFinancial' });
+		}
+		if (!hasHousing) {
+			missingItems.push({ label: 'Set housing expense', route: '/(stack)/settings/profile/editExpenses' });
+		}
+		if (!hasSavings) {
+			missingItems.push({ label: 'Set your savings', route: '/(stack)/settings/profile/editFinancial' });
+		}
+		if (!hasName) {
+			missingItems.push({ label: 'Set your name', route: '/(stack)/settings/profile/editName' });
+		}
+		if (!hasPhone) {
+			missingItems.push({ label: 'Set your phone', route: '/(stack)/settings/profile/editPhone' });
+		}
+
+		return { filled, total, missing, percentage, missingItems };
+	}, []);
+
+	const profileCompletionData = useMemo(() => {
+		return computeProfileCompletion(profile);
+	}, [profile, computeProfileCompletion]);
 
 	const profileStats = useMemo(() => {
-		if (!profile) return { filled: 0, total: 0, missing: 0 };
+		return {
+			filled: profileCompletionData.filled,
+			total: profileCompletionData.total,
+			missing: profileCompletionData.missing,
+		};
+	}, [profileCompletionData]);
 
-		const fields = [
-			profile.firstName,
-			profile.lastName,
-			profile.monthlyIncome,
-			profile.savings,
-			profile.debt,
-			profile.expenses?.housing,
-			profile.expenses?.loans,
-			profile.expenses?.subscriptions,
-			profile.financialGoal,
-		];
+	const missingFields = useMemo(() => {
+		return profileCompletionData.missingItems.slice(0, 3); // Limit to 3 items
+	}, [profileCompletionData.missingItems]);
 
-		const filled = fields.filter(
-			(f) => f !== undefined && f !== null && f !== ''
-		).length;
-		const total = fields.length;
-		const missing = Math.max(0, total - filled);
-
-		return { filled, total, missing };
-	}, [profile]);
-
-	const completionSub =
-		profileCompletion === 100
-			? 'Profile complete'
-			: `${profileStats.missing} fields left`;
-
-	const healthSub =
-		healthScore >= 80
-			? 'Keep it up'
-			: healthScore >= 60
-			? 'On track'
-			: 'Improve by adding savings';
 
 	useEffect(() => {
 		fetchProfile();
-		fetchIncomeComparison();
-	}, [fetchProfile, fetchIncomeComparison]);
+	}, [fetchProfile]);
 
-	useEffect(() => {
-		if (profile) {
-			setProfileCompletion(calculateProfileCompletion(profile));
-		}
-	}, [profile, calculateProfileCompletion]);
 
 	const handleExportProfile = async () => {
 		try {
@@ -293,7 +283,7 @@ export default function AccountScreen() {
 
 			await Share.share({
 				message: jsonString,
-				title: 'Profile Export',
+				title: 'Profile Data Export',
 			});
 		} catch (err) {
 			logger.error('Export error:', err);
@@ -303,11 +293,11 @@ export default function AccountScreen() {
 
 	const handleBackupProfile = async () => {
 		Alert.alert(
-			'Backup Profile',
-			'This will create a backup of your profile data. Continue?',
+			'Export data',
+			'This will generate a JSON file you can share or save.',
 			[
 				{ text: 'Cancel', style: 'cancel' },
-				{ text: 'Backup', onPress: handleExportProfile },
+				{ text: 'Export', onPress: handleExportProfile },
 			]
 		);
 	};
@@ -424,20 +414,17 @@ export default function AccountScreen() {
 						<View style={styles.identityMeta}>
 							<View
 								style={[
-									styles.healthPill,
+									styles.completionPill,
 									{ backgroundColor: 'rgba(14,165,233,0.08)' },
 								]}
 							>
-								<View
-									style={[
-										styles.healthDot,
-										{ backgroundColor: healthStatus.color },
-									]}
-								/>
 								<Text
-									style={[styles.healthPillText, { color: healthStatus.color }]}
+									style={[styles.completionPillText, { color: palette.primary }]}
 								>
-									Health: {healthStatus.label}
+									{profileCompletionData.percentage}% ·{' '}
+									{profileCompletionData.percentage === 100
+										? 'Complete'
+										: `${profileStats.missing} fields left`}
 								</Text>
 							</View>
 						</View>
@@ -446,6 +433,9 @@ export default function AccountScreen() {
 						onPress={() => router.push('/(stack)/settings/profile/editName')}
 						activeOpacity={0.7}
 						style={styles.editPill}
+						hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+						accessibilityRole="button"
+						accessibilityLabel="Edit name"
 					>
 						<Ionicons name="pencil" size={14} color={palette.primary} />
 						<Text
@@ -461,102 +451,61 @@ export default function AccountScreen() {
 				</View>
 			</Card>
 
-			{/* KPIs */}
-			<Card style={styles.kpiModule}>
-				<View style={styles.kpiTopRow}>
-					<View style={styles.kpiTopLeft}>
-						<Text style={styles.kpiEyebrow}>Profile</Text>
-						<Text style={styles.kpiTitle}>Your snapshot</Text>
-					</View>
-
-					<View style={styles.kpiTopRight}>
+			{/* Profile Checklist */}
+			{profileCompletionData.percentage < 100 && missingFields.length > 0 && (
+				<Card style={styles.checklistCard}>
+					<Text style={styles.checklistTitle}>Finish your profile</Text>
+					
+					{/* Progress Bar */}
+					<View style={styles.checklistProgressTrack}>
 						<View
 							style={[
-								styles.healthPill,
-								{ backgroundColor: 'rgba(14,165,233,0.10)' }, // tint from primary
+								styles.checklistProgressFill,
+								{
+									width: `${profileCompletionData.percentage}%`,
+									backgroundColor: palette.primary,
+								},
 							]}
-						>
-							<View
-								style={[
-									styles.healthDot,
-									{ backgroundColor: healthStatus.color },
-								]}
-							/>
-							<Text
-								style={[styles.healthPillText, { color: healthStatus.color }]}
+						/>
+					</View>
+
+					{/* Missing Items Chips */}
+					<View style={styles.checklistChips}>
+						{missingFields.map((item, index) => (
+							<TouchableOpacity
+								key={index}
+								onPress={() => router.push(item.route as any)}
+								activeOpacity={0.7}
+								style={styles.checklistChip}
+								hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+								accessibilityRole="button"
+								accessibilityLabel={item.label}
 							>
-								{healthStatus.label}
-							</Text>
-						</View>
-					</View>
-				</View>
-
-				<View style={styles.kpiGrid}>
-					{/* Completion lane */}
-					<View style={styles.kpiLane}>
-						<View style={styles.kpiLaneHeader}>
-							<Ionicons
-								name="checkmark-circle-outline"
-								size={18}
-								color={palette.success}
-							/>
-							<Text style={styles.kpiLaneLabel}>Completion</Text>
-						</View>
-
-						<View style={styles.kpiValueRow}>
-							<Text style={styles.kpiValue}>{profileCompletion}%</Text>
-							<Text style={styles.kpiSub}>{completionSub}</Text>
-						</View>
-
-						<View style={styles.kpiTrack}>
-							<View
-								style={[
-									styles.kpiFill,
-									{
-										width: `${profileCompletion}%`,
-										backgroundColor: palette.success,
-									},
-								]}
-							/>
-						</View>
+								<Text style={styles.checklistChipText}>{item.label}</Text>
+							</TouchableOpacity>
+						))}
 					</View>
 
-					<View style={styles.kpiDivider} />
+					{/* CTA Button */}
+					<TouchableOpacity
+						onPress={() => {
+							// Route to the first missing field (ordered by impact)
+							if (missingFields.length > 0) {
+								router.push(missingFields[0].route as any);
+							}
+						}}
+						activeOpacity={0.8}
+						style={[styles.checklistButton, { backgroundColor: palette.primary }]}
+						accessibilityRole="button"
+						accessibilityLabel="Finish profile"
+					>
+						<Text style={styles.checklistButtonText}>Finish profile</Text>
+					</TouchableOpacity>
+				</Card>
+			)}
 
-					{/* Health lane */}
-					<View style={styles.kpiLane}>
-						<View style={styles.kpiLaneHeader}>
-							<Ionicons
-								name="trending-up-outline"
-								size={18}
-								color={healthStatus.color}
-							/>
-							<Text style={styles.kpiLaneLabel}>Health</Text>
-						</View>
-
-						<View style={styles.kpiValueRow}>
-							<Text style={styles.kpiValue}>{healthScore}</Text>
-							<Text style={styles.kpiValueSuffix}>/100</Text>
-							<Text style={styles.kpiSub}>{healthSub}</Text>
-						</View>
-
-						<View style={styles.kpiTrack}>
-							<View
-								style={[
-									styles.kpiFill,
-									{
-										width: `${healthScore}%`,
-										backgroundColor: healthStatus.color,
-									},
-								]}
-							/>
-						</View>
-					</View>
-				</View>
-			</Card>
-
-			{/* Account */}
-			<Section title="Account">
+			{/* Profile */}
+			<Section title="Profile">
 				<Card style={[styles.cardSoft, styles.listCard]}>
 					<Row
 						icon="person-outline"
@@ -564,150 +513,104 @@ export default function AccountScreen() {
 						value={
 							profile.firstName || profile.lastName
 								? `${profile.firstName ?? ''} ${profile.lastName ?? ''}`.trim()
-								: 'Not set'
+								: 'Set your name'
 						}
 						onPress={() => router.push('/(stack)/settings/profile/editName')}
 					/>
-					<View style={[styles.divider, { backgroundColor: palette.border }]} />
+					<View style={styles.divider} />
 					<Row
 						icon="call-outline"
-						label="Phone"
-						value={profile.phone || 'Not set'}
+						label="Contact"
+						value={(() => {
+							const phoneSet = profile.phone && profile.phone.trim() !== '';
+							if (phoneSet && user?.email) {
+								return `${profile.phone} · ${user.email}`;
+							}
+							if (phoneSet) {
+								return profile.phone;
+							}
+							if (user?.email) {
+								return user.email;
+							}
+							return 'Set your phone number';
+						})()}
 						onPress={() => router.push('/(stack)/settings/profile/editPhone')}
 					/>
-					<View style={[styles.divider, { backgroundColor: palette.border }]} />
-					<Row
-						icon="mail-outline"
-						label="Email"
-						value={user?.email || 'Not set'}
-					/>
-				</Card>
-			</Section>
-
-			{/* Income Divergence */}
-			{incomeComparison &&
-				incomeComparison.userDeclared &&
-				incomeComparison.observed &&
-				incomeComparison.divergence && (
-					<IncomeDivergenceWarning
-						userDeclaredAmount={incomeComparison.userDeclared.monthlyIncome}
-						observedAmount={incomeComparison.observed.monthlyIncome}
-						divergencePercent={incomeComparison.divergence}
-						onUpdateIncome={() =>
-							router.push('/(stack)/settings/profile/editFinancial')
-						}
-					/>
-				)}
-
-			{/* Financial */}
-			<Section title="Financial">
-				<Card style={[styles.cardSoft, styles.listCard]}>
+					<View style={styles.divider} />
 					<Row
 						icon="cash-outline"
-						label="Monthly Income"
-						value={currency(
-							incomeEstimate?.monthlyIncome || profile.monthlyIncome
-						)}
+						label="Money"
+						value={(() => {
+							const incomeSet = profile.monthlyIncome !== null && profile.monthlyIncome !== undefined;
+							const savingsSet = profile.savings !== null && profile.savings !== undefined;
+							
+							if (incomeSet && savingsSet) {
+								return `${currency(profile.monthlyIncome)} · ${currency(profile.savings)}`;
+							}
+							if (incomeSet) {
+								return currency(profile.monthlyIncome);
+							}
+							if (savingsSet) {
+								return currency(profile.savings);
+							}
+							return 'Set your income & savings';
+						})()}
 						onPress={() =>
 							router.push('/(stack)/settings/profile/editFinancial')
 						}
-						rightMeta={
-							incomeEstimate && (
-								<IncomeSourceBadge
-									source={incomeEstimate.source}
-									confidence={incomeEstimate.confidence}
-									compact
-									tone="ghost"
-								/>
-							)
-						}
 					/>
-					<View style={[styles.divider, { backgroundColor: palette.border }]} />
+					<View style={styles.divider} />
 					<Row
-						icon="trending-up-outline"
-						label="Savings & Investments"
-						value={currency(profile.savings)}
+						icon="card-outline"
+						label="Expenses"
+						value={(() => {
+							const expenses = profile.expenses || {};
+							const expenseItems: { label: string; value: number }[] = [];
+							
+							// Collect non-zero expense categories
+							if (expenses.housing !== null && expenses.housing !== undefined && expenses.housing > 0) {
+								expenseItems.push({ label: 'Housing', value: expenses.housing });
+							}
+							if (expenses.subscriptions !== null && expenses.subscriptions !== undefined && expenses.subscriptions > 0) {
+								expenseItems.push({ label: 'Subscriptions', value: expenses.subscriptions });
+							}
+							if (expenses.loans !== null && expenses.loans !== undefined && expenses.loans > 0) {
+								expenseItems.push({ label: 'Loans', value: expenses.loans });
+							}
+							
+							if (expenseItems.length === 0) {
+								return 'Set your housing expense';
+							}
+							
+							// Show top 2 expense categories in compact format
+							const topItems = expenseItems.slice(0, 2);
+							return topItems.map(item => `${item.label} ${currency(item.value)}`).join(' · ');
+						})()}
 						onPress={() =>
-							router.push('/(stack)/settings/profile/editFinancial')
+							router.push('/(stack)/settings/profile/editExpenses')
 						}
 					/>
-					{profile.savings === 0 && (
-						<Text
-							style={[
-								type.labelXs,
-								{
-									color: palette.warning,
-									marginLeft: 52,
-									marginBottom: 2,
-									fontWeight: '600',
-								},
-							]}
-						>
-							Adding savings improves your health score
-						</Text>
-					)}
-					<Text
-						style={[
-							type.small,
-							styles.helperText,
-							{ color: palette.textSubtle, marginLeft: 52, marginTop: 2 },
-						]}
-					>
-						Include cash + investment balances.
-					</Text>
-					<View style={[styles.divider, { backgroundColor: palette.border }]} />
+					<View style={styles.divider} />
 					<Row
-						icon="trending-down-outline"
-						label="Total Debt"
-						value={currency(profile.debt)}
+						icon="wallet-outline"
+						label="Other financial details"
+						value={(() => {
+							const debtSet = profile.debt !== null && profile.debt !== undefined;
+							
+							if (debtSet) {
+								return `Debt: ${currency(profile.debt)}`;
+							}
+							return 'Set debt';
+						})()}
 						onPress={() =>
 							router.push('/(stack)/settings/profile/editFinancial')
 						}
 					/>
-					{!!profile.expenses && (
-						<>
-							<View
-								style={[styles.divider, { backgroundColor: palette.border }]}
-							/>
-							<Row
-								icon="card-outline"
-								label="Expenses"
-								value={`Housing: ${currency(profile.expenses.housing)}`}
-								onPress={() =>
-									router.push('/(stack)/settings/profile/editExpenses')
-								}
-							/>
-						</>
-					)}
 				</Card>
 			</Section>
 
 			{/* Quick Actions */}
-			<Section
-				title="Quick Actions"
-				right={
-					<TouchableOpacity
-						onPress={handleBackupProfile}
-						style={styles.inlineButton}
-						activeOpacity={0.7}
-					>
-						<Ionicons
-							name="cloud-upload-outline"
-							size={16}
-							color={palette.primary}
-						/>
-						<Text
-							style={[
-								type.small,
-								styles.inlineButtonText,
-								{ color: palette.primary },
-							]}
-						>
-							Backup
-						</Text>
-					</TouchableOpacity>
-				}
-			>
+			<Section title="Quick Actions">
 				<View style={styles.quickGrid}>
 					<Pressable
 						android_ripple={{ color: 'rgba(0,0,0,0.04)', borderless: false }}
@@ -719,6 +622,9 @@ export default function AccountScreen() {
 						onPress={() =>
 							router.push('/(stack)/settings/profile/editFinancial')
 						}
+						hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+						accessibilityRole="button"
+						accessibilityLabel="Update money, Income, savings, expenses"
 					>
 						<View style={styles.quickIconWrap}>
 							<Ionicons name="cash-outline" size={20} color={palette.success} />
@@ -726,31 +632,9 @@ export default function AccountScreen() {
 						<Text
 							style={[type.body, styles.quickLabel, { color: palette.text }]}
 						>
-							Financial Info
+							Update money
 						</Text>
-						<Text style={styles.quickSub}>Adjust income</Text>
-					</Pressable>
-
-					<Pressable
-						android_ripple={{ color: 'rgba(0,0,0,0.04)', borderless: false }}
-						style={({ pressed }) => [
-							styles.quickTile,
-							pressed && { transform: [{ scale: 0.985 }], opacity: 0.96 },
-							pressed && Platform.OS === 'ios' ? { shadowOpacity: 0.03 } : null,
-						]}
-						onPress={() =>
-							router.push('/(stack)/settings/profile/editExpenses')
-						}
-					>
-						<View style={styles.quickIconWrap}>
-							<Ionicons name="card-outline" size={20} color={palette.warning} />
-						</View>
-						<Text
-							style={[type.body, styles.quickLabel, { color: palette.text }]}
-						>
-							Edit Expenses
-						</Text>
-						<Text style={styles.quickSub}>Monthly costs</Text>
+						<Text style={styles.quickSub}>Income, savings, expenses</Text>
 					</Pressable>
 
 					<Pressable
@@ -761,6 +645,9 @@ export default function AccountScreen() {
 							pressed && Platform.OS === 'ios' ? { shadowOpacity: 0.03 } : null,
 						]}
 						onPress={() => router.push('/(tabs)/wallet/goals')}
+						hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+						accessibilityRole="button"
+						accessibilityLabel="Goals, Set targets"
 					>
 						<View style={styles.quickIconWrap}>
 							<Ionicons name="flag-outline" size={20} color={palette.primary} />
@@ -781,69 +668,35 @@ export default function AccountScreen() {
 							pressed && Platform.OS === 'ios' ? { shadowOpacity: 0.03 } : null,
 						]}
 						onPress={handleBackupProfile}
+						hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+						accessibilityRole="button"
+						accessibilityLabel="Export data, Backup profile"
 					>
 						<View style={styles.quickIconWrap}>
-							<Ionicons name="cloud-upload-outline" size={20} color="#8b5cf6" />
+							<Ionicons name="cloud-upload-outline" size={20} color={palette.textMuted} />
 						</View>
 						<Text
 							style={[type.body, styles.quickLabel, { color: palette.text }]}
 						>
-							Backup
+							Export data
 						</Text>
-						<Text style={styles.quickSub}>Export data</Text>
+						<Text style={styles.quickSub}>Backup profile</Text>
 					</Pressable>
 				</View>
 			</Section>
 
 			{/* AI Insights */}
 			{aiInsightsPreviewEnabled && (
-				<Section
-					title="AI Insights"
-					right={
-						<TouchableOpacity
-							onPress={() => router.push('/(tabs)/chat')}
-							style={styles.inlineButton}
-							activeOpacity={0.7}
-						>
-							<Text
-								style={[
-									type.small,
-									styles.inlineButtonText,
-									{ color: palette.primary },
-								]}
-							>
-								Chat about insights
-							</Text>
-							<Ionicons
-								name="chatbubble-outline"
-								size={15}
-								color={palette.primary}
-							/>
-						</TouchableOpacity>
-					}
-				>
+				<Section title="AI Assistant">
 					<Card style={[styles.cardSoft, styles.listCard]}>
-						<AIProfileInsights
-							profile={profile}
-							onAction={(a) => {
-								if (a === 'export_insights') {
-									Alert.alert(
-										'Export',
-										'Use Share from the insights screen to export.'
-									);
-									return;
-								}
-								if (a === 'optimize_income' || a === 'debt_strategy')
-									router.push('/(stack)/settings/profile/editFinancial');
-								else if (a === 'reduce_expenses')
-									router.push('/(stack)/settings/profile/editExpenses');
-								else if (a === 'set_savings_goal')
-									router.push('/(tabs)/wallet/goals');
-								else if (a === 'create_budget')
-									router.push('/(tabs)/wallet/budgets');
-								else router.push('/(tabs)/chat');
-							}}
-							mode="preview"
+						<Row
+							icon="sparkles-outline"
+							label="Ask Brie (AI)"
+							value="Get financial insights"
+							onPress={() => router.push({
+								pathname: '/(tabs)/chat',
+								params: { initialMessage: 'Give me a snapshot of my finances based on my profile.' }
+							} as any)}
 						/>
 					</Card>
 				</Section>
@@ -852,6 +705,12 @@ export default function AccountScreen() {
 			{/* Management */}
 			<Section title="Management">
 				<Card style={[styles.cardSoft, styles.listCard]}>
+					<Row
+						icon="cloud-upload-outline"
+						label="Export data"
+						onPress={handleBackupProfile}
+					/>
+					<View style={styles.divider} />
 					<Row
 						icon="trash-outline"
 						label="Delete Account"
@@ -966,8 +825,7 @@ const styles = StyleSheet.create({
 
 	divider: {
 		height: 1,
-		opacity: 0.45,
-		backgroundColor: 'rgba(229,231,235,0.5)',
+		backgroundColor: palette.border, // Use theme color directly for consistency across light/dark
 		marginLeft: 52, // aligns under text, not under icon
 	},
 
@@ -1047,119 +905,74 @@ const styles = StyleSheet.create({
 		fontWeight: '700',
 	},
 
-	kpiModule: {
-		padding: space.lg,
-		borderRadius: radius.xl,
-		borderWidth: 1,
-		borderColor: 'rgba(229,231,235,0.45)',
-		backgroundColor: 'rgba(255,255,255,0.96)',
-		...shadow.soft,
-	},
-
-	kpiTopRow: {
+	completionPill: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		justifyContent: 'space-between',
-		marginBottom: space.md,
-	},
-	kpiTopLeft: {
-		flex: 1,
-	},
-	kpiEyebrow: {
-		fontSize: 11,
-		fontWeight: '700',
-		letterSpacing: 1.1,
-		textTransform: 'uppercase',
-		color: palette.textSubtle,
-	},
-	kpiTitle: {
-		marginTop: 4,
-		fontSize: 16,
-		fontWeight: '700',
-		color: palette.text,
-	},
-	kpiTopRight: {
-		marginLeft: space.md,
-	},
-
-	healthPill: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
 		paddingHorizontal: 9,
 		paddingVertical: 5,
 		borderRadius: 999,
 		marginTop: 2, // optical alignment
 	},
-	healthDot: {
-		width: 8,
-		height: 8,
-		borderRadius: 4,
-	},
-	healthPillText: {
+	completionPillText: {
 		fontSize: 11,
 		fontWeight: '700',
 	},
 
-	kpiGrid: {
-		flexDirection: 'row',
-		alignItems: 'stretch',
+	checklistCard: {
+		padding: space.lg,
+		borderRadius: radius.xl,
+		borderWidth: 1,
+		borderColor: 'rgba(229,231,235,0.45)',
+		backgroundColor: palette.surface,
+		...shadow.soft,
 	},
-	kpiLane: {
-		flex: 1,
-	},
-	kpiLaneHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
-		marginBottom: 8,
-	},
-	kpiLaneLabel: {
-		fontSize: 12,
+	checklistTitle: {
+		fontSize: 16,
 		fontWeight: '700',
-		color: palette.textSubtle,
-	},
-
-	kpiValueRow: {
-		flexDirection: 'row',
-		alignItems: 'baseline',
-		flexWrap: 'wrap',
-		gap: 6,
-		marginBottom: 10,
-	},
-	kpiValue: {
-		fontSize: 22,
-		fontWeight: '800',
 		color: palette.text,
-		fontVariant: ['tabular-nums'],
+		marginBottom: space.md,
 	},
-	kpiValueSuffix: {
-		fontSize: 12,
-		fontWeight: '700',
-		color: palette.textSubtle,
-		marginLeft: -4,
-	},
-	kpiSub: {
-		fontSize: 12,
-		fontWeight: '600',
-		color: palette.textSubtle,
-	},
-
-	kpiTrack: {
-		height: 7,
+	checklistProgressTrack: {
+		height: 6,
 		borderRadius: 999,
 		backgroundColor: palette.track,
 		overflow: 'hidden',
+		marginBottom: space.md,
 	},
-	kpiFill: {
+	checklistProgressFill: {
 		height: '100%',
 		borderRadius: 999,
 	},
-
-	kpiDivider: {
-		width: 1,
-		backgroundColor: 'rgba(229,231,235,0.7)',
-		marginHorizontal: space.lg,
+	checklistChips: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		gap: space.sm,
+		marginBottom: space.md,
+	},
+	checklistChip: {
+		paddingHorizontal: 12,
+		paddingVertical: 8,
+		borderRadius: radius.lg,
+		backgroundColor: palette.primarySubtle,
+		borderWidth: 1,
+		borderColor: 'rgba(14,165,233,0.2)',
+	},
+	checklistChipText: {
+		fontSize: 12,
+		fontWeight: '600',
+		color: palette.primary,
+	},
+	checklistButton: {
+		paddingVertical: space.sm,
+		paddingHorizontal: space.lg,
+		borderRadius: radius.lg,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	checklistButtonText: {
+		fontSize: 14,
+		fontWeight: '700',
+		color: palette.primaryTextOn,
 	},
 
 	helperText: {
@@ -1183,8 +996,9 @@ const styles = StyleSheet.create({
 		gap: space.sm,
 	},
 	quickTile: {
-		flexBasis: '48%',
+		flexBasis: '31%', // Works well for 3 tiles per row
 		flexGrow: 1,
+		minWidth: 100, // Ensure tiles don't get too narrow
 		paddingVertical: space.sm,
 		paddingHorizontal: space.md,
 		borderRadius: radius.xl,

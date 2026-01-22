@@ -5,7 +5,6 @@ import {
 	Text,
 	FlatList,
 	StyleSheet,
-	SafeAreaView,
 	TouchableOpacity,
 	Alert,
 	ActivityIndicator,
@@ -14,7 +13,6 @@ import {
 	Modal,
 	ScrollView,
 } from 'react-native';
-import { useTheme } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import {
 	Gesture,
@@ -34,6 +32,16 @@ import { useNotification } from '@/src/context/notificationContext';
 import { NotificationData } from '@/src/services';
 import { router } from 'expo-router';
 import { debounce } from '@/src/utils/debounce';
+import {
+	Page,
+	LoadingState,
+	EmptyState,
+	palette,
+	space,
+	radius,
+	type,
+	shadow,
+} from '../../../src/ui';
 
 // Helper function to get notification type icon and color
 const getNotificationTypeInfo = (type?: string) => {
@@ -68,7 +76,6 @@ const NotificationItem = ({
 	onDelete: (id: string, resetAnimation: () => void) => void;
 	onMarkAsRead: (id: string) => void;
 }) => {
-	const { colors } = useTheme();
 	const translateX = useSharedValue(0);
 	const TRANSLATE_THRESHOLD = -70;
 	const DELETE_WIDTH = 60;
@@ -225,22 +232,28 @@ const NotificationItem = ({
 			<View style={styles.deleteAction}>
 				<Animated.View style={trashIconStyle}>
 					<TouchableOpacity onPress={() => onDelete(item.id!, resetAnimation)}>
-						<Ionicons name="trash-outline" size={18} color="#fff" />
+						<Ionicons name="trash-outline" size={18} color={palette.primaryTextOn} />
 					</TouchableOpacity>
 				</Animated.View>
 			</View>
 			<GestureDetector gesture={panGesture}>
 				<Animated.View
 					style={[
-						styles.notificationItem,
+						styles.notificationItemWrapper,
 						animatedStyle,
-						!item.read && styles.unreadNotification,
 					]}
 				>
-					<TouchableOpacity
-						onPress={handlePress}
-						style={styles.notificationContent}
+					<View
+						style={[
+							styles.notificationItem,
+							!item.read && styles.unreadNotification,
+						]}
 					>
+						<TouchableOpacity
+							onPress={handlePress}
+							style={styles.notificationContent}
+							activeOpacity={0.7}
+						>
 						<View style={styles.notificationHeader}>
 							<View style={styles.titleContainer}>
 								<Ionicons
@@ -249,17 +262,17 @@ const NotificationItem = ({
 									color={typeInfo.color}
 									style={styles.typeIcon}
 								/>
-								<Text style={[styles.title, { color: colors.text }]}>
+								<Text style={[styles.title, { color: palette.text }]}>
 									{item.title}
 								</Text>
 							</View>
 							{!item.read && <View style={styles.unreadDot} />}
 						</View>
-						<Text style={[styles.message, { color: colors.text }]}>
+						<Text style={[styles.message, { color: palette.text }]}>
 							{item.message}
 						</Text>
 						<View style={styles.footerContainer}>
-							<Text style={[styles.timestamp, { color: colors.text }]}>
+							<Text style={[styles.timestamp, { color: palette.textMuted }]}>
 								{item.timeAgo || 'Just now'}
 							</Text>
 							{item.priority && (
@@ -275,7 +288,8 @@ const NotificationItem = ({
 								</View>
 							)}
 						</View>
-					</TouchableOpacity>
+						</TouchableOpacity>
+					</View>
 				</Animated.View>
 			</GestureDetector>
 		</View>
@@ -283,7 +297,6 @@ const NotificationItem = ({
 };
 
 export default function NotificationsScreen() {
-	const { colors } = useTheme();
 	const [refreshing, setRefreshing] = useState(false);
 	const [searchQuery, setSearchQuery] = useState('');
 	const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
@@ -373,14 +386,9 @@ export default function NotificationsScreen() {
 	// Early return if context is not available
 	if (!notificationContext) {
 		return (
-			<SafeAreaView style={styles.container}>
-				<View style={styles.loadingContainer}>
-					<ActivityIndicator size="large" color={colors.primary} />
-					<Text style={[styles.loadingText, { color: colors.text }]}>
-						Loading notifications...
-					</Text>
-				</View>
-			</SafeAreaView>
+			<Page>
+				<LoadingState label="Loading notifications..." />
+			</Page>
 		);
 	}
 
@@ -475,42 +483,37 @@ export default function NotificationsScreen() {
 
 	if (loading && (!notifications || notifications.length === 0)) {
 		return (
-			<SafeAreaView style={styles.container}>
-				<View style={styles.loadingContainer}>
-					<ActivityIndicator size="large" color={colors.primary} />
-					<Text style={[styles.loadingText, { color: colors.text }]}>
-						Loading notifications...
-					</Text>
-				</View>
-			</SafeAreaView>
+			<Page>
+				<LoadingState label="Loading notifications..." />
+			</Page>
 		);
 	}
 
 	return (
 		<GestureHandlerRootView style={{ flex: 1 }}>
-			<SafeAreaView style={styles.container}>
+			<Page>
 				{/* Header with search and filters */}
 				<View style={styles.headerContainer}>
 					<View style={styles.searchContainer}>
 						<Ionicons
 							name="search-outline"
-							size={20}
-							color={colors.text}
+							size={18}
+							color={palette.textMuted}
 							style={styles.searchIcon}
 						/>
 						<TextInput
-							style={[
-								styles.searchInput,
-								{ color: colors.text, borderColor: colors.border },
-							]}
+							style={styles.searchInput}
 							placeholder="Search notifications..."
-							placeholderTextColor={colors.text + '80'}
+							placeholderTextColor={palette.textSubtle}
 							value={searchQuery}
 							onChangeText={setSearchQuery}
 						/>
 						{searchQuery.length > 0 && (
-							<TouchableOpacity onPress={() => setSearchQuery('')}>
-								<Ionicons name="close-circle" size={20} color={colors.text} />
+							<TouchableOpacity
+								onPress={() => setSearchQuery('')}
+								style={styles.clearSearchButton}
+							>
+								<Ionicons name="close-circle" size={18} color={palette.textMuted} />
 							</TouchableOpacity>
 						)}
 					</View>
@@ -518,39 +521,43 @@ export default function NotificationsScreen() {
 					<View style={styles.headerActions}>
 						<TouchableOpacity
 							onPress={() => setShowFilterModal(true)}
-							style={[styles.filterButton, { borderColor: colors.border }]}
+							style={styles.iconButton}
+							activeOpacity={0.7}
 						>
-							<Ionicons name="filter-outline" size={20} color={colors.text} />
+							<Ionicons name="filter-outline" size={18} color={palette.text} />
 						</TouchableOpacity>
 
 						<TouchableOpacity
 							onPress={() => router.push('/(stack)/settings/notification')}
-							style={[styles.actionButton, { borderColor: colors.border }]}
+							style={styles.iconButton}
+							activeOpacity={0.7}
 						>
-							<Ionicons name="settings-outline" size={20} color={colors.text} />
+							<Ionicons name="settings-outline" size={18} color={palette.text} />
 						</TouchableOpacity>
 
 						{notifications && notifications.length > 0 && (
 							<>
 								<TouchableOpacity
 									onPress={handleMarkAllAsRead}
-									style={[styles.actionButton, { borderColor: colors.border }]}
+									style={styles.iconButton}
+									activeOpacity={0.7}
 								>
 									<Ionicons
 										name="checkmark-done-outline"
-										size={20}
-										color={colors.text}
+										size={18}
+										color={palette.text}
 									/>
 								</TouchableOpacity>
 
 								<TouchableOpacity
 									onPress={handleClearAll}
-									style={[styles.actionButton, { borderColor: colors.border }]}
+									style={styles.iconButton}
+									activeOpacity={0.7}
 								>
 									<Ionicons
 										name="trash-outline"
-										size={20}
-										color={colors.text}
+										size={18}
+										color={palette.text}
 									/>
 								</TouchableOpacity>
 							</>
@@ -561,48 +568,42 @@ export default function NotificationsScreen() {
 				{/* Active filters display */}
 				{(selectedType || showUnreadOnly) && (
 					<View style={styles.activeFiltersContainer}>
-						<ScrollView horizontal showsHorizontalScrollIndicator={false}>
+						<ScrollView
+							horizontal
+							showsHorizontalScrollIndicator={false}
+							contentContainerStyle={styles.activeFiltersScrollContent}
+						>
 							{selectedType && (
-								<View
-									style={[
-										styles.filterChip,
-										{ backgroundColor: colors.primary + '20' },
-									]}
-								>
-									<Text
-										style={[styles.filterChipText, { color: colors.primary }]}
-									>
-										{selectedType}
+								<View style={styles.filterChip}>
+									<Text style={styles.filterChipText}>
+										{selectedType.charAt(0).toUpperCase() +
+											selectedType.slice(1).replace('_', ' ')}
 									</Text>
-									<TouchableOpacity onPress={() => setSelectedType(undefined)}>
-										<Ionicons name="close" size={16} color={colors.primary} />
+									<TouchableOpacity
+										onPress={() => setSelectedType(undefined)}
+										style={styles.filterChipClose}
+									>
+										<Ionicons name="close" size={14} color={palette.primary} />
 									</TouchableOpacity>
 								</View>
 							)}
 							{showUnreadOnly && (
-								<View
-									style={[
-										styles.filterChip,
-										{ backgroundColor: colors.primary + '20' },
-									]}
-								>
-									<Text
-										style={[styles.filterChipText, { color: colors.primary }]}
+								<View style={styles.filterChip}>
+									<Text style={styles.filterChipText}>Unread Only</Text>
+									<TouchableOpacity
+										onPress={() => setShowUnreadOnly(false)}
+										style={styles.filterChipClose}
 									>
-										Unread Only
-									</Text>
-									<TouchableOpacity onPress={() => setShowUnreadOnly(false)}>
-										<Ionicons name="close" size={16} color={colors.primary} />
+										<Ionicons name="close" size={14} color={palette.primary} />
 									</TouchableOpacity>
 								</View>
 							)}
 							<TouchableOpacity
 								onPress={clearFilters}
 								style={styles.clearFiltersButton}
+								activeOpacity={0.7}
 							>
-								<Text style={[styles.clearFiltersText, { color: colors.text }]}>
-									Clear All
-								</Text>
+								<Text style={styles.clearFiltersText}>Clear All</Text>
 							</TouchableOpacity>
 						</ScrollView>
 					</View>
@@ -625,48 +626,41 @@ export default function NotificationsScreen() {
 						<RefreshControl
 							refreshing={refreshing}
 							onRefresh={onRefresh}
-							colors={[colors.primary]}
-							tintColor={colors.primary}
+							colors={[palette.primary]}
+							tintColor={palette.primary}
 						/>
 					}
 					onEndReached={handleLoadMore}
 					onEndReachedThreshold={0.1}
 					ListEmptyComponent={() => (
-						<View style={styles.emptyContainer}>
-							<Ionicons
-								name="notifications-outline"
-								size={64}
-								color={colors.text}
-								style={styles.emptyIcon}
-							/>
-							<Text style={[styles.emptyText, { color: colors.text }]}>
-								{searchQuery || selectedType || showUnreadOnly
+						<EmptyState
+							icon="notifications-outline"
+							title={
+								searchQuery || selectedType || showUnreadOnly
 									? 'No matching notifications'
-									: 'No notifications'}
-							</Text>
-							<Text style={[styles.emptySubtext, { color: colors.text }]}>
-								{searchQuery || selectedType || showUnreadOnly
+									: 'No notifications'
+							}
+							subtitle={
+								searchQuery || selectedType || showUnreadOnly
 									? 'Try adjusting your filters'
-									: "You're all caught up!"}
-							</Text>
-							{(searchQuery || selectedType || showUnreadOnly) && (
-								<TouchableOpacity
-									onPress={clearFilters}
-									style={styles.clearFiltersButton}
-								>
-									<Text
-										style={[styles.clearFiltersText, { color: colors.primary }]}
-									>
-										Clear Filters
-									</Text>
-								</TouchableOpacity>
-							)}
-						</View>
+									: "You're all caught up!"
+							}
+							ctaLabel={
+								searchQuery || selectedType || showUnreadOnly
+									? 'Clear Filters'
+									: undefined
+							}
+							onPress={
+								searchQuery || selectedType || showUnreadOnly
+									? clearFilters
+									: undefined
+							}
+						/>
 					)}
 					ListFooterComponent={() =>
 						loading && filteredNotifications.length > 0 ? (
 							<View style={styles.loadingFooter}>
-								<ActivityIndicator size="small" color={colors.primary} />
+								<ActivityIndicator size="small" color={palette.primary} />
 							</View>
 						) : null
 					}
@@ -674,7 +668,7 @@ export default function NotificationsScreen() {
 
 				{error && (
 					<View style={styles.errorContainer}>
-						<Text style={[styles.errorText, { color: '#dc2626' }]}>
+						<Text style={styles.errorText}>
 							Error: {error?.toString() || 'Unknown error'}
 						</Text>
 					</View>
@@ -687,21 +681,19 @@ export default function NotificationsScreen() {
 					presentationStyle="pageSheet"
 					onRequestClose={() => setShowFilterModal(false)}
 				>
-					<SafeAreaView style={styles.modalContainer}>
+					<Page>
 						<View style={styles.modalHeader}>
-							<Text style={[styles.modalTitle, { color: colors.text }]}>
+							<Text style={styles.modalTitle}>
 								Filter Notifications
 							</Text>
 							<TouchableOpacity onPress={() => setShowFilterModal(false)}>
-								<Ionicons name="close" size={24} color={colors.text} />
+								<Ionicons name="close" size={24} color={palette.text} />
 							</TouchableOpacity>
 						</View>
 
 						<ScrollView style={styles.modalContent}>
 							<View style={styles.filterSection}>
-								<Text
-									style={[styles.filterSectionTitle, { color: colors.text }]}
-								>
+								<Text style={styles.filterSectionTitle}>
 									Type
 								</Text>
 								{[
@@ -727,10 +719,7 @@ export default function NotificationsScreen() {
 											}
 											style={[
 												styles.filterOption,
-												{ borderColor: colors.border },
-												selectedType === type && {
-													backgroundColor: colors.primary + '20',
-												},
+												selectedType === type && styles.filterOptionSelected,
 											]}
 										>
 											<View style={styles.filterOptionContent}>
@@ -739,12 +728,7 @@ export default function NotificationsScreen() {
 													size={20}
 													color={typeInfo.color}
 												/>
-												<Text
-													style={[
-														styles.filterOptionText,
-														{ color: colors.text },
-													]}
-												>
+												<Text style={styles.filterOptionText}>
 													{type.charAt(0).toUpperCase() +
 														type.slice(1).replace('_', ' ')}
 												</Text>
@@ -753,7 +737,7 @@ export default function NotificationsScreen() {
 												<Ionicons
 													name="checkmark"
 													size={20}
-													color={colors.primary}
+													color={palette.primary}
 												/>
 											)}
 										</TouchableOpacity>
@@ -762,30 +746,23 @@ export default function NotificationsScreen() {
 							</View>
 
 							<View style={styles.filterSection}>
-								<Text
-									style={[styles.filterSectionTitle, { color: colors.text }]}
-								>
+								<Text style={styles.filterSectionTitle}>
 									Status
 								</Text>
 								<TouchableOpacity
 									onPress={() => setShowUnreadOnly(!showUnreadOnly)}
 									style={[
 										styles.filterOption,
-										{ borderColor: colors.border },
-										showUnreadOnly && {
-											backgroundColor: colors.primary + '20',
-										},
+										showUnreadOnly && styles.filterOptionSelected,
 									]}
 								>
 									<View style={styles.filterOptionContent}>
 										<Ionicons
 											name="mail-unread-outline"
 											size={20}
-											color={colors.primary}
+											color={palette.primary}
 										/>
-										<Text
-											style={[styles.filterOptionText, { color: colors.text }]}
-										>
+										<Text style={styles.filterOptionText}>
 											Unread Only
 										</Text>
 									</View>
@@ -793,7 +770,7 @@ export default function NotificationsScreen() {
 										<Ionicons
 											name="checkmark"
 											size={20}
-											color={colors.primary}
+											color={palette.primary}
 										/>
 									)}
 								</TouchableOpacity>
@@ -803,152 +780,154 @@ export default function NotificationsScreen() {
 						<View style={styles.modalFooter}>
 							<TouchableOpacity
 								onPress={clearFilters}
-								style={[styles.modalButton, { borderColor: colors.border }]}
+								style={styles.modalButtonSecondary}
 							>
-								<Text style={[styles.modalButtonText, { color: colors.text }]}>
+								<Text style={styles.modalButtonTextSecondary}>
 									Clear All
 								</Text>
 							</TouchableOpacity>
 							<TouchableOpacity
 								onPress={() => setShowFilterModal(false)}
-								style={[
-									styles.modalButton,
-									{ backgroundColor: colors.primary },
-								]}
+								style={styles.modalButton}
 							>
-								<Text style={[styles.modalButtonText, { color: '#fff' }]}>
+								<Text style={styles.modalButtonText}>
 									Apply Filters
 								</Text>
 							</TouchableOpacity>
 						</View>
-					</SafeAreaView>
+					</Page>
 				</Modal>
-			</SafeAreaView>
+			</Page>
 		</GestureHandlerRootView>
 	);
 }
 
 const styles = StyleSheet.create({
-	container: { flex: 1, backgroundColor: '#f9fafb' },
 	headerContainer: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		borderBottomWidth: 1,
-		borderBottomColor: '#e5e7eb',
-		gap: 12,
+		paddingHorizontal: space.lg,
+		paddingTop: space.md,
+		paddingBottom: space.md,
+		borderBottomWidth: StyleSheet.hairlineWidth,
+		borderBottomColor: palette.border,
+		backgroundColor: palette.surface,
+		gap: space.md,
 	},
 	searchContainer: {
 		flex: 1,
 		flexDirection: 'row',
 		alignItems: 'center',
-		backgroundColor: '#fff',
-		borderRadius: 8,
-		borderWidth: 1,
-		paddingHorizontal: 12,
-		paddingVertical: 8,
-		gap: 8,
+		backgroundColor: palette.surfaceAlt,
+		borderRadius: radius.lg,
+		borderWidth: StyleSheet.hairlineWidth,
+		borderColor: palette.border,
+		paddingHorizontal: space.md,
+		paddingVertical: space.sm + 2,
+		gap: space.sm,
+		minHeight: 44,
 	},
 	searchIcon: {
-		opacity: 0.6,
+		opacity: 0.5,
 	},
 	searchInput: {
 		flex: 1,
-		fontSize: 16,
+		...type.body,
+		color: palette.text,
 		paddingVertical: 0,
+		paddingHorizontal: 0,
+	},
+	clearSearchButton: {
+		padding: space.xs,
+		marginLeft: -space.xs,
 	},
 	headerActions: {
 		flexDirection: 'row',
-		gap: 8,
+		gap: space.xs,
 	},
-	filterButton: {
-		padding: 8,
-		borderRadius: 8,
-		borderWidth: 1,
-		backgroundColor: '#fff',
-	},
-	actionButton: {
-		padding: 8,
-		borderRadius: 8,
-		borderWidth: 1,
-		backgroundColor: '#fff',
+	iconButton: {
+		width: 40,
+		height: 40,
+		borderRadius: radius.sm,
+		borderWidth: StyleSheet.hairlineWidth,
+		borderColor: palette.border,
+		backgroundColor: palette.surface,
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
 	activeFiltersContainer: {
-		paddingHorizontal: 16,
-		paddingVertical: 8,
-		borderBottomWidth: 1,
-		borderBottomColor: '#e5e7eb',
+		paddingHorizontal: space.lg,
+		paddingVertical: space.sm,
+		borderBottomWidth: StyleSheet.hairlineWidth,
+		borderBottomColor: palette.border,
+		backgroundColor: palette.surface,
+	},
+	activeFiltersScrollContent: {
+		paddingRight: space.lg,
+		alignItems: 'center',
 	},
 	filterChip: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		borderRadius: 16,
-		marginRight: 8,
-		gap: 6,
+		paddingHorizontal: space.md,
+		paddingVertical: space.xs + 2,
+		borderRadius: radius.pill,
+		marginRight: space.sm,
+		gap: space.xs,
+		backgroundColor: palette.primarySubtle,
+		borderWidth: 1,
+		borderColor: palette.primaryBorder,
 	},
 	filterChipText: {
-		fontSize: 12,
-		fontWeight: '500',
+		...type.small,
+		color: palette.primary,
+		fontWeight: '600',
+	},
+	filterChipClose: {
+		padding: 2,
+		marginLeft: -space.xs,
 	},
 	clearFiltersButton: {
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		justifyContent: 'center',
-	},
-	clearFiltersText: {
-		fontSize: 12,
-		fontWeight: '500',
-		opacity: 0.7,
-	},
-	clearAllContainer: {
-		flexDirection: 'row',
-		justifyContent: 'flex-end',
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		borderBottomWidth: 1,
-		borderBottomColor: '#e5e7eb',
-	},
-	clearButton: {
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-	},
-	clearButtonText: {
-		fontSize: 14,
-		fontWeight: '500',
-	},
-	listContainer: {
-		paddingVertical: 8,
-		flexGrow: 1,
-	},
-	loadingContainer: {
-		flex: 1,
+		paddingHorizontal: space.md,
+		paddingVertical: space.xs + 2,
 		justifyContent: 'center',
 		alignItems: 'center',
 	},
-	loadingText: {
-		marginTop: 16,
-		fontSize: 16,
+	clearFiltersText: {
+		...type.small,
+		color: palette.primary,
+		fontWeight: '600',
+	},
+	listContainer: {
+		paddingHorizontal: space.lg,
+		paddingTop: space.md,
+		paddingBottom: space.xl,
+		flexGrow: 1,
 	},
 	loadingFooter: {
-		paddingVertical: 16,
+		paddingVertical: space.lg,
 		alignItems: 'center',
 	},
 	txRowContainer: {
 		overflow: 'hidden',
+		marginBottom: space.md,
+	},
+	notificationItemWrapper: {
+		overflow: 'hidden',
 	},
 	notificationItem: {
-		padding: 16,
-		backgroundColor: '#f9fafb',
-		borderBottomWidth: 1,
-		borderBottomColor: '#e5e7eb',
+		padding: space.lg,
+		backgroundColor: palette.surface,
+		borderRadius: radius.lg,
+		borderWidth: 1,
+		borderColor: palette.border,
+		...shadow.soft,
 	},
 	unreadNotification: {
-		backgroundColor: '#f0f9ff',
-		borderLeftWidth: 4,
-		borderLeftColor: '#3b82f6',
+		backgroundColor: palette.primarySubtle,
+		borderLeftWidth: 3,
+		borderLeftColor: palette.primary,
+		borderColor: palette.primaryBorder,
 	},
 	notificationContent: {
 		flex: 1,
@@ -957,38 +936,41 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		marginBottom: 4,
+		marginBottom: space.sm,
 	},
 	titleContainer: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		flex: 1,
-		gap: 8,
+		gap: space.sm,
+		minWidth: 0,
 	},
 	typeIcon: {
-		opacity: 0.8,
+		opacity: 0.9,
 	},
 	unreadDot: {
 		width: 8,
 		height: 8,
 		borderRadius: 4,
-		backgroundColor: '#3b82f6',
+		backgroundColor: palette.primary,
+		marginLeft: space.xs,
 	},
 	footerContainer: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		marginTop: 4,
+		marginTop: space.sm,
 	},
 	priorityBadge: {
-		paddingHorizontal: 6,
-		paddingVertical: 2,
-		borderRadius: 4,
+		paddingHorizontal: space.sm,
+		paddingVertical: 3,
+		borderRadius: radius.sm,
 	},
 	priorityText: {
-		fontSize: 10,
-		fontWeight: '600',
-		color: '#fff',
+		...type.labelXs,
+		color: palette.primaryTextOn,
+		fontWeight: '700',
+		letterSpacing: 0.3,
 	},
 	deleteAction: {
 		position: 'absolute',
@@ -996,112 +978,129 @@ const styles = StyleSheet.create({
 		top: 0,
 		bottom: 0,
 		width: '100%',
-		backgroundColor: '#dc2626',
+		backgroundColor: palette.danger,
 		justifyContent: 'center',
 		alignItems: 'flex-end',
-		paddingRight: 18,
+		paddingRight: space.lg,
 	},
-	emptyContainer: {
+	title: {
+		...type.h2,
 		flex: 1,
-		justifyContent: 'center',
-		alignItems: 'center',
-		paddingVertical: 64,
+		color: palette.text,
+		flexShrink: 1,
 	},
-	emptyIcon: {
-		opacity: 0.5,
-		marginBottom: 16,
+	message: {
+		...type.body,
+		marginTop: space.xs,
+		lineHeight: 20,
+		color: palette.textSecondary,
 	},
-	emptyText: {
-		fontSize: 18,
-		fontWeight: '600',
-		marginBottom: 4,
+	timestamp: {
+		...type.bodyXs,
+		color: palette.textMuted,
 	},
-	emptySubtext: {
-		fontSize: 14,
-		opacity: 0.7,
-		marginBottom: 16,
-	},
-	title: { fontSize: 16, fontWeight: 'bold', flex: 1 },
-	message: { fontSize: 14, marginBottom: 8, lineHeight: 20 },
-	timestamp: { fontSize: 12, opacity: 0.7 },
 	errorContainer: {
-		padding: 16,
-		backgroundColor: '#fef2f2',
+		padding: space.lg,
+		backgroundColor: palette.dangerSubtle,
 		borderTopWidth: 1,
-		borderTopColor: '#fecaca',
+		borderTopColor: palette.dangerBorder,
 	},
 	errorText: {
-		fontSize: 14,
+		...type.body,
+		color: palette.danger,
 		fontWeight: '500',
 		textAlign: 'center',
 	},
 	// Modal styles
-	modalContainer: {
-		flex: 1,
-		backgroundColor: '#f9fafb',
-	},
 	modalHeader: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
-		paddingHorizontal: 16,
-		paddingVertical: 16,
-		borderBottomWidth: 1,
-		borderBottomColor: '#e5e7eb',
+		paddingHorizontal: space.lg,
+		paddingVertical: space.lg,
+		borderBottomWidth: StyleSheet.hairlineWidth,
+		borderBottomColor: palette.border,
+		backgroundColor: palette.surface,
 	},
 	modalTitle: {
-		fontSize: 18,
-		fontWeight: '600',
+		...type.h1,
+		color: palette.text,
 	},
 	modalContent: {
 		flex: 1,
-		paddingHorizontal: 16,
+		paddingHorizontal: space.lg,
+		paddingTop: space.md,
 	},
 	filterSection: {
-		marginVertical: 16,
+		marginBottom: space.xl,
 	},
 	filterSectionTitle: {
-		fontSize: 16,
-		fontWeight: '600',
-		marginBottom: 12,
+		...type.h2,
+		color: palette.text,
+		marginBottom: space.md,
 	},
 	filterOption: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		borderRadius: 8,
+		paddingHorizontal: space.lg,
+		paddingVertical: space.md + 2,
+		borderRadius: radius.md,
 		borderWidth: 1,
-		marginBottom: 8,
-		backgroundColor: '#fff',
+		borderColor: palette.border,
+		marginBottom: space.sm,
+		backgroundColor: palette.surface,
+	},
+	filterOptionSelected: {
+		backgroundColor: palette.primarySubtle,
+		borderColor: palette.primaryBorder,
 	},
 	filterOptionContent: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 12,
+		gap: space.md,
 	},
 	filterOptionText: {
-		fontSize: 16,
+		...type.body,
+		color: palette.text,
 		fontWeight: '500',
 	},
 	modalFooter: {
 		flexDirection: 'row',
-		paddingHorizontal: 16,
-		paddingVertical: 16,
-		borderTopWidth: 1,
-		borderTopColor: '#e5e7eb',
-		gap: 12,
+		paddingHorizontal: space.lg,
+		paddingVertical: space.lg,
+		borderTopWidth: StyleSheet.hairlineWidth,
+		borderTopColor: palette.border,
+		backgroundColor: palette.surface,
+		gap: space.md,
 	},
 	modalButton: {
 		flex: 1,
-		paddingVertical: 12,
-		borderRadius: 8,
-		borderWidth: 1,
+		paddingVertical: space.md + 2,
+		borderRadius: radius.md,
 		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: palette.primary,
+		...shadow.soft,
 	},
 	modalButtonText: {
-		fontSize: 16,
+		...type.body,
+		color: palette.primaryTextOn,
+		fontWeight: '600',
+	},
+	modalButtonSecondary: {
+		flex: 1,
+		paddingVertical: space.md + 2,
+		borderRadius: radius.md,
+		borderWidth: 1,
+		borderColor: palette.border,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: palette.surface,
+	},
+	modalButtonTextSecondary: {
+		...type.body,
+		color: palette.text,
 		fontWeight: '600',
 	},
 });

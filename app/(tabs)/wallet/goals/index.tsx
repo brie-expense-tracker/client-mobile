@@ -6,7 +6,6 @@ import {
 	RefreshControl,
 	StyleSheet,
 	View,
-	Text,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -22,9 +21,9 @@ import {
 	LoadingState,
 	EmptyState,
 	SegmentedControl,
+	FAB,
 	palette,
 	space,
-	type as typography,
 } from '../../../../src/ui';
 
 import { isDevMode } from '../../../../src/config/environment';
@@ -163,23 +162,21 @@ export default function GoalsScreen() {
 					/>
 				}
 			>
-				{/* Hero – same card pattern as Budgets + Bills + Debts */}
+				{/* Top sheet hero */}
 				<View style={styles.heroShell}>
-					<View style={styles.goalsSummaryCardWrapper}>
-						<GoalsSummaryCard
-							totalGoals={summaryStats.totalGoals}
-							completedGoals={summaryStats.completedGoals}
-							totalTarget={summaryStats.totalTarget}
-							totalCurrent={summaryStats.totalCurrent}
-							onAddGoal={showModal}
-						/>
-					</View>
+					<GoalsSummaryCard
+						totalGoals={summaryStats.totalGoals}
+						completedGoals={summaryStats.completedGoals}
+						totalTarget={summaryStats.totalTarget}
+						totalCurrent={summaryStats.totalCurrent}
+					/>
 				</View>
 
 				{/* List – title above filter */}
-				<Section style={styles.goalsSection}>
-					<View style={styles.goalsHeader}>
-						<Text style={styles.goalsTitle}>Your goals</Text>
+				<Section
+					title="Your goals"
+					style={styles.goalsSection}
+					right={
 						<SegmentedControl
 							value={filterBy}
 							onChange={(key) => setFilterBy(key as any)}
@@ -199,7 +196,8 @@ export default function GoalsScreen() {
 								},
 							]}
 						/>
-					</View>
+					}
+				>
 					{isLoading ? (
 						<LoadingState label="Loading goals…" />
 					) : goals.length === 0 ? (
@@ -219,6 +217,8 @@ export default function GoalsScreen() {
 					)}
 				</Section>
 			</ScrollView>
+
+			{goals.length > 0 && <FAB onPress={showModal} />}
 
 			<QuickAddTransaction
 				isVisible={showQuickAddModal}
@@ -240,39 +240,15 @@ const styles = StyleSheet.create({
 		paddingBottom: space.xl,
 	},
 
-	// background of the top area – stays light grey now
+	// ✅ match BudgetScreen heroShell exactly
 	heroShell: {
-		backgroundColor: palette.surfaceAlt,
 		paddingTop: space.lg,
-		paddingBottom: space.lg,
+		paddingBottom: space.md,
 		paddingHorizontal: space.lg,
-	},
-
-	// actual white card behind the goals summary
-	goalsSummaryCardWrapper: {
-		backgroundColor: palette.surface,
-		borderRadius: 24,
-		padding: space.lg,
-		shadowColor: '#000',
-		shadowOpacity: 0.06,
-		shadowRadius: 18,
-		shadowOffset: { width: 0, height: 10 },
-		elevation: 4,
 	},
 
 	goalsSection: {
 		marginTop: space.lg,
-		paddingHorizontal: space.lg,
 		paddingTop: space.sm,
-	},
-
-	goalsHeader: {
-		marginBottom: space.sm,
-	},
-
-	goalsTitle: {
-		...typography.titleSm,
-		color: palette.text,
-		marginBottom: space.sm,
 	},
 });

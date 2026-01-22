@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet } from 'react-native';
 import LinearProgressBar from '../shared/LinearProgressBar';
-import { palette, space, type as typography } from '../../../../../src/ui';
+import SummaryHeroCard from '../shared/SummaryHeroCard';
+import { palette, space, radius, type as typography } from '../../../../../src/ui';
 import { currency } from '../../../../../src/utils/format';
 
 interface Props {
@@ -10,7 +10,7 @@ interface Props {
 	completedGoals: number;
 	totalTarget: number;
 	totalCurrent: number;
-	onAddGoal: () => void;
+	onAddGoal?: () => void; // Optional since FAB handles this now
 }
 
 const GoalsSummaryCard: React.FC<Props> = ({
@@ -18,30 +18,15 @@ const GoalsSummaryCard: React.FC<Props> = ({
 	completedGoals,
 	totalTarget,
 	totalCurrent,
-	onAddGoal,
 }) => {
 	const progressPercentage =
 		totalTarget > 0 ? (totalCurrent / totalTarget) * 100 : 0;
 
 	return (
-		<View style={styles.container}>
-			{/* Header */}
-			<View style={styles.header}>
-				<View style={styles.headerContent}>
-					<Text style={styles.overline}>Track Your Goals</Text>
-					<Text style={styles.headerTitle}>Your Goals</Text>
-				</View>
-				<TouchableOpacity
-					activeOpacity={0.85}
-					onPress={onAddGoal}
-					style={styles.iconButton}
-					accessibilityRole="button"
-					accessibilityLabel="Add new goal"
-				>
-					<Ionicons name="add" size={20} color={palette.primary} />
-				</TouchableOpacity>
-			</View>
-
+		<SummaryHeroCard
+			overline="TRACK YOUR GOALS"
+			title="Your Goals"
+		>
 			{/* Progress */}
 			<View style={styles.progressSection}>
 				<LinearProgressBar
@@ -77,65 +62,11 @@ const GoalsSummaryCard: React.FC<Props> = ({
 					<Text style={styles.statLabel}>Total target</Text>
 				</View>
 			</View>
-		</View>
+		</SummaryHeroCard>
 	);
 };
 
 const styles = StyleSheet.create({
-	container: {
-		// hero-style: parent supplies horizontal padding
-		paddingTop: space.xs,
-		paddingBottom: space.lg,
-	},
-
-	/* HEADER */
-	header: {
-		flexDirection: 'row',
-		alignItems: 'flex-start',
-		justifyContent: 'space-between',
-	},
-
-	headerContent: {
-		flex: 1,
-	},
-
-	overline: {
-		...typography.labelSm,
-		color: palette.textMuted,
-		marginBottom: 6,
-		letterSpacing: 1.2,
-		textTransform: 'uppercase',
-	},
-
-	headerTitle: {
-		...typography.titleMd,
-		fontSize: 30,
-		lineHeight: 34,
-		fontWeight: '700',
-		color: palette.text,
-	},
-
-	headerSubtitle: {
-		...typography.bodySm,
-		color: palette.textMuted,
-		marginTop: 8,
-		maxWidth: '80%',
-	},
-
-	iconButton: {
-		width: 44,
-		height: 44,
-		borderRadius: 22,
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: palette.primarySoft,
-		shadowColor: '#000',
-		shadowOpacity: 0.06,
-		shadowRadius: 10,
-		shadowOffset: { width: 0, height: 6 },
-		elevation: 3,
-	},
-
 	/* PROGRESS */
 	progressSection: {
 		marginTop: space.md,
@@ -150,7 +81,7 @@ const styles = StyleSheet.create({
 	statsGrid: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',
-		columnGap: 24,
+		columnGap: space.xl,
 		rowGap: space.md,
 	},
 
@@ -161,7 +92,7 @@ const styles = StyleSheet.create({
 	statValue: {
 		...typography.numMd,
 		color: palette.text,
-		marginBottom: 4,
+		marginBottom: space.xs,
 	},
 
 	statLabel: {

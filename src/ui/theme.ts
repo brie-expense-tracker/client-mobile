@@ -13,9 +13,28 @@ export const palette = {
 	// Primary
 	primary: '#00A2FF',
 	primaryMuted: '#0EA5E9',
+	primaryStrong: '#0284C7', // slightly deeper than primaryMuted
 	primarySubtle: '#E0F2FE',
 	primarySoft: '#EFF6FF',
+	primaryBorder: '#7DD3FC', // for subtle outlines when needed
 	primaryTextOn: '#FFFFFF',
+
+	// Text roles
+	textOnDark: '#FFFFFF', // for dark hero cards
+	textOnPrimary: '#FFFFFF', // alias to primaryTextOn
+	textLink: '#00A2FF', // use primary, but a named role helps
+
+	// Surfaces
+	surfaceRaised: '#FFFFFF', // same as surface, but role clarifies usage
+	surfaceSunken: '#F1F5F9', // for wallet "page well" if you want it distinct (optional)
+
+	// Hero
+	heroBg: '#0F172A', // dark hero background
+	heroText: '#FFFFFF', // text on hero
+	heroSubtle: 'rgba(255,255,255,0.72)', // or just use opacity in style
+
+	// Dividers / hairlines
+	hairline: '#E5E7EB', // alias to borderSubtle
 
 	// Semantic
 	warning: '#F59E0B',
@@ -70,35 +89,33 @@ export const space = {
 	xxl: 32,
 };
 
+// Helper to create shadow styles with tokenized colors
+export const makeShadow = (
+	shadowColor: string,
+	opacity: number,
+	radius: number,
+	y: number,
+	elevation: number,
+) => ({
+	shadowColor,
+	shadowOpacity: opacity,
+	shadowRadius: radius,
+	shadowOffset: { width: 0, height: y },
+	elevation,
+});
+
 export const shadow = {
-	card: {
-		shadowColor: '#000',
-		shadowOpacity: 0.06,
-		shadowRadius: 10,
-		shadowOffset: { width: 0, height: 4 },
-		elevation: 2,
-	},
-	soft: {
-		shadowColor: '#000',
-		shadowOpacity: 0.04,
-		shadowRadius: 8,
-		shadowOffset: { width: 0, height: 2 },
-		elevation: 1,
-	},
-	toolbar: {
-		shadowColor: '#000',
-		shadowOpacity: 0.05,
-		shadowRadius: 8,
-		shadowOffset: { width: 0, height: -2 },
-		elevation: 3,
-	},
+	card: makeShadow('#000', 0.06, 10, 4, 2),
+	hero: makeShadow(palette.primary, 0.3, 8, 4, 8),
+	soft: makeShadow('#000', 0.04, 8, 2, 1),
+	toolbar: makeShadow('#000', 0.05, 8, -2, 3),
 };
 
 export const type = {
 	h1: { fontSize: 20, fontWeight: '700' as const },
 	h2: { fontSize: 16, fontWeight: '600' as const },
 	body: { fontSize: 14, fontWeight: '400' as const },
-	bodySm: { fontSize: 14, fontWeight: '400' as const },
+	bodySm: { fontSize: 13, fontWeight: '400' as const },
 	bodyXs: { fontSize: 12, fontWeight: '400' as const },
 	small: { fontSize: 12, fontWeight: '500' as const },
 	labelXs: {
@@ -106,10 +123,10 @@ export const type = {
 		fontWeight: '500' as const,
 	},
 	labelSm: {
-		fontSize: 14,
+		fontSize: 12,
 		fontWeight: '600' as const,
 		textTransform: 'uppercase' as const,
-		letterSpacing: 0.5,
+		letterSpacing: 0.6,
 	},
 	titleMd: { fontSize: 20, fontWeight: '600' as const },
 	titleSm: { fontSize: 17, fontWeight: '700' as const },

@@ -17,6 +17,7 @@ import {
 	LoadingState,
 	EmptyState,
 	SegmentedControl,
+	FAB,
 	palette,
 	space,
 } from '../../../../src/ui';
@@ -24,6 +25,7 @@ import { createLogger } from '../../../../src/utils/sublogger';
 
 const budgetsScreenLog = createLogger('BudgetsScreen');
 
+// MVP: Hardcode period start days (monthStartDay = 1, weekStartDay = 1 = Monday)
 const startOfMonth = (d = new Date()) =>
 	new Date(d.getFullYear(), d.getMonth(), 1);
 
@@ -31,9 +33,11 @@ const endOfMonth = (d = new Date()) =>
 	new Date(d.getFullYear(), d.getMonth() + 1, 0);
 
 const startOfWeek = (d = new Date()) => {
-	const day = d.getDay();
+	// MVP: Always start on Monday (day 1), not Sunday (day 0)
+	const day = d.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+	const daysSinceMonday = day === 0 ? 6 : day - 1; // Sunday = 6 days back, Monday = 0 days back
 	const s = new Date(d);
-	s.setDate(d.getDate() - day);
+	s.setDate(d.getDate() - daysSinceMonday);
 	s.setHours(0, 0, 0, 0);
 	return s;
 };
@@ -67,6 +71,7 @@ export default function BudgetScreen() {
 	);
 
 	const [refreshing, setRefreshing] = useState(false);
+	const [lastFetchedAt, setLastFetchedAt] = useState<Date | null>(null);
 
 	const showModal = useCallback(() => {
 		router.push('/wallet/budgets/new');
@@ -76,30 +81,33 @@ export default function BudgetScreen() {
 
 	useEffect(() => {
 		if (!hasLoaded) {
-			refetch();
+			refetch().then(() => setLastFetchedAt(new Date()));
 		}
 	}, [refetch, hasLoaded]);
 
-	// refresh on focus
+	// refresh on focus (MVP: only if stale or never loaded)
 
 	useFocusEffect(
 		useCallback(() => {
 			if (!hasLoaded) {
 				budgetsScreenLog.debug('Screen focused, no data loaded yet - fetching');
-
-				refetch();
-			} else {
-				budgetsScreenLog.debug(
-					'Screen focused, refreshing to ensure latest data'
-				);
-
-				const timer = setTimeout(() => {
-					refetch();
-				}, 300);
-
-				return () => clearTimeout(timer);
+				refetch().then(() => setLastFetchedAt(new Date()));
+			} else if (lastFetchedAt) {
+				// Only refetch if data is stale (older than 60 seconds)
+				const secondsSinceLastFetch =
+					(Date.now() - lastFetchedAt.getTime()) / 1000;
+				if (secondsSinceLastFetch > 60) {
+					budgetsScreenLog.debug(
+						'Screen focused, data is stale - refreshing'
+					);
+					refetch().then(() => setLastFetchedAt(new Date()));
+				} else {
+					budgetsScreenLog.debug(
+						'Screen focused, data is fresh - skipping refetch'
+					);
+				}
 			}
-		}, [refetch, hasLoaded])
+		}, [refetch, hasLoaded, lastFetchedAt])
 	);
 
 	// open "new budget" from URL params
@@ -141,6 +149,7 @@ export default function BudgetScreen() {
 			ApiService.clearCacheByPrefix('/api/budgets');
 
 			await refetch();
+			setLastFetchedAt(new Date());
 		} catch (error) {
 			budgetsScreenLog.error('Error refreshing', error);
 
@@ -215,14 +224,13 @@ export default function BudgetScreen() {
 			};
 		}
 
-		const periodStart = startOfWeek(now);
-		const periodEnd = endOfMonth(now);
+		// MVP: For "All" tab, use honest labels instead of misleading date range
 		const total = combined.total || 0;
 		const spent = combined.spent || 0;
 		const remaining = Math.max(0, total - spent);
 		return {
-			label: fmtRange(periodStart, periodEnd),
-			title: fmtMonthYear(periodEnd),
+			label: 'Across all periods',
+			title: 'All budgets',
 			total,
 			spent,
 			remaining,
@@ -292,17 +300,14 @@ export default function BudgetScreen() {
 			>
 				{/* Top sheet hero */}
 				<View style={styles.heroShell}>
-					<View style={styles.budgetSummaryCardWrapper}>
-						<BudgetSummaryCard
-							periodLabel={heroProps.periodLabel}
-							periodTitle={heroProps.periodTitle}
-							periodRangeLabel={heroProps.periodRangeLabel}
-							totalBudgets={heroProps.totalBudgets}
-							totalPlanned={heroProps.totalPlanned}
-							totalSpent={heroProps.totalSpent}
-							onAddBudget={showModal}
-						/>
-					</View>
+					<BudgetSummaryCard
+						periodLabel={heroProps.periodLabel}
+						periodTitle={heroProps.periodTitle}
+						periodRangeLabel={heroProps.periodRangeLabel}
+						totalBudgets={heroProps.totalBudgets}
+						totalPlanned={heroProps.totalPlanned}
+						totalSpent={heroProps.totalSpent}
+					/>
 				</View>
 
 				{/* List – unchanged */}
@@ -340,6 +345,7 @@ export default function BudgetScreen() {
 					)}
 				</Section>
 			</ScrollView>
+			{filteredBudgets.length > 0 && <FAB onPress={showModal} />}
 		</Page>
 	);
 }
@@ -352,28 +358,14 @@ const styles = StyleSheet.create({
 	scrollContent: {
 		paddingBottom: space.xl,
 	},
-	// background of the top area – stays light grey now
+	// spacing only – BudgetSummaryCard handles its own card styling
 	heroShell: {
-		backgroundColor: palette.surfaceAlt,
 		paddingTop: space.lg,
-		paddingBottom: space.lg,
+		paddingBottom: space.md,
 		paddingHorizontal: space.lg,
-	},
-
-	// actual white card behind the budget summary
-	budgetSummaryCardWrapper: {
-		backgroundColor: palette.surface,
-		borderRadius: 24,
-		padding: space.lg,
-		shadowColor: '#000',
-		shadowOpacity: 0.06,
-		shadowRadius: 18,
-		shadowOffset: { width: 0, height: 10 },
-		elevation: 4,
 	},
 	budgetsSection: {
 		marginTop: space.lg,
-		paddingHorizontal: space.lg,
 		paddingTop: space.sm,
 	},
 });

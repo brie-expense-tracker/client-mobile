@@ -68,6 +68,7 @@ const TabLayout: React.FC = () => {
 								tabBarStyle: {
 									paddingTop: 6,
 									height: 64,
+									paddingHorizontal: 20,
 								},
 								// Freeze most tabs for perf, but keep heavy tabs "live"
 								freezeOnBlur: !isHeavyTab,
@@ -81,20 +82,6 @@ const TabLayout: React.FC = () => {
 									),
 								}}
 								listeners={createTabListener('/(tabs)/dashboard')}
-							/>
-
-							<Tabs.Screen
-								name="chat"
-								options={{
-									tabBarIcon: ({ color, size }) => (
-										<Ionicons
-											name="sparkles-outline"
-											color={color}
-											size={size}
-										/>
-									),
-								}}
-								listeners={createTabListener('/(tabs)/chat')}
 							/>
 
 							<Tabs.Screen
@@ -122,17 +109,27 @@ const TabLayout: React.FC = () => {
 							/>
 
 							<Tabs.Screen
-								name="reflections"
+								name="settings"
 								options={{
 									tabBarIcon: ({ color, size }) => (
-										<Ionicons
-											name="journal-outline"
-											color={color}
-											size={size}
-										/>
+										<Ionicons name="person-outline" color={color} size={size} />
 									),
 								}}
-								listeners={createTabListener('/(tabs)/reflections')}
+								listeners={createTabListener('/(tabs)/settings')}
+							/>
+
+							{/* Hidden tabs - removed from tab bar but kept as routes */}
+							<Tabs.Screen
+								name="chat"
+								options={{
+									href: null, // Hide from tab bar
+								}}
+							/>
+							<Tabs.Screen
+								name="reflections"
+								options={{
+									href: null, // Hide from tab bar
+								}}
 							/>
 						</Tabs>
 					</View>

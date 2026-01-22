@@ -53,13 +53,17 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'space-between',
 		marginBottom: space.sm,
+		flexWrap: 'nowrap',
 	},
 	headerLeft: {
 		flexShrink: 1,
+		flexGrow: 0,
 		paddingRight: space.sm,
+		minWidth: 0, // Allows text to truncate properly
 	},
 	headerRight: {
 		flexShrink: 0,
+		flexGrow: 0,
 	},
 	title: {
 		...typography.titleSm,

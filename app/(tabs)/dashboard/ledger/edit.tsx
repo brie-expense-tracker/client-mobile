@@ -78,13 +78,6 @@ const fmtMoney = (n: number) =>
 	});
 
 export default function EditTransactionScreen() {
-	if (
-		Platform.OS === 'android' &&
-		UIManager.setLayoutAnimationEnabledExperimental
-	) {
-		UIManager.setLayoutAnimationEnabledExperimental(true);
-	}
-
 	const insets = useSafeAreaInsets();
 	const { id } = useLocalSearchParams<{ id: string }>();
 
@@ -93,6 +86,16 @@ export default function EditTransactionScreen() {
 	const { budgets } = useBudget();
 	const { goals } = useGoal();
 	const { expenses: recurringExpenses } = useBills();
+
+	// Enable LayoutAnimation for Android (once on mount)
+	useEffect(() => {
+		if (
+			Platform.OS === 'android' &&
+			UIManager.setLayoutAnimationEnabledExperimental
+		) {
+			UIManager.setLayoutAnimationEnabledExperimental(true);
+		}
+	}, []);
 
 	const tx = useMemo(
 		() => transactions.find((t) => t.id === id),
@@ -118,6 +121,7 @@ export default function EditTransactionScreen() {
 	>();
 	const [saving, setSaving] = useState(false);
 	const [footerH, setFooterH] = useState(0);
+	const [descriptionFocused, setDescriptionFocused] = useState(false);
 
 	// enhancements
 	const [filter, setFilter] = useState('');
@@ -126,13 +130,6 @@ export default function EditTransactionScreen() {
 	// derived lists
 	const selectableBudgets = useMemo(() => budgets ?? [], [budgets]);
 	const selectableGoals = useMemo(() => goals ?? [], [goals]);
-
-	const availableModels = useMemo(() => {
-		const models: ('Budget' | 'Goal')[] = [];
-		if (selectableBudgets.length > 0) models.push('Budget');
-		if (selectableGoals.length > 0) models.push('Goal');
-		return models;
-	}, [selectableBudgets, selectableGoals]);
 
 	const hasBudgets = selectableBudgets.length > 0;
 	const hasGoals = selectableGoals.length > 0;
@@ -222,7 +219,6 @@ export default function EditTransactionScreen() {
 		}
 		return e;
 	}, [
-		description,
 		amountInput,
 		date,
 		targetModel,
@@ -232,7 +228,7 @@ export default function EditTransactionScreen() {
 	]);
 
 	const topError =
-		errors.description || errors.amount || errors.date || errors.target || null;
+		errors.amount || errors.date || errors.target || null;
 
 	// changes
 	const hasChanges = useMemo(() => {
@@ -390,18 +386,9 @@ export default function EditTransactionScreen() {
 					? (null as any)
 					: undefined,
 				recurringPattern: recurringExpenseId
-					? {
+					? ({
 							patternId: recurringExpenseId,
-							frequency:
-								recurringExpenses.find(
-									(e) => e.patternId === recurringExpenseId
-								)?.frequency || 'monthly',
-							confidence: 0.8,
-							nextExpectedDate:
-								recurringExpenses.find(
-									(e) => e.patternId === recurringExpenseId
-								)?.nextExpectedDate || date,
-					  }
+					  } as Transaction['recurringPattern'])
 					: undefined,
 			};
 
@@ -433,7 +420,6 @@ export default function EditTransactionScreen() {
 		targetId,
 		targetModel,
 		recurringExpenseId,
-		recurringExpenses,
 		updateTransaction,
 	]);
 
@@ -510,6 +496,9 @@ export default function EditTransactionScreen() {
 				]}
 				keyboardShouldPersistTaps="handled"
 				showsVerticalScrollIndicator={false}
+				contentInsetAdjustmentBehavior="never"
+				automaticallyAdjustContentInsets={false}
+				automaticallyAdjustKeyboardInsets={false}
 			>
 				<View style={styles.stack}>
 					{/* MAIN DETAILS CARD */}
@@ -521,18 +510,13 @@ export default function EditTransactionScreen() {
 									{isIncome ? 'Money coming in' : 'Money going out'}
 								</Text>
 							</View>
-							<View
-								style={[
-									styles.chip,
-									isIncome ? styles.chipIncome : styles.chipExpense,
-								]}
-							>
+							<View style={[styles.chip, styles.chipStatus]}>
 								<Ionicons
 									name={isIncome ? 'arrow-down-circle' : 'arrow-up-circle'}
-									size={14}
-									color={palette.primaryTextOn}
+									size={12}
+									color={palette.textMuted}
 								/>
-								<Text style={styles.chipText}>
+								<Text style={styles.chipStatusText}>
 									{isIncome ? 'Income' : 'Expense'}
 								</Text>
 							</View>
@@ -559,24 +543,9 @@ export default function EditTransactionScreen() {
 												);
 												setType(t);
 												Haptics.selectionAsync();
+												// Clear selections when type changes, but don't auto-switch targetModel
 												setSelectedBudgetId(undefined);
 												setSelectedGoalId(undefined);
-
-												if (t === 'income') {
-													const newModel = availableModels.includes('Goal')
-														? 'Goal'
-														: availableModels.includes('Budget')
-														? 'Budget'
-														: undefined;
-													setTargetModel(newModel);
-												} else {
-													const newModel = availableModels.includes('Budget')
-														? 'Budget'
-														: availableModels.includes('Goal')
-														? 'Goal'
-														: undefined;
-													setTargetModel(newModel);
-												}
 											}}
 											accessibilityRole="button"
 											accessibilityState={{ selected: active }}
@@ -604,7 +573,7 @@ export default function EditTransactionScreen() {
 							<View
 								style={[
 									styles.inputRow,
-									errors.description && styles.inputError,
+									descriptionFocused && styles.inputRowFocused,
 								]}
 							>
 								<Ionicons
@@ -616,9 +585,14 @@ export default function EditTransactionScreen() {
 								<TextInput
 									value={description}
 									onChangeText={setDescription}
+									onFocus={() => setDescriptionFocused(true)}
+									onBlur={() => setDescriptionFocused(false)}
 									placeholder="e.g., Apple Music subscription"
 									placeholderTextColor={palette.textMuted}
-									style={styles.inputBare}
+									style={[
+										styles.inputBare,
+										description.trim() && styles.inputBareFilled,
+									]}
 									returnKeyType="next"
 									maxFontSizeMultiplier={1.3}
 								/>
@@ -636,9 +610,6 @@ export default function EditTransactionScreen() {
 									</TouchableOpacity>
 								)}
 							</View>
-							{errors.description && (
-								<Text style={styles.errorText}>{errors.description}</Text>
-							)}
 						</View>
 
 						{/* Amount */}
@@ -906,43 +877,25 @@ export default function EditTransactionScreen() {
 					)}
 
 					{/* RECURRING CARD */}
-					<View style={styles.groupedSection}>
-						<View style={styles.cardHeaderRow}>
-							<View style={{ flex: 1 }}>
-								<Text style={styles.cardTitle}>Bill</Text>
-								<Text style={styles.cardSubtitle}>
-									Link this to a repeating bill or subscription so Brie can
-									track it for you.
-								</Text>
+					{hasRecurringPatterns && (
+						<View style={styles.groupedSection}>
+							<View style={styles.cardHeaderRow}>
+								<View style={{ flex: 1 }}>
+									<Text style={styles.cardTitle}>Bill</Text>
+									<Text style={styles.cardSubtitle}>
+										Link this to a repeating bill or subscription so Brie can
+										track it for you.
+									</Text>
+								</View>
+								{selectedRecurringPattern && (
+									<View style={[styles.chip, styles.chipSoft]}>
+										<Ionicons name="repeat" size={14} color={palette.primary} />
+										<Text style={styles.chipSoftText}>Linked</Text>
+									</View>
+								)}
 							</View>
-							{selectedRecurringPattern && (
-								<View style={[styles.chip, styles.chipSoft]}>
-									<Ionicons name="repeat" size={14} color={palette.primary} />
-									<Text style={styles.chipSoftText}>Linked</Text>
-								</View>
-							)}
-						</View>
 
-						<View style={{ marginTop: space.sm }}>
-							{!hasRecurringPatterns ? (
-								<View style={styles.recEmptyInline}>
-									<View style={styles.recInputIcon}>
-										<Ionicons
-											name="repeat-outline"
-											size={18}
-											color={palette.primary}
-										/>
-									</View>
-									<View style={{ flex: 1 }}>
-										<Text style={styles.recInputTitle}>
-											No bills yet
-										</Text>
-										<Text style={styles.recInputSub}>
-											Create a bill and you&apos;ll be able to link it here.
-										</Text>
-									</View>
-								</View>
-							) : (
+							<View style={{ marginTop: space.sm }}>
 								<>
 									<TouchableOpacity
 										style={[
@@ -1074,15 +1027,22 @@ export default function EditTransactionScreen() {
 										</View>
 									)}
 								</>
-							)}
+							</View>
 						</View>
-					</View>
+					)}
 
 					{/* Helper text if no budgets/goals */}
 					{selectableBudgets.length === 0 && selectableGoals.length === 0 && (
 						<Text style={styles.helperText}>
 							You don&apos;t have any budgets or goals yet. You can create them
 							later and link this transaction from its details.
+						</Text>
+					)}
+
+					{/* Helper text if no bills */}
+					{!hasRecurringPatterns && (
+						<Text style={styles.helperText}>
+							Tip: Create bills to automatically track recurring expenses.
 						</Text>
 					)}
 				</View>
@@ -1094,7 +1054,7 @@ export default function EditTransactionScreen() {
 				style={[
 					styles.footer,
 					{
-						paddingBottom: space.md,
+						paddingBottom:  space.sm,
 						backgroundColor: hasChanges ? palette.surface : palette.subtle,
 						shadowOpacity: hasChanges ? shadow.card.shadowOpacity * 0.5 : 0,
 					},
@@ -1202,7 +1162,7 @@ const styles = StyleSheet.create({
 	},
 	stack: {
 		gap: space.lg,
-		paddingTop: space.sm,
+		paddingTop: space.xs,
 	},
 
 	primaryCard: {
@@ -1278,11 +1238,17 @@ const styles = StyleSheet.create({
 		borderColor: palette.border,
 		minHeight: INPUT_HEIGHT,
 	},
+	inputRowFocused: {
+		borderColor: palette.primarySubtle,
+	},
 	inputBare: {
 		flex: 1,
 		fontSize: 16,
 		color: palette.text,
 		paddingVertical: 8,
+	},
+	inputBareFilled: {
+		fontWeight: '500',
 	},
 	currencySymbol: {
 		fontSize: 16,
@@ -1355,6 +1321,18 @@ const styles = StyleSheet.create({
 		paddingVertical: space.sm + 2,
 		gap: space.sm,
 	},
+	recCreateLink: {
+		marginTop: space.sm,
+		flexDirection: 'row',
+		alignItems: 'center',
+		alignSelf: 'flex-start',
+		paddingHorizontal: space.sm,
+	},
+	recCreateLinkText: {
+		color: palette.primary,
+		fontSize: 13,
+		fontWeight: '600',
+	},
 
 	recUnlinkInline: {
 		marginTop: 6,
@@ -1412,6 +1390,44 @@ const styles = StyleSheet.create({
 		borderTopWidth: 1,
 		borderTopColor: palette.border,
 		alignItems: 'flex-start',
+	},
+
+	billCollapsedRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		backgroundColor: palette.bg,
+		borderRadius: radius.xl,
+		borderWidth: 1,
+		borderColor: palette.border,
+		paddingHorizontal: space.md,
+		paddingVertical: space.sm + 4,
+		shadowColor: shadow.card.shadowColor,
+		shadowOpacity: shadow.card.shadowOpacity * 0.15,
+		shadowRadius: shadow.card.shadowRadius * 0.5,
+		shadowOffset: shadow.card.shadowOffset,
+		elevation: shadow.card.elevation * 0.3,
+	},
+	billCollapsedTitle: {
+		fontSize: 14,
+		fontWeight: '600',
+		color: palette.text,
+		marginBottom: 2,
+	},
+	billCollapsedSubtitle: {
+		fontSize: 12,
+		color: palette.textMuted,
+	},
+	billCollapsedButton: {
+		paddingHorizontal: space.md,
+		paddingVertical: space.xs + 2,
+		borderRadius: radius.md,
+		backgroundColor: palette.primary,
+	},
+	billCollapsedButtonText: {
+		color: palette.bg,
+		fontSize: 13,
+		fontWeight: '600',
 	},
 
 	/** Segments / toggles */
@@ -1518,6 +1534,16 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		fontWeight: '600',
 	},
+	chipStatus: {
+		backgroundColor: palette.surfaceAlt,
+		paddingHorizontal: space.xs + 2,
+		paddingVertical: 3,
+	},
+	chipStatusText: {
+		color: palette.textMuted,
+		fontSize: 11,
+		fontWeight: '500',
+	},
 
 	/** Meta / helper */
 
@@ -1581,10 +1607,6 @@ const styles = StyleSheet.create({
 		paddingTop: space.md,
 		borderTopWidth: 1,
 		borderTopColor: palette.border,
-		shadowColor: shadow.card.shadowColor,
-		shadowRadius: shadow.card.shadowRadius * 0.8,
-		shadowOffset: shadow.card.shadowOffset,
-		elevation: shadow.card.elevation,
 		backgroundColor: palette.surface,
 	},
 	footerButtons: {

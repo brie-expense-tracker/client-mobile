@@ -40,7 +40,8 @@ import { loadLocalOverrides, getResolvedFlags } from '../src/config/features';
 import * as Notifications from 'expo-notifications';
 import { ensureBgPushRegistered } from '../src/services/notifications/backgroundTaskService';
 import { useAppInit } from '../src/hooks/useAppInit';
-import { DEV_MODE, isDevMode } from '../src/config/environment';
+import { DEV_MODE, isDevMode, isInternalBuild } from '../src/config/environment';
+import { useDevModeEasterEgg } from '../src/hooks/useDevModeEasterEgg';
 
 // Create namespaced logger for this service
 const layoutLog = createLogger('Layout');
@@ -98,6 +99,7 @@ function RootLayoutContent() {
 	const { user, firebaseUser, loading } = useAuth();
 	const { hasSeenOnboarding, isEditingOnboarding } = useOnboarding();
 	const router = useRouter();
+	const { isEnabled: isDevModeEasterEggEnabled } = useDevModeEasterEgg();
 	const segments = useSegments();
 	const [isMounted, setIsMounted] = useState(false);
 
@@ -291,7 +293,7 @@ function RootLayoutContent() {
 				'budgets',
 				'goals',
 				'recurring',
-				'debts',
+				// 'debts', // Debt tracking hidden for MVP
 			];
 			const isStackRoute =
 				inStackGroup || knownStackRoutes.includes(segments[0] || '');
@@ -437,9 +439,15 @@ function RootLayoutContent() {
 			layoutLog.debug('Rendering: authenticated app');
 		}
 		try {
+			// Show DEV MODE badge only if:
+			// 1. It's an internal build (development/testflight, not production) AND easter egg is enabled
+			// 2. OR it's development mode with DEV_MODE enabled (for developers working locally)
+			const shouldShowDevModeBadge =
+				(isInternalBuild && isDevModeEasterEggEnabled) || isDevMode;
+
 			return (
 				<ProfileProvider>
-					{isDevMode && (
+					{shouldShowDevModeBadge && (
 						<View style={styles.devIndicator}>
 							<Text style={styles.devText}>DEV MODE</Text>
 						</View>
