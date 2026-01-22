@@ -6,3 +6,5 @@ export { SegmentedControl } from './SegmentedControl';
 export { FAB } from './FAB';
 export { FooterBar } from './FooterBar';
 export * from './theme';
+// UI Primitives
+export * from './primitives';

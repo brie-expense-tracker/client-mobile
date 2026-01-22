@@ -565,14 +565,31 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 			try {
 				setError(null);
 
-				const response = await ApiService.put<{ data: Profile }>(
+				const response = await ApiService.put<any>(
 					'/api/profiles/me',
 					updates
 				);
 
-				if (response.success && response.data) {
+				// Server returns: { success: true, message: "...", data: Profile }
+				// ApiService returns: { success: true, data: { success: true, message: "...", data: Profile } }
+				const serverResponse = response.data;
+				
+				// Extract profile data - handle both nested and direct structures
+				const profileData = serverResponse?.data || 
+					(serverResponse?.success && serverResponse) || 
+					serverResponse;
+
+				// Check if we have valid profile data (has _id or userId)
+				const hasValidProfile = profileData && 
+					(profileData._id || profileData.userId || 
+					 (typeof profileData === 'object' && Object.keys(profileData).length > 0));
+
+				if (response.success && hasValidProfile) {
 					// The optimistic update was correct, no need to update again
-					profileContextLog.debug('Profile updated successfully');
+					profileContextLog.debug('Profile updated successfully', {
+						hasProfileData: !!profileData,
+						profileKeys: profileData ? Object.keys(profileData) : [],
+					});
 					setLastSyncTime(Date.now());
 					setIsOffline(false);
 
@@ -584,16 +601,40 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 				} else {
 					// API call failed, revert to previous state
 					setProfile(previousProfile);
-					throw new Error(response.error || 'Failed to update profile');
+					const errorMessage = response.error || 
+						serverResponse?.error || 
+						serverResponse?.message ||
+						'Failed to update profile';
+					profileContextLog.error('Profile update failed', {
+						responseSuccess: response.success,
+						hasServerResponse: !!serverResponse,
+						hasProfileData: !!profileData,
+						responseError: response.error,
+						serverResponseError: serverResponse?.error,
+						serverResponseMessage: serverResponse?.message,
+						errorMessage,
+					});
+					throw new Error(errorMessage);
 				}
 			} catch (err) {
-				profileContextLog.error('Error updating profile', err);
+				profileContextLog.error('Error updating profile', {
+					error: err,
+					errorMessage: err instanceof Error ? err.message : String(err),
+					errorType: typeof err,
+					errorString: String(err),
+					errorKeys: err && typeof err === 'object' ? Object.keys(err) : [],
+				});
 				// Revert to previous state on error
 				setProfile(previousProfile);
-				setError(
-					err instanceof Error ? err.message : 'Failed to update profile'
-				);
-				throw err;
+				const errorMessage = err instanceof Error 
+					? err.message 
+					: typeof err === 'string'
+					? err
+					: err && typeof err === 'object' && 'message' in err
+					? String(err.message)
+					: 'Failed to update profile';
+				setError(errorMessage);
+				throw err instanceof Error ? err : new Error(errorMessage);
 			}
 		},
 		[user, firebaseUser, profile]

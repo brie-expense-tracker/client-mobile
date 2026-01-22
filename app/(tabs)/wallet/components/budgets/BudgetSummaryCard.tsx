@@ -1,220 +1,176 @@
-// app/(tabs)/wallet/components/budgets/BudgetSummaryCard.tsx
+// BudgetSummaryCard.tsx
 
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet } from 'react-native';
 import LinearProgressBar from '../shared/LinearProgressBar';
-import { palette, space, type as typography } from '../../../../../src/ui';
+import SummaryHeroCard from '../shared/SummaryHeroCard';
+import { palette, space, radius, type as typography } from '../../../../../src/ui';
 import { currency } from '../../../../../src/utils/format';
 
 interface BudgetSummaryCardProps {
-	/**
-	 * Legacy single-line label for the period (fallback).
-	 * Prefer `periodTitle` + `periodRangeLabel` for the new two-line chip layout.
-	 */
 	periodLabel: string;
-	/**
-	 * Primary label inside the period chip, e.g. "December 2025" or "This week".
-	 */
 	periodTitle?: string;
-	/**
-	 * Secondary label inside the period chip, e.g. "Nov 30 – Dec 31".
-	 */
 	periodRangeLabel?: string;
 	totalBudgets: number;
 	totalPlanned: number;
 	totalSpent: number;
-	onAddBudget: () => void;
+	onAddBudget?: () => void; // Optional since FAB handles this now
 }
 
 const BudgetSummaryCard: React.FC<BudgetSummaryCardProps> = ({
 	periodLabel,
 	periodTitle,
 	periodRangeLabel,
-	totalBudgets,
 	totalPlanned,
 	totalSpent,
-	onAddBudget,
 }) => {
 	const remaining = Math.max(totalPlanned - totalSpent, 0);
 	const percentUsed = totalPlanned > 0 ? (totalSpent / totalPlanned) * 100 : 0;
-	const displayPeriod = periodTitle || periodLabel;
+
+	const chipTitle = periodTitle || periodLabel;
+	const chipSub = periodRangeLabel || 'Across all periods';
+
+	const showProgressMeta = totalPlanned > 0;
 
 	return (
-		<View style={styles.container}>
-			{/* HEADER (title + add button) */}
-			<View style={styles.headerRow}>
-				<View style={styles.headerTextBlock}>
-					<Text style={styles.overline}>TRACK YOUR BUDGETS</Text>
-					<Text style={styles.title}>Budget Overview</Text>
-					{!!displayPeriod && (
-						<Text style={styles.periodLabel}>{displayPeriod}</Text>
-					)}
+		<SummaryHeroCard
+			overline="TRACK YOUR BUDGETS"
+			title="Budget Overview"
+			headerRight={
+				<View style={styles.periodChip}>
+					<Text style={styles.periodChipTitle} numberOfLines={1}>
+						{chipTitle}
+					</Text>
+					<Text style={styles.periodChipSub} numberOfLines={1}>
+						{chipSub}
+					</Text>
 				</View>
-
-				<TouchableOpacity
-					activeOpacity={0.85}
-					onPress={onAddBudget}
-					style={styles.iconButton}
-					accessibilityRole="button"
-					accessibilityLabel="Add new budget"
-				>
-					<Ionicons name="add" size={22} color={palette.primary} />
-				</TouchableOpacity>
-			</View>
-
-			{/* MAIN NUMBERS */}
-			<View style={styles.mainRow}>
-				<View style={styles.mainBlock}>
-					<Text style={styles.mainLabel}>REMAINING</Text>
-					<Text style={styles.mainValue}>{currency(remaining)}</Text>
-					<Text style={styles.mainSub}>
+			}
+		>
+			{/* Remaining */}
+			<View style={styles.remainingRow}>
+				<View style={styles.remainingLeft}>
+					<Text style={styles.sectionLabel}>REMAINING</Text>
+					<Text style={styles.remainingValue}>{currency(remaining)}</Text>
+					<Text style={styles.remainingSub}>
 						{currency(totalSpent)} spent of {currency(totalPlanned)}
 					</Text>
 				</View>
+			</View>
 
-				<View style={styles.sideBlock}>
-					<Text style={styles.sideLabel}>PLANNED</Text>
-					<Text style={styles.sideValue}>{currency(totalPlanned)}</Text>
-
-					<Text style={[styles.sideLabel, { marginTop: space.xs }]}>SPENT</Text>
-					<Text style={styles.sideValueSmall}>{currency(totalSpent)}</Text>
+			{/* Stats */}
+			<View style={styles.statRow}>
+				<View style={styles.statPill}>
+					<Text style={styles.statLabel}>Planned</Text>
+					<Text style={styles.statValue}>{currency(totalPlanned)}</Text>
+				</View>
+				<View style={styles.statPill}>
+					<Text style={styles.statLabel}>Spent</Text>
+					<Text style={styles.statValue}>{currency(totalSpent)}</Text>
+				</View>
+				<View style={styles.statPill}>
+					<Text style={styles.statLabel}>Left</Text>
+					<Text style={styles.statValue}>{currency(remaining)}</Text>
 				</View>
 			</View>
 
-			{/* PROGRESS */}
+			{/* Progress */}
 			<View style={styles.progressSection}>
 				<LinearProgressBar
 					percent={percentUsed}
-					height={6}
+					height={7}
 					color={palette.primary}
 					trackColor={palette.borderMuted}
-					leftLabel={`${percentUsed.toFixed(1)}% used`}
-					rightLabel={`${currency(remaining)} left`}
+					leftLabel={showProgressMeta ? `${percentUsed.toFixed(1)}% used` : ''}
+					rightLabel={showProgressMeta ? `${currency(remaining)} left` : ''}
 				/>
 			</View>
-		</View>
+		</SummaryHeroCard>
 	);
 };
 
 const styles = StyleSheet.create({
-	// behaves like page header, not a card
-	container: {
-		paddingTop: space.xs,
-		paddingBottom: space.lg,
+	remainingRow: {
+		marginTop: space.md,
 	},
 
-	/* HEADER */
-	headerRow: {
-		flexDirection: 'row',
-		alignItems: 'flex-start',
-		justifyContent: 'space-between',
-	},
-
-	headerTextBlock: {
+	remainingLeft: {
 		flex: 1,
-		marginBottom: space.lg,
 	},
 
-	overline: {
+	periodChip: {
+		alignSelf: 'flex-start',
+		backgroundColor: palette.surfaceAlt,
+		borderRadius: radius.md,
+		paddingHorizontal: space.md,
+		paddingVertical: space.sm,
+		borderWidth: 1,
+		borderColor: palette.borderMuted,
+		minWidth: 100,
+	},
+
+	periodChipTitle: {
+		...typography.bodySm,
+		color: palette.text,
+		fontWeight: '700',
+	},
+
+	periodChipSub: {
+		...typography.bodyXs,
+		color: palette.textMuted,
+		marginTop: 2, // Fine-tuned spacing for chip subtitle
+	},
+
+	sectionLabel: {
 		...typography.labelSm,
 		color: palette.textMuted,
-		marginBottom: 6,
 		textTransform: 'uppercase',
-		letterSpacing: 1.2,
+		letterSpacing: 1.0,
 	},
 
-	title: {
-		...typography.titleMd,
-		fontSize: 30,
-		lineHeight: 34,
-		fontWeight: '700',
+	remainingValue: {
+		...typography.num2xl,
 		color: palette.text,
-	},
-
-	subtitle: {
-		...typography.bodySm,
-		color: palette.textMuted,
-		marginTop: 8,
-	},
-
-	periodLabel: {
-		...typography.bodySm,
-		color: palette.textSecondary,
+		fontWeight: '900',
 		marginTop: space.xs,
 	},
 
-	iconButton: {
-		width: 44,
-		height: 44,
-		borderRadius: 22,
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: palette.primarySoft,
-		shadowColor: '#000',
-		shadowOpacity: 0.06,
-		shadowRadius: 10,
-		shadowOffset: { width: 0, height: 6 },
-		elevation: 3,
-	},
-
-	/* MAIN NUMBERS */
-	mainRow: {
-		flexDirection: 'row',
-		alignItems: 'flex-start',
-	},
-
-	mainBlock: {
-		flex: 1,
-		paddingRight: space.lg,
-	},
-
-	mainLabel: {
-		...typography.labelSm,
-		color: palette.textMuted,
-		textTransform: 'uppercase',
-		letterSpacing: 1.1,
-	},
-
-	mainValue: {
-		...typography.numLg,
-		color: palette.text,
-		marginTop: 4,
-	},
-
-	mainSub: {
+	remainingSub: {
 		...typography.bodySm,
 		color: palette.textSubtle,
-		marginTop: 4,
+		marginTop: space.xs,
 	},
 
-	sideBlock: {
-		alignItems: 'flex-end',
-		minWidth: 120,
+	statRow: {
+		flexDirection: 'row',
+		gap: space.sm, // ↓ slightly tighter
+		marginTop: space.md,
 	},
 
-	sideLabel: {
-		...typography.labelSm,
+	statPill: {
+		flex: 1,
+		backgroundColor: palette.surfaceAlt,
+		borderRadius: radius.md,
+		paddingVertical: space.sm, // ↓ smaller pill
+		paddingHorizontal: space.md,
+		borderWidth: 1,
+		borderColor: palette.borderMuted,
+	},
+
+	statLabel: {
+		...typography.bodyXs,
 		color: palette.textMuted,
-		textTransform: 'uppercase',
-		letterSpacing: 1.1,
 	},
 
-	sideValue: {
+	statValue: {
 		...typography.numMd,
 		color: palette.text,
-		marginTop: 4,
+		fontWeight: '800',
+		marginTop: space.xs,
 	},
 
-	sideValueSmall: {
-		...typography.numMd,
-		color: palette.text,
-		marginTop: 2,
-	},
-
-	/* PROGRESS */
 	progressSection: {
-		marginTop: space.lg,
+		marginTop: space.md,
 	},
 });
 

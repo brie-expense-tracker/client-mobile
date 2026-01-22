@@ -13,135 +13,111 @@ import {
 	StyleSheet,
 	TouchableOpacity,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import type { StyleProp, ViewStyle } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+// Debt tracking hidden for MVP - useFocusEffect no longer needed (was used for debt loading)
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Path } from 'react-native-svg';
 import { router } from 'expo-router';
 import { useBudget } from '../../../src/context/budgetContext';
 import { useGoal } from '../../../src/context/goalContext';
 import { useBills } from '../../../src/context/billContext';
+import { useProfile } from '../../../src/context/profileContext';
 import { BillService } from '../../../src/services';
-import { DebtsService, Debt } from '../../../src/services/feature/debtsService';
-import { palette, space, shadow } from '../../../src/ui/theme';
-import { getItem, setItem } from '../../../src/utils/safeStorage';
+// Debt tracking hidden for MVP - increases finance complexity perception
+// import { DebtsService, Debt } from '../../../src/services/feature/debtsService';
+import { palette, type } from '../../../src/ui/theme';
 import BottomSheet from '../../../src/components/BottomSheet';
+import {
+	AppScreen,
+	AppCard,
+	AppText,
+	AppButton,
+	HeroCard,
+} from '../../../src/ui/primitives';
+import CardHeader from './components/shared/CardHeader';
+import StatPill from './components/shared/StatPill';
+import TransactionsSummaryCard from './components/transactions/TransactionsSummaryCard';
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
 	style: 'currency',
 	currency: 'USD',
 });
 
-function WalletHero({
-	total = 0,
-	setupNetChange = 0,
+function SafeToSpendHero({
+	safeToSpend = 0,
 	onPress,
 }: {
-	total?: number | null;
-	setupNetChange?: number;
+	safeToSpend?: number | null;
 	onPress?: () => void;
 }) {
-	const formatted = `${
-		setupNetChange >= 0 ? '+' : ''
-	}${currencyFormatter.format(Math.abs(setupNetChange))} this month`;
+	return (
+		<HeroCard
+			variant="dark"
+			onPress={onPress}
+			accessibilityLabel="Safe to spend this week"
+			contentStyle={heroStyles.content}
+		>
+			<AppText.Caption style={heroStyles.overline}>THIS WEEK</AppText.Caption>
 
-	const isPositive = setupNetChange >= 0;
+			<AppText style={heroStyles.amount}>
+				{currencyFormatter.format(safeToSpend ?? 0)}
+			</AppText>
 
-	const content = (
-		<View style={heroStyles.container}>
-			<View>
-				<Text style={heroStyles.overline}>Your setup</Text>
-				<Text style={heroStyles.label}>Total Tracked</Text>
-				<Text style={heroStyles.amount}>
-					{currencyFormatter.format(total ?? 0)}
-				</Text>
-				<Text style={heroStyles.sub}>
-					Everything you&apos;re currently tracking
-				</Text>
-			</View>
-			<View style={heroStyles.heroRight}>
-				<View style={heroStyles.deltaPill}>
-					<Text style={heroStyles.deltaText}>
-						{isPositive ? '↑ ' : '↓ '}
-						{formatted}
-					</Text>
-				</View>
-				<View style={heroStyles.heroSparklineWrapper}>
-					<Svg width={90} height={40}>
-						<Path
-							d="M2 30 L18 22 L36 24 L54 12 L72 18 L88 6"
-							stroke="#0F6FFF"
-							strokeWidth={2}
-							fill="none"
-							strokeLinecap="round"
-						/>
-					</Svg>
-				</View>
-			</View>
-		</View>
+			<AppText.Body style={heroStyles.sub}>
+				After budgets and bills
+			</AppText.Body>
+		</HeroCard>
 	);
-
-	if (onPress) {
-		return (
-			<TouchableOpacity onPress={onPress} activeOpacity={0.7}>
-				{content}
-			</TouchableOpacity>
-		);
-	}
-
-	return content;
 }
+
 
 const heroStyles = StyleSheet.create({
 	container: {
-		backgroundColor: '#0F172A',
-		borderRadius: 24,
-		padding: 22,
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
 		gap: 20,
-		...shadow.card,
+	},
+	content: {
+		paddingVertical: 22,
+		paddingHorizontal: 22,
+		minHeight: 140,
+		justifyContent: 'center',
 	},
 	overline: {
-		color: '#CBD5F5',
-		fontSize: 12,
-		fontWeight: '500',
-		textTransform: 'uppercase',
-		letterSpacing: 0.8,
-		marginBottom: 2,
-	},
-	label: {
-		color: '#E2E8F0',
-		fontWeight: '600',
-		fontSize: 16,
+		...type.labelSm,
+		color: 'rgba(255,255,255,0.7)',
+		letterSpacing: 1.2,
 	},
 	amount: {
-		fontSize: 32,
-		fontWeight: '700',
-		color: '#F8FAFC',
-		marginTop: 8,
+		...type.num2xl,
+		fontSize: 44,
+		lineHeight: 48,
+		color: '#FFFFFF',
+		marginTop: 10,
+		letterSpacing: -0.8,
 	},
 	sub: {
-		color: '#CBD5F5',
+		...type.body,
+		color: 'rgba(255,255,255,0.72)',
 		marginTop: 8,
-		fontSize: 13,
+	},
+	heroContent: {
+		flex: 1,
 	},
 	heroRight: {
 		alignItems: 'flex-end',
 		flex: 1,
 	},
 	deltaPill: {
-		backgroundColor: 'rgba(15,111,255,0.18)',
+		backgroundColor: palette.primarySubtle,
 		paddingHorizontal: 12,
 		paddingVertical: 6,
 		borderRadius: 999,
 	},
 	deltaText: {
-		color: '#60A5FA',
+		color: palette.primary,
+		...type.small,
 		fontWeight: '600',
-		fontSize: 12,
 	},
 	heroSparklineWrapper: {
 		marginTop: 18,
@@ -230,7 +206,7 @@ function WalletHeroSkeleton() {
 
 function BudgetCardSkeleton() {
 	return (
-		<View style={styles.card}>
+		<AppCard padding={18} borderRadius={22}>
 			<View style={styles.cardHeaderRow}>
 				<View style={styles.cardHeaderLeft}>
 					<SkeletonLine width={32} height={32} style={{ borderRadius: 12 }} />
@@ -251,13 +227,13 @@ function BudgetCardSkeleton() {
 				<SkeletonLine width="32%" height={48} style={{ borderRadius: 16 }} />
 				<SkeletonLine width="32%" height={48} style={{ borderRadius: 16 }} />
 			</View>
-		</View>
+		</AppCard>
 	);
 }
 
 function UpcomingBillsSkeleton() {
 	return (
-		<View style={styles.card}>
+		<AppCard padding={18} borderRadius={22}>
 			<View style={styles.cardHeaderRow}>
 				<View style={styles.cardHeaderLeft}>
 					<SkeletonLine width={32} height={32} style={{ borderRadius: 12 }} />
@@ -283,13 +259,13 @@ function UpcomingBillsSkeleton() {
 				<SkeletonLine width="100%" height={52} style={{ borderRadius: 18 }} />
 				<SkeletonLine width="100%" height={52} style={{ borderRadius: 18 }} />
 			</View>
-		</View>
+		</AppCard>
 	);
 }
 
 function GoalsCardSkeleton() {
 	return (
-		<View style={styles.card}>
+		<AppCard padding={18} borderRadius={22}>
 			<View style={styles.cardHeaderRow}>
 				<View style={styles.cardHeaderLeft}>
 					<SkeletonLine width={32} height={32} style={{ borderRadius: 12 }} />
@@ -309,85 +285,55 @@ function GoalsCardSkeleton() {
 				<SkeletonLine width="32%" height={48} style={{ borderRadius: 16 }} />
 				<SkeletonLine width="32%" height={48} style={{ borderRadius: 16 }} />
 			</View>
-		</View>
+		</AppCard>
 	);
 }
 
-function DebtCardSkeleton() {
-	return (
-		<View style={styles.card}>
-			<View style={styles.cardHeaderRow}>
-				<View style={styles.cardHeaderLeft}>
-					<SkeletonLine width={32} height={32} style={{ borderRadius: 12 }} />
-					<View>
-						<SkeletonLine width={140} height={18} />
-						<SkeletonLine
-							width={150}
-							height={12}
-							style={{ marginTop: 6, borderRadius: 6 }}
-						/>
-					</View>
-				</View>
-				<SkeletonLine width={60} height={14} />
-			</View>
-			<View style={styles.statRow}>
-				<SkeletonLine width="32%" height={48} style={{ borderRadius: 16 }} />
-				<SkeletonLine width="32%" height={48} style={{ borderRadius: 16 }} />
-				<SkeletonLine width="32%" height={48} style={{ borderRadius: 16 }} />
-			</View>
-		</View>
-	);
-}
+// Debt tracking hidden for MVP - increases finance complexity perception
+// function DebtCardSkeleton() {
+// 	return (
+// 		<View style={styles.card}>
+// 			<View style={styles.cardHeaderRow}>
+// 				<View style={styles.cardHeaderLeft}>
+// 					<SkeletonLine width={32} height={32} style={{ borderRadius: 12 }} />
+// 					<View>
+// 						<SkeletonLine width={140} height={18} />
+// 						<SkeletonLine
+// 							width={150}
+// 							height={12}
+// 							style={{ marginTop: 6, borderRadius: 6 }}
+// 						/>
+// 					</View>
+// 				</View>
+// 				<SkeletonLine width={60} height={14} />
+// 			</View>
+// 			<View style={styles.statRow}>
+// 				<SkeletonLine width="32%" height={48} style={{ borderRadius: 16 }} />
+// 				<SkeletonLine width="32%" height={48} style={{ borderRadius: 16 }} />
+// 				<SkeletonLine width="32%" height={48} style={{ borderRadius: 16 }} />
+// 			</View>
+// 		</View>
+// 	);
+// }
 
-type CardHeaderProps = {
-	title: string;
-	subtitle?: string;
-	actionLabel?: string;
-	icon?: keyof typeof Ionicons.glyphMap;
-};
 
-function CardHeader({
-	title,
-	subtitle,
-	actionLabel,
-	icon = 'ellipse-outline',
-}: CardHeaderProps) {
-	return (
-		<View style={styles.cardHeaderRow}>
-			<View style={styles.cardHeaderLeft}>
-				<View style={styles.cardIcon}>
-					<Ionicons name={icon} size={18} color="#0F6FFF" />
-				</View>
-				<View>
-					<Text style={styles.cardTitle}>{title}</Text>
-					{subtitle ? <Text style={styles.cardSub}>{subtitle}</Text> : null}
-				</View>
-			</View>
-			{actionLabel ? <Text style={styles.linkText}>{actionLabel}</Text> : null}
-		</View>
-	);
-}
-
-function StatPill({ label, value }: { label: string; value: string }) {
-	return (
-		<View style={styles.statPill}>
-			<Text style={styles.statPillLabel}>{label}</Text>
-			<Text style={styles.statPillValue}>{value}</Text>
-		</View>
-	);
-}
 
 function QuickActionButton({
 	label,
 	onPress,
+	secondary = false,
 }: {
 	label: string;
 	onPress: () => void;
+	secondary?: boolean;
 }) {
 	return (
-		<TouchableOpacity onPress={onPress} style={styles.quickAction}>
-			<Text style={styles.quickActionText}>{label}</Text>
-		</TouchableOpacity>
+		<AppButton
+			label={label}
+			variant={secondary ? 'secondary' : 'primary'}
+			onPress={onPress}
+			size="md"
+		/>
 	);
 }
 
@@ -398,41 +344,15 @@ type UpcomingExpenseSummary = {
 };
 
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: palette.surfaceAlt,
-	},
-	scroll: {
-		backgroundColor: '#F1F5F9',
-	},
 	header: {
-		paddingHorizontal: space.xl,
-		paddingTop: space.lg,
+		// Horizontal padding handled by AppScreen
 		paddingBottom: 12,
-		backgroundColor: palette.surfaceAlt,
-	},
-	title: {
-		fontSize: 28,
-		fontWeight: '700',
-		color: palette.text,
 	},
 	subtitle: {
 		marginTop: 4,
-		color: palette.textMuted,
 	},
-	content: {
-		paddingHorizontal: space.xl,
-		paddingTop: 16,
-		paddingBottom: 32,
-		gap: 18,
-		backgroundColor: '#F1F5F9',
-	},
-	card: {
-		backgroundColor: '#fff',
-		borderRadius: 22,
-		padding: 18,
-		...shadow.card,
-	},
+	// content styles removed - AppScreen now handles all screen-level spacing
+	// Card styles moved to AppCard primitive
 	cardHeaderRow: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
@@ -447,13 +367,12 @@ const styles = StyleSheet.create({
 		width: 32,
 		height: 32,
 		borderRadius: 12,
-		backgroundColor: 'rgba(15,111,255,0.12)',
+		backgroundColor: palette.primarySubtle,
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
 	cardTitle: {
-		fontSize: 18,
-		fontWeight: '600',
+		...type.numLg,
 		color: palette.text,
 	},
 	cardSub: {
@@ -467,22 +386,24 @@ const styles = StyleSheet.create({
 	},
 	statPill: {
 		flex: 1,
-		backgroundColor: '#F8FAFC',
+		backgroundColor: palette.surfaceAlt,
 		borderRadius: 14,
 		paddingVertical: 10,
 		paddingHorizontal: 12,
 		gap: 4,
 	},
 	statPillLabel: {
-		color: '#94A3B8',
-		fontSize: 12,
+		color: palette.textMuted,
+		...type.bodyXs,
 	},
 	statPillValue: {
-		color: '#0F172A',
+		color: palette.text,
+		...type.body,
 		fontWeight: '600',
 	},
 	linkText: {
 		color: palette.primary,
+		...type.body,
 		fontWeight: '600',
 	},
 	ticketList: {
@@ -490,7 +411,7 @@ const styles = StyleSheet.create({
 		gap: 12,
 	},
 	ticketItem: {
-		backgroundColor: '#F8FAFC',
+		backgroundColor: palette.surfaceAlt,
 		borderRadius: 18,
 		paddingVertical: 12,
 		paddingHorizontal: 16,
@@ -499,118 +420,30 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 	},
 	ticketVendor: {
-		color: '#0F172A',
+		color: palette.text,
+		...type.body,
 		fontWeight: '600',
 	},
 	ticketMeta: {
-		color: '#94A3B8',
-		fontSize: 12,
+		color: palette.textMuted,
+		...type.bodyXs,
 		marginTop: 2,
 	},
 	footerSpacer: {
 		height: 32,
 	},
 	skeletonBlock: {
-		backgroundColor: '#E5E7EB',
+		backgroundColor: palette.border,
 	},
 	quickActionsRow: {
 		flexDirection: 'row',
 		gap: 12,
-		marginBottom: 4,
 		flexWrap: 'wrap',
+		// Vertical spacing handled by AppScreen gap system
 	},
-	quickAction: {
-		backgroundColor: '#fff',
-		borderRadius: 16,
-		paddingHorizontal: 16,
-		paddingVertical: 10,
-		flexGrow: 1,
-		minWidth: 110,
-		alignItems: 'center',
-		...shadow.card,
-	},
-	quickActionText: {
-		fontWeight: '600',
-		color: '#0F172A',
-	},
+	// QuickActionButton styles moved to AppButton primitive
 });
 
-function useCardPressAnimation() {
-	const scale = useRef(new Animated.Value(1)).current;
-	const opacity = useRef(new Animated.Value(1)).current;
-
-	const handlePressIn = useCallback(() => {
-		Animated.parallel([
-			Animated.spring(scale, {
-				toValue: 0.97,
-				useNativeDriver: true,
-				speed: 20,
-				bounciness: 6,
-			}),
-			Animated.timing(opacity, {
-				toValue: 0.9,
-				duration: 120,
-				useNativeDriver: true,
-			}),
-		]).start();
-	}, [scale, opacity]);
-
-	const handlePressOut = useCallback(() => {
-		Animated.parallel([
-			Animated.spring(scale, {
-				toValue: 1,
-				useNativeDriver: true,
-				speed: 20,
-				bounciness: 6,
-			}),
-			Animated.timing(opacity, {
-				toValue: 1,
-				duration: 120,
-				useNativeDriver: true,
-			}),
-		]).start();
-	}, [scale, opacity]);
-
-	const animatedStyle: StyleProp<ViewStyle> = {
-		transform: [{ scale }],
-		opacity,
-	};
-
-	return { animatedStyle, handlePressIn, handlePressOut };
-}
-
-type CardWrapperProps = {
-	children: React.ReactNode;
-	onPress?: () => void;
-	accessibilityLabel: string;
-};
-
-function CardWrapper({
-	children,
-	onPress,
-	accessibilityLabel,
-}: CardWrapperProps) {
-	const { animatedStyle, handlePressIn, handlePressOut } =
-		useCardPressAnimation();
-
-	const isPressable = !!onPress;
-
-	return (
-		<TouchableOpacity
-			activeOpacity={1}
-			onPress={onPress}
-			onPressIn={isPressable ? handlePressIn : undefined}
-			onPressOut={isPressable ? handlePressOut : undefined}
-			disabled={!isPressable}
-			accessibilityRole={isPressable ? 'button' : undefined}
-			accessibilityLabel={accessibilityLabel}
-		>
-			<Animated.View style={[styles.card, animatedStyle]}>
-				{children}
-			</Animated.View>
-		</TouchableOpacity>
-	);
-}
 
 export default function WalletOverviewScreen() {
 	const {
@@ -632,26 +465,17 @@ export default function WalletOverviewScreen() {
 		isLoading: billsLoading,
 		refetch: refetchBills,
 	} = useBills();
+	const { profile } = useProfile();
 
-	const [debts, setDebts] = useState<Debt[]>([]);
-	const [debtsLoading, setDebtsLoading] = useState(true);
+	// Debt tracking hidden for MVP - increases finance complexity perception
+	// const [debts, setDebts] = useState<Debt[]>([]);
+	// const [debtsLoading, setDebtsLoading] = useState(true);
 
-	type WalletBaseline = {
-		budgetsAllocated: number;
-		goalsCurrent: number;
-		debtTotal: number;
-		trackedBalance: number;
-		createdAt: string;
-	};
-
-	const [monthBaseline, setMonthBaseline] = useState<WalletBaseline | null>(
-		null
-	);
 	const [showBreakdown, setShowBreakdown] = useState(false);
 	const budgetsBusy = budgetsLoading && !budgetsLoaded;
 	const billsBusy = billsLoading && !billsLoaded;
 	const goalsBusy = goalsLoading && !goalsLoaded;
-	const debtsBusy = debtsLoading && !debts.length;
+	// const debtsBusy = debtsLoading && !debts.length;
 
 	useEffect(() => {
 		if (!budgetsLoaded) {
@@ -671,125 +495,40 @@ export default function WalletOverviewScreen() {
 		}
 	}, [billsLoaded, refetchBills]);
 
-	const loadDebts = useCallback(async () => {
-		// Don't flip to skeleton on refocus if we already have data
-		if (debts.length > 0) return;
-		
-		setDebtsLoading(true);
-		try {
-			const data = await DebtsService.getDebts();
-			setDebts(data);
-		} catch (error) {
-			console.warn('Failed to load debts summary', error);
-		} finally {
-			setDebtsLoading(false);
-		}
-	}, [debts.length]);
+	// Debt tracking hidden for MVP - increases finance complexity perception
+	// const loadDebts = useCallback(async () => {
+	// 	// Don't flip to skeleton on refocus if we already have data
+	// 	if (debts.length > 0) return;
+	// 	
+	// 	setDebtsLoading(true);
+	// 	try {
+	// 		const data = await DebtsService.getDebts();
+	// 		setDebts(data);
+	// 	} catch (error) {
+	// 		console.warn('Failed to load debts summary', error);
+	// 	} finally {
+	// 		setDebtsLoading(false);
+	// 	}
+	// }, [debts.length]);
 
-	useFocusEffect(
-		useCallback(() => {
-			loadDebts();
-		}, [loadDebts])
-	);
+	// useFocusEffect(
+	// 	useCallback(() => {
+	// 		loadDebts();
+	// 	}, [loadDebts])
+	// );
 
-	// Helper functions for month keys
-	const getMonthKey = useCallback((d = new Date()) => {
-		return `${d.getFullYear()}_${d.getMonth()}`;
-	}, []);
-
-	const baselineKeyForMonth = useCallback(
-		(d = new Date()) => {
-			return `walletBaseline_${getMonthKey(d)}`;
-		},
-		[getMonthKey]
-	);
-
-	// Extract current values for tracked balance and baseline comparison
+	// Extract current values for tracked balance
 	const budgetsAmount = monthlySummary?.totalAllocated ?? 0;
 	const goalsAmount = goals.reduce((sum, goal) => sum + (goal.current || 0), 0);
-	const debtsAmount = DebtsService.calculateTotalDebt(debts);
+	// Debt tracking hidden for MVP - increases finance complexity perception
+	// const debtsAmount = DebtsService.calculateTotalDebt(debts);
 
-	// Calculate tracked balance (budgets allocated + goals current + debts total)
+	// Calculate tracked balance (budgets allocated + goals current)
+	// Debt tracking hidden for MVP - increases finance complexity perception
 	const trackedBalance = useMemo(() => {
-		return budgetsAmount + goalsAmount + debtsAmount;
-	}, [budgetsAmount, goalsAmount, debtsAmount]);
+		return budgetsAmount + goalsAmount;
+	}, [budgetsAmount, goalsAmount]);
 
-	// Load or create the baseline once data is ready
-	useEffect(() => {
-		const loadOrCreateBaseline = async () => {
-			try {
-				const key = baselineKeyForMonth();
-				const stored = await getItem(key);
-
-				const currentTotal = budgetsAmount + goalsAmount + debtsAmount;
-
-				// If all current values are zero, reset the baseline to zero
-				// This prevents showing false positive changes from stale baseline data
-				if (currentTotal === 0) {
-					const zeroBaseline: WalletBaseline = {
-						budgetsAllocated: 0,
-						goalsCurrent: 0,
-						debtTotal: 0,
-						trackedBalance: 0,
-						createdAt: new Date().toISOString(),
-					};
-					await setItem(key, JSON.stringify(zeroBaseline));
-					setMonthBaseline(zeroBaseline);
-					return;
-				}
-
-				if (stored) {
-					setMonthBaseline(JSON.parse(stored));
-					return;
-				}
-
-				// Create baseline at first "stable load" of the month
-				const baseline: WalletBaseline = {
-					budgetsAllocated: budgetsAmount,
-					goalsCurrent: goalsAmount,
-					debtTotal: debtsAmount,
-					trackedBalance: budgetsAmount + goalsAmount + debtsAmount,
-					createdAt: new Date().toISOString(),
-				};
-
-				await setItem(key, JSON.stringify(baseline));
-				setMonthBaseline(baseline);
-			} catch (e) {
-				console.warn('Failed to load/create wallet baseline', e);
-			}
-		};
-
-		// only do this when data is actually loaded and stable
-		if (!budgetsBusy && !goalsBusy && !debtsBusy) {
-			loadOrCreateBaseline();
-		}
-	}, [
-		budgetsBusy,
-		goalsBusy,
-		debtsBusy,
-		budgetsAmount,
-		goalsAmount,
-		debtsAmount,
-		baselineKeyForMonth,
-	]);
-
-	// Compute "this month" setup change
-	const setupNetChange = useMemo(() => {
-		if (!monthBaseline) return 0;
-
-		// If all current values are zero, there's no meaningful change to show
-		const currentTotal = budgetsAmount + goalsAmount + debtsAmount;
-		if (currentTotal === 0 && monthBaseline.trackedBalance === 0) {
-			return 0;
-		}
-
-		const budgetsDelta = budgetsAmount - monthBaseline.budgetsAllocated;
-		const goalsDelta = goalsAmount - monthBaseline.goalsCurrent;
-		const debtDelta = debtsAmount - monthBaseline.debtTotal; // positive means debt increased
-
-		// debt going down is GOOD -> subtract debt delta
-		return budgetsDelta + goalsDelta - debtDelta;
-	}, [monthBaseline, budgetsAmount, goalsAmount, debtsAmount]);
 
 	const formatCurrency = useCallback((amount?: number | null) => {
 		if (typeof amount !== 'number' || Number.isNaN(amount)) {
@@ -940,80 +679,112 @@ export default function WalletOverviewScreen() {
 		};
 	}, [goalsLoading, goalsLoaded, goals, formatCurrency]);
 
-	const debtSummary = useMemo(() => {
-		if (debtsLoading) {
-			return {
-				subtitle: 'Loading debts…',
-				totalDebt: '—',
-				count: '—',
-				average: '—',
-			};
-		}
+	// Debt tracking hidden for MVP - increases finance complexity perception
+	// const debtSummary = useMemo(() => {
+	// 	if (debtsLoading) {
+	// 		return {
+	// 			subtitle: 'Loading debts…',
+	// 			totalDebt: '—',
+	// 			count: '—',
+	// 			average: '—',
+	// 		};
+	// 	}
 
-		if (!debts.length) {
-			return {
-				subtitle: 'No debts tracked yet',
-				totalDebt: formatCurrency(0),
-				count: '0',
-				average: formatCurrency(0),
-			};
-		}
+	// 	if (!debts.length) {
+	// 		return {
+	// 			subtitle: 'No debts tracked yet',
+	// 			totalDebt: formatCurrency(0),
+	// 			count: '0',
+	// 			average: formatCurrency(0),
+	// 		};
+	// 	}
 
-		const totalDebtAmount = DebtsService.calculateTotalDebt(debts);
-		const averageDebt = totalDebtAmount / debts.length;
+	// 	const totalDebtAmount = DebtsService.calculateTotalDebt(debts);
+	// 	const averageDebt = totalDebtAmount / debts.length;
 
-		return {
-			subtitle: `Total debt remaining: ${formatCurrency(totalDebtAmount)}`,
-			totalDebt: formatCurrency(totalDebtAmount),
-			count: String(debts.length),
-			average: formatCurrency(averageDebt),
-		};
-	}, [debtsLoading, debts, formatCurrency]);
+	// 	return {
+	// 		subtitle: `Total debt remaining: ${formatCurrency(totalDebtAmount)}`,
+	// 		totalDebt: formatCurrency(totalDebtAmount),
+	// 		count: String(debts.length),
+	// 		average: formatCurrency(averageDebt),
+	// 	};
+	// }, [debtsLoading, debts, formatCurrency]);
+
+
+	// Calculate "Safe to Spend This Week"
+	const safeToSpendThisWeek = useMemo(() => {
+		// Get weekly income (from monthly income / 4.33, or from transactions)
+		const monthlyIncome = profile?.monthlyIncome || 0;
+		const weeklyIncome = monthlyIncome / 4.33;
+
+		// Calculate weekly budget allocation
+		// Monthly budgets divided by 4.33, plus weekly budgets
+		const monthlyBudgets = budgets.filter((b) => b.period === 'monthly');
+		const weeklyBudgets = budgets.filter((b) => b.period === 'weekly');
+		
+		const monthlyBudgetWeekly = monthlyBudgets.reduce(
+			(sum, b) => sum + (b.amount / 4.33),
+			0
+		);
+		const weeklyBudgetTotal = weeklyBudgets.reduce(
+			(sum, b) => sum + b.amount,
+			0
+		);
+		const totalWeeklyBudget = monthlyBudgetWeekly + weeklyBudgetTotal;
+
+		// Get bills due this week (already calculated above)
+		const billsDueThisWeek = expenses
+			.filter((expense) => {
+				if (!expense?.nextExpectedDate) return false;
+				const days = BillService.getDaysUntilNext(expense.nextExpectedDate);
+				return days >= 0 && days <= 7;
+			})
+			.reduce((sum, expense) => sum + (expense.amount || 0), 0);
+
+		// Safe to spend = weekly income - weekly budgets - bills due this week
+		const safeToSpend = Math.max(0, weeklyIncome - totalWeeklyBudget - billsDueThisWeek);
+
+		return safeToSpend;
+	}, [profile?.monthlyIncome, budgets, expenses]);
 
 	return (
-		<SafeAreaView style={styles.container} edges={['top']}>
+		<AppScreen>
 			<View style={styles.header}>
-				<Text style={styles.title}>Wallet Overview</Text>
-				<Text style={styles.subtitle}>Manage what you&apos;re tracking</Text>
+				<AppText.Title>Wallet Overview</AppText.Title>
+				<AppText.Subtitle color="muted" style={styles.subtitle}>
+					Manage what you&apos;re tracking
+				</AppText.Subtitle>
 			</View>
-
-			<ScrollView
-				style={styles.scroll}
-				showsVerticalScrollIndicator={false}
-				contentContainerStyle={styles.content}
-				contentInsetAdjustmentBehavior="never"
-				automaticallyAdjustContentInsets={false}
-				automaticallyAdjustKeyboardInsets={false}
-			>
-				{budgetsBusy || goalsBusy || debtsBusy ? (
+				{budgetsBusy || goalsBusy ? (
 					<WalletHeroSkeleton />
 				) : (
-					<WalletHero
-						total={trackedBalance}
-						setupNetChange={setupNetChange}
+					<SafeToSpendHero
+						safeToSpend={safeToSpendThisWeek}
 						onPress={() => setShowBreakdown(true)}
 					/>
 				)}
 
 				<View style={styles.quickActionsRow}>
 					<QuickActionButton
+						label="Add Goal"
+						onPress={() => router.push('/(tabs)/wallet/goals/new')}
+					/>
+					<QuickActionButton
 						label="Add Budget"
 						onPress={() => router.push('/(tabs)/wallet/budgets/new')}
+						secondary
 					/>
 					<QuickActionButton
 						label="Add Bill"
 						onPress={() => router.push('/(tabs)/wallet/bills/new')}
-					/>
-					<QuickActionButton
-						label="Add Goal"
-						onPress={() => router.push('/(tabs)/wallet/goals/new')}
+						secondary
 					/>
 				</View>
 
 				{budgetsBusy ? (
 					<BudgetCardSkeleton />
 				) : (
-					<CardWrapper
+					<AppCard
 						onPress={() => router.push('/(tabs)/wallet/budgets')}
 						accessibilityLabel="Open budgets overview"
 					>
@@ -1031,13 +802,13 @@ export default function WalletOverviewScreen() {
 								<StatPill label="Remaining" value={budgetSummary.remaining} />
 							</View>
 						</View>
-					</CardWrapper>
+					</AppCard>
 				)}
 
 				{billsBusy ? (
 					<UpcomingBillsSkeleton />
 				) : (
-					<CardWrapper
+					<AppCard
 						onPress={() => router.push('/(tabs)/wallet/bills')}
 						accessibilityLabel="Open upcoming bills"
 					>
@@ -1081,13 +852,13 @@ export default function WalletOverviewScreen() {
 								)}
 							</View>
 						</View>
-					</CardWrapper>
+					</AppCard>
 				)}
 
 				{goalsBusy ? (
 					<GoalsCardSkeleton />
 				) : (
-					<CardWrapper
+					<AppCard
 						onPress={() => router.push('/(tabs)/wallet/goals')}
 						accessibilityLabel="Open savings goals"
 					>
@@ -1105,13 +876,14 @@ export default function WalletOverviewScreen() {
 								<StatPill label="Progress" value={goalsSummary.progress} />
 							</View>
 						</View>
-					</CardWrapper>
+					</AppCard>
 				)}
 
-				{debtsBusy ? (
+				{/* Debt tracking hidden for MVP - increases finance complexity perception */}
+				{/* {debtsBusy ? (
 					<DebtCardSkeleton />
 				) : (
-					<CardWrapper
+					<AppCard
 						onPress={() => router.push('/(tabs)/wallet/debts')}
 						accessibilityLabel="Open debt payoff details"
 					>
@@ -1129,11 +901,12 @@ export default function WalletOverviewScreen() {
 								<StatPill label="Avg Balance" value={debtSummary.average} />
 							</View>
 						</View>
-					</CardWrapper>
-				)}
+					</AppCard>
+				)} */}
+
+				<TransactionsSummaryCard />
 
 				<View style={styles.footerSpacer} />
-			</ScrollView>
 
 			{/* Breakdown Modal */}
 			<BottomSheet
@@ -1150,18 +923,10 @@ export default function WalletOverviewScreen() {
 							paddingBottom: 12,
 						}}
 					>
-						<Text
-							style={{
-								fontSize: 20,
-								fontWeight: '700',
-								color: '#0F172A',
-							}}
-						>
-							Total Tracked
-						</Text>
-						<TouchableOpacity onPress={() => setShowBreakdown(false)}>
-							<Ionicons name="close" size={24} color="#64748B" />
-						</TouchableOpacity>
+					<AppText.Heading>Total Tracked</AppText.Heading>
+					<TouchableOpacity onPress={() => setShowBreakdown(false)}>
+						<Ionicons name="close" size={24} color={palette.textSubtle} />
+					</TouchableOpacity>
 					</View>
 				}
 			>
@@ -1169,16 +934,9 @@ export default function WalletOverviewScreen() {
 					showsVerticalScrollIndicator={false}
 					contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
 				>
-					<Text
-						style={{
-							fontSize: 32,
-							fontWeight: '700',
-							color: '#0F172A',
-							marginBottom: 24,
-						}}
-					>
+					<AppText.Title style={{ marginBottom: 24 }}>
 						{currencyFormatter.format(trackedBalance)}
-					</Text>
+					</AppText.Title>
 
 					<View style={{ gap: 16 }}>
 						<View
@@ -1188,7 +946,7 @@ export default function WalletOverviewScreen() {
 								alignItems: 'center',
 								paddingVertical: 12,
 								borderBottomWidth: 1,
-								borderBottomColor: '#E5E7EB',
+								borderBottomColor: palette.border,
 							}}
 						>
 							<View
@@ -1199,7 +957,7 @@ export default function WalletOverviewScreen() {
 										width: 40,
 										height: 40,
 										borderRadius: 12,
-										backgroundColor: 'rgba(15,111,255,0.12)',
+										backgroundColor: palette.primarySubtle,
 										alignItems: 'center',
 										justifyContent: 'center',
 									}}
@@ -1207,28 +965,14 @@ export default function WalletOverviewScreen() {
 									<Ionicons
 										name="pie-chart-outline"
 										size={20}
-										color="#0F6FFF"
+										color={palette.primary}
 									/>
 								</View>
 								<View>
-									<Text
-										style={{
-											fontSize: 16,
-											fontWeight: '600',
-											color: '#0F172A',
-										}}
-									>
-										Budgets (monthly)
-									</Text>
-									<Text
-										style={{
-											fontSize: 13,
-											color: '#64748B',
-											marginTop: 2,
-										}}
-									>
+									<AppText.Heading>Budgets (monthly)</AppText.Heading>
+									<AppText.Body color="subtle" style={{ marginTop: 2 }}>
 										{formatCurrency(budgetsAmount)}
-									</Text>
+									</AppText.Body>
 								</View>
 							</View>
 						</View>
@@ -1240,7 +984,7 @@ export default function WalletOverviewScreen() {
 								alignItems: 'center',
 								paddingVertical: 12,
 								borderBottomWidth: 1,
-								borderBottomColor: '#E5E7EB',
+								borderBottomColor: palette.border,
 							}}
 						>
 							<View
@@ -1251,37 +995,24 @@ export default function WalletOverviewScreen() {
 										width: 40,
 										height: 40,
 										borderRadius: 12,
-										backgroundColor: 'rgba(15,111,255,0.12)',
+										backgroundColor: palette.primarySubtle,
 										alignItems: 'center',
 										justifyContent: 'center',
 									}}
 								>
-									<Ionicons name="flag-outline" size={20} color="#0F6FFF" />
+									<Ionicons name="flag-outline" size={20} color={palette.primary} />
 								</View>
 								<View>
-									<Text
-										style={{
-											fontSize: 16,
-											fontWeight: '600',
-											color: '#0F172A',
-										}}
-									>
-										Goals saved
-									</Text>
-									<Text
-										style={{
-											fontSize: 13,
-											color: '#64748B',
-											marginTop: 2,
-										}}
-									>
+									<AppText.Heading>Goals saved</AppText.Heading>
+									<AppText.Body color="subtle" style={{ marginTop: 2 }}>
 										{formatCurrency(goalsAmount)}
-									</Text>
+									</AppText.Body>
 								</View>
 							</View>
 						</View>
 
-						<View
+						{/* Debt tracking hidden for MVP - increases finance complexity perception */}
+						{/* <View
 							style={{
 								flexDirection: 'row',
 								justifyContent: 'space-between',
@@ -1297,27 +1028,26 @@ export default function WalletOverviewScreen() {
 										width: 40,
 										height: 40,
 										borderRadius: 12,
-										backgroundColor: 'rgba(15,111,255,0.12)',
+										backgroundColor: palette.primarySubtle,
 										alignItems: 'center',
 										justifyContent: 'center',
 									}}
 								>
-									<Ionicons name="card-outline" size={20} color="#0F6FFF" />
+									<Ionicons name="card-outline" size={20} color={palette.primary} />
 								</View>
 								<View>
 									<Text
 										style={{
-											fontSize: 16,
-											fontWeight: '600',
-											color: '#0F172A',
+											...type.h2,
+											color: palette.text,
 										}}
 									>
 										Debt remaining
 									</Text>
 									<Text
 										style={{
-											fontSize: 13,
-											color: '#64748B',
+											...type.body,
+											color: palette.textMuted,
 											marginTop: 2,
 										}}
 									>
@@ -1325,10 +1055,10 @@ export default function WalletOverviewScreen() {
 									</Text>
 								</View>
 							</View>
-						</View>
+						</View> */}
 					</View>
 				</ScrollView>
 			</BottomSheet>
-		</SafeAreaView>
+		</AppScreen>
 	);
 }

@@ -123,8 +123,27 @@ export default function EditNameScreen() {
 				},
 			]);
 		} catch (error) {
-			logger.error('Error updating name:', error);
-			Alert.alert('Error', 'Failed to update name');
+			// Enhanced error logging
+			const errorMessage = error instanceof Error 
+				? error.message 
+				: typeof error === 'string'
+				? error
+				: error && typeof error === 'object' && 'message' in error
+				? String(error.message)
+				: 'Failed to update name';
+			
+			logger.error('Error updating name:', {
+				error,
+				errorMessage,
+				errorType: typeof error,
+				errorString: String(error),
+				errorJSON: JSON.stringify(error, Object.getOwnPropertyNames(error)),
+			});
+			
+			Alert.alert(
+				'Error', 
+				errorMessage || 'Failed to update name. Please try again.'
+			);
 		} finally {
 			setIsLoading(false);
 		}

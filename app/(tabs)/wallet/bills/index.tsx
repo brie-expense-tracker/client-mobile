@@ -21,6 +21,7 @@ import {
 	LoadingState,
 	EmptyState,
 	SegmentedControl,
+	FAB,
 	palette,
 	space,
 } from '../../../../src/ui';
@@ -255,11 +256,9 @@ const BillsScreen: React.FC = () => {
 					/>
 				}
 			>
-				{/* Top-sheet hero like Budgets / Debts / Goals */}
+				{/* Top sheet hero */}
 				<View style={styles.heroShell}>
-					<View style={styles.billsSummaryCardWrapper}>
-						<BillsSummaryCard summary={summary} onAddPress={handleAddExpense} />
-					</View>
+					<BillsSummaryCard summary={summary} />
 				</View>
 
 				<Section
@@ -297,6 +296,7 @@ const BillsScreen: React.FC = () => {
 					)}
 				</Section>
 			</ScrollView>
+			{filteredExpenses.length > 0 && <FAB onPress={handleAddExpense} />}
 		</Page>
 	);
 };
@@ -304,35 +304,21 @@ const BillsScreen: React.FC = () => {
 const styles = StyleSheet.create({
 	scroll: {
 		flex: 1,
-		backgroundColor: palette.surfaceAlt, // light grey
+		backgroundColor: palette.surfaceAlt,
 	},
 	scrollContent: {
 		paddingBottom: space.xl,
 	},
 
-	// background of the top area – stays light grey now
+	// ✅ match BudgetScreen heroShell exactly
 	heroShell: {
-		backgroundColor: palette.surfaceAlt,
 		paddingTop: space.lg,
-		paddingBottom: space.lg,
+		paddingBottom: space.md,
 		paddingHorizontal: space.lg,
-	},
-
-	// actual white card behind the bills summary
-	billsSummaryCardWrapper: {
-		backgroundColor: palette.surface,
-		borderRadius: 24,
-		padding: space.lg,
-		shadowColor: '#000',
-		shadowOpacity: 0.06,
-		shadowRadius: 18,
-		shadowOffset: { width: 0, height: 10 },
-		elevation: 4,
 	},
 
 	expensesSection: {
 		marginTop: space.lg,
-		paddingHorizontal: space.lg,
 		paddingTop: space.sm,
 	},
 });

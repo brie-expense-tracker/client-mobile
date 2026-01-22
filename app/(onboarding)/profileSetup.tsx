@@ -29,7 +29,6 @@ import { useProfile } from '../../src/context/profileContext';
 type FieldErrors = {
 	firstName?: string;
 	lastName?: string;
-	monthlyIncome?: string;
 	netPerPaycheck?: string;
 	payCadence?: string;
 	financialGoal?: string;
@@ -96,7 +95,6 @@ const OnboardingScreen = () => {
 	// Basic Info
 	const [firstName, setFirstName] = useState('');
 	const [lastName, setLastName] = useState('');
-	const [monthlyIncome, setMonthlyIncome] = useState(''); // optional manual override
 	const [payCadence, setPayCadence] = useState<
 		'weekly' | 'biweekly' | 'semimonthly' | 'monthly' | ''
 	>('');
@@ -114,7 +112,6 @@ const OnboardingScreen = () => {
 	const [touched, setTouched] = useState<{
 		firstName: boolean;
 		lastName: boolean;
-		monthlyIncome: boolean;
 		netPerPaycheck: boolean;
 		payCadence: boolean;
 		financialGoal: boolean;
@@ -123,7 +120,6 @@ const OnboardingScreen = () => {
 	}>({
 		firstName: false,
 		lastName: false,
-		monthlyIncome: false,
 		netPerPaycheck: false,
 		payCadence: false,
 		financialGoal: false,
@@ -168,8 +164,6 @@ const OnboardingScreen = () => {
 		if (profile) {
 			if (profile.firstName) setFirstName(profile.firstName);
 			if (profile.lastName) setLastName(profile.lastName);
-			if (profile.monthlyIncome)
-				setMonthlyIncome(profile.monthlyIncome.toString());
 			if (profile.pay?.cadence) setPayCadence(profile.pay.cadence as any);
 			if (profile.pay?.netPerPaycheck)
 				setNetPerPaycheck(profile.pay.netPerPaycheck.toString());
@@ -238,9 +232,6 @@ const OnboardingScreen = () => {
 	if (touched.lastName && !isValidName(lastName)) {
 		errors.lastName = 'Last name must be at least 2 characters.';
 	}
-	if (touched.monthlyIncome && !isValidCurrency(monthlyIncome)) {
-		errors.monthlyIncome = 'Please enter a valid amount (e.g., 2450.50).';
-	}
 	if (touched.payCadence && !isValidCadence(payCadence)) {
 		errors.payCadence = 'Select your pay schedule.';
 	}
@@ -260,7 +251,6 @@ const OnboardingScreen = () => {
 	const stepValid = useMemo(() => {
 		if (currentIndex === 0) return true; // welcome screen
 		if (currentIndex === 1) {
-			const hasMonthlyIncome = monthlyIncome && parseFloat(monthlyIncome) > 0;
 			const hasPayInfo =
 				isValidCadence(payCadence) &&
 				netPerPaycheck &&
@@ -268,8 +258,7 @@ const OnboardingScreen = () => {
 			return (
 				isValidName(firstName) &&
 				isValidName(lastName) &&
-				// either a valid manual monthly income OR a valid cadence + net per paycheck
-				(hasMonthlyIncome || hasPayInfo)
+				hasPayInfo
 			);
 		}
 		if (currentIndex === 2) {
@@ -285,7 +274,6 @@ const OnboardingScreen = () => {
 		currentIndex,
 		firstName,
 		lastName,
-		monthlyIncome,
 		payCadence,
 		netPerPaycheck,
 		financialGoal,
@@ -308,16 +296,14 @@ const OnboardingScreen = () => {
 				return true;
 			}
 
-			// Income logic: either monthlyIncome OR (payCadence + netPerPaycheck)
+			// Income fields: always required
 			if (fieldName === 'payCadence' || fieldName === 'netPerPaycheck') {
-				const hasMonthlyIncome = monthlyIncome && parseFloat(monthlyIncome) > 0;
-				return !hasMonthlyIncome;
+				return true;
 			}
 
-			// monthlyIncome is never strictly required (it's an alternative path)
 			return false;
 		},
-		[monthlyIncome]
+		[]
 	);
 
 	// Helper to determine if we should show error styling on asterisk (after user interaction)
@@ -336,21 +322,16 @@ const OnboardingScreen = () => {
 					!isValidName(lastName)
 				)
 					return true;
-
-				const hasMonthlyIncome = monthlyIncome && parseFloat(monthlyIncome) > 0;
-
 				if (
 					fieldName === 'payCadence' &&
 					touched.payCadence &&
-					!isValidCadence(payCadence) &&
-					!hasMonthlyIncome
+					!isValidCadence(payCadence)
 				)
 					return true;
 				if (
 					fieldName === 'netPerPaycheck' &&
 					touched.netPerPaycheck &&
-					(!netPerPaycheck || parseFloat(netPerPaycheck) <= 0) &&
-					!hasMonthlyIncome
+					(!netPerPaycheck || parseFloat(netPerPaycheck) <= 0)
 				)
 					return true;
 			} else if (currentIndex === 2) {
@@ -382,7 +363,6 @@ const OnboardingScreen = () => {
 			lastName,
 			payCadence,
 			netPerPaycheck,
-			monthlyIncome,
 			financialGoal,
 			housingExpense,
 			budgetCycleStart,
@@ -410,7 +390,6 @@ const OnboardingScreen = () => {
 				...prev,
 				firstName: true,
 				lastName: true,
-				monthlyIncome: true,
 				payCadence: true,
 				netPerPaycheck: true,
 			}));
@@ -436,7 +415,6 @@ const OnboardingScreen = () => {
 		setTouched({
 			firstName: true,
 			lastName: true,
-			monthlyIncome: true,
 			netPerPaycheck: true,
 			payCadence: true,
 			financialGoal: true,
@@ -452,7 +430,6 @@ const OnboardingScreen = () => {
 				firstNameLength: firstName.trim().length,
 				lastName: lastName.trim(),
 				lastNameLength: lastName.trim().length,
-				monthlyIncome,
 				payCadence,
 				netPerPaycheck,
 				financialGoal,
@@ -466,10 +443,7 @@ const OnboardingScreen = () => {
 		logger.debug('✅ [ProfileSetup] Form is valid, proceeding with submission');
 		setSubmitting(true);
 		try {
-			const monthlyIncomeNumber =
-				monthlyIncome && parseFloat(monthlyIncome) > 0
-					? parseFloat(monthlyIncome)
-					: derivedMonthlyIncome;
+			const monthlyIncomeNumber = derivedMonthlyIncome;
 
 			const trimmedFirstName = firstName.trim();
 			const trimmedLastName = lastName.trim();
@@ -506,7 +480,9 @@ const OnboardingScreen = () => {
 				budgetCycleStart,
 			});
 
-			const profileData = {
+			// Build minimal PATCH-like payload with only user-entered fields
+			// Defaults are applied server-side or in context, not here
+			const profileData: any = {
 				firstName: trimmedFirstName,
 				lastName: trimmedLastName,
 				monthlyIncome: isNaN(monthlyIncomeNumber) ? 0 : monthlyIncomeNumber,
@@ -520,84 +496,33 @@ const OnboardingScreen = () => {
 				financialGoal,
 				expenses: {
 					housing: housingExpense ? parseFloat(housingExpense) : 0,
-					loans: 0,
-					subscriptions: 0,
-				},
-				savings: 0,
-				debt: 0,
-				riskProfile: {
-					tolerance: '3',
-					experience: '3',
-				},
-				preferences: {
-					adviceFrequency: 'Weekly summary',
-					autoSave: {
-						enabled: false,
-						amount: 0,
-					},
-					notifications: {
-						enableNotifications: true,
-						weeklySummary: true,
-						overspendingAlert: true,
-						aiSuggestion: true,
-						budgetMilestones: true,
-						monthlyFinancialCheck: true,
-						monthlySavingsTransfer: false,
-					},
-					aiInsights: {
-						enabled: true,
-						frequency: 'weekly' as const,
-						pushNotifications: true,
-						emailAlerts: false,
-						insightTypes: {
-							budgetingTips: true,
-							expenseReduction: true,
-							incomeSuggestions: true,
-						},
-					},
-					budgetSettings: {
-						cycleType: 'monthly' as const,
-						cycleStart: budgetCycleStart ?? 1,
-						alertPct: 80,
-						carryOver: false,
-						autoSync: true,
-					},
-					goalSettings: {
-						defaults: {
-							target:
-								financialGoal === 'Build an emergency fund' &&
-								emergencyFundMonths
-									? (housingExpense ? parseFloat(housingExpense) : 0) *
-									  emergencyFundMonths
-									: 1000,
-							dueDays: 90,
-							sortBy: 'percent',
-							currency: 'USD',
-							emergencyFundMonths: emergencyFundMonths || 3,
-						},
-						ai: {
-							enabled: true,
-							tone: 'friendly',
-							frequency: 'medium',
-							whatIf: true,
-						},
-						notifications: {
-							milestoneAlerts: true,
-							weeklySummary: false,
-							offTrackAlert: true,
-						},
-						display: {
-							showCompleted: true,
-							autoArchive: true,
-							rounding: '1',
-						},
-						security: {
-							lockEdit: false,
-							undoWindow: 24,
-						},
-					},
 				},
 			};
+
+			// Only send preferences fields that the user explicitly set
+			// Note: Backend should merge nested objects, not replace them
+			// If backend doesn't support nested merging, defaults should be applied server-side
+			const userBudgetCycleStart = budgetCycleStart ?? 1;
+			
+			// Always send budget cycle start since user selected it in onboarding
+			profileData.preferences = {
+				budgetSettings: {
+					cycleStart: userBudgetCycleStart,
+				},
+			};
+
+			// Handle emergency fund goal-specific overrides
+			if (financialGoal === 'Build an emergency fund') {
+				const emergencyMonths = emergencyFundMonths || 3;
+				const emergencyTarget = (housingExpense ? parseFloat(housingExpense) : 0) * emergencyMonths;
+				
+				profileData.preferences.goalSettings = {
+					defaults: {
+						emergencyFundMonths: emergencyMonths,
+						target: emergencyTarget,
+					},
+				};
+			}
 
 			// Update profile using profileContext
 			logger.debug('📡 [ProfileSetup] Calling updateProfile...');
@@ -625,7 +550,6 @@ const OnboardingScreen = () => {
 						firstNameLength: firstName.trim().length,
 						lastName: lastName.trim(),
 						lastNameLength: lastName.trim().length,
-						monthlyIncome,
 						payCadence,
 						netPerPaycheck,
 					},
@@ -680,7 +604,6 @@ const OnboardingScreen = () => {
 		stepValid,
 		firstName,
 		lastName,
-		monthlyIncome,
 		payCadence,
 		netPerPaycheck,
 		derivedMonthlyIncome,

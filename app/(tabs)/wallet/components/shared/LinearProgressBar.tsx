@@ -25,17 +25,21 @@ type Props = {
 	leftLabel?: string;
 	/** container style override */
 	style?: ViewStyle;
+
+	/** spacing between labels and bar */
+	labelGap?: number;
 };
 
 const LinearProgressBar: React.FC<Props> = ({
 	percent,
 	height = 6,
-	color = '#0EA5E9', // sky-500
-	trackColor = '#EEF2F7', // very light gray/blue
+	color = '#0EA5E9',
+	trackColor = '#EEF2F7',
 	animated = true,
 	leftLabel,
 	rightLabel,
 	style,
+	labelGap = 6, // ↓ tighter by default
 }) => {
 	const clamped = Math.max(0, Math.min(100, percent));
 	const anim = useRef(new Animated.Value(0)).current;
@@ -60,18 +64,23 @@ const LinearProgressBar: React.FC<Props> = ({
 		outputRange: ['0%', '100%'],
 	});
 
-	// Slightly darker edge for depth (no gradients/deps needed)
-	const darker = useMemo(() => {
-		// quick tone-down
-		return shade(color, -12);
-	}, [color]);
+	const darker = useMemo(() => shade(color, -12), [color]);
+
+	// ✅ Only render labels if they have meaningful text
+	const left = (leftLabel ?? '').trim();
+	const right = (rightLabel ?? '').trim();
+	const showLabels = left.length > 0 || right.length > 0;
 
 	return (
 		<View style={style}>
-			{(leftLabel || rightLabel) && (
-				<View style={styles.headerRow}>
-					<Text style={styles.leftLabel}>{leftLabel}</Text>
-					<Text style={styles.rightLabel}>{rightLabel}</Text>
+			{showLabels && (
+				<View style={[styles.headerRow, { marginBottom: labelGap }]}>
+					<Text style={styles.leftLabel} numberOfLines={1}>
+						{left}
+					</Text>
+					<Text style={styles.rightLabel} numberOfLines={1}>
+						{right}
+					</Text>
 				</View>
 			)}
 
@@ -81,7 +90,6 @@ const LinearProgressBar: React.FC<Props> = ({
 					{ height, borderRadius: radius, backgroundColor: trackColor },
 				]}
 			>
-				{/* Fill */}
 				<Animated.View
 					style={[
 						styles.fill,
@@ -90,7 +98,6 @@ const LinearProgressBar: React.FC<Props> = ({
 							height,
 							borderRadius: radius,
 							backgroundColor: color,
-							// subtle inner shadow / edge
 							borderTopColor: '#FFFFFF',
 							borderTopWidth: 0.5,
 							borderBottomColor: darker,
@@ -99,7 +106,6 @@ const LinearProgressBar: React.FC<Props> = ({
 					]}
 				/>
 
-				{/* Gloss highlight */}
 				<View
 					pointerEvents="none"
 					style={[
@@ -115,7 +121,6 @@ const LinearProgressBar: React.FC<Props> = ({
 	);
 };
 
-// tiny util to darken/lighten hex by percent
 function shade(hex: string, percent: number) {
 	const c = hex.replace('#', '');
 	const num = parseInt(c.length === 3 ? c.replace(/(.)/g, '$1$1') : c, 16);
@@ -139,17 +144,17 @@ const styles = StyleSheet.create({
 	headerRow: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
-		marginBottom: 8,
+		alignItems: 'center',
 	},
 	leftLabel: {
-		fontSize: 14,
-		color: '#4B5563',
-		fontWeight: '500',
+		fontSize: 12, // ↓ smaller + cleaner
+		color: '#6B7280',
+		fontWeight: '600',
 	},
 	rightLabel: {
-		fontSize: 14,
-		color: '#6B7280',
-		fontWeight: '500',
+		fontSize: 12,
+		color: '#9CA3AF',
+		fontWeight: '600',
 	},
 	track: {
 		width: '100%',
@@ -159,11 +164,6 @@ const styles = StyleSheet.create({
 		position: 'absolute',
 		left: 0,
 		top: 0,
-	},
-	cap: {
-		position: 'absolute',
-		top: 0,
-		right: 0,
 	},
 	gloss: {
 		position: 'absolute',

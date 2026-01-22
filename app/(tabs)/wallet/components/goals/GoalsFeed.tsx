@@ -20,6 +20,7 @@ import {
 	palette,
 	radius,
 	space,
+	shadow,
 	type as typography,
 } from '../../../../../src/ui';
 
@@ -311,6 +312,7 @@ const styles = StyleSheet.create({
 		borderWidth: 1,
 		borderColor: palette.borderMuted,
 		marginBottom: space.sm,
+		...shadow.soft,
 	},
 	cardPressed: {
 		backgroundColor: palette.surfaceSubtle,

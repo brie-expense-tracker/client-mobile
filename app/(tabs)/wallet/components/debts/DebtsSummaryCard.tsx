@@ -1,8 +1,8 @@
 // app/(tabs)/wallet/components/debts/DebtsSummaryCard.tsx
 
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet } from 'react-native';
+import SummaryHeroCard from '../shared/SummaryHeroCard';
 import { palette, space, type as typography } from '../../../../../src/ui';
 import { currency } from '../../../../../src/utils/format';
 
@@ -24,25 +24,12 @@ const DebtsSummaryCard: React.FC<Props> = ({
 	onAddDebt,
 }) => {
 	return (
-		<View style={styles.container}>
-			{/* Header */}
-			<View style={styles.header}>
-				<View style={styles.headerContent}>
-					<Text style={styles.overline}>Track your debts</Text>
-					<Text style={styles.headerTitle}>Debt Overview</Text>
-				</View>
-
-				<TouchableOpacity
-					activeOpacity={0.85}
-					onPress={onAddDebt}
-					style={styles.iconButton}
-					accessibilityRole="button"
-					accessibilityLabel="Add a debt"
-				>
-					<Ionicons name="add" size={20} color={palette.primary} />
-				</TouchableOpacity>
-			</View>
-
+		<SummaryHeroCard
+			overline="TRACK YOUR DEBTS"
+			title="Debt Overview"
+			addButtonLabel="Add Debt"
+			onAddPress={onAddDebt}
+		>
 			{/* Main total */}
 			<View style={styles.totalRow}>
 				<View>
@@ -78,65 +65,17 @@ const DebtsSummaryCard: React.FC<Props> = ({
 					</Text>
 				</View>
 			</View>
-		</View>
+		</SummaryHeroCard>
 	);
 };
 
 const styles = StyleSheet.create({
-	container: {
-		// hero-style: parent supplies horizontal padding
-		paddingTop: space.xs,
-		paddingBottom: space.lg,
-	},
-
-	/* HEADER */
-	header: {
-		flexDirection: 'row',
-		alignItems: 'flex-start',
-		justifyContent: 'space-between',
-		marginBottom: space.md,
-	},
-	headerContent: {
-		flex: 1,
-	},
-	overline: {
-		...typography.labelSm,
-		color: palette.textMuted,
-		marginBottom: 6,
-		letterSpacing: 1.2,
-		textTransform: 'uppercase',
-	},
-	headerTitle: {
-		...typography.titleMd,
-		fontSize: 30,
-		lineHeight: 34,
-		fontWeight: '700',
-		color: palette.text,
-	},
-	headerSubtitle: {
-		...typography.bodySm,
-		color: palette.textMuted,
-		marginTop: 8,
-	},
-	iconButton: {
-		width: 44,
-		height: 44,
-		borderRadius: 22,
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: palette.primarySoft,
-		shadowColor: '#000',
-		shadowOpacity: 0.06,
-		shadowRadius: 10,
-		shadowOffset: { width: 0, height: 6 },
-		elevation: 3,
-	},
-
 	/* TOTAL ROW */
 	totalRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
+		marginTop: space.md,
 		marginBottom: space.lg,
 	},
 	totalLabel: {

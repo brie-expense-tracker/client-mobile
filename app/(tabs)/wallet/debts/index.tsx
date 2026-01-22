@@ -96,18 +96,16 @@ export default function DebtsScreen() {
 					/>
 				}
 			>
-				{/* Top-sheet hero, same pattern as budgets/bills/goals */}
+				{/* Top sheet hero */}
 				<View style={styles.heroShell}>
-					<View style={styles.debtSummaryCardWrapper}>
-						<DebtsSummaryCard
-							totalDebt={totalDebt}
-							accountsCount={accountsCount}
-							highestAPR={highestAPR}
-							averageAPR={averageAPR}
-							totalMinPayment={totalMinPayment ?? undefined}
-							onAddDebt={handleAddDebt}
-						/>
-					</View>
+					<DebtsSummaryCard
+						totalDebt={totalDebt}
+						accountsCount={accountsCount}
+						highestAPR={highestAPR}
+						averageAPR={averageAPR}
+						totalMinPayment={totalMinPayment ?? undefined}
+						onAddDebt={handleAddDebt}
+					/>
 				</View>
 
 				{/* List */}
@@ -146,29 +144,15 @@ const styles = StyleSheet.create({
 		paddingBottom: space.xl,
 	},
 
-	// background of the top area – stays light grey now
+	// ✅ match BudgetScreen heroShell exactly
 	heroShell: {
-		backgroundColor: palette.surfaceAlt,
 		paddingTop: space.lg,
-		paddingBottom: space.lg,
+		paddingBottom: space.md,
 		paddingHorizontal: space.lg,
-	},
-
-	// actual white card behind the debt summary
-	debtSummaryCardWrapper: {
-		backgroundColor: palette.surface,
-		borderRadius: 24,
-		padding: space.lg,
-		shadowColor: '#000',
-		shadowOpacity: 0.06,
-		shadowRadius: 18,
-		shadowOffset: { width: 0, height: 10 },
-		elevation: 4,
 	},
 
 	debtsSection: {
 		marginTop: space.lg,
-		paddingHorizontal: space.lg,
 		paddingTop: space.sm,
 	},
 	debtsFeedContainer: {

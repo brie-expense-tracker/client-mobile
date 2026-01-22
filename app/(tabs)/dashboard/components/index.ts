@@ -7,7 +7,8 @@ export { default as SettingsBudgetsGoalsWidget } from './SettingsBudgetsGoalsWid
 export { default as AICoachSection } from './AICoachSection';
 export { default as BillsList } from '../../wallet/components/shared/BillsList';
 export { default as BillsSummaryWidget } from './BillsSummaryWidget';
-export { default as SpendingForecastCard } from './SpendingForecastCard';
+// SpendingForecastCard removed for MVP - analytics/forecasting hidden to reduce complexity
+// export { default as SpendingForecastCard } from './SpendingForecastCard';
 
 // Default export for React Router compatibility
 export { default } from './StatWidget';

@@ -16,7 +16,7 @@ import {
 	Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
 	OrchestratorAIService,
@@ -104,9 +104,11 @@ const LEGACY_STREAM_FALLBACK_ACK =
 
 export default function ChatScreen() {
 	const router = useRouter();
+	const params = useLocalSearchParams<{ initialMessage?: string }>();
 	const insets = useSafeAreaInsets();
 	const [composerH, onComposerLayout] = useComposerHeight(56);
 	const { profile } = useProfile();
+	const hasProcessedInitialMessage = useRef(false);
 	const { budgets } = useBudget();
 	const aiInsightsEnabled = useFeature('aiInsights');
 	const { goals } = useGoal() as { goals: any[] };
@@ -628,6 +630,7 @@ export default function ChatScreen() {
 		return () => clearTimeout(timer);
 	}, []);
 
+
 	// Proactively clear cached insights when the user turns the toggle OFF
 	useEffect(() => {
 		const personalizationEnabled = isPersonalizationOn(config);
@@ -894,6 +897,7 @@ export default function ChatScreen() {
 		setInputText(text);
 		await handleSendMessage(text);
 	};
+
 
 	const handleSendMessage = async (messageOverride?: string) => {
 		const sourceText = messageOverride ?? inputText;
@@ -1643,6 +1647,28 @@ export default function ChatScreen() {
 		// Send directly without setTimeout
 		await sendFromComposer(question);
 	};
+
+	// Process initial message from query params once orchestrator is ready
+	useEffect(() => {
+		const initialMessage = params.initialMessage;
+		
+		if (
+			initialMessage &&
+			!hasProcessedInitialMessage.current &&
+			orchestratorService &&
+			!isStreaming &&
+			dataInitialized
+		) {
+			hasProcessedInitialMessage.current = true;
+			// Small delay to ensure UI is ready
+			const timer = setTimeout(() => {
+				sendFromComposer(initialMessage);
+			}, 300);
+			
+			return () => clearTimeout(timer);
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [params.initialMessage, orchestratorService, isStreaming, dataInitialized]);
 
 	// Handle expand button
 	const handleExpand = async () => {

@@ -21,11 +21,12 @@ import {
 	Keyboard,
 	InputAccessoryView,
 	InteractionManager,
+	Dimensions,
 } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Calendar } from 'react-native-calendars';
 import { TransactionContext } from '../../../src/context/transactionContext';
 import { useGoal, Goal } from '../../../src/context/goalContext';
@@ -37,15 +38,18 @@ import { navigateToGoalsWithModal } from '../../../src/utils/navigationUtils';
 import BottomSheet from '../../../src/components/BottomSheet';
 import { isDevMode } from '../../../src/config/environment';
 import { createLogger } from '../../../src/utils/sublogger';
-import {
-	DashboardService,
-	DashboardRollup,
-	DebtRollup,
-} from '../../../src/services/feature/dashboardService';
+// DashboardService and DashboardRollup removed - no longer used in this screen
 import { normalizeIconName } from '../../../src/constants/uiConstants';
 import { resolveBillAppearance } from '../../../src/utils/billAppearance';
-import { palette, radius, shadow, space, type } from '../../../src/ui/theme';
+import { palette, radius, space, type } from '../../../src/ui/theme';
 import { getItem, setItem, removeItem } from '../../../src/utils/safeStorage';
+import {
+	AppScreen,
+	AppCard,
+	AppText,
+	AppButton,
+	AppRow,
+} from '../../../src/ui/primitives';
 
 // Create namespaced logger for this service
 const transactionScreenLog = createLogger('TransactionScreen');
@@ -66,10 +70,12 @@ interface TransactionFormData {
 
 // ---------- Utils
 const getLocalIsoDate = (): string => {
+	// Format date directly from local components to avoid timezone conversion issues
 	const today = new Date();
-	const offset = today.getTimezoneOffset();
-	const local = new Date(today.getTime() - offset * 60 * 1000);
-	return local.toISOString().split('T')[0];
+	const year = today.getFullYear();
+	const month = String(today.getMonth() + 1).padStart(2, '0');
+	const day = String(today.getDate()).padStart(2, '0');
+	return `${year}-${month}-${day}`;
 };
 
 // Allow only digits + one dot, clamp to two decimals
@@ -110,11 +116,14 @@ export default function TransactionScreenProModern() {
 		mode?: 'income' | 'expense';
 	}>();
 	const amountRef = useRef<TextInput>(null);
-	const descRef = useRef<TextInput>(null);
+	const noteInputRef = useRef<TextInput>(null);
 	const scrollRef = useRef<ScrollView>(null);
+	const scrollYRef = useRef(0);
+	const [keyboardHeight, setKeyboardHeight] = useState(0);
+	const insets = useSafeAreaInsets();
 
-	// Stable bottom padding for tab screens (tab bar already handles bottom inset)
-	const contentBottomPad = space.xl;
+	// Bottom padding: safe area + additional breathing room
+	const contentBottomPad = insets.bottom + space.xl;
 
 	const [mode, setMode] = useState<'income' | 'expense'>(
 		params.mode === 'expense' ? 'expense' : 'expense' // default to Expense
@@ -123,22 +132,31 @@ export default function TransactionScreenProModern() {
 	const [selectedBudgets, setSelectedBudgets] = useState<Budget[]>([]);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [pickerOpen, setPickerOpen] = useState<
-		null | 'goal' | 'budget' | 'debt' | 'bill'
+		null | 'goal' | 'budget' | 'bill' // 'debt' removed for MVP
 	>(null);
 	const [datePickerOpen, setDatePickerOpen] = useState(false);
 	const [mountCalendar, setMountCalendar] = useState(false);
-	const [debts, setDebts] = useState<DebtRollup[]>([]);
-	const [debtsLoading, setDebtsLoading] = useState(false);
-	const [selectedDebt, setSelectedDebt] = useState<DebtRollup | null>(null);
+	// Debt tracking hidden for MVP - increases finance complexity perception
+	// const [debts, setDebts] = useState<DebtRollup[]>([]);
+	// const [debtsLoading, setDebtsLoading] = useState(false);
+	// const [selectedDebt, setSelectedDebt] = useState<DebtRollup | null>(null);
 	const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
 	const [isAmountLocked, setIsAmountLocked] = useState(false);
 	const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+	const [showAdvanced, setShowAdvanced] = useState(false);
 
 	const { addTransaction } = useContext(TransactionContext);
 	const { goals, isLoading: goalsLoading } = useGoal();
 	const { budgets, isLoading: budgetsLoading } = useBudget();
 	const { expenses: bills, isLoading: billsLoading } = useBills();
 	const { firebaseUser, user } = useAuth();
+
+	// Auto-expand Advanced section if bill is selected
+	useEffect(() => {
+		if (selectedBill && bills?.length > 0) {
+			setShowAdvanced(true);
+		}
+	}, [selectedBill, bills]);
 
 	// Debug logging for goals and budgets
 	useEffect(() => {
@@ -161,39 +179,40 @@ export default function TransactionScreenProModern() {
 		}
 	}, [budgets, budgetsLoading]);
 
+	// Debt tracking hidden for MVP - increases finance complexity perception
 	// Load debts once
-	useEffect(() => {
-		let isMounted = true;
-		const loadDebts = async () => {
-			// Don't fetch if user is not authenticated
-			if (!firebaseUser || !user) {
-				if (isMounted) setDebtsLoading(false);
-				return;
-			}
+	// useEffect(() => {
+	// 	let isMounted = true;
+	// 	const loadDebts = async () => {
+	// 		// Don't fetch if user is not authenticated
+	// 		if (!firebaseUser || !user) {
+	// 			if (isMounted) setDebtsLoading(false);
+	// 			return;
+	// 		}
 
-			try {
-				setDebtsLoading(true);
-				const rollup: DashboardRollup =
-					await DashboardService.getDashboardRollup();
-				if (!isMounted) return;
-				setDebts(rollup.debts?.debts || []);
-			} catch (err: any) {
-				// Silently handle auth errors (expected on logout)
-				if (err?.isAuthError || err?.message === 'User not authenticated') {
-					return;
-				}
-				if (isDevMode) {
-					transactionScreenLog.error('Failed to load debts', err);
-				}
-			} finally {
-				if (isMounted) setDebtsLoading(false);
-			}
-		};
-		loadDebts();
-		return () => {
-			isMounted = false;
-		};
-	}, [firebaseUser, user]);
+	// 		try {
+	// 			setDebtsLoading(true);
+	// 			const rollup: DashboardRollup =
+	// 				await DashboardService.getDashboardRollup();
+	// 			if (!isMounted) return;
+	// 			setDebts(rollup.debts?.debts || []);
+	// 		} catch (err: any) {
+	// 			// Silently handle auth errors (expected on logout)
+	// 			if (err?.isAuthError || err?.message === 'User not authenticated') {
+	// 				return;
+	// 			}
+	// 			if (isDevMode) {
+	// 				transactionScreenLog.error('Failed to load debts', err);
+	// 			}
+	// 		} finally {
+	// 			if (isMounted) setDebtsLoading(false);
+	// 		}
+	// 	};
+	// 	loadDebts();
+	// 	return () => {
+	// 		isMounted = false;
+	// 	};
+	// }, [firebaseUser, user]);
 
 	const ready = mode === 'income' ? !goalsLoading : !budgetsLoading;
 
@@ -203,6 +222,26 @@ export default function TransactionScreenProModern() {
 			setHasLoadedOnce(true);
 		}
 	}, [ready, hasLoadedOnce]);
+
+	// Track keyboard height
+	useEffect(() => {
+		const onShow = (e: any) => setKeyboardHeight(e?.endCoordinates?.height ?? 0);
+		const onHide = () => setKeyboardHeight(0);
+
+		const showSub = Keyboard.addListener(
+			Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+			onShow
+		);
+		const hideSub = Keyboard.addListener(
+			Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+			onHide
+		);
+
+		return () => {
+			showSub.remove();
+			hideSub.remove();
+		};
+	}, []);
 
 	// Defer Calendar mount until after interactions settle
 	useEffect(() => {
@@ -255,7 +294,7 @@ export default function TransactionScreenProModern() {
 	const FORM_STATE_KEY = 'transaction_form_state';
 	const [isNewForm, setIsNewForm] = useState(true);
 	const [hasRestoredState, setHasRestoredState] = useState(false);
-	const [savedDebtId, setSavedDebtId] = useState<string | null>(null);
+	// const [savedDebtId, setSavedDebtId] = useState<string | null>(null); // Debt tracking hidden for MVP
 	const [savedBillId, setSavedBillId] = useState<string | null>(null);
 
 	// Restore saved form state on mount (immediate, no deferral)
@@ -284,7 +323,7 @@ export default function TransactionScreenProModern() {
 					if (state.mode) setMode(state.mode);
 					if (state.selectedGoals) setSelectedGoals(state.selectedGoals);
 					if (state.selectedBudgets) setSelectedBudgets(state.selectedBudgets);
-					if (state.selectedDebtId) setSavedDebtId(state.selectedDebtId);
+					// if (state.selectedDebtId) setSavedDebtId(state.selectedDebtId); // Debt tracking hidden for MVP
 					if (state.selectedBillId) setSavedBillId(state.selectedBillId);
 				} else {
 					setIsNewForm(true);
@@ -301,16 +340,17 @@ export default function TransactionScreenProModern() {
 		};
 	}, [setValue]);
 
+	// Debt tracking hidden for MVP - increases finance complexity perception
 	// Restore selectedDebt after debts are loaded
-	useEffect(() => {
-		if (savedDebtId && debts.length > 0 && !selectedDebt) {
-			const debt = debts.find((d) => d.debtId === savedDebtId);
-			if (debt) {
-				setSelectedDebt(debt);
-			}
-			setSavedDebtId(null);
-		}
-	}, [savedDebtId, debts, selectedDebt]);
+	// useEffect(() => {
+	// 	if (savedDebtId && debts.length > 0 && !selectedDebt) {
+	// 		const debt = debts.find((d) => d.debtId === savedDebtId);
+	// 		if (debt) {
+	// 			setSelectedDebt(debt);
+	// 		}
+	// 		setSavedDebtId(null);
+	// 	}
+	// }, [savedDebtId, debts, selectedDebt]);
 
 	// Restore selectedBill after bills are loaded
 	useEffect(() => {
@@ -341,7 +381,7 @@ export default function TransactionScreenProModern() {
 					mode,
 					selectedGoals,
 					selectedBudgets,
-					selectedDebtId: selectedDebt?.debtId || null,
+					// selectedDebtId: selectedDebt?.debtId || null, // Debt tracking hidden for MVP
 					selectedBillId: selectedBill
 						? selectedBill.patternId || (selectedBill as any).id
 						: null,
@@ -353,7 +393,7 @@ export default function TransactionScreenProModern() {
 					!!description ||
 					selectedGoals.length > 0 ||
 					selectedBudgets.length > 0 ||
-					!!selectedDebt ||
+					// !!selectedDebt || // Debt tracking hidden for MVP
 					!!selectedBill;
 
 				if (hasData) {
@@ -381,7 +421,7 @@ export default function TransactionScreenProModern() {
 		mode,
 		selectedGoals,
 		selectedBudgets,
-		selectedDebt,
+		// selectedDebt, // Debt tracking hidden for MVP
 		selectedBill,
 		hasRestoredState,
 	]);
@@ -398,6 +438,39 @@ export default function TransactionScreenProModern() {
 	const canSubmit = isValid && !isSubmitting && amountNumber > 0;
 
 	// ---------- Handlers
+	const focusNoteCentered = useCallback(() => {
+		// Focus first so keyboard starts opening
+		noteInputRef.current?.focus();
+
+		// Wait a tick so layout updates + keyboard animation begins
+		requestAnimationFrame(() => {
+			setTimeout(() => {
+				if (!noteInputRef.current || !scrollRef.current) return;
+
+				noteInputRef.current.measureInWindow((x, y, w, h) => {
+					const screenH = Dimensions.get('window').height;
+
+					// visible area is screen minus keyboard
+					const visibleH = Math.max(0, screenH - keyboardHeight);
+
+					// target center inside visible region
+					const targetCenterY = visibleH / 2;
+
+					// where the input's center currently is
+					const inputCenterY = y + h / 2;
+
+					// how much we need to move content (positive means scroll down)
+					const delta = inputCenterY - targetCenterY;
+
+					// scroll by delta relative to current offset
+					scrollRef.current?.scrollTo({
+						y: Math.max(0, (scrollYRef.current ?? 0) + delta),
+						animated: true,
+					});
+				});
+			}, Platform.OS === 'ios' ? 80 : 120);
+		});
+	}, [keyboardHeight]);
 	const handleModeChange = useCallback(
 		(newMode: 'income' | 'expense') => {
 			if (!isSubmitting && mode !== newMode) {
@@ -452,7 +525,7 @@ export default function TransactionScreenProModern() {
 			} else {
 				setSelectedBudgets([b]);
 				setValue('budgets', [b], { shouldValidate: false });
-				setSelectedDebt(null); // Clear debt when budget is selected
+				// setSelectedDebt(null); // Debt tracking hidden for MVP
 				setSelectedBill(null); // Clear bill when budget is selected
 				setIsAmountLocked(false); // Unlock amount when bill is cleared
 			}
@@ -478,7 +551,7 @@ export default function TransactionScreenProModern() {
 			} else {
 				setSelectedBill(bill);
 				setSelectedBudgets([]); // Clear budget when bill is selected
-				setSelectedDebt(null); // Clear debt when bill is selected
+				// setSelectedDebt(null); // Debt tracking hidden for MVP
 				setValue('budgets', [], { shouldValidate: false });
 
 				// Fill in amount and lock it
@@ -534,27 +607,29 @@ export default function TransactionScreenProModern() {
 						frequency: selectedBill.frequency,
 						confidence: selectedBill.confidence || 1.0,
 					};
-				} else if (selectedDebt) {
-					// Debt payments are matched by description/vendor, not via target/targetModel
-					// Include debt name in description to enable automatic matching
-					const debtName = selectedDebt.debtName;
-					const currentDesc = payload.description?.trim() || '';
-					// Only append debt name if it's not already in the description
-					if (!currentDesc.toLowerCase().includes(debtName.toLowerCase())) {
-						payload.description = currentDesc
-							? `${currentDesc} - ${debtName}`.trim()
-							: debtName;
-					}
-					// Set vendor to debt name for better matching
-					payload.vendor = debtName;
-					// Don't set target/targetModel - server doesn't support 'Debt' as targetModel
 				}
+				// Debt tracking hidden for MVP - increases finance complexity perception
+				// else if (selectedDebt) {
+				// 	// Debt payments are matched by description/vendor, not via target/targetModel
+				// 	// Include debt name in description to enable automatic matching
+				// 	const debtName = selectedDebt.debtName;
+				// 	const currentDesc = payload.description?.trim() || '';
+				// 	// Only append debt name if it's not already in the description
+				// 	if (!currentDesc.toLowerCase().includes(debtName.toLowerCase())) {
+				// 		payload.description = currentDesc
+				// 			? `${currentDesc} - ${debtName}`.trim()
+				// 			: debtName;
+				// 	}
+				// 	// Set vendor to debt name for better matching
+				// 	payload.vendor = debtName;
+				// 	// Don't set target/targetModel - server doesn't support 'Debt' as targetModel
+				// }
 			}
 
 			await addTransaction(payload);
 
-			const wasDebtPayment =
-				!isIncome && !selectedBudgets.length && !selectedBill && selectedDebt;
+			// const wasDebtPayment = // Debt tracking hidden for MVP
+			// 	!isIncome && !selectedBudgets.length && !selectedBill && selectedDebt;
 			const wasBillPayment =
 				!isIncome && !selectedBudgets.length && selectedBill;
 
@@ -564,9 +639,10 @@ export default function TransactionScreenProModern() {
 
 			Alert.alert(
 				'Success',
-				wasDebtPayment
-					? `Payment added to ${selectedDebt?.debtName}.`
-					: wasBillPayment
+				// wasDebtPayment // Debt tracking hidden for MVP
+				// 	? `Payment added to ${selectedDebt?.debtName}.`
+				// 	: 
+				wasBillPayment
 					? `Payment added to ${selectedBill?.vendor || 'bill'}.`
 					: `${isIncome ? 'Income' : 'Expense'} saved successfully!`,
 				[
@@ -584,7 +660,7 @@ export default function TransactionScreenProModern() {
 							});
 							setSelectedGoals([]);
 							setSelectedBudgets([]);
-							setSelectedDebt(null);
+							// setSelectedDebt(null); // Debt tracking hidden for MVP
 							setSelectedBill(null);
 							setIsAmountLocked(false);
 							if (router.canGoBack()) router.back();
@@ -604,50 +680,16 @@ export default function TransactionScreenProModern() {
 	};
 
 	// --------------- UI Helpers -----------------
-	const Row = React.memo(
-		({
-			icon,
-			label,
-			right,
-			onPress,
-			accessibilityLabel,
-		}: {
-			icon: any;
-			label: string;
-			right?: React.ReactNode;
-			onPress?: () => void;
-			accessibilityLabel?: string;
-		}) => (
-			<TouchableOpacity
-				onPress={onPress}
-				activeOpacity={onPress ? 0.2 : 1}
-				style={styles.row}
-				accessibilityRole={onPress ? 'button' : undefined}
-				accessibilityLabel={accessibilityLabel || label}
-			>
-				<View style={styles.rowLeft}>
-					<View style={styles.rowIconWrap}>
-						<Ionicons name={icon} size={18} color={palette.text} />
-					</View>
-					<Text style={[type.body, styles.rowLabel]}>{label}</Text>
-				</View>
-				<View style={styles.rowRight}>
-					{right}
-					{onPress && (
-						<Ionicons
-							name="chevron-forward"
-							size={18}
-							color={palette.textSubtle}
-						/>
-					)}
-				</View>
-			</TouchableOpacity>
-		)
-	);
-	Row.displayName = 'Row';
+	// Row component replaced with AppRow primitive
 
-	const ValueText = ({ children }: { children: React.ReactNode }) => (
-		<Text numberOfLines={1} style={[type.body, styles.valueText]}>
+	const ValueText = ({
+		children,
+		style,
+	}: {
+		children: React.ReactNode;
+		style?: any;
+	}) => (
+		<Text numberOfLines={1} style={[type.body, styles.valueText, style]}>
 			{children}
 		</Text>
 	);
@@ -658,11 +700,11 @@ export default function TransactionScreenProModern() {
 	// Gate rendering until state is restored to prevent layout shifts
 	if (!hasRestoredState) {
 		return (
-			<SafeAreaView style={styles.container} edges={['top']}>
+			<AppScreen edges={['top']} scrollable={false}>
 				<View style={styles.loadingOverlay}>
 					<ActivityIndicator size="large" color={palette.primary} />
 				</View>
-			</SafeAreaView>
+			</AppScreen>
 		);
 	}
 
@@ -682,93 +724,96 @@ export default function TransactionScreenProModern() {
 				contentInsetAdjustmentBehavior="never"
 				automaticallyAdjustKeyboardInsets={false}
 				showsVerticalScrollIndicator={false}
+				onScroll={(e) => {
+					scrollYRef.current = e.nativeEvent.contentOffset.y;
+				}}
+				scrollEventThrottle={16}
 			>
 				{/* Hero section: header + amount + type toggle */}
 				<View>
-					<Text style={styles.heroKicker}>New transaction</Text>
-					<Text style={styles.heroTitle}>What happened with your money?</Text>
-					<Text style={styles.heroSubtitle}>
-						Enter an amount, then link it to a budget, goal, bill, or debt.
-					</Text>
+					<AppText.Caption color="muted" style={styles.heroKicker}>
+						New transaction
+					</AppText.Caption>
+					<AppText.Title style={styles.heroTitle}>New transaction</AppText.Title>
 
-					<View style={styles.amountCard} accessibilityRole="summary">
-						<View style={styles.amountRow}>
-							<Pressable
-								style={styles.amountInputContainer}
-								onPress={() => !isAmountLocked && amountRef.current?.focus()}
-								disabled={isAmountLocked}
-							>
-								<Text style={styles.dollar}>$</Text>
-								<Controller
-									control={control}
-									name="amount"
-									rules={{
-										required: '*Amount is required',
-										validate: (v) =>
-											Number(v) > 0 || 'Enter an amount greater than 0',
-									}}
-									render={({ field: { value, onBlur } }) => (
-										<TextInput
-											ref={amountRef}
-											style={[
-												styles.amountInput,
-												isAmountLocked && styles.amountInputLocked,
-											]}
-											placeholder="0"
-											placeholderTextColor={palette.textSubtle}
-											keyboardType="decimal-pad"
-											value={value}
-											onChangeText={onChangeAmount}
-											onBlur={() => {
-												onBlur();
-												onBlurAmount();
-											}}
-											returnKeyType="next"
-											accessibilityLabel="Amount"
-											maxLength={9}
-											editable={!isAmountLocked}
-											inputAccessoryViewID={
-												Platform.OS === 'ios' ? accessoryId : undefined
-											}
-										/>
-									)}
-								/>
-							</Pressable>
-							{isAmountLocked && selectedBill && (
-								<TouchableOpacity
-									style={styles.unlockButton}
-									onPress={() => setIsAmountLocked(false)}
-									accessibilityLabel="Unlock amount for manual override"
-								>
-									<Ionicons
-										name="lock-closed"
-										size={18}
-										color={palette.primary}
+					<AppCard style={styles.section} padding={space.lg} borderRadius={radius.lg}>
+					<View style={styles.amountRow}>
+						<Pressable
+							style={styles.amountInputContainer}
+							onPress={() => !isAmountLocked && amountRef.current?.focus()}
+							disabled={isAmountLocked}
+						>
+							<Text style={styles.dollar}>$</Text>
+							<Controller
+								control={control}
+								name="amount"
+								rules={{
+									required: '*Amount is required',
+									validate: (v) =>
+										Number(v) > 0 || 'Enter an amount greater than 0',
+								}}
+								render={({ field: { value, onBlur } }) => (
+									<TextInput
+										ref={amountRef}
+										style={[
+											styles.amountInput,
+											isAmountLocked && styles.amountInputLocked,
+										]}
+										placeholder="0"
+										placeholderTextColor={palette.textSubtle}
+										keyboardType="decimal-pad"
+										value={value}
+										onChangeText={onChangeAmount}
+										onBlur={() => {
+											onBlur();
+											onBlurAmount();
+										}}
+										returnKeyType="next"
+										accessibilityLabel="Amount"
+										maxLength={9}
+										editable={!isAmountLocked}
+										inputAccessoryViewID={
+											Platform.OS === 'ios' ? accessoryId : undefined
+										}
 									/>
-								</TouchableOpacity>
-							)}
-						</View>
-						<View style={styles.amountUnderline} />
+								)}
+							/>
+						</Pressable>
+						{isAmountLocked && selectedBill && (
+							<TouchableOpacity
+								style={styles.unlockButton}
+								onPress={() => setIsAmountLocked(false)}
+								accessibilityLabel="Unlock amount for manual override"
+							>
+								<Ionicons
+									name="lock-closed"
+									size={18}
+									color={palette.textMuted}
+								/>
+							</TouchableOpacity>
+						)}
+					</View>
+					<View style={styles.amountUnderline} />
 						{isAmountLocked && selectedBill && (
 							<View style={styles.lockHintContainer}>
-								<Text style={styles.lockHintText}>
+								<AppText.Caption color="muted" style={styles.lockHintText}>
 									Amount locked from bill. Tap{' '}
 									<Ionicons
 										name="lock-closed"
 										size={12}
-										color={palette.primary}
+										color={palette.textMuted}
 									/>{' '}
 									to override
-								</Text>
+								</AppText.Caption>
 							</View>
 						)}
 
 						{/* Reserve space for error to prevent layout shift */}
 						<View style={styles.errorContainer}>
 							{errors.amount && (
-								<Text style={styles.errorText}>
+								<AppText.Caption color="danger" style={styles.errorText}>
 									{String(errors.amount.message)}
-								</Text>
+								</AppText.Caption>
 							)}
 						</View>
 
@@ -788,9 +833,9 @@ export default function TransactionScreenProModern() {
 											isRight && styles.segBtnRight,
 											active && styles.segBtnActive,
 											{
-												backgroundColor: active
-													? palette.surface
-													: palette.borderMuted,
+									backgroundColor: active
+										? palette.surface
+										: 'transparent',
 												opacity: pressed ? 0.7 : 1,
 											},
 										]}
@@ -798,119 +843,142 @@ export default function TransactionScreenProModern() {
 										accessibilityRole="button"
 										accessibilityState={{ selected: active }}
 									>
-										<Text
-											style={[
-												styles.segText,
-												{
-													color: active ? palette.text : palette.textMuted,
-												},
-											]}
+										<AppText.Body
+											style={styles.segText}
+											color={active ? 'default' : 'muted'}
 										>
 											{label}
-										</Text>
+										</AppText.Body>
 									</Pressable>
 								);
 							})}
 						</View>
-					</View>
+					</AppCard>
 				</View>
 
-				{/* Details card (Budget / Goal / Debt / Note / Recurring / Date) */}
-				<View style={styles.cardList}>
-					<Row
-						icon={mode === 'expense' ? 'scale-outline' : 'trophy-outline'}
-						label={mode === 'expense' ? 'Budget' : 'Goal'}
-						right={
-							mode === 'expense' ? (
-								selectedBudgets[0]?.name ? (
-									<ValueText>{selectedBudgets[0].name}</ValueText>
-								) : (
-									<ValueText>None</ValueText>
-								)
-							) : selectedGoals[0]?.name ? (
-								<ValueText>{selectedGoals[0].name}</ValueText>
-							) : (
-								<ValueText>None</ValueText>
-							)
-						}
-						onPress={() => {
-							Keyboard.dismiss();
-							if (mode === 'expense') {
-								setPickerOpen('budget');
-							} else {
-								if (!goals?.length) return navigateToGoalsWithModal();
-								setPickerOpen('goal');
-							}
-						}}
-						accessibilityLabel={
-							mode === 'expense' ? 'Select Budget' : 'Select Goal'
-						}
-					/>
+				{/* Details card (Budget / Goal / Note / Recurring / Date) */}
+				{/* Debt tracking hidden for MVP - increases finance complexity perception */}
+				<AppCard style={styles.section} padding={0} borderRadius={radius.lg}>
+					{/* Budget/Goal - always shown as it's the category */}
+					{(() => {
+						const hasBudgets = (budgets?.length ?? 0) > 0;
+						const hasGoals = (goals?.length ?? 0) > 0;
 
-					{mode === 'expense' && (
-						<Row
-							icon="card-outline"
-							label="Debt"
-							right={
-								debtsLoading ? (
-									<ActivityIndicator size="small" />
-								) : selectedDebt ? (
-									<ValueText>{selectedDebt.debtName}</ValueText>
-								) : (
-									<ValueText>None</ValueText>
-								)
-							}
-							onPress={() => {
-								Keyboard.dismiss();
-								setPickerOpen('debt');
-							}}
-							accessibilityLabel="Select Debt"
-						/>
-					)}
+						return (
+							<AppRow
+								icon={mode === 'expense' ? 'scale-outline' : 'trophy-outline'}
+								label={mode === 'expense' ? 'Budget' : 'Goal'}
+								right={
+									mode === 'expense' ? (
+										selectedBudgets[0]?.name ? (
+											<ValueText>{selectedBudgets[0].name}</ValueText>
+										) : hasBudgets ? (
+											<ValueText>Optional</ValueText>
+										) : (
+											<ValueText style={{ color: palette.textMuted }}>
+												Create a budget
+											</ValueText>
+										)
+									) : selectedGoals[0]?.name ? (
+										<ValueText>{selectedGoals[0].name}</ValueText>
+									) : (
+										<ValueText>Optional</ValueText>
+									)
+								}
+								// ✅ Only pressable when it can do something (open picker)
+								onPress={
+									mode === 'expense'
+										? hasBudgets
+											? () => {
+													Keyboard.dismiss();
+													setPickerOpen('budget');
+												}
+											: undefined
+										: () => {
+												Keyboard.dismiss();
+												if (!hasGoals) return navigateToGoalsWithModal();
+												setPickerOpen('goal');
+											}
+								}
+								// ✅ Force chevron off when no budgets (redundant but explicit)
+								showChevron={mode === 'expense' ? hasBudgets : hasGoals}
+								accessibilityLabel={
+									mode === 'expense' ? 'Select Budget' : 'Select Goal'
+								}
+								bordered
+							/>
+						);
+					})()}
 
-					{mode === 'expense' && (
-						<Row
-							icon={
-								selectedBill
-									? resolveBillAppearance(selectedBill).icon
-									: 'receipt-outline'
-							}
-							label="Bill"
-							right={
-								billsLoading ? (
-									<ActivityIndicator size="small" />
-								) : selectedBill ? (
-									<ValueText>{selectedBill.vendor || 'Bill'}</ValueText>
-								) : (
-									<ValueText>None</ValueText>
-								)
-							}
-							onPress={() => {
-								Keyboard.dismiss();
-								setPickerOpen('bill');
-							}}
-							accessibilityLabel="Select Bill"
-						/>
-					)}
-
-					<Row
+					{/* Date - always shown */}
+					<AppRow
 						icon="calendar-outline"
 						label="Date"
 						right={<ValueText>{formatDateString(selectedDate)}</ValueText>}
 						onPress={() => setDatePickerOpen(true)}
+						bordered={false}
 					/>
-				</View>
+				</AppCard>
+
+				{/* Advanced section - only show if bills exist (for expenses) */}
+				{mode === 'expense' && bills?.length > 0 && (
+					<AppCard style={styles.section} padding={0} borderRadius={radius.lg}>
+						<AppRow
+							icon="options-outline"
+							label="Advanced"
+							right={
+								<Ionicons
+									name={showAdvanced ? 'chevron-up' : 'chevron-down'}
+									size={18}
+									color={palette.textSubtle}
+								/>
+							}
+							onPress={() => setShowAdvanced(!showAdvanced)}
+							bordered={showAdvanced}
+							showChevron={false}
+						/>
+
+						{showAdvanced && (
+							<>
+								{/* Bill - only show in Advanced if bills exist */}
+								<AppRow
+									icon={
+										selectedBill
+											? resolveBillAppearance(selectedBill).icon
+											: 'receipt-outline'
+									}
+									label="Bill"
+									right={
+										billsLoading ? (
+											<ActivityIndicator size="small" />
+										) : selectedBill ? (
+											<ValueText>{selectedBill.vendor || 'Bill'}</ValueText>
+										) : (
+											<ValueText>Optional</ValueText>
+										)
+									}
+									onPress={() => {
+										Keyboard.dismiss();
+										setPickerOpen('bill');
+									}}
+									accessibilityLabel="Select Bill"
+									bordered={false}
+								/>
+							</>
+						)}
+					</AppCard>
+				)}
 
 				{/* Description input */}
-				<View style={styles.inputCard}>
-					<Text style={[type.h2, styles.inputLabel]}>Description</Text>
+				<AppCard style={styles.section}>
+					<AppText.Heading style={styles.inputLabel}>Note (optional)</AppText.Heading>
 					<Controller
 						control={control}
 						name="description"
 						rules={{}}
 						render={({ field: { value, onChange, onBlur } }) => (
 							<TextInput
-								ref={descRef}
+								ref={noteInputRef}
 								style={[styles.input, errors.description && styles.inputError]}
 								placeholder={
 									mode === 'income'
@@ -924,11 +992,7 @@ export default function TransactionScreenProModern() {
 									onBlur();
 									trigger('description');
 								}}
-								onFocus={() => {
-									requestAnimationFrame(() => {
-										scrollRef.current?.scrollToEnd({ animated: true });
-									});
-								}}
+								onFocus={focusNoteCentered}
 								returnKeyType="done"
 								blurOnSubmit={true}
 								onSubmitEditing={() => Keyboard.dismiss()}
@@ -943,92 +1007,51 @@ export default function TransactionScreenProModern() {
 					{/* Reserve space for error to prevent layout shift */}
 					<View style={{ minHeight: 18, marginTop: space.xs }}>
 						{errors.description && (
-							<Text style={styles.errorText}>
+							<AppText.Caption color="danger" style={styles.errorText}>
 								{String(errors.description.message)}
-							</Text>
+							</AppText.Caption>
 						)}
 					</View>
-				</View>
-
-				{/* Preview */}
-				<View style={styles.previewCard} accessibilityRole="summary">
-					<View style={styles.previewHeader}>
-						<Ionicons
-							name={
-								mode === 'income'
-									? 'file-tray-full-outline'
-									: 'file-tray-outline'
-							}
-							size={18}
-							color={palette.text}
-						/>
-						<Text style={[type.body, styles.previewTitle]}>
-							Review before saving
-						</Text>
-					</View>
-					<Text style={[type.body, styles.previewLine]}>
-						<Text style={styles.previewEmph}>
-							{prettyCurrency(amount || '')}
-						</Text>{' '}
-						{mode} on {formatDateString(selectedDate)}{' '}
-						{mode === 'income'
-							? selectedGoals.length > 0
-								? ` • Goal: ${selectedGoals[0].name}`
-								: ' • No goal selected'
-							: mode === 'expense'
-							? selectedBudgets.length > 0
-								? ` • Budget: ${selectedBudgets[0].name}`
-								: selectedBill
-								? ` • Bill: ${selectedBill.vendor || 'Bill'}`
-								: selectedDebt
-								? ` • Debt: ${selectedDebt.debtName}`
-								: ' • No budget, bill, or debt selected'
-							: ''}
-					</Text>
-				</View>
+				</AppCard>
 
 				{/* Inline CTA */}
 				<View style={styles.inlineCtaWrap}>
-					<TouchableOpacity
-						style={[
-							styles.inlineCtaBtn,
-							!canSubmit && styles.inlineCtaBtnDisabled,
-						]}
-						activeOpacity={0.8}
+					{amount && Number(amount) > 0 && (
+						<AppText.Caption color="muted" style={styles.miniSummary}>
+							{prettyCurrency(amount || '')} • {formatDateString(selectedDate)}
+						</AppText.Caption>
+					)}
+					<AppButton
+						label={
+							isSubmitting
+								? 'Saving…'
+								: mode === 'expense' &&
+									!selectedBudgets.length &&
+									selectedBill
+									? 'Pay Bill'
+									: 'Create Transaction'
+						}
+						variant="primary"
+						icon={isSubmitting ? undefined : 'add'}
 						onPress={() => {
 							if (isSubmitting) return;
 							handleSubmit(onSubmit)();
 						}}
 						disabled={!canSubmit}
+						loading={isSubmitting}
+						fullWidth
 						accessibilityLabel={`Create ${mode}`}
-						testID="create-transaction"
-					>
-						{isSubmitting ? (
-							<>
-								<ActivityIndicator size="small" color={palette.primaryTextOn} />
-								<Text style={styles.inlineCtaText}>Saving…</Text>
-							</>
-						) : (
-							<>
-								<Text style={styles.inlineCtaText}>
-									{mode === 'expense' && !selectedBudgets.length && selectedDebt
-										? 'Pay Debt'
-										: mode === 'expense' &&
-										  !selectedBudgets.length &&
-										  !selectedDebt &&
-										  selectedBill
-										? 'Pay Bill'
-										: 'Create Transaction'}
-								</Text>
-								<Ionicons name="add" size={18} color={palette.primaryTextOn} />
-							</>
-						)}
-					</TouchableOpacity>
+					/>
 
 					{!canSubmit && (
-						<Text style={styles.inlineCtaHint}>Enter amount to continue.</Text>
+						<AppText.Caption color="muted" style={styles.inlineCtaHint}>
+							Enter amount to continue.
+						</AppText.Caption>
 					)}
 				</View>
+
+				{/* Bottom spacer for keyboard */}
+				<View style={{ height: keyboardHeight ? keyboardHeight + space.lg : 0 }} />
 			</ScrollView>
 
 			{/* (Optional) iOS accessory bar just for a "Done" keyboard dismiss */}
@@ -1039,7 +1062,9 @@ export default function TransactionScreenProModern() {
 							onPress={() => Keyboard.dismiss()}
 							hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
 						>
-							<Text style={styles.accessoryDoneText}>Done</Text>
+							<AppText.Body color="primary" style={styles.accessoryDoneText}>
+							Done
+						</AppText.Body>
 						</TouchableOpacity>
 					</View>
 				</InputAccessoryView>
@@ -1057,8 +1082,8 @@ export default function TransactionScreenProModern() {
 							name={
 								pickerOpen === 'goal'
 									? 'trophy-outline'
-									: pickerOpen === 'debt'
-									? 'card-outline'
+									// : pickerOpen === 'debt' // Debt tracking hidden for MVP
+									// ? 'card-outline'
 									: pickerOpen === 'bill'
 									? 'receipt-outline'
 									: 'wallet-outline'
@@ -1067,15 +1092,15 @@ export default function TransactionScreenProModern() {
 							color={palette.primary}
 							style={{ marginRight: space.sm }}
 						/>
-						<Text style={[type.h1, styles.sheetTitle]}>
+						<AppText.Heading style={styles.sheetTitle}>
 							{pickerOpen === 'goal'
 								? 'Select Goal'
-								: pickerOpen === 'debt'
-								? 'Select Debt'
+								// : pickerOpen === 'debt' // Debt tracking hidden for MVP
+								// ? 'Select Debt'
 								: pickerOpen === 'bill'
 								? 'Select Bill'
 								: 'Select Budget'}
-						</Text>
+						</AppText.Heading>
 						<TouchableOpacity onPress={() => setPickerOpen(null)}>
 							<Ionicons name="close" size={24} color={palette.textMuted} />
 						</TouchableOpacity>
@@ -1086,14 +1111,14 @@ export default function TransactionScreenProModern() {
 					data={
 						pickerOpen === 'goal'
 							? (goals as any[])
-							: pickerOpen === 'debt'
-							? debts
+							// : pickerOpen === 'debt' // Debt tracking hidden for MVP
+							// ? debts
 							: pickerOpen === 'bill'
 							? bills
 							: (budgets as any[])
 					}
 					keyExtractor={(item) => {
-						if (pickerOpen === 'debt') return item.debtId;
+						// if (pickerOpen === 'debt') return item.debtId; // Debt tracking hidden for MVP
 						if (pickerOpen === 'bill') {
 							return (item as Bill).patternId || (item as any).id;
 						}
@@ -1107,8 +1132,8 @@ export default function TransactionScreenProModern() {
 						const data =
 							pickerOpen === 'goal'
 								? goals
-								: pickerOpen === 'debt'
-								? debts
+								// : pickerOpen === 'debt' // Debt tracking hidden for MVP
+								// ? debts
 								: pickerOpen === 'bill'
 								? bills
 								: budgets;
@@ -1121,15 +1146,15 @@ export default function TransactionScreenProModern() {
 						}
 						return (
 							<View style={{ paddingVertical: space.md }}>
-								<Text style={{ color: palette.textMuted }}>
+								<AppText.Body color="muted">
 									{pickerOpen === 'goal'
 										? 'No goals yet. Create one from Goals.'
-										: pickerOpen === 'debt'
-										? 'No debts yet. Add one from Debts.'
+										// : pickerOpen === 'debt' // Debt tracking hidden for MVP
+										// ? 'No debts yet. Add one from Debts.'
 										: pickerOpen === 'bill'
 										? 'No bills yet. Create one from Bills.'
 										: 'No budgets yet. Create one from Budgets.'}
-								</Text>
+								</AppText.Body>
 							</View>
 						);
 					}}
@@ -1142,11 +1167,14 @@ export default function TransactionScreenProModern() {
 							icon = normalizeIconName((item as any).icon ?? 'trophy-outline');
 							color = (item as any).color ?? palette.text;
 							label = (item as any).name;
-						} else if (pickerOpen === 'debt') {
-							icon = 'card-outline';
-							color = palette.text;
-							label = (item as DebtRollup).debtName;
-						} else if (pickerOpen === 'bill') {
+						} 
+						// Debt tracking hidden for MVP - increases finance complexity perception
+						// else if (pickerOpen === 'debt') {
+						// 	icon = 'card-outline';
+						// 	color = palette.text;
+						// 	label = (item as DebtRollup).debtName;
+						// } 
+						else if (pickerOpen === 'bill') {
 							const billItem = item as Bill;
 							if (billItem) {
 								if (isDevMode) {
@@ -1180,20 +1208,23 @@ export default function TransactionScreenProModern() {
 								onPress={() => {
 									if (pickerOpen === 'goal') {
 										selectGoal(item as Goal);
-									} else if (pickerOpen === 'debt') {
-										const debtItem = item as DebtRollup;
-										// Toggle: if already selected, deselect it
-										if (selectedDebt?.debtId === debtItem.debtId) {
-											setSelectedDebt(null);
-										} else {
-											setSelectedDebt(debtItem);
-											setSelectedBudgets([]); // Clear budget when debt is selected
-											setSelectedBill(null); // Clear bill when debt is selected
-											setIsAmountLocked(false); // Unlock amount when bill is cleared
-											setValue('budgets', [], { shouldValidate: false });
-										}
-										setPickerOpen(null);
-									} else if (pickerOpen === 'bill') {
+									} 
+									// Debt tracking hidden for MVP - increases finance complexity perception
+									// else if (pickerOpen === 'debt') {
+									// 	const debtItem = item as DebtRollup;
+									// 	// Toggle: if already selected, deselect it
+									// 	if (selectedDebt?.debtId === debtItem.debtId) {
+									// 		setSelectedDebt(null);
+									// 	} else {
+									// 		setSelectedDebt(debtItem);
+									// 		setSelectedBudgets([]); // Clear budget when debt is selected
+									// 		setSelectedBill(null); // Clear bill when debt is selected
+									// 		setIsAmountLocked(false); // Unlock amount when bill is cleared
+									// 		setValue('budgets', [], { shouldValidate: false });
+									// 	}
+									// 	setPickerOpen(null);
+									// } 
+									else if (pickerOpen === 'bill') {
 										selectBill(item as Bill);
 									} else {
 										selectBudget(item as Budget);
@@ -1206,9 +1237,7 @@ export default function TransactionScreenProModern() {
 									color={color}
 									style={{ marginRight: space.sm }}
 								/>
-								<Text style={[type.body, { color: palette.text }]}>
-									{label}
-								</Text>
+								<AppText.Body>{label}</AppText.Body>
 							</TouchableOpacity>
 						);
 					}}
@@ -1229,7 +1258,7 @@ export default function TransactionScreenProModern() {
 							color={palette.primary}
 							style={{ marginRight: space.sm }}
 						/>
-						<Text style={[type.h1, styles.sheetTitle]}>Select Date</Text>
+						<AppText.Heading style={styles.sheetTitle}>Select Date</AppText.Heading>
 						<TouchableOpacity onPress={() => setDatePickerOpen(false)}>
 							<Ionicons name="close" size={24} color={palette.textMuted} />
 						</TouchableOpacity>
@@ -1245,7 +1274,7 @@ export default function TransactionScreenProModern() {
 							setDatePickerOpen(false);
 						}}
 					>
-						<Text style={styles.quickActionText}>Today</Text>
+						<AppText.Body style={styles.quickActionText}>Today</AppText.Body>
 					</TouchableOpacity>
 				</View>
 
@@ -1297,9 +1326,9 @@ export default function TransactionScreenProModern() {
 			{!ready && !hasLoadedOnce && (
 				<View style={styles.loadingOverlay}>
 					<ActivityIndicator size="large" color={palette.primary} />
-					<Text style={styles.loadingText}>
+					<AppText.Body color="muted" style={styles.loadingText}>
 						{mode === 'income' ? 'Loading goals…' : 'Loading budgets…'}
-					</Text>
+					</AppText.Body>
 				</View>
 			)}
 		</SafeAreaView>
@@ -1318,32 +1347,21 @@ const styles = StyleSheet.create({
 	},
 
 	heroKicker: {
-		...type.small,
-		color: palette.textSubtle,
 		marginBottom: space.xs,
 	},
 
 	heroTitle: {
-		...type.h1,
-		color: palette.text,
-		marginBottom: space.xs,
+		fontSize: 24,
+		marginBottom: space.md,
 	},
 
 	heroSubtitle: {
 		...type.body,
 		color: palette.textMuted,
-		marginBottom: space.md,
-	},
-
-	// Hero = amount + segmented
-	amountCard: {
-		paddingHorizontal: space.lg,
-		paddingVertical: space.md,
-		borderRadius: radius.xl,
-		backgroundColor: palette.surface,
-		...shadow.card,
 		marginBottom: space.lg,
 	},
+
+	// Hero = amount + segmented (using AppCard now)
 
 	amountRow: {
 		flexDirection: 'row',
@@ -1358,9 +1376,9 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 	},
 	dollar: {
-		fontSize: 28,
-		fontWeight: '400',
-		color: palette.primary,
+		fontSize: 32,
+		fontWeight: '600',
+		color: palette.text,
 		marginRight: 6,
 		marginBottom: 6,
 	},
@@ -1368,7 +1386,7 @@ const styles = StyleSheet.create({
 		flexGrow: 0,
 		flexShrink: 1,
 		fontSize: 48,
-		fontWeight: '600',
+		fontWeight: '700',
 		color: palette.text,
 		textAlign: 'center',
 		minWidth: 30,
@@ -1390,13 +1408,11 @@ const styles = StyleSheet.create({
 	lockHintText: {
 		...type.small,
 		color: palette.textMuted,
-		fontSize: 11,
 	},
 	amountUnderline: {
-		marginTop: space.xs,
-		height: 2,
-		backgroundColor: palette.primary,
-		borderRadius: radius.pill,
+		marginTop: space.sm,
+		height: 1,
+		backgroundColor: palette.border,
 	},
 	errorContainer: {
 		alignItems: 'flex-end',
@@ -1407,11 +1423,13 @@ const styles = StyleSheet.create({
 
 	// Segmented (now inside amountCard)
 	segmented: {
-		marginTop: space.md,
-		backgroundColor: palette.chipBg,
-		borderRadius: radius.lg,
+		marginTop: space.lg,
+		backgroundColor: palette.surfaceAlt,
+		borderRadius: radius.md,
 		padding: 4,
 		flexDirection: 'row',
+		borderWidth: 1,
+		borderColor: palette.border,
 	},
 	segBtn: {
 		flex: 1,
@@ -1420,67 +1438,29 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 	},
 	segBtnLeft: {
-		borderTopLeftRadius: radius.md,
-		borderBottomLeftRadius: radius.md,
+		borderTopLeftRadius: radius.sm,
+		borderBottomLeftRadius: radius.sm,
 	},
 	segBtnRight: {
-		borderTopRightRadius: radius.md,
-		borderBottomRightRadius: radius.md,
+		borderTopRightRadius: radius.sm,
+		borderBottomRightRadius: radius.sm,
 	},
 	segBtnActive: {
-		...shadow.card,
+		backgroundColor: palette.surface,
 	},
 	segText: {
 		fontSize: 14,
-		fontWeight: '700',
+		fontWeight: '600',
 	},
 
-	// Card list (cells)
-	cardList: {
-		backgroundColor: palette.surface,
-		borderRadius: radius.lg,
-		borderWidth: 1,
-		borderColor: palette.border,
-		overflow: 'hidden',
-		// marginTop: space.md,
-	},
-	row: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		paddingHorizontal: space.md,
-		paddingVertical: space.md,
-		borderBottomWidth: StyleSheet.hairlineWidth,
-		borderBottomColor: palette.border,
-	},
-	rowLeft: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-	rowIconWrap: {
-		width: 28,
-		height: 28,
-		borderRadius: radius.md,
-		backgroundColor: palette.subtle,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	rowLabel: { color: palette.text },
-	rowRight: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: space.xs,
-		maxWidth: '55%',
-	},
+	// Card list (cells) - using AppCard and AppRow now
+	// Row styles moved to AppRow primitive
 	valueText: { color: palette.text, fontWeight: '600' },
 
-	// Input card
-	inputCard: {
-		marginTop: space.lg,
-		backgroundColor: palette.surface,
-		borderRadius: radius.lg,
-		borderWidth: 1,
-		borderColor: palette.border,
-		padding: space.md,
+	// Input card - using AppCard now
+	inputLabel: {
+		marginBottom: space.sm,
 	},
-	inputLabel: { color: palette.text, marginBottom: space.sm },
 	input: {
 		height: 48,
 		borderRadius: radius.md,
@@ -1495,50 +1475,55 @@ const styles = StyleSheet.create({
 
 	// Preview
 	previewCard: {
-		marginTop: space.lg,
-		backgroundColor: palette.surfaceAlt,
-		borderRadius: radius.md,
+		marginBottom: space.lg,
+		backgroundColor: palette.surface,
+		borderRadius: radius.lg,
 		borderWidth: 1,
 		borderColor: palette.border,
-		padding: space.md,
+		padding: space.lg,
 	},
 	previewHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: space.xs,
-		marginBottom: 4,
+		marginBottom: space.sm,
 	},
-	previewTitle: { color: palette.text },
-	previewLine: { color: palette.text },
-	previewEmph: { fontWeight: '800' },
+	previewTitle: { 
+		color: palette.text,
+		fontSize: 14,
+		fontWeight: '600',
+	},
+	previewLine: { 
+		color: palette.textMuted,
+		fontSize: 14,
+		lineHeight: 20,
+	},
+	previewEmph: { 
+		fontWeight: '700',
+		color: palette.text,
+	},
 
-	// Inline CTA
+	// Section spacing
+	section: {
+		marginTop: space.md,
+	},
+	sectionLg: {
+		marginTop: space.lg,
+	},
+
+	// Inline CTA - using AppButton now
+	// Bottom spacing handled by contentContainerStyle paddingBottom
 	inlineCtaWrap: {
 		marginTop: space.lg,
-		paddingBottom: space.xl,
-	},
-	inlineCtaBtn: {
-		minHeight: 52,
-		borderRadius: radius.lg,
-		backgroundColor: palette.primary,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
-		gap: space.xs,
-	},
-	inlineCtaBtnDisabled: {
-		backgroundColor: palette.primarySubtle,
-	},
-	inlineCtaText: {
-		color: palette.primaryTextOn,
-		fontWeight: '700',
-		fontSize: 16,
+		paddingTop: space.xs,
 	},
 	inlineCtaHint: {
-		marginTop: space.xs,
+		marginTop: space.sm,
 		textAlign: 'center',
-		color: palette.textMuted,
-		fontSize: 12,
+	},
+	miniSummary: {
+		textAlign: 'center',
+		marginBottom: space.md,
 	},
 
 	// Accessory bar

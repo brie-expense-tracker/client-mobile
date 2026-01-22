@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Picker } from '@react-native-picker/picker';
 import { useProfile } from '../../../../src/context/profileContext';
 import {
 	type NotificationSettingsView,
@@ -23,7 +22,7 @@ import {
 
 const NotificationSettingsScreen: React.FC = () => {
 	const router = useRouter();
-	const { profile, updateNotificationSettings, loading } = useProfile();
+	const { profile, updateNotificationSettings, loading, updateProfile } = useProfile();
 	const [settings, setSettings] = useState<NotificationSettingsView>({
 		notificationsEnabled: true,
 		budgetAlerts: true,
@@ -37,6 +36,7 @@ const NotificationSettingsScreen: React.FC = () => {
 		quietHoursStart: '22:00',
 		quietHoursEnd: '08:00',
 	});
+	const [billReminders, setBillReminders] = useState(true);
 	const [saving, setSaving] = useState(false);
 
 	const notificationsDisabled = !settings.notificationsEnabled;
@@ -54,6 +54,9 @@ const NotificationSettingsScreen: React.FC = () => {
 			// Convert to settings view
 			const view = prefsToSettingsView(prefs);
 			setSettings(view);
+
+			// Load bill reminders setting
+			setBillReminders(profile.preferences.recurringExpenses?.notifications ?? true);
 		}
 	}, [profile?.preferences]);
 
@@ -108,6 +111,29 @@ const NotificationSettingsScreen: React.FC = () => {
 		}
 	};
 
+	const handleBillRemindersChange = async (value: boolean) => {
+		const previousValue = billReminders;
+		try {
+			setSaving(true);
+			setBillReminders(value);
+			await updateProfile({
+				preferences: {
+					...profile?.preferences,
+					recurringExpenses: {
+						...profile?.preferences?.recurringExpenses,
+						notifications: value,
+					},
+				},
+			});
+		} catch (error) {
+			logger.error('Error updating bill reminders:', error);
+			setBillReminders(previousValue);
+			Alert.alert('Update Failed', 'Failed to update bill reminders');
+		} finally {
+			setSaving(false);
+		}
+	};
+
 	const isBusy = saving || loading;
 
 	if (loading && !profile?.preferences?.notifications) {
@@ -139,138 +165,15 @@ const NotificationSettingsScreen: React.FC = () => {
 			/>
 
 			<ScrollView contentContainerStyle={styles.content}>
-				{/* General Settings */}
+				{/* MVP: Simple notification toggles only */}
 				<View style={styles.sectionContainer}>
 					<Text style={styles.sectionTitle}>NOTIFICATIONS</Text>
 					<View style={styles.section}>
 						<View style={styles.row}>
-							<Text style={styles.label}>Enable Notifications</Text>
-							<Switch
-								value={settings.notificationsEnabled}
-								onValueChange={(value) =>
-									handleSettingChange('notificationsEnabled', value)
-								}
-								disabled={saving || loading}
-								trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
-								thumbColor={
-									settings.notificationsEnabled ? '#ffffff' : '#9ca3af'
-								}
-							/>
-						</View>
-					</View>
-				</View>
-
-				{/* Important */}
-				<View style={styles.sectionContainer}>
-					<Text style={styles.sectionTitle}>IMPORTANT</Text>
-					<View style={styles.section}>
-						<View style={styles.infoRow}>
-							<Ionicons
-								name="shield-checkmark-outline"
-								size={20}
-								color="#6b7280"
-							/>
-							<Text style={styles.infoText}>
-								Security and critical account alerts are always enabled to help
-								protect your account.
-							</Text>
-						</View>
-					</View>
-				</View>
-
-				{/* Spending */}
-				<View style={styles.sectionContainer}>
-					<Text style={styles.sectionTitle}>SPENDING</Text>
-					<View style={styles.section}>
-						<View style={styles.row}>
 							<View style={styles.settingInfo}>
-								<Text style={styles.label}>Overspending Alerts</Text>
+								<Text style={styles.label}>Weekly Check-in Reminder</Text>
 								<Text style={styles.settingDescription}>
-									Get notified when you&apos;re overspending.
-								</Text>
-							</View>
-							<Switch
-								value={settings.overspendingAlerts}
-								onValueChange={(value) =>
-									handleSettingChange('overspendingAlerts', value)
-								}
-								disabled={isBusy || notificationsDisabled}
-								trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
-								thumbColor={settings.overspendingAlerts ? '#ffffff' : '#9ca3af'}
-							/>
-						</View>
-
-						<View style={styles.lastRow}>
-							<View style={styles.settingInfo}>
-								<Text style={styles.label}>Budget Alerts</Text>
-								<Text style={styles.settingDescription}>
-									Spending limits and budget updates.
-								</Text>
-							</View>
-							<Switch
-								value={settings.budgetAlerts}
-								onValueChange={(value) =>
-									handleSettingChange('budgetAlerts', value)
-								}
-								disabled={isBusy || notificationsDisabled}
-								trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
-								thumbColor={settings.budgetAlerts ? '#ffffff' : '#9ca3af'}
-							/>
-						</View>
-					</View>
-				</View>
-
-				{/* Goals & Progress */}
-				<View style={styles.sectionContainer}>
-					<Text style={styles.sectionTitle}>GOALS & PROGRESS</Text>
-					<View style={styles.section}>
-						<View style={styles.row}>
-							<View style={styles.settingInfo}>
-								<Text style={styles.label}>Goals & Milestones</Text>
-								<Text style={styles.settingDescription}>
-									Updates on savings goals and milestone achievements.
-								</Text>
-							</View>
-							<Switch
-								value={settings.goalsAndMilestones}
-								onValueChange={(value) =>
-									handleSettingChange('goalsAndMilestones', value)
-								}
-								disabled={isBusy || notificationsDisabled}
-								trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
-								thumbColor={settings.goalsAndMilestones ? '#ffffff' : '#9ca3af'}
-							/>
-						</View>
-					</View>
-				</View>
-
-				{/* Insights & Summaries */}
-				<View style={styles.sectionContainer}>
-					<Text style={styles.sectionTitle}>INSIGHTS & SUMMARIES</Text>
-					<View style={styles.section}>
-						<View style={styles.row}>
-							<View style={styles.settingInfo}>
-								<Text style={styles.label}>AI Insights</Text>
-								<Text style={styles.settingDescription}>
-									Let Brie send smart insights about your spending and goals.
-								</Text>
-							</View>
-							<Switch
-								value={settings.aiInsightsEnabled}
-								onValueChange={(value) =>
-									handleSettingChange('aiInsightsEnabled', value)
-								}
-								disabled={isBusy || notificationsDisabled}
-								trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
-								thumbColor={settings.aiInsightsEnabled ? '#ffffff' : '#9ca3af'}
-							/>
-						</View>
-
-						<View style={styles.row}>
-							<View style={styles.settingInfo}>
-								<Text style={styles.label}>Weekly Digest</Text>
-								<Text style={styles.settingDescription}>
-									Weekly overview of your finances.
+									Get a weekly reminder to review your finances.
 								</Text>
 							</View>
 							<Switch
@@ -288,164 +191,19 @@ const NotificationSettingsScreen: React.FC = () => {
 
 						<View style={styles.lastRow}>
 							<View style={styles.settingInfo}>
-								<Text style={styles.label}>Monthly Review</Text>
+								<Text style={styles.label}>Bill Reminders</Text>
 								<Text style={styles.settingDescription}>
-									Monthly financial health review.
+									Get notified before bills are due.
 								</Text>
 							</View>
 							<Switch
-								value={settings.monthlyReviewEnabled}
-								onValueChange={(value) =>
-									handleSettingChange('monthlyReviewEnabled', value)
-								}
-								disabled={isBusy || notificationsDisabled}
+								value={billReminders}
+								onValueChange={handleBillRemindersChange}
+								disabled={isBusy}
 								trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
-								thumbColor={
-									settings.monthlyReviewEnabled ? '#ffffff' : '#9ca3af'
-								}
+								thumbColor={billReminders ? '#ffffff' : '#9ca3af'}
 							/>
 						</View>
-					</View>
-				</View>
-
-				{/* Quiet Hours */}
-				<View style={styles.sectionContainer}>
-					<Text style={styles.sectionTitle}>QUIET HOURS</Text>
-					<Text style={styles.sectionDescription}>
-						Set times when you don&apos;t want to receive notifications
-					</Text>
-					<View style={styles.section}>
-						<View style={styles.row}>
-							<View style={styles.settingInfo}>
-								<Text style={styles.label}>Enable Quiet Hours</Text>
-								<Text style={styles.settingDescription}>
-									Suppress non-critical notifications during specified times.
-								</Text>
-							</View>
-							<Switch
-								value={settings.quietHoursEnabled}
-								onValueChange={(value) =>
-									handleSettingChange('quietHoursEnabled', value)
-								}
-								disabled={isBusy || notificationsDisabled}
-								trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
-								thumbColor={settings.quietHoursEnabled ? '#ffffff' : '#9ca3af'}
-							/>
-						</View>
-
-						{settings.quietHoursEnabled && (
-							<>
-								<View style={styles.row}>
-									<View style={styles.settingInfo}>
-										<Text style={styles.label}>Start Time</Text>
-										<Text style={styles.settingDescription}>
-											When to start suppressing notifications
-										</Text>
-									</View>
-									<View style={styles.pickerContainer}>
-										<Picker
-											selectedValue={settings.quietHoursStart}
-											onValueChange={(value: string) =>
-												handleSettingChange('quietHoursStart', value)
-											}
-											style={styles.picker}
-										>
-											{Array.from({ length: 24 }, (_, i) => {
-												const hour = i.toString().padStart(2, '0');
-												return (
-													<Picker.Item
-														key={hour}
-														label={`${hour}:00`}
-														value={`${hour}:00`}
-													/>
-												);
-											})}
-										</Picker>
-									</View>
-								</View>
-
-								<View style={styles.lastRow}>
-									<View style={styles.settingInfo}>
-										<Text style={styles.label}>End Time</Text>
-										<Text style={styles.settingDescription}>
-											When to resume notifications
-										</Text>
-									</View>
-									<View style={styles.pickerContainer}>
-										<Picker
-											selectedValue={settings.quietHoursEnd}
-											onValueChange={(value: string) =>
-												handleSettingChange('quietHoursEnd', value)
-											}
-											style={styles.picker}
-										>
-											{Array.from({ length: 24 }, (_, i) => {
-												const hour = i.toString().padStart(2, '0');
-												return (
-													<Picker.Item
-														key={hour}
-														label={`${hour}:00`}
-														value={`${hour}:00`}
-													/>
-												);
-											})}
-										</Picker>
-									</View>
-								</View>
-							</>
-						)}
-					</View>
-				</View>
-
-				{/* Marketing */}
-				<View style={styles.sectionContainer}>
-					<Text style={styles.sectionTitle}>MARKETING</Text>
-					<View style={styles.section}>
-						<View style={styles.row}>
-							<View style={styles.settingInfo}>
-								<Text style={styles.label}>Marketing & Product Updates</Text>
-								<Text style={styles.settingDescription}>
-									One or two messages a month max. You can change this anytime.
-								</Text>
-							</View>
-							<Switch
-								value={settings.marketingUpdatesEnabled}
-								onValueChange={(value) =>
-									handleSettingChange('marketingUpdatesEnabled', value)
-								}
-								disabled={isBusy || notificationsDisabled}
-								trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
-								thumbColor={
-									settings.marketingUpdatesEnabled ? '#ffffff' : '#9ca3af'
-								}
-							/>
-						</View>
-					</View>
-				</View>
-
-				{/* Advanced Preferences Link */}
-				<View style={styles.sectionContainer}>
-					<View style={styles.section}>
-						<TouchableOpacity
-							style={styles.consentLink}
-							onPress={() =>
-								router.push('/(stack)/settings/notification/consentManagement')
-							}
-						>
-							<View style={styles.consentLinkContent}>
-								<Ionicons name="settings-outline" size={24} color="#007ACC" />
-								<View style={styles.consentLinkText}>
-									<Text style={styles.consentLinkTitle}>
-										Advanced Preferences & Consent
-									</Text>
-									<Text style={styles.consentLinkDescription}>
-										Manage detailed notification preferences, AI frequency,
-										marketing consent, and more.
-									</Text>
-								</View>
-							</View>
-							<Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-						</TouchableOpacity>
 					</View>
 				</View>
 			</ScrollView>
@@ -578,15 +336,6 @@ const styles = StyleSheet.create({
 		alignItems: 'flex-start',
 		paddingHorizontal: 16,
 		paddingVertical: 12,
-	},
-	pickerContainer: {
-		minWidth: 120,
-		height: 40,
-		justifyContent: 'center',
-	},
-	picker: {
-		height: 40,
-		width: 120,
 	},
 });
 
