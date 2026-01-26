@@ -30,6 +30,25 @@ const sanitizeMessageText = (input?: string | null) => {
 	// Remove any leftover double asterisks from uneven markdown
 	sanitized = sanitized.replace(/\*\*/g, '');
 
+	// Remove numbers and currency amounts to create a cleaner, more conversational UI
+	// Remove currency amounts (e.g., "$2,709", "$2,500.50", "$100")
+	sanitized = sanitized.replace(/\$[\d,]+(?:\.\d+)?/g, '');
+	// Remove percentages (e.g., "50%", "100%", "12.5%")
+	sanitized = sanitized.replace(/\d+(?:\.\d+)?%/g, '');
+	// Remove numbers with commas (e.g., "2,709", "1,234,567")
+	sanitized = sanitized.replace(/\b\d{1,3}(?:,\d{3})+\b/g, '');
+	// Remove decimal numbers (e.g., "2.5", "100.50")
+	sanitized = sanitized.replace(/\b\d+\.\d+\b/g, '');
+	// Remove standalone numbers (e.g., "2500", "100", "2026", "50")
+	sanitized = sanitized.replace(/\b\d+\b/g, '');
+	
+	// Clean up extra spaces that may result from number removal
+	sanitized = sanitized.replace(/\s+/g, ' '); // Multiple spaces to single space
+	sanitized = sanitized.replace(/\s+([.,!?;:])/g, '$1'); // Space before punctuation
+	sanitized = sanitized.replace(/([.,!?;:])\s*([.,!?;:])/g, '$1'); // Multiple punctuation
+	sanitized = sanitized.replace(/\s*-\s*/g, ' '); // Clean up dashes with spaces
+	sanitized = sanitized.trim();
+
 	// Normalize curly apostrophes and quotes to straight ones for better compatibility
 	// This ensures apostrophes display correctly in React Native
 	sanitized = sanitized.replace(/['']/g, "'"); // Curly apostrophes to straight
@@ -116,69 +135,21 @@ export const ChatMessage = memo(function ChatMessage({
 				) : null}
 			</Text>
 
-			{__DEV__ && !isUser && (
-				<Text style={styles.debugText}>
-					Debug: {message.isStreaming ? 'streaming' : 'final'} | Text:{' '}
-					{message.text?.length || 0} chars | Buffered:{' '}
-					{message.buffered?.length || 0} chars
-				</Text>
-			)}
+			<Text
+				style={[
+					styles.timestamp,
+					isUser ? styles.userTimestamp : styles.aiTimestamp,
+				]}
+			>
+				{message.timestamp.toLocaleTimeString([], {
+					hour: '2-digit',
+					minute: '2-digit',
+				})}
+			</Text>
 
-			{!isUser && message.performance && (
-				<View style={styles.performanceInfo}>
-					<Text style={styles.performanceText}>
-						⚡ {message.performance.totalLatency}ms
-						{message.performance.timeToFirstToken && (
-							<Text style={styles.timeToFirstToken}>
-								{' '}
-								(first token: {message.performance.timeToFirstToken}ms)
-							</Text>
-						)}
-						{message.performance.cacheHit ? ' (cached)' : ''}
-					</Text>
+			{/* Debug info removed for cleaner UI */}
 
-					{message.performance.parallelTools &&
-						message.performance.parallelTools.executed.length > 0 && (
-							<Text style={styles.parallelInfo}>
-								🔧 {message.performance.parallelTools.executed.length} tools (
-								{message.performance.parallelTools.successCount}✓,{' '}
-								{message.performance.parallelTools.failureCount}✗)
-								{message.performance.parallelTools.timeoutCount > 0 &&
-									`, ${message.performance.parallelTools.timeoutCount}⏱`}
-							</Text>
-						)}
-
-					{message.performance.parallelFacts &&
-						message.performance.parallelFacts.queriesExecuted > 0 && (
-							<Text style={styles.parallelInfo}>
-								📊 {message.performance.parallelFacts.queriesExecuted} queries (
-								{message.performance.parallelFacts.successCount}✓,{' '}
-								{message.performance.parallelFacts.failureCount}✗)
-							</Text>
-						)}
-
-					{message.performance.optimizations && (
-						<Text style={styles.optimizationInfo}>
-							🚀 Parallel:{' '}
-							{Object.entries(message.performance.optimizations)
-								.filter(([_, enabled]) => enabled)
-								.map(([key, _]) => key.replace(/([A-Z])/g, ' $1').toLowerCase())
-								.join(', ')}
-						</Text>
-					)}
-
-					{message.showWorkButton && (
-						<TouchableOpacity
-							style={styles.showWorkButton}
-							onPress={() => {
-								logger.debug('Show work button pressed');
-							}}
-						>
-							<Text style={styles.showWorkButtonText}>📊 Show your work</Text>
-						</TouchableOpacity>
-					)}
-				</View>
-			)}
+			{/* Performance info removed for cleaner UI */}
 
 			{!isUser && (traceData || performance) && (
 				<WhyThisTray traceData={traceData} performance={performance} />
@@ -312,5 +283,19 @@ const styles = StyleSheet.create({
 	expandButtonText: {
 		...typography.labelSm,
 		color: palette.primaryMuted,
+	},
+	timestamp: {
+		...typography.labelXs,
+		marginTop: space.xs,
+		fontSize: 11,
+	},
+	userTimestamp: {
+		color: palette.onPrimary,
+		opacity: 0.7,
+		textAlign: 'right',
+	},
+	aiTimestamp: {
+		color: palette.textMuted,
+		textAlign: 'left',
 	},
 });

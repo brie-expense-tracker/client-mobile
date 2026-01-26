@@ -1746,15 +1746,7 @@ export default function ChatScreen() {
 							</Text>
 						</View>
 
-						{budgetStatus && (
-							<View style={styles.budgetPill}>
-								<Text style={styles.budgetPillLabel}>Monthly budget</Text>
-								<Text style={styles.budgetPillValue}>
-									{Math.round(budgetStatus.percentage)}% used ·{' '}
-									{Math.round(budgetStatus.remaining)} left
-								</Text>
-							</View>
-						)}
+						{/* Budget pill removed for cleaner UI without numbers */}
 					</View>
 				</View>
 
