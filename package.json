@@ -13,7 +13,12 @@
 		"lint": "expo lint"
 	},
 	"jest": {
-		"preset": "jest-expo"
+		"preset": "jest-expo",
+		"setupFilesAfterEnv": ["<rootDir>/jest.setup.js"],
+		"moduleNameMapper": {
+			"^src/(.*)$": "<rootDir>/src/$1"
+		},
+		"moduleDirectories": ["node_modules", "<rootDir>/src"]
 	},
 	"expo": {
 		"doctor": {

@@ -29,9 +29,16 @@ export const useConnectivity = () => {
 	}, [isChecking, isOnline]);
 
 	useEffect(() => {
-		// Check initial connectivity only
+		// Check initial connectivity
 		checkConnectivity();
-	}, []); // Remove dependency to prevent re-runs
+
+		// Set up periodic checks (every 5 seconds)
+		const interval = setInterval(() => {
+			checkConnectivity();
+		}, 5000);
+
+		return () => clearInterval(interval);
+	}, [checkConnectivity]);
 
 	return {
 		isOnline,
