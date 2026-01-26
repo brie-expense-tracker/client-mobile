@@ -2,12 +2,11 @@
 // Provides deterministic calculations and semantic caching for consistent responses
 
 import {
-import { logger } from '../../../utils/logger';
-
 	FactPack,
 	FactPackBuilder,
 	FactPackCalculator,
 } from '../../services/assistant/factPack';
+import { logger } from '../../../utils/logger';
 
 export interface GroundedResponse {
 	response: string;

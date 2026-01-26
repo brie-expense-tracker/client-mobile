@@ -2,8 +2,6 @@
 // Handles validation, caching, metrics, dependencies, and testing
 
 import {
-import { logger } from '../../../../utils/logger';
-
 	EnhancedSkill,
 	SkillValidationResult,
 	SkillCacheEntry,
@@ -18,6 +16,7 @@ import { logger } from '../../../../utils/logger';
 } from './types';
 import { ChatContext } from '../../feature/chatController';
 import { ChatResponse } from '../responseSchema';
+import { logger } from '../../../../utils/logger';
 
 // Default configuration
 const DEFAULT_CONFIG: SkillRegistryConfig = {

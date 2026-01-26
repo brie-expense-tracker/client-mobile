@@ -51,10 +51,28 @@ export class ErrorService {
 	 * Categorize error and return appropriate UX state
 	 */
 	static categorizeError(error: any, retryCount: number = 0): ErrorState {
-		const errorMessage = error?.message || error?.toString() || 'Unknown error';
+		// Safely extract error message to avoid stack overflow from circular references
+		let errorMessage = 'Unknown error';
+		try {
+			if (error?.message) {
+				errorMessage = String(error.message);
+			} else if (typeof error === 'string') {
+				errorMessage = error;
+			} else {
+				// Try toString but catch if it causes issues
+				try {
+					errorMessage = String(error);
+				} catch {
+					errorMessage = 'Unknown error';
+				}
+			}
+		} catch {
+			errorMessage = 'Unknown error';
+		}
+		
 		const timestamp = new Date();
 
-		// Track error metrics
+		// Track error metrics (trackError now safely extracts type without recursion)
 		this.trackError(error);
 
 		// Connectivity errors
@@ -400,9 +418,32 @@ export class ErrorService {
 
 	/**
 	 * Track error for analytics and monitoring
+	 * Note: This extracts error type directly to avoid circular recursion with categorizeError
 	 */
 	private static trackError(error: any): void {
-		const errorType = this.categorizeError(error).type;
+		// Extract error type directly without calling categorizeError to avoid recursion
+		let errorType = 'system'; // default
+		
+		const message = error?.message?.toLowerCase() || '';
+		const code = error?.code || error?.status;
+		
+		// Quick type detection without full categorization
+		if (this.isConnectivityError(error)) {
+			errorType = 'connectivity';
+		} else if (this.isAuthError(error)) {
+			errorType = 'auth';
+		} else if (this.isRateLimitError(error)) {
+			errorType = 'rate_limit';
+		} else if (this.isTimeoutError(error)) {
+			errorType = 'timeout';
+		} else if (this.isServerError(error)) {
+			errorType = 'server_error';
+		} else if (this.isValidationError(error)) {
+			errorType = 'validation';
+		} else if (this.isPermissionError(error)) {
+			errorType = 'permission';
+		}
+		
 		const existing = this.errorMetrics.get(errorType);
 
 		if (existing) {

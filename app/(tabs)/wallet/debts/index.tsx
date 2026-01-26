@@ -9,6 +9,8 @@ import {
 } from '../../../../src/services/feature/debtsService';
 import { Page, LoadingState, EmptyState, Section } from '../../../../src/ui';
 import { palette, space } from '../../../../src/ui/theme';
+import { NetworkErrorCard } from '../../../../src/components/NetworkErrorCard';
+import { ErrorService, ErrorState } from '../../../../src/services/errorService';
 
 import DebtsSummaryCard from '../components/debts/DebtsSummaryCard';
 import DebtsFeed from '../components/debts/DebtsFeed';
@@ -23,13 +25,19 @@ export default function DebtsScreen() {
 	const [debts, setDebts] = useState<Debt[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
+	const [fetchError, setFetchError] = useState<ErrorState | null>(null);
 
-	const load = useCallback(async () => {
+	const load = useCallback(async (clearError = true) => {
 		try {
+			if (clearError) {
+				setFetchError(null);
+			}
 			const data = await DebtsService.getDebts();
 			setDebts(data);
-		} catch (err) {
+		} catch (err: any) {
 			console.warn('Failed to load debts', err);
+			const errorState = ErrorService.categorizeError(err);
+			setFetchError(errorState);
 		} finally {
 			setLoading(false);
 			setRefreshing(false);
@@ -42,10 +50,11 @@ export default function DebtsScreen() {
 		}, [load])
 	);
 
-	const onRefresh = () => {
+	const onRefresh = useCallback(() => {
 		setRefreshing(true);
-		load();
-	};
+		setFetchError(null); // Clear error at start of refresh
+		load(false); // Don't clear error again - we already cleared it
+	}, [load]);
 
 	const totalDebt = DebtsService.calculateTotalDebt(debts);
 
@@ -96,6 +105,19 @@ export default function DebtsScreen() {
 					/>
 				}
 			>
+				{/* Error Banner */}
+				{fetchError && (
+					<View style={styles.errorBannerContainer}>
+						<NetworkErrorCard
+							error={fetchError}
+							onRetry={() => {
+								setFetchError(null);
+								load(false);
+							}}
+						/>
+					</View>
+				)}
+
 				{/* Top sheet hero */}
 				<View style={styles.heroShell}>
 					<DebtsSummaryCard
@@ -143,7 +165,11 @@ const styles = StyleSheet.create({
 	scrollContent: {
 		paddingBottom: space.xl,
 	},
-
+	errorBannerContainer: {
+		paddingHorizontal: space.lg,
+		paddingTop: space.lg,
+		paddingBottom: space.sm,
+	},
 	// ✅ match BudgetScreen heroShell exactly
 	heroShell: {
 		paddingTop: space.lg,
