@@ -644,7 +644,7 @@ export default function AccountScreen() {
 							pressed && { transform: [{ scale: 0.985 }], opacity: 0.96 },
 							pressed && Platform.OS === 'ios' ? { shadowOpacity: 0.03 } : null,
 						]}
-						onPress={() => router.push('/(tabs)/wallet/goals')}
+						onPress={() => router.push('/(tabs)/dashboard')}
 						hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
 						accessibilityRole="button"
 						accessibilityLabel="Goals, Set targets"

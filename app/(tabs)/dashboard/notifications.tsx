@@ -185,28 +185,20 @@ const NotificationItem = ({
 			// Otherwise, navigate based on notification type
 			switch (type) {
 				case 'budget':
-					if (entityId) {
-						router.push(`/(stack)/budgets/${entityId}` as any);
-					} else {
-						router.push('/(tabs)/wallet/budgets');
-					}
-					break;
 				case 'goal':
-					if (entityId) {
-						router.push(`/(stack)/goals/${entityId}` as any);
-					} else {
-						router.push('/(tabs)/wallet/goals');
-					}
+					// MVP: wallet removed - redirect to dashboard
+					router.push('/(tabs)/dashboard');
 					break;
 				case 'transaction':
 					if (entityId) {
-						router.push(`/(stack)/transactionDetails?id=${entityId}` as any);
+						router.push(`/dashboard/ledger/edit?id=${entityId}` as any);
 					} else {
 						router.push('/(tabs)/transaction');
 					}
 					break;
 				case 'ai_insight':
-					router.push('/(tabs)/chat');
+					// MVP: chat removed - redirect to dashboard
+					router.push('/(tabs)/dashboard');
 					break;
 				case 'system':
 					router.push('/(stack)/settings');

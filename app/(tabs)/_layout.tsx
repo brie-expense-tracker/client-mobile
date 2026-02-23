@@ -96,12 +96,6 @@ const TabLayout: React.FC = () => {
 								listeners={createTabListener('/(tabs)/transaction')}
 							/>
 
-							{/* MVP: Wallet hidden - budgets, bills, debts, goals out of scope */}
-							<Tabs.Screen
-								name="wallet"
-								options={{ href: null }}
-							/>
-
 							<Tabs.Screen
 								name="settings"
 								options={{
@@ -110,20 +104,6 @@ const TabLayout: React.FC = () => {
 									),
 								}}
 								listeners={createTabListener('/(tabs)/settings')}
-							/>
-
-							{/* Hidden tabs - removed from tab bar but kept as routes */}
-							<Tabs.Screen
-								name="chat"
-								options={{
-									href: null, // Hide from tab bar
-								}}
-							/>
-							<Tabs.Screen
-								name="reflections"
-								options={{
-									href: null, // Hide from tab bar
-								}}
 							/>
 						</Tabs>
 					</View>

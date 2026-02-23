@@ -131,7 +131,7 @@ export default function BillsSettingsScreen() {
 					<Text style={styles.sectionTitle}>Quick Actions</Text>
 					<TouchableOpacity
 						style={styles.actionButton}
-						onPress={() => router.push('/(tabs)/wallet/bills')}
+						onPress={() => router.push('/(tabs)/dashboard')}
 					>
 						<Ionicons name="list-outline" size={20} color="#007AFF" />
 						<Text style={styles.actionButtonText}>
@@ -142,7 +142,7 @@ export default function BillsSettingsScreen() {
 
 					<TouchableOpacity
 						style={styles.actionButton}
-						onPress={() => router.push('/(tabs)/wallet/bills/new')}
+						onPress={() => router.push('/(tabs)/dashboard')}
 					>
 						<Ionicons name="add-circle-outline" size={20} color="#007AFF" />
 						<Text style={styles.actionButtonText}>
