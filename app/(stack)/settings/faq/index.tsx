@@ -16,14 +16,14 @@ export default function HelpAndAboutScreen() {
 
 	const faqItems = [
 		{
-			question: 'How do I create a budget?',
+			question: 'How do I log a transaction?',
 			answer:
-				'Go to the Budgets tab and tap "Add Budget". Set your spending limit and category, then start tracking your expenses.',
+				'Tap the + button on the home tab, choose Cash In or Cash Out, enter the amount and description, select a category for expenses, then save.',
 		},
 		{
-			question: 'How does AI coaching work?',
+			question: 'How do I categorize spending?',
 			answer:
-				'Our AI analyzes your spending patterns and provides personalized tips to help you save money and reach your financial goals.',
+				'When logging a Cash Out transaction, pick a category (Food, Rides, Drinks, Groceries, or Other). This helps you see where your money goes.',
 		},
 		{
 			question: 'Can I sync with my bank account?',
@@ -31,9 +31,9 @@ export default function HelpAndAboutScreen() {
 				"Currently, you need to manually enter transactions. We're working on bank integration for future updates.",
 		},
 		{
-			question: 'How do I set financial goals?',
+			question: 'Where can I see my cash balance?',
 			answer:
-				'Navigate to the Goals section and tap "Add Goal". Set your target amount and timeline, then track your progress.',
+				"The Dashboard shows 'Cash on Me'—the sum of all your logged cash in minus cash out. Tap 'View All' to see your full transaction history.",
 		},
 	];
 
@@ -56,9 +56,8 @@ export default function HelpAndAboutScreen() {
 				<View style={styles.section}>
 					<Text style={styles.sectionTitle}>About Brie</Text>
 					<Text style={styles.aboutText}>
-						Brie is your personal financial companion, designed to help you
-						build better money habits through intelligent budgeting, goal
-						tracking, and AI-powered insights.
+						Brie helps you track cash in and out. Log transactions, see your
+						balance, and understand where your money goes.
 					</Text>
 					<Text style={styles.versionText}>Version 1.0.0</Text>
 				</View>

@@ -8,9 +8,6 @@ import React, {
 	ReactNode,
 } from 'react';
 import { ApiService, BillService } from '../services';
-import { useBudget } from './budgetContext';
-import { useGoal } from './goalContext';
-import { useBills } from './billContext';
 import { setCacheInvalidationFlags } from '../services/utility/cacheInvalidationUtils';
 import { createLogger } from '../utils/sublogger';
 
@@ -79,29 +76,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 	const [isLoading, setIsLoading] = useState<boolean>(false); // Changed from true to false
 	const [hasLoaded, setHasLoaded] = useState<boolean>(false); // Track if data has been loaded
 
-	// Get budget, goal, and bill context functions
-	const { refetch: refetchBudgets } = useBudget();
-	const { refetch: refetchGoals } = useGoal();
-	const { refetch: refetchBills } = useBills();
-
-	// Use refs to store the refetch functions to avoid dependency issues
-	const refetchBudgetsRef = useRef(refetchBudgets);
-	const refetchGoalsRef = useRef(refetchGoals);
-	const refetchBillsRef = useRef(refetchBills);
-
-	// Update refs when functions change
-	useEffect(() => {
-		refetchBudgetsRef.current = refetchBudgets;
-	}, [refetchBudgets]);
-
-	useEffect(() => {
-		refetchGoalsRef.current = refetchGoals;
-	}, [refetchGoals]);
-
-	useEffect(() => {
-		refetchBillsRef.current = refetchBills;
-	}, [refetchBills]);
-
+	// MVP: Budget/Goal/Bill refetch removed - wallet out of scope
 	const refetch = useCallback(async () => {
 		setIsLoading(true);
 		try {
@@ -211,52 +186,6 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 			setIsLoading(false);
 		}
 	}, [hasLoaded]);
-
-	// Helper function to update budgets and goals
-	const updateBudgetsAndGoals = useCallback(
-		async (transaction: Transaction) => {
-			try {
-				transactionContextLog.debug(
-					'updateBudgetsAndGoals called with transaction',
-					{
-						id: transaction.id,
-						target: transaction.target,
-						targetModel: transaction.targetModel,
-						type: transaction.type,
-						amount: transaction.amount,
-					}
-				);
-
-				// Only update if transaction has a specific target
-				if (transaction.target && transaction.targetModel) {
-					if (transaction.targetModel === 'Budget') {
-						// Backend now handles budget updates automatically when creating transactions
-						// So we just need to refresh the budgets to get the latest data
-						transactionContextLog.debug(
-							`Backend handled budget update for ${transaction.target}, refreshing budgets...`
-						);
-						await refetchBudgetsRef.current();
-						transactionContextLog.debug('Budgets refreshed successfully');
-					} else if (transaction.targetModel === 'Goal') {
-						// Backend now handles goal updates automatically when creating transactions
-						// So we just need to refresh the goals to get the latest data
-						transactionContextLog.debug(
-							`Backend handled goal update for ${transaction.target}, refreshing goals...`
-						);
-						await refetchGoalsRef.current();
-						transactionContextLog.debug('Goals refreshed successfully');
-					}
-				} else {
-					transactionContextLog.debug(
-						'Transaction has no specific target, skipping budget/goal updates'
-					);
-				}
-			} catch (error) {
-				transactionContextLog.error('Error updating budgets and goals', error);
-			}
-		},
-		[] // No dependencies needed since we use refs
-	);
 
 	// Sort transactions by date first, then by updatedAt time when dates are the same
 	const sortTransactions = useCallback(
@@ -400,9 +329,6 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 						return updated;
 					});
 
-					// Auto-update budgets and goals based on transaction
-					await updateBudgetsAndGoals(serverTransaction);
-
 					// Invalidate relevant cache entries
 					setCacheInvalidationFlags.onNewTransaction();
 
@@ -419,7 +345,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 				throw error;
 			}
 		},
-		[updateBudgetsAndGoals]
+		[]
 	);
 
 	const deleteTransaction = useCallback(
@@ -435,39 +361,11 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 			try {
 				await ApiService.delete(`/api/transactions/${id}`);
 
-				// If the deleted transaction was linked to a bill via recurringPattern.patternId,
-				// clear the payment status cache and refetch bills so the bill is no longer marked as paid
+				// Clear bill payment cache if transaction was linked to a bill
 				if (transactionToDelete?.recurringPattern?.patternId) {
-					const patternId = transactionToDelete.recurringPattern.patternId;
-					transactionContextLog.debug(
-						`Transaction deleted that was linked to bill patternId ${patternId}, clearing payment status cache and refetching bills...`
+					BillService.clearPaymentStatusCache(
+						transactionToDelete.recurringPattern.patternId
 					);
-					BillService.clearPaymentStatusCache(patternId);
-					// Force a fresh pull of bills so "Paid / Unpaid" + nextExpectedDate reflects backend changes
-					await refetchBillsRef.current();
-				}
-
-				// Refresh budgets and goals if the deleted transaction had a target
-				// The backend updates budgets/goals when deleting, so we need to refresh client state
-				if (transactionToDelete?.target && transactionToDelete?.targetModel) {
-					if (transactionToDelete.targetModel === 'Budget') {
-						transactionContextLog.debug(
-							`Transaction deleted that affected budget ${transactionToDelete.target}, refreshing budgets...`
-						);
-						await refetchBudgetsRef.current();
-					} else if (transactionToDelete.targetModel === 'Goal') {
-						transactionContextLog.debug(
-							`Transaction deleted that affected goal ${transactionToDelete.target}, refreshing goals...`
-						);
-						await refetchGoalsRef.current();
-					}
-				} else {
-					// Even if no specific target, refresh both to ensure consistency
-					// (transactions might affect budget calculations even without explicit target)
-					await Promise.all([
-						refetchBudgetsRef.current(),
-						refetchGoalsRef.current(),
-					]);
 				}
 
 				// Invalidate relevant cache entries
@@ -662,9 +560,6 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 						prev.map((t) => (t.id === id ? updatedTransaction : t))
 					);
 
-					// Auto-update budgets and goals based on updated transaction
-					await updateBudgetsAndGoals(updatedTransaction);
-
 					// Invalidate relevant cache entries
 					setCacheInvalidationFlags.onNewTransaction();
 
@@ -688,7 +583,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 				throw error;
 			}
 		},
-		[refetch, updateBudgetsAndGoals]
+		[refetch]
 	);
 
 	const refreshTransactions = useCallback(() => {

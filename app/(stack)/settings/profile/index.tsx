@@ -645,17 +645,17 @@ export default function AccountScreen() {
 						onPress={() => router.push('/(tabs)/dashboard')}
 						hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
 						accessibilityRole="button"
-						accessibilityLabel="Goals, Set targets"
+						accessibilityLabel="Dashboard, View transactions"
 					>
 						<View style={styles.quickIconWrap}>
-							<Ionicons name="flag-outline" size={20} color={palette.primary} />
+							<Ionicons name="grid-outline" size={20} color={palette.primary} />
 						</View>
 						<Text
 							style={[type.body, styles.quickLabel, { color: palette.text }]}
 						>
-							Goals
+							Dashboard
 						</Text>
-						<Text style={styles.quickSub}>Set targets</Text>
+						<Text style={styles.quickSub}>View transactions</Text>
 					</Pressable>
 
 					<Pressable

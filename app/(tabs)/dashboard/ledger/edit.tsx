@@ -23,9 +23,6 @@ import { palette, radius, space, shadow } from '../../../../src/ui/theme';
 
 // Contexts (paths may differ in your repo)
 import { TransactionContext } from '../../../../src/context/transactionContext';
-import { useBudget } from '../../../../src/context/budgetContext';
-import { useGoal } from '../../../../src/context/goalContext';
-import { useBills } from '../../../../src/context/billContext';
 import { normalizeIconName } from '../../../../src/constants/uiConstants';
 import { DateField } from '../../../../src/components/DateField';
 
@@ -65,13 +62,6 @@ const CASH_CATEGORIES = [
 	'Other',
 ] as const;
 
-const toLocalISODate = (d: Date) => {
-	const year = d.getFullYear();
-	const month = String(d.getMonth() + 1).padStart(2, '0');
-	const day = String(d.getDate()).padStart(2, '0');
-	return `${year}-${month}-${day}`;
-};
-
 const parseMoney = (raw: string) => {
 	const cleaned = raw.replace(/[^0-9.]/g, '');
 	const parts = cleaned.split('.');
@@ -93,9 +83,6 @@ export default function EditTransactionScreen() {
 
 	const { transactions, updateTransaction, deleteTransaction } =
 		React.useContext(TransactionContext);
-	const { budgets } = useBudget();
-	const { goals } = useGoal();
-	const { expenses: recurringExpenses } = useBills();
 
 	// Enable LayoutAnimation for Android (once on mount)
 	useEffect(() => {
@@ -119,16 +106,6 @@ export default function EditTransactionScreen() {
 	const [date, setDate] = useState<string>(
 		new Date().toISOString().split('T')[0]
 	);
-	const [targetModel, setTargetModel] = useState<'Budget' | 'Goal' | undefined>(
-		undefined
-	);
-	const [selectedBudgetId, setSelectedBudgetId] = useState<
-		string | undefined
-	>();
-	const [selectedGoalId, setSelectedGoalId] = useState<string | undefined>();
-	const [recurringExpenseId, setRecurringExpenseId] = useState<
-		string | undefined
-	>();
 	const [selectedCategory, setSelectedCategory] = useState<
 		(typeof CASH_CATEGORIES)[number] | null
 	>(null);
@@ -136,25 +113,6 @@ export default function EditTransactionScreen() {
 	const [saving, setSaving] = useState(false);
 	const [footerH, setFooterH] = useState(0);
 	const [descriptionFocused, setDescriptionFocused] = useState(false);
-
-	// enhancements
-	const [filter, setFilter] = useState('');
-	const [recurringPickerOpen, setRecurringPickerOpen] = useState(false);
-
-	// derived lists
-	const selectableBudgets = useMemo(() => budgets ?? [], [budgets]);
-	const selectableGoals = useMemo(() => goals ?? [], [goals]);
-
-	const hasBudgets = selectableBudgets.length > 0;
-	const hasGoals = selectableGoals.length > 0;
-	const showApplyCard = hasBudgets || hasGoals;
-
-	const targetId =
-		targetModel === 'Budget'
-			? selectedBudgetId
-			: targetModel === 'Goal'
-			? selectedGoalId
-			: undefined;
 
 	// prefill
 	useEffect(() => {
@@ -179,43 +137,6 @@ export default function EditTransactionScreen() {
 				: base.toISOString().split('T')[0]
 		);
 
-		if (tx.targetModel === 'Budget' && tx.target) {
-			const hasBudget = selectableBudgets.some((b) => b.id === tx.target);
-			if (hasBudget) {
-				setTargetModel('Budget');
-				setSelectedBudgetId(tx.target);
-				setSelectedGoalId(undefined);
-			} else {
-				setTargetModel(undefined);
-				setSelectedBudgetId(undefined);
-				setSelectedGoalId(undefined);
-			}
-		} else if (tx.targetModel === 'Goal' && tx.target) {
-			const hasGoal = selectableGoals.some((g) => g.id === tx.target);
-			if (hasGoal) {
-				setTargetModel('Goal');
-				setSelectedGoalId(tx.target);
-				setSelectedBudgetId(undefined);
-			} else {
-				setTargetModel(undefined);
-				setSelectedBudgetId(undefined);
-				setSelectedGoalId(undefined);
-			}
-		} else {
-			setTargetModel(undefined);
-			setSelectedBudgetId(undefined);
-			setSelectedGoalId(undefined);
-		}
-
-		if (tx.recurringPattern?.patternId) {
-			const exists = recurringExpenses.some(
-				(e) => e.patternId === tx.recurringPattern!.patternId
-			);
-			setRecurringExpenseId(exists ? tx.recurringPattern.patternId : undefined);
-		} else {
-			setRecurringExpenseId(undefined);
-		}
-
 		// MVP: Prefill category from metadata
 		const cat = (tx.metadata as any)?.category;
 		if (cat && CASH_CATEGORIES.includes(cat as any)) {
@@ -223,7 +144,7 @@ export default function EditTransactionScreen() {
 		} else {
 			setSelectedCategory(null);
 		}
-	}, [tx, selectableBudgets, selectableGoals, recurringExpenses]);
+	}, [tx]);
 
 	// validation
 	const errors = useMemo(() => {
@@ -233,24 +154,10 @@ export default function EditTransactionScreen() {
 		const parsedDate = date ? new Date(`${date}T00:00:00`) : new Date('');
 		if (!date || isNaN(parsedDate.getTime())) e.date = 'Choose a valid date.';
 
-		if (targetModel === 'Budget' && selectableBudgets.length > 0 && !targetId) {
-			e.target = 'Select a budget or unlink.';
-		}
-		if (targetModel === 'Goal' && selectableGoals.length > 0 && !targetId) {
-			e.target = 'Select a goal or unlink.';
-		}
 		return e;
-	}, [
-		amountInput,
-		date,
-		targetModel,
-		targetId,
-		selectableBudgets.length,
-		selectableGoals.length,
-	]);
+	}, [amountInput, date]);
 
-	const topError =
-		errors.amount || errors.date || errors.target || null;
+	const topError = errors.amount || errors.date || null;
 
 	// changes
 	const hasChanges = useMemo(() => {
@@ -260,34 +167,6 @@ export default function EditTransactionScreen() {
 		const signedAmount = type === 'expense' ? -amountNum : amountNum;
 		const origAmount = Number(tx.amount ?? 0);
 		const origType: TxType = tx.type ?? (origAmount < 0 ? 'expense' : 'income');
-
-		let effectiveOrigTargetModel: string | undefined = undefined;
-		let effectiveOrigTarget: string | undefined = undefined;
-
-		if (tx.targetModel === 'Budget' && tx.target) {
-			const hasBudget = selectableBudgets.some((b) => b.id === tx.target);
-			if (hasBudget) {
-				effectiveOrigTargetModel = tx.targetModel;
-				effectiveOrigTarget = tx.target;
-			}
-		} else if (tx.targetModel === 'Goal' && tx.target) {
-			const hasGoal = selectableGoals.some((g) => g.id === tx.target);
-			if (hasGoal) {
-				effectiveOrigTargetModel = tx.targetModel;
-				effectiveOrigTarget = tx.target;
-			}
-		}
-
-		let effectiveOrigRecurringPatternId: string | undefined = undefined;
-		if (tx.recurringPattern?.patternId) {
-			const hasPattern = recurringExpenses.some(
-				(e) => e.patternId === tx.recurringPattern!.patternId
-			);
-			if (hasPattern) {
-				effectiveOrigRecurringPatternId = tx.recurringPattern.patternId;
-			}
-		}
-
 		const origCategory = (tx.metadata as any)?.category ?? null;
 
 		return (
@@ -296,25 +175,9 @@ export default function EditTransactionScreen() {
 			type !== origType ||
 			(date ?? '') !==
 				(tx.date.includes('T') ? tx.date.slice(0, 10) : tx.date) ||
-			(targetModel ?? undefined) !== effectiveOrigTargetModel ||
-			(targetId ?? undefined) !== effectiveOrigTarget ||
-			(recurringExpenseId ?? undefined) !== effectiveOrigRecurringPatternId ||
 			(selectedCategory ?? null) !== origCategory
 		);
-	}, [
-		tx,
-		description,
-		amountInput,
-		type,
-		date,
-		targetId,
-		targetModel,
-		recurringExpenseId,
-		selectedCategory,
-		selectableBudgets,
-		selectableGoals,
-		recurringExpenses,
-	]);
+	}, [tx, description, amountInput, type, date, selectedCategory]);
 
 	const canSave = hasChanges && Object.keys(errors).length === 0;
 
@@ -328,40 +191,6 @@ export default function EditTransactionScreen() {
 		// keep header calm if description is long
 		return base.length > 40 ? `${base.slice(0, 37)}…` : base;
 	}, [description, tx?.description]);
-
-	const filteredCollection = useMemo(() => {
-		const collection =
-			targetModel === 'Budget'
-				? selectableBudgets
-				: targetModel === 'Goal'
-				? selectableGoals
-				: [];
-		if (!filter.trim()) return collection;
-		const q = filter.toLowerCase();
-		return collection.filter((it: any) =>
-			`${it.name}`.toLowerCase().includes(q)
-		);
-	}, [targetModel, selectableBudgets, selectableGoals, filter]);
-
-	const hasRecurringPatterns = recurringExpenses.length > 0;
-	const recurringPickerItems = useMemo(() => {
-		if (!hasRecurringPatterns) return [];
-		return recurringExpenses;
-	}, [recurringExpenses, hasRecurringPatterns]);
-
-	const selectedRecurringPattern = hasRecurringPatterns
-		? recurringExpenses.find((d) => d.patternId === recurringExpenseId)
-		: undefined;
-
-	const recurringSummaryText = selectedRecurringPattern
-		? `${selectedRecurringPattern.frequency || 'monthly'} • next ${
-				selectedRecurringPattern.nextExpectedDate
-					? new Date(
-							selectedRecurringPattern.nextExpectedDate
-					  ).toLocaleDateString()
-					: toLocalISODate(new Date(`${date}T00:00:00`))
-		  }`
-		: 'Not linked to a pattern';
 
 	// Money input handler
 	const handleAmountChange = (t: string) => {
@@ -393,30 +222,11 @@ export default function EditTransactionScreen() {
 			const amountNum = Number(parseMoney(amountInput).toFixed(2));
 			const signedAmount = type === 'expense' ? -amountNum : amountNum;
 
-			const originalHasTarget = !!(tx.target && tx.targetModel);
-			const currentHasTarget = !!(targetId && targetModel);
-
 			const payload: Partial<Transaction> = {
 				description: description.trim() || undefined,
 				amount: signedAmount,
 				type,
 				date,
-				target: currentHasTarget
-					? targetId
-					: originalHasTarget
-					? (null as any)
-					: undefined,
-				targetModel: currentHasTarget
-					? targetModel
-					: originalHasTarget
-					? (null as any)
-					: undefined,
-				recurringPattern: recurringExpenseId
-					? ({
-							patternId: recurringExpenseId,
-					  } as Transaction['recurringPattern'])
-					: undefined,
-				// MVP: Include category for expenses
 				metadata:
 					type === 'expense' && selectedCategory
 						? { category: selectedCategory }
@@ -448,9 +258,6 @@ export default function EditTransactionScreen() {
 		amountInput,
 		type,
 		date,
-		targetId,
-		targetModel,
-		recurringExpenseId,
 		selectedCategory,
 		updateTransaction,
 	]);
@@ -575,8 +382,6 @@ export default function EditTransactionScreen() {
 												);
 												setType(t);
 												Haptics.selectionAsync();
-												setSelectedBudgetId(undefined);
-												setSelectedGoalId(undefined);
 												if (t === 'income') setSelectedCategory(null);
 											}}
 											accessibilityRole="button"
@@ -764,380 +569,6 @@ export default function EditTransactionScreen() {
 						</View>
 					</View>
 
-					{/* APPLY TO CARD */}
-					{showApplyCard && (
-						<View style={styles.groupedSection}>
-							<View style={styles.cardHeaderRow}>
-								<View style={{ flex: 1 }}>
-									<Text style={styles.cardTitle}>Apply to budget or goal</Text>
-									<Text style={styles.cardSubtitle}>
-										Count this toward a budget or goal so your progress stays in
-										sync.
-									</Text>
-								</View>
-							</View>
-
-							<View style={[styles.fieldSection, { marginTop: space.md }]}>
-								<View style={styles.segment}>
-									{(['Budget', 'Goal'] as const).map((m) => {
-										const active = targetModel === m;
-										const disabled =
-											(m === 'Budget' && !hasBudgets) ||
-											(m === 'Goal' && !hasGoals);
-
-										return (
-											<TouchableOpacity
-												key={m}
-												style={[
-													styles.segmentBtn,
-													active && styles.segmentBtnActive,
-													disabled && styles.segmentBtnDisabled,
-												]}
-												onPress={() => {
-													if (disabled) {
-														Haptics.selectionAsync();
-														return;
-													}
-
-													Haptics.selectionAsync();
-
-													if (active) {
-														setTargetModel(undefined);
-														setSelectedBudgetId(undefined);
-														setSelectedGoalId(undefined);
-														setFilter('');
-														return;
-													}
-
-													if (m === 'Budget') {
-														setSelectedGoalId(undefined);
-														setTargetModel('Budget');
-													} else {
-														setSelectedBudgetId(undefined);
-														setTargetModel('Goal');
-													}
-												}}
-												disabled={disabled}
-												accessibilityRole="button"
-												accessibilityState={{ selected: active, disabled }}
-											>
-												<Text
-													style={[
-														styles.segmentText,
-														active && styles.segmentTextActive,
-														disabled && styles.segmentTextDisabled,
-													]}
-												>
-													{m}
-												</Text>
-											</TouchableOpacity>
-										);
-									})}
-								</View>
-							</View>
-
-							{/* Card body stays the same */}
-							{targetModel && (
-								<View style={{ marginTop: space.sm }}>
-									{(targetModel === 'Budget'
-										? selectableBudgets
-										: selectableGoals
-									).length > 6 && (
-										<View style={[styles.inputRow, { marginBottom: space.sm }]}>
-											<Ionicons
-												name="search-outline"
-												size={18}
-												color={palette.textMuted}
-												style={{ marginRight: 8 }}
-											/>
-											<TextInput
-												value={filter}
-												onChangeText={setFilter}
-												placeholder={`Search ${targetModel.toLowerCase()}s`}
-												placeholderTextColor={palette.textMuted}
-												style={styles.inputBare}
-											/>
-											{!!filter && (
-												<TouchableOpacity onPress={() => setFilter('')}>
-													<Ionicons
-														name="close-circle"
-														size={18}
-														color={palette.textMuted}
-													/>
-												</TouchableOpacity>
-											)}
-										</View>
-									)}
-
-									<View style={styles.applyListContainer}>
-										{filteredCollection.length === 0 ? (
-											<Text style={styles.muted}>
-												No {targetModel.toLowerCase()}s available.
-											</Text>
-										) : (
-											<View style={styles.applyList}>
-												{filteredCollection.map((item: any) => {
-													const isSelected =
-														targetModel === 'Budget'
-															? selectedBudgetId === item.id
-															: selectedGoalId === item.id;
-
-													return (
-														<TouchableOpacity
-															key={item.id}
-															style={[
-																styles.optionRow,
-																isSelected && styles.optionRowActive,
-															]}
-															onPress={() => {
-																if (targetModel === 'Budget') {
-																	setSelectedGoalId(undefined);
-																	setSelectedBudgetId(
-																		item.id === selectedBudgetId
-																			? undefined
-																			: item.id
-																	);
-																} else {
-																	setSelectedBudgetId(undefined);
-																	setSelectedGoalId(
-																		item.id === selectedGoalId
-																			? undefined
-																			: item.id
-																	);
-																}
-															}}
-															activeOpacity={0.9}
-														>
-															<View
-																style={[
-																	styles.iconCircle,
-																	{
-																		backgroundColor: `${
-																			item.color ?? palette.text
-																		}20`,
-																	},
-																]}
-															>
-																<Ionicons
-																	name={normalizeIconName(
-																		item.icon ?? 'pricetag-outline'
-																	)}
-																	size={18}
-																	color={item.color ?? palette.text}
-																/>
-															</View>
-
-															<View style={{ flex: 1 }}>
-																<Text style={styles.optionTitle}>
-																	{item.name}
-																</Text>
-																{'amount' in item &&
-																	typeof item.amount === 'number' && (
-																		<Text style={styles.optionSub}>
-																			{fmtMoney(item.amount)} allocated
-																		</Text>
-																	)}
-																{'target' in item &&
-																	typeof item.target === 'number' && (
-																		<Text style={styles.optionSub}>
-																			Target {fmtMoney(item.target)}
-																		</Text>
-																	)}
-															</View>
-
-															<Ionicons
-																name={
-																	isSelected
-																		? 'checkmark-circle'
-																		: 'ellipse-outline'
-																}
-																size={20}
-																color={
-																	isSelected
-																		? palette.primary
-																		: palette.textMuted
-																}
-															/>
-														</TouchableOpacity>
-													);
-												})}
-											</View>
-										)}
-									</View>
-								</View>
-							)}
-						</View>
-					)}
-
-					{/* RECURRING CARD */}
-					{hasRecurringPatterns && (
-						<View style={styles.groupedSection}>
-							<View style={styles.cardHeaderRow}>
-								<View style={{ flex: 1 }}>
-									<Text style={styles.cardTitle}>Bill</Text>
-									<Text style={styles.cardSubtitle}>
-										Link this to a repeating bill or subscription so Brie can
-										track it for you.
-									</Text>
-								</View>
-								{selectedRecurringPattern && (
-									<View style={[styles.chip, styles.chipSoft]}>
-										<Ionicons name="repeat" size={14} color={palette.primary} />
-										<Text style={styles.chipSoftText}>Linked</Text>
-									</View>
-								)}
-							</View>
-
-							<View style={{ marginTop: space.sm }}>
-								<>
-									<TouchableOpacity
-										style={[
-											styles.recInputRow,
-											recurringPickerOpen && styles.recInputActive,
-										]}
-										onPress={() => setRecurringPickerOpen((v) => !v)}
-										accessibilityRole="button"
-										accessibilityState={{ expanded: recurringPickerOpen }}
-									>
-										<View style={styles.recInputLeft}>
-											<View style={styles.recInputIcon}>
-												<Ionicons
-													name="repeat-outline"
-													size={18}
-													color={palette.primary}
-												/>
-											</View>
-											<View style={{ flex: 1 }}>
-												<Text style={styles.recInputTitle}>
-													{selectedRecurringPattern?.vendor || 'Link to bills'}
-												</Text>
-												<Text style={styles.recInputSub} numberOfLines={1}>
-													{recurringSummaryText}
-												</Text>
-											</View>
-										</View>
-										<Ionicons
-											name={recurringPickerOpen ? 'chevron-up' : 'chevron-down'}
-											size={18}
-											color={palette.textMuted}
-										/>
-									</TouchableOpacity>
-
-									{selectedRecurringPattern && !recurringPickerOpen && (
-										<TouchableOpacity
-											style={styles.recUnlinkInline}
-											onPress={() => setRecurringExpenseId(undefined)}
-											hitSlop={8}
-										>
-											<Ionicons
-												name="close-circle"
-												size={14}
-												color={palette.primary}
-											/>
-											<Text style={styles.recUnlinkInlineText}>
-												Unlink recurring pattern
-											</Text>
-										</TouchableOpacity>
-									)}
-
-									{recurringPickerOpen && (
-										<View style={styles.recSheetInline}>
-											{recurringPickerItems.length === 0 ? (
-												<Text style={styles.recEmptyListText}>
-													No bills available.
-												</Text>
-											) : (
-												recurringPickerItems.map((exp) => {
-													const active = recurringExpenseId === exp.patternId;
-													const next = exp.nextExpectedDate
-														? new Date(
-																exp.nextExpectedDate
-														  ).toLocaleDateString()
-														: toLocalISODate(new Date(`${date}T00:00:00`));
-													return (
-														<TouchableOpacity
-															key={exp.patternId}
-															style={[
-																styles.comboRow,
-																active && styles.comboRowActive,
-															]}
-															onPress={() => {
-																setRecurringExpenseId(exp.patternId);
-																Haptics.selectionAsync();
-																setRecurringPickerOpen(false);
-															}}
-															accessibilityRole="button"
-															accessibilityState={{ selected: active }}
-														>
-															<View style={styles.comboIcon}>
-																<Ionicons
-																	name="repeat"
-																	size={18}
-																	color={palette.primary}
-																/>
-															</View>
-															<View style={{ flex: 1 }}>
-																<Text
-																	style={styles.optionTitle}
-																	numberOfLines={1}
-																>
-																	{exp.vendor || 'Bill'}
-																</Text>
-																<Text
-																	style={styles.optionSub}
-																	numberOfLines={1}
-																>
-																	{exp.frequency || 'monthly'} • next {next}
-																</Text>
-															</View>
-															<Ionicons
-																name={
-																	active
-																		? 'radio-button-on'
-																		: 'radio-button-off'
-																}
-																size={20}
-																color={
-																	active ? palette.primary : palette.textMuted
-																}
-															/>
-														</TouchableOpacity>
-													);
-												})
-											)}
-
-											{!!recurringExpenseId && (
-												<TouchableOpacity
-													style={styles.recClearLink}
-													onPress={() => {
-														setRecurringExpenseId(undefined);
-														setRecurringPickerOpen(false);
-													}}
-												>
-													<Text style={styles.link}>Clear link</Text>
-												</TouchableOpacity>
-											)}
-										</View>
-									)}
-								</>
-							</View>
-						</View>
-					)}
-
-					{/* Helper text if no budgets/goals */}
-					{selectableBudgets.length === 0 && selectableGoals.length === 0 && (
-						<Text style={styles.helperText}>
-							You don&apos;t have any budgets or goals yet. You can create them
-							later and link this transaction from its details.
-						</Text>
-					)}
-
-					{/* Helper text if no bills */}
-					{!hasRecurringPatterns && (
-						<Text style={styles.helperText}>
-							Tip: Create bills to automatically track recurring expenses.
-						</Text>
-					)}
 				</View>
 			</ScrollView>
 
@@ -1386,165 +817,6 @@ const styles = StyleSheet.create({
 		paddingHorizontal: space.md,
 		paddingVertical: 10,
 		minHeight: INPUT_HEIGHT,
-	},
-
-	// Recurring input-like styles
-	recInputRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		backgroundColor: palette.surfaceAlt,
-		borderRadius: radius.lg,
-		borderWidth: 1,
-		borderColor: palette.border,
-		paddingHorizontal: space.md,
-		paddingVertical: 10,
-		minHeight: 52,
-	},
-	recInputActive: {
-		borderColor: palette.primarySubtle,
-	},
-	recInputLeft: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		flex: 1,
-	},
-	recInputIcon: {
-		width: 36,
-		height: 36,
-		borderRadius: 18,
-		backgroundColor: `${palette.primary}20`,
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginRight: space.md,
-	},
-	recInputTitle: {
-		fontSize: 15,
-		color: palette.text,
-		fontWeight: '600',
-	},
-	recInputSub: {
-		fontSize: 12,
-		color: palette.textMuted,
-		marginTop: 2,
-	},
-
-	recEmptyInline: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: palette.surfaceAlt,
-		borderRadius: RADIUS_MD,
-		paddingHorizontal: space.md,
-		paddingVertical: space.sm + 2,
-		gap: space.sm,
-	},
-	recCreateLink: {
-		marginTop: space.sm,
-		flexDirection: 'row',
-		alignItems: 'center',
-		alignSelf: 'flex-start',
-		paddingHorizontal: space.sm,
-	},
-	recCreateLinkText: {
-		color: palette.primary,
-		fontSize: 13,
-		fontWeight: '600',
-	},
-
-	recUnlinkInline: {
-		marginTop: 6,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 4,
-	},
-	recUnlinkInlineText: {
-		fontSize: 12,
-		color: palette.primary,
-		fontWeight: '600',
-	},
-
-	recSheetInline: {
-		marginTop: 6,
-		borderWidth: 1,
-		borderColor: palette.border,
-		borderRadius: RADIUS_MD,
-		backgroundColor: palette.surface,
-		overflow: 'hidden',
-		shadowColor: shadow.card.shadowColor,
-		shadowOpacity: shadow.card.shadowOpacity * 0.3,
-		shadowRadius: shadow.card.shadowRadius * 0.5,
-		shadowOffset: shadow.card.shadowOffset,
-		elevation: shadow.card.elevation * 0.4,
-	},
-	comboRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingHorizontal: space.md,
-		paddingVertical: space.sm + 4,
-		backgroundColor: palette.surface,
-		gap: space.md,
-	},
-	comboRowActive: {
-		backgroundColor: palette.surfaceAlt,
-	},
-	comboIcon: {
-		width: ICON_SIZE,
-		height: ICON_SIZE,
-		borderRadius: radius.md,
-		backgroundColor: palette.primarySubtle,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	recEmptyListText: {
-		fontSize: 13,
-		color: palette.textMuted,
-		paddingHorizontal: space.md,
-		paddingVertical: space.sm,
-	},
-	recClearLink: {
-		paddingHorizontal: space.md,
-		paddingVertical: space.sm,
-		borderTopWidth: 1,
-		borderTopColor: palette.border,
-		alignItems: 'flex-start',
-	},
-
-	billCollapsedRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		backgroundColor: palette.bg,
-		borderRadius: radius.xl,
-		borderWidth: 1,
-		borderColor: palette.border,
-		paddingHorizontal: space.md,
-		paddingVertical: space.sm + 4,
-		shadowColor: shadow.card.shadowColor,
-		shadowOpacity: shadow.card.shadowOpacity * 0.15,
-		shadowRadius: shadow.card.shadowRadius * 0.5,
-		shadowOffset: shadow.card.shadowOffset,
-		elevation: shadow.card.elevation * 0.3,
-	},
-	billCollapsedTitle: {
-		fontSize: 14,
-		fontWeight: '600',
-		color: palette.text,
-		marginBottom: 2,
-	},
-	billCollapsedSubtitle: {
-		fontSize: 12,
-		color: palette.textMuted,
-	},
-	billCollapsedButton: {
-		paddingHorizontal: space.md,
-		paddingVertical: space.xs + 2,
-		borderRadius: radius.md,
-		backgroundColor: palette.primary,
-	},
-	billCollapsedButtonText: {
-		color: palette.bg,
-		fontSize: 13,
-		fontWeight: '600',
 	},
 
 	/** Segments / toggles */
