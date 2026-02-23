@@ -1,6 +1,3 @@
-// Progress & UI Components
-export { default as LinearProgressBar } from '../../app/(tabs)/wallet/components/shared/LinearProgressBar';
-
 // Existing Components
 export { default as Setting } from '../../app/(stack)/settings/components/settingItem';
 

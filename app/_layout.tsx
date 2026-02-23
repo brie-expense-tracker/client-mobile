@@ -30,12 +30,8 @@ import {
 import { ProfileProvider } from '../src/context/profileContext';
 import { NotificationProvider } from '../src/context/notificationContext';
 import { TransactionProvider } from '../src/context/transactionContext';
-import { TransactionModalProvider } from '../src/context/transactionModalContext';
 import { LocalTransactionProvider } from '../src/context/localTransactionContext';
 import { StubProviders } from '../src/context/stubProviders';
-import { BudgetProvider } from '../src/context/budgetContext';
-import { GoalProvider } from '../src/context/goalContext';
-import { BillProvider } from '../src/context/billContext';
 import { ThemeProvider } from '../src/context/ThemeContext';
 import { SubscriptionProvider } from '../src/context/SubscriptionContext';
 import { loadLocalOverrides, getResolvedFlags } from '../src/config/features';
@@ -474,43 +470,37 @@ function RootLayoutContent() {
 							<Text style={styles.devText}>DEV MODE</Text>
 						</View>
 					)}
-					{/* Always mount all providers to ensure onboarding screens have access */}
-					<BudgetProvider>
-						<GoalProvider>
-							<BillProvider>
-								<TransactionProvider>
-									<TransactionModalProvider>
-										<GestureHandlerRootView style={{ flex: 1 }}>
-											<Stack
-												screenOptions={{
-													headerShown: false,
-													animation: 'none',
-													contentStyle: { backgroundColor: '#fff' },
-												}}
-											>
-												<Stack.Screen
-													name="(auth)"
-													options={{ headerShown: false, animation: 'none' }}
-												/>
-												<Stack.Screen
-													name="(onboarding)"
-													options={{ headerShown: false, animation: 'none' }}
-												/>
-												<Stack.Screen
-													name="(tabs)"
-													options={{ headerShown: false, animation: 'none' }}
-												/>
-												<Stack.Screen
-													name="(stack)"
-													options={{ headerShown: false, animation: 'none' }}
-												/>
-											</Stack>
-										</GestureHandlerRootView>
-									</TransactionModalProvider>
-								</TransactionProvider>
-							</BillProvider>
-						</GoalProvider>
-					</BudgetProvider>
+					{/* MVP: StubProviders for Budget/Goal/Bill - wallet removed, cash-only */}
+					<StubProviders>
+						<TransactionProvider>
+							<GestureHandlerRootView style={{ flex: 1 }}>
+								<Stack
+									screenOptions={{
+										headerShown: false,
+										animation: 'none',
+										contentStyle: { backgroundColor: '#fff' },
+									}}
+								>
+									<Stack.Screen
+										name="(auth)"
+										options={{ headerShown: false, animation: 'none' }}
+									/>
+									<Stack.Screen
+										name="(onboarding)"
+										options={{ headerShown: false, animation: 'none' }}
+									/>
+									<Stack.Screen
+										name="(tabs)"
+										options={{ headerShown: false, animation: 'none' }}
+									/>
+									<Stack.Screen
+										name="(stack)"
+										options={{ headerShown: false, animation: 'none' }}
+									/>
+								</Stack>
+							</GestureHandlerRootView>
+						</TransactionProvider>
+					</StubProviders>
 				</ProfileProvider>
 			);
 		} catch (error) {

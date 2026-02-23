@@ -34,7 +34,6 @@ import { useBudget, Budget } from '../../../src/context/budgetContext';
 import { useBills } from '../../../src/context/billContext';
 import useAuth from '../../../src/context/AuthContext';
 import { Bill } from '../../../src/services';
-import { navigateToGoalsWithModal } from '../../../src/utils/navigationUtils';
 import BottomSheet from '../../../src/components/BottomSheet';
 import { isDevMode } from '../../../src/config/environment';
 import { createLogger } from '../../../src/utils/sublogger';

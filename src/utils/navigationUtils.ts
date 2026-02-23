@@ -4,33 +4,11 @@ import { router } from 'expo-router';
  * Navigation utility functions for common app navigation patterns
  */
 
-/**
- * Navigate to the goals screen and automatically open the goal creation modal
- */
-export const navigateToGoalsWithModal = () => {
-	router.push('/(tabs)/wallet/goals?openModal=true');
-};
-
-/**
- * Navigate to the goals screen without opening the modal
- */
-export const navigateToGoals = () => {
-	router.push('/(tabs)/wallet/goals');
-};
-
-/**
- * Navigate to the budgets screen
- */
-export const navigateToBudgets = () => {
-	router.push('/(tabs)/wallet/budgets');
-};
-
-/**
- * Navigate to the budgets screen and automatically open the budget creation modal
- */
-export const navigateToBudgetsWithModal = () => {
-	router.push('/(tabs)/wallet/budgets?openModal=true');
-};
+/** MVP: Wallet removed - these redirect to dashboard */
+export const navigateToGoalsWithModal = () => router.push('/(tabs)/dashboard');
+export const navigateToGoals = () => router.push('/(tabs)/dashboard');
+export const navigateToBudgets = () => router.push('/(tabs)/dashboard');
+export const navigateToBudgetsWithModal = () => router.push('/(tabs)/dashboard');
 
 /**
  * Navigate to the transaction screen
@@ -58,12 +36,8 @@ export const navigateToDashboard = () => {
 	router.push('/(tabs)/dashboard');
 };
 
-/**
- * Navigate to the insights screen
- */
-export const navigateToInsights = () => {
-	router.push('/(tabs)/reflections');
-};
+/** MVP: Reflections removed - redirect to dashboard */
+export const navigateToInsights = () => router.push('/(tabs)/dashboard');
 
 /**
  * Navigate to the settings screen
