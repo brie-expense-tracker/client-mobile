@@ -4,6 +4,7 @@ import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import useAuth from '../../../src/context/AuthContext';
+import { setUseLocalMode } from '../../../src/storage/localModeStorage';
 import ConnectivityTest from '../../../src/components/ConnectivityTest';
 import {
 	useFeature,
@@ -61,7 +62,7 @@ function Section({ title, items }: { title: string; items: Item[] }) {
 
 export default function SettingsScreen() {
 	const router = useRouter();
-	const { logout } = useAuth();
+	const { logout, user } = useAuth();
 	const { isPro } = useBriePro();
 	const aiInsightsEnabled = useFeature('aiInsights');
 	const aiInsightsPreviewEnabled = useFeature('aiInsightsPreview');
@@ -202,6 +203,11 @@ export default function SettingsScreen() {
 		},
 	];
 
+	const handleSignInToSync = async () => {
+		await setUseLocalMode(false);
+		router.replace('/(auth)/login');
+	};
+
 	return (
 		<AppScreen key={refreshKey}>
 			{/* Header */}
@@ -211,6 +217,24 @@ export default function SettingsScreen() {
 					Manage your account and preferences.
 				</AppText.Subtitle>
 			</View>
+
+			{/* MVP: Sign in prompt when using local-only mode */}
+			{!user && (
+				<View style={styles.section}>
+					<AppCard onPress={handleSignInToSync}>
+						<View style={styles.signInPrompt}>
+							<Ionicons name="cloud-upload-outline" size={24} color={palette.primary} />
+							<View style={{ flex: 1 }}>
+								<AppText.Heading>Sign in to backup and sync</AppText.Heading>
+								<AppText.Caption color="muted" style={{ marginTop: 4 }}>
+									Create an account to save your data to the cloud and use it on other devices.
+								</AppText.Caption>
+							</View>
+							<Ionicons name="chevron-forward" size={20} color={palette.textSubtle} />
+						</View>
+					</AppCard>
+				</View>
+			)}
 
 			{/* Debug / Testing - Only show when enabled */}
 			{__DEV__ && SHOW_DEBUG_SECTION && (
@@ -459,22 +483,28 @@ export default function SettingsScreen() {
 				</View>
 			)}
 
-			{/* Sections */}
-			<Section title="Account" items={accountItems} />
-			<Section title="Notifications" items={notificationItems} />
-			{isPro && <Section title="Data" items={dataItems} />}
+			{/* Sections - only show when signed in */}
+			{user && (
+				<>
+					<Section title="Account" items={accountItems} />
+					<Section title="Notifications" items={notificationItems} />
+					{isPro && <Section title="Data" items={dataItems} />}
+				</>
+			)}
 
-			{/* Logout */}
-			<View style={styles.logoutContainer}>
-				<AppButton
-					label="Logout"
-					variant="secondary"
-					icon="log-out-outline"
-					iconPosition="left"
-					onPress={handleLogout}
-					fullWidth
-				/>
-			</View>
+			{/* Logout - only when signed in */}
+			{user && (
+				<View style={styles.logoutContainer}>
+					<AppButton
+						label="Logout"
+						variant="secondary"
+						icon="log-out-outline"
+						iconPosition="left"
+						onPress={handleLogout}
+						fullWidth
+					/>
+				</View>
+			)}
 		</AppScreen>
 	);
 }
@@ -549,6 +579,11 @@ const styles = StyleSheet.create({
 	toggleText: {
 		fontSize: 12,
 		fontWeight: '600',
+	},
+	signInPrompt: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: space.md,
 	},
 	resetButton: {
 		paddingHorizontal: space.md,

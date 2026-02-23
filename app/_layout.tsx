@@ -31,6 +31,8 @@ import { ProfileProvider } from '../src/context/profileContext';
 import { NotificationProvider } from '../src/context/notificationContext';
 import { TransactionProvider } from '../src/context/transactionContext';
 import { TransactionModalProvider } from '../src/context/transactionModalContext';
+import { LocalTransactionProvider } from '../src/context/localTransactionContext';
+import { StubProviders } from '../src/context/stubProviders';
 import { BudgetProvider } from '../src/context/budgetContext';
 import { GoalProvider } from '../src/context/goalContext';
 import { BillProvider } from '../src/context/billContext';
@@ -42,6 +44,7 @@ import { ensureBgPushRegistered } from '../src/services/notifications/background
 import { useAppInit } from '../src/hooks/useAppInit';
 import { DEV_MODE, isDevMode, isInternalBuild } from '../src/config/environment';
 import { useDevModeEasterEgg } from '../src/hooks/useDevModeEasterEgg';
+import { getUseLocalMode } from '../src/storage/localModeStorage';
 
 // Create namespaced logger for this service
 const layoutLog = createLogger('Layout');
@@ -102,6 +105,12 @@ function RootLayoutContent() {
 	const { isEnabled: isDevModeEasterEggEnabled } = useDevModeEasterEgg();
 	const segments = useSegments();
 	const [isMounted, setIsMounted] = useState(false);
+
+	// MVP: Local mode (no account) - data stays on device
+	const [useLocalMode, setUseLocalMode] = useState<boolean | null>(null);
+	useEffect(() => {
+		getUseLocalMode().then(setUseLocalMode);
+	}, []);
 
 	// Add timeout mechanism to prevent infinite loading
 	const [loadingTimeout, setLoadingTimeout] = useState(false);
@@ -388,6 +397,17 @@ function RootLayoutContent() {
 					}
 				}
 			} else {
+				// MVP: Local mode - skip login, go to tabs
+				if (useLocalMode === true) {
+					if (inAuthGroup) {
+						try {
+							router.replace('/(tabs)/dashboard');
+						} catch (error) {
+							layoutLog.warn('Failed to navigate to dashboard:', error);
+						}
+					}
+					return;
+				}
 				if (!inAuthGroup) {
 					try {
 						router.replace('/(auth)/login');
@@ -410,10 +430,12 @@ function RootLayoutContent() {
 		isMounted,
 		router,
 		logState,
+		useLocalMode,
 	]);
 
-	// Show spinner only while we're still genuinely loading AND we haven't timed out
+	// Show spinner while loading, or waiting for local mode check
 	if (
+		useLocalMode === null ||
 		(loading && !loadingTimeout) ||
 		(user && hasSeenOnboarding === null && !loadingTimeout)
 	) {
@@ -503,6 +525,47 @@ function RootLayoutContent() {
 				</View>
 			);
 		}
+	}
+
+	// MVP: Local mode - render tabs with local storage (no auth)
+	if (useLocalMode === true) {
+		if (isDevMode) {
+			layoutLog.debug('Rendering: local mode (no account)');
+		}
+		return (
+			<NotificationProvider>
+				<StubProviders>
+					<LocalTransactionProvider>
+						<GestureHandlerRootView style={{ flex: 1 }}>
+						<Stack
+							screenOptions={{
+								headerShown: false,
+								animation: 'none',
+								contentStyle: { backgroundColor: '#fff' },
+							}}
+						>
+							<Stack.Screen
+								name="(auth)"
+								options={{ headerShown: false, animation: 'none' }}
+							/>
+							<Stack.Screen
+								name="(onboarding)"
+								options={{ headerShown: false, animation: 'none' }}
+							/>
+							<Stack.Screen
+								name="(tabs)"
+								options={{ headerShown: false, animation: 'none' }}
+							/>
+							<Stack.Screen
+								name="(stack)"
+								options={{ headerShown: false, animation: 'none' }}
+							/>
+						</Stack>
+					</GestureHandlerRootView>
+				</LocalTransactionProvider>
+			</StubProviders>
+		</NotificationProvider>
+		);
 	}
 
 	// For unauthenticated or auth screens, just show the stack (no user-dependent providers)
