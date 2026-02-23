@@ -29,17 +29,10 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Calendar } from 'react-native-calendars';
 import { TransactionContext } from '../../../src/context/transactionContext';
-import { useGoal, Goal } from '../../../src/context/goalContext';
-import { useBudget, Budget } from '../../../src/context/budgetContext';
-import { useBills } from '../../../src/context/billContext';
-import useAuth from '../../../src/context/AuthContext';
-import { Bill } from '../../../src/services';
 import BottomSheet from '../../../src/components/BottomSheet';
 import { isDevMode } from '../../../src/config/environment';
 import { createLogger } from '../../../src/utils/sublogger';
 // DashboardService and DashboardRollup removed - no longer used in this screen
-import { normalizeIconName } from '../../../src/constants/uiConstants';
-import { resolveBillAppearance } from '../../../src/utils/billAppearance';
 import { palette, radius, space, type } from '../../../src/ui/theme';
 import { getItem, setItem, removeItem } from '../../../src/utils/safeStorage';
 import {
@@ -66,14 +59,9 @@ const CASH_CATEGORIES = [
 ] as const;
 
 interface TransactionFormData {
-	type?: 'income' | 'expense';
 	description: string;
-	amount: string; // user‑friendly
-	goals?: Goal[];
-	budgets?: Budget[];
-	date: string; // yyyy-mm-dd
-	target?: string;
-	targetModel?: 'Budget' | 'Goal';
+	amount: string;
+	date: string;
 }
 
 // ---------- Utils
@@ -147,101 +135,17 @@ export default function TransactionScreenProModern() {
 			if (params.mode === 'income') setSelectedCategory(null);
 		}
 	}, [params.mode]);
-	const [selectedGoals, setSelectedGoals] = useState<Goal[]>([]);
-	const [selectedBudgets, setSelectedBudgets] = useState<Budget[]>([]);
 	const [isSubmitting, setIsSubmitting] = useState(false);
-	const [pickerOpen, setPickerOpen] = useState<
-		null | 'goal' | 'budget' | 'bill' | 'category'
-	>(null);
+	const [pickerOpen, setPickerOpen] = useState<boolean>(false);
 	const [datePickerOpen, setDatePickerOpen] = useState(false);
 	const [mountCalendar, setMountCalendar] = useState(false);
-	// Debt tracking hidden for MVP - increases finance complexity perception
-	// const [debts, setDebts] = useState<DebtRollup[]>([]);
-	// const [debtsLoading, setDebtsLoading] = useState(false);
-	// const [selectedDebt, setSelectedDebt] = useState<DebtRollup | null>(null);
-	const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
-	const [isAmountLocked, setIsAmountLocked] = useState(false);
 	const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
-	const [showAdvanced, setShowAdvanced] = useState(false);
 
 	const { addTransaction } = useContext(TransactionContext);
-	const { goals, isLoading: goalsLoading } = useGoal();
-	const { budgets, isLoading: budgetsLoading } = useBudget();
-	const { expenses: bills, isLoading: billsLoading } = useBills();
-	const { firebaseUser, user } = useAuth();
-
-	// Auto-expand Advanced section if bill is selected
-	useEffect(() => {
-		if (selectedBill && bills?.length > 0) {
-			setShowAdvanced(true);
-		}
-	}, [selectedBill, bills]);
-
-	// Debug logging for goals and budgets
-	useEffect(() => {
-		if (isDevMode) {
-			transactionScreenLog.debug('Goals data', {
-				count: goals?.length || 0,
-				goals: goals,
-				isLoading: goalsLoading,
-			});
-		}
-	}, [goals, goalsLoading]);
 
 	useEffect(() => {
-		if (isDevMode) {
-			transactionScreenLog.debug('Budgets data', {
-				count: budgets?.length || 0,
-				budgets: budgets,
-				isLoading: budgetsLoading,
-			});
-		}
-	}, [budgets, budgetsLoading]);
-
-	// Debt tracking hidden for MVP - increases finance complexity perception
-	// Load debts once
-	// useEffect(() => {
-	// 	let isMounted = true;
-	// 	const loadDebts = async () => {
-	// 		// Don't fetch if user is not authenticated
-	// 		if (!firebaseUser || !user) {
-	// 			if (isMounted) setDebtsLoading(false);
-	// 			return;
-	// 		}
-
-	// 		try {
-	// 			setDebtsLoading(true);
-	// 			const rollup: DashboardRollup =
-	// 				await DashboardService.getDashboardRollup();
-	// 			if (!isMounted) return;
-	// 			setDebts(rollup.debts?.debts || []);
-	// 		} catch (err: any) {
-	// 			// Silently handle auth errors (expected on logout)
-	// 			if (err?.isAuthError || err?.message === 'User not authenticated') {
-	// 				return;
-	// 			}
-	// 			if (isDevMode) {
-	// 				transactionScreenLog.error('Failed to load debts', err);
-	// 			}
-	// 		} finally {
-	// 			if (isMounted) setDebtsLoading(false);
-	// 		}
-	// 	};
-	// 	loadDebts();
-	// 	return () => {
-	// 		isMounted = false;
-	// 	};
-	// }, [firebaseUser, user]);
-
-	// MVP: Category picker doesn't need goals/budgets - no loading wait
-	const ready = true;
-
-	// Track first load to prevent loading overlay on refetch
-	useEffect(() => {
-		if (ready && !hasLoadedOnce) {
-			setHasLoadedOnce(true);
-		}
-	}, [ready, hasLoadedOnce]);
+		setHasLoadedOnce(true);
+	}, []);
 
 	// Track keyboard height
 	useEffect(() => {
@@ -298,11 +202,7 @@ export default function TransactionScreenProModern() {
 		defaultValues: {
 			description: '',
 			amount: '',
-			goals: [],
-			budgets: [],
 			date: getLocalIsoDate(),
-			target: undefined,
-			targetModel: undefined,
 		},
 		mode: 'onChange',
 	});
@@ -315,7 +215,6 @@ export default function TransactionScreenProModern() {
 	const [isNewForm, setIsNewForm] = useState(true);
 	const [hasRestoredState, setHasRestoredState] = useState(false);
 	// const [savedDebtId, setSavedDebtId] = useState<string | null>(null); // Debt tracking hidden for MVP
-	const [savedBillId, setSavedBillId] = useState<string | null>(null);
 
 	// Restore saved form state on mount (immediate, no deferral)
 	useEffect(() => {
@@ -341,10 +240,7 @@ export default function TransactionScreenProModern() {
 					setValue('description', state.description ?? '');
 					setValue('date', state.date ?? getLocalIsoDate());
 					if (state.mode) setMode(state.mode);
-					if (state.selectedGoals) setSelectedGoals(state.selectedGoals);
-					if (state.selectedBudgets) setSelectedBudgets(state.selectedBudgets);
-					// if (state.selectedDebtId) setSavedDebtId(state.selectedDebtId); // Debt tracking hidden for MVP
-					if (state.selectedBillId) setSavedBillId(state.selectedBillId);
+					if (state.selectedCategory) setSelectedCategory(state.selectedCategory);
 				} else {
 					setIsNewForm(true);
 				}
@@ -372,20 +268,6 @@ export default function TransactionScreenProModern() {
 	// 	}
 	// }, [savedDebtId, debts, selectedDebt]);
 
-	// Restore selectedBill after bills are loaded
-	useEffect(() => {
-		if (savedBillId && bills.length > 0 && !selectedBill) {
-			const bill = bills.find((b) => {
-				const billId = b.patternId || (b as any).id;
-				return billId === savedBillId;
-			});
-			if (bill) {
-				setSelectedBill(bill);
-			}
-			setSavedBillId(null);
-		}
-	}, [savedBillId, bills, selectedBill]);
-
 	// Save form state as user types (debounced)
 	useEffect(() => {
 		if (!hasRestoredState) return; // Don't save during initial restore
@@ -399,22 +281,10 @@ export default function TransactionScreenProModern() {
 					description,
 					date: selectedDate,
 					mode,
-					selectedGoals,
-					selectedBudgets,
-					// selectedDebtId: selectedDebt?.debtId || null, // Debt tracking hidden for MVP
-					selectedBillId: selectedBill
-						? selectedBill.patternId || (selectedBill as any).id
-						: null,
+					selectedCategory,
 				};
 
-				// Only save if there's actual data
-				const hasData =
-					amountHasValue ||
-					!!description ||
-					selectedGoals.length > 0 ||
-					selectedBudgets.length > 0 ||
-					// !!selectedDebt || // Debt tracking hidden for MVP
-					!!selectedBill;
+				const hasData = amountHasValue || !!description || !!selectedCategory;
 
 				if (hasData) {
 					await setItem(FORM_STATE_KEY, JSON.stringify(stateToSave));
@@ -434,17 +304,7 @@ export default function TransactionScreenProModern() {
 		// Debounce saves to avoid too frequent writes
 		const timeoutId = setTimeout(saveState, 500);
 		return () => clearTimeout(timeoutId);
-	}, [
-		amount,
-		description,
-		selectedDate,
-		mode,
-		selectedGoals,
-		selectedBudgets,
-		// selectedDebt, // Debt tracking hidden for MVP
-		selectedBill,
-		hasRestoredState,
-	]);
+	}, [amount, description, selectedDate, mode, selectedCategory, hasRestoredState]);
 
 	// Keep caret at end for manual edits
 	useEffect(() => {
@@ -527,77 +387,12 @@ export default function TransactionScreenProModern() {
 		trigger('amount');
 	}, [amount, setValue, trigger]);
 
-	const selectGoal = useCallback(
-		(g: Goal) => {
-			// Toggle: if already selected, deselect it
-			if (selectedGoals[0]?.id === g.id) {
-				setSelectedGoals([]);
-				setValue('goals', [], { shouldValidate: false });
-			} else {
-				setSelectedGoals([g]);
-				setValue('goals', [g], { shouldValidate: false });
-			}
-			setPickerOpen(null);
-		},
-		[setValue, selectedGoals]
-	);
-
-	const selectBudget = useCallback(
-		(b: Budget) => {
-			// Toggle: if already selected, deselect it
-			if (selectedBudgets[0]?.id === b.id) {
-				setSelectedBudgets([]);
-				setValue('budgets', [], { shouldValidate: false });
-			} else {
-				setSelectedBudgets([b]);
-				setValue('budgets', [b], { shouldValidate: false });
-				// setSelectedDebt(null); // Debt tracking hidden for MVP
-				setSelectedBill(null); // Clear bill when budget is selected
-				setIsAmountLocked(false); // Unlock amount when bill is cleared
-			}
-			setPickerOpen(null);
-		},
-		[setValue, selectedBudgets]
-	);
-
 	const selectCategory = useCallback(
 		(cat: (typeof CASH_CATEGORIES)[number]) => {
 			setSelectedCategory(cat);
-			setPickerOpen(null);
+			setPickerOpen(false);
 		},
 		[]
-	);
-
-	const selectBill = useCallback(
-		(bill: Bill) => {
-			const billId = bill.patternId || (bill as any).id;
-			const currentBillId =
-				selectedBill?.patternId || (selectedBill as any)?.id;
-
-			// Toggle: if already selected, deselect it
-			if (currentBillId && currentBillId === billId) {
-				setSelectedBill(null);
-				setIsAmountLocked(false);
-				// Clear amount if it was locked from this bill
-				if (isAmountLocked && selectedBill?.amount) {
-					setValue('amount', '', { shouldValidate: true });
-				}
-			} else {
-				setSelectedBill(bill);
-				setSelectedBudgets([]); // Clear budget when bill is selected
-				// setSelectedDebt(null); // Debt tracking hidden for MVP
-				setValue('budgets', [], { shouldValidate: false });
-
-				// Fill in amount and lock it
-				if (bill.amount) {
-					setValue('amount', bill.amount.toFixed(2), { shouldValidate: true });
-					setIsAmountLocked(true);
-				}
-			}
-
-			setPickerOpen(null);
-		},
-		[setValue, selectedBill, isAmountLocked]
 	);
 
 	const onSubmit = async (data: TransactionFormData) => {
@@ -623,24 +418,8 @@ export default function TransactionScreenProModern() {
 				type: isIncome ? 'income' : 'expense',
 			};
 
-			// MVP: Cash-only - use fixed category for expenses, store in metadata
 			if (isExpense && selectedCategory) {
 				payload.metadata = { category: selectedCategory };
-			}
-			// Legacy: Budget/Goal/Bill - kept for backward compatibility but not used in MVP flow
-			if (isIncome && selectedGoals.length > 0) {
-				payload.target = selectedGoals[0].id;
-				payload.targetModel = 'Goal';
-			} else if (isExpense && selectedBudgets.length > 0) {
-				payload.target = selectedBudgets[0].id;
-				payload.targetModel = 'Budget';
-			} else if (isExpense && selectedBill) {
-				const billId = selectedBill.patternId || (selectedBill as any).id;
-				payload.recurringPattern = {
-					patternId: billId,
-					frequency: selectedBill.frequency,
-					confidence: selectedBill.confidence || 1.0,
-				};
 			}
 			await addTransaction(payload);
 
@@ -658,17 +437,9 @@ export default function TransactionScreenProModern() {
 							reset({
 								description: '',
 								amount: '',
-								goals: [],
-								budgets: [],
 								date: getLocalIsoDate(),
-								target: undefined,
-								targetModel: undefined,
 							});
-							setSelectedGoals([]);
-							setSelectedBudgets([]);
-							setSelectedBill(null);
 							setSelectedCategory(null);
-							setIsAmountLocked(false);
 							if (router.canGoBack()) router.back();
 							else router.replace('/(tabs)/dashboard');
 						},
@@ -785,34 +556,8 @@ export default function TransactionScreenProModern() {
 								)}
 							/>
 						</Pressable>
-						{isAmountLocked && selectedBill && (
-							<TouchableOpacity
-								style={styles.unlockButton}
-								onPress={() => setIsAmountLocked(false)}
-								accessibilityLabel="Unlock amount for manual override"
-							>
-								<Ionicons
-									name="lock-closed"
-									size={18}
-									color={palette.textMuted}
-								/>
-							</TouchableOpacity>
-						)}
 					</View>
 					<View style={styles.amountUnderline} />
-						{isAmountLocked && selectedBill && (
-							<View style={styles.lockHintContainer}>
-								<AppText.Caption color="muted" style={styles.lockHintText}>
-									Amount locked from bill. Tap{' '}
-									<Ionicons
-										name="lock-closed"
-										size={12}
-										color={palette.textMuted}
-									/>{' '}
-									to override
-								</AppText.Caption>
-							</View>
-						)}
 
 						{/* Reserve space for error to prevent layout shift */}
 						<View style={styles.errorContainer}>
@@ -880,7 +625,7 @@ export default function TransactionScreenProModern() {
 							}
 							onPress={() => {
 								Keyboard.dismiss();
-								setPickerOpen('category');
+								setPickerOpen(true);
 							}}
 							showChevron
 							accessibilityLabel="Select category"
@@ -899,54 +644,6 @@ export default function TransactionScreenProModern() {
 				</AppCard>
 
 				{/* MVP: Advanced (bills) hidden - cash-only focus */}
-				{false && mode === 'expense' && bills?.length > 0 && (
-					<AppCard style={styles.section} padding={0} borderRadius={radius.lg}>
-						<AppRow
-							icon="options-outline"
-							label="Advanced"
-							right={
-								<Ionicons
-									name={showAdvanced ? 'chevron-up' : 'chevron-down'}
-									size={18}
-									color={palette.textSubtle}
-								/>
-							}
-							onPress={() => setShowAdvanced(!showAdvanced)}
-							bordered={showAdvanced}
-							showChevron={false}
-						/>
-
-						{showAdvanced && (
-							<>
-								{/* Bill - only show in Advanced if bills exist */}
-								<AppRow
-									icon={
-										selectedBill
-											? resolveBillAppearance(selectedBill).icon
-											: 'receipt-outline'
-									}
-									label="Bill"
-									right={
-										billsLoading ? (
-											<ActivityIndicator size="small" />
-										) : selectedBill ? (
-											<ValueText>{selectedBill.vendor || 'Bill'}</ValueText>
-										) : (
-											<ValueText>Optional</ValueText>
-										)
-									}
-									onPress={() => {
-										Keyboard.dismiss();
-										setPickerOpen('bill');
-									}}
-									accessibilityLabel="Select Bill"
-									bordered={false}
-								/>
-							</>
-						)}
-					</AppCard>
-				)}
-
 				{/* Description input */}
 				<AppCard style={styles.section}>
 					<AppText.Heading style={styles.inputLabel}>Note (optional)</AppText.Heading>
@@ -1000,15 +697,7 @@ export default function TransactionScreenProModern() {
 						</AppText.Caption>
 					)}
 					<AppButton
-						label={
-							isSubmitting
-								? 'Saving…'
-								: mode === 'expense' &&
-									!selectedBudgets.length &&
-									selectedBill
-									? 'Pay Bill'
-									: 'Create Transaction'
-						}
+						label={isSubmitting ? 'Saving…' : 'Create Transaction'}
 						variant="primary"
 						icon={isSubmitting ? undefined : 'add'}
 						onPress={() => {
@@ -1050,147 +739,50 @@ export default function TransactionScreenProModern() {
 
 			{/* Picker Modal */}
 			<BottomSheet
-				isOpen={pickerOpen !== null}
-				onClose={() => setPickerOpen(null)}
+				isOpen={pickerOpen}
+				onClose={() => setPickerOpen(false)}
 				snapPoints={[0.6, 0.4]}
 				initialSnapIndex={0}
 				header={
 					<View style={styles.sheetHeader}>
 						<Ionicons
-							name={
-								pickerOpen === 'category'
-									? 'pricetag-outline'
-									: pickerOpen === 'goal'
-									? 'trophy-outline'
-									: pickerOpen === 'bill'
-									? 'receipt-outline'
-									: 'wallet-outline'
-							}
+							name="pricetag-outline"
 							size={20}
 							color={palette.primary}
 							style={{ marginRight: space.sm }}
 						/>
 						<AppText.Heading style={styles.sheetTitle}>
-							{pickerOpen === 'category'
-								? 'Select Category'
-								: pickerOpen === 'goal'
-								? 'Select Goal'
-								: pickerOpen === 'bill'
-								? 'Select Bill'
-								: 'Select Budget'}
+							Select Category
 						</AppText.Heading>
-						<TouchableOpacity onPress={() => setPickerOpen(null)}>
+						<TouchableOpacity onPress={() => setPickerOpen(false)}>
 							<Ionicons name="close" size={24} color={palette.textMuted} />
 						</TouchableOpacity>
 					</View>
 				}
 			>
 				<FlatList
-					data={
-						pickerOpen === 'category'
-							? [...CASH_CATEGORIES]
-							: pickerOpen === 'goal'
-							? (goals as any[])
-							: pickerOpen === 'bill'
-							? bills
-							: (budgets as any[])
-					}
-					keyExtractor={(item) => {
-						if (pickerOpen === 'category') return item as string;
-						if (pickerOpen === 'bill') {
-							return (item as Bill).patternId || (item as any).id;
-						}
-						return (item as any).id;
-					}}
+					data={[...CASH_CATEGORIES]}
+					keyExtractor={(item) => item}
 					initialNumToRender={12}
 					windowSize={6}
 					maxToRenderPerBatch={12}
 					getItemLayout={(_, i) => ({ length: 48, offset: 48 * i, index: i })}
-					ListEmptyComponent={() => {
-						if (pickerOpen === 'category') return null; // Categories always have data
-						const data =
-							pickerOpen === 'goal'
-								? goals
-								: pickerOpen === 'bill'
-								? bills
-								: budgets;
-						return (
-							<View style={{ paddingVertical: space.md }}>
-								<AppText.Body color="muted">
-									{pickerOpen === 'goal'
-										? 'No goals yet. Create one from Goals.'
-										: pickerOpen === 'bill'
-										? 'No bills yet. Create one from Bills.'
-										: 'No budgets yet. Create one from Budgets.'}
-								</AppText.Body>
-							</View>
-						);
-					}}
-					renderItem={({ item }) => {
-						let icon: keyof typeof Ionicons.glyphMap = 'wallet-outline';
-						let color = palette.text;
-						let label = '';
-
-						if (pickerOpen === 'category') {
-							icon = 'pricetag-outline';
-							label = item as string;
-						} else if (pickerOpen === 'goal') {
-							icon = normalizeIconName((item as any).icon ?? 'trophy-outline');
-							color = (item as any).color ?? palette.text;
-							label = (item as any).name;
-						} else if (pickerOpen === 'bill') {
-							const billItem = item as Bill;
-							if (billItem) {
-								if (isDevMode) {
-									transactionScreenLog.debug('Bill item in picker', {
-										vendor: billItem.vendor,
-										name: (billItem as any).name,
-										patternId: billItem.patternId,
-										fullItem: billItem,
-									});
-								}
-								const billAppearance = resolveBillAppearance(billItem);
-								icon = billAppearance.icon;
-								color = billAppearance.color;
-								// Try vendor first, then check for name field, then fallback
-								label =
-									billItem.vendor ||
-									(billItem as any).name ||
-									(billItem.patternId
-										? `Bill ${billItem.patternId.slice(-4)}`
-										: 'Bill');
+					renderItem={({ item }) => (
+						<TouchableOpacity
+							style={styles.sheetRow}
+							onPress={() =>
+								selectCategory(item as (typeof CASH_CATEGORIES)[number])
 							}
-						} else {
-							icon = normalizeIconName((item as any).icon ?? 'wallet-outline');
-							color = (item as any).color ?? palette.text;
-							label = (item as any).name;
-						}
-
-						return (
-							<TouchableOpacity
-								style={styles.sheetRow}
-								onPress={() => {
-									if (pickerOpen === 'category') {
-										selectCategory(item as (typeof CASH_CATEGORIES)[number]);
-									} else if (pickerOpen === 'goal') {
-										selectGoal(item as Goal);
-									} else if (pickerOpen === 'bill') {
-										selectBill(item as Bill);
-									} else {
-										selectBudget(item as Budget);
-									}
-								}}
-							>
-								<Ionicons
-									name={icon}
-									size={18}
-									color={color}
-									style={{ marginRight: space.sm }}
-								/>
-								<AppText.Body>{label}</AppText.Body>
-							</TouchableOpacity>
-						);
-					}}
+						>
+							<Ionicons
+								name="pricetag-outline"
+								size={18}
+								color={palette.text}
+								style={{ marginRight: space.sm }}
+							/>
+							<AppText.Body>{item}</AppText.Body>
+						</TouchableOpacity>
+					)}
 				/>
 			</BottomSheet>
 
@@ -1273,14 +865,6 @@ export default function TransactionScreenProModern() {
 				) : null}
 			</BottomSheet>
 
-			{!ready && !hasLoadedOnce && (
-				<View style={styles.loadingOverlay}>
-					<ActivityIndicator size="large" color={palette.primary} />
-					<AppText.Body color="muted" style={styles.loadingText}>
-						{mode === 'income' ? 'Loading goals…' : 'Loading budgets…'}
-					</AppText.Body>
-				</View>
-			)}
 		</SafeAreaView>
 	);
 }

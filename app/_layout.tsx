@@ -293,13 +293,7 @@ function RootLayoutContent() {
 				isWizardRoute || isReviewOrEditRoute || isEditingOnboarding;
 
 			// Stack routes don't include the group name in segments, so check for known stack routes
-			const knownStackRoutes = [
-				'settings',
-				'budgets',
-				'goals',
-				'recurring',
-				// 'debts', // Debt tracking hidden for MVP
-			];
+			const knownStackRoutes = ['settings'];
 			const isStackRoute =
 				inStackGroup || knownStackRoutes.includes(segments[0] || '');
 			if (firebaseUser && user) {

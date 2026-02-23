@@ -1,7 +1,5 @@
-export {
-	useInsightsHub,
-	type Period,
-	type SummaryData,
-	type ReportData,
-	type UseInsightsHubReturn,
-} from './useInsightsHub';
+// Re-export commonly used hooks (optional - components can import directly)
+export { useBriePro } from './useBriePro';
+export { useAppInit } from './useAppInit';
+export { useDevModeEasterEgg } from './useDevModeEasterEgg';
+export { useActionConfirmation } from './useActionConfirmation';
