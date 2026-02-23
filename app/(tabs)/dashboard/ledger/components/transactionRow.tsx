@@ -322,12 +322,21 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 			}
 		}
 
-		// Smart fallback: try to infer icon and color from transaction description
-		const smartFallback = getSmartFallback(item.description, item.type);
+		// MVP: For expenses with metadata.category, use it as name
+		const category = (item.metadata as any)?.category;
+		const smartFallback = getSmartFallback(
+			item.description || category,
+			item.type
+		);
 
 		return {
 			type: 'general' as const,
-			name: item.type === 'income' ? 'Income' : 'Expense',
+			name:
+				item.type === 'expense' && category
+					? category
+					: item.type === 'income'
+					? 'Income'
+					: 'Expense',
 			icon: smartFallback.icon,
 			color: smartFallback.color,
 			progress: 0,
@@ -340,6 +349,7 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 		item.type,
 		item.amount,
 		item.description,
+		(item.metadata as any)?.category,
 		budgets,
 		goals,
 	]);
@@ -364,13 +374,18 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 			.trim();
 	}, [item.description]);
 
-	// Get display description: use vendor name if bill, otherwise use cleaned description
+	// Get display description: bill vendor, then category (MVP), then description
 	const displayDescription = useMemo(() => {
 		if (billInfo?.vendor) {
 			return billInfo.vendor;
 		}
+		// MVP: Show category for cash expenses when no description
+		const category = (item.metadata as any)?.category;
+		if (item.type === 'expense' && category) {
+			return cleanDescription ? `${category} – ${cleanDescription}` : category;
+		}
 		return cleanDescription || item.description || 'Transaction';
-	}, [billInfo, cleanDescription, item.description]);
+	}, [billInfo, cleanDescription, item.description, item.type, (item.metadata as any)?.category]);
 
 	const triggerHaptic = useCallback(() => {
 		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

@@ -53,7 +53,17 @@ interface Transaction {
 		confidence: number;
 		nextExpectedDate: string;
 	};
+	metadata?: { category?: string }; // MVP: cash spending category
 }
+
+// MVP: Fixed cash spending categories (same as transaction screen)
+const CASH_CATEGORIES = [
+	'Food',
+	'Rides',
+	'Drinks',
+	'Groceries',
+	'Other',
+] as const;
 
 const toLocalISODate = (d: Date) => {
 	const year = d.getFullYear();
@@ -119,6 +129,10 @@ export default function EditTransactionScreen() {
 	const [recurringExpenseId, setRecurringExpenseId] = useState<
 		string | undefined
 	>();
+	const [selectedCategory, setSelectedCategory] = useState<
+		(typeof CASH_CATEGORIES)[number] | null
+	>(null);
+	const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
 	const [saving, setSaving] = useState(false);
 	const [footerH, setFooterH] = useState(0);
 	const [descriptionFocused, setDescriptionFocused] = useState(false);
@@ -201,6 +215,14 @@ export default function EditTransactionScreen() {
 		} else {
 			setRecurringExpenseId(undefined);
 		}
+
+		// MVP: Prefill category from metadata
+		const cat = (tx.metadata as any)?.category;
+		if (cat && CASH_CATEGORIES.includes(cat as any)) {
+			setSelectedCategory(cat as (typeof CASH_CATEGORIES)[number]);
+		} else {
+			setSelectedCategory(null);
+		}
 	}, [tx, selectableBudgets, selectableGoals, recurringExpenses]);
 
 	// validation
@@ -266,6 +288,8 @@ export default function EditTransactionScreen() {
 			}
 		}
 
+		const origCategory = (tx.metadata as any)?.category ?? null;
+
 		return (
 			(description.trim() || undefined) !== (tx.description?.trim() || undefined) ||
 			signedAmount !== origAmount ||
@@ -274,7 +298,8 @@ export default function EditTransactionScreen() {
 				(tx.date.includes('T') ? tx.date.slice(0, 10) : tx.date) ||
 			(targetModel ?? undefined) !== effectiveOrigTargetModel ||
 			(targetId ?? undefined) !== effectiveOrigTarget ||
-			(recurringExpenseId ?? undefined) !== effectiveOrigRecurringPatternId
+			(recurringExpenseId ?? undefined) !== effectiveOrigRecurringPatternId ||
+			(selectedCategory ?? null) !== origCategory
 		);
 	}, [
 		tx,
@@ -285,6 +310,7 @@ export default function EditTransactionScreen() {
 		targetId,
 		targetModel,
 		recurringExpenseId,
+		selectedCategory,
 		selectableBudgets,
 		selectableGoals,
 		recurringExpenses,
@@ -390,6 +416,11 @@ export default function EditTransactionScreen() {
 							patternId: recurringExpenseId,
 					  } as Transaction['recurringPattern'])
 					: undefined,
+				// MVP: Include category for expenses
+				metadata:
+					type === 'expense' && selectedCategory
+						? { category: selectedCategory }
+						: undefined,
 			};
 
 			if (typeof updateTransaction !== 'function') {
@@ -420,6 +451,7 @@ export default function EditTransactionScreen() {
 		targetId,
 		targetModel,
 		recurringExpenseId,
+		selectedCategory,
 		updateTransaction,
 	]);
 
@@ -543,9 +575,9 @@ export default function EditTransactionScreen() {
 												);
 												setType(t);
 												Haptics.selectionAsync();
-												// Clear selections when type changes, but don't auto-switch targetModel
 												setSelectedBudgetId(undefined);
 												setSelectedGoalId(undefined);
+												if (t === 'income') setSelectedCategory(null);
 											}}
 											accessibilityRole="button"
 											accessibilityState={{ selected: active }}
@@ -655,6 +687,67 @@ export default function EditTransactionScreen() {
 								<Text style={styles.errorText}>{errors.amount}</Text>
 							)}
 						</View>
+
+						{/* MVP: Category for expenses */}
+						{type === 'expense' && (
+							<View style={styles.fieldSection}>
+								<Text style={styles.label}>Category</Text>
+								<TouchableOpacity
+									style={styles.inputRow}
+									onPress={() => setCategoryPickerOpen(true)}
+								>
+									<Ionicons
+										name="pricetag-outline"
+										size={18}
+										color={palette.textMuted}
+										style={{ marginRight: space.sm }}
+									/>
+									<Text
+										style={[
+											styles.inputBare,
+											{ flex: 1 },
+											selectedCategory && styles.inputBareFilled,
+										]}
+									>
+										{selectedCategory || 'Select category'}
+									</Text>
+									<Ionicons
+										name="chevron-down"
+										size={18}
+										color={palette.textMuted}
+									/>
+								</TouchableOpacity>
+								{categoryPickerOpen && (
+									<View style={styles.categoryPicker}>
+										{CASH_CATEGORIES.map((cat) => (
+											<TouchableOpacity
+												key={cat}
+												style={[
+													styles.categoryOption,
+													selectedCategory === cat &&
+														styles.categoryOptionSelected,
+												]}
+												onPress={() => {
+													setSelectedCategory(cat);
+													setCategoryPickerOpen(false);
+													Haptics.selectionAsync();
+												}}
+											>
+												<Text
+													style={[
+														styles.categoryOptionText,
+														selectedCategory === cat &&
+															styles.categoryOptionTextSelected,
+													]}
+												>
+													{cat}
+												</Text>
+											</TouchableOpacity>
+										))}
+									</View>
+								)}
+							</View>
+						)}
 
 						{/* Date */}
 						<View style={styles.fieldSection}>
@@ -1249,6 +1342,30 @@ const styles = StyleSheet.create({
 	},
 	inputBareFilled: {
 		fontWeight: '500',
+	},
+	categoryPicker: {
+		marginTop: space.sm,
+		gap: space.xs,
+	},
+	categoryOption: {
+		paddingVertical: space.sm,
+		paddingHorizontal: space.md,
+		borderRadius: radius.md,
+		backgroundColor: palette.surfaceAlt,
+		borderWidth: 1,
+		borderColor: palette.border,
+	},
+	categoryOptionSelected: {
+		backgroundColor: palette.primarySubtle,
+		borderColor: palette.primary,
+	},
+	categoryOptionText: {
+		fontSize: 15,
+		color: palette.text,
+	},
+	categoryOptionTextSelected: {
+		fontWeight: '600',
+		color: palette.primary,
 	},
 	currencySymbol: {
 		fontSize: 16,
