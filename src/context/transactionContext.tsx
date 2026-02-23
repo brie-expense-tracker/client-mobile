@@ -39,6 +39,7 @@ export interface Transaction {
 		location?: string;
 		paymentMethod?: string;
 		originalDescription?: string;
+		category?: string; // MVP: fixed category for cash spending (Food, Rides, etc.)
 	};
 }
 
@@ -178,6 +179,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 									location: tx.metadata.location,
 									paymentMethod: tx.metadata.paymentMethod,
 									originalDescription: tx.metadata.originalDescription,
+									category: tx.metadata.category,
 							  }
 							: undefined,
 					};
