@@ -1,6 +1,5 @@
 // index.tsx
-import React, { useState, useMemo, useContext, useEffect } from 'react';
-import { logger } from '../../../../src/utils/logger';
+import React, { useState, useMemo, useContext } from 'react';
 import {
 	View,
 	Text,
@@ -22,8 +21,6 @@ import {
 	type Transaction,
 } from '../../../../src/context/transactionContext';
 import { FilterContext } from '../../../../src/context/filterContext';
-import { useBudget } from '../../../../src/context/budgetContext';
-import { useGoal } from '../../../../src/context/goalContext';
 import { TransactionRow } from './components/transactionRow';
 import CalendarSheet from './components/CalendarSheet';
 import CalendarTrigger from './components/CalendarTrigger';
@@ -119,47 +116,7 @@ export default function TransactionScreen() {
 
 	const { transactions, isLoading, refetch, deleteTransaction } =
 		useContext(TransactionContext);
-	const {
-		selectedGoals,
-		selectedBudgets,
-		dateFilterMode,
-		selectedPatternId,
-		setSelectedPatternId,
-		transactionTypes,
-	} = useContext(FilterContext);
-	const { goals } = useGoal();
-	const { budgets } = useBudget();
-
-	// Debug logging
-	useEffect(() => {
-		logger.debug('[Ledger] Current state:', {
-			transactionsCount: transactions.length,
-			transactions: transactions.map((tx) => ({
-				id: tx.id,
-				description: tx.description,
-				type: tx.type,
-				target: tx.target,
-				targetModel: tx.targetModel,
-				date: tx.date,
-			})),
-			selectedGoals,
-			selectedBudgets,
-			selectedPatternId,
-			dateFilterMode,
-			selectedDate,
-			goalsCount: goals.length,
-			budgetsCount: budgets.length,
-		});
-	}, [
-		transactions,
-		selectedGoals,
-		selectedBudgets,
-		selectedPatternId,
-		dateFilterMode,
-		selectedDate,
-		goals,
-		budgets,
-	]);
+	const { dateFilterMode, transactionTypes } = useContext(FilterContext);
 
 	const handleFilterPress = () => {
 		router.push('./ledger/ledgerFilter');
@@ -167,175 +124,26 @@ export default function TransactionScreen() {
 
 	// filter transactions
 	const filtered = useMemo(() => {
-		logger.debug('[Ledger] Filtering transactions:', {
-			totalTransactions: transactions.length,
-			selectedGoals,
-			selectedBudgets,
-			dateFilterMode,
-			selectedDate,
-			searchQuery,
-			selectedPatternId,
-			transactionTypes,
-		});
-
 		return transactions
 			.filter((tx) => {
-				// transaction type match
 				const typeMatch = transactionTypes[tx.type];
-				if (!typeMatch) {
-					logger.debug(
-						'[Ledger] Transaction filtered out by type filter:',
-						tx.description,
-						'type:',
-						tx.type
-					);
-					return false;
-				}
+				if (!typeMatch) return false;
 
-				// pattern match
-				const patternMatch = (() => {
-					if (!selectedPatternId) {
-						return true;
-					}
+				const patternMatch = !selectedPatternId
+					? true
+					: !!(tx.recurringPattern?.patternId === selectedPatternId);
+				if (!patternMatch) return false;
 
-					// Check if transaction has a recurring pattern that matches
-					if (
-						tx.recurringPattern &&
-						tx.recurringPattern.patternId === selectedPatternId
-					) {
-						logger.debug(
-							'[Ledger] Transaction matches selected pattern:',
-							tx.description
-						);
-						return true;
-					}
-
-					logger.debug(
-						'[Ledger] Transaction filtered out by pattern filter:',
-						tx.description
-					);
-					return false;
-				})();
-
-				// goal/budget match
-				const goalBudgetMatch = (() => {
-					// If no goals or budgets are selected, show all transactions
-					if (selectedGoals.length === 0 && selectedBudgets.length === 0) {
-						logger.debug(
-							'[Ledger] No filters selected, showing all transactions'
-						);
-						return true;
-					}
-
-					// Check if transaction matches any selected goals (for income transactions)
-					if (tx.type === 'income' && selectedGoals.length > 0) {
-						// Check if transaction has a goal target
-						if (tx.target && tx.targetModel === 'Goal') {
-							const matchingGoals = goals.filter(
-								(goal) =>
-									selectedGoals.includes(goal.id) && tx.target === goal.id
-							);
-							if (matchingGoals.length > 0) {
-								logger.debug(
-									'[Ledger] Transaction matches selected goal:',
-									tx.description
-								);
-								return true;
-							}
-						} else {
-							// Transaction doesn't have a goal target, but we have goals selected
-							// This means it's an "Other" transaction for goals
-							logger.debug(
-								'[Ledger] Transaction is "Other" for goals:',
-								tx.description
-							);
-							return false; // Don't show "Other" transactions when specific goals are selected
-						}
-					}
-
-					// Check if transaction matches any selected budgets (for expense transactions)
-					if (tx.type === 'expense' && selectedBudgets.length > 0) {
-						// Check if transaction has a budget target
-						if (tx.target && tx.targetModel === 'Budget') {
-							const matchingBudgets = budgets.filter(
-								(budget) =>
-									selectedBudgets.includes(budget.id) && tx.target === budget.id
-							);
-							if (matchingBudgets.length > 0) {
-								logger.debug(
-									'[Ledger] Transaction matches selected budget:',
-									tx.description
-								);
-								return true;
-							}
-						} else {
-							// Transaction doesn't have a budget target, but we have budgets selected
-							// This means it's an "Other" transaction for budgets
-							logger.debug(
-								'[Ledger] Transaction is "Other" for budgets:',
-								tx.description
-							);
-							return false; // Don't show "Other" transactions when specific budgets are selected
-						}
-					}
-
-					// If we have goals selected but this is an expense transaction, or
-					// if we have budgets selected but this is an income transaction,
-					// don't show it
-					if (
-						(selectedGoals.length > 0 && tx.type === 'expense') ||
-						(selectedBudgets.length > 0 && tx.type === 'income')
-					) {
-						logger.debug(
-							'[Ledger] Transaction type mismatch with selected filters:',
-							tx.description
-						);
-						return false;
-					}
-
-					logger.debug(
-						'[Ledger] Transaction filtered out by goal/budget filter:',
-						tx.description
-					);
-					return false;
-				})();
-
-				// date match
 				const txDay = tx.date.slice(0, 10);
 				const dateMatch =
 					dateFilterMode === 'month' ||
 					(dateFilterMode === 'day' && txDay === selectedDate);
+				if (!dateMatch) return false;
 
-				if (!dateMatch) {
-					logger.debug(
-						'[Ledger] Transaction filtered out by date filter:',
-						tx.description,
-						'txDay:',
-						txDay,
-						'selectedDate:',
-						selectedDate
-					);
-				}
-
-				// search match
 				const text = searchQuery.toLowerCase();
 				const searchMatch =
 					!text || (tx.description?.toLowerCase().includes(text) ?? false);
-
-				if (!searchMatch) {
-					logger.debug(
-						'[Ledger] Transaction filtered out by search filter:',
-						tx.description
-					);
-				}
-
-				const shouldInclude =
-					patternMatch && goalBudgetMatch && dateMatch && searchMatch;
-				if (shouldInclude) {
-					logger.debug('[Ledger] Transaction included:', tx.description);
-				}
-
-				return shouldInclude;
+				return searchMatch;
 			})
 			.sort((a, b) => {
 				// First, compare by date (newest first)
@@ -354,11 +162,6 @@ export default function TransactionScreen() {
 			});
 	}, [
 		transactions,
-		selectedGoals,
-		selectedBudgets,
-		selectedPatternId,
-		goals,
-		budgets,
 		dateFilterMode,
 		selectedDate,
 		searchQuery,
@@ -478,24 +281,6 @@ export default function TransactionScreen() {
 							</TouchableOpacity>
 						) : null}
 					</View>
-
-					{/* Pattern Filter Indicator */}
-					{selectedPatternId && (
-						<View style={styles.patternFilterContainer}>
-							<View style={styles.patternFilterContent}>
-								<Ionicons name="repeat" size={16} color={palette.primary} />
-								<Text style={styles.patternFilterText}>
-									Filtered by recurring pattern
-								</Text>
-								<TouchableOpacity
-									onPress={() => setSelectedPatternId(null)}
-									style={styles.clearPatternButton}
-								>
-									<Ionicons name="close" size={16} color={palette.primary} />
-								</TouchableOpacity>
-							</View>
-						</View>
-					)}
 
 					{/* Date Header */}
 					{renderDateHeader()}
@@ -748,30 +533,6 @@ const styles = StyleSheet.create({
 		paddingVertical: 10,
 	},
 	clearButton: {
-		padding: 4,
-	},
-	patternFilterContainer: {
-		marginHorizontal: space.lg,
-		marginVertical: space.sm,
-	},
-	patternFilterContent: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: palette.infoSubtle,
-		borderRadius: radius.md,
-		paddingHorizontal: space.md,
-		paddingVertical: space.sm,
-		borderWidth: 1,
-		borderColor: palette.primarySubtle,
-	},
-	patternFilterText: {
-		flex: 1,
-		marginLeft: space.sm,
-		fontSize: 14,
-		color: palette.primary,
-		fontWeight: '600',
-	},
-	clearPatternButton: {
 		padding: 4,
 	},
 	modalContainer: {

@@ -3,7 +3,6 @@ import React, { useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { logger } from '../../../../../src/utils/logger';
 import Animated, {
 	useSharedValue,
 	useAnimatedStyle,
@@ -13,9 +12,6 @@ import Animated, {
 	Easing,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { useBudget } from '../../../../../src/context/budgetContext';
-import { useGoal } from '../../../../../src/context/goalContext';
-import { useBills } from '../../../../../src/context/billContext';
 import { normalizeIconName } from '../../../../../src/constants/uiConstants';
 import type { Transaction } from '../../../../../src/context/transactionContext';
 
@@ -252,77 +248,8 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 	const TRANSLATE_THRESHOLD = -70;
 	const DELETE_WIDTH = 60;
 
-	// Get budget, goal, and bill contexts
-	const { budgets } = useBudget();
-	const { goals } = useGoal();
-	const { expenses: bills } = useBills();
-
-	// Memoize the transaction context calculation to prevent unnecessary recalculations
+	// MVP: Use category or smart fallback for display
 	const transactionContext = useMemo(() => {
-		// Check if transaction has a target and targetModel
-		if (item.target && item.targetModel) {
-			if (item.targetModel === 'Budget' && item.type === 'expense') {
-				// For expenses, find the matching budget by ID
-				const matchingBudget = budgets.find(
-					(budget) => budget.id === item.target
-				);
-
-				if (matchingBudget) {
-					// Calculate the incremental percentage this transaction contributes to the budget
-					const transactionContribution =
-						(item.amount / (matchingBudget.amount || 1)) * 100;
-
-					// Use budget icon/color if available, otherwise fall back to smart inference
-					const budgetIcon =
-						matchingBudget.icon ||
-						getSmartFallback(item.description, 'expense').icon;
-					const budgetColor =
-						matchingBudget.color ||
-						getSmartFallback(item.description, 'expense').color;
-
-					return {
-						type: 'budget' as const,
-						name: matchingBudget.name,
-						icon: normalizeIconName(budgetIcon),
-						color: budgetColor,
-						progress: transactionContribution,
-						spent: matchingBudget.spent || 0,
-						allocated: matchingBudget.amount || 0,
-						transactionAmount: item.amount,
-					};
-				}
-			} else if (item.targetModel === 'Goal' && item.type === 'income') {
-				// For income, find the matching goal by ID
-				const matchingGoal = goals.find((goal) => goal.id === item.target);
-
-				if (matchingGoal) {
-					// Calculate the incremental percentage this transaction contributes to the goal
-					const transactionContribution =
-						(item.amount / matchingGoal.target) * 100;
-
-					// Use goal icon/color if available, otherwise fall back to smart inference
-					const goalIcon =
-						matchingGoal.icon ||
-						getSmartFallback(item.description, 'income').icon;
-					const goalColor =
-						matchingGoal.color ||
-						getSmartFallback(item.description, 'income').color;
-
-					return {
-						type: 'goal' as const,
-						name: matchingGoal.name,
-						icon: normalizeIconName(goalIcon),
-						color: goalColor,
-						progress: transactionContribution,
-						current: matchingGoal.current,
-						target: matchingGoal.target,
-						transactionAmount: item.amount,
-					};
-				}
-			}
-		}
-
-		// MVP: For expenses with metadata.category, use it as name
 		const category = (item.metadata as any)?.category;
 		const smartFallback = getSmartFallback(
 			item.description || category,
@@ -337,33 +264,13 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 					: item.type === 'income'
 					? 'Income'
 					: 'Expense',
-			icon: smartFallback.icon,
+			icon: normalizeIconName(smartFallback.icon),
 			color: smartFallback.color,
 			progress: 0,
 			spent: 0,
 			allocated: 0,
 		};
-	}, [
-		item.target,
-		item.targetModel,
-		item.type,
-		item.amount,
-		item.description,
-		(item.metadata as any)?.category,
-		budgets,
-		goals,
-	]);
-
-	// Get bill information if linked
-	const billInfo = useMemo(() => {
-		if (item.recurringPattern?.patternId) {
-			const bill = bills.find(
-				(b) => b.patternId === item.recurringPattern?.patternId
-			);
-			return bill;
-		}
-		return null;
-	}, [item.recurringPattern?.patternId, bills]);
+	}, [item.type, item.description, (item.metadata as any)?.category]);
 
 	// Clean description by removing " - Bill" suffix
 	const cleanDescription = useMemo(() => {
@@ -374,18 +281,14 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 			.trim();
 	}, [item.description]);
 
-	// Get display description: bill vendor, then category (MVP), then description
+	// Get display description: category (MVP) or description
 	const displayDescription = useMemo(() => {
-		if (billInfo?.vendor) {
-			return billInfo.vendor;
-		}
-		// MVP: Show category for cash expenses when no description
 		const category = (item.metadata as any)?.category;
 		if (item.type === 'expense' && category) {
 			return cleanDescription ? `${category} – ${cleanDescription}` : category;
 		}
 		return cleanDescription || item.description || 'Transaction';
-	}, [billInfo, cleanDescription, item.description, item.type, (item.metadata as any)?.category]);
+	}, [cleanDescription, item.description, item.type, (item.metadata as any)?.category]);
 
 	const triggerHaptic = useCallback(() => {
 		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -520,87 +423,9 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 							<Text style={styles.description}>{displayDescription}</Text>
 						</View>
 
-						{/* Enhanced linked data display */}
+						{/* Category display */}
 						<View style={styles.linkedDataContainer}>
-							{/* Budget payment information */}
-							{transactionContext.type === 'budget' && (
-								<View style={styles.linkedItem}>
-									<View
-										style={[
-											styles.linkedIcon,
-											{ backgroundColor: `${transactionContext.color}20` },
-										]}
-									>
-										<Ionicons
-											name="wallet-outline"
-											size={12}
-											color={transactionContext.color}
-										/>
-									</View>
-									<Text style={styles.linkedText}>
-										<Text style={styles.linkedName}>Budget payment</Text>
-										<Text style={styles.linkedDetails}>
-											{' '}
-											• {transactionContext.name} • +
-											{transactionContext.progress.toFixed(1)}%
-										</Text>
-									</Text>
-								</View>
-							)}
-
-							{transactionContext.type === 'goal' && (
-								<View style={styles.linkedItem}>
-									<View
-										style={[
-											styles.linkedIcon,
-											{ backgroundColor: `${transactionContext.color}20` },
-										]}
-									>
-										<Ionicons
-											name="flag-outline"
-											size={12}
-											color={transactionContext.color}
-										/>
-									</View>
-									<Text style={styles.linkedText}>
-										<Text style={styles.linkedName}>Goal payment</Text>
-										<Text style={styles.linkedDetails}>
-											{' '}
-											• {transactionContext.name} • +
-											{transactionContext.progress.toFixed(1)}%
-										</Text>
-									</Text>
-								</View>
-							)}
-
-							{/* Bill payment information */}
-							{billInfo && (
-								<View style={styles.linkedItem}>
-									<View
-										style={[styles.linkedIcon, { backgroundColor: '#e0f2fe' }]}
-									>
-										<Ionicons name="repeat" size={12} color="#0ea5e9" />
-									</View>
-									<Text style={styles.linkedText}>
-										<Text style={styles.linkedName}>Bill payment</Text>
-										<Text style={styles.linkedDetails}>
-											{' '}
-											•{' '}
-											{billInfo.frequency
-												? `${billInfo.frequency
-														.charAt(0)
-														.toUpperCase()}${billInfo.frequency.slice(1)}`
-												: 'Monthly'}
-											{billInfo.amount && <> • ${billInfo.amount.toFixed(2)}</>}
-										</Text>
-									</Text>
-								</View>
-							)}
-
-							{/* Fallback for general transactions */}
-							{transactionContext.type === 'general' && !billInfo && (
-								<Text style={styles.category}>{transactionContext.name}</Text>
-							)}
+							<Text style={styles.category}>{transactionContext.name}</Text>
 						</View>
 
 						{/* Transaction Details */}
@@ -768,32 +593,6 @@ const styles = StyleSheet.create({
 	linkedDataContainer: {
 		marginTop: 4,
 		gap: 4,
-	},
-	linkedItem: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
-	},
-	linkedIcon: {
-		width: 20,
-		height: 20,
-		borderRadius: 4,
-		justifyContent: 'center',
-		alignItems: 'center',
-	},
-	linkedText: {
-		fontSize: 12,
-		color: '#6b7280',
-		fontWeight: '500',
-		flex: 1,
-	},
-	linkedName: {
-		fontWeight: '600',
-		color: '#374151',
-	},
-	linkedDetails: {
-		fontWeight: '400',
-		color: '#6b7280',
 	},
 	category: {
 		fontSize: 12,

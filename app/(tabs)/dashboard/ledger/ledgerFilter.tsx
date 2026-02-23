@@ -7,84 +7,24 @@ import {
 	TouchableOpacity,
 	ScrollView,
 	SafeAreaView,
-	TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { dateFilterModes } from './_layout';
 import { FilterContext } from '../../../../src/context/filterContext';
-import { useBudget } from '../../../../src/context/budgetContext';
-import { useGoal } from '../../../../src/context/goalContext';
 
 export default function LedgerFilterScreen() {
 	const {
-		selectedGoals,
-		setSelectedGoals,
-		selectedBudgets,
-		setSelectedBudgets,
 		dateFilterMode,
 		setDateFilterMode,
 		transactionTypes,
 		setTransactionTypes,
 	} = useContext(FilterContext);
 
-	// Get goals and budgets from context
-	const { goals } = useGoal();
-	const { budgets } = useBudget();
-
-	// Initialize local state from context
-	const [localSelectedGoals, setLocalSelectedGoals] =
-		useState<string[]>(selectedGoals);
-	const [localSelectedBudgets, setLocalSelectedBudgets] =
-		useState<string[]>(selectedBudgets);
 	const [localDateFilterMode, setLocalDateFilterMode] =
 		useState<string>(dateFilterMode);
 
-	// Search and filter state
-	const [goalSearchQuery, setGoalSearchQuery] = useState('');
-	const [budgetSearchQuery, setBudgetSearchQuery] = useState('');
-
-	// Filter goals and budgets based on search query
-	const filteredGoals = useMemo(() => {
-		if (!goalSearchQuery.trim()) return goals;
-		return goals.filter((goal) =>
-			goal.name.toLowerCase().includes(goalSearchQuery.toLowerCase())
-		);
-	}, [goals, goalSearchQuery]);
-
-	const filteredBudgets = useMemo(() => {
-		if (!budgetSearchQuery.trim()) return budgets;
-		return budgets.filter((budget) =>
-			budget.name.toLowerCase().includes(budgetSearchQuery.toLowerCase())
-		);
-	}, [budgets, budgetSearchQuery]);
-
-	const handleGoalToggle = (goalId: string) => {
-		if (goalId === '') {
-			setLocalSelectedGoals([]);
-		} else if (localSelectedGoals.includes(goalId)) {
-			setLocalSelectedGoals(localSelectedGoals.filter((id) => id !== goalId));
-		} else {
-			setLocalSelectedGoals([...localSelectedGoals, goalId]);
-		}
-	};
-
-	const handleBudgetToggle = (budgetId: string) => {
-		if (budgetId === '') {
-			setLocalSelectedBudgets([]);
-		} else if (localSelectedBudgets.includes(budgetId)) {
-			setLocalSelectedBudgets(
-				localSelectedBudgets.filter((id) => id !== budgetId)
-			);
-		} else {
-			setLocalSelectedBudgets([...localSelectedBudgets, budgetId]);
-		}
-	};
-
 	const handleBack = () => {
-		// push edits back into global filter context
-		setSelectedGoals(localSelectedGoals);
-		setSelectedBudgets(localSelectedBudgets);
 		setDateFilterMode(localDateFilterMode);
 		router.back();
 	};
@@ -110,12 +50,7 @@ export default function LedgerFilterScreen() {
 	};
 
 	const handleReset = () => {
-		// Reset to default values
-		setLocalSelectedGoals([]);
-		setLocalSelectedBudgets([]);
 		setLocalDateFilterMode('month');
-		setGoalSearchQuery('');
-		setBudgetSearchQuery('');
 		setTransactionTypes({ income: true, expense: true });
 	};
 
@@ -150,102 +85,6 @@ export default function LedgerFilterScreen() {
 							onPress={() => setLocalDateFilterMode(mode.value)}
 						/>
 					))}
-				</Section>
-
-				{/* Goals */}
-				<Section title="Goals">
-					<SectionSubtext>
-						Select which goals to include (income transactions)
-					</SectionSubtext>
-
-					{/* Search Input */}
-					<View style={styles.searchContainer}>
-						<Ionicons
-							name="search"
-							size={20}
-							color="#666"
-							style={styles.searchIcon}
-						/>
-						<TextInput
-							style={styles.searchInput}
-							placeholder="Search goals..."
-							value={goalSearchQuery}
-							onChangeText={setGoalSearchQuery}
-							placeholderTextColor="#999"
-						/>
-					</View>
-
-					{/* "All" option */}
-					<OptionRow
-						label="All Goals"
-						selected={localSelectedGoals.length === 0}
-						onPress={() => handleGoalToggle('')}
-					/>
-
-					{filteredGoals.length ? (
-						filteredGoals.map((goal) => (
-							<OptionRow
-								key={goal.id}
-								label={goal.name}
-								selected={localSelectedGoals.includes(goal.id)}
-								onPress={() => handleGoalToggle(goal.id)}
-							/>
-						))
-					) : (
-						<Text style={styles.noCatsText}>
-							{goalSearchQuery
-								? 'No goals found matching your search'
-								: 'No goals available'}
-						</Text>
-					)}
-				</Section>
-
-				{/* Budgets */}
-				<Section title="Budgets">
-					<SectionSubtext>
-						Select which budgets to include (expense transactions)
-					</SectionSubtext>
-
-					{/* Search Input */}
-					<View style={styles.searchContainer}>
-						<Ionicons
-							name="search"
-							size={20}
-							color="#666"
-							style={styles.searchIcon}
-						/>
-						<TextInput
-							style={styles.searchInput}
-							placeholder="Search budgets..."
-							value={budgetSearchQuery}
-							onChangeText={setBudgetSearchQuery}
-							placeholderTextColor="#999"
-						/>
-					</View>
-
-					{/* "All" option */}
-					<OptionRow
-						label="All Budgets"
-						selected={localSelectedBudgets.length === 0}
-						onPress={() => handleBudgetToggle('')}
-					/>
-
-					{filteredBudgets.length ? (
-						filteredBudgets.map((budget) => (
-							<OptionRow
-								key={budget.id}
-								label={budget.name}
-								selected={localSelectedBudgets.includes(budget.id)}
-								onPress={() => handleBudgetToggle(budget.id)}
-							/>
-						))
-					) : (
-						<Text style={styles.noCatsText}>
-							{budgetSearchQuery
-								? 'No budgets found matching your search'
-								: 'No budgets available'}
-						</Text>
-					)}
 				</Section>
 			</ScrollView>
 
@@ -349,12 +188,6 @@ const styles = StyleSheet.create({
 	checkSelected: {
 		color: '#007AFF',
 	},
-	noCatsText: {
-		fontStyle: 'italic',
-		color: '#666',
-		marginTop: 8,
-		paddingHorizontal: 4,
-	},
 	actionButtons: {
 		flexDirection: 'row',
 		paddingHorizontal: 16,
@@ -394,24 +227,5 @@ const styles = StyleSheet.create({
 		color: '#fff',
 		fontSize: 16,
 		fontWeight: '600',
-	},
-	searchContainer: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#f5f5f5',
-		borderRadius: 8,
-		paddingHorizontal: 12,
-		marginBottom: 12,
-		borderWidth: 1,
-		borderColor: '#e2e2e2',
-	},
-	searchIcon: {
-		marginRight: 8,
-	},
-	searchInput: {
-		flex: 1,
-		paddingVertical: 10,
-		fontSize: 16,
-		color: '#333',
 	},
 });
