@@ -20,6 +20,7 @@ import * as Haptics from 'expo-haptics';
 import useAuth from '../../src/context/AuthContext';
 import { RectButton, BorderlessButton } from 'react-native-gesture-handler';
 import { createLogger } from '../../src/utils/sublogger';
+import { setUseLocalMode } from '../../src/storage/localModeStorage';
 
 const loginScreenLog = createLogger('LoginScreen');
 
@@ -587,6 +588,20 @@ export default function Login() {
 								<Text style={styles.signupLink}>Sign Up</Text>
 							</BorderlessButton>
 						</View>
+
+						{/* Use without account - local-only MVP */}
+						<BorderlessButton
+							onPress={async () => {
+								await setUseLocalMode(true);
+								router.replace('/(tabs)/dashboard');
+							}}
+							rippleColor="rgba(0,0,0,0.08)"
+							style={styles.useLocalButton}
+						>
+							<Text style={[styles.useLocalText, { color: palette.subtext }]}>
+								Use without account (data stays on your device)
+							</Text>
+						</BorderlessButton>
 					</View>
 				</ScrollView>
 			</KeyboardAvoidingView>
@@ -765,6 +780,16 @@ const styles = StyleSheet.create({
 		fontSize: 15,
 		fontWeight: '600',
 		color: '#334155',
+	},
+	useLocalButton: {
+		marginTop: 24,
+		alignSelf: 'center',
+		paddingVertical: 8,
+		paddingHorizontal: 12,
+	},
+	useLocalText: {
+		fontSize: 13,
+		textAlign: 'center',
 	},
 	signupRow: {
 		flexDirection: 'row',
