@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { logger } from '../../../src/utils/logger';
 import {
 	View,
@@ -10,17 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import useAuth from '../../../src/context/AuthContext';
-import ConnectivityTest from '../../../src/components/ConnectivityTest';
-import {
-	useFeature,
-	setLocalOverride,
-	clearLocalOverrides,
-	debugFeatureFlags,
-} from '../../../src/config/features';
 import { palette, radius, space, type, shadow } from '../../../src/ui/theme';
-
-// Development mode toggle - controls visibility of debug/testing features
-const SHOW_DEBUG_SECTION = false;
 
 /* --------------------------------- UI --------------------------------- */
 
@@ -99,106 +89,12 @@ function Section({ title, items }: { title: string; items: Item[] }) {
 export default function SettingsScreen() {
 	const router = useRouter();
 	const { logout } = useAuth();
-	const aiInsightsEnabled = useFeature('aiInsights');
-	const aiInsightsPreviewEnabled = useFeature('aiInsightsPreview');
-	const newBudgetsV2Enabled = useFeature('newBudgetsV2');
-	const goalsTimelineEnabled = useFeature('goalsTimeline');
-
-	// Force re-render when feature flags change
-	const [refreshKey, setRefreshKey] = useState(0);
-
-	useEffect(() => {
-		logger.debug('🔧 [Settings] Feature flags updated:', {
-			aiInsights: aiInsightsEnabled,
-			aiInsightsPreview: aiInsightsPreviewEnabled,
-			newBudgetsV2: newBudgetsV2Enabled,
-			goalsTimeline: goalsTimelineEnabled,
-		});
-		logger.debug('🔧 [Settings] Environment variables:', {
-			EXPO_PUBLIC_AI_INSIGHTS: process.env.EXPO_PUBLIC_AI_INSIGHTS,
-			EXPO_PUBLIC_AI_INSIGHTS_PREVIEW:
-				process.env.EXPO_PUBLIC_AI_INSIGHTS_PREVIEW,
-			EXPO_PUBLIC_NEW_BUDGETS_V2: process.env.EXPO_PUBLIC_NEW_BUDGETS_V2,
-			EXPO_PUBLIC_GOALS_TIMELINE: process.env.EXPO_PUBLIC_GOALS_TIMELINE,
-		});
-	}, [
-		aiInsightsEnabled,
-		aiInsightsPreviewEnabled,
-		newBudgetsV2Enabled,
-		goalsTimelineEnabled,
-	]);
 
 	const handleLogout = async () => {
 		try {
 			await logout();
 		} catch (error) {
 			logger.error('Logout error:', error);
-		}
-	};
-
-	const toggleAIInsights = async () => {
-		try {
-			const newValue = !aiInsightsEnabled;
-			await setLocalOverride('aiInsights', newValue);
-			logger.debug('AI Insights toggled:', newValue);
-			setRefreshKey((prev) => prev + 1);
-		} catch (error) {
-			logger.error('Failed to toggle AI Insights:', error);
-		}
-	};
-
-	const toggleAIInsightsPreview = async () => {
-		try {
-			const newValue = !aiInsightsPreviewEnabled;
-			await setLocalOverride('aiInsightsPreview', newValue);
-			logger.debug('AI Insights Preview toggled:', newValue);
-			setRefreshKey((prev) => prev + 1);
-		} catch (error) {
-			logger.error('Failed to toggle AI Insights Preview:', error);
-		}
-	};
-
-	const toggleNewBudgetsV2 = async () => {
-		try {
-			const newValue = !newBudgetsV2Enabled;
-			await setLocalOverride('newBudgetsV2', newValue);
-			logger.debug('New Budgets V2 toggled:', newValue);
-			setRefreshKey((prev) => prev + 1);
-		} catch (error) {
-			logger.error('Failed to toggle New Budgets V2:', error);
-		}
-	};
-
-	const toggleGoalsTimeline = async () => {
-		try {
-			const newValue = !goalsTimelineEnabled;
-			await setLocalOverride('goalsTimeline', newValue);
-			logger.debug('Goals Timeline toggled:', newValue);
-			setRefreshKey((prev) => prev + 1);
-		} catch (error) {
-			logger.error('Failed to toggle Goals Timeline:', error);
-		}
-	};
-
-	const resetLabs = async () => {
-		try {
-			clearLocalOverrides();
-			logger.debug('Labs settings reset - cleared local overrides');
-			logger.debug(
-				'Note: Environment variables (.env) cannot be reset at runtime'
-			);
-			logger.debug('Current base values from .env:');
-			logger.debug(
-				'- EXPO_PUBLIC_AI_INSIGHTS:',
-				process.env.EXPO_PUBLIC_AI_INSIGHTS
-			);
-			logger.debug(
-				'- EXPO_PUBLIC_AI_INSIGHTS_PREVIEW:',
-				process.env.EXPO_PUBLIC_AI_INSIGHTS_PREVIEW
-			);
-			setRefreshKey((prev) => prev + 1);
-		} catch (error) {
-			logger.error('Failed to reset labs:', error);
 		}
 	};
 
@@ -257,7 +153,6 @@ export default function SettingsScreen() {
 
 	return (
 		<ScrollView
-			key={refreshKey}
 			style={[styles.container, { backgroundColor: palette.bg }]}
 			contentContainerStyle={styles.scrollContent}
 			showsVerticalScrollIndicator={false}
@@ -277,253 +172,6 @@ export default function SettingsScreen() {
 					Manage your account, notifications, privacy, and app preferences.
 				</Text>
 			</View>
-
-			{/* Debug / Testing - Only show when enabled */}
-			{__DEV__ && SHOW_DEBUG_SECTION && (
-				<View style={styles.section}>
-					<Text
-						style={[
-							type.labelSm,
-							styles.sectionTitle,
-							{ color: palette.textSubtle },
-						]}
-					>
-						Debug & Testing
-					</Text>
-					<View
-						style={[
-							styles.cardNoRows,
-							{
-								backgroundColor: palette.surface,
-								borderColor: palette.border,
-							},
-						]}
-					>
-						<ConnectivityTest />
-
-						{/* AI Insights Toggle */}
-						<View style={styles.debugRow}>
-							<Text
-								style={[type.body, styles.debugLabel, { color: palette.text }]}
-							>
-								AI Insights
-							</Text>
-							<TouchableOpacity
-								style={[
-									styles.toggleButton,
-									{
-										backgroundColor: aiInsightsEnabled
-											? palette.successSubtle
-											: palette.subtle,
-										borderColor: aiInsightsEnabled
-											? palette.success
-											: palette.border,
-									},
-								]}
-								onPress={toggleAIInsights}
-							>
-								<Text
-									style={[
-										styles.toggleText,
-										{
-											color: aiInsightsEnabled
-												? palette.success
-												: palette.textSubtle,
-										},
-									]}
-								>
-									{aiInsightsEnabled ? 'ON' : 'OFF'}
-								</Text>
-							</TouchableOpacity>
-						</View>
-
-						{/* AI Insights Preview Toggle */}
-						<View style={styles.debugRow}>
-							<Text
-								style={[type.body, styles.debugLabel, { color: palette.text }]}
-							>
-								AI Insights Preview
-							</Text>
-							<TouchableOpacity
-								style={[
-									styles.toggleButton,
-									{
-										backgroundColor: aiInsightsPreviewEnabled
-											? palette.successSubtle
-											: palette.subtle,
-										borderColor: aiInsightsPreviewEnabled
-											? palette.success
-											: palette.border,
-									},
-								]}
-								onPress={toggleAIInsightsPreview}
-							>
-								<Text
-									style={[
-										styles.toggleText,
-										{
-											color: aiInsightsPreviewEnabled
-												? palette.success
-												: palette.textSubtle,
-										},
-									]}
-								>
-									{aiInsightsPreviewEnabled ? 'ON' : 'OFF'}
-								</Text>
-							</TouchableOpacity>
-						</View>
-
-						{/* New Budgets V2 Toggle */}
-						<View style={styles.debugRow}>
-							<Text
-								style={[type.body, styles.debugLabel, { color: palette.text }]}
-							>
-								New Budgets V2
-							</Text>
-							<TouchableOpacity
-								style={[
-									styles.toggleButton,
-									{
-										backgroundColor: newBudgetsV2Enabled
-											? palette.successSubtle
-											: palette.subtle,
-										borderColor: newBudgetsV2Enabled
-											? palette.success
-											: palette.border,
-									},
-								]}
-								onPress={toggleNewBudgetsV2}
-							>
-								<Text
-									style={[
-										styles.toggleText,
-										{
-											color: newBudgetsV2Enabled
-												? palette.success
-												: palette.textSubtle,
-										},
-									]}
-								>
-									{newBudgetsV2Enabled ? 'ON' : 'OFF'}
-								</Text>
-							</TouchableOpacity>
-						</View>
-
-						{/* Goals Timeline Toggle */}
-						<View style={styles.debugRow}>
-							<Text
-								style={[type.body, styles.debugLabel, { color: palette.text }]}
-							>
-								Goals Timeline
-							</Text>
-							<TouchableOpacity
-								style={[
-									styles.toggleButton,
-									{
-										backgroundColor: goalsTimelineEnabled
-											? palette.successSubtle
-											: palette.subtle,
-										borderColor: goalsTimelineEnabled
-											? palette.success
-											: palette.border,
-									},
-								]}
-								onPress={toggleGoalsTimeline}
-							>
-								<Text
-									style={[
-										styles.toggleText,
-										{
-											color: goalsTimelineEnabled
-												? palette.success
-												: palette.textSubtle,
-										},
-									]}
-								>
-									{goalsTimelineEnabled ? 'ON' : 'OFF'}
-								</Text>
-							</TouchableOpacity>
-						</View>
-
-						{/* Feature Flag Status */}
-						<View style={styles.debugRow}>
-							<Text
-								style={[type.body, styles.debugLabel, { color: palette.text }]}
-							>
-								Base Values (.env)
-							</Text>
-							<View style={styles.debugValueContainer}>
-								<Text
-									style={[styles.debugValue, { color: palette.textSubtle }]}
-								>
-									AI: {process.env.EXPO_PUBLIC_AI_INSIGHTS || 'undefined'}
-								</Text>
-								<Text
-									style={[styles.debugValue, { color: palette.textSubtle }]}
-								>
-									Preview:{' '}
-									{process.env.EXPO_PUBLIC_AI_INSIGHTS_PREVIEW || 'undefined'}
-								</Text>
-								<Text
-									style={[styles.debugValue, { color: palette.textSubtle }]}
-								>
-									Budgets:{' '}
-									{process.env.EXPO_PUBLIC_NEW_BUDGETS_V2 || 'undefined'}
-								</Text>
-								<Text
-									style={[styles.debugValue, { color: palette.textSubtle }]}
-								>
-									Goals: {process.env.EXPO_PUBLIC_GOALS_TIMELINE || 'undefined'}
-								</Text>
-							</View>
-						</View>
-
-						{/* Debug Feature Flags Button */}
-						<View style={styles.debugRow}>
-							<Text
-								style={[type.body, styles.debugLabel, { color: palette.text }]}
-							>
-								Debug Flags
-							</Text>
-							<TouchableOpacity
-								style={styles.debugButton}
-								onPress={() => {
-									logger.debug('🔧 [Settings] Debug button pressed!');
-									logger.debug(
-										'🔧 [Settings] debugFeatureFlags function:',
-										typeof debugFeatureFlags
-									);
-									try {
-										debugFeatureFlags();
-										logger.debug(
-											'🔧 [Settings] debugFeatureFlags called successfully'
-										);
-									} catch (error) {
-										logger.error(
-											'🔧 [Settings] Error calling debugFeatureFlags:',
-											error
-										);
-									}
-								}}
-							>
-								<Text style={styles.debugButtonText}>Debug</Text>
-							</TouchableOpacity>
-						</View>
-
-						{/* Reset Labs Button */}
-						<View style={styles.debugRow}>
-							<Text
-								style={[type.body, styles.debugLabel, { color: palette.text }]}
-							>
-								Reset Labs
-							</Text>
-							<TouchableOpacity style={styles.resetButton} onPress={resetLabs}>
-								<Text style={styles.resetText}>Reset</Text>
-							</TouchableOpacity>
-						</View>
-					</View>
-				</View>
-			)}
 
 			{/* Sections (now styled like Legal) */}
 			<Section title="Account" items={accountItems} />
