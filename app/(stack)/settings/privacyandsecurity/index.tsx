@@ -44,10 +44,6 @@ export default function PrivacySecurityScreen() {
 					label: 'Download your data',
 					route: '/(stack)/settings/privacyandsecurity/downloadData',
 				},
-				{
-					label: 'AI Privacy Settings',
-					route: '/(stack)/settings/privacy/AIPrivacySettings',
-				},
 			],
 		},
 	];

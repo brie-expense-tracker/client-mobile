@@ -16,7 +16,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useProfile } from '../../../../src/context/profileContext';
 import useAuth from '../../../../src/context/AuthContext';
-import { useFeature } from '../../../../src/config/features';
 import { logger } from '../../../../src/utils/logger';
 import { palette, radius, space, type, shadow } from '../../../../src/ui/theme';
 
@@ -168,7 +167,6 @@ export default function AccountScreen() {
 		fetchProfile,
 	} = useProfile();
 	const { user } = useAuth();
-	const aiInsightsPreviewEnabled = useFeature('aiInsightsPreview');
 	const [refreshing, setRefreshing] = useState(false);
 
 	const handleRefresh = useCallback(async () => {
@@ -684,23 +682,6 @@ export default function AccountScreen() {
 					</Pressable>
 				</View>
 			</Section>
-
-			{/* AI Insights */}
-			{aiInsightsPreviewEnabled && (
-				<Section title="AI Assistant">
-					<Card style={[styles.cardSoft, styles.listCard]}>
-						<Row
-							icon="sparkles-outline"
-							label="Ask Brie (AI)"
-							value="Get financial insights"
-							onPress={() => router.push({
-								pathname: '/(tabs)/chat',
-								params: { initialMessage: 'Give me a snapshot of my finances based on my profile.' }
-							} as any)}
-						/>
-					</Card>
-				</Section>
-			)}
 
 			{/* Management */}
 			<Section title="Management">

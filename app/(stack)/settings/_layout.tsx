@@ -395,56 +395,6 @@ export default function Layout() {
 				}}
 			/>
 			<Stack.Screen
-				name="assistant/index"
-				options={{
-					headerShown: true,
-					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: 'Assistant',
-					headerShadowVisible: false,
-					headerTitleStyle: {
-						fontSize: 20,
-						fontWeight: '600',
-						color: '#333',
-					},
-					headerStyle: {
-						backgroundColor: '#ffffff',
-					},
-					headerLeft: () => (
-						<BorderlessButton
-							onPress={() => router.back()}
-							style={{ width: 50 }}
-						>
-							<Ionicons name="chevron-back" size={24} color="#333" />
-						</BorderlessButton>
-					),
-				}}
-			/>
-			<Stack.Screen
-				name="privacy/AIPrivacySettings"
-				options={{
-					headerShown: true,
-					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: 'AI Privacy Settings',
-					headerShadowVisible: false,
-					headerTitleStyle: {
-						fontSize: 20,
-						fontWeight: '600',
-						color: '#333',
-					},
-					headerStyle: {
-						backgroundColor: '#ffffff',
-					},
-					headerLeft: () => (
-						<BorderlessButton
-							onPress={() => router.back()}
-							style={{ width: 50 }}
-						>
-							<Ionicons name="chevron-back" size={24} color="#333" />
-						</BorderlessButton>
-					),
-				}}
-			/>
-			<Stack.Screen
 				name="notification/consentManagement"
 				options={{
 					headerShown: true,
@@ -503,67 +453,6 @@ export default function Layout() {
 					headerBackButtonDisplayMode: 'minimal',
 					headerTitle: 'Frequently Asked Questions',
 					headerShadowVisible: false,
-					headerTitleStyle: {
-						fontSize: 20,
-						fontWeight: '600',
-						color: '#333',
-					},
-					headerStyle: {
-						backgroundColor: '#ffffff',
-					},
-
-					headerLeft: () => (
-						<BorderlessButton
-							onPress={() => router.back()}
-							style={{ width: 50 }}
-						>
-							<Ionicons name="chevron-back" size={24} color="#333" />
-						</BorderlessButton>
-					),
-				}}
-			/>
-			<Stack.Screen
-				name="budgets/index"
-				options={{
-					headerShown: true,
-					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: 'Budgets',
-					headerShadowVisible: false,
-					headerLargeTitle: true,
-					headerLargeStyle: {
-						backgroundColor: '#ffffff',
-					},
-					headerTitleStyle: {
-						fontSize: 20,
-						fontWeight: '600',
-						color: '#333',
-					},
-					headerStyle: {
-						backgroundColor: '#ffffff',
-					},
-
-					headerLeft: () => (
-						<BorderlessButton
-							onPress={() => router.back()}
-							style={{ width: 50 }}
-						>
-							<Ionicons name="chevron-back" size={24} color="#333" />
-						</BorderlessButton>
-					),
-				}}
-			/>
-
-			<Stack.Screen
-				name="goals/index"
-				options={{
-					headerShown: true,
-					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: 'Goals',
-					headerShadowVisible: false,
-					headerLargeTitle: true,
-					headerLargeStyle: {
-						backgroundColor: '#ffffff',
-					},
 					headerTitleStyle: {
 						fontSize: 20,
 						fontWeight: '600',
@@ -790,32 +679,6 @@ export default function Layout() {
 				}}
 			/>
 
-			<Stack.Screen
-				name="aiInsights/index"
-				options={{
-					headerShown: true,
-					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: 'AI Insights',
-					headerShadowVisible: false,
-					headerTitleStyle: {
-						fontSize: 20,
-						fontWeight: '600',
-						color: '#333',
-					},
-					headerStyle: {
-						backgroundColor: '#ffffff',
-					},
-
-					headerLeft: () => (
-						<BorderlessButton
-							onPress={() => router.back()}
-							style={{ width: 50 }}
-						>
-							<Ionicons name="chevron-back" size={24} color="#333" />
-						</BorderlessButton>
-					),
-				}}
-			/>
 		</Stack>
 	);
 }

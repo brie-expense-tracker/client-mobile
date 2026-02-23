@@ -17,17 +17,9 @@ export const navigateToTransaction = () => {
 	router.push('/(tabs)/transaction');
 };
 
-/**
- * Show the transaction modal (income vs expense choice)
- * This function should be used with the useTransactionModal hook
- */
-export const showTransactionModal = () => {
-	// This function is a placeholder - the actual implementation
-	// should use the useTransactionModal hook in the component
-	throw new Error(
-		'showTransactionModal should be used with useTransactionModal hook'
-	);
-};
+/** MVP: Transaction modal removed - navigates to transaction screen */
+export const showTransactionModal = () =>
+	router.push('/(tabs)/transaction');
 
 /**
  * Navigate to the dashboard screen
