@@ -4,9 +4,9 @@ import { Tabs, usePathname, useRouter, useSegments } from 'expo-router';
 import type { Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { BudgetProvider } from '../../src/context/budgetContext';
-import { GoalProvider } from '../../src/context/goalContext';
 import { ProfileProvider } from '../../src/context/profileContext';
+
+// MVP: BudgetProvider, GoalProvider removed - cash-only tracking with fixed categories
 
 type TabPressEvent = { preventDefault: () => void };
 
@@ -52,14 +52,12 @@ const TabLayout: React.FC = () => {
 		[pathname, router]
 	);
 
-	const isHeavyTab = tabKey === 'wallet' || tabKey === 'transaction';
+	const isHeavyTab = tabKey === 'transaction';
 
 	return (
 		<ProfileProvider>
-			<BudgetProvider>
-				<GoalProvider>
-					<View style={{ flex: 1 }}>
-						<Tabs
+			<View style={{ flex: 1 }}>
+				<Tabs
 							screenOptions={{
 								headerShown: false,
 								tabBarShowLabel: false,
@@ -98,14 +96,10 @@ const TabLayout: React.FC = () => {
 								listeners={createTabListener('/(tabs)/transaction')}
 							/>
 
+							{/* MVP: Wallet hidden - budgets, bills, debts, goals out of scope */}
 							<Tabs.Screen
 								name="wallet"
-								options={{
-									tabBarIcon: ({ color, size }) => (
-										<Ionicons name="wallet-outline" color={color} size={size} />
-									),
-								}}
-								listeners={createTabListener('/(tabs)/wallet')}
+								options={{ href: null }}
 							/>
 
 							<Tabs.Screen
@@ -133,8 +127,6 @@ const TabLayout: React.FC = () => {
 							/>
 						</Tabs>
 					</View>
-				</GoalProvider>
-			</BudgetProvider>
 		</ProfileProvider>
 	);
 };
