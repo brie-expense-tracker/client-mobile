@@ -1,148 +1,308 @@
-import React from 'react';
-import { logger } from '../../../src/utils/logger';
-import { View, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useMemo } from 'react';
+import {
+	View,
+	StyleSheet,
+	ScrollView,
+	TouchableOpacity,
+	Text,
+	Alert,
+} from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import useAuth from '../../../src/context/AuthContext';
 import { setUseLocalMode } from '../../../src/storage/localModeStorage';
-import { palette, radius, space, type, shadow } from '../../../src/ui/theme';
-import { useBriePro } from '../../../src/hooks/useBriePro';
+import { palette, radius, space, type } from '../../../src/ui/theme';
+import { useProfile } from '../../../src/context/profileContext';
 import {
-	AppScreen,
 	AppCard,
 	AppText,
 	AppButton,
 	AppRow,
 } from '../../../src/ui/primitives';
 
-/* --------------------------------- UI --------------------------------- */
+const currency = new Intl.NumberFormat('en-US', {
+	style: 'currency',
+	currency: 'USD',
+}).format;
 
-type Item = {
-	label: string;
-	icon: keyof typeof Ionicons.glyphMap;
-	route?: string;
-	onPress?: () => void;
-	description?: string;
-};
+/* ---------------------------- Profile Completion ---------------------------- */
 
-function Section({ title, items }: { title: string; items: Item[] }) {
-	return (
-		<View style={styles.section}>
-			<AppText.Label color="subtle" style={styles.sectionTitle}>
-				{title}
-			</AppText.Label>
+function getProfileCompletion(profile: {
+	firstName?: string;
+	lastName?: string;
+	phone?: string;
+	monthlyIncome?: number;
+	expenses?: { housing?: number; loans?: number; subscriptions?: number };
+} | null, email?: string): { percent: number; fieldsLeft: number } {
+	if (!profile) return { percent: 0, fieldsLeft: 5 };
 
-			<AppCard padding={0} borderRadius={12}>
-				{items.map((item, index) => (
-					<AppRow
-						key={item.label}
-						icon={item.icon}
-						label={item.label}
-						description={item.description}
-						onPress={item.onPress}
-						bordered={index < items.length - 1}
-					/>
-				))}
-			</AppCard>
-		</View>
-	);
+	const fields = [
+		!!(profile.firstName && profile.firstName.trim()),
+		!!(profile.lastName && profile.lastName.trim()),
+		!!email?.trim(),
+		!!profile.phone?.trim(),
+		typeof profile.monthlyIncome === 'number' && profile.monthlyIncome > 0,
+	];
+	const filled = fields.filter(Boolean).length;
+	const total = 5;
+	const fieldsLeft = total - filled;
+	const percent = total > 0 ? Math.round((filled / total) * 100) : 0;
+	return { percent, fieldsLeft };
 }
 
-/* ---------------------------- Screen ---------------------------- */
+/* ---------------------------- Sign-in view (no ProfileProvider) ---------------------------- */
 
-export default function SettingsScreen() {
+function SignInView() {
 	const router = useRouter();
-	const { logout, user } = useAuth();
-	const { isPro } = useBriePro();
-
-	const handleLogout = async () => {
-		try {
-			await logout();
-		} catch (error) {
-			logger.error('Logout error:', error);
-		}
-	};
-
-	const accountItems: Item[] = [
-		{
-			label: 'Profile',
-			icon: 'person-outline',
-			onPress: () => router.push('/(stack)/settings/profile'),
-		},
-		{
-			label: 'Subscription',
-			icon: 'card-outline',
-			onPress: () => router.push('/(stack)/settings/subscription'),
-		},
-		{
-			label: 'Onboarding',
-			icon: 'rocket-outline',
-			onPress: () => router.push('/(onboarding)/profileSetup'),
-			description: 'Revisit the onboarding flow',
-		},
-	];
-
-	const notificationItems: Item[] = [
-		{
-			label: 'Notifications',
-			icon: 'notifications-outline',
-			onPress: () => router.push('/(stack)/settings/notification'),
-		},
-	];
-
-	const dataItems: Item[] = [
-		{
-			label: 'Data Export',
-			icon: 'download-outline',
-			description: 'Plus',
-			onPress: () => router.push('/(stack)/settings/privacyandsecurity/downloadData'),
-		},
-	];
-
+	const insets = useSafeAreaInsets();
 	const handleSignInToSync = async () => {
 		await setUseLocalMode(false);
 		router.replace('/(auth)/login');
 	};
 
 	return (
-		<AppScreen>
-			{/* Header */}
-			<View style={styles.headerSection}>
-				<AppText.Title>Settings</AppText.Title>
-				<AppText.Subtitle color="subtle" style={styles.headerDescription}>
-					Manage your account and preferences.
-				</AppText.Subtitle>
+		<View style={[styles.container, { paddingTop: insets.top }]}>
+			<View style={styles.header}>
+				<AppText.Title>Profile</AppText.Title>
+			</View>
+			<ScrollView
+				contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + space.xl }]}
+				showsVerticalScrollIndicator={false}
+			>
+				<AppCard onPress={handleSignInToSync}>
+					<View style={styles.signInPrompt}>
+						<Ionicons name="cloud-upload-outline" size={24} color={palette.primary} />
+						<View style={{ flex: 1 }}>
+							<AppText.Heading>Sign in to backup and sync</AppText.Heading>
+							<AppText.Caption color="muted" style={{ marginTop: 4 }}>
+								Create an account to save your data to the cloud and use it on other devices.
+							</AppText.Caption>
+						</View>
+						<Ionicons name="chevron-forward" size={20} color={palette.textSubtle} />
+					</View>
+				</AppCard>
+			</ScrollView>
+		</View>
+	);
+}
+
+/* ---------------------------- Profile content (requires ProfileProvider) ---------------------------- */
+
+function ProfileContent() {
+	const router = useRouter();
+	const insets = useSafeAreaInsets();
+	const { logout, user, firebaseUser } = useAuth();
+	const { profile } = useProfile();
+
+	const displayName = useMemo(() => {
+		if (profile?.firstName || profile?.lastName) {
+			return [profile.firstName, profile.lastName].filter(Boolean).join(' ') || 'User';
+		}
+		return firebaseUser?.displayName || 'User';
+	}, [profile, firebaseUser]);
+
+	const email = user?.email || firebaseUser?.email || '';
+	const initials = useMemo(() => {
+		const parts = displayName.split(/\s+/).filter(Boolean);
+		if (parts.length >= 2) {
+			return (parts[0][0]! + parts[parts.length - 1]![0]).toUpperCase();
+		}
+		return displayName.slice(0, 2).toUpperCase();
+	}, [displayName]);
+
+	const completion = useMemo(
+		() => getProfileCompletion(profile, email),
+		[profile, email]
+	);
+
+	const handleEditProfile = () => router.push('/(onboarding)/profileSetup');
+	const handleFinishProfile = () => router.push('/(onboarding)/profileSetup');
+	const handleSetPhone = () => router.push('/(onboarding)/profileSetup');
+
+	const handleUpdateMoney = () => router.push('/(tabs)/transaction');
+	const handleDashboard = () => router.push('/(tabs)/dashboard');
+	const handleExportData = () => {
+		// MVP: Export screen may not exist - show placeholder
+		Alert.alert(
+			'Export data',
+			'Back up your profile and transactions. This feature is coming soon.',
+			[{ text: 'OK' }]
+		);
+	};
+
+	const handleLogout = async () => {
+		try {
+			await logout();
+		} catch {
+			// ignore
+		}
+	};
+
+	/* ---------- Authenticated: Profile MVP ---------- */
+
+	const savings = profile?.savings ?? 0;
+	const debt = profile?.debt ?? 0;
+	const expenses = profile?.expenses ?? { housing: 0, loans: 0, subscriptions: 0 };
+	const housingLabel =
+		expenses.housing > 0 ? `Housing ${currency(expenses.housing)}` : 'Not set';
+	const moneyValue = `${currency(savings)} • ${currency(debt)}`;
+
+	return (
+		<View style={[styles.container, { paddingTop: insets.top }]}>
+			<View style={styles.header}>
+				<View style={styles.headerLeft} />
+				<AppText.Title style={styles.headerTitle}>Profile</AppText.Title>
+				<View style={styles.headerRight} />
 			</View>
 
-			{/* MVP: Sign in prompt when using local-only mode */}
-			{!user && (
-				<View style={styles.section}>
-					<AppCard onPress={handleSignInToSync}>
-						<View style={styles.signInPrompt}>
-							<Ionicons name="cloud-upload-outline" size={24} color={palette.primary} />
-							<View style={{ flex: 1 }}>
-								<AppText.Heading>Sign in to backup and sync</AppText.Heading>
-								<AppText.Caption color="muted" style={{ marginTop: 4 }}>
-									Create an account to save your data to the cloud and use it on other devices.
-								</AppText.Caption>
-							</View>
-							<Ionicons name="chevron-forward" size={20} color={palette.textSubtle} />
+			<ScrollView
+				contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + space.xxl }]}
+				showsVerticalScrollIndicator={false}
+			>
+				{/* User Profile Summary Card */}
+				<AppCard style={styles.profileCard} padding={space.lg}>
+					<View style={styles.profileSummary}>
+						<View style={styles.avatar}>
+							<Text style={styles.avatarText}>{initials}</Text>
 						</View>
+						<View style={styles.profileInfo}>
+							<AppText.Heading>{displayName}</AppText.Heading>
+							<AppText.Caption color="muted" style={styles.profileEmail}>
+								{email || 'No email'}
+							</AppText.Caption>
+							<AppText.Caption color="primary" style={styles.completionText}>
+								{completion.percent}% • {completion.fieldsLeft} fields left
+							</AppText.Caption>
+						</View>
+						<AppButton
+							label="Edit"
+							variant="primary"
+							size="sm"
+							icon="pencil-outline"
+							iconPosition="left"
+							onPress={handleEditProfile}
+							style={styles.editButton}
+						/>
+					</View>
+				</AppCard>
+
+				{/* Profile Completion Progress Card */}
+				<AppCard style={styles.completionCard} padding={space.lg}>
+					<AppText.Heading style={styles.completionTitle}>
+						Finish your profile
+					</AppText.Heading>
+					<View style={styles.progressBar}>
+						<View
+							style={[
+								styles.progressFill,
+								{ width: `${completion.percent}%` },
+							]}
+						/>
+					</View>
+					<View style={styles.completionButtons}>
+						<AppButton
+							label="Set your phone"
+							variant="secondary"
+							size="sm"
+							onPress={handleSetPhone}
+							style={styles.completionSecondary}
+						/>
+						<AppButton
+							label="Finish profile"
+							variant="primary"
+							size="sm"
+							onPress={handleFinishProfile}
+							style={styles.completionPrimary}
+						/>
+					</View>
+				</AppCard>
+
+				{/* PROFILE Section */}
+				<View style={styles.section}>
+					<AppText.Label color="subtle" style={styles.sectionTitle}>
+						PROFILE
+					</AppText.Label>
+					<AppCard padding={0} borderRadius={radius.lg}>
+						<AppRow
+							icon="person-outline"
+							label="Name"
+							right={<AppText.Body>{displayName}</AppText.Body>}
+							onPress={handleEditProfile}
+						/>
+						<AppRow
+							icon="call-outline"
+							label="Contact"
+							right={<AppText.Body numberOfLines={1}>{email || 'Not set'}</AppText.Body>}
+							onPress={handleEditProfile}
+						/>
+						<AppRow
+							icon="cash-outline"
+							label="Money"
+							right={<AppText.Body>{moneyValue}</AppText.Body>}
+							onPress={handleEditProfile}
+						/>
+						<AppRow
+							icon="wallet-outline"
+							label="Expenses"
+							right={<AppText.Body>{housingLabel}</AppText.Body>}
+							onPress={handleEditProfile}
+						/>
+						<AppRow
+							icon="card-outline"
+							label="Other financial details"
+							right={<AppText.Body>Debt: {currency(debt)}</AppText.Body>}
+							bordered={false}
+							onPress={handleEditProfile}
+						/>
 					</AppCard>
 				</View>
-			)}
 
-			{/* Sections - only show when signed in */}
-			{user && (
-				<>
-					<Section title="Account" items={accountItems} />
-					<Section title="Notifications" items={notificationItems} />
-					{isPro && <Section title="Data" items={dataItems} />}
-				</>
-			)}
+				{/* QUICK ACTIONS */}
+				<View style={styles.section}>
+					<AppText.Label color="subtle" style={styles.sectionTitle}>
+						QUICK ACTIONS
+					</AppText.Label>
+					<View style={styles.quickActions}>
+						<TouchableOpacity
+							style={styles.quickActionCard}
+							onPress={handleUpdateMoney}
+							activeOpacity={0.7}
+						>
+							<View style={[styles.quickActionIcon, { backgroundColor: palette.successSubtle }]}>
+								<Ionicons name="cash-outline" size={24} color={palette.success} />
+							</View>
+							<AppText.Heading style={styles.quickActionTitle}>Update money</AppText.Heading>
+							<AppText.Caption color="muted">Income, savings, expenses</AppText.Caption>
+						</TouchableOpacity>
 
-			{/* Logout - only when signed in */}
-			{user && (
+						<TouchableOpacity
+							style={styles.quickActionCard}
+							onPress={handleDashboard}
+							activeOpacity={0.7}
+						>
+							<View style={[styles.quickActionIcon, { backgroundColor: palette.primarySubtle }]}>
+								<Ionicons name="grid-outline" size={24} color={palette.primary} />
+							</View>
+							<AppText.Heading style={styles.quickActionTitle}>Dashboard</AppText.Heading>
+							<AppText.Caption color="muted">View transactions</AppText.Caption>
+						</TouchableOpacity>
+
+						<TouchableOpacity
+							style={styles.quickActionCard}
+							onPress={handleExportData}
+							activeOpacity={0.7}
+						>
+							<View style={[styles.quickActionIcon, { backgroundColor: palette.primarySoft }]}>
+								<Ionicons name="cloud-upload-outline" size={24} color={palette.primary} />
+							</View>
+							<AppText.Heading style={styles.quickActionTitle}>Export data</AppText.Heading>
+							<AppText.Caption color="muted">Backup profile</AppText.Caption>
+						</TouchableOpacity>
+					</View>
+				</View>
+
+				{/* Logout */}
 				<View style={styles.logoutContainer}>
 					<AppButton
 						label="Logout"
@@ -153,111 +313,151 @@ export default function SettingsScreen() {
 						fullWidth
 					/>
 				</View>
-			)}
-		</AppScreen>
+			</ScrollView>
+		</View>
 	);
+}
+
+/* ---------------------------- Main export ---------------------------- */
+
+export default function ProfileScreen() {
+	const { user } = useAuth();
+	if (!user) {
+		return <SignInView />;
+	}
+	return <ProfileContent />;
 }
 
 /* ----------------------------- Styles ----------------------------- */
 
 const styles = StyleSheet.create({
-	/* Header */
-	headerSection: {
-		paddingHorizontal: space.sm,
-		paddingTop: space.lg,
-		paddingBottom: space.sm,
-	},
-	headerDescription: {
-		marginTop: space.xs,
-	},
-
-	/* Sections */
-	section: {
-		marginHorizontal: space.sm,
-		marginTop: space.md,
-	},
-	sectionTitle: {
-		marginBottom: space.xs,
-	},
-
-	/* Legacy card for debug block (no row dividers) */
-	cardNoRows: {
-		borderRadius: radius.lg,
-		borderWidth: StyleSheet.hairlineWidth,
-		padding: space.md,
-		...shadow.card,
-	},
-
-	/* Logout */
-	logoutContainer: {
-		marginTop: space.lg,
-		marginBottom: space.xl,
-	},
-
-	/* Debug Toggle / Labs */
-	debugRow: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		marginTop: space.sm,
-		paddingTop: space.sm,
-		borderTopWidth: StyleSheet.hairlineWidth,
-		borderTopColor: palette.border,
-	},
-	debugLabel: {
-		fontSize: 14,
-		fontWeight: '500',
-	},
-	debugValue: {
-		fontSize: 12,
-		fontWeight: '400',
-		fontFamily: 'monospace',
-	},
-	debugValueContainer: {
+	container: {
 		flex: 1,
-		marginLeft: space.sm,
+		backgroundColor: palette.bg,
 	},
-	toggleButton: {
-		paddingHorizontal: space.md,
-		paddingVertical: space.xs,
-		borderRadius: radius.pill,
-		minWidth: 64,
+	header: {
+		flexDirection: 'row',
 		alignItems: 'center',
-		borderWidth: 1,
+		justifyContent: 'space-between',
+		paddingHorizontal: space.lg,
+		paddingVertical: space.md,
+		borderBottomWidth: StyleSheet.hairlineWidth,
+		borderBottomColor: palette.border,
 	},
-	toggleText: {
-		fontSize: 12,
-		fontWeight: '600',
+	headerLeft: { width: 40 },
+	headerTitle: { flex: 1, textAlign: 'center' },
+	headerRight: {
+		width: 40,
+		alignItems: 'flex-end',
+	},
+	content: {
+		paddingHorizontal: space.lg,
+		paddingTop: space.lg,
+	},
+	scrollContent: {
+		paddingHorizontal: space.lg,
+		paddingTop: space.lg,
+		gap: space.lg,
 	},
 	signInPrompt: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: space.md,
 	},
-	resetButton: {
-		paddingHorizontal: space.md,
-		paddingVertical: space.xs,
-		borderRadius: radius.pill,
-		backgroundColor: palette.dangerSubtle,
-		minWidth: 64,
+	profileCard: {
+		marginBottom: 0,
+	},
+	profileSummary: {
+		flexDirection: 'row',
+		alignItems: 'flex-start',
+		gap: space.md,
+	},
+	avatar: {
+		width: 56,
+		height: 56,
+		borderRadius: 28,
+		backgroundColor: palette.primary,
 		alignItems: 'center',
+		justifyContent: 'center',
 	},
-	resetText: {
-		color: palette.danger,
-		fontSize: 12,
-		fontWeight: '600',
+	avatarText: {
+		...type.titleMd,
+		color: palette.primaryTextOn,
 	},
-	debugButton: {
-		paddingHorizontal: space.md,
-		paddingVertical: space.xs,
-		borderRadius: radius.pill,
-		backgroundColor: palette.primarySubtle,
-		minWidth: 64,
+	profileInfo: {
+		flex: 1,
+		justifyContent: 'center',
+	},
+	profileEmail: {
+		marginTop: 2,
+	},
+	completionText: {
+		marginTop: 4,
+	},
+	editButton: {
+		alignSelf: 'center',
+	},
+	completionCard: {
+		marginBottom: 0,
+	},
+	completionTitle: {
+		marginBottom: space.sm,
+	},
+	progressBar: {
+		height: 8,
+		borderRadius: 4,
+		backgroundColor: palette.track,
+		overflow: 'hidden',
+		marginBottom: space.md,
+	},
+	progressFill: {
+		height: '100%',
+		backgroundColor: palette.primary,
+		borderRadius: 4,
+	},
+	completionButtons: {
+		flexDirection: 'row',
+		gap: space.sm,
+	},
+	completionSecondary: {
+		flex: 1,
+	},
+	completionPrimary: {
+		flex: 1,
+	},
+	section: {
+		marginTop: 0,
+	},
+	sectionTitle: {
+		marginBottom: space.xs,
+	},
+	logoutContainer: {
+		marginTop: space.lg,
+	},
+	quickActions: {
+		flexDirection: 'row',
+		gap: space.sm,
+	},
+	quickActionCard: {
+		flex: 1,
+		backgroundColor: palette.surface,
+		borderRadius: radius.lg,
+		padding: space.md,
 		alignItems: 'center',
+		borderWidth: StyleSheet.hairlineWidth,
+		borderColor: palette.border,
 	},
-	debugButtonText: {
-		color: palette.primary,
-		fontSize: 12,
-		fontWeight: '600',
+	quickActionIcon: {
+		width: 48,
+		height: 48,
+		borderRadius: radius.md,
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginBottom: space.sm,
+	},
+	quickActionTitle: {
+		fontSize: 14,
+		textAlign: 'center',
+		marginBottom: 2,
 	},
 });
