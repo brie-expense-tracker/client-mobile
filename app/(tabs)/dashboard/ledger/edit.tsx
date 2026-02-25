@@ -56,9 +56,16 @@ interface Transaction {
 // MVP: Fixed cash spending categories (same as transaction screen)
 const CASH_CATEGORIES = [
 	'Food',
-	'Rides',
-	'Drinks',
 	'Groceries',
+	'Drinks',
+	'Transportation',
+	'Entertainment',
+	'Shopping',
+	'Personal care',
+	'Bills & utilities',
+	'Household',
+	'Health',
+	'Gifts & donations',
 	'Other',
 ] as const;
 

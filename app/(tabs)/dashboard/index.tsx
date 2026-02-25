@@ -17,7 +17,10 @@ import {
 	ActivityIndicator,
 	Image,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+	SafeAreaView,
+	useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -68,7 +71,7 @@ export default function DashboardPro() {
 	useFocusEffect(
 		useCallback(() => {
 			refetch();
-		}, [refetch])
+		}, [refetch]),
 	);
 
 	// Calculate "Cash on Me" (sum of IN minus sum of OUT)
@@ -81,29 +84,36 @@ export default function DashboardPro() {
 	}, [transactions]);
 
 	// Last 30 days summary (MVP)
+	// Use local date for cutoff so "last 30 days" matches user's local timezone
 	const last30Days = useMemo(() => {
 		const now = new Date();
-		const cutoff = new Date(now);
-		cutoff.setDate(cutoff.getDate() - 30);
-		const cutoffIso = cutoff.toISOString().split('T')[0];
+		const cutoff = new Date(
+			now.getFullYear(),
+			now.getMonth(),
+			now.getDate() - 30,
+		);
+		const y = cutoff.getFullYear();
+		const m = String(cutoff.getMonth() + 1).padStart(2, '0');
+		const d = String(cutoff.getDate()).padStart(2, '0');
+		const cutoffIso = `${y}-${m}-${d}`;
+		const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
 		let totalIn = 0;
 		let totalOut = 0;
 		const categoryTotals: Record<string, number> = {};
 
 		for (const t of transactions) {
-			const d = (t.date || '').slice(0, 10);
-			if (d < cutoffIso) continue;
+			const txDate = (t.date || '').slice(0, 10);
+			if (!txDate || txDate.length < 10) continue;
+			if (txDate < cutoffIso || txDate > todayIso) continue;
 
 			const amt = isNaN(t.amount) ? 0 : Math.abs(t.amount);
-			const isExpense = t.type === 'expense' || t.amount < 0;
+			const isExpense =
+				t.type === 'expense' || (typeof t.amount === 'number' && t.amount < 0);
 
 			if (isExpense) {
 				totalOut += amt;
-				const cat =
-					(t.metadata as any)?.category ||
-					t.description ||
-					'Other';
+				const cat = (t.metadata as any)?.category || t.description || 'Other';
 				categoryTotals[cat] = (categoryTotals[cat] || 0) + amt;
 			} else {
 				totalIn += amt;
@@ -152,116 +162,118 @@ export default function DashboardPro() {
 		<ErrorBoundary>
 			<SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
 				<GestureHandlerRootView style={{ flex: 1 }}>
-				{/* ---------- Sticky Header ---------- */}
-				<View style={styles.stickyHeader}>
-					<TouchableOpacity
-						onPress={handleLogoTap}
-						activeOpacity={0.7}
-						style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
-					>
-						<Image
-							source={require('../../../src/assets/logos/brie-logo.png')}
-							style={styles.logo}
-							resizeMode="contain"
-							accessibilityRole="image"
-							accessibilityLabel="Brie app logo"
-						/>
-					</TouchableOpacity>
-
-					<View style={styles.headerButtons}>
+					{/* ---------- Sticky Header ---------- */}
+					<View style={styles.stickyHeader}>
 						<TouchableOpacity
-							onPress={() => router.push('/dashboard/notifications')}
-							style={styles.headerButton}
-							{...accessibilityProps.button}
-							accessibilityLabel={generateAccessibilityLabel.button(
-								'Open',
-								'notifications'
-							)}
+							onPress={handleLogoTap}
+							activeOpacity={0.7}
+							style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
 						>
-							<View>
-								<Ionicons
-									name="notifications-outline"
-									color={palette.text}
-									size={24}
-								/>
-								{unreadCount > 0 && (
-									<View style={styles.notificationBadge}>
-										<Text style={styles.notificationBadgeText}>
-											{unreadCount > 99 ? '99+' : unreadCount}
-										</Text>
-									</View>
-								)}
-							</View>
+							<Image
+								source={require('../../../src/assets/logos/brie-logo.png')}
+								style={styles.logo}
+								resizeMode="contain"
+								accessibilityRole="image"
+								accessibilityLabel="Brie app logo"
+							/>
 						</TouchableOpacity>
-					</View>
-				</View>
 
-				{/* Offline Banner - Below header */}
-				{!isOnline && (
-					<View style={offlineBannerStyles.container}>
-						<View style={offlineBannerStyles.banner}>
-							<Ionicons name="cloud-offline" size={18} color={palette.danger} />
-							<AppText.Body style={offlineBannerStyles.text}>
-								You&apos;re offline. Some features may be unavailable.
-							</AppText.Body>
+						<View style={styles.headerButtons}>
+							<TouchableOpacity
+								onPress={() => router.push('/dashboard/notifications')}
+								style={styles.headerButton}
+								{...accessibilityProps.button}
+								accessibilityLabel={generateAccessibilityLabel.button(
+									'Open',
+									'notifications',
+								)}
+							>
+								<View>
+									<Ionicons
+										name="notifications-outline"
+										color={palette.text}
+										size={24}
+									/>
+									{unreadCount > 0 && (
+										<View style={styles.notificationBadge}>
+											<Text style={styles.notificationBadgeText}>
+												{unreadCount > 99 ? '99+' : unreadCount}
+											</Text>
+										</View>
+									)}
+								</View>
+							</TouchableOpacity>
 						</View>
 					</View>
-				)}
 
-				<ScrollView
-					style={styles.scrollView}
-					contentContainerStyle={[
-						styles.content,
-						{ paddingBottom: insets.bottom + space.xxl },
-					]}
-					showsVerticalScrollIndicator={false}
-					refreshControl={
-						<RefreshControl
-							refreshing={refreshing}
-							onRefresh={onRefresh}
-							tintColor={palette.primary}
-							colors={[palette.primary]}
-							progressBackgroundColor={palette.surface}
+					{/* Offline Banner - Below header */}
+					{!isOnline && (
+						<View style={offlineBannerStyles.container}>
+							<View style={offlineBannerStyles.banner}>
+								<Ionicons
+									name="cloud-offline"
+									size={18}
+									color={palette.danger}
+								/>
+								<AppText.Body style={offlineBannerStyles.text}>
+									You&apos;re offline. Some features may be unavailable.
+								</AppText.Body>
+							</View>
+						</View>
+					)}
+
+					<ScrollView
+						style={styles.scrollView}
+						contentContainerStyle={[
+							styles.content,
+							{ paddingBottom: insets.bottom + space.xxl },
+						]}
+						showsVerticalScrollIndicator={false}
+						refreshControl={
+							<RefreshControl
+								refreshing={refreshing}
+								onRefresh={onRefresh}
+								tintColor={palette.primary}
+								colors={[palette.primary]}
+								progressBackgroundColor={palette.surface}
+							/>
+						}
+						keyboardShouldPersistTaps="handled"
+					>
+						{/* MVP: Cash on Me - prominent at top */}
+						<CashOnMeCard
+							balance={totalBalance}
+							empty={transactions.length === 0}
 						/>
-					}
-					keyboardShouldPersistTaps="handled"
-				>
-					{/* MVP: Cash on Me - prominent at top */}
-					<CashOnMeCard
-						balance={totalBalance}
-						empty={transactions.length === 0}
-					/>
 
-					{/* MVP: Primary actions - one tap to log */}
-					<View style={quickAddStyles.row}>
-						<AppButton
-							label="+ Cash In"
-							variant="primary"
-							icon="add"
-							iconPosition="left"
-							onPress={() =>
-								router.push('/(tabs)/transaction?mode=income')
-							}
-							style={quickAddStyles.halfButton}
-						/>
-						<AppButton
-							label="+ Cash Out"
-							variant="secondary"
-							icon="remove"
-							iconPosition="left"
-							onPress={() =>
-								router.push('/(tabs)/transaction?mode=expense')
-							}
-							style={quickAddStyles.halfButton}
-						/>
-					</View>
+						{/* MVP: Primary actions - one tap to log */}
+						<View style={quickAddStyles.rowWrapper}>
+							<View style={quickAddStyles.row}>
+								<AppButton
+									label="Cash In"
+								variant="primary"
+								icon="add"
+								iconPosition="left"
+								onPress={() => router.push('/(tabs)/transaction?mode=income')}
+								style={quickAddStyles.halfButton}
+							/>
+							<AppButton
+								label="Cash Out"
+								variant="secondary"
+								icon="remove"
+								iconPosition="left"
+								onPress={() => router.push('/(tabs)/transaction?mode=expense')}
+								style={quickAddStyles.halfButton}
+							/>
+							</View>
+						</View>
 
-					{/* MVP: Last 30 days summary */}
-					<Last30DaysCard summary={last30Days} />
+						{/* MVP: Last 30 days summary */}
+						<Last30DaysCard summary={last30Days} />
 
-					{/* History - recent entries with View All */}
-					<RecentTransactionsList transactions={recentTransactions} />
-				</ScrollView>
+						{/* History - recent entries with View All */}
+						<RecentTransactionsList transactions={recentTransactions} />
+					</ScrollView>
 				</GestureHandlerRootView>
 			</SafeAreaView>
 		</ErrorBoundary>
@@ -270,13 +282,7 @@ export default function DashboardPro() {
 
 /** ----------------- MVP Subcomponents ----------------- */
 
-function CashOnMeCard({
-	balance,
-	empty,
-}: {
-	balance: number;
-	empty: boolean;
-}) {
+function CashOnMeCard({ balance, empty }: { balance: number; empty: boolean }) {
 	const isPositive = balance >= 0;
 
 	return (
@@ -356,7 +362,15 @@ function Last30DaysCard({
 function RecentTransactionsList({
 	transactions,
 }: {
-	transactions: { id?: string; _id?: string; description?: string; amount: number; date?: string; type?: string }[];
+	transactions: {
+		id?: string;
+		_id?: string;
+		description?: string;
+		amount: number;
+		date?: string;
+		type?: string;
+		metadata?: { category?: string };
+	}[];
 }) {
 	if (transactions.length === 0) {
 		return (
@@ -395,49 +409,59 @@ function RecentTransactionsList({
 					</AppText.Body>
 				</TouchableOpacity>
 			</View>
-					{transactions.map((tx, index) => {
-						const isExpense = tx.type === 'expense' || tx.amount < 0;
-						const amount = Math.abs(tx.amount);
-						const date = tx.date ? new Date(tx.date).toLocaleDateString('en-US', {
+			{transactions.map((tx, index) => {
+				const isExpense = tx.type === 'expense' || tx.amount < 0;
+				const amount = Math.abs(tx.amount);
+				const date = tx.date
+					? new Date(tx.date).toLocaleDateString('en-US', {
 							month: 'short',
 							day: 'numeric',
-						}) : '';
+						})
+					: '';
 
-						const transactionId = tx.id || tx._id;
-						return (
-							<TouchableOpacity
-								key={transactionId || index}
-								style={recentStyles.transaction}
-								onPress={() => {
-									if (transactionId) {
-										router.push({
-											pathname: '/dashboard/ledger/edit',
-											params: { id: transactionId },
-										});
-									}
-								}}
-								activeOpacity={0.7}
+				const transactionId = tx.id || tx._id;
+				return (
+					<TouchableOpacity
+						key={transactionId || index}
+						style={recentStyles.transaction}
+						onPress={() => {
+							if (transactionId) {
+								router.push({
+									pathname: '/dashboard/ledger/edit',
+									params: { id: transactionId },
+								});
+							}
+						}}
+						activeOpacity={0.7}
+					>
+						<View style={recentStyles.transactionContent}>
+							<AppText.Body
+								style={recentStyles.transactionDesc}
+								numberOfLines={1}
 							>
-								<View style={recentStyles.transactionContent}>
-								<AppText.Body style={recentStyles.transactionDesc} numberOfLines={1}>
-									{isExpense
-										? (tx.metadata as any)?.category || tx.description || 'Cash out'
-										: tx.description || 'Cash in'}
-								</AppText.Body>
-								<AppText.Caption color="muted" style={recentStyles.transactionDate}>
-									{date}
-								</AppText.Caption>
-								</View>
-								<AppText.Body
-									style={recentStyles.transactionAmount}
-									color={isExpense ? 'danger' : 'success'}
-								>
-									{isExpense ? '-' : '+'}
-									{currency(amount)}
-								</AppText.Body>
-							</TouchableOpacity>
-						);
-					})}
+								{isExpense
+									? tx.metadata?.category ||
+										tx.description ||
+										'Cash out'
+									: tx.description || 'Cash in'}
+							</AppText.Body>
+							<AppText.Caption
+								color="muted"
+								style={recentStyles.transactionDate}
+							>
+								{date}
+							</AppText.Caption>
+						</View>
+						<AppText.Body
+							style={recentStyles.transactionAmount}
+							color={isExpense ? 'danger' : 'success'}
+						>
+							{isExpense ? '-' : '+'}
+							{currency(amount)}
+						</AppText.Body>
+					</TouchableOpacity>
+				);
+			})}
 		</AppCard>
 	);
 }
@@ -517,12 +541,20 @@ const cashOnMeStyles = StyleSheet.create({
 });
 
 const quickAddStyles = StyleSheet.create({
+	rowWrapper: {
+		width: '100%',
+		alignItems: 'center',
+	},
 	row: {
 		flexDirection: 'row',
 		gap: space.md,
+		alignSelf: 'center',
+		maxWidth: 360,
+		width: '100%',
 	},
 	halfButton: {
 		flex: 1,
+		minWidth: 0,
 	},
 });
 

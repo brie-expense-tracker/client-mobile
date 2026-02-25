@@ -65,7 +65,7 @@ interface BillContextType {
 	deleteBill: (id: string) => Promise<void>;
 }
 
-const BillContext = createContext<BillContextType>({
+export const BillContext = createContext<BillContextType>({
 	expenses: [],
 	isLoading: false,
 	hasLoaded: false,
