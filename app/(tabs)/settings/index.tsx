@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import useAuth from '../../../src/context/AuthContext';
 import { setUseLocalMode } from '../../../src/storage/localModeStorage';
+import { isDevMode } from '../../../src/config/environment';
 import { palette, radius, space, type } from '../../../src/ui/theme';
 import { useProfile } from '../../../src/context/profileContext';
 import {
@@ -119,6 +120,8 @@ function ProfileContent() {
 	const handleEditProfile = () => router.push('/(onboarding)/profileSetup');
 	const handleFinishProfile = () => router.push('/(onboarding)/profileSetup');
 	const handleSetPhone = () => router.push('/(onboarding)/profileSetup');
+	const handleOpenOnboarding = () =>
+		router.push('/(onboarding)/profileSetup');
 
 	const handleUpdateMoney = () => router.push('/(tabs)/transaction');
 	const handleDashboard = () => router.push('/(tabs)/dashboard');
@@ -217,6 +220,28 @@ function ProfileContent() {
 						/>
 					</View>
 				</AppCard>
+
+				{/* DEV: Onboarding access */}
+				{isDevMode && (
+					<View style={styles.section}>
+						<AppText.Label color="subtle" style={styles.sectionTitle}>
+							DEV
+						</AppText.Label>
+						<AppCard padding={space.lg}>
+							<AppText.Caption color="muted" style={{ marginBottom: space.sm }}>
+								Open full onboarding flow for testing
+							</AppText.Caption>
+							<AppButton
+								label="Open Onboarding"
+								variant="secondary"
+								size="sm"
+								icon="layers-outline"
+								iconPosition="left"
+								onPress={handleOpenOnboarding}
+							/>
+						</AppCard>
+					</View>
+				)}
 
 				{/* PROFILE Section */}
 				<View style={styles.section}>
