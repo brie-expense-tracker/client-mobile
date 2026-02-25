@@ -52,9 +52,16 @@ const accessoryId = 'tx-input-accessory';
 // MVP: Fixed cash spending categories (per PRD)
 const CASH_CATEGORIES = [
 	'Food',
-	'Rides',
-	'Drinks',
 	'Groceries',
+	'Drinks',
+	'Transportation',
+	'Entertainment',
+	'Shopping',
+	'Personal care',
+	'Bills & utilities',
+	'Household',
+	'Health',
+	'Gifts & donations',
 	'Other',
 ] as const;
 
@@ -140,6 +147,9 @@ export default function TransactionScreenProModern() {
 	const [datePickerOpen, setDatePickerOpen] = useState(false);
 	const [mountCalendar, setMountCalendar] = useState(false);
 	const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+
+	// MVP: Amount lock for bill payments is hidden; always false
+	const isAmountLocked = false;
 
 	const { addTransaction } = useContext(TransactionContext);
 
@@ -767,6 +777,9 @@ export default function TransactionScreenProModern() {
 					windowSize={6}
 					maxToRenderPerBatch={12}
 					getItemLayout={(_, i) => ({ length: 48, offset: 48 * i, index: i })}
+					contentContainerStyle={{
+						paddingBottom: insets.bottom + 64 + space.md,
+					}}
 					renderItem={({ item }) => (
 						<TouchableOpacity
 							style={styles.sheetRow}
