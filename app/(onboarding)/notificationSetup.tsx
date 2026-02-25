@@ -15,12 +15,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useProfile } from '../../src/context/profileContext';
 import { useOnboarding } from '../../src/context/OnboardingContext';
 import { NotificationConsent, notificationService } from '../../src/services';
+import { palette, space } from '../../src/ui/theme';
 
 type PresetKey = 'essential' | 'recommended' | 'quiet';
 
+// MVP: Cash-only. No budget/goal alerts (those features removed). Transactions + weekly summary.
 const PRESETS: Record<PresetKey, NotificationConsent> = {
 	essential: {
-		core: { budget: true, goals: true, transactions: true, system: true },
+		core: { budget: false, goals: false, transactions: true, system: true },
 		aiInsights: {
 			enabled: false,
 			frequency: 'weekly',
@@ -42,7 +44,7 @@ const PRESETS: Record<PresetKey, NotificationConsent> = {
 		},
 	},
 	recommended: {
-		core: { budget: true, goals: true, transactions: true, system: true },
+		core: { budget: false, goals: false, transactions: true, system: true },
 		aiInsights: {
 			enabled: true,
 			frequency: 'weekly',
@@ -173,7 +175,7 @@ export default function NotificationPermissionScreen() {
 					try {
 						await notificationService.sendNotification(
 							'Notifications Enabled ✅',
-							"You're all set! You'll receive important budget alerts and insights.",
+							"You're all set! You'll receive weekly cash summaries and important alerts.",
 							'system',
 							undefined,
 							'high'
@@ -317,26 +319,26 @@ export default function NotificationPermissionScreen() {
 			<ScrollView contentContainerStyle={styles.content}>
 				{/* Header */}
 				<View style={styles.header}>
-					<Ionicons name="notifications-outline" size={48} color="#007ACC" />
-					<Text style={styles.title}>Want helpful budget alerts?</Text>
+					<Ionicons name="notifications-outline" size={48} color={palette.primary} />
+					<Text style={styles.title}>Stay on top of your cash</Text>
 					<Text style={styles.subtitle}>
-						Get important alerts and weekly insights so you stay on budget.
+						Get weekly summaries and important alerts so you always know where your money is.
 					</Text>
 				</View>
 
 				{/* Value Props */}
 				<View style={styles.valueProps}>
 					<View style={styles.valuePropItem}>
-						<Ionicons name="checkmark-circle" size={20} color="#10b981" />
-						<Text style={styles.valuePropText}>Approaching a budget</Text>
+						<Ionicons name="checkmark-circle" size={20} color={palette.success} />
+						<Text style={styles.valuePropText}>Weekly cash summary</Text>
 					</View>
 					<View style={styles.valuePropItem}>
-						<Ionicons name="checkmark-circle" size={20} color="#10b981" />
-						<Text style={styles.valuePropText}>Weekly money insights</Text>
+						<Ionicons name="checkmark-circle" size={20} color={palette.success} />
+						<Text style={styles.valuePropText}>Transaction activity</Text>
 					</View>
 					<View style={styles.valuePropItem}>
-						<Ionicons name="checkmark-circle" size={20} color="#10b981" />
-						<Text style={styles.valuePropText}>Goal progress</Text>
+						<Ionicons name="checkmark-circle" size={20} color={palette.success} />
+						<Text style={styles.valuePropText}>Monthly check-in</Text>
 					</View>
 				</View>
 
@@ -350,6 +352,8 @@ export default function NotificationPermissionScreen() {
 								selectedPreset === 'essential' && styles.presetCardSelected,
 							]}
 							onPress={() => applyPreset('essential')}
+							accessibilityLabel="Essential only: transactions and weekly summary"
+							accessibilityRole="button"
 						>
 							<Text
 								style={[
@@ -360,7 +364,7 @@ export default function NotificationPermissionScreen() {
 								Essential only
 							</Text>
 							<Text style={styles.presetDescription}>
-								Budget, goals, transactions; no AI, no marketing
+								Transactions & weekly summary; no AI, no marketing
 							</Text>
 						</TouchableOpacity>
 
@@ -370,6 +374,8 @@ export default function NotificationPermissionScreen() {
 								selectedPreset === 'recommended' && styles.presetCardSelected,
 							]}
 							onPress={() => applyPreset('recommended')}
+							accessibilityLabel="Essential plus insights: recommended"
+							accessibilityRole="button"
 						>
 							<View style={styles.recommendedBadge}>
 								<Text style={styles.recommendedText}>Recommended</Text>
@@ -384,7 +390,7 @@ export default function NotificationPermissionScreen() {
 								Essential + Insights
 							</Text>
 							<Text style={styles.presetDescription}>
-								Essential + weekly insights push
+								Transactions + weekly insights push
 							</Text>
 						</TouchableOpacity>
 
@@ -394,6 +400,8 @@ export default function NotificationPermissionScreen() {
 								selectedPreset === 'quiet' && styles.presetCardSelected,
 							]}
 							onPress={() => applyPreset('quiet')}
+							accessibilityLabel="Quiet mode: email summaries only"
+							accessibilityRole="button"
 						>
 							<Text
 								style={[
@@ -404,7 +412,7 @@ export default function NotificationPermissionScreen() {
 								Quiet mode
 							</Text>
 							<Text style={styles.presetDescription}>
-								Email only or summaries; no push
+								Email summaries only; no push
 							</Text>
 						</TouchableOpacity>
 					</View>
@@ -414,63 +422,31 @@ export default function NotificationPermissionScreen() {
 				<TouchableOpacity
 					style={styles.customizeHeader}
 					onPress={() => setShowCustomize(!showCustomize)}
+					accessibilityLabel={showCustomize ? 'Hide customization options' : 'Show customization options'}
+					accessibilityRole="button"
 				>
 					<Text style={styles.customizeTitle}>Customize</Text>
 					<Ionicons
 						name={showCustomize ? 'chevron-up' : 'chevron-down'}
 						size={20}
-						color="#6b7280"
+						color={palette.textMuted}
 					/>
 				</TouchableOpacity>
 
 				{showCustomize && (
 					<View style={styles.customizeContent}>
-						{/* Core Notifications */}
+						{/* Core Notifications - MVP: transactions only, no budget/goals */}
 						<View style={styles.section}>
 							<Text style={styles.sectionTitle}>Essential Updates</Text>
 							<Text style={styles.sectionDescription}>
-								These help you stay on top of your budget and goals
+								Keep track of your cash flow
 							</Text>
-
-							<View style={styles.settingRow}>
-								<View style={styles.settingInfo}>
-									<Text style={styles.settingLabel}>Budget Alerts</Text>
-									<Text style={styles.settingDescription}>
-										Get notified when you&apos;re approaching budget limits
-									</Text>
-								</View>
-								<Switch
-									value={consent.core.budget}
-									onValueChange={(value) =>
-										updateConsent('core', 'budget', value)
-									}
-									trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
-									thumbColor={consent.core.budget ? '#ffffff' : '#9ca3af'}
-								/>
-							</View>
-
-							<View style={styles.settingRow}>
-								<View style={styles.settingInfo}>
-									<Text style={styles.settingLabel}>Goal Progress</Text>
-									<Text style={styles.settingDescription}>
-										Updates on your savings and investment goals
-									</Text>
-								</View>
-								<Switch
-									value={consent.core.goals}
-									onValueChange={(value) =>
-										updateConsent('core', 'goals', value)
-									}
-									trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
-									thumbColor={consent.core.goals ? '#ffffff' : '#9ca3af'}
-								/>
-							</View>
 
 							<View style={styles.settingRow}>
 								<View style={styles.settingInfo}>
 									<Text style={styles.settingLabel}>Transaction Alerts</Text>
 									<Text style={styles.settingDescription}>
-										Important updates about your accounts
+										Important updates about your cash entries
 									</Text>
 								</View>
 								<Switch
@@ -478,24 +454,24 @@ export default function NotificationPermissionScreen() {
 									onValueChange={(value) =>
 										updateConsent('core', 'transactions', value)
 									}
-									trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
-									thumbColor={consent.core.transactions ? '#ffffff' : '#9ca3af'}
+									trackColor={{ false: palette.border, true: palette.primary }}
+									thumbColor={consent.core.transactions ? palette.primaryTextOn : palette.textSubtle}
 								/>
 							</View>
 						</View>
 
 						{/* AI Insights */}
 						<View style={styles.section}>
-							<Text style={styles.sectionTitle}>AI Insights</Text>
+							<Text style={styles.sectionTitle}>Weekly Insights</Text>
 							<Text style={styles.sectionDescription}>
-								Personalized financial advice and spending insights
+								Spending summaries and cash flow tips
 							</Text>
 
 							<View style={styles.settingRow}>
 								<View style={styles.settingInfo}>
-									<Text style={styles.settingLabel}>Weekly Insights</Text>
+									<Text style={styles.settingLabel}>Enable Insights</Text>
 									<Text style={styles.settingDescription}>
-										AI-powered financial recommendations
+										Weekly tips based on your cash activity
 									</Text>
 								</View>
 								<Switch
@@ -503,9 +479,9 @@ export default function NotificationPermissionScreen() {
 									onValueChange={(value) =>
 										updateConsent('aiInsights', 'enabled', value)
 									}
-									trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
+									trackColor={{ false: palette.border, true: palette.primary }}
 									thumbColor={
-										consent.aiInsights.enabled ? '#ffffff' : '#9ca3af'
+										consent.aiInsights.enabled ? palette.primaryTextOn : palette.textSubtle
 									}
 								/>
 							</View>
@@ -515,7 +491,7 @@ export default function NotificationPermissionScreen() {
 									<View style={styles.settingInfo}>
 										<Text style={styles.settingLabel}>Push Notifications</Text>
 										<Text style={styles.settingDescription}>
-											Receive insights as notifications
+											Receive insights as push notifications
 										</Text>
 									</View>
 									<Switch
@@ -523,11 +499,11 @@ export default function NotificationPermissionScreen() {
 										onValueChange={(value) =>
 											updateConsent('aiInsights', 'pushNotifications', value)
 										}
-										trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
+										trackColor={{ false: palette.border, true: palette.primary }}
 										thumbColor={
 											consent.aiInsights.pushNotifications
-												? '#ffffff'
-												: '#9ca3af'
+												? palette.primaryTextOn
+												: palette.textSubtle
 										}
 									/>
 								</View>
@@ -538,14 +514,14 @@ export default function NotificationPermissionScreen() {
 						<View style={styles.section}>
 							<Text style={styles.sectionTitle}>Reminders</Text>
 							<Text style={styles.sectionDescription}>
-								Helpful reminders to keep you on track
+								Regular summaries of your cash flow
 							</Text>
 
 							<View style={styles.settingRow}>
 								<View style={styles.settingInfo}>
 									<Text style={styles.settingLabel}>Weekly Summary</Text>
 									<Text style={styles.settingDescription}>
-										Weekly overview of your spending and savings
+										Weekly overview of your cash in and out
 									</Text>
 								</View>
 								<Switch
@@ -553,9 +529,9 @@ export default function NotificationPermissionScreen() {
 									onValueChange={(value) =>
 										updateConsent('reminders', 'weeklySummary', value)
 									}
-									trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
+									trackColor={{ false: palette.border, true: palette.primary }}
 									thumbColor={
-										consent.reminders.weeklySummary ? '#ffffff' : '#9ca3af'
+										consent.reminders.weeklySummary ? palette.primaryTextOn : palette.textSubtle
 									}
 								/>
 							</View>
@@ -564,7 +540,7 @@ export default function NotificationPermissionScreen() {
 								<View style={styles.settingInfo}>
 									<Text style={styles.settingLabel}>Monthly Check-in</Text>
 									<Text style={styles.settingDescription}>
-										Monthly financial health review
+										Monthly snapshot of your cash
 									</Text>
 								</View>
 								<Switch
@@ -572,9 +548,9 @@ export default function NotificationPermissionScreen() {
 									onValueChange={(value) =>
 										updateConsent('reminders', 'monthlyCheck', value)
 									}
-									trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
+									trackColor={{ false: palette.border, true: palette.primary }}
 									thumbColor={
-										consent.reminders.monthlyCheck ? '#ffffff' : '#9ca3af'
+										consent.reminders.monthlyCheck ? palette.primaryTextOn : palette.textSubtle
 									}
 								/>
 							</View>
@@ -584,7 +560,7 @@ export default function NotificationPermissionScreen() {
 						<View style={styles.section}>
 							<Text style={styles.sectionTitle}>Marketing & Updates</Text>
 							<Text style={styles.sectionDescription}>
-								Optional updates about new features and offers
+								Optional updates about new features
 							</Text>
 
 							<View style={styles.settingRow}>
@@ -602,9 +578,9 @@ export default function NotificationPermissionScreen() {
 											updateConsent('marketing', 'enabled', true);
 										}
 									}}
-									trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
+									trackColor={{ false: palette.border, true: palette.primary }}
 									thumbColor={
-										consent.marketing.productUpdates ? '#ffffff' : '#9ca3af'
+										consent.marketing.productUpdates ? palette.primaryTextOn : palette.textSubtle
 									}
 								/>
 							</View>
@@ -624,9 +600,9 @@ export default function NotificationPermissionScreen() {
 											updateConsent('marketing', 'enabled', true);
 										}
 									}}
-									trackColor={{ false: '#e5e7eb', true: '#007ACC' }}
+									trackColor={{ false: palette.border, true: palette.primary }}
 									thumbColor={
-										consent.marketing.specialOffers ? '#ffffff' : '#9ca3af'
+										consent.marketing.specialOffers ? palette.primaryTextOn : palette.textSubtle
 									}
 								/>
 							</View>
@@ -639,11 +615,11 @@ export default function NotificationPermissionScreen() {
 					<Ionicons
 						name="information-circle-outline"
 						size={20}
-						color="#6b7280"
+						color={palette.textMuted}
 					/>
 					<Text style={styles.noteText}>
-						You can change these settings anytime in the app. Core app features
-						work without notifications.
+						You can change these settings anytime in Profile. Cash tracking works
+						without notifications.
 					</Text>
 				</View>
 
@@ -653,6 +629,8 @@ export default function NotificationPermissionScreen() {
 						style={[styles.button, styles.primaryButton]}
 						onPress={handleContinue}
 						disabled={loading}
+						accessibilityLabel={loading ? 'Setting up' : 'Allow notifications'}
+						accessibilityRole="button"
 					>
 						<Text style={styles.primaryButtonText}>
 							{loading ? 'Setting Up...' : 'Allow notifications'}
@@ -663,6 +641,8 @@ export default function NotificationPermissionScreen() {
 						style={[styles.button, styles.secondaryButton]}
 						onPress={handleSkip}
 						disabled={loading}
+						accessibilityLabel="Skip notifications"
+						accessibilityRole="button"
 					>
 						<Text style={styles.secondaryButtonText}>Not now</Text>
 					</TouchableOpacity>
@@ -675,192 +655,192 @@ export default function NotificationPermissionScreen() {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: '#ffffff',
+		backgroundColor: palette.bg,
 	},
 	content: {
-		paddingHorizontal: 24,
-		paddingBottom: 48,
+		paddingHorizontal: space.xl,
+		paddingBottom: space.xxl,
 	},
 	header: {
 		alignItems: 'center',
-		marginTop: 40,
-		marginBottom: 32,
+		marginTop: space.xxl,
+		marginBottom: space.xl,
 	},
 	title: {
 		fontSize: 28,
 		fontWeight: '700',
-		color: '#1f2937',
-		marginTop: 16,
-		marginBottom: 8,
+		color: palette.text,
+		marginTop: space.lg,
+		marginBottom: space.sm,
 		textAlign: 'center',
 	},
 	subtitle: {
 		fontSize: 16,
-		color: '#6b7280',
+		color: palette.textMuted,
 		textAlign: 'center',
 		lineHeight: 24,
 	},
 	valueProps: {
-		marginBottom: 32,
+		marginBottom: space.xl,
 	},
 	valuePropItem: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		marginBottom: 12,
+		marginBottom: space.md,
 	},
 	valuePropText: {
 		fontSize: 16,
-		color: '#374151',
-		marginLeft: 12,
+		color: palette.text,
+		marginLeft: space.md,
 	},
 	presetSection: {
-		marginBottom: 32,
+		marginBottom: space.xl,
 	},
 	presetSectionTitle: {
 		fontSize: 18,
 		fontWeight: '600',
-		color: '#1f2937',
-		marginBottom: 16,
+		color: palette.text,
+		marginBottom: space.lg,
 	},
 	presetContainer: {
-		gap: 12,
+		gap: space.md,
 	},
 	presetCard: {
-		backgroundColor: '#f9fafb',
+		backgroundColor: palette.surfaceAlt,
 		borderWidth: 2,
-		borderColor: '#e5e7eb',
+		borderColor: palette.border,
 		borderRadius: 12,
-		padding: 16,
+		padding: space.lg,
 		position: 'relative',
 	},
 	presetCardSelected: {
-		borderColor: '#007ACC',
-		backgroundColor: '#eff6ff',
+		borderColor: palette.primary,
+		backgroundColor: palette.primarySubtle,
 	},
 	presetTitle: {
 		fontSize: 16,
 		fontWeight: '600',
-		color: '#1f2937',
-		marginBottom: 4,
+		color: palette.text,
+		marginBottom: space.sm,
 	},
 	presetTitleSelected: {
-		color: '#007ACC',
+		color: palette.primary,
 	},
 	presetDescription: {
 		fontSize: 14,
-		color: '#6b7280',
+		color: palette.textMuted,
 		lineHeight: 20,
 	},
 	recommendedBadge: {
 		position: 'absolute',
-		top: -8,
-		right: 12,
-		backgroundColor: '#10b981',
-		paddingHorizontal: 8,
-		paddingVertical: 4,
+		top: -space.sm,
+		right: space.md,
+		backgroundColor: palette.success,
+		paddingHorizontal: space.sm,
+		paddingVertical: space.xs,
 		borderRadius: 12,
 	},
 	recommendedText: {
 		fontSize: 12,
 		fontWeight: '600',
-		color: '#ffffff',
+		color: palette.primaryTextOn,
 	},
 	customizeHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		paddingVertical: 16,
+		paddingVertical: space.lg,
 		borderBottomWidth: 1,
-		borderBottomColor: '#e5e7eb',
-		marginBottom: 16,
+		borderBottomColor: palette.border,
+		marginBottom: space.lg,
 	},
 	customizeTitle: {
 		fontSize: 16,
 		fontWeight: '600',
-		color: '#6b7280',
+		color: palette.textMuted,
 	},
 	customizeContent: {
-		marginBottom: 32,
+		marginBottom: space.xl,
 	},
 	section: {
-		marginBottom: 32,
+		marginBottom: space.xl,
 	},
 	sectionTitle: {
 		fontSize: 20,
 		fontWeight: '600',
-		color: '#1f2937',
-		marginBottom: 8,
+		color: palette.text,
+		marginBottom: space.sm,
 	},
 	sectionDescription: {
 		fontSize: 14,
-		color: '#6b7280',
-		marginBottom: 16,
+		color: palette.textMuted,
+		marginBottom: space.lg,
 		lineHeight: 20,
 	},
 	settingRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		paddingVertical: 16,
+		paddingVertical: space.lg,
 		borderBottomWidth: 1,
-		borderBottomColor: '#f3f4f6',
+		borderBottomColor: palette.subtle,
 	},
 	settingInfo: {
 		flex: 1,
-		marginRight: 16,
+		marginRight: space.lg,
 	},
 	settingLabel: {
 		fontSize: 16,
 		fontWeight: '500',
-		color: '#1f2937',
-		marginBottom: 4,
+		color: palette.text,
+		marginBottom: space.sm,
 	},
 	settingDescription: {
 		fontSize: 14,
-		color: '#6b7280',
+		color: palette.textMuted,
 		lineHeight: 20,
 	},
 	noteContainer: {
 		flexDirection: 'row',
 		alignItems: 'flex-start',
-		backgroundColor: '#f9fafb',
-		padding: 16,
+		backgroundColor: palette.surfaceAlt,
+		padding: space.lg,
 		borderRadius: 8,
-		marginBottom: 32,
+		marginBottom: space.xl,
 	},
 	noteText: {
 		flex: 1,
 		fontSize: 14,
-		color: '#6b7280',
-		marginLeft: 8,
+		color: palette.textMuted,
+		marginLeft: space.sm,
 		lineHeight: 20,
 	},
 	buttonContainer: {
-		gap: 12,
+		gap: space.md,
 	},
 	button: {
-		paddingVertical: 16,
-		paddingHorizontal: 24,
+		paddingVertical: space.lg,
+		paddingHorizontal: space.xl,
 		borderRadius: 12,
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
 	primaryButton: {
-		backgroundColor: '#007ACC',
+		backgroundColor: palette.primary,
 	},
 	primaryButtonText: {
 		fontSize: 16,
 		fontWeight: '600',
-		color: '#ffffff',
+		color: palette.primaryTextOn,
 	},
 	secondaryButton: {
 		backgroundColor: 'transparent',
 		borderWidth: 1,
-		borderColor: '#d1d5db',
+		borderColor: palette.border,
 	},
 	secondaryButtonText: {
 		fontSize: 16,
 		fontWeight: '600',
-		color: '#6b7280',
+		color: palette.textMuted,
 	},
 });
