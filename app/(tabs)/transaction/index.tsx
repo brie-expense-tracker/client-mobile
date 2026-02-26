@@ -1,11 +1,4 @@
-import React, {
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-	useContext,
-	useCallback,
-} from 'react';
+import React, { useEffect, useRef, useState, useContext, useCallback } from 'react';
 import {
 	View,
 	Text,
@@ -13,7 +6,6 @@ import {
 	StyleSheet,
 	Alert,
 	ScrollView,
-	ActivityIndicator,
 	TouchableOpacity,
 	Pressable,
 	FlatList,
@@ -32,11 +24,9 @@ import { TransactionContext } from '../../../src/context/transactionContext';
 import BottomSheet from '../../../src/components/BottomSheet';
 import { isDevMode } from '../../../src/config/environment';
 import { createLogger } from '../../../src/utils/sublogger';
-// DashboardService and DashboardRollup removed - no longer used in this screen
 import { palette, radius, space, type } from '../../../src/ui/theme';
 import { getItem, setItem, removeItem } from '../../../src/utils/safeStorage';
 import {
-	AppScreen,
 	AppCard,
 	AppText,
 	AppButton,
@@ -44,13 +34,9 @@ import {
 } from '../../../src/ui/primitives';
 import { ErrorBoundary } from '../../../src/components/ErrorBoundary';
 
-// Create namespaced logger for this service
 const transactionScreenLog = createLogger('TransactionScreen');
-
-// iOS InputAccessoryView ID
 const accessoryId = 'tx-input-accessory';
 
-// MVP: Fixed cash spending categories (per PRD)
 const CASH_CATEGORIES = [
 	'Food',
 	'Groceries',
@@ -72,9 +58,7 @@ interface TransactionFormData {
 	date: string;
 }
 
-// ---------- Utils
 const getLocalIsoDate = (): string => {
-	// Format date directly from local components to avoid timezone conversion issues
 	const today = new Date();
 	const year = today.getFullYear();
 	const month = String(today.getMonth() + 1).padStart(2, '0');
@@ -82,7 +66,6 @@ const getLocalIsoDate = (): string => {
 	return `${year}-${month}-${day}`;
 };
 
-// Allow only digits + one dot, clamp to two decimals
 const sanitizeCurrency = (value: string): string => {
 	const cleaned = value.replace(/[^0-9.]/g, '');
 	if (!cleaned) return '';
@@ -104,13 +87,12 @@ const prettyCurrency = (value: string): string => {
 	}).format(num);
 };
 
-// Format date string (yyyy-mm-dd) to locale date string without timezone issues
 const formatDateString = (dateString: string): string => {
 	if (!dateString || typeof dateString !== 'string') return '';
 	const datePart = dateString.slice(0, 10);
 	if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return dateString;
 	const [year, month, day] = datePart.split('-').map(Number);
-	const date = new Date(year, month - 1, day); // month is 0-indexed
+	const date = new Date(year, month - 1, day);
 	return date.toLocaleDateString();
 };
 
@@ -126,7 +108,6 @@ export default function TransactionScreenProModern() {
 	const [keyboardHeight, setKeyboardHeight] = useState(0);
 	const insets = useSafeAreaInsets();
 
-	// Bottom padding: safe area + additional breathing room
 	const contentBottomPad = insets.bottom + space.xl;
 
 	const [mode, setMode] = useState<'income' | 'expense'>(
@@ -136,7 +117,6 @@ export default function TransactionScreenProModern() {
 		(typeof CASH_CATEGORIES)[number] | null
 	>(null);
 
-	// Sync mode from URL params when navigating with ?mode=income or ?mode=expense
 	useEffect(() => {
 		if (params.mode === 'income' || params.mode === 'expense') {
 			setMode(params.mode);
@@ -144,21 +124,12 @@ export default function TransactionScreenProModern() {
 		}
 	}, [params.mode]);
 	const [isSubmitting, setIsSubmitting] = useState(false);
-	const [pickerOpen, setPickerOpen] = useState<boolean>(false);
+	const [pickerOpen, setPickerOpen] = useState(false);
 	const [datePickerOpen, setDatePickerOpen] = useState(false);
 	const [mountCalendar, setMountCalendar] = useState(false);
-	const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
-
-	// MVP: Amount lock for bill payments is hidden; always false
-	const isAmountLocked = false;
 
 	const { addTransaction } = useContext(TransactionContext);
 
-	useEffect(() => {
-		setHasLoadedOnce(true);
-	}, []);
-
-	// Track keyboard height
 	useEffect(() => {
 		const onShow = (e: any) => setKeyboardHeight(e?.endCoordinates?.height ?? 0);
 		const onHide = () => setKeyboardHeight(0);
@@ -178,7 +149,6 @@ export default function TransactionScreenProModern() {
 		};
 	}, []);
 
-	// Defer Calendar mount until after interactions settle
 	useEffect(() => {
 		if (!datePickerOpen) {
 			setMountCalendar(false);
@@ -190,7 +160,6 @@ export default function TransactionScreenProModern() {
 		return () => task.cancel();
 	}, [datePickerOpen]);
 
-	// Keep URL in sync without navigation transition (skip first mount to prevent layout shift)
 	const didMountRef = useRef(false);
 	useEffect(() => {
 		if (!didMountRef.current) {
@@ -223,11 +192,8 @@ export default function TransactionScreenProModern() {
 	const selectedDate = watch('date');
 
 	const FORM_STATE_KEY = 'transaction_form_state';
-	const [isNewForm, setIsNewForm] = useState(true);
 	const [hasRestoredState, setHasRestoredState] = useState(false);
-	// const [savedDebtId, setSavedDebtId] = useState<string | null>(null); // Debt tracking hidden for MVP
 
-	// Restore saved form state on mount (immediate, no deferral)
 	useEffect(() => {
 		let isMounted = true;
 
@@ -239,8 +205,6 @@ export default function TransactionScreenProModern() {
 
 				if (saved) {
 					const state = JSON.parse(saved);
-					setIsNewForm(false);
-
 					const restoredAmount =
 						typeof state.amount === 'string' ? state.amount.trim() : '';
 
@@ -252,11 +216,8 @@ export default function TransactionScreenProModern() {
 					setValue('date', state.date ?? getLocalIsoDate());
 					if (state.mode) setMode(state.mode);
 					if (state.selectedCategory) setSelectedCategory(state.selectedCategory);
-				} else {
-					setIsNewForm(true);
 				}
 			} catch {
-				setIsNewForm(true);
 			} finally {
 				if (isMounted) setHasRestoredState(true);
 			}
@@ -267,21 +228,8 @@ export default function TransactionScreenProModern() {
 		};
 	}, [setValue]);
 
-	// Debt tracking hidden for MVP - increases finance complexity perception
-	// Restore selectedDebt after debts are loaded
-	// useEffect(() => {
-	// 	if (savedDebtId && debts.length > 0 && !selectedDebt) {
-	// 		const debt = debts.find((d) => d.debtId === savedDebtId);
-	// 		if (debt) {
-	// 			setSelectedDebt(debt);
-	// 		}
-	// 		setSavedDebtId(null);
-	// 	}
-	// }, [savedDebtId, debts, selectedDebt]);
-
-	// Save form state as user types (debounced)
 	useEffect(() => {
-		if (!hasRestoredState) return; // Don't save during initial restore
+		if (!hasRestoredState) return;
 
 		const saveState = async () => {
 			try {
@@ -299,11 +247,8 @@ export default function TransactionScreenProModern() {
 
 				if (hasData) {
 					await setItem(FORM_STATE_KEY, JSON.stringify(stateToSave));
-					setIsNewForm(false);
 				} else {
-					// Clear saved state if form is empty
 					await removeItem(FORM_STATE_KEY);
-					setIsNewForm(true);
 				}
 			} catch (err) {
 				if (isDevMode) {
@@ -312,12 +257,10 @@ export default function TransactionScreenProModern() {
 			}
 		};
 
-		// Debounce saves to avoid too frequent writes
 		const timeoutId = setTimeout(saveState, 500);
 		return () => clearTimeout(timeoutId);
 	}, [amount, description, selectedDate, mode, selectedCategory, hasRestoredState]);
 
-	// Keep caret at end for manual edits
 	useEffect(() => {
 		if (amountRef.current) {
 			const len = amount?.length ?? 0;
@@ -325,40 +268,24 @@ export default function TransactionScreenProModern() {
 		}
 	}, [amount]);
 
-	const amountNumber = useMemo(() => Number(amount), [amount]);
-	// MVP: Category required for expense
 	const canSubmit =
 		isValid &&
 		!isSubmitting &&
-		amountNumber > 0 &&
+		Number(amount) > 0 &&
 		(mode === 'income' || (mode === 'expense' && selectedCategory !== null));
 
-	// ---------- Handlers
 	const focusNoteCentered = useCallback(() => {
-		// Focus first so keyboard starts opening
 		noteInputRef.current?.focus();
-
-		// Wait a tick so layout updates + keyboard animation begins
 		requestAnimationFrame(() => {
 			setTimeout(() => {
 				if (!noteInputRef.current || !scrollRef.current) return;
 
-				noteInputRef.current.measureInWindow((x, y, w, h) => {
+				noteInputRef.current.measureInWindow((_x, y, _w, h) => {
 					const screenH = Dimensions.get('window').height;
-
-					// visible area is screen minus keyboard
 					const visibleH = Math.max(0, screenH - keyboardHeight);
-
-					// target center inside visible region
 					const targetCenterY = visibleH / 2;
-
-					// where the input's center currently is
 					const inputCenterY = y + h / 2;
-
-					// how much we need to move content (positive means scroll down)
 					const delta = inputCenterY - targetCenterY;
-
-					// scroll by delta relative to current offset
 					scrollRef.current?.scrollTo({
 						y: Math.max(0, (scrollYRef.current ?? 0) + delta),
 						animated: true,
@@ -378,17 +305,11 @@ export default function TransactionScreenProModern() {
 	);
 	const onChangeAmount = useCallback(
 		(text: string) => {
-			if (isAmountLocked) return; // Don't allow changes when locked
 			const sanitized = sanitizeCurrency(text);
-			// Check if the number exceeds the limit
-			const num = Number(sanitized);
-			if (num > 999999.99) {
-				// Don't update if it exceeds the limit
-				return;
-			}
+			if (Number(sanitized) > 999999.99) return;
 			setValue('amount', sanitized, { shouldValidate: true });
 		},
-		[setValue, isAmountLocked]
+		[setValue]
 	);
 
 	const onBlurAmount = useCallback(() => {
@@ -419,28 +340,22 @@ export default function TransactionScreenProModern() {
 			if (!isFinite(amt) || amt <= 0)
 				return Alert.alert('Invalid amount', 'Enter an amount greater than 0.');
 
-			const isIncome = mode === 'income';
-			const isExpense = mode === 'expense';
-
 			const payload: any = {
 				description: data.description?.trim() || undefined,
-				amount: isIncome ? Math.abs(amt) : -Math.abs(amt),
+				amount: mode === 'income' ? Math.abs(amt) : -Math.abs(amt),
 				date: data.date,
-				type: isIncome ? 'income' : 'expense',
+				type: mode,
 			};
 
-			if (isExpense && selectedCategory) {
+			if (mode === 'expense' && selectedCategory) {
 				payload.metadata = { category: selectedCategory };
 			}
 			await addTransaction(payload);
-
-			// Clear saved form state on successful submit
 			await removeItem(FORM_STATE_KEY);
-			setIsNewForm(true);
 
 			Alert.alert(
 				'Success',
-				`${isIncome ? 'Cash IN' : 'Cash OUT'} saved!`,
+				`${mode === 'income' ? 'Cash IN' : 'Cash OUT'} saved!`,
 				[
 					{
 						text: 'OK',
@@ -467,9 +382,6 @@ export default function TransactionScreenProModern() {
 		}
 	};
 
-	// --------------- UI Helpers -----------------
-	// Row component replaced with AppRow primitive
-
 	const ValueText = ({
 		children,
 		style,
@@ -481,20 +393,6 @@ export default function TransactionScreenProModern() {
 			{children}
 		</Text>
 	);
-
-	// =============================================================
-	// Render
-	// =============================================================
-	// Gate rendering until state is restored to prevent layout shifts
-	if (!hasRestoredState) {
-		return (
-			<AppScreen edges={['top']} scrollable={false}>
-				<View style={styles.loadingOverlay}>
-					<ActivityIndicator size="large" color={palette.primary} />
-				</View>
-			</AppScreen>
-		);
-	}
 
 	return (
 		<ErrorBoundary>
@@ -508,7 +406,6 @@ export default function TransactionScreenProModern() {
 				]}
 				keyboardShouldPersistTaps="handled"
 				keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-				// 🔻 prevent iOS from doing a delayed inset animation
 				automaticallyAdjustContentInsets={false}
 				contentInsetAdjustmentBehavior="never"
 				automaticallyAdjustKeyboardInsets={false}
@@ -518,19 +415,14 @@ export default function TransactionScreenProModern() {
 				}}
 				scrollEventThrottle={16}
 			>
-				{/* Hero section: header + amount + type toggle */}
 				<View>
-					<AppText.Caption color="muted" style={styles.heroKicker}>
-						New transaction
-					</AppText.Caption>
 					<AppText.Title style={styles.heroTitle}>New transaction</AppText.Title>
 
 					<AppCard style={styles.section} padding={space.lg} borderRadius={radius.lg}>
 					<View style={styles.amountRow}>
 						<Pressable
 							style={styles.amountInputContainer}
-							onPress={() => !isAmountLocked && amountRef.current?.focus()}
-							disabled={isAmountLocked}
+							onPress={() => amountRef.current?.focus()}
 						>
 							<Text style={styles.dollar}>$</Text>
 							<Controller
@@ -544,10 +436,7 @@ export default function TransactionScreenProModern() {
 								render={({ field: { value, onBlur } }) => (
 									<TextInput
 										ref={amountRef}
-										style={[
-											styles.amountInput,
-											isAmountLocked && styles.amountInputLocked,
-										]}
+										style={styles.amountInput}
 										placeholder="0"
 										placeholderTextColor={palette.textSubtle}
 										keyboardType="decimal-pad"
@@ -560,7 +449,6 @@ export default function TransactionScreenProModern() {
 										returnKeyType="next"
 										accessibilityLabel="Amount"
 										maxLength={9}
-										editable={!isAmountLocked}
 										inputAccessoryViewID={
 											Platform.OS === 'ios' ? accessoryId : undefined
 										}
@@ -571,7 +459,6 @@ export default function TransactionScreenProModern() {
 					</View>
 					<View style={styles.amountUnderline} />
 
-						{/* Reserve space for error to prevent layout shift */}
 						<View style={styles.errorContainer}>
 							{errors.amount && (
 								<AppText.Caption color="danger" style={styles.errorText}>
@@ -580,25 +467,22 @@ export default function TransactionScreenProModern() {
 							)}
 						</View>
 
-						{/* Segmented control inside hero */}
 						<View style={styles.segmented}>
-							{(['expense', 'income'] as const).map((m, index) => {
+							{(['expense', 'income'] as const).map((m) => {
 								const active = mode === m;
 								const label = m.charAt(0).toUpperCase() + m.slice(1);
-								const isLeft = index === 0;
-								const isRight = index === 1;
 								return (
 									<Pressable
 										key={m}
 										style={({ pressed }) => [
 											styles.segBtn,
-											isLeft && styles.segBtnLeft,
-											isRight && styles.segBtnRight,
+											m === 'expense' && styles.segBtnLeft,
+											m === 'income' && styles.segBtnRight,
 											active && styles.segBtnActive,
 											{
-									backgroundColor: active
-										? palette.surface
-										: 'transparent',
+												backgroundColor: active
+													? palette.surface
+													: 'transparent',
 												opacity: pressed ? 0.7 : 1,
 											},
 										]}
@@ -619,9 +503,7 @@ export default function TransactionScreenProModern() {
 					</AppCard>
 				</View>
 
-				{/* Details card: MVP = Category (expense) + Date */}
 				<AppCard style={styles.section} padding={0} borderRadius={radius.lg}>
-					{/* MVP: Category - required for Cash OUT, fixed set */}
 					{mode === 'expense' && (
 						<AppRow
 							icon="pricetag-outline"
@@ -645,7 +527,6 @@ export default function TransactionScreenProModern() {
 						/>
 					)}
 
-					{/* Date - always shown */}
 					<AppRow
 						icon="calendar-outline"
 						label="Date"
@@ -655,14 +536,11 @@ export default function TransactionScreenProModern() {
 					/>
 				</AppCard>
 
-				{/* MVP: Advanced (bills) hidden - cash-only focus */}
-				{/* Description input */}
 				<AppCard style={styles.section}>
 					<AppText.Heading style={styles.inputLabel}>Note (optional)</AppText.Heading>
 					<Controller
 						control={control}
 						name="description"
-						rules={{}}
 						render={({ field: { value, onChange, onBlur } }) => (
 							<TextInput
 								ref={noteInputRef}
@@ -675,13 +553,9 @@ export default function TransactionScreenProModern() {
 								placeholderTextColor={palette.textSubtle}
 								value={value}
 								onChangeText={(t) => onChange(t)}
-								onBlur={() => {
-									onBlur();
-									trigger('description');
-								}}
+								onBlur={onBlur}
 								onFocus={focusNoteCentered}
 								returnKeyType="done"
-								blurOnSubmit={true}
 								onSubmitEditing={() => Keyboard.dismiss()}
 								accessibilityLabel="Description"
 								maxLength={120}
@@ -691,7 +565,6 @@ export default function TransactionScreenProModern() {
 							/>
 						)}
 					/>
-					{/* Reserve space for error to prevent layout shift */}
 					<View style={{ minHeight: 18, marginTop: space.xs }}>
 						{errors.description && (
 							<AppText.Caption color="danger" style={styles.errorText}>
@@ -701,7 +574,6 @@ export default function TransactionScreenProModern() {
 					</View>
 				</AppCard>
 
-				{/* Inline CTA */}
 				<View style={styles.inlineCtaWrap}>
 					{amount && Number(amount) > 0 && (
 						<AppText.Caption color="muted" style={styles.miniSummary}>
@@ -729,11 +601,9 @@ export default function TransactionScreenProModern() {
 					)}
 				</View>
 
-				{/* Bottom spacer for keyboard */}
 				<View style={{ height: keyboardHeight ? keyboardHeight + space.lg : 0 }} />
 			</ScrollView>
 
-			{/* (Optional) iOS accessory bar just for a "Done" keyboard dismiss */}
 			{Platform.OS === 'ios' && (
 				<InputAccessoryView nativeID={accessoryId}>
 					<View style={styles.accessoryBar}>
@@ -749,7 +619,6 @@ export default function TransactionScreenProModern() {
 				</InputAccessoryView>
 			)}
 
-			{/* Picker Modal */}
 			<BottomSheet
 				isOpen={pickerOpen}
 				onClose={() => setPickerOpen(false)}
@@ -773,7 +642,7 @@ export default function TransactionScreenProModern() {
 				}
 			>
 				<FlatList
-					data={[...CASH_CATEGORIES]}
+					data={CASH_CATEGORIES}
 					keyExtractor={(item) => item}
 					initialNumToRender={12}
 					windowSize={6}
@@ -801,7 +670,6 @@ export default function TransactionScreenProModern() {
 				/>
 			</BottomSheet>
 
-			{/* Date Picker Modal */}
 			<BottomSheet
 				isOpen={datePickerOpen}
 				onClose={() => setDatePickerOpen(false)}
@@ -822,7 +690,6 @@ export default function TransactionScreenProModern() {
 					</View>
 				}
 			>
-				{/* Quick actions */}
 				<View style={styles.quickActions}>
 					<TouchableOpacity
 						style={styles.quickActionBtn}
@@ -835,7 +702,6 @@ export default function TransactionScreenProModern() {
 					</TouchableOpacity>
 				</View>
 
-				{/* Calendar - only mount after interactions settle */}
 				{datePickerOpen && mountCalendar ? (
 					<Calendar
 						onDayPress={(day) => {
@@ -885,9 +751,6 @@ export default function TransactionScreenProModern() {
 	);
 }
 
-// =============================================================
-// Styles
-// =============================================================
 const styles = StyleSheet.create({
 	container: { flex: 1, backgroundColor: palette.surfaceAlt },
 
@@ -896,22 +759,10 @@ const styles = StyleSheet.create({
 		paddingTop: space.sm,
 	},
 
-	heroKicker: {
-		marginBottom: space.xs,
-	},
-
 	heroTitle: {
 		fontSize: 24,
 		marginBottom: space.md,
 	},
-
-	heroSubtitle: {
-		...type.body,
-		color: palette.textMuted,
-		marginBottom: space.lg,
-	},
-
-	// Hero = amount + segmented (using AppCard now)
 
 	amountRow: {
 		flexDirection: 'row',
@@ -942,23 +793,6 @@ const styles = StyleSheet.create({
 		minWidth: 30,
 		paddingHorizontal: 0,
 	},
-	amountInputLocked: {
-		opacity: 0.7,
-	},
-	unlockButton: {
-		padding: space.xs,
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginBottom: 4,
-	},
-	lockHintContainer: {
-		marginTop: space.xs,
-		alignItems: 'center',
-	},
-	lockHintText: {
-		...type.small,
-		color: palette.textMuted,
-	},
 	amountUnderline: {
 		marginTop: space.sm,
 		height: 1,
@@ -967,11 +801,10 @@ const styles = StyleSheet.create({
 	errorContainer: {
 		alignItems: 'flex-end',
 		marginTop: space.xs,
-		minHeight: 18, // Reserve space to prevent layout shift
+		minHeight: 18,
 	},
 	errorText: { color: palette.danger, fontSize: 13, marginTop: space.xs },
 
-	// Segmented (now inside amountCard)
 	segmented: {
 		marginTop: space.lg,
 		backgroundColor: palette.surfaceAlt,
@@ -1003,11 +836,8 @@ const styles = StyleSheet.create({
 		fontWeight: '600',
 	},
 
-	// Card list (cells) - using AppCard and AppRow now
-	// Row styles moved to AppRow primitive
 	valueText: { color: palette.text, fontWeight: '600' },
 
-	// Input card - using AppCard now
 	inputLabel: {
 		marginBottom: space.sm,
 	},
@@ -1023,46 +853,10 @@ const styles = StyleSheet.create({
 	},
 	inputError: { borderColor: palette.danger, borderWidth: 1.5 },
 
-	// Preview
-	previewCard: {
-		marginBottom: space.lg,
-		backgroundColor: palette.surface,
-		borderRadius: radius.lg,
-		borderWidth: 1,
-		borderColor: palette.border,
-		padding: space.lg,
-	},
-	previewHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: space.xs,
-		marginBottom: space.sm,
-	},
-	previewTitle: { 
-		color: palette.text,
-		fontSize: 14,
-		fontWeight: '600',
-	},
-	previewLine: { 
-		color: palette.textMuted,
-		fontSize: 14,
-		lineHeight: 20,
-	},
-	previewEmph: { 
-		fontWeight: '700',
-		color: palette.text,
-	},
-
-	// Section spacing
 	section: {
 		marginTop: space.md,
 	},
-	sectionLg: {
-		marginTop: space.lg,
-	},
 
-	// Inline CTA - using AppButton now
-	// Bottom spacing handled by contentContainerStyle paddingBottom
 	inlineCtaWrap: {
 		marginTop: space.lg,
 		paddingTop: space.xs,
@@ -1076,7 +870,6 @@ const styles = StyleSheet.create({
 		marginBottom: space.md,
 	},
 
-	// Accessory bar
 	accessoryBar: {
 		padding: space.md,
 		alignItems: 'flex-end',
@@ -1087,7 +880,6 @@ const styles = StyleSheet.create({
 		fontWeight: '700',
 	},
 
-	// BottomSheet shared
 	sheetHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -1107,7 +899,6 @@ const styles = StyleSheet.create({
 		paddingHorizontal: space.lg,
 	},
 
-	// Date quick action
 	quickActions: {
 		flexDirection: 'row',
 		gap: space.sm,
@@ -1125,19 +916,6 @@ const styles = StyleSheet.create({
 	},
 	quickActionText: {
 		color: palette.text,
-		fontWeight: '600',
-	},
-
-	// Loading overlay
-	loadingOverlay: {
-		...StyleSheet.absoluteFillObject,
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: palette.surfaceAlt,
-	},
-	loadingText: {
-		marginTop: space.sm,
-		color: palette.textMuted,
 		fontWeight: '600',
 	},
 });
