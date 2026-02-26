@@ -1,4 +1,10 @@
-import React, { useEffect, useRef, useState, useContext, useCallback } from 'react';
+import React, {
+	useEffect,
+	useRef,
+	useState,
+	useContext,
+	useCallback,
+} from 'react';
 import {
 	View,
 	Text,
@@ -11,27 +17,32 @@ import {
 	FlatList,
 	Platform,
 	Keyboard,
+	KeyboardAvoidingView,
 	InputAccessoryView,
 	InteractionManager,
 	Dimensions,
 } from 'react-native';
+import Animated, {
+	useSharedValue,
+	useAnimatedStyle,
+	withSequence,
+	withTiming,
+} from 'react-native-reanimated';
 import { useForm, Controller } from 'react-hook-form';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+	SafeAreaView,
+	useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import { Calendar } from 'react-native-calendars';
 import { TransactionContext } from '../../../src/context/transactionContext';
 import BottomSheet from '../../../src/components/BottomSheet';
 import { isDevMode } from '../../../src/config/environment';
 import { createLogger } from '../../../src/utils/sublogger';
-import { palette, radius, space, type } from '../../../src/ui/theme';
+import { palette, radius, space } from '../../../src/ui/theme';
 import { getItem, setItem, removeItem } from '../../../src/utils/safeStorage';
-import {
-	AppCard,
-	AppText,
-	AppButton,
-	AppRow,
-} from '../../../src/ui/primitives';
+import { AppCard, AppText, AppButton } from '../../../src/ui/primitives';
 import { ErrorBoundary } from '../../../src/components/ErrorBoundary';
 
 const transactionScreenLog = createLogger('TransactionScreen');
@@ -51,6 +62,20 @@ const CASH_CATEGORIES = [
 	'Gifts & donations',
 	'Other',
 ] as const;
+
+const INCOME_CATEGORIES = [
+	'Paycheck',
+	'Freelance',
+	'Bonus',
+	'Refund',
+	'Interest',
+	'Investment',
+	'Gift',
+	'Other',
+] as const;
+
+type ExpenseCategory = (typeof CASH_CATEGORIES)[number];
+type IncomeCategory = (typeof INCOME_CATEGORIES)[number];
 
 interface TransactionFormData {
 	description: string;
@@ -78,15 +103,6 @@ const sanitizeCurrency = (value: string): string => {
 	return result;
 };
 
-const prettyCurrency = (value: string): string => {
-	const num = Number(value);
-	if (!isFinite(num) || num <= 0) return '$0';
-	return new Intl.NumberFormat('en-US', {
-		style: 'currency',
-		currency: 'USD',
-	}).format(num);
-};
-
 const formatDateString = (dateString: string): string => {
 	if (!dateString || typeof dateString !== 'string') return '';
 	const datePart = dateString.slice(0, 10);
@@ -94,6 +110,17 @@ const formatDateString = (dateString: string): string => {
 	const [year, month, day] = datePart.split('-').map(Number);
 	const date = new Date(year, month - 1, day);
 	return date.toLocaleDateString();
+};
+
+const isToday = (dateString: string): boolean => {
+	const today = getLocalIsoDate();
+	return !!dateString && dateString.slice(0, 10) === today;
+};
+
+const formatDateWithHint = (dateString: string): string => {
+	const formatted = formatDateString(dateString);
+	if (!formatted) return '';
+	return isToday(dateString) ? `Today, ${formatted}` : formatted;
 };
 
 export default function TransactionScreenProModern() {
@@ -108,13 +135,13 @@ export default function TransactionScreenProModern() {
 	const [keyboardHeight, setKeyboardHeight] = useState(0);
 	const insets = useSafeAreaInsets();
 
-	const contentBottomPad = insets.bottom + space.xl;
+	const contentBottomPad = space.xl;
 
 	const [mode, setMode] = useState<'income' | 'expense'>(
-		params.mode === 'income' ? 'income' : 'expense'
+		params.mode === 'income' ? 'income' : 'expense',
 	);
 	const [selectedCategory, setSelectedCategory] = useState<
-		(typeof CASH_CATEGORIES)[number] | null
+		ExpenseCategory | IncomeCategory | null
 	>(null);
 
 	useEffect(() => {
@@ -127,20 +154,38 @@ export default function TransactionScreenProModern() {
 	const [pickerOpen, setPickerOpen] = useState(false);
 	const [datePickerOpen, setDatePickerOpen] = useState(false);
 	const [mountCalendar, setMountCalendar] = useState(false);
+	const [noteExpanded, setNoteExpanded] = useState(false);
+	const [showCategoryError, setShowCategoryError] = useState(false);
+	const categoryShakeX = useSharedValue(0);
+	const categoryShakeStyle = useAnimatedStyle(() => ({
+		transform: [{ translateX: categoryShakeX.value }],
+	}));
 
 	const { addTransaction } = useContext(TransactionContext);
 
+	// Auto-focus Amount on screen open to reduce taps and keep decimal pad ready
 	useEffect(() => {
-		const onShow = (e: any) => setKeyboardHeight(e?.endCoordinates?.height ?? 0);
+		const task = InteractionManager.runAfterInteractions(() => {
+			const t = setTimeout(() => {
+				amountRef.current?.focus();
+			}, 100);
+			return () => clearTimeout(t);
+		});
+		return () => task.cancel();
+	}, []);
+
+	useEffect(() => {
+		const onShow = (e: any) =>
+			setKeyboardHeight(e?.endCoordinates?.height ?? 0);
 		const onHide = () => setKeyboardHeight(0);
 
 		const showSub = Keyboard.addListener(
 			Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-			onShow
+			onShow,
 		);
 		const hideSub = Keyboard.addListener(
 			Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-			onHide
+			onHide,
 		);
 
 		return () => {
@@ -175,7 +220,7 @@ export default function TransactionScreenProModern() {
 		setValue,
 		watch,
 		trigger,
-		formState: { errors, isValid },
+		formState: { errors },
 		clearErrors,
 		reset,
 	} = useForm<TransactionFormData>({
@@ -184,7 +229,7 @@ export default function TransactionScreenProModern() {
 			amount: '',
 			date: getLocalIsoDate(),
 		},
-		mode: 'onChange',
+		mode: 'onTouched',
 	});
 
 	const amount = watch('amount');
@@ -210,12 +255,14 @@ export default function TransactionScreenProModern() {
 
 					setValue(
 						'amount',
-						restoredAmount && Number(restoredAmount) > 0 ? restoredAmount : ''
+						restoredAmount && Number(restoredAmount) > 0 ? restoredAmount : '',
 					);
 					setValue('description', state.description ?? '');
 					setValue('date', state.date ?? getLocalIsoDate());
 					if (state.mode) setMode(state.mode);
-					if (state.selectedCategory) setSelectedCategory(state.selectedCategory);
+					if (state.selectedCategory)
+						setSelectedCategory(state.selectedCategory);
+					if (state.description?.trim()) setNoteExpanded(true);
 				}
 			} catch {
 			} finally {
@@ -259,7 +306,14 @@ export default function TransactionScreenProModern() {
 
 		const timeoutId = setTimeout(saveState, 500);
 		return () => clearTimeout(timeoutId);
-	}, [amount, description, selectedDate, mode, selectedCategory, hasRestoredState]);
+	}, [
+		amount,
+		description,
+		selectedDate,
+		mode,
+		selectedCategory,
+		hasRestoredState,
+	]);
 
 	useEffect(() => {
 		if (amountRef.current) {
@@ -268,40 +322,51 @@ export default function TransactionScreenProModern() {
 		}
 	}, [amount]);
 
-	const canSubmit =
-		isValid &&
-		!isSubmitting &&
-		Number(amount) > 0 &&
-		(mode === 'income' || (mode === 'expense' && selectedCategory !== null));
+	// Nudge Category cell (shake) when user taps Create with missing category
+	useEffect(() => {
+		if (!showCategoryError || mode !== 'expense') return;
+		categoryShakeX.value = withSequence(
+			withTiming(-8, { duration: 50 }),
+			withTiming(8, { duration: 50 }),
+			withTiming(-6, { duration: 50 }),
+			withTiming(6, { duration: 50 }),
+			withTiming(-4, { duration: 40 }),
+			withTiming(4, { duration: 40 }),
+			withTiming(0, { duration: 40 })
+		);
+	}, [showCategoryError, mode, categoryShakeX]);
 
 	const focusNoteCentered = useCallback(() => {
 		noteInputRef.current?.focus();
 		requestAnimationFrame(() => {
-			setTimeout(() => {
-				if (!noteInputRef.current || !scrollRef.current) return;
+			setTimeout(
+				() => {
+					if (!noteInputRef.current || !scrollRef.current) return;
 
-				noteInputRef.current.measureInWindow((_x, y, _w, h) => {
-					const screenH = Dimensions.get('window').height;
-					const visibleH = Math.max(0, screenH - keyboardHeight);
-					const targetCenterY = visibleH / 2;
-					const inputCenterY = y + h / 2;
-					const delta = inputCenterY - targetCenterY;
-					scrollRef.current?.scrollTo({
-						y: Math.max(0, (scrollYRef.current ?? 0) + delta),
-						animated: true,
+					noteInputRef.current.measureInWindow((_x, y, _w, h) => {
+						const screenH = Dimensions.get('window').height;
+						const visibleH = Math.max(0, screenH - keyboardHeight);
+						const targetCenterY = visibleH / 2;
+						const inputCenterY = y + h / 2;
+						const delta = inputCenterY - targetCenterY;
+						scrollRef.current?.scrollTo({
+							y: Math.max(0, (scrollYRef.current ?? 0) + delta),
+							animated: true,
+						});
 					});
-				});
-			}, Platform.OS === 'ios' ? 80 : 120);
+				},
+				Platform.OS === 'ios' ? 80 : 120,
+			);
 		});
 	}, [keyboardHeight]);
 	const handleModeChange = useCallback(
 		(newMode: 'income' | 'expense') => {
 			if (!isSubmitting && mode !== newMode) {
 				setMode(newMode);
-				if (newMode === 'income') setSelectedCategory(null);
+				setSelectedCategory(null);
 			}
 		},
-		[isSubmitting, mode]
+		[isSubmitting, mode],
 	);
 	const onChangeAmount = useCallback(
 		(text: string) => {
@@ -309,7 +374,7 @@ export default function TransactionScreenProModern() {
 			if (Number(sanitized) > 999999.99) return;
 			setValue('amount', sanitized, { shouldValidate: true });
 		},
-		[setValue]
+		[setValue],
 	);
 
 	const onBlurAmount = useCallback(() => {
@@ -320,433 +385,565 @@ export default function TransactionScreenProModern() {
 	}, [amount, setValue, trigger]);
 
 	const selectCategory = useCallback(
-		(cat: (typeof CASH_CATEGORIES)[number]) => {
+		(cat: ExpenseCategory | IncomeCategory) => {
 			setSelectedCategory(cat);
+			setShowCategoryError(false);
 			setPickerOpen(false);
 		},
-		[]
+		[],
 	);
 
-	const onSubmit = async (data: TransactionFormData) => {
-		clearErrors();
+	const onSubmit = useCallback(
+		async (data: TransactionFormData) => {
+			if (!data.amount?.trim())
+				return Alert.alert('Missing amount', 'Please enter an amount.');
 
-		if (!data.amount?.trim())
-			return Alert.alert('Missing amount', 'Please enter an amount.');
+			try {
+				setIsSubmitting(true);
 
-		try {
-			setIsSubmitting(true);
+				const amt = Number(data.amount);
+				if (!isFinite(amt) || amt <= 0)
+					return Alert.alert(
+						'Invalid amount',
+						'Enter an amount greater than 0.',
+					);
 
-			const amt = Number(data.amount);
-			if (!isFinite(amt) || amt <= 0)
-				return Alert.alert('Invalid amount', 'Enter an amount greater than 0.');
+				const payload: any = {
+					description: data.description?.trim() || undefined,
+					amount: mode === 'income' ? Math.abs(amt) : -Math.abs(amt),
+					date: data.date,
+					type: mode,
+				};
 
-			const payload: any = {
-				description: data.description?.trim() || undefined,
-				amount: mode === 'income' ? Math.abs(amt) : -Math.abs(amt),
-				date: data.date,
-				type: mode,
-			};
-
-			if (mode === 'expense' && selectedCategory) {
+			if (selectedCategory) {
 				payload.metadata = { category: selectedCategory };
 			}
-			await addTransaction(payload);
-			await removeItem(FORM_STATE_KEY);
+				await addTransaction(payload);
+				await removeItem(FORM_STATE_KEY);
 
-			Alert.alert(
-				'Success',
-				`${mode === 'income' ? 'Cash IN' : 'Cash OUT'} saved!`,
-				[
-					{
-						text: 'OK',
-						onPress: () => {
-							reset({
-								description: '',
-								amount: '',
-								date: getLocalIsoDate(),
-							});
-							setSelectedCategory(null);
-							if (router.canGoBack()) router.back();
-							else router.replace('/(tabs)/dashboard');
+				Alert.alert(
+					'Success',
+					`${mode === 'income' ? 'Cash IN' : 'Cash OUT'} saved!`,
+					[
+						{
+							text: 'OK',
+							onPress: () => {
+								reset({
+									description: '',
+									amount: '',
+									date: getLocalIsoDate(),
+								});
+								setSelectedCategory(null);
+								if (router.canGoBack()) router.back();
+								else router.replace('/(tabs)/dashboard');
+							},
 						},
-					},
-				]
-			);
-		} catch (e) {
-			if (isDevMode) {
-				transactionScreenLog.error('Save transaction error', e);
+					],
+				);
+			} catch (e) {
+				if (isDevMode) {
+					transactionScreenLog.error('Save transaction error', e);
+				}
+				Alert.alert('Error', 'Failed to save. Please try again.');
+			} finally {
+				setIsSubmitting(false);
 			}
-			Alert.alert('Error', 'Failed to save. Please try again.');
-		} finally {
-			setIsSubmitting(false);
-		}
-	};
-
-	const ValueText = ({
-		children,
-		style,
-	}: {
-		children: React.ReactNode;
-		style?: any;
-	}) => (
-		<Text numberOfLines={1} style={[type.body, styles.valueText, style]}>
-			{children}
-		</Text>
+		},
+		[mode, selectedCategory, addTransaction, reset, router],
 	);
+
+	const handleCreatePress = useCallback(() => {
+		if (isSubmitting) return;
+		clearErrors();
+		setShowCategoryError(false);
+
+		if (mode === 'expense' && !selectedCategory) {
+			setShowCategoryError(true);
+			return;
+		}
+		handleSubmit(onSubmit)();
+	}, [
+		isSubmitting,
+		mode,
+		selectedCategory,
+		clearErrors,
+		handleSubmit,
+		onSubmit,
+	]);
 
 	return (
 		<ErrorBoundary>
-		<SafeAreaView style={styles.container} edges={['top']}>
-			<ScrollView
-				ref={scrollRef}
-				style={{ flex: 1 }}
-				contentContainerStyle={[
-					styles.content,
-					{ paddingBottom: contentBottomPad },
-				]}
-				keyboardShouldPersistTaps="handled"
-				keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-				automaticallyAdjustContentInsets={false}
-				contentInsetAdjustmentBehavior="never"
-				automaticallyAdjustKeyboardInsets={false}
-				showsVerticalScrollIndicator={false}
-				onScroll={(e) => {
-					scrollYRef.current = e.nativeEvent.contentOffset.y;
-				}}
-				scrollEventThrottle={16}
-			>
-				<View>
-					<AppText.Title style={styles.heroTitle}>New transaction</AppText.Title>
+			<SafeAreaView style={styles.container} edges={['top']}>
+				<KeyboardAvoidingView
+					style={{ flex: 1 }}
+					behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+					keyboardVerticalOffset={0}
+				>
+					<ScrollView
+						ref={scrollRef}
+						style={{ flex: 1 }}
+						contentContainerStyle={[
+							styles.content,
+							{ paddingBottom: contentBottomPad },
+						]}
+						keyboardShouldPersistTaps="handled"
+						keyboardDismissMode={
+							Platform.OS === 'ios' ? 'interactive' : 'on-drag'
+						}
+						automaticallyAdjustContentInsets={false}
+						contentInsetAdjustmentBehavior="never"
+						automaticallyAdjustKeyboardInsets={false}
+						showsVerticalScrollIndicator={false}
+						onScroll={(e) => {
+							scrollYRef.current = e.nativeEvent.contentOffset.y;
+						}}
+						scrollEventThrottle={16}
+					>
+						<View>
+							<AppText.Title style={styles.heroTitle}>
+								New transaction
+							</AppText.Title>
 
-					<AppCard style={styles.section} padding={space.lg} borderRadius={radius.lg}>
-					<View style={styles.amountRow}>
-						<Pressable
-							style={styles.amountInputContainer}
-							onPress={() => amountRef.current?.focus()}
+							<AppCard
+								style={styles.amountCard}
+								padding={space.md}
+								borderRadius={radius.lg}
+							>
+								<View style={styles.amountRow}>
+									<Pressable
+										style={styles.amountInputContainer}
+										onPress={() => amountRef.current?.focus()}
+									>
+										<Text style={styles.dollar}>$</Text>
+										<Controller
+											control={control}
+											name="amount"
+											rules={{
+												required: 'Amount is required',
+												validate: (v) =>
+													Number(v) > 0 || 'Enter an amount greater than 0',
+											}}
+											render={({ field: { value, onBlur } }) => (
+												<TextInput
+													ref={amountRef}
+													style={styles.amountInput}
+													placeholder="0"
+													placeholderTextColor={palette.textSubtle}
+													keyboardType="decimal-pad"
+													value={value}
+													onChangeText={onChangeAmount}
+													onBlur={() => {
+														onBlur();
+														onBlurAmount();
+													}}
+													returnKeyType="next"
+													accessibilityLabel="Amount"
+													maxLength={9}
+													inputAccessoryViewID={
+														Platform.OS === 'ios' ? accessoryId : undefined
+													}
+												/>
+											)}
+										/>
+									</Pressable>
+								</View>
+								<View style={styles.amountUnderline} />
+
+								<View style={styles.errorContainer}>
+									{errors.amount && (
+										<AppText.Caption color="danger" style={styles.errorText}>
+											{String(errors.amount.message)}
+										</AppText.Caption>
+									)}
+								</View>
+
+								<View style={styles.segmentedCompact}>
+									{(['expense', 'income'] as const).map((m) => {
+										const active = mode === m;
+										const label = m.charAt(0).toUpperCase() + m.slice(1);
+										return (
+											<Pressable
+												key={m}
+												style={({ pressed }) => [
+													styles.segBtnCompact,
+													m === 'expense' && styles.segBtnLeft,
+													m === 'income' && styles.segBtnRight,
+													active && styles.segBtnActive,
+													{
+														backgroundColor: active
+															? palette.surface
+															: 'transparent',
+														opacity: pressed ? 0.7 : 1,
+													},
+												]}
+												onPress={() => handleModeChange(m)}
+												accessibilityRole="button"
+												accessibilityState={{ selected: active }}
+											>
+												<AppText.Body
+													style={styles.segTextCompact}
+													color={active ? 'default' : 'muted'}
+												>
+													{label}
+												</AppText.Body>
+											</Pressable>
+										);
+									})}
+								</View>
+							</AppCard>
+						</View>
+
+						<AppCard
+							style={styles.section}
+							padding={0}
+							borderRadius={radius.lg}
 						>
-							<Text style={styles.dollar}>$</Text>
-							<Controller
-								control={control}
-								name="amount"
-								rules={{
-									required: '*Amount is required',
-									validate: (v) =>
-										Number(v) > 0 || 'Enter an amount greater than 0',
-								}}
-								render={({ field: { value, onBlur } }) => (
-									<TextInput
-										ref={amountRef}
-										style={styles.amountInput}
-										placeholder="0"
-										placeholderTextColor={palette.textSubtle}
-										keyboardType="decimal-pad"
-										value={value}
-										onChangeText={onChangeAmount}
-										onBlur={() => {
-											onBlur();
-											onBlurAmount();
+							<View style={styles.metadataRow}>
+								<Animated.View
+									style={[
+										styles.metadataCell,
+										styles.metadataCellLeft,
+										styles.metadataCellCategory,
+										showCategoryError &&
+											mode === 'expense' &&
+											!selectedCategory &&
+											styles.metadataCellError,
+										categoryShakeStyle,
+									]}
+								>
+									<TouchableOpacity
+										style={styles.metadataCellTouchable}
+										onPress={() => {
+											Keyboard.dismiss();
+											setPickerOpen(true);
 										}}
-										returnKeyType="next"
-										accessibilityLabel="Amount"
-										maxLength={9}
-										inputAccessoryViewID={
-											Platform.OS === 'ios' ? accessoryId : undefined
-										}
-									/>
-								)}
-							/>
-						</Pressable>
-					</View>
-					<View style={styles.amountUnderline} />
+										activeOpacity={0.6}
+										hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+										accessibilityLabel="Select category"
+										accessibilityRole="button"
+									>
+										<Ionicons
+											name="pricetag-outline"
+											size={20}
+											color={
+												showCategoryError &&
+												mode === 'expense' &&
+												!selectedCategory
+													? palette.danger
+													: palette.primary
+											}
+											style={styles.metadataCellIcon}
+										/>
+										<View style={styles.metadataCellContent}>
+											<AppText.Caption color="muted" style={styles.metadataLabel}>
+												Category
+											</AppText.Caption>
+											<View style={styles.metadataValueWrap}>
+												<Text
+													style={[
+														styles.metadataValueCategory,
+														showCategoryError &&
+															mode === 'expense' &&
+															!selectedCategory &&
+															styles.metadataValueRequired,
+														!selectedCategory && mode === 'expense'
+															? showCategoryError
+																? { color: palette.danger }
+																: { color: palette.textMuted }
+															: { color: palette.text },
+													]}
+													numberOfLines={1}
+													ellipsizeMode="tail"
+												>
+													{selectedCategory
+														? selectedCategory
+														: mode === 'expense'
+															? 'Required'
+															: 'Optional'}
+												</Text>
+											</View>
+										</View>
+										<Ionicons
+											name="chevron-forward"
+											size={16}
+											color={palette.textSubtle}
+										/>
+									</TouchableOpacity>
+								</Animated.View>
 
-						<View style={styles.errorContainer}>
-							{errors.amount && (
-								<AppText.Caption color="danger" style={styles.errorText}>
-									{String(errors.amount.message)}
-								</AppText.Caption>
+								<TouchableOpacity
+									style={[styles.metadataCell, styles.metadataCellRight]}
+									onPress={() => setDatePickerOpen(true)}
+									activeOpacity={0.6}
+									hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+									accessibilityLabel="Select date"
+									accessibilityRole="button"
+								>
+									<View style={styles.metadataCellContent}>
+										<AppText.Caption color="muted" style={styles.metadataLabel}>
+											Date
+										</AppText.Caption>
+										<View style={styles.metadataValueWrap}>
+											<Text
+												style={styles.metadataValue}
+												numberOfLines={1}
+												ellipsizeMode="tail"
+											>
+												{formatDateWithHint(selectedDate)}
+											</Text>
+										</View>
+									</View>
+									<Ionicons
+										name="chevron-forward"
+										size={16}
+										color={palette.textSubtle}
+									/>
+								</TouchableOpacity>
+							</View>
+						</AppCard>
+
+						<View style={styles.noteSection}>
+							{!noteExpanded ? (
+								<TouchableOpacity
+									style={styles.addNoteChip}
+									onPress={() => {
+										setNoteExpanded(true);
+										setTimeout(() => noteInputRef.current?.focus(), 100);
+									}}
+									activeOpacity={0.6}
+									hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+									accessibilityLabel={description ? 'Edit note' : 'Add note'}
+									accessibilityRole="button"
+								>
+									<Ionicons
+										name={description ? 'create-outline' : 'add-circle-outline'}
+										size={18}
+										color={palette.primary}
+										style={{ marginRight: space.xs }}
+									/>
+									<AppText.Body color="primary" style={styles.addNoteChipText}>
+										{description?.trim()
+											? `Note: ${description.trim().slice(0, 24)}${description.trim().length > 24 ? '…' : ''}`
+											: 'Add note'}
+									</AppText.Body>
+								</TouchableOpacity>
+							) : (
+								<View style={styles.noteExpandedContainer}>
+									<Controller
+										control={control}
+										name="description"
+										render={({ field: { value, onChange, onBlur } }) => (
+											<TextInput
+												ref={noteInputRef}
+												style={[
+													styles.noteInput,
+													errors.description && styles.inputError,
+												]}
+												placeholder={
+													mode === 'income'
+														? 'e.g., Paycheck, refund…'
+														: 'e.g., Groceries, gas, subscription…'
+												}
+												placeholderTextColor={palette.textSubtle}
+												value={value}
+												onChangeText={(t) => onChange(t)}
+												onBlur={onBlur}
+												onFocus={focusNoteCentered}
+												returnKeyType="done"
+												onSubmitEditing={() => Keyboard.dismiss()}
+												accessibilityLabel="Description"
+												maxLength={120}
+												multiline
+												numberOfLines={2}
+												inputAccessoryViewID={
+													Platform.OS === 'ios' ? accessoryId : undefined
+												}
+											/>
+										)}
+									/>
+									<TouchableOpacity
+										style={styles.collapseNoteBtn}
+										onPress={() => setNoteExpanded(false)}
+									>
+										<AppText.Caption color="muted">Hide note</AppText.Caption>
+									</TouchableOpacity>
+								</View>
 							)}
 						</View>
 
-						<View style={styles.segmented}>
-							{(['expense', 'income'] as const).map((m) => {
-								const active = mode === m;
-								const label = m.charAt(0).toUpperCase() + m.slice(1);
-								return (
-									<Pressable
-										key={m}
-										style={({ pressed }) => [
-											styles.segBtn,
-											m === 'expense' && styles.segBtnLeft,
-											m === 'income' && styles.segBtnRight,
-											active && styles.segBtnActive,
-											{
-												backgroundColor: active
-													? palette.surface
-													: 'transparent',
-												opacity: pressed ? 0.7 : 1,
-											},
-										]}
-										onPress={() => handleModeChange(m)}
-										accessibilityRole="button"
-										accessibilityState={{ selected: active }}
-									>
-										<AppText.Body
-											style={styles.segText}
-											color={active ? 'default' : 'muted'}
-										>
-											{label}
-										</AppText.Body>
-									</Pressable>
-								);
-							})}
-						</View>
-					</AppCard>
-				</View>
+						<View style={{ height: 8 }} />
+					</ScrollView>
 
-				<AppCard style={styles.section} padding={0} borderRadius={radius.lg}>
-					{mode === 'expense' && (
-						<AppRow
-							icon="pricetag-outline"
-							label="Category"
-							right={
-								selectedCategory ? (
-									<ValueText>{selectedCategory}</ValueText>
-								) : (
-									<ValueText style={{ color: palette.textMuted }}>
-										Required
-									</ValueText>
-								)
-							}
-							onPress={() => {
-								Keyboard.dismiss();
-								setPickerOpen(true);
-							}}
-							showChevron
-							accessibilityLabel="Select category"
-							bordered
+					{/* Sticky Create button — always enabled, shows inline error when category missing */}
+					<View
+						style={[styles.stickyCtaWrap, { paddingBottom: contentBottomPad }]}
+					>
+						<AppButton
+							label={isSubmitting ? 'Saving…' : 'Create Transaction'}
+							variant="primary"
+							icon={isSubmitting ? undefined : 'add'}
+							onPress={handleCreatePress}
+							disabled={isSubmitting}
+							loading={isSubmitting}
+							fullWidth
+							accessibilityLabel={`Create ${mode}`}
 						/>
-					)}
-
-					<AppRow
-						icon="calendar-outline"
-						label="Date"
-						right={<ValueText>{formatDateString(selectedDate)}</ValueText>}
-						onPress={() => setDatePickerOpen(true)}
-						bordered={false}
-					/>
-				</AppCard>
-
-				<AppCard style={styles.section}>
-					<AppText.Heading style={styles.inputLabel}>Note (optional)</AppText.Heading>
-					<Controller
-						control={control}
-						name="description"
-						render={({ field: { value, onChange, onBlur } }) => (
-							<TextInput
-								ref={noteInputRef}
-								style={[styles.input, errors.description && styles.inputError]}
-								placeholder={
-									mode === 'income'
-										? 'e.g., Paycheck, refund…'
-										: 'e.g., Groceries, gas, subscription…'
-								}
-								placeholderTextColor={palette.textSubtle}
-								value={value}
-								onChangeText={(t) => onChange(t)}
-								onBlur={onBlur}
-								onFocus={focusNoteCentered}
-								returnKeyType="done"
-								onSubmitEditing={() => Keyboard.dismiss()}
-								accessibilityLabel="Description"
-								maxLength={120}
-								inputAccessoryViewID={
-									Platform.OS === 'ios' ? accessoryId : undefined
-								}
-							/>
-						)}
-					/>
-					<View style={{ minHeight: 18, marginTop: space.xs }}>
-						{errors.description && (
-							<AppText.Caption color="danger" style={styles.errorText}>
-								{String(errors.description.message)}
+						{showCategoryError && mode === 'expense' && (
+							<AppText.Caption color="danger" style={styles.stickyCtaError}>
+								Please choose a category
 							</AppText.Caption>
 						)}
 					</View>
-				</AppCard>
+				</KeyboardAvoidingView>
 
-				<View style={styles.inlineCtaWrap}>
-					{amount && Number(amount) > 0 && (
-						<AppText.Caption color="muted" style={styles.miniSummary}>
-							{prettyCurrency(amount || '')} • {formatDateString(selectedDate)}
-						</AppText.Caption>
-					)}
-					<AppButton
-						label={isSubmitting ? 'Saving…' : 'Create Transaction'}
-						variant="primary"
-						icon={isSubmitting ? undefined : 'add'}
-						onPress={() => {
-							if (isSubmitting) return;
-							handleSubmit(onSubmit)();
-						}}
-						disabled={!canSubmit}
-						loading={isSubmitting}
-						fullWidth
-						accessibilityLabel={`Create ${mode}`}
-					/>
+				{Platform.OS === 'ios' && (
+					<InputAccessoryView nativeID={accessoryId}>
+						<View style={styles.accessoryBar}>
+							<TouchableOpacity
+								onPress={() => Keyboard.dismiss()}
+								hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+							>
+								<AppText.Body color="primary" style={styles.accessoryDoneText}>
+									Done
+								</AppText.Body>
+							</TouchableOpacity>
+						</View>
+					</InputAccessoryView>
+				)}
 
-					{!canSubmit && (
-						<AppText.Caption color="muted" style={styles.inlineCtaHint}>
-							Enter amount to continue.
-						</AppText.Caption>
-					)}
-				</View>
-
-				<View style={{ height: keyboardHeight ? keyboardHeight + space.lg : 0 }} />
-			</ScrollView>
-
-			{Platform.OS === 'ios' && (
-				<InputAccessoryView nativeID={accessoryId}>
-					<View style={styles.accessoryBar}>
-						<TouchableOpacity
-							onPress={() => Keyboard.dismiss()}
-							hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-						>
-							<AppText.Body color="primary" style={styles.accessoryDoneText}>
-							Done
-						</AppText.Body>
-						</TouchableOpacity>
-					</View>
-				</InputAccessoryView>
-			)}
-
-			<BottomSheet
-				isOpen={pickerOpen}
-				onClose={() => setPickerOpen(false)}
-				snapPoints={[0.6, 0.4]}
-				initialSnapIndex={0}
-				header={
-					<View style={styles.sheetHeader}>
-						<Ionicons
-							name="pricetag-outline"
-							size={20}
-							color={palette.primary}
-							style={{ marginRight: space.sm }}
-						/>
-						<AppText.Heading style={styles.sheetTitle}>
-							Select Category
-						</AppText.Heading>
-						<TouchableOpacity onPress={() => setPickerOpen(false)}>
-							<Ionicons name="close" size={24} color={palette.textMuted} />
-						</TouchableOpacity>
-					</View>
-				}
-			>
-				<FlatList
-					data={CASH_CATEGORIES}
-					keyExtractor={(item) => item}
-					initialNumToRender={12}
-					windowSize={6}
-					maxToRenderPerBatch={12}
-					getItemLayout={(_, i) => ({ length: 48, offset: 48 * i, index: i })}
-					contentContainerStyle={{
-						paddingBottom: insets.bottom + 64 + space.md,
-					}}
-					renderItem={({ item }) => (
-						<TouchableOpacity
-							style={styles.sheetRow}
-							onPress={() =>
-								selectCategory(item as (typeof CASH_CATEGORIES)[number])
-							}
-						>
+				<BottomSheet
+					isOpen={pickerOpen}
+					onClose={() => setPickerOpen(false)}
+					snapPoints={[0.6, 0.4]}
+					initialSnapIndex={0}
+					header={
+						<View style={styles.sheetHeader}>
 							<Ionicons
 								name="pricetag-outline"
-								size={18}
-								color={palette.text}
+								size={20}
+								color={palette.primary}
 								style={{ marginRight: space.sm }}
 							/>
-							<AppText.Body>{item}</AppText.Body>
-						</TouchableOpacity>
-					)}
-				/>
-			</BottomSheet>
+							<AppText.Heading style={styles.sheetTitle}>
+								Select Category
+							</AppText.Heading>
+							<TouchableOpacity onPress={() => setPickerOpen(false)}>
+								<Ionicons name="close" size={24} color={palette.textMuted} />
+							</TouchableOpacity>
+						</View>
+					}
+				>
+					<FlatList
+						data={mode === 'expense' ? [...CASH_CATEGORIES] : [...INCOME_CATEGORIES]}
+						keyExtractor={(item) => item}
+						initialNumToRender={12}
+						windowSize={6}
+						maxToRenderPerBatch={12}
+						getItemLayout={(_, i) => ({ length: 48, offset: 48 * i, index: i })}
+						contentContainerStyle={{
+							paddingBottom: insets.bottom + 64 + space.md,
+						}}
+						renderItem={({ item }) => (
+							<TouchableOpacity
+								style={styles.sheetRow}
+								onPress={() =>
+									selectCategory(
+										item as ExpenseCategory | IncomeCategory
+									)
+								}
+							>
+								<Ionicons
+									name="pricetag-outline"
+									size={18}
+									color={palette.text}
+									style={{ marginRight: space.sm }}
+								/>
+								<AppText.Body>{item}</AppText.Body>
+							</TouchableOpacity>
+						)}
+					/>
+				</BottomSheet>
 
-			<BottomSheet
-				isOpen={datePickerOpen}
-				onClose={() => setDatePickerOpen(false)}
-				snapPoints={[0.7, 0.5]}
-				initialSnapIndex={0}
-				header={
-					<View style={styles.sheetHeader}>
-						<Ionicons
-							name="calendar-outline"
-							size={20}
-							color={palette.primary}
-							style={{ marginRight: space.sm }}
-						/>
-						<AppText.Heading style={styles.sheetTitle}>Select Date</AppText.Heading>
-						<TouchableOpacity onPress={() => setDatePickerOpen(false)}>
-							<Ionicons name="close" size={24} color={palette.textMuted} />
+				<BottomSheet
+					isOpen={datePickerOpen}
+					onClose={() => setDatePickerOpen(false)}
+					snapPoints={[0.7, 0.5]}
+					initialSnapIndex={0}
+					header={
+						<View style={styles.sheetHeader}>
+							<Ionicons
+								name="calendar-outline"
+								size={20}
+								color={palette.primary}
+								style={{ marginRight: space.sm }}
+							/>
+							<AppText.Heading style={styles.sheetTitle}>
+								Select Date
+							</AppText.Heading>
+							<TouchableOpacity onPress={() => setDatePickerOpen(false)}>
+								<Ionicons name="close" size={24} color={palette.textMuted} />
+							</TouchableOpacity>
+						</View>
+					}
+				>
+					<View style={styles.quickActions}>
+						<TouchableOpacity
+							style={styles.quickActionBtn}
+							onPress={() => {
+								setValue('date', getLocalIsoDate(), { shouldValidate: false });
+								setDatePickerOpen(false);
+							}}
+						>
+							<AppText.Body style={styles.quickActionText}>Today</AppText.Body>
 						</TouchableOpacity>
 					</View>
-				}
-			>
-				<View style={styles.quickActions}>
-					<TouchableOpacity
-						style={styles.quickActionBtn}
-						onPress={() => {
-							setValue('date', getLocalIsoDate(), { shouldValidate: false });
-							setDatePickerOpen(false);
-						}}
-					>
-						<AppText.Body style={styles.quickActionText}>Today</AppText.Body>
-					</TouchableOpacity>
-				</View>
 
-				{datePickerOpen && mountCalendar ? (
-					<Calendar
-						onDayPress={(day) => {
-							setValue('date', day.dateString, { shouldValidate: false });
-							setDatePickerOpen(false);
-						}}
-						markedDates={{
-							[selectedDate]: {
-								selected: true,
-								selectedColor: palette.primary,
-								selectedTextColor: palette.primaryTextOn,
-							},
-						}}
-						firstDay={0}
-						enableSwipeMonths
-						renderArrow={(direction) => (
-							<Ionicons
-								name={direction === 'left' ? 'chevron-back' : 'chevron-forward'}
-								size={18}
-								color={palette.text}
-							/>
-						)}
-						theme={{
-							backgroundColor: palette.surface,
-							calendarBackground: palette.surface,
-							textSectionTitleColor: palette.textSubtle,
-							selectedDayBackgroundColor: palette.primary,
-							selectedDayTextColor: palette.primaryTextOn,
-							todayTextColor: palette.primary,
-							dayTextColor: palette.text,
-							textDisabledColor: palette.borderMuted,
-							monthTextColor: palette.text,
-							arrowColor: palette.text,
-							textDayFontWeight: '500',
-							textMonthFontWeight: '700',
-							textDayHeaderFontWeight: '600',
-							textDayFontSize: 14,
-							textMonthFontSize: 16,
-							textDayHeaderFontSize: 12,
-						}}
-					/>
-				) : null}
-			</BottomSheet>
-
-		</SafeAreaView>
+					{datePickerOpen && mountCalendar ? (
+						<Calendar
+							onDayPress={(day) => {
+								setValue('date', day.dateString, { shouldValidate: false });
+								setDatePickerOpen(false);
+							}}
+							markedDates={{
+								[selectedDate]: {
+									selected: true,
+									selectedColor: palette.primary,
+									selectedTextColor: palette.primaryTextOn,
+								},
+							}}
+							firstDay={0}
+							enableSwipeMonths
+							renderArrow={(direction) => (
+								<Ionicons
+									name={
+										direction === 'left' ? 'chevron-back' : 'chevron-forward'
+									}
+									size={18}
+									color={palette.text}
+								/>
+							)}
+							theme={{
+								backgroundColor: palette.surface,
+								calendarBackground: palette.surface,
+								textSectionTitleColor: palette.textSubtle,
+								selectedDayBackgroundColor: palette.primary,
+								selectedDayTextColor: palette.primaryTextOn,
+								todayTextColor: palette.primary,
+								dayTextColor: palette.text,
+								textDisabledColor: palette.borderMuted,
+								monthTextColor: palette.text,
+								arrowColor: palette.text,
+								textDayFontWeight: '500',
+								textMonthFontWeight: '700',
+								textDayHeaderFontWeight: '600',
+								textDayFontSize: 14,
+								textMonthFontSize: 16,
+								textDayHeaderFontSize: 12,
+							}}
+						/>
+					) : null}
+				</BottomSheet>
+			</SafeAreaView>
 		</ErrorBoundary>
 	);
 }
@@ -756,12 +953,12 @@ const styles = StyleSheet.create({
 
 	content: {
 		paddingHorizontal: space.lg,
-		paddingTop: space.sm,
+		paddingTop: 0,
 	},
 
 	heroTitle: {
 		fontSize: 24,
-		marginBottom: space.md,
+		marginBottom: space.sm,
 	},
 
 	amountRow: {
@@ -777,16 +974,16 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 	},
 	dollar: {
-		fontSize: 32,
+		fontSize: 28,
 		fontWeight: '600',
 		color: palette.text,
 		marginRight: 6,
-		marginBottom: 6,
+		marginBottom: 4,
 	},
 	amountInput: {
 		flexGrow: 0,
 		flexShrink: 1,
-		fontSize: 48,
+		fontSize: 42,
 		fontWeight: '700',
 		color: palette.text,
 		textAlign: 'center',
@@ -794,7 +991,7 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 0,
 	},
 	amountUnderline: {
-		marginTop: space.sm,
+		marginTop: space.xs,
 		height: 1,
 		backgroundColor: palette.border,
 	},
@@ -814,9 +1011,25 @@ const styles = StyleSheet.create({
 		borderWidth: 1,
 		borderColor: palette.border,
 	},
+	segmentedCompact: {
+		marginTop: space.sm,
+		backgroundColor: palette.surfaceAlt,
+		borderRadius: radius.md,
+		padding: 3,
+		flexDirection: 'row',
+		borderWidth: 1,
+		borderColor: palette.border,
+	},
 	segBtn: {
 		flex: 1,
 		paddingVertical: space.sm,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	segBtnCompact: {
+		flex: 1,
+		minHeight: 44,
+		paddingVertical: 12,
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
@@ -835,8 +1048,133 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		fontWeight: '600',
 	},
-
-	valueText: { color: palette.text, fontWeight: '600' },
+	segTextCompact: {
+		fontSize: 13,
+		fontWeight: '600',
+	},
+	metadataRow: {
+		flexDirection: 'row',
+		alignItems: 'stretch',
+		minHeight: 54,
+	},
+	metadataCell: {
+		flex: 1,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		paddingVertical: space.md,
+		paddingHorizontal: space.md,
+	},
+	metadataCellLeft: {
+		borderRightWidth: StyleSheet.hairlineWidth,
+		borderRightColor: palette.border,
+	},
+	metadataCellCategory: {
+		// Category is visually dominant
+	},
+	metadataCellError: {
+		backgroundColor: palette.dangerSubtle,
+		borderWidth: 1.5,
+		borderColor: palette.danger,
+		borderRadius: radius.sm,
+	},
+	metadataCellTouchable: {
+		flex: 1,
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingVertical: space.md,
+		paddingHorizontal: space.lg,
+	},
+	metadataCellIcon: {
+		marginRight: space.sm,
+	},
+	metadataCellRight: {
+		borderLeftWidth: StyleSheet.hairlineWidth,
+		borderLeftColor: palette.border,
+		paddingRight: space.lg,
+	},
+	metadataCellContent: {
+		flex: 1,
+		minWidth: 0,
+		overflow: 'hidden',
+	},
+	metadataLabel: {
+		fontSize: 11,
+		marginBottom: 2,
+		textTransform: 'uppercase',
+		letterSpacing: 0.6,
+	},
+	metadataValueWrap: {
+		flex: 1,
+		minWidth: 0,
+		overflow: 'hidden',
+		justifyContent: 'center',
+	},
+	metadataValue: {
+		fontSize: 14,
+		fontWeight: '600',
+	},
+	metadataValueCategory: {
+		fontSize: 15,
+		fontWeight: '700',
+		flexShrink: 1,
+	},
+	metadataValueRequired: {
+		color: palette.danger,
+	},
+	noteSection: {
+		marginTop: space.sm,
+	},
+	addNoteChip: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingVertical: space.sm,
+		paddingHorizontal: space.md,
+		borderRadius: radius.md,
+		backgroundColor: palette.chipBg,
+		borderWidth: 1,
+		borderColor: palette.borderAccent,
+		borderStyle: 'dashed',
+		alignSelf: 'flex-start',
+	},
+	addNoteChipText: {
+		fontWeight: '600',
+	},
+	noteExpandedContainer: {
+		gap: space.sm,
+	},
+	noteInput: {
+		minHeight: 64,
+		borderRadius: radius.md,
+		borderWidth: 1,
+		borderColor: palette.border,
+		paddingHorizontal: space.md,
+		paddingVertical: space.md,
+		fontSize: 16,
+		color: palette.text,
+		backgroundColor: palette.surface,
+		textAlignVertical: 'top',
+	},
+	collapseNoteBtn: {
+		alignSelf: 'flex-start',
+		paddingVertical: space.xs,
+	},
+	stickyCtaWrap: {
+		paddingHorizontal: space.lg,
+		paddingTop: space.md,
+		backgroundColor: palette.surfaceAlt,
+		borderTopWidth: StyleSheet.hairlineWidth,
+		borderTopColor: palette.border,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: -2 },
+		shadowOpacity: 0.06,
+		shadowRadius: 8,
+		elevation: 8,
+	},
+	stickyCtaError: {
+		marginTop: space.sm,
+		textAlign: 'center',
+	},
 
 	inputLabel: {
 		marginBottom: space.sm,
@@ -854,7 +1192,10 @@ const styles = StyleSheet.create({
 	inputError: { borderColor: palette.danger, borderWidth: 1.5 },
 
 	section: {
-		marginTop: space.md,
+		marginTop: space.sm,
+	},
+	amountCard: {
+		marginTop: space.sm,
 	},
 
 	inlineCtaWrap: {
