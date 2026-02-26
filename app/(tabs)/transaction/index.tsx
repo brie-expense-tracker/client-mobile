@@ -42,6 +42,7 @@ import {
 	AppButton,
 	AppRow,
 } from '../../../src/ui/primitives';
+import { ErrorBoundary } from '../../../src/components/ErrorBoundary';
 
 // Create namespaced logger for this service
 const transactionScreenLog = createLogger('TransactionScreen');
@@ -496,6 +497,7 @@ export default function TransactionScreenProModern() {
 	}
 
 	return (
+		<ErrorBoundary>
 		<SafeAreaView style={styles.container} edges={['top']}>
 			<ScrollView
 				ref={scrollRef}
@@ -879,6 +881,7 @@ export default function TransactionScreenProModern() {
 			</BottomSheet>
 
 		</SafeAreaView>
+		</ErrorBoundary>
 	);
 }
 

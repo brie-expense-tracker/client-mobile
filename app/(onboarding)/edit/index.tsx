@@ -11,7 +11,13 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useProfile } from '../../../src/context/profileContext';
 import { useOnboarding } from '../../../src/context/OnboardingContext';
-import { currency } from '../../../src/utils/format';
+
+const currency = (amount: number) =>
+	new Intl.NumberFormat('en-US', {
+		style: 'currency',
+		currency: 'USD',
+		maximumFractionDigits: 0,
+	}).format(amount);
 
 type SectionKey = 'profile' | 'income' | 'savings' | 'debt';
 

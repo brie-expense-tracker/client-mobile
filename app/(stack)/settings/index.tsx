@@ -102,7 +102,7 @@ export default function SettingsScreen() {
 		{
 			label: 'Profile',
 			icon: 'person-outline',
-			onPress: () => router.push('/(stack)/settings/profile'),
+			onPress: () => router.push('/(tabs)/settings'),
 		},
 		{
 			label: 'Privacy & Security',

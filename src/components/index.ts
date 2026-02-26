@@ -1,11 +1,2 @@
-// Existing Components
-export { default as Setting } from '../../app/(stack)/settings/components/settingItem';
-
-// New components from moved locations
-export { sharedStyles } from './assistant/shared/sharedStyles';
-export { InterfaceMode, Message } from '../services/assistant/types';
-export { ColorPicker, IconPicker, ColorOption } from './budgets/FormPickers';
-
-// Error Handling
+// Core components (import directly for tree-shaking; this barrel for convenience)
 export { ErrorBoundary } from './ErrorBoundary';
-export { NetworkErrorCard } from './NetworkErrorCard';

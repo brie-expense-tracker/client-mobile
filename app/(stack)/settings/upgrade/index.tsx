@@ -17,7 +17,6 @@ import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { getRevenueCatUI } from '../../../../src/services/subscriptions/revenueCatUIImports';
 import { useSubscription } from '../../../../src/context/SubscriptionContext';
-import { useBriePro } from '../../../../src/hooks/useBriePro';
 import { PurchasesPackage } from 'react-native-purchases';
 
 export default function UpgradeScreen() {
@@ -25,6 +24,7 @@ export default function UpgradeScreen() {
 	const {
 		isLoading: subscriptionLoading,
 		isPro,
+		subscriptionStatus,
 		availablePackages,
 		offerings,
 		purchasePackage,
@@ -32,7 +32,6 @@ export default function UpgradeScreen() {
 		refreshSubscription,
 		error: subscriptionError,
 	} = useSubscription();
-	const { subscriptionStatus } = useBriePro();
 
 	const [loading, setLoading] = useState(false);
 	const [selectedPackage, setSelectedPackage] =

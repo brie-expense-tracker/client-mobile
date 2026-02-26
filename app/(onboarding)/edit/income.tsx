@@ -13,7 +13,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { palette, radius, space, type, shadow } from '../../../src/ui/theme';
 import { useProfile } from '../../../src/context/profileContext';
-import { currency } from '../../../src/utils/format';
+
+const currency = (amount: number) =>
+	new Intl.NumberFormat('en-US', {
+		style: 'currency',
+		currency: 'USD',
+		maximumFractionDigits: 0,
+	}).format(amount);
 
 type Cadence = 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
 
