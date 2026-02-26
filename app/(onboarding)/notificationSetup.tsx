@@ -8,6 +8,7 @@ import {
 	TouchableOpacity,
 	Switch,
 	Alert,
+	ActivityIndicator,
 } from 'react-native';
 import { logger } from '../../src/utils/logger';
 import { Stack, useRouter } from 'expo-router';
@@ -15,11 +16,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useProfile } from '../../src/context/profileContext';
 import { useOnboarding } from '../../src/context/OnboardingContext';
 import { NotificationConsent, notificationService } from '../../src/services';
-import { palette, space } from '../../src/ui/theme';
+import { palette, radius, space } from '../../src/ui/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-type PresetKey = 'essential' | 'recommended' | 'quiet';
+type PresetKey = 'essential' | 'quiet';
 
-// MVP: Cash-only. No budget/goal alerts (those features removed). Transactions + weekly summary.
+// MVP: Cash-only. No insights (EXPO_PUBLIC_AI_INSIGHTS=0). Transactions + weekly summary only.
 const PRESETS: Record<PresetKey, NotificationConsent> = {
 	essential: {
 		core: { budget: false, goals: false, transactions: true, system: true },
@@ -27,28 +29,6 @@ const PRESETS: Record<PresetKey, NotificationConsent> = {
 			enabled: false,
 			frequency: 'weekly',
 			pushNotifications: false,
-			emailAlerts: false,
-		},
-		marketing: {
-			enabled: false,
-			promotional: false,
-			newsletter: false,
-			productUpdates: false,
-			specialOffers: false,
-		},
-		reminders: {
-			enabled: true,
-			weeklySummary: true,
-			monthlyCheck: true,
-			overspendingAlerts: true,
-		},
-	},
-	recommended: {
-		core: { budget: false, goals: false, transactions: true, system: true },
-		aiInsights: {
-			enabled: true,
-			frequency: 'weekly',
-			pushNotifications: true,
 			emailAlerts: false,
 		},
 		marketing: {
@@ -91,13 +71,14 @@ const PRESETS: Record<PresetKey, NotificationConsent> = {
 
 export default function NotificationPermissionScreen() {
 	const router = useRouter();
+	const insets = useSafeAreaInsets();
 	const { updatePreferences } = useProfile();
 	const { markOnboardingComplete } = useOnboarding();
 
 	const [selectedPreset, setSelectedPreset] =
-		useState<PresetKey>('recommended');
+		useState<PresetKey>('essential');
 	const [consent, setConsent] = useState<NotificationConsent>(
-		PRESETS.recommended
+		PRESETS.essential
 	);
 	const [showCustomize, setShowCustomize] = useState(false);
 	const [loading, setLoading] = useState(false);
@@ -205,7 +186,7 @@ export default function NotificationPermissionScreen() {
 
 			Alert.alert(
 				'Setup Incomplete',
-				'There was an issue setting up notifications. You can continue using the app and configure notifications later in settings.',
+				'There was an issue setting up notifications. You can continue and configure them later in Profile.',
 				[
 					{
 						text: 'Continue Anyway',
@@ -316,7 +297,13 @@ export default function NotificationPermissionScreen() {
 				}}
 			/>
 
-			<ScrollView contentContainerStyle={styles.content}>
+			<ScrollView
+				contentContainerStyle={[
+					styles.content,
+					{ paddingBottom: Math.max(space.xxl, insets.bottom + space.lg) },
+				]}
+				showsVerticalScrollIndicator={false}
+			>
 				{/* Header */}
 				<View style={styles.header}>
 					<Ionicons name="notifications-outline" size={48} color={palette.primary} />
@@ -352,29 +339,7 @@ export default function NotificationPermissionScreen() {
 								selectedPreset === 'essential' && styles.presetCardSelected,
 							]}
 							onPress={() => applyPreset('essential')}
-							accessibilityLabel="Essential only: transactions and weekly summary"
-							accessibilityRole="button"
-						>
-							<Text
-								style={[
-									styles.presetTitle,
-									selectedPreset === 'essential' && styles.presetTitleSelected,
-								]}
-							>
-								Essential only
-							</Text>
-							<Text style={styles.presetDescription}>
-								Transactions & weekly summary; no AI, no marketing
-							</Text>
-						</TouchableOpacity>
-
-						<TouchableOpacity
-							style={[
-								styles.presetCard,
-								selectedPreset === 'recommended' && styles.presetCardSelected,
-							]}
-							onPress={() => applyPreset('recommended')}
-							accessibilityLabel="Essential plus insights: recommended"
+							accessibilityLabel="Essential: transactions and weekly summary, recommended"
 							accessibilityRole="button"
 						>
 							<View style={styles.recommendedBadge}>
@@ -383,14 +348,13 @@ export default function NotificationPermissionScreen() {
 							<Text
 								style={[
 									styles.presetTitle,
-									selectedPreset === 'recommended' &&
-										styles.presetTitleSelected,
+									selectedPreset === 'essential' && styles.presetTitleSelected,
 								]}
 							>
-								Essential + Insights
+								Essential
 							</Text>
 							<Text style={styles.presetDescription}>
-								Transactions + weekly insights push
+								Transactions & weekly summary; no marketing
 							</Text>
 						</TouchableOpacity>
 
@@ -458,56 +422,6 @@ export default function NotificationPermissionScreen() {
 									thumbColor={consent.core.transactions ? palette.primaryTextOn : palette.textSubtle}
 								/>
 							</View>
-						</View>
-
-						{/* AI Insights */}
-						<View style={styles.section}>
-							<Text style={styles.sectionTitle}>Weekly Insights</Text>
-							<Text style={styles.sectionDescription}>
-								Spending summaries and cash flow tips
-							</Text>
-
-							<View style={styles.settingRow}>
-								<View style={styles.settingInfo}>
-									<Text style={styles.settingLabel}>Enable Insights</Text>
-									<Text style={styles.settingDescription}>
-										Weekly tips based on your cash activity
-									</Text>
-								</View>
-								<Switch
-									value={consent.aiInsights.enabled}
-									onValueChange={(value) =>
-										updateConsent('aiInsights', 'enabled', value)
-									}
-									trackColor={{ false: palette.border, true: palette.primary }}
-									thumbColor={
-										consent.aiInsights.enabled ? palette.primaryTextOn : palette.textSubtle
-									}
-								/>
-							</View>
-
-							{consent.aiInsights.enabled && (
-								<View style={styles.settingRow}>
-									<View style={styles.settingInfo}>
-										<Text style={styles.settingLabel}>Push Notifications</Text>
-										<Text style={styles.settingDescription}>
-											Receive insights as push notifications
-										</Text>
-									</View>
-									<Switch
-										value={consent.aiInsights.pushNotifications}
-										onValueChange={(value) =>
-											updateConsent('aiInsights', 'pushNotifications', value)
-										}
-										trackColor={{ false: palette.border, true: palette.primary }}
-										thumbColor={
-											consent.aiInsights.pushNotifications
-												? palette.primaryTextOn
-												: palette.textSubtle
-										}
-									/>
-								</View>
-							)}
 						</View>
 
 						{/* Reminders */}
@@ -626,15 +540,24 @@ export default function NotificationPermissionScreen() {
 				{/* Action Buttons */}
 				<View style={styles.buttonContainer}>
 					<TouchableOpacity
-						style={[styles.button, styles.primaryButton]}
+						style={[
+							styles.button,
+							styles.primaryButton,
+							loading && styles.buttonDisabled,
+						]}
 						onPress={handleContinue}
 						disabled={loading}
 						accessibilityLabel={loading ? 'Setting up' : 'Allow notifications'}
 						accessibilityRole="button"
 					>
-						<Text style={styles.primaryButtonText}>
-							{loading ? 'Setting Up...' : 'Allow notifications'}
-						</Text>
+						{loading ? (
+							<View style={styles.buttonLoading}>
+								<ActivityIndicator size="small" color={palette.primaryTextOn} />
+								<Text style={styles.primaryButtonText}>Setting up...</Text>
+							</View>
+						) : (
+							<Text style={styles.primaryButtonText}>Allow notifications</Text>
+						)}
 					</TouchableOpacity>
 
 					<TouchableOpacity
@@ -709,7 +632,7 @@ const styles = StyleSheet.create({
 		backgroundColor: palette.surfaceAlt,
 		borderWidth: 2,
 		borderColor: palette.border,
-		borderRadius: 12,
+		borderRadius: radius.md,
 		padding: space.lg,
 		position: 'relative',
 	},
@@ -738,7 +661,7 @@ const styles = StyleSheet.create({
 		backgroundColor: palette.success,
 		paddingHorizontal: space.sm,
 		paddingVertical: space.xs,
-		borderRadius: 12,
+		borderRadius: radius.pill,
 	},
 	recommendedText: {
 		fontSize: 12,
@@ -805,7 +728,7 @@ const styles = StyleSheet.create({
 		alignItems: 'flex-start',
 		backgroundColor: palette.surfaceAlt,
 		padding: space.lg,
-		borderRadius: 8,
+		borderRadius: radius.sm,
 		marginBottom: space.xl,
 	},
 	noteText: {
@@ -821,12 +744,21 @@ const styles = StyleSheet.create({
 	button: {
 		paddingVertical: space.lg,
 		paddingHorizontal: space.xl,
-		borderRadius: 12,
+		borderRadius: radius.md,
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
 	primaryButton: {
 		backgroundColor: palette.primary,
+	},
+	buttonDisabled: {
+		opacity: 0.9,
+	},
+	buttonLoading: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		gap: space.sm,
 	},
 	primaryButtonText: {
 		fontSize: 16,

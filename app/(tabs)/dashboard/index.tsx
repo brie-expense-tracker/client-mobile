@@ -290,7 +290,7 @@ function CashOnMeCard({ balance, empty }: { balance: number; empty: boolean }) {
 			<AppText.Label color="muted">Cash on Me</AppText.Label>
 			{empty ? (
 				<AppText.Body color="subtle" style={cashOnMeStyles.emptyText}>
-					Log your first shift to see your cash total
+					Log your first Cash In or Cash Out to see your total
 				</AppText.Body>
 			) : (
 				<AppText
@@ -385,7 +385,7 @@ function RecentTransactionsList({
 						No transactions yet
 					</AppText.Body>
 					<AppText.Caption color="muted" style={recentStyles.emptySubtitle}>
-						Log your first shift to see it here
+						Log your first Cash In or Cash Out to see it here
 					</AppText.Caption>
 					<AppButton
 						label="+ Cash In"

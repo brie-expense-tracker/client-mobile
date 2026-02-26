@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
 	View,
 	Text,
@@ -6,20 +6,27 @@ import {
 	ScrollView,
 	TouchableOpacity,
 	SafeAreaView,
+	Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import CustomerCenter from '../../../../src/components/CustomerCenter';
-import { useBriePro } from '../../../../src/hooks/useBriePro';
+import { useSubscription } from '../../../../src/context/SubscriptionContext';
 
 export default function SubscriptionSettingsScreen() {
 	const router = useRouter();
-	const { isPro, subscriptionStatus, expirationDate, willRenew } = useBriePro();
-	const [showCustomerCenter, setShowCustomerCenter] = useState(false);
+	const { isPro, subscriptionStatus } = useSubscription();
+	const { expirationDate, willRenew } = subscriptionStatus;
+
+	const handleManageSubscription = () => {
+		Alert.alert(
+			'Manage Subscription',
+			'Manage your subscription through your device\'s App Store or Google Play account settings.',
+			[{ text: 'OK' }]
+		);
+	};
 
 	return (
-		<>
-			<SafeAreaView style={styles.container}>
+		<SafeAreaView style={styles.container}>
 				<ScrollView
 					contentContainerStyle={styles.scrollContent}
 					showsVerticalScrollIndicator={false}
@@ -103,7 +110,7 @@ export default function SubscriptionSettingsScreen() {
 
 						<TouchableOpacity
 							style={styles.actionCard}
-							onPress={() => setShowCustomerCenter(true)}
+							onPress={handleManageSubscription}
 							activeOpacity={0.7}
 						>
 							<View style={styles.actionIcon}>
@@ -129,19 +136,13 @@ export default function SubscriptionSettingsScreen() {
 							/>
 							<Text style={styles.infoText}>
 								Subscriptions auto-renew unless cancelled. Manage your
-								subscription through the Customer Center or your App
-								Store/Google Play account settings.
+								subscription through your App Store or Google Play
+								account settings.
 							</Text>
 						</View>
 					</View>
 				</ScrollView>
-			</SafeAreaView>
-
-			<CustomerCenter
-				visible={showCustomerCenter}
-				onClose={() => setShowCustomerCenter(false)}
-			/>
-		</>
+		</SafeAreaView>
 	);
 }
 

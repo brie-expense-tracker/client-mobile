@@ -181,32 +181,6 @@ export default function Layout() {
 			/>
 
 			<Stack.Screen
-				name="profile/index"
-				options={{
-					headerShown: true,
-					headerBackButtonDisplayMode: 'minimal',
-					headerTitle: 'Profile',
-					headerShadowVisible: false,
-					headerTitleStyle: {
-						fontSize: 20,
-						fontWeight: '600',
-						color: '#333',
-					},
-					headerStyle: {
-						backgroundColor: '#ffffff',
-					},
-
-					headerLeft: () => (
-						<BorderlessButton
-							onPress={() => router.back()}
-							style={{ width: 50 }}
-						>
-							<Ionicons name="chevron-back" size={24} color="#333" />
-						</BorderlessButton>
-					),
-				}}
-			/>
-			<Stack.Screen
 				name="profile/editName"
 				options={{
 					headerShown: true,

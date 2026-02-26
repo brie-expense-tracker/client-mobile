@@ -21,6 +21,7 @@ import {
 	AppButton,
 	AppRow,
 } from '../../../src/ui/primitives';
+import { ErrorBoundary } from '../../../src/components/ErrorBoundary';
 
 const currency = new Intl.NumberFormat('en-US', {
 	style: 'currency',
@@ -29,13 +30,16 @@ const currency = new Intl.NumberFormat('en-US', {
 
 /* ---------------------------- Profile Completion ---------------------------- */
 
-function getProfileCompletion(profile: {
-	firstName?: string;
-	lastName?: string;
-	phone?: string;
-	monthlyIncome?: number;
-	expenses?: { housing?: number; loans?: number; subscriptions?: number };
-} | null, email?: string): { percent: number; fieldsLeft: number } {
+function getProfileCompletion(
+	profile: {
+		firstName?: string;
+		lastName?: string;
+		phone?: string;
+		monthlyIncome?: number;
+		expenses?: { housing?: number; loans?: number; subscriptions?: number };
+	} | null,
+	email?: string,
+): { percent: number; fieldsLeft: number } {
 	if (!profile) return { percent: 0, fieldsLeft: 5 };
 
 	const fields = [
@@ -68,19 +72,31 @@ function SignInView() {
 				<AppText.Title>Profile</AppText.Title>
 			</View>
 			<ScrollView
-				contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + space.xl }]}
+				contentContainerStyle={[
+					styles.content,
+					{ paddingBottom: insets.bottom + space.xl },
+				]}
 				showsVerticalScrollIndicator={false}
 			>
 				<AppCard onPress={handleSignInToSync}>
 					<View style={styles.signInPrompt}>
-						<Ionicons name="cloud-upload-outline" size={24} color={palette.primary} />
+						<Ionicons
+							name="cloud-upload-outline"
+							size={24}
+							color={palette.primary}
+						/>
 						<View style={{ flex: 1 }}>
 							<AppText.Heading>Sign in to backup and sync</AppText.Heading>
 							<AppText.Caption color="muted" style={{ marginTop: 4 }}>
-								Create an account to save your data to the cloud and use it on other devices.
+								Create an account to save your data to the cloud and use it on
+								other devices.
 							</AppText.Caption>
 						</View>
-						<Ionicons name="chevron-forward" size={20} color={palette.textSubtle} />
+						<Ionicons
+							name="chevron-forward"
+							size={20}
+							color={palette.textSubtle}
+						/>
 					</View>
 				</AppCard>
 			</ScrollView>
@@ -98,7 +114,10 @@ function ProfileContent() {
 
 	const displayName = useMemo(() => {
 		if (profile?.firstName || profile?.lastName) {
-			return [profile.firstName, profile.lastName].filter(Boolean).join(' ') || 'User';
+			return (
+				[profile.firstName, profile.lastName].filter(Boolean).join(' ') ||
+				'User'
+			);
 		}
 		return firebaseUser?.displayName || 'User';
 	}, [profile, firebaseUser]);
@@ -114,14 +133,22 @@ function ProfileContent() {
 
 	const completion = useMemo(
 		() => getProfileCompletion(profile, email),
-		[profile, email]
+		[profile, email],
 	);
 
-	const handleEditProfile = () => router.push('/(onboarding)/profileSetup');
-	const handleFinishProfile = () => router.push('/(onboarding)/profileSetup');
-	const handleSetPhone = () => router.push('/(onboarding)/profileSetup');
-	const handleOpenOnboarding = () =>
-		router.push('/(onboarding)/profileSetup');
+	// Go directly to edit screens - no intermediate hub to avoid repetition
+	const handleEditName = () => router.push('/(stack)/settings/profile/editName');
+	const handleEditPhone = () => router.push('/(stack)/settings/profile/editPhone');
+	const handleEditFinancial = () =>
+		router.push('/(stack)/settings/profile/editFinancial');
+	const handleEditExpenses = () =>
+		router.push('/(stack)/settings/profile/editExpenses');
+
+	const handleEditProfile = handleEditName; // Edit button → name
+	const handleFinishProfile = handleEditFinancial; // Finish → income/money
+	const handleSetPhone = handleEditPhone;
+	// DEV only: full onboarding flow for testing
+	const handleOpenOnboarding = () => router.push('/(onboarding)/profileSetup');
 
 	const handleUpdateMoney = () => router.push('/(tabs)/transaction');
 	const handleDashboard = () => router.push('/(tabs)/dashboard');
@@ -130,7 +157,7 @@ function ProfileContent() {
 		Alert.alert(
 			'Export data',
 			'Back up your profile and transactions. This feature is coming soon.',
-			[{ text: 'OK' }]
+			[{ text: 'OK' }],
 		);
 	};
 
@@ -146,7 +173,11 @@ function ProfileContent() {
 
 	const savings = profile?.savings ?? 0;
 	const debt = profile?.debt ?? 0;
-	const expenses = profile?.expenses ?? { housing: 0, loans: 0, subscriptions: 0 };
+	const expenses = profile?.expenses ?? {
+		housing: 0,
+		loans: 0,
+		subscriptions: 0,
+	};
 	const housingLabel =
 		expenses.housing > 0 ? `Housing ${currency(expenses.housing)}` : 'Not set';
 	const moneyValue = `${currency(savings)} • ${currency(debt)}`;
@@ -160,7 +191,10 @@ function ProfileContent() {
 			</View>
 
 			<ScrollView
-				contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + space.xxl }]}
+				contentContainerStyle={[
+					styles.scrollContent,
+					{ paddingBottom: insets.bottom + space.xxl },
+				]}
 				showsVerticalScrollIndicator={false}
 			>
 				{/* User Profile Summary Card */}
@@ -197,10 +231,7 @@ function ProfileContent() {
 					</AppText.Heading>
 					<View style={styles.progressBar}>
 						<View
-							style={[
-								styles.progressFill,
-								{ width: `${completion.percent}%` },
-							]}
+							style={[styles.progressFill, { width: `${completion.percent}%` }]}
 						/>
 					</View>
 					<View style={styles.completionButtons}>
@@ -243,7 +274,7 @@ function ProfileContent() {
 					</View>
 				)}
 
-				{/* PROFILE Section */}
+				{/* PROFILE Section - each row goes directly to its edit screen */}
 				<View style={styles.section}>
 					<AppText.Label color="subtle" style={styles.sectionTitle}>
 						PROFILE
@@ -253,32 +284,36 @@ function ProfileContent() {
 							icon="person-outline"
 							label="Name"
 							right={<AppText.Body>{displayName}</AppText.Body>}
-							onPress={handleEditProfile}
+							onPress={handleEditName}
 						/>
 						<AppRow
 							icon="call-outline"
 							label="Contact"
-							right={<AppText.Body numberOfLines={1}>{email || 'Not set'}</AppText.Body>}
-							onPress={handleEditProfile}
+							right={
+								<AppText.Body numberOfLines={1}>
+									{email || 'Not set'}
+								</AppText.Body>
+							}
+							onPress={handleEditPhone}
 						/>
 						<AppRow
 							icon="cash-outline"
 							label="Money"
 							right={<AppText.Body>{moneyValue}</AppText.Body>}
-							onPress={handleEditProfile}
+							onPress={handleEditFinancial}
 						/>
 						<AppRow
 							icon="wallet-outline"
 							label="Expenses"
 							right={<AppText.Body>{housingLabel}</AppText.Body>}
-							onPress={handleEditProfile}
+							onPress={handleEditExpenses}
 						/>
 						<AppRow
 							icon="card-outline"
 							label="Other financial details"
 							right={<AppText.Body>Debt: {currency(debt)}</AppText.Body>}
 							bordered={false}
-							onPress={handleEditProfile}
+							onPress={handleEditFinancial}
 						/>
 					</AppCard>
 				</View>
@@ -294,11 +329,24 @@ function ProfileContent() {
 							onPress={handleUpdateMoney}
 							activeOpacity={0.7}
 						>
-							<View style={[styles.quickActionIcon, { backgroundColor: palette.successSubtle }]}>
-								<Ionicons name="cash-outline" size={24} color={palette.success} />
+							<View
+								style={[
+									styles.quickActionIcon,
+									{ backgroundColor: palette.successSubtle },
+								]}
+							>
+								<Ionicons
+									name="cash-outline"
+									size={24}
+									color={palette.success}
+								/>
 							</View>
-							<AppText.Heading style={styles.quickActionTitle}>Update money</AppText.Heading>
-							<AppText.Caption color="muted">Income, savings, expenses</AppText.Caption>
+							<AppText.Heading style={styles.quickActionTitle}>
+								Update money
+							</AppText.Heading>
+							<AppText.Caption color="muted">
+								Income, savings, expenses
+							</AppText.Caption>
 						</TouchableOpacity>
 
 						<TouchableOpacity
@@ -306,10 +354,21 @@ function ProfileContent() {
 							onPress={handleDashboard}
 							activeOpacity={0.7}
 						>
-							<View style={[styles.quickActionIcon, { backgroundColor: palette.primarySubtle }]}>
-								<Ionicons name="grid-outline" size={24} color={palette.primary} />
+							<View
+								style={[
+									styles.quickActionIcon,
+									{ backgroundColor: palette.primarySubtle },
+								]}
+							>
+								<Ionicons
+									name="grid-outline"
+									size={24}
+									color={palette.primary}
+								/>
 							</View>
-							<AppText.Heading style={styles.quickActionTitle}>Dashboard</AppText.Heading>
+							<AppText.Heading style={styles.quickActionTitle}>
+								Dashboard
+							</AppText.Heading>
 							<AppText.Caption color="muted">View transactions</AppText.Caption>
 						</TouchableOpacity>
 
@@ -318,16 +377,27 @@ function ProfileContent() {
 							onPress={handleExportData}
 							activeOpacity={0.7}
 						>
-							<View style={[styles.quickActionIcon, { backgroundColor: palette.primarySoft }]}>
-								<Ionicons name="cloud-upload-outline" size={24} color={palette.primary} />
+							<View
+								style={[
+									styles.quickActionIcon,
+									{ backgroundColor: palette.primarySoft },
+								]}
+							>
+								<Ionicons
+									name="cloud-upload-outline"
+									size={24}
+									color={palette.primary}
+								/>
 							</View>
-							<AppText.Heading style={styles.quickActionTitle}>Export data</AppText.Heading>
+							<AppText.Heading style={styles.quickActionTitle}>
+								Export data
+							</AppText.Heading>
 							<AppText.Caption color="muted">Backup profile</AppText.Caption>
 						</TouchableOpacity>
 					</View>
 				</View>
 
-				{/* Logout */}
+				{/* Logout & Delete Account */}
 				<View style={styles.logoutContainer}>
 					<AppButton
 						label="Logout"
@@ -337,6 +407,13 @@ function ProfileContent() {
 						onPress={handleLogout}
 						fullWidth
 					/>
+					<TouchableOpacity
+						style={styles.deleteAccountButton}
+						onPress={() => router.push('/(stack)/settings/profile/deleteAccount')}
+						activeOpacity={0.8}
+					>
+						<Text style={styles.deleteAccountText}>Delete account</Text>
+					</TouchableOpacity>
 				</View>
 			</ScrollView>
 		</View>
@@ -347,10 +424,9 @@ function ProfileContent() {
 
 export default function ProfileScreen() {
 	const { user } = useAuth();
-	if (!user) {
-		return <SignInView />;
-	}
-	return <ProfileContent />;
+	return (
+		<ErrorBoundary>{!user ? <SignInView /> : <ProfileContent />}</ErrorBoundary>
+	);
 }
 
 /* ----------------------------- Styles ----------------------------- */
@@ -458,6 +534,16 @@ const styles = StyleSheet.create({
 	},
 	logoutContainer: {
 		marginTop: space.lg,
+		gap: space.sm,
+	},
+	deleteAccountButton: {
+		paddingVertical: space.sm,
+		alignItems: 'center',
+	},
+	deleteAccountText: {
+		...type.small,
+		color: palette.danger,
+		fontWeight: '600',
 	},
 	quickActions: {
 		flexDirection: 'row',
