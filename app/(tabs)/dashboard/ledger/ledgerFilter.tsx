@@ -1,5 +1,5 @@
 // ledgerFilter.tsx
-import React, { useState, useContext, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
 	View,
 	Text,
@@ -8,10 +8,13 @@ import {
 	ScrollView,
 	SafeAreaView,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { dateFilterModes } from './_layout';
-import { FilterContext } from '../../../../src/context/filterContext';
+import {
+	useFilter,
+	type DateFilterMode,
+} from '../../../../src/context/filterContext';
+import { palette, radius, space } from '../../../../src/ui/theme';
 
 export default function LedgerFilterScreen() {
 	const {
@@ -19,10 +22,10 @@ export default function LedgerFilterScreen() {
 		setDateFilterMode,
 		transactionTypes,
 		setTransactionTypes,
-	} = useContext(FilterContext);
+	} = useFilter();
 
 	const [localDateFilterMode, setLocalDateFilterMode] =
-		useState<string>(dateFilterMode);
+		useState<DateFilterMode>(dateFilterMode);
 
 	const handleBack = () => {
 		setDateFilterMode(localDateFilterMode);
@@ -57,18 +60,18 @@ export default function LedgerFilterScreen() {
 	return (
 		<SafeAreaView style={styles.mainContainer}>
 			<ScrollView contentContainerStyle={styles.scrollContent}>
-				{/* Transaction Types */}
-				<Section title="Transaction Types">
+				{/* Cash In / Cash Out (MVP terminology) */}
+				<Section title="Show">
 					<SectionSubtext>
-						Select which types of transactions to show
+						Select Cash In, Cash Out, or both
 					</SectionSubtext>
 					<OptionRow
-						label="Income"
+						label="Cash In"
 						selected={transactionTypes.income}
 						onPress={() => handleTransactionTypeToggle('income')}
 					/>
 					<OptionRow
-						label="Expenses"
+						label="Cash Out"
 						selected={transactionTypes.expense}
 						onPress={() => handleTransactionTypeToggle('expense')}
 					/>
@@ -82,7 +85,7 @@ export default function LedgerFilterScreen() {
 							key={mode.value}
 							label={mode.label}
 							selected={localDateFilterMode === mode.value}
-							onPress={() => setLocalDateFilterMode(mode.value)}
+							onPress={() => setLocalDateFilterMode(mode.value as DateFilterMode)}
 						/>
 					))}
 				</Section>
@@ -141,31 +144,21 @@ const OptionRow = ({
 const styles = StyleSheet.create({
 	mainContainer: {
 		flex: 1,
-		backgroundColor: '#fff',
+		backgroundColor: palette.bg,
 	},
-
-	backButton: {
-		padding: 4,
-	},
-
 	scrollContent: {
-		padding: 16,
-		paddingBottom: 100, // Space for action buttons
-	},
-	divider: {
-		height: 1,
-		backgroundColor: '#e2e2e2',
-		marginVertical: 16,
+		padding: space.lg,
+		paddingBottom: 100,
 	},
 	sectionHeader: {
 		fontSize: 18,
 		fontWeight: '600',
-		color: '#333',
+		color: palette.text,
 		marginBottom: 12,
 	},
 	sectionSubtext: {
 		fontSize: 12,
-		color: '#666',
+		color: palette.textMuted,
 		marginBottom: 12,
 	},
 	optionRow: {
@@ -174,27 +167,27 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		paddingVertical: 12,
 		borderBottomWidth: 1,
-		borderBottomColor: '#efefef',
+		borderBottomColor: palette.border,
 	},
 	optionLabel: {
 		fontSize: 16,
-		color: '#333',
+		color: palette.text,
 	},
 	check: {
 		fontSize: 18,
-		color: '#ccc',
+		color: palette.textSubtle,
 		fontWeight: 'bold',
 	},
 	checkSelected: {
-		color: '#007AFF',
+		color: palette.primary,
 	},
 	actionButtons: {
 		flexDirection: 'row',
-		paddingHorizontal: 16,
+		paddingHorizontal: space.lg,
 		paddingVertical: 12,
-		backgroundColor: '#fff',
+		backgroundColor: palette.bg,
 		borderTopWidth: 1,
-		borderTopColor: '#e2e2e2',
+		borderTopColor: palette.border,
 		position: 'absolute',
 		bottom: 0,
 		left: 0,
@@ -202,29 +195,29 @@ const styles = StyleSheet.create({
 	},
 	resetButton: {
 		flex: 1,
-		backgroundColor: '#f5f5f5',
+		backgroundColor: palette.surfaceAlt,
 		paddingVertical: 12,
-		paddingHorizontal: 16,
-		borderRadius: 8,
-		marginRight: 8,
+		paddingHorizontal: space.lg,
+		borderRadius: radius.md,
+		marginRight: space.sm,
 		alignItems: 'center',
 	},
 	resetButtonText: {
-		color: '#666',
+		color: palette.textMuted,
 		fontSize: 16,
 		fontWeight: '500',
 	},
 	applyButton: {
 		flex: 1,
-		backgroundColor: '#007AFF',
+		backgroundColor: palette.primary,
 		paddingVertical: 12,
-		paddingHorizontal: 16,
-		borderRadius: 8,
-		marginLeft: 8,
+		paddingHorizontal: space.lg,
+		borderRadius: radius.md,
+		marginLeft: space.sm,
 		alignItems: 'center',
 	},
 	applyButtonText: {
-		color: '#fff',
+		color: palette.primaryTextOn,
 		fontSize: 16,
 		fontWeight: '600',
 	},

@@ -135,8 +135,6 @@ export default function TransactionScreenProModern() {
 	const [keyboardHeight, setKeyboardHeight] = useState(0);
 	const insets = useSafeAreaInsets();
 
-	const contentBottomPad = space.xl;
-
 	const [mode, setMode] = useState<'income' | 'expense'>(
 		params.mode === 'income' ? 'income' : 'expense',
 	);
@@ -482,10 +480,7 @@ export default function TransactionScreenProModern() {
 					<ScrollView
 						ref={scrollRef}
 						style={{ flex: 1 }}
-						contentContainerStyle={[
-							styles.content,
-							{ paddingBottom: contentBottomPad },
-						]}
+						contentContainerStyle={styles.content}
 						keyboardShouldPersistTaps="handled"
 						keyboardDismissMode={
 							Platform.OS === 'ios' ? 'interactive' : 'on-drag'
@@ -643,8 +638,9 @@ export default function TransactionScreenProModern() {
 													mode === 'expense' &&
 													!selectedCategory &&
 													styles.metadataValueRequired,
-												!selectedCategory && mode === 'expense'
-													? showCategoryError
+												!selectedCategory
+													? showCategoryError &&
+														mode === 'expense'
 														? { color: palette.danger }
 														: { color: palette.textMuted }
 													: { color: palette.text },
@@ -771,29 +767,27 @@ export default function TransactionScreenProModern() {
 							)}
 						</View>
 
-						<View style={{ height: space.xxl }} />
-					</ScrollView>
+						<View style={styles.createButtonSection}>
+							<AppButton
+								label={isSubmitting ? 'Saving…' : 'Create Transaction'}
+								variant="primary"
+								icon={isSubmitting ? undefined : 'add'}
+								onPress={handleCreatePress}
+								disabled={isSubmitting}
+								loading={isSubmitting}
+								fullWidth
+								style={styles.createButton}
+								accessibilityLabel={`Create ${mode}`}
+							/>
+							{showCategoryError && mode === 'expense' && (
+								<AppText.Caption color="danger" style={styles.createButtonError}>
+									Please choose a category
+								</AppText.Caption>
+							)}
+						</View>
 
-					{/* Sticky Create button — always enabled, shows inline error when category missing */}
-					<View
-						style={[styles.stickyCtaWrap, { paddingBottom: contentBottomPad }]}
-					>
-						<AppButton
-							label={isSubmitting ? 'Saving…' : 'Create Transaction'}
-							variant="primary"
-							icon={isSubmitting ? undefined : 'add'}
-							onPress={handleCreatePress}
-							disabled={isSubmitting}
-							loading={isSubmitting}
-							fullWidth
-							accessibilityLabel={`Create ${mode}`}
-						/>
-						{showCategoryError && mode === 'expense' && (
-							<AppText.Caption color="danger" style={styles.stickyCtaError}>
-								Please choose a category
-							</AppText.Caption>
-						)}
-					</View>
+						<View style={{ height: insets.bottom + space.xxl }} />
+					</ScrollView>
 				</KeyboardAvoidingView>
 
 				{Platform.OS === 'ios' && (
@@ -955,10 +949,10 @@ const styles = StyleSheet.create({
 
 	content: {
 		flexGrow: 1,
-		justifyContent: 'center',
 		paddingHorizontal: space.xl,
 		paddingTop: space.xl,
 		alignItems: 'center',
+		// No justifyContent: 'center' — keeps layout stable when keyboard opens or note expands (avoids jitter)
 	},
 
 	formWrap: {
@@ -992,8 +986,7 @@ const styles = StyleSheet.create({
 		fontSize: 32,
 		fontWeight: '600',
 		color: palette.textMuted,
-		marginRight: 4,
-		marginBottom: 6,
+		marginBottom: 4,
 	},
 	amountInput: {
 		flexGrow: 0,
@@ -1007,14 +1000,14 @@ const styles = StyleSheet.create({
 		letterSpacing: -0.5,
 	},
 	amountUnderline: {
-		marginTop: space.sm,
+		marginTop: space.xs,
 		height: 1,
 		backgroundColor: palette.border,
 		opacity: 0.8,
 	},
 	errorContainer: {
 		alignItems: 'center',
-		marginTop: space.sm,
+		marginTop: space.xs,
 		minHeight: 20,
 	},
 	errorText: {
@@ -1022,28 +1015,11 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		fontWeight: '500',
 	},
-
-	segmented: {
-		marginTop: space.lg,
-		backgroundColor: palette.surfaceAlt,
-		borderRadius: radius.md,
-		padding: 4,
-		flexDirection: 'row',
-		borderWidth: 1,
-		borderColor: palette.border,
-	},
 	segmentedCompact: {
-		marginTop: space.lg,
 		backgroundColor: palette.subtle,
 		borderRadius: radius.pill,
 		padding: 4,
 		flexDirection: 'row',
-	},
-	segBtn: {
-		flex: 1,
-		paddingVertical: space.sm,
-		alignItems: 'center',
-		justifyContent: 'center',
 	},
 	segBtnCompact: {
 		flex: 1,
@@ -1139,6 +1115,7 @@ const styles = StyleSheet.create({
 	},
 	noteSection: {
 		marginTop: space.lg,
+		alignSelf: 'stretch',
 	},
 	addNoteChip: {
 		flexDirection: 'row',
@@ -1149,7 +1126,7 @@ const styles = StyleSheet.create({
 		backgroundColor: palette.surface,
 		borderWidth: 1,
 		borderColor: palette.border,
-		alignSelf: 'flex-start',
+		alignSelf: 'stretch',
 		...shadow.soft,
 	},
 	addNoteChipText: {
@@ -1158,9 +1135,11 @@ const styles = StyleSheet.create({
 	},
 	noteExpandedContainer: {
 		gap: space.sm,
+		alignSelf: 'stretch',
 	},
 	noteInput: {
 		minHeight: 72,
+		width: '100%',
 		borderRadius: radius.lg,
 		borderWidth: 1,
 		borderColor: palette.border,
@@ -1175,16 +1154,18 @@ const styles = StyleSheet.create({
 		alignSelf: 'flex-start',
 		paddingVertical: space.xs,
 	},
-	stickyCtaWrap: {
-		paddingHorizontal: space.xl,
-		paddingTop: space.lg,
-		backgroundColor: palette.surface,
-		borderTopWidth: 1,
-		borderTopColor: palette.border,
-		...shadow.toolbar,
+	createButtonSection: {
+		marginTop: space.xl,
+		gap: space.sm,
+		alignSelf: 'stretch',
 	},
-	stickyCtaError: {
-		marginTop: space.sm,
+	createButton: {
+		alignSelf: 'stretch',
+		width: '100%',
+		minHeight: 52,
+		borderRadius: radius.xl,
+	},
+	createButtonError: {
 		textAlign: 'center',
 		fontSize: 12,
 		fontWeight: '500',

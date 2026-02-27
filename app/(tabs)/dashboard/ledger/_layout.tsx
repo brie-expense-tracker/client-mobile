@@ -1,8 +1,10 @@
 // _layout.tsx
 import { router, Stack } from 'expo-router';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { FilterProvider } from '../../../../src/context/filterContext';
 import { BorderlessButton } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
+import { palette } from '../../../../src/ui/theme';
 
 export const dateFilterModes = [
 	{ label: 'Day', value: 'day', icon: 'calendar-outline' },
@@ -11,8 +13,9 @@ export const dateFilterModes = [
 
 export default function TransactionStack() {
 	return (
-		<FilterProvider>
-			<Stack
+		<SafeAreaProvider>
+			<FilterProvider>
+				<Stack
 				screenOptions={{
 					animation: 'slide_from_right',
 					gestureEnabled: true,
@@ -30,19 +33,19 @@ export default function TransactionStack() {
 						headerTitle: 'Filter',
 						headerShadowVisible: false,
 						headerStyle: {
-							backgroundColor: '#ffffff',
+							backgroundColor: palette.bg,
 						},
 						headerTitleStyle: {
 							fontSize: 20,
 							fontWeight: '600',
-							color: '#333',
+							color: palette.text,
 						},
 						headerLeft: () => (
 							<BorderlessButton
 								onPress={() => router.back()}
 								style={{ width: 50 }}
 							>
-								<Ionicons name="chevron-back" size={24} color="#333" />
+								<Ionicons name="chevron-back" size={24} color={palette.text} />
 							</BorderlessButton>
 						),
 					}}
@@ -54,6 +57,7 @@ export default function TransactionStack() {
 					}}
 				/>
 			</Stack>
-		</FilterProvider>
+			</FilterProvider>
+		</SafeAreaProvider>
 	);
 }

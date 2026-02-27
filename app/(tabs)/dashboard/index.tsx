@@ -23,7 +23,6 @@ import {
 } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { TransactionContext } from '../../../src/context/transactionContext';
 import { useNotification } from '../../../src/context/notificationContext';
 import useAuth from '../../../src/context/AuthContext';
@@ -161,7 +160,7 @@ export default function DashboardPro() {
 	return (
 		<ErrorBoundary>
 			<SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
-				<GestureHandlerRootView style={{ flex: 1 }}>
+				<View style={styles.screenContent}>
 					{/* ---------- Sticky Header ---------- */}
 					<View style={styles.stickyHeader}>
 						<TouchableOpacity
@@ -274,7 +273,7 @@ export default function DashboardPro() {
 						{/* History - recent entries with View All */}
 						<RecentTransactionsList transactions={recentTransactions} />
 					</ScrollView>
-				</GestureHandlerRootView>
+				</View>
 			</SafeAreaView>
 		</ErrorBoundary>
 	);
@@ -470,6 +469,7 @@ function RecentTransactionsList({
 
 const styles = StyleSheet.create({
 	safeArea: { flex: 1, backgroundColor: palette.surfaceAlt },
+	screenContent: { flex: 1 },
 	loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 	loadingText: {
 		marginTop: 16,
