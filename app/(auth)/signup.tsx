@@ -336,15 +336,6 @@ export default function Signup() {
 									{isLoading ? 'Creating account…' : 'Google'}
 								</Text>
 							</RectButton>
-
-							<RectButton
-								enabled={!isLoading}
-								onPress={() => {}}
-								style={[styles.socialButton, socialShadow, { opacity: 0.6 }]}
-							>
-								<Ionicons name="logo-apple" size={22} color="#0F172A" />
-								<Text style={styles.socialButtonText}>Apple (soon)</Text>
-							</RectButton>
 						</View>
 
 						{/* Login prompt */}

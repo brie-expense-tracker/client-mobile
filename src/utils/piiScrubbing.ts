@@ -1,6 +1,6 @@
 /**
- * PII Scrubbing for client-side logging
- * Redacts personally identifiable information from log messages
+ * PII Scrubbing for client-side logging and crash reporting
+ * Redacts personally identifiable information from log messages and error contexts
  */
 
 const EMAIL_REGEX = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
@@ -9,7 +9,7 @@ const SSN_REGEX = /\b\d{3}-?\d{2}-?\d{4}\b/g;
 const CREDIT_CARD_REGEX = /\b(?:\d{4}[-\s]?){3}\d{4}\b/g;
 
 /**
- * Scrub PII from a string. Used by the logger to avoid leaking PII in logs.
+ * Scrub PII from a string. Used by the logger and crash reporting to avoid leaking PII.
  */
 export function scrubPII(text: string): string {
 	return text
@@ -17,4 +17,40 @@ export function scrubPII(text: string): string {
 		.replace(PHONE_REGEX, '[phone]')
 		.replace(SSN_REGEX, '[ssn]')
 		.replace(CREDIT_CARD_REGEX, '[card]');
+}
+
+/**
+ * Scrub PII from an Error's message. Returns a new Error with scrubbed message.
+ */
+export function scrubError(error: Error): Error {
+	const scrubbedMessage = scrubPII(error.message);
+	return new Error(scrubbedMessage);
+}
+
+/**
+ * Recursively scrub PII from an analytics/context object.
+ * String values are scrubbed; nested objects are processed recursively.
+ */
+export function scrubAnalyticsEvent(obj: unknown): unknown {
+	if (obj === null || obj === undefined) {
+		return obj;
+	}
+
+	if (typeof obj === 'string') {
+		return scrubPII(obj);
+	}
+
+	if (Array.isArray(obj)) {
+		return obj.map((item) => scrubAnalyticsEvent(item));
+	}
+
+	if (typeof obj === 'object') {
+		const result: Record<string, unknown> = {};
+		for (const [key, value] of Object.entries(obj)) {
+			result[key] = scrubAnalyticsEvent(value);
+		}
+		return result;
+	}
+
+	return obj;
 }

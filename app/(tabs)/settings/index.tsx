@@ -136,13 +136,11 @@ function ProfileContent() {
 		[profile, email],
 	);
 
-	// Go directly to edit screens - no intermediate hub to avoid repetition
-	const handleEditName = () => router.push('/(stack)/settings/profile/editName');
-	const handleEditPhone = () => router.push('/(stack)/settings/profile/editPhone');
-	const handleEditFinancial = () =>
-		router.push('/(stack)/settings/profile/editFinancial');
-	const handleEditExpenses = () =>
-		router.push('/(stack)/settings/profile/editExpenses');
+	// Go to onboarding/edit screens (profile, income, savings, debt)
+	const handleEditName = () => router.push('/(onboarding)/edit/profile');
+	const handleEditPhone = () => router.push('/(onboarding)/edit/profile');
+	const handleEditFinancial = () => router.push('/(onboarding)/edit');
+	const handleEditExpenses = () => router.push('/(onboarding)/edit');
 
 	const handleEditProfile = handleEditName; // Edit button → name
 	const handleFinishProfile = handleEditFinancial; // Finish → income/money
@@ -409,7 +407,13 @@ function ProfileContent() {
 					/>
 					<TouchableOpacity
 						style={styles.deleteAccountButton}
-						onPress={() => router.push('/(stack)/settings/profile/deleteAccount')}
+						onPress={() =>
+							Alert.alert(
+								'Delete account',
+								'Account deletion is not available yet. Contact support if you need help.',
+								[{ text: 'OK' }]
+							)
+						}
 						activeOpacity={0.8}
 					>
 						<Text style={styles.deleteAccountText}>Delete account</Text>
