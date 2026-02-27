@@ -411,7 +411,7 @@ function ProfileContent() {
 							Alert.alert(
 								'Delete account',
 								'Account deletion is not available yet. Contact support if you need help.',
-								[{ text: 'OK' }]
+								[{ text: 'OK' }],
 							)
 						}
 						activeOpacity={0.8}
