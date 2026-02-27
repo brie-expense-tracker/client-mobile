@@ -10,7 +10,10 @@ import {
 	SectionList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+	useSafeAreaInsets,
+	SafeAreaInsetsContext,
+} from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
 	BorderlessButton,
@@ -20,7 +23,7 @@ import {
 	TransactionContext,
 	type Transaction,
 } from '../../../../src/context/transactionContext';
-import { FilterContext } from '../../../../src/context/filterContext';
+import { useFilter } from '../../../../src/context/filterContext';
 import { TransactionRow } from './components/transactionRow';
 import CalendarSheet from './components/CalendarSheet';
 import CalendarTrigger from './components/CalendarTrigger';
@@ -106,8 +109,11 @@ const getLocalIsoDate = (): string => {
 // =============================================
 // Main Transaction Screen Component
 // =============================================
+const DEFAULT_INSETS = { top: 0, right: 0, bottom: 0, left: 0 };
+
 export default function TransactionScreen() {
-	const insets = useSafeAreaInsets();
+	const rawInsets = useContext(SafeAreaInsetsContext);
+	const insets = rawInsets ?? DEFAULT_INSETS;
 	const [selectedDate, setSelectedDate] = useState<string>(() => {
 		return getLocalIsoDate();
 	});
@@ -116,7 +122,11 @@ export default function TransactionScreen() {
 
 	const { transactions, isLoading, refetch, deleteTransaction } =
 		useContext(TransactionContext);
-	const { dateFilterMode, transactionTypes } = useContext(FilterContext);
+	const {
+		dateFilterMode,
+		transactionTypes,
+		selectedPatternId,
+	} = useFilter();
 
 	const handleFilterPress = () => {
 		router.push('./ledger/ledgerFilter');
@@ -166,6 +176,7 @@ export default function TransactionScreen() {
 		selectedDate,
 		searchQuery,
 		transactionTypes,
+		selectedPatternId,
 	]);
 
 	// Group into sections
@@ -263,7 +274,7 @@ export default function TransactionScreen() {
 						/>
 						<TextInput
 							style={styles.searchInput}
-							placeholder="Search transactions..."
+							placeholder="Search Cash In or Cash Out..."
 							value={searchQuery}
 							onChangeText={setSearchQuery}
 							placeholderTextColor={palette.textMuted}
@@ -318,7 +329,7 @@ export default function TransactionScreen() {
 											size={48}
 											color={palette.textSubtle}
 										/>
-										<Text style={styles.emptyText}>No transactions</Text>
+										<Text style={styles.emptyText}>No Cash In or Cash Out yet</Text>
 									</View>
 								)
 							}

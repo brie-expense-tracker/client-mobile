@@ -1,4 +1,4 @@
-// src/components/TransactionRow.tsx
+// Ledger transaction row – MVP: Cash In / Cash Out, fixed categories, theme tokens
 import React, { useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +14,7 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 import { normalizeIconName } from '../../../../../src/constants/uiConstants';
 import type { Transaction } from '../../../../../src/context/transactionContext';
+import { palette, radius, space } from '../../../../../src/ui/theme';
 
 // Helper function to format date without time
 const formatDateWithoutTime = (dateString: string): string => {
@@ -54,181 +55,64 @@ const formatDateWithoutTime = (dateString: string): string => {
 	}
 };
 
-// Smart fallback function to infer icon and color from transaction description
+// Infer icon and color from description/category; uses theme palette
 const getSmartFallback = (description: string | undefined, type: 'income' | 'expense') => {
-	// Handle undefined/null descriptions
 	if (!description || typeof description !== 'string') {
-		// Return default icon/color based on type
 		if (type === 'income') {
-			return {
-				icon: 'trending-up-outline' as keyof typeof Ionicons.glyphMap,
-				color: '#43A047',
-			};
+			return { icon: 'trending-up-outline' as keyof typeof Ionicons.glyphMap, color: palette.success };
 		}
-		return {
-			icon: 'trending-down-outline' as keyof typeof Ionicons.glyphMap,
-			color: '#E53935',
-		};
+		return { icon: 'trending-down-outline' as keyof typeof Ionicons.glyphMap, color: palette.danger };
 	}
 	const desc = description.toLowerCase();
 
-	// Income categories
 	if (type === 'income') {
-		if (
-			desc.includes('salary') ||
-			desc.includes('payroll') ||
-			desc.includes('wage')
-		) {
-			return {
-				icon: 'briefcase-outline' as keyof typeof Ionicons.glyphMap,
-				color: '#43A047',
-			};
+		if (desc.includes('salary') || desc.includes('payroll') || desc.includes('wage')) {
+			return { icon: 'briefcase-outline' as keyof typeof Ionicons.glyphMap, color: palette.success };
 		}
-		if (
-			desc.includes('freelance') ||
-			desc.includes('contract') ||
-			desc.includes('gig')
-		) {
-			return {
-				icon: 'laptop-outline' as keyof typeof Ionicons.glyphMap,
-				color: '#1E88E5',
-			};
+		if (desc.includes('freelance') || desc.includes('contract') || desc.includes('gig')) {
+			return { icon: 'laptop-outline' as keyof typeof Ionicons.glyphMap, color: palette.primary };
 		}
-		if (
-			desc.includes('investment') ||
-			desc.includes('dividend') ||
-			desc.includes('stock')
-		) {
-			return {
-				icon: 'trending-up-outline' as keyof typeof Ionicons.glyphMap,
-				color: '#8E24AA',
-			};
+		if (desc.includes('investment') || desc.includes('dividend') || desc.includes('stock')) {
+			return { icon: 'trending-up-outline' as keyof typeof Ionicons.glyphMap, color: palette.primaryMuted };
 		}
 		if (desc.includes('refund') || desc.includes('rebate')) {
-			return {
-				icon: 'arrow-back-outline' as keyof typeof Ionicons.glyphMap,
-				color: '#43A047',
-			};
+			return { icon: 'arrow-back-outline' as keyof typeof Ionicons.glyphMap, color: palette.success };
 		}
 		if (desc.includes('gift') || desc.includes('bonus')) {
-			return {
-				icon: 'gift-outline' as keyof typeof Ionicons.glyphMap,
-				color: '#FB8C00',
-			};
+			return { icon: 'gift-outline' as keyof typeof Ionicons.glyphMap, color: palette.warning };
 		}
-		// Default income
-		return {
-			icon: 'trending-up-outline' as keyof typeof Ionicons.glyphMap,
-			color: '#43A047',
-		};
+		return { icon: 'trending-up-outline' as keyof typeof Ionicons.glyphMap, color: palette.success };
 	}
 
-	// Expense categories
-	if (
-		desc.includes('food') ||
-		desc.includes('restaurant') ||
-		desc.includes('grocery') ||
-		desc.includes('dining')
-	) {
-		return {
-			icon: 'restaurant-outline' as keyof typeof Ionicons.glyphMap,
-			color: '#FB8C00',
-		};
+	// Expense (Cash Out) – map to theme
+	if (desc.includes('food') || desc.includes('restaurant') || desc.includes('grocery') || desc.includes('dining')) {
+		return { icon: 'restaurant-outline' as keyof typeof Ionicons.glyphMap, color: palette.warning };
 	}
-	if (
-		desc.includes('gas') ||
-		desc.includes('fuel') ||
-		desc.includes('transport') ||
-		desc.includes('uber') ||
-		desc.includes('lyft')
-	) {
-		return {
-			icon: 'car-outline' as keyof typeof Ionicons.glyphMap,
-			color: '#1E88E5',
-		};
+	if (desc.includes('gas') || desc.includes('fuel') || desc.includes('transport') || desc.includes('uber') || desc.includes('lyft')) {
+		return { icon: 'car-outline' as keyof typeof Ionicons.glyphMap, color: palette.primary };
 	}
-	if (
-		desc.includes('rent') ||
-		desc.includes('mortgage') ||
-		desc.includes('housing') ||
-		desc.includes('utilities')
-	) {
-		return {
-			icon: 'home-outline' as keyof typeof Ionicons.glyphMap,
-			color: '#8E24AA',
-		};
+	if (desc.includes('rent') || desc.includes('mortgage') || desc.includes('housing') || desc.includes('utilities')) {
+		return { icon: 'home-outline' as keyof typeof Ionicons.glyphMap, color: palette.primaryMuted };
 	}
-	if (
-		desc.includes('shopping') ||
-		desc.includes('store') ||
-		desc.includes('amazon') ||
-		desc.includes('retail')
-	) {
-		return {
-			icon: 'bag-outline' as keyof typeof Ionicons.glyphMap,
-			color: '#E53935',
-		};
+	if (desc.includes('shopping') || desc.includes('store') || desc.includes('amazon') || desc.includes('retail')) {
+		return { icon: 'bag-outline' as keyof typeof Ionicons.glyphMap, color: palette.danger };
 	}
-	if (
-		desc.includes('entertainment') ||
-		desc.includes('movie') ||
-		desc.includes('game') ||
-		desc.includes('streaming')
-	) {
-		return {
-			icon: 'game-controller-outline' as keyof typeof Ionicons.glyphMap,
-			color: '#5E35B1',
-		};
+	if (desc.includes('entertainment') || desc.includes('movie') || desc.includes('game') || desc.includes('streaming')) {
+		return { icon: 'game-controller-outline' as keyof typeof Ionicons.glyphMap, color: palette.primaryMuted };
 	}
-	if (
-		desc.includes('health') ||
-		desc.includes('medical') ||
-		desc.includes('doctor') ||
-		desc.includes('pharmacy')
-	) {
-		return {
-			icon: 'medical-outline' as keyof typeof Ionicons.glyphMap,
-			color: '#E53935',
-		};
+	if (desc.includes('health') || desc.includes('medical') || desc.includes('doctor') || desc.includes('pharmacy')) {
+		return { icon: 'medical-outline' as keyof typeof Ionicons.glyphMap, color: palette.danger };
 	}
-	if (
-		desc.includes('education') ||
-		desc.includes('school') ||
-		desc.includes('course') ||
-		desc.includes('book')
-	) {
-		return {
-			icon: 'school-outline' as keyof typeof Ionicons.glyphMap,
-			color: '#1E88E5',
-		};
+	if (desc.includes('education') || desc.includes('school') || desc.includes('course') || desc.includes('book')) {
+		return { icon: 'school-outline' as keyof typeof Ionicons.glyphMap, color: palette.primary };
 	}
-	if (
-		desc.includes('subscription') ||
-		desc.includes('netflix') ||
-		desc.includes('spotify') ||
-		desc.includes('premium')
-	) {
-		return {
-			icon: 'card-outline' as keyof typeof Ionicons.glyphMap,
-			color: '#8E24AA',
-		};
+	if (desc.includes('subscription') || desc.includes('netflix') || desc.includes('spotify') || desc.includes('premium')) {
+		return { icon: 'card-outline' as keyof typeof Ionicons.glyphMap, color: palette.primaryMuted };
 	}
-	if (
-		desc.includes('insurance') ||
-		desc.includes('tax') ||
-		desc.includes('fee')
-	) {
-		return {
-			icon: 'shield-outline' as keyof typeof Ionicons.glyphMap,
-			color: '#424242',
-		};
+	if (desc.includes('insurance') || desc.includes('tax') || desc.includes('fee')) {
+		return { icon: 'shield-outline' as keyof typeof Ionicons.glyphMap, color: palette.textMuted };
 	}
-
-	// Default expense
-	return {
-		icon: 'trending-down-outline' as keyof typeof Ionicons.glyphMap,
-		color: '#E53935',
-	};
+	return { icon: 'trending-down-outline' as keyof typeof Ionicons.glyphMap, color: palette.danger };
 };
 
 interface TransactionRowProps {
@@ -248,29 +132,24 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 	const TRANSLATE_THRESHOLD = -70;
 	const DELETE_WIDTH = 60;
 
-	// MVP: Use category or smart fallback for display
-	const transactionContext = useMemo(() => {
-		const category = (item.metadata as any)?.category;
+	// MVP: fixed category from metadata, Cash In / Cash Out label, theme-based icon color
+	const rowDisplay = useMemo(() => {
+		const category = item.metadata?.category;
 		const smartFallback = getSmartFallback(
-			item.description || category,
+			item.description ?? category,
 			item.type
 		);
-
 		return {
-			type: 'general' as const,
 			name:
 				item.type === 'expense' && category
 					? category
 					: item.type === 'income'
-					? 'Income'
-					: 'Expense',
+					? 'Cash In'
+					: 'Cash Out',
 			icon: normalizeIconName(smartFallback.icon),
 			color: smartFallback.color,
-			progress: 0,
-			spent: 0,
-			allocated: 0,
 		};
-	}, [item.type, item.description, (item.metadata as any)?.category]);
+	}, [item.type, item.description, item.metadata?.category]);
 
 	// Clean description by removing " - Bill" suffix
 	const cleanDescription = useMemo(() => {
@@ -281,14 +160,14 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 			.trim();
 	}, [item.description]);
 
-	// Get display description: category (MVP) or description
+	// Display: fixed category (MVP) + description, or Cash In / Cash Out fallback
 	const displayDescription = useMemo(() => {
-		const category = (item.metadata as any)?.category;
+		const category = item.metadata?.category;
 		if (item.type === 'expense' && category) {
 			return cleanDescription ? `${category} – ${cleanDescription}` : category;
 		}
-		return cleanDescription || item.description || 'Transaction';
-	}, [cleanDescription, item.description, item.type, (item.metadata as any)?.category]);
+		return cleanDescription || item.description || (item.type === 'income' ? 'Cash In' : 'Cash Out');
+	}, [cleanDescription, item.description, item.type, item.metadata?.category]);
 
 	const triggerHaptic = useCallback(() => {
 		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -399,7 +278,7 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 			<View style={styles.deleteBackground}>
 				<Animated.View style={animatedIconStyle}>
 					<TouchableOpacity onPress={() => onDelete(item.id, resetAnimation)}>
-						<Ionicons name="trash-outline" size={18} color="#fff" />
+						<Ionicons name="trash-outline" size={18} color={palette.primaryTextOn} />
 					</TouchableOpacity>
 				</Animated.View>
 			</View>
@@ -409,23 +288,21 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 					<View
 						style={[
 							styles.iconCircle,
-							{ backgroundColor: `${transactionContext.color}20` },
+							{ backgroundColor: `${rowDisplay.color}20` },
 						]}
 					>
 						<Ionicons
-							name={transactionContext.icon}
+							name={rowDisplay.icon as React.ComponentProps<typeof Ionicons>['name']}
 							size={20}
-							color={transactionContext.color}
+							color={rowDisplay.color}
 						/>
 					</View>
 					<View style={styles.textContainer}>
 						<View style={styles.descriptionContainer}>
 							<Text style={styles.description}>{displayDescription}</Text>
 						</View>
-
-						{/* Category display */}
 						<View style={styles.linkedDataContainer}>
-							<Text style={styles.category}>{transactionContext.name}</Text>
+							<Text style={styles.category}>{rowDisplay.name}</Text>
 						</View>
 
 						{/* Transaction Details */}
@@ -439,7 +316,7 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 										<Ionicons
 											name="document-text-outline"
 											size={12}
-											color="#6b7280"
+											color={palette.textMuted}
 										/>
 										<Text style={styles.detailText}>{item.notes}</Text>
 									</View>
@@ -447,26 +324,14 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 								<View style={styles.detailsRow}>
 									{item.metadata?.location && (
 										<View style={styles.detailBadge}>
-											<Ionicons
-												name="location-outline"
-												size={10}
-												color="#6b7280"
-											/>
-											<Text style={styles.detailBadgeText}>
-												{item.metadata.location}
-											</Text>
+											<Ionicons name="location-outline" size={10} color={palette.textMuted} />
+											<Text style={styles.detailBadgeText}>{item.metadata.location}</Text>
 										</View>
 									)}
 									{item.metadata?.paymentMethod && (
 										<View style={styles.detailBadge}>
-											<Ionicons
-												name="card-outline"
-												size={10}
-												color="#6b7280"
-											/>
-											<Text style={styles.detailBadgeText}>
-												{item.metadata.paymentMethod}
-											</Text>
+											<Ionicons name="card-outline" size={10} color={palette.textMuted} />
+											<Text style={styles.detailBadgeText}>{item.metadata.paymentMethod}</Text>
 										</View>
 									)}
 									{item.source && item.source !== 'manual' && (
@@ -480,11 +345,10 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 														: 'download-outline'
 												}
 												size={10}
-												color="#6b7280"
+												color={palette.textMuted}
 											/>
 											<Text style={styles.detailBadgeText}>
-												{item.source.charAt(0).toUpperCase() +
-													item.source.slice(1)}
+												{item.source.charAt(0).toUpperCase() + item.source.slice(1)}
 											</Text>
 										</View>
 									)}
@@ -513,34 +377,19 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 export const TransactionRow = React.memo(
 	TransactionRowComponent,
 	(prevProps, nextProps) => {
-		// Custom comparison function to determine if re-render is needed
+		// Re-render when any displayed field or metadata.category changes (MVP: fixed category)
 		const shouldUpdate =
 			prevProps.item.id === nextProps.item.id &&
 			prevProps.item.description === nextProps.item.description &&
 			prevProps.item.amount === nextProps.item.amount &&
 			prevProps.item.date === nextProps.item.date &&
 			prevProps.item.type === nextProps.item.type &&
+			prevProps.item.metadata?.category === nextProps.item.metadata?.category &&
+			prevProps.item.notes === nextProps.item.notes &&
+			prevProps.item.source === nextProps.item.source &&
 			prevProps.item.target === nextProps.item.target &&
 			prevProps.item.targetModel === nextProps.item.targetModel &&
-			prevProps.item.recurringPattern?.patternId ===
-				nextProps.item.recurringPattern?.patternId;
-
-		// Debug logging for transaction updates
-		if (!shouldUpdate) {
-			logger.debug('[TransactionRow] Re-rendering due to changes:', {
-				id: prevProps.item.id,
-				prevDescription: prevProps.item.description,
-				nextDescription: nextProps.item.description,
-				prevAmount: prevProps.item.amount,
-				nextAmount: nextProps.item.amount,
-				prevTarget: prevProps.item.target,
-				nextTarget: nextProps.item.target,
-				prevTargetModel: prevProps.item.targetModel,
-				nextTargetModel: nextProps.item.targetModel,
-				prevRecurringPattern: prevProps.item.recurringPattern?.patternId,
-				nextRecurringPattern: nextProps.item.recurringPattern?.patternId,
-			});
-		}
+			prevProps.item.recurringPattern?.patternId === nextProps.item.recurringPattern?.patternId;
 
 		return shouldUpdate;
 	}
@@ -557,27 +406,27 @@ const styles = StyleSheet.create({
 		top: 0,
 		bottom: 0,
 		width: '100%',
-		backgroundColor: '#dc2626',
+		backgroundColor: palette.danger,
 		justifyContent: 'center',
 		alignItems: 'flex-end',
-		paddingRight: 18,
+		paddingRight: space.lg,
 	},
 	row: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		paddingVertical: 16,
-		backgroundColor: '#fff',
-		paddingHorizontal: 24,
+		paddingVertical: space.md,
+		backgroundColor: palette.surface,
+		paddingHorizontal: space.xl,
 	},
 	iconCircle: {
 		width: 36,
 		height: 36,
-		borderRadius: 8,
+		borderRadius: radius.sm,
 		justifyContent: 'center',
 		alignItems: 'center',
 	},
 	textContainer: {
-		marginLeft: 12,
+		marginLeft: space.md,
 		flex: 1,
 	},
 	descriptionContainer: {
@@ -587,17 +436,17 @@ const styles = StyleSheet.create({
 	description: {
 		fontSize: 16,
 		fontWeight: '500',
-		color: '#212121',
+		color: palette.text,
 		flex: 1,
 	},
 	linkedDataContainer: {
-		marginTop: 4,
-		gap: 4,
+		marginTop: space.xs,
+		gap: space.xs,
 	},
 	category: {
 		fontSize: 12,
-		color: '#9ca3af',
-		marginTop: 4,
+		color: palette.textSubtle,
+		marginTop: space.xs,
 		fontWeight: '500',
 	},
 	amountDate: {
@@ -608,50 +457,50 @@ const styles = StyleSheet.create({
 		fontWeight: '600',
 	},
 	income: {
-		color: '#16a34a',
+		color: palette.success,
 	},
 	expense: {
-		color: '#dc2626',
+		color: palette.danger,
 	},
 	date: {
 		fontSize: 12,
-		color: '#9ca3af',
-		marginTop: 4,
+		color: palette.textSubtle,
+		marginTop: space.xs,
 	},
 	detailsContainer: {
-		marginTop: 6,
-		gap: 4,
+		marginTop: space.sm,
+		gap: space.xs,
 	},
 	detailRow: {
 		flexDirection: 'row',
 		alignItems: 'flex-start',
-		gap: 6,
+		gap: space.sm,
 		marginTop: 2,
 	},
 	detailText: {
 		fontSize: 11,
-		color: '#6b7280',
+		color: palette.textMuted,
 		flex: 1,
 		lineHeight: 14,
 	},
 	detailsRow: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',
-		gap: 6,
+		gap: space.sm,
 		marginTop: 2,
 	},
 	detailBadge: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 4,
-		paddingHorizontal: 6,
+		gap: space.xs,
+		paddingHorizontal: space.sm,
 		paddingVertical: 2,
-		backgroundColor: '#f3f4f6',
-		borderRadius: 4,
+		backgroundColor: palette.subtle,
+		borderRadius: radius.sm,
 	},
 	detailBadgeText: {
 		fontSize: 10,
-		color: '#6b7280',
+		color: palette.textMuted,
 		fontWeight: '500',
 	},
 });

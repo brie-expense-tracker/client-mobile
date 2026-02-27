@@ -1257,11 +1257,13 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 			// Also fetch income estimate when profile loads
 			fetchIncomeEstimate();
 		} else {
-			setProfile(null);
-			setIncomeEstimate(null);
-			setIncomeComparison(null);
-			setLoading(false);
-			setError(null);
+			// Only update state when not already cleared to avoid re-render loops
+			// (e.g. in local mode when tapping Cash Out and navigating to transaction tab)
+			setProfile((prev) => (prev === null ? prev : null));
+			setIncomeEstimate((prev) => (prev === null ? prev : null));
+			setIncomeComparison((prev) => (prev === null ? prev : null));
+			setLoading((prev) => (prev === false ? prev : false));
+			setError((prev) => (prev === null ? prev : null));
 		}
 	}, [user, firebaseUser, fetchProfile, fetchIncomeEstimate]); // Include firebaseUser to ensure we have auth before fetching
 
