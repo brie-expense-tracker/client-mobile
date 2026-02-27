@@ -388,22 +388,9 @@ function RootLayoutContent() {
 					}
 				}
 			} else {
-				// MVP: Local mode - skip login, go to tabs (unless user just chose to sign in)
-				if (useLocalMode === true) {
-					if (inAuthGroup) {
-						// Re-read from storage: user may have tapped "Sign in to backup and sync"
-						getUseLocalMode().then((current) => {
-							if (current) {
-								try {
-									router.replace('/(tabs)/dashboard');
-								} catch (error) {
-									layoutLog.warn('Failed to navigate to dashboard:', error);
-								}
-							}
-						});
-					}
-					return;
-				}
+				// MVP: Local mode - allow tabs and auth. User can open login from settings
+				// ("Sign in to backup and sync"); do not redirect them away from auth.
+				if (useLocalMode === true) return;
 				if (!inAuthGroup) {
 					try {
 						router.replace('/(auth)/login');

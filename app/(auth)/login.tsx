@@ -12,8 +12,9 @@ import {
 	ActivityIndicator,
 	Pressable,
 	Alert,
+	TouchableOpacity,
 } from 'react-native';
-import { router, Stack } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import auth from '@react-native-firebase/auth';
 import * as Haptics from 'expo-haptics';
@@ -102,6 +103,7 @@ const getAuthErrorMessage = (error: any): string => {
 };
 
 export default function Login() {
+	const { from } = useLocalSearchParams<{ from?: string }>();
 	const [email, setEmail] = useState('');
 	const [password, setPassword] = useState('');
 	const [touched, setTouched] = useState<{ email: boolean; password: boolean }>(
@@ -114,6 +116,8 @@ export default function Login() {
 	const [showPassword, setShowPassword] = useState(false);
 	const [formError, setFormError] = useState<string | null>(null);
 	const { login, signInWithGoogle, error: authError, clearError } = useAuth();
+
+	const showBackToSettings = from === 'settings';
 
 	const palette = useMemo(
 		() => ({
@@ -375,6 +379,19 @@ export default function Login() {
 			style={[styles.safeAreaContainer, { backgroundColor: palette.bg }]}
 		>
 			<Stack.Screen options={{ headerShown: false }} />
+			{showBackToSettings && (
+				<TouchableOpacity
+					onPress={() => router.back()}
+					style={styles.backButton}
+					accessibilityLabel="Back to settings"
+					accessibilityRole="button"
+				>
+					<Ionicons name="chevron-back" size={28} color={palette.text} />
+					<Text style={[styles.backButtonText, { color: palette.text }]}>
+						Back to settings
+					</Text>
+				</TouchableOpacity>
+			)}
 			<KeyboardAvoidingView
 				style={styles.keyboardAvoidingView}
 				behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -563,7 +580,13 @@ export default function Login() {
 								Don&apos;t have an account?
 							</Text>
 							<BorderlessButton
-								onPress={() => router.replace('/signup')}
+								onPress={() =>
+									router.replace(
+										showBackToSettings
+											? '/(auth)/signup?from=settings'
+											: '/(auth)/signup'
+									)
+								}
 								rippleColor="rgba(0,0,0,0.08)"
 							>
 								<Text style={styles.signupLink}>Sign Up</Text>
@@ -625,6 +648,17 @@ const cardShadow = Platform.select({
 const styles = StyleSheet.create({
 	safeAreaContainer: {
 		flex: 1,
+	},
+	backButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingHorizontal: 16,
+		paddingVertical: 12,
+		gap: 4,
+	},
+	backButtonText: {
+		fontSize: 16,
+		fontWeight: '500',
 	},
 	keyboardAvoidingView: { flex: 1 },
 	scrollView: { flex: 1 },
