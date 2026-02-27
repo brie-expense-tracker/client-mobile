@@ -40,7 +40,7 @@ import { TransactionContext } from '../../../src/context/transactionContext';
 import BottomSheet from '../../../src/components/BottomSheet';
 import { isDevMode } from '../../../src/config/environment';
 import { createLogger } from '../../../src/utils/sublogger';
-import { palette, radius, space } from '../../../src/ui/theme';
+import { palette, radius, space, shadow, type } from '../../../src/ui/theme';
 import { getItem, setItem, removeItem } from '../../../src/utils/safeStorage';
 import { AppCard, AppText, AppButton } from '../../../src/ui/primitives';
 import { ErrorBoundary } from '../../../src/components/ErrorBoundary';
@@ -332,7 +332,7 @@ export default function TransactionScreenProModern() {
 			withTiming(6, { duration: 50 }),
 			withTiming(-4, { duration: 40 }),
 			withTiming(4, { duration: 40 }),
-			withTiming(0, { duration: 40 })
+			withTiming(0, { duration: 40 }),
 		);
 	}, [showCategoryError, mode, categoryShakeX]);
 
@@ -415,9 +415,9 @@ export default function TransactionScreenProModern() {
 					type: mode,
 				};
 
-			if (selectedCategory) {
-				payload.metadata = { category: selectedCategory };
-			}
+				if (selectedCategory) {
+					payload.metadata = { category: selectedCategory };
+				}
 				await addTransaction(payload);
 				await removeItem(FORM_STATE_KEY);
 
@@ -499,15 +499,15 @@ export default function TransactionScreenProModern() {
 						}}
 						scrollEventThrottle={16}
 					>
-						<View>
+						<View style={styles.formWrap}>
 							<AppText.Title style={styles.heroTitle}>
 								New transaction
 							</AppText.Title>
 
 							<AppCard
 								style={styles.amountCard}
-								padding={space.md}
-								borderRadius={radius.lg}
+								padding={space.lg}
+								borderRadius={radius.xl}
 							>
 								<View style={styles.amountRow}>
 									<Pressable
@@ -596,110 +596,110 @@ export default function TransactionScreenProModern() {
 						<AppCard
 							style={styles.section}
 							padding={0}
-							borderRadius={radius.lg}
+							borderRadius={radius.xl}
 						>
-							<View style={styles.metadataRow}>
-								<Animated.View
-									style={[
-										styles.metadataCell,
-										styles.metadataCellLeft,
-										styles.metadataCellCategory,
-										showCategoryError &&
-											mode === 'expense' &&
-											!selectedCategory &&
+							{/* Category row — full width */}
+							<Animated.View
+								style={[
+									styles.metadataRowSingle,
+									showCategoryError &&
+										mode === 'expense' &&
+										!selectedCategory && [
 											styles.metadataCellError,
-										categoryShakeStyle,
-									]}
-								>
-									<TouchableOpacity
-										style={styles.metadataCellTouchable}
-										onPress={() => {
-											Keyboard.dismiss();
-											setPickerOpen(true);
-										}}
-										activeOpacity={0.6}
-										hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-										accessibilityLabel="Select category"
-										accessibilityRole="button"
-									>
-										<Ionicons
-											name="pricetag-outline"
-											size={20}
-											color={
-												showCategoryError &&
-												mode === 'expense' &&
-												!selectedCategory
-													? palette.danger
-													: palette.primary
-											}
-											style={styles.metadataCellIcon}
-										/>
-										<View style={styles.metadataCellContent}>
-											<AppText.Caption color="muted" style={styles.metadataLabel}>
-												Category
-											</AppText.Caption>
-											<View style={styles.metadataValueWrap}>
-												<Text
-													style={[
-														styles.metadataValueCategory,
-														showCategoryError &&
-															mode === 'expense' &&
-															!selectedCategory &&
-															styles.metadataValueRequired,
-														!selectedCategory && mode === 'expense'
-															? showCategoryError
-																? { color: palette.danger }
-																: { color: palette.textMuted }
-															: { color: palette.text },
-													]}
-													numberOfLines={1}
-													ellipsizeMode="tail"
-												>
-													{selectedCategory
-														? selectedCategory
-														: mode === 'expense'
-															? 'Required'
-															: 'Optional'}
-												</Text>
-											</View>
-										</View>
-										<Ionicons
-											name="chevron-forward"
-											size={16}
-											color={palette.textSubtle}
-										/>
-									</TouchableOpacity>
-								</Animated.View>
-
+											styles.metadataCellErrorSpacing,
+										],
+									categoryShakeStyle,
+								]}
+							>
 								<TouchableOpacity
-									style={[styles.metadataCell, styles.metadataCellRight]}
-									onPress={() => setDatePickerOpen(true)}
+									style={styles.metadataRowTouchable}
+									onPress={() => {
+										Keyboard.dismiss();
+										setPickerOpen(true);
+									}}
 									activeOpacity={0.6}
-									hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-									accessibilityLabel="Select date"
+									hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+									accessibilityLabel="Select category"
 									accessibilityRole="button"
 								>
-									<View style={styles.metadataCellContent}>
-										<AppText.Caption color="muted" style={styles.metadataLabel}>
-											Date
-										</AppText.Caption>
-										<View style={styles.metadataValueWrap}>
-											<Text
-												style={styles.metadataValue}
-												numberOfLines={1}
-												ellipsizeMode="tail"
-											>
-												{formatDateWithHint(selectedDate)}
-											</Text>
-										</View>
+									<Ionicons
+										name="pricetag-outline"
+										size={22}
+										color={
+											showCategoryError &&
+											mode === 'expense' &&
+											!selectedCategory
+												? palette.danger
+												: palette.primary
+										}
+										style={styles.metadataRowIcon}
+									/>
+									<View style={styles.metadataRowContent}>
+										<Text style={styles.metadataLabel}>Category</Text>
+										<Text
+											style={[
+												styles.metadataValueCategory,
+												showCategoryError &&
+													mode === 'expense' &&
+													!selectedCategory &&
+													styles.metadataValueRequired,
+												!selectedCategory && mode === 'expense'
+													? showCategoryError
+														? { color: palette.danger }
+														: { color: palette.textMuted }
+													: { color: palette.text },
+											]}
+											numberOfLines={1}
+											ellipsizeMode="tail"
+										>
+											{selectedCategory
+												? selectedCategory
+												: mode === 'expense'
+													? 'Required'
+													: 'Optional'}
+										</Text>
 									</View>
 									<Ionicons
 										name="chevron-forward"
-										size={16}
+										size={20}
 										color={palette.textSubtle}
 									/>
 								</TouchableOpacity>
-							</View>
+							</Animated.View>
+
+							<View style={styles.metadataDivider} />
+
+							{/* Date row — full width */}
+							<TouchableOpacity
+								style={styles.metadataRowSingle}
+								onPress={() => setDatePickerOpen(true)}
+								activeOpacity={0.6}
+								hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+								accessibilityLabel="Select date"
+								accessibilityRole="button"
+							>
+								<Ionicons
+									name="calendar-outline"
+									size={22}
+									color={palette.primary}
+									style={styles.metadataRowIcon}
+								/>
+								<View style={styles.metadataRowContent}>
+									<Text style={styles.metadataLabel}>Date</Text>
+									<Text
+										style={styles.metadataValue}
+										numberOfLines={1}
+										ellipsizeMode="tail"
+									>
+										{formatDateWithHint(selectedDate)}
+									</Text>
+								</View>
+								<Ionicons
+									name="chevron-forward"
+									size={20}
+									color={palette.textSubtle}
+								/>
+							</TouchableOpacity>
 						</AppCard>
 
 						<View style={styles.noteSection}>
@@ -771,7 +771,7 @@ export default function TransactionScreenProModern() {
 							)}
 						</View>
 
-						<View style={{ height: 8 }} />
+						<View style={{ height: space.xxl }} />
 					</ScrollView>
 
 					{/* Sticky Create button — always enabled, shows inline error when category missing */}
@@ -834,7 +834,9 @@ export default function TransactionScreenProModern() {
 					}
 				>
 					<FlatList
-						data={mode === 'expense' ? [...CASH_CATEGORIES] : [...INCOME_CATEGORIES]}
+						data={
+							mode === 'expense' ? [...CASH_CATEGORIES] : [...INCOME_CATEGORIES]
+						}
 						keyExtractor={(item) => item}
 						initialNumToRender={12}
 						windowSize={6}
@@ -847,9 +849,7 @@ export default function TransactionScreenProModern() {
 							<TouchableOpacity
 								style={styles.sheetRow}
 								onPress={() =>
-									selectCategory(
-										item as ExpenseCategory | IncomeCategory
-									)
+									selectCategory(item as ExpenseCategory | IncomeCategory)
 								}
 							>
 								<Ionicons
@@ -948,17 +948,32 @@ export default function TransactionScreenProModern() {
 	);
 }
 
+const FORM_MAX_WIDTH = 420;
+
 const styles = StyleSheet.create({
 	container: { flex: 1, backgroundColor: palette.surfaceAlt },
 
 	content: {
-		paddingHorizontal: space.lg,
-		paddingTop: 0,
+		flexGrow: 1,
+		justifyContent: 'center',
+		paddingHorizontal: space.xl,
+		paddingTop: space.xl,
+		alignItems: 'center',
+	},
+
+	formWrap: {
+		width: '100%',
+		maxWidth: FORM_MAX_WIDTH,
+		alignSelf: 'center',
 	},
 
 	heroTitle: {
-		fontSize: 24,
-		marginBottom: space.sm,
+		...type.titleMd,
+		fontSize: 20,
+		fontWeight: '700',
+		color: palette.text,
+		letterSpacing: -0.4,
+		marginBottom: space.xl,
 	},
 
 	amountRow: {
@@ -974,33 +989,39 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 	},
 	dollar: {
-		fontSize: 28,
+		fontSize: 32,
 		fontWeight: '600',
-		color: palette.text,
-		marginRight: 6,
-		marginBottom: 4,
+		color: palette.textMuted,
+		marginRight: 4,
+		marginBottom: 6,
 	},
 	amountInput: {
 		flexGrow: 0,
 		flexShrink: 1,
-		fontSize: 42,
+		fontSize: 40,
 		fontWeight: '700',
 		color: palette.text,
 		textAlign: 'center',
-		minWidth: 30,
+		minWidth: 48,
 		paddingHorizontal: 0,
+		letterSpacing: -0.5,
 	},
 	amountUnderline: {
-		marginTop: space.xs,
+		marginTop: space.sm,
 		height: 1,
 		backgroundColor: palette.border,
+		opacity: 0.8,
 	},
 	errorContainer: {
-		alignItems: 'flex-end',
-		marginTop: space.xs,
-		minHeight: 18,
+		alignItems: 'center',
+		marginTop: space.sm,
+		minHeight: 20,
 	},
-	errorText: { color: palette.danger, fontSize: 13, marginTop: space.xs },
+	errorText: {
+		color: palette.danger,
+		fontSize: 12,
+		fontWeight: '500',
+	},
 
 	segmented: {
 		marginTop: space.lg,
@@ -1012,13 +1033,11 @@ const styles = StyleSheet.create({
 		borderColor: palette.border,
 	},
 	segmentedCompact: {
-		marginTop: space.sm,
-		backgroundColor: palette.surfaceAlt,
-		borderRadius: radius.md,
-		padding: 3,
+		marginTop: space.lg,
+		backgroundColor: palette.subtle,
+		borderRadius: radius.pill,
+		padding: 4,
 		flexDirection: 'row',
-		borderWidth: 1,
-		borderColor: palette.border,
 	},
 	segBtn: {
 		flex: 1,
@@ -1028,127 +1047,124 @@ const styles = StyleSheet.create({
 	},
 	segBtnCompact: {
 		flex: 1,
-		minHeight: 44,
-		paddingVertical: 12,
+		minHeight: 40,
+		paddingVertical: 10,
 		alignItems: 'center',
 		justifyContent: 'center',
+		borderRadius: radius.pill,
 	},
 	segBtnLeft: {
-		borderTopLeftRadius: radius.sm,
-		borderBottomLeftRadius: radius.sm,
+		borderTopLeftRadius: radius.pill,
+		borderBottomLeftRadius: radius.pill,
 	},
 	segBtnRight: {
-		borderTopRightRadius: radius.sm,
-		borderBottomRightRadius: radius.sm,
+		borderTopRightRadius: radius.pill,
+		borderBottomRightRadius: radius.pill,
 	},
 	segBtnActive: {
 		backgroundColor: palette.surface,
+		...shadow.soft,
+		borderWidth: 1,
+		borderColor: palette.border,
 	},
 	segText: {
 		fontSize: 14,
 		fontWeight: '600',
 	},
 	segTextCompact: {
-		fontSize: 13,
-		fontWeight: '600',
-	},
-	metadataRow: {
-		flexDirection: 'row',
-		alignItems: 'stretch',
-		minHeight: 54,
-	},
-	metadataCell: {
-		flex: 1,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		paddingVertical: space.md,
-		paddingHorizontal: space.md,
-	},
-	metadataCellLeft: {
-		borderRightWidth: StyleSheet.hairlineWidth,
-		borderRightColor: palette.border,
-	},
-	metadataCellCategory: {
-		// Category is visually dominant
-	},
-	metadataCellError: {
-		backgroundColor: palette.dangerSubtle,
-		borderWidth: 1.5,
-		borderColor: palette.danger,
-		borderRadius: radius.sm,
-	},
-	metadataCellTouchable: {
-		flex: 1,
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingVertical: space.md,
-		paddingHorizontal: space.lg,
-	},
-	metadataCellIcon: {
-		marginRight: space.sm,
-	},
-	metadataCellRight: {
-		borderLeftWidth: StyleSheet.hairlineWidth,
-		borderLeftColor: palette.border,
-		paddingRight: space.lg,
-	},
-	metadataCellContent: {
-		flex: 1,
-		minWidth: 0,
-		overflow: 'hidden',
-	},
-	metadataLabel: {
-		fontSize: 11,
-		marginBottom: 2,
-		textTransform: 'uppercase',
-		letterSpacing: 0.6,
-	},
-	metadataValueWrap: {
-		flex: 1,
-		minWidth: 0,
-		overflow: 'hidden',
-		justifyContent: 'center',
-	},
-	metadataValue: {
 		fontSize: 14,
 		fontWeight: '600',
 	},
+	metadataRowSingle: {
+		width: '100%',
+		flexDirection: 'row',
+		alignItems: 'center',
+		minHeight: 64,
+		paddingVertical: space.md,
+		paddingHorizontal: space.lg,
+		justifyContent: 'center',
+	},
+	metadataRowTouchable: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		flex: 1,
+		width: '100%',
+		paddingVertical: space.xs,
+		minWidth: 0,
+	},
+	metadataRowIcon: {
+		marginRight: space.md,
+	},
+	metadataRowContent: {
+		flex: 1,
+		minWidth: 0,
+		justifyContent: 'center',
+		alignItems: 'flex-start',
+		paddingRight: space.sm,
+	},
+	metadataDivider: {
+		height: 1,
+		backgroundColor: palette.border,
+		marginHorizontal: space.lg,
+	},
+	metadataCellError: {
+		backgroundColor: palette.dangerSubtle,
+		borderWidth: 2,
+		borderColor: palette.danger,
+		borderRadius: radius.md,
+		marginTop: space.sm,
+		marginBottom: space.xs,
+		marginHorizontal: 4,
+	},
+	metadataCellErrorSpacing: {},
+	metadataLabel: {
+		fontSize: 11,
+		fontWeight: '600',
+		textTransform: 'uppercase',
+		letterSpacing: 0.8,
+		color: palette.textMuted,
+		marginBottom: 2,
+	},
+	metadataValue: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: palette.text,
+	},
 	metadataValueCategory: {
-		fontSize: 15,
-		fontWeight: '700',
-		flexShrink: 1,
+		fontSize: 16,
+		fontWeight: '600',
 	},
 	metadataValueRequired: {
 		color: palette.danger,
 	},
 	noteSection: {
-		marginTop: space.sm,
+		marginTop: space.lg,
 	},
 	addNoteChip: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		paddingVertical: space.sm,
-		paddingHorizontal: space.md,
-		borderRadius: radius.md,
-		backgroundColor: palette.chipBg,
+		paddingVertical: space.md,
+		paddingHorizontal: space.lg,
+		borderRadius: radius.lg,
+		backgroundColor: palette.surface,
 		borderWidth: 1,
-		borderColor: palette.borderAccent,
-		borderStyle: 'dashed',
+		borderColor: palette.border,
 		alignSelf: 'flex-start',
+		...shadow.soft,
 	},
 	addNoteChipText: {
 		fontWeight: '600',
+		fontSize: 15,
 	},
 	noteExpandedContainer: {
 		gap: space.sm,
 	},
 	noteInput: {
-		minHeight: 64,
-		borderRadius: radius.md,
+		minHeight: 72,
+		borderRadius: radius.lg,
 		borderWidth: 1,
 		borderColor: palette.border,
-		paddingHorizontal: space.md,
+		paddingHorizontal: space.lg,
 		paddingVertical: space.md,
 		fontSize: 16,
 		color: palette.text,
@@ -1160,20 +1176,18 @@ const styles = StyleSheet.create({
 		paddingVertical: space.xs,
 	},
 	stickyCtaWrap: {
-		paddingHorizontal: space.lg,
-		paddingTop: space.md,
-		backgroundColor: palette.surfaceAlt,
-		borderTopWidth: StyleSheet.hairlineWidth,
+		paddingHorizontal: space.xl,
+		paddingTop: space.lg,
+		backgroundColor: palette.surface,
+		borderTopWidth: 1,
 		borderTopColor: palette.border,
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: -2 },
-		shadowOpacity: 0.06,
-		shadowRadius: 8,
-		elevation: 8,
+		...shadow.toolbar,
 	},
 	stickyCtaError: {
 		marginTop: space.sm,
 		textAlign: 'center',
+		fontSize: 12,
+		fontWeight: '500',
 	},
 
 	inputLabel: {
@@ -1192,10 +1206,17 @@ const styles = StyleSheet.create({
 	inputError: { borderColor: palette.danger, borderWidth: 1.5 },
 
 	section: {
-		marginTop: space.sm,
+		marginTop: space.lg,
+		backgroundColor: palette.surface,
+		borderWidth: 0,
+		overflow: 'hidden',
+		...shadow.soft,
 	},
 	amountCard: {
-		marginTop: space.sm,
+		marginTop: 0,
+		backgroundColor: palette.surface,
+		borderWidth: 0,
+		...shadow.soft,
 	},
 
 	inlineCtaWrap: {
