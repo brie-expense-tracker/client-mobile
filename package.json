@@ -8,6 +8,7 @@
 		"ios": "expo run:ios",
 		"web": "expo start --web",
 		"test": "jest --watchAll",
+		"test:once": "jest --runInBand --passWithNoTests",
 		"lint": "expo lint"
 	},
 	"jest": {
@@ -16,7 +17,8 @@
 		"moduleNameMapper": {
 			"^src/(.*)$": "<rootDir>/src/$1"
 		},
-		"moduleDirectories": ["node_modules", "<rootDir>/src"]
+		"moduleDirectories": ["node_modules", "<rootDir>/src"],
+		"testPathIgnorePatterns": ["/node_modules/"]
 	},
 	"expo": {
 		"doctor": {
