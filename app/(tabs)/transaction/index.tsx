@@ -21,6 +21,7 @@ import {
 	InputAccessoryView,
 	InteractionManager,
 	Dimensions,
+	StatusBar,
 } from 'react-native';
 import Animated, {
 	useSharedValue,
@@ -134,6 +135,14 @@ export default function TransactionScreenProModern() {
 	const scrollYRef = useRef(0);
 	const [keyboardHeight, setKeyboardHeight] = useState(0);
 	const insets = useSafeAreaInsets();
+	// Stable top inset from first frame to avoid "content pops down" jitter when
+	// safe area is applied after initial layout (use fallback when insets not yet available)
+	const topInset =
+		insets.top > 0
+			? insets.top
+			: Platform.OS === 'android'
+				? (StatusBar.currentHeight ?? 24)
+				: 44;
 
 	const [mode, setMode] = useState<'income' | 'expense'>(
 		params.mode === 'income' ? 'income' : 'expense',
@@ -471,11 +480,14 @@ export default function TransactionScreenProModern() {
 
 	return (
 		<ErrorBoundary>
-			<SafeAreaView style={styles.container} edges={['top']}>
+			<SafeAreaView
+				style={[styles.container, { paddingTop: topInset }]}
+				edges={[]}
+			>
 				<KeyboardAvoidingView
 					style={{ flex: 1 }}
 					behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-					keyboardVerticalOffset={0}
+					keyboardVerticalOffset={topInset}
 				>
 					<ScrollView
 						ref={scrollRef}

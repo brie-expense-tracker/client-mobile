@@ -11,7 +11,6 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import useAuth from '../../../src/context/AuthContext';
-import { setUseLocalMode } from '../../../src/storage/localModeStorage';
 import { isDevMode } from '../../../src/config/environment';
 import { palette, radius, space, type } from '../../../src/ui/theme';
 import { useProfile } from '../../../src/context/profileContext';
@@ -61,9 +60,8 @@ function getProfileCompletion(
 function SignInView() {
 	const router = useRouter();
 	const insets = useSafeAreaInsets();
-	const handleSignInToSync = async () => {
-		await setUseLocalMode(false);
-		router.replace('/(auth)/login');
+	const handleSignInToSync = () => {
+		router.push('/(auth)/login?from=settings');
 	};
 
 	return (
