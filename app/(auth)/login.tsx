@@ -232,18 +232,11 @@ export default function Login() {
 				if (!signInMethods.includes('password')) {
 					// User exists but doesn't have password auth enabled
 					const hasGoogle = signInMethods.includes('google.com');
-					const hasApple = signInMethods.includes('apple.com');
 
 					let errorMessage = 'This account was created using ';
-					if (hasGoogle && hasApple) {
-						errorMessage +=
-							'Google or Apple Sign-In. Please use one of those methods to sign in.';
-					} else if (hasGoogle) {
+					if (hasGoogle) {
 						errorMessage +=
 							'Google Sign-In. Please use Google Sign-In to sign in.';
-					} else if (hasApple) {
-						errorMessage +=
-							'Apple Sign-In. Please use Apple Sign-In to sign in.';
 					} else {
 						errorMessage +=
 							'a different sign-in method. Please use the original method you used to create your account.';
@@ -271,7 +264,7 @@ export default function Login() {
 				password.trim()
 			);
 
-			// Pass the Firebase user to your app's auth context to handle backend verification
+			// Pass the Firebase user to the auth context to handle backend verification
 			await login(userCredential.user);
 
 			await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -347,9 +340,6 @@ export default function Login() {
 							if (signInMethods.includes('password')) {
 								errorMessage =
 									'This account was created using email and password. Please use email and password to sign in.';
-							} else if (signInMethods.includes('apple.com')) {
-								errorMessage =
-									'This account was created using Apple Sign-In. Please use Apple Sign-In to sign in.';
 							} else {
 								errorMessage =
 									'This account was created using a different sign-in method. Please use the original method you used to create your account.';
@@ -565,15 +555,6 @@ export default function Login() {
 									{isLoading ? 'Signing in…' : 'Google'}
 								</Text>
 							</RectButton>
-
-							<RectButton
-								enabled={!isLoading}
-								onPress={() => {}}
-								style={[styles.socialButton, socialShadow, { opacity: 0.6 }]}
-							>
-								<Ionicons name="logo-apple" size={22} color="#0F172A" />
-								<Text style={styles.socialButtonText}>Apple (soon)</Text>
-							</RectButton>
 						</View>
 
 						{/* Signup prompt */}
@@ -589,19 +570,19 @@ export default function Login() {
 							</BorderlessButton>
 						</View>
 
-						{/* Use without account - local-only MVP */}
-						<BorderlessButton
+						{/* Use without account - optional, data stays on device */}
+						<RectButton
 							onPress={async () => {
 								await setUseLocalMode(true);
 								router.replace('/(tabs)/dashboard');
 							}}
-							rippleColor="rgba(0,0,0,0.08)"
 							style={styles.useLocalButton}
+							rippleColor="rgba(0,0,0,0.06)"
 						>
 							<Text style={[styles.useLocalText, { color: palette.subtext }]}>
 								Use without account (data stays on your device)
 							</Text>
-						</BorderlessButton>
+						</RectButton>
 					</View>
 				</ScrollView>
 			</KeyboardAvoidingView>
@@ -783,12 +764,17 @@ const styles = StyleSheet.create({
 	},
 	useLocalButton: {
 		marginTop: 24,
-		alignSelf: 'center',
-		paddingVertical: 8,
-		paddingHorizontal: 12,
+		alignSelf: 'stretch',
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingVertical: 14,
+		paddingHorizontal: 16,
+		borderRadius: 12,
+		backgroundColor: 'transparent',
 	},
 	useLocalText: {
-		fontSize: 13,
+		fontSize: 14,
+		fontWeight: '600',
 		textAlign: 'center',
 	},
 	signupRow: {

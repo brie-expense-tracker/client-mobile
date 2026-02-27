@@ -388,7 +388,7 @@ function RecentTransactionsList({
 						Log your first Cash In or Cash Out to see it here
 					</AppText.Caption>
 					<AppButton
-						label="+ Cash In"
+						label="Cash In"
 						variant="primary"
 						icon="add"
 						onPress={() => router.push('/(tabs)/transaction?mode=income')}

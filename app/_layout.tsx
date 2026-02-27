@@ -38,6 +38,7 @@ import { loadLocalOverrides, getResolvedFlags } from '../src/config/features';
 import * as Notifications from 'expo-notifications';
 import { ensureBgPushRegistered } from '../src/services/notifications/backgroundTaskService';
 import { useAppInit } from '../src/hooks/useAppInit';
+import { LocalMigrationRunner } from '../src/components/LocalMigrationRunner';
 import { DEV_MODE, isDevMode, isInternalBuild } from '../src/config/environment';
 import { useDevModeEasterEgg } from '../src/hooks/useDevModeEasterEgg';
 import { getUseLocalMode } from '../src/storage/localModeStorage';
@@ -107,6 +108,12 @@ function RootLayoutContent() {
 	useEffect(() => {
 		getUseLocalMode().then(setUseLocalMode);
 	}, []);
+	// Re-read when entering auth so "Sign in to backup and sync" works (storage updated before state)
+	useEffect(() => {
+		if (segments[0] === '(auth)') {
+			getUseLocalMode().then(setUseLocalMode);
+		}
+	}, [segments]);
 
 	// Add timeout mechanism to prevent infinite loading
 	const [loadingTimeout, setLoadingTimeout] = useState(false);
@@ -125,7 +132,6 @@ function RootLayoutContent() {
 					inAuthGroup: segments[0] === '(auth)',
 					inTabsGroup: segments[0] === '(tabs)',
 					inOnboardingGroup: segments[0] === '(onboarding)',
-					inStackGroup: segments[0] === '(stack)',
 					isEditingOnboarding,
 					DEV_MODE,
 					isDevMode,
@@ -267,7 +273,6 @@ function RootLayoutContent() {
 			const inAuthGroup = segments[0] === '(auth)';
 			const inTabsGroup = segments[0] === '(tabs)';
 			const inOnboardingGroup = segments[0] === '(onboarding)';
-			const inStackGroup = segments[0] === '(stack)';
 			const isNotFound = (segments[0] as string) === '+not-found';
 			const isRoot =
 				(segments.length as number) === 0 ||
@@ -292,10 +297,6 @@ function RootLayoutContent() {
 			const allowOnboardingRoute =
 				isWizardRoute || isReviewOrEditRoute || isEditingOnboarding;
 
-			// Stack routes don't include the group name in segments, so check for known stack routes
-			const knownStackRoutes = ['settings'];
-			const isStackRoute =
-				inStackGroup || knownStackRoutes.includes(segments[0] || '');
 			if (firebaseUser && user) {
 				// If we're on a 404 page, let it be shown if it's NOT just the initial root loading
 				if (isNotFound && !isRoot) return;
@@ -341,10 +342,10 @@ function RootLayoutContent() {
 				}
 
 				// If onboarding is complete:
-				// - Allow tabs and stack routes
+				// - Allow tabs
 				// - Allow onboarding edit routes (prod) (dev allowed above)
 				if (hasCompletedOnboarding) {
-					if (inTabsGroup || isStackRoute) return;
+					if (inTabsGroup) return;
 					if (isReviewOrEditRoute || isEditingOnboarding) return;
 
 					logState('nav-effect:redirecting-to-dashboard');
@@ -387,14 +388,19 @@ function RootLayoutContent() {
 					}
 				}
 			} else {
-				// MVP: Local mode - skip login, go to tabs
+				// MVP: Local mode - skip login, go to tabs (unless user just chose to sign in)
 				if (useLocalMode === true) {
 					if (inAuthGroup) {
-						try {
-							router.replace('/(tabs)/dashboard');
-						} catch (error) {
-							layoutLog.warn('Failed to navigate to dashboard:', error);
-						}
+						// Re-read from storage: user may have tapped "Sign in to backup and sync"
+						getUseLocalMode().then((current) => {
+							if (current) {
+								try {
+									router.replace('/(tabs)/dashboard');
+								} catch (error) {
+									layoutLog.warn('Failed to navigate to dashboard:', error);
+								}
+							}
+						});
 					}
 					return;
 				}
@@ -467,6 +473,7 @@ function RootLayoutContent() {
 					{/* MVP: StubProviders for Budget/Goal/Bill - wallet removed, cash-only */}
 					<StubProviders>
 						<TransactionProvider>
+							<LocalMigrationRunner />
 							<GestureHandlerRootView style={{ flex: 1 }}>
 								<Stack
 									screenOptions={{
@@ -485,10 +492,6 @@ function RootLayoutContent() {
 									/>
 									<Stack.Screen
 										name="(tabs)"
-										options={{ headerShown: false, animation: 'none' }}
-									/>
-									<Stack.Screen
-										name="(stack)"
 										options={{ headerShown: false, animation: 'none' }}
 									/>
 								</Stack>
@@ -540,10 +543,6 @@ function RootLayoutContent() {
 								name="(tabs)"
 								options={{ headerShown: false, animation: 'none' }}
 							/>
-							<Stack.Screen
-								name="(stack)"
-								options={{ headerShown: false, animation: 'none' }}
-							/>
 						</Stack>
 					</GestureHandlerRootView>
 				</LocalTransactionProvider>
@@ -575,10 +574,6 @@ function RootLayoutContent() {
 				/>
 				<Stack.Screen
 					name="(tabs)"
-					options={{ headerShown: false, animation: 'none' }}
-				/>
-				<Stack.Screen
-					name="(stack)"
 					options={{ headerShown: false, animation: 'none' }}
 				/>
 			</Stack>
