@@ -311,14 +311,19 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 						notes: response.data.notes,
 						source: response.data.source,
 						vendor: response.data.vendor,
-						metadata: response.data.metadata
-							? {
-									location: response.data.metadata.location,
-									paymentMethod: response.data.metadata.paymentMethod,
-									originalDescription:
-										response.data.metadata.originalDescription,
-							  }
-							: undefined,
+						metadata:
+							response.data.metadata || transactionData.metadata
+								? {
+										location: response.data.metadata?.location,
+										paymentMethod:
+											response.data.metadata?.paymentMethod,
+										originalDescription:
+											response.data.metadata?.originalDescription,
+										category:
+											response.data.metadata?.category ??
+											transactionData.metadata?.category,
+								  }
+								: undefined,
 					};
 
 					// Replace the temporary transaction with the real one
@@ -540,6 +545,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 									paymentMethod: response.data.metadata.paymentMethod,
 									originalDescription:
 										response.data.metadata.originalDescription,
+									category: response.data.metadata.category,
 							  }
 							: undefined,
 					};

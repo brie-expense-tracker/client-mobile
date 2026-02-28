@@ -12,6 +12,19 @@ import type { Transaction } from '../context/transactionContext';
 
 const MIGRATED_KEY = 'brie_local_migrated';
 
+/**
+ * Clear the migration flag so that the next sign-in will run migration again
+ * if there are local transactions (e.g. after switching accounts).
+ * Call this on logout so local data can migrate to the new account.
+ */
+export async function clearLocalMigrationFlag(): Promise<void> {
+	try {
+		await AsyncStorage.removeItem(MIGRATED_KEY);
+	} catch {
+		// ignore
+	}
+}
+
 function toPayload(tx: Transaction): Omit<Transaction, 'id'> {
 	return {
 		description: tx.description,

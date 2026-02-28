@@ -132,20 +132,16 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 	const TRANSLATE_THRESHOLD = -70;
 	const DELETE_WIDTH = 60;
 
-	// MVP: fixed category from metadata, Cash In / Cash Out label, theme-based icon color
+	// MVP: fixed category from metadata; show category when present for both income and expense
 	const rowDisplay = useMemo(() => {
 		const category = item.metadata?.category;
 		const smartFallback = getSmartFallback(
 			item.description ?? category,
 			item.type
 		);
+		const fallbackLabel = item.type === 'income' ? 'Cash In' : 'Cash Out';
 		return {
-			name:
-				item.type === 'expense' && category
-					? category
-					: item.type === 'income'
-					? 'Cash In'
-					: 'Cash Out',
+			name: category ?? fallbackLabel,
 			icon: normalizeIconName(smartFallback.icon),
 			color: smartFallback.color,
 		};
@@ -160,10 +156,10 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 			.trim();
 	}, [item.description]);
 
-	// Display: fixed category (MVP) + description, or Cash In / Cash Out fallback
+	// Display: category + description when category present (income or expense), else description or fallback
 	const displayDescription = useMemo(() => {
 		const category = item.metadata?.category;
-		if (item.type === 'expense' && category) {
+		if (category) {
 			return cleanDescription ? `${category} – ${cleanDescription}` : category;
 		}
 		return cleanDescription || item.description || (item.type === 'income' ? 'Cash In' : 'Cash Out');
