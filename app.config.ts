@@ -1,4 +1,49 @@
 import { ExpoConfig, ConfigContext } from 'expo/config';
+import path from 'path';
+import fs from 'fs';
+
+/** Read client IDs from google-services.json (or path in GOOGLE_SERVICES_JSON) for a single source of truth. */
+function getGoogleClientIds(): {
+	webClientId: string | null;
+	iosClientId: string | null;
+} {
+	const jsonPath =
+		process.env.GOOGLE_SERVICES_JSON ||
+		path.join(__dirname, 'google-services.json');
+	try {
+		const raw = fs.readFileSync(jsonPath, 'utf-8');
+		const data = JSON.parse(raw) as {
+			client?: Array<{
+				oauth_client?: Array<{ client_id: string; client_type: number }>;
+				services?: {
+					appinvite_service?: {
+						other_platform_oauth_client?: Array<{
+							client_id: string;
+							client_type: number;
+						}>;
+					};
+				};
+			}>;
+		};
+		const client = data.client?.[0];
+		const web =
+			client?.oauth_client?.find((c) => c.client_type === 3)?.client_id ?? null;
+		const ios =
+			client?.services?.appinvite_service?.other_platform_oauth_client?.find(
+				(c) => c.client_type === 2
+			)?.client_id ?? null;
+		return { webClientId: web, iosClientId: ios };
+	} catch {
+		// Fallback when file missing (e.g. secret not checked in) so builds still work
+		return {
+			webClientId: '807336746313-5spjml5hicchm614hbvk67csns8idd66.apps.googleusercontent.com',
+			iosClientId:
+				'807336746313-khft9ts8r9li4cvme5bpjnhr1tdou3je.apps.googleusercontent.com',
+		};
+	}
+}
+
+const googleClientIds = getGoogleClientIds();
 
 export default ({ config }: ConfigContext): ExpoConfig => {
 	const profile = process.env.EAS_BUILD_PROFILE ?? ''; // e.g., "production" | "testflight" | "development"
@@ -28,6 +73,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 				tinted: './src/assets/icons/ios-tinted.png',
 			},
 			infoPlist: {
+				// Required by @react-native-google-signin for iOS (from google-services.json when available)
+				...(googleClientIds.iosClientId && {
+					GIDClientID: googleClientIds.iosClientId,
+				}),
 				ITSAppUsesNonExemptEncryption: false,
 				NSAppTransportSecurity: {
 					NSAllowsLocalNetworking: true,
@@ -126,6 +175,13 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 			eas: {
 				projectId: '86bf0001-bc3c-4327-85d5-9ceca2cd9150',
 			},
+			// From google-services.json (or GOOGLE_SERVICES_JSON path) for Google Sign-In
+			...(googleClientIds.webClientId && {
+				googleWebClientId: googleClientIds.webClientId,
+			}),
+			...(googleClientIds.iosClientId && {
+				googleIosClientId: googleClientIds.iosClientId,
+			}),
 		},
 		owner: 'xamata',
 	};

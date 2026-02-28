@@ -21,6 +21,7 @@ import {
 } from '@react-native-firebase/auth';
 import { isDevMode } from '../config/environment';
 import { setItem, removeItem } from '../utils/safeStorage';
+import { clearLocalMigrationFlag } from '../storage/migrateLocalTransactions';
 import * as Sentry from '@sentry/react-native';
 import { UserService, User, Profile } from '../services';
 import { ApiService } from '../services/core/apiService';
@@ -882,6 +883,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				processingTimeoutRef.current = null;
 			}
 			await removeItem(UID_KEY);
+			// Reset migration flag so local data can migrate to the next account on sign-in
+			await clearLocalMigrationFlag().catch(() => undefined);
 		} catch (error) {
 			authContextLog.error('Error during logout', error);
 			setError({
@@ -1426,6 +1429,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 			// Clear AsyncStorage and context state
 			await removeItem(UID_KEY);
+			await clearLocalMigrationFlag().catch(() => undefined);
 			setUser(null);
 			setProfile(null);
 			setFirebaseUser(null);
@@ -1537,6 +1541,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 			// Local cleanup
 			await removeItem(UID_KEY);
+			await clearLocalMigrationFlag().catch(() => undefined);
 			setUser(null);
 			setProfile(null);
 			setFirebaseUser(null);

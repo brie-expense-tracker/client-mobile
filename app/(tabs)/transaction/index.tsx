@@ -18,7 +18,6 @@ import {
 	Platform,
 	Keyboard,
 	KeyboardAvoidingView,
-	InputAccessoryView,
 	InteractionManager,
 	Dimensions,
 	StatusBar,
@@ -47,7 +46,6 @@ import { AppCard, AppText, AppButton } from '../../../src/ui/primitives';
 import { ErrorBoundary } from '../../../src/components/ErrorBoundary';
 
 const transactionScreenLog = createLogger('TransactionScreen');
-const accessoryId = 'tx-input-accessory';
 
 const CASH_CATEGORIES = [
 	'Food',
@@ -546,9 +544,6 @@ export default function TransactionScreenProModern() {
 													returnKeyType="next"
 													accessibilityLabel="Amount"
 													maxLength={9}
-													inputAccessoryViewID={
-														Platform.OS === 'ios' ? accessoryId : undefined
-													}
 												/>
 											)}
 										/>
@@ -651,8 +646,7 @@ export default function TransactionScreenProModern() {
 													!selectedCategory &&
 													styles.metadataValueRequired,
 												!selectedCategory
-													? showCategoryError &&
-														mode === 'expense'
+													? showCategoryError && mode === 'expense'
 														? { color: palette.danger }
 														: { color: palette.textMuted }
 													: { color: palette.text },
@@ -763,9 +757,6 @@ export default function TransactionScreenProModern() {
 												maxLength={120}
 												multiline
 												numberOfLines={2}
-												inputAccessoryViewID={
-													Platform.OS === 'ios' ? accessoryId : undefined
-												}
 											/>
 										)}
 									/>
@@ -792,30 +783,22 @@ export default function TransactionScreenProModern() {
 								accessibilityLabel={`Create ${mode}`}
 							/>
 							{showCategoryError && mode === 'expense' && (
-								<AppText.Caption color="danger" style={styles.createButtonError}>
+								<AppText.Caption
+									color="danger"
+									style={styles.createButtonError}
+								>
 									Please choose a category
 								</AppText.Caption>
 							)}
 						</View>
 
-						<View style={{ height: insets.bottom + space.xxl }} />
+						<View
+							style={{
+								height: keyboardHeight > 0 ? 0 : insets.bottom + space.xxl,
+							}}
+						/>
 					</ScrollView>
 				</KeyboardAvoidingView>
-
-				{Platform.OS === 'ios' && (
-					<InputAccessoryView nativeID={accessoryId}>
-						<View style={styles.accessoryBar}>
-							<TouchableOpacity
-								onPress={() => Keyboard.dismiss()}
-								hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-							>
-								<AppText.Body color="primary" style={styles.accessoryDoneText}>
-									Done
-								</AppText.Body>
-							</TouchableOpacity>
-						</View>
-					</InputAccessoryView>
-				)}
 
 				<BottomSheet
 					isOpen={pickerOpen}
@@ -966,7 +949,6 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		// No justifyContent: 'center' — keeps layout stable when keyboard opens or note expands (avoids jitter)
 	},
-
 	formWrap: {
 		width: '100%',
 		maxWidth: FORM_MAX_WIDTH,
@@ -1223,16 +1205,6 @@ const styles = StyleSheet.create({
 	miniSummary: {
 		textAlign: 'center',
 		marginBottom: space.md,
-	},
-
-	accessoryBar: {
-		padding: space.md,
-		alignItems: 'flex-end',
-		backgroundColor: palette.surfaceAlt,
-	},
-	accessoryDoneText: {
-		color: palette.primary,
-		fontWeight: '700',
 	},
 
 	sheetHeader: {

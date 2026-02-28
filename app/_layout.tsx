@@ -33,7 +33,6 @@ import { TransactionProvider } from '../src/context/transactionContext';
 import { LocalTransactionProvider } from '../src/context/localTransactionContext';
 import { StubProviders } from '../src/context/stubProviders';
 import { ThemeProvider } from '../src/context/ThemeContext';
-import { SubscriptionProvider } from '../src/context/SubscriptionContext';
 import { loadLocalOverrides, getResolvedFlags } from '../src/config/features';
 import * as Notifications from 'expo-notifications';
 import { ensureBgPushRegistered } from '../src/services/notifications/backgroundTaskService';
@@ -649,13 +648,11 @@ export default function RootLayout() {
 							translucent={false}
 						/>
 						<AuthProvider>
-							<SubscriptionProvider>
-								<OnboardingProvider>
-									<NotificationProvider>
-										<RootLayoutContent />
-									</NotificationProvider>
-								</OnboardingProvider>
-							</SubscriptionProvider>
+							<OnboardingProvider>
+								<NotificationProvider>
+									<RootLayoutContent />
+								</NotificationProvider>
+							</OnboardingProvider>
 						</AuthProvider>
 					</ThemeProvider>
 				</QueryClientProvider>
