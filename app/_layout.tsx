@@ -21,6 +21,7 @@ import { createLogger } from '../src/utils/sublogger';
 import {
 	SafeAreaProvider,
 	initialWindowMetrics,
+	useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 import useAuth, { AuthProvider } from '../src/context/AuthContext';
 import {
@@ -57,7 +58,6 @@ SplashScreen.preventAutoHideAsync();
 const styles = StyleSheet.create({
 	devIndicator: {
 		position: 'absolute',
-		top: 55,
 		right: 20,
 		backgroundColor: '#FFFFFF',
 		paddingHorizontal: 10,
@@ -98,6 +98,7 @@ function RootLayoutContent() {
 	const { user, firebaseUser, loading } = useAuth();
 	const { hasSeenOnboarding, isEditingOnboarding } = useOnboarding();
 	const router = useRouter();
+	const insets = useSafeAreaInsets();
 	const { isEnabled: isDevModeEasterEggEnabled } = useDevModeEasterEgg();
 	const segments = useSegments();
 	const [isMounted, setIsMounted] = useState(false);
@@ -452,7 +453,12 @@ function RootLayoutContent() {
 			return (
 				<ProfileProvider>
 					{shouldShowDevModeBadge && (
-						<View style={styles.devIndicator}>
+						<View
+							style={[
+								styles.devIndicator,
+								{ top: insets.top + 10 },
+							]}
+						>
 							<Text style={styles.devText}>DEV MODE</Text>
 						</View>
 					)}

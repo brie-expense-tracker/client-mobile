@@ -25,6 +25,13 @@ export default function EditLayout() {
 				}}
 			/>
 			<Stack.Screen
+				name="expenses"
+				options={{
+					headerShown: false,
+					animation: 'slide_from_right',
+				}}
+			/>
+			<Stack.Screen
 				name="savings"
 				options={{
 					headerShown: false,
@@ -41,4 +48,3 @@ export default function EditLayout() {
 		</Stack>
 	);
 }
-

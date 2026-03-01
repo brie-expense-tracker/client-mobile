@@ -134,28 +134,13 @@ function ProfileContent() {
 		[profile, email],
 	);
 
-	// Go to onboarding/edit screens (profile, income, savings, debt)
-	const handleEditName = () => router.push('/(onboarding)/edit/profile');
-	const handleEditPhone = () => router.push('/(onboarding)/edit/profile');
+	// Go to profile review hub (Review your details) or direct edit
+	const handleEditName = () => router.push('/(onboarding)/edit');
 	const handleEditFinancial = () => router.push('/(onboarding)/edit');
 	const handleEditExpenses = () => router.push('/(onboarding)/edit');
 
-	const handleEditProfile = handleEditName; // Edit button → name
-	const handleFinishProfile = handleEditFinancial; // Finish → income/money
-	const handleSetPhone = handleEditPhone;
 	// DEV only: full onboarding flow for testing
 	const handleOpenOnboarding = () => router.push('/(onboarding)/profileSetup');
-
-	const handleUpdateMoney = () => router.push('/(tabs)/transaction');
-	const handleDashboard = () => router.push('/(tabs)/dashboard');
-	const handleExportData = () => {
-		// MVP: Export screen may not exist - show placeholder
-		Alert.alert(
-			'Export data',
-			'Back up your profile and transactions. This feature is coming soon.',
-			[{ text: 'OK' }],
-		);
-	};
 
 	const handleLogout = async () => {
 		try {
@@ -174,8 +159,12 @@ function ProfileContent() {
 		loans: 0,
 		subscriptions: 0,
 	};
-	const housingLabel =
-		expenses.housing > 0 ? `Housing ${currency(expenses.housing)}` : 'Not set';
+	const expensesTotal =
+		(expenses.housing ?? 0) + (expenses.loans ?? 0) + (expenses.subscriptions ?? 0);
+	const expensesLabel =
+		expensesTotal > 0 ? `${currency(expensesTotal)}/mo` : 'Not set';
+	// Defensive: keep for stale bundle / hot reload; Money row was removed from UI
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	const moneyValue = `${currency(savings)} • ${currency(debt)}`;
 
 	return (
@@ -208,43 +197,6 @@ function ProfileContent() {
 								{completion.percent}% • {completion.fieldsLeft} fields left
 							</AppText.Caption>
 						</View>
-						<AppButton
-							label="Edit"
-							variant="primary"
-							size="sm"
-							icon="pencil-outline"
-							iconPosition="left"
-							onPress={handleEditProfile}
-							style={styles.editButton}
-						/>
-					</View>
-				</AppCard>
-
-				{/* Profile Completion Progress Card */}
-				<AppCard style={styles.completionCard} padding={space.lg}>
-					<AppText.Heading style={styles.completionTitle}>
-						Finish your profile
-					</AppText.Heading>
-					<View style={styles.progressBar}>
-						<View
-							style={[styles.progressFill, { width: `${completion.percent}%` }]}
-						/>
-					</View>
-					<View style={styles.completionButtons}>
-						<AppButton
-							label="Set your phone"
-							variant="secondary"
-							size="sm"
-							onPress={handleSetPhone}
-							style={styles.completionSecondary}
-						/>
-						<AppButton
-							label="Finish profile"
-							variant="primary"
-							size="sm"
-							onPress={handleFinishProfile}
-							style={styles.completionPrimary}
-						/>
 					</View>
 				</AppCard>
 
@@ -283,25 +235,18 @@ function ProfileContent() {
 							onPress={handleEditName}
 						/>
 						<AppRow
-							icon="call-outline"
-							label="Contact"
+							icon="mail-outline"
+							label="Email"
 							right={
 								<AppText.Body numberOfLines={1}>
 									{email || 'Not set'}
 								</AppText.Body>
 							}
-							onPress={handleEditPhone}
-						/>
-						<AppRow
-							icon="cash-outline"
-							label="Money"
-							right={<AppText.Body>{moneyValue}</AppText.Body>}
-							onPress={handleEditFinancial}
 						/>
 						<AppRow
 							icon="wallet-outline"
 							label="Expenses"
-							right={<AppText.Body>{housingLabel}</AppText.Body>}
+							right={<AppText.Body>{expensesLabel}</AppText.Body>}
 							onPress={handleEditExpenses}
 						/>
 						<AppRow
@@ -312,85 +257,6 @@ function ProfileContent() {
 							onPress={handleEditFinancial}
 						/>
 					</AppCard>
-				</View>
-
-				{/* QUICK ACTIONS */}
-				<View style={styles.section}>
-					<AppText.Label color="subtle" style={styles.sectionTitle}>
-						QUICK ACTIONS
-					</AppText.Label>
-					<View style={styles.quickActions}>
-						<TouchableOpacity
-							style={styles.quickActionCard}
-							onPress={handleUpdateMoney}
-							activeOpacity={0.7}
-						>
-							<View
-								style={[
-									styles.quickActionIcon,
-									{ backgroundColor: palette.successSubtle },
-								]}
-							>
-								<Ionicons
-									name="cash-outline"
-									size={24}
-									color={palette.success}
-								/>
-							</View>
-							<AppText.Heading style={styles.quickActionTitle}>
-								Update money
-							</AppText.Heading>
-							<AppText.Caption color="muted">
-								Income, savings, expenses
-							</AppText.Caption>
-						</TouchableOpacity>
-
-						<TouchableOpacity
-							style={styles.quickActionCard}
-							onPress={handleDashboard}
-							activeOpacity={0.7}
-						>
-							<View
-								style={[
-									styles.quickActionIcon,
-									{ backgroundColor: palette.primarySubtle },
-								]}
-							>
-								<Ionicons
-									name="grid-outline"
-									size={24}
-									color={palette.primary}
-								/>
-							</View>
-							<AppText.Heading style={styles.quickActionTitle}>
-								Dashboard
-							</AppText.Heading>
-							<AppText.Caption color="muted">View transactions</AppText.Caption>
-						</TouchableOpacity>
-
-						<TouchableOpacity
-							style={styles.quickActionCard}
-							onPress={handleExportData}
-							activeOpacity={0.7}
-						>
-							<View
-								style={[
-									styles.quickActionIcon,
-									{ backgroundColor: palette.primarySoft },
-								]}
-							>
-								<Ionicons
-									name="cloud-upload-outline"
-									size={24}
-									color={palette.primary}
-								/>
-							</View>
-							<AppText.Heading style={styles.quickActionTitle}>
-								Export data
-							</AppText.Heading>
-							<AppText.Caption color="muted">Backup profile</AppText.Caption>
-						</TouchableOpacity>
-					</View>
 				</View>
 
 				{/* Logout & Delete Account */}
@@ -472,7 +338,8 @@ const styles = StyleSheet.create({
 	},
 	profileSummary: {
 		flexDirection: 'row',
-		alignItems: 'flex-start',
+		alignItems: 'center',
+		justifyContent: 'flex-start',
 		gap: space.md,
 	},
 	avatar: {
@@ -497,37 +364,6 @@ const styles = StyleSheet.create({
 	completionText: {
 		marginTop: 4,
 	},
-	editButton: {
-		alignSelf: 'center',
-	},
-	completionCard: {
-		marginBottom: 0,
-	},
-	completionTitle: {
-		marginBottom: space.sm,
-	},
-	progressBar: {
-		height: 8,
-		borderRadius: 4,
-		backgroundColor: palette.track,
-		overflow: 'hidden',
-		marginBottom: space.md,
-	},
-	progressFill: {
-		height: '100%',
-		backgroundColor: palette.primary,
-		borderRadius: 4,
-	},
-	completionButtons: {
-		flexDirection: 'row',
-		gap: space.sm,
-	},
-	completionSecondary: {
-		flex: 1,
-	},
-	completionPrimary: {
-		flex: 1,
-	},
 	section: {
 		marginTop: 0,
 	},
@@ -546,31 +382,5 @@ const styles = StyleSheet.create({
 		...type.small,
 		color: palette.danger,
 		fontWeight: '600',
-	},
-	quickActions: {
-		flexDirection: 'row',
-		gap: space.sm,
-	},
-	quickActionCard: {
-		flex: 1,
-		backgroundColor: palette.surface,
-		borderRadius: radius.lg,
-		padding: space.md,
-		alignItems: 'center',
-		borderWidth: StyleSheet.hairlineWidth,
-		borderColor: palette.border,
-	},
-	quickActionIcon: {
-		width: 48,
-		height: 48,
-		borderRadius: radius.md,
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginBottom: space.sm,
-	},
-	quickActionTitle: {
-		fontSize: 14,
-		textAlign: 'center',
-		marginBottom: 2,
 	},
 });

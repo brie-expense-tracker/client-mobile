@@ -11,11 +11,11 @@ import {
 	generateAccessibilityLabel,
 	voiceOverHints,
 } from '../../../src/utils/accessibility';
+import { palette } from '../../../src/ui/theme';
 
 export default function DashboardLayout() {
 	const [isPressed, setIsPressed] = useState(false);
 
-	// Animated style for button press feedback
 	const animatedButtonStyle = useAnimatedStyle(() => ({
 		transform: [{ scale: withSpring(isPressed ? 0.95 : 1) }],
 		opacity: withSpring(isPressed ? 0.7 : 1),
@@ -34,12 +34,11 @@ export default function DashboardLayout() {
 					headerTitleStyle: {
 						fontSize: 20,
 						fontWeight: '600',
-						color: '#333',
+						color: palette.text,
 					},
 					headerStyle: {
-						backgroundColor: '#ffffff',
+						backgroundColor: palette.bg,
 					},
-
 					headerLeft: () => (
 						<Animated.View style={animatedButtonStyle}>
 							<BorderlessButton
@@ -55,7 +54,7 @@ export default function DashboardLayout() {
 								<Ionicons
 									name="chevron-back"
 									size={24}
-									color="#333"
+									color={palette.text}
 									accessibilityRole="image"
 									accessibilityLabel="Back arrow"
 								/>

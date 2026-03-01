@@ -1,9 +1,10 @@
 import React, { useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { palette, radius, space, type, shadow } from '../../../src/ui/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { palette, radius, space } from '../../../src/ui/theme';
+import { AppCard, AppText, AppButton, AppRow } from '../../../src/ui/primitives';
 import Animated, {
 	useSharedValue,
 	withTiming,
@@ -19,40 +20,11 @@ const currency = (amount: number) =>
 		maximumFractionDigits: 0,
 	}).format(amount);
 
-type SectionKey = 'profile' | 'income' | 'savings' | 'debt';
-
-function SectionCard({
-	title,
-	subtitle,
-	icon,
-	onPress,
-}: {
-	title: string;
-	subtitle: string;
-	icon: keyof typeof Ionicons.glyphMap;
-	onPress: () => void;
-}) {
-	return (
-		<Pressable
-			onPress={onPress}
-			style={({ pressed }) => [styles.card, pressed && { opacity: 0.9 }]}
-		>
-			<View style={styles.cardLeft}>
-				<View style={styles.iconWrap}>
-					<Ionicons name={icon} size={18} color={palette.primary} />
-				</View>
-				<View style={{ flex: 1 }}>
-					<Text style={styles.cardTitle}>{title}</Text>
-					<Text style={styles.cardSub}>{subtitle}</Text>
-				</View>
-			</View>
-			<Ionicons name="chevron-forward" size={18} color={palette.textSubtle} />
-		</Pressable>
-	);
-}
+type SectionKey = 'profile' | 'income' | 'expenses' | 'savings' | 'debt';
 
 export default function OnboardingEditIndex() {
 	const router = useRouter();
+	const insets = useSafeAreaInsets();
 	const { profile } = useProfile();
 	const { setIsEditingOnboarding } = useOnboarding();
 
@@ -60,6 +32,9 @@ export default function OnboardingEditIndex() {
 		const monthlyIncome = profile?.monthlyIncome ?? 0;
 		const savings = profile?.savings ?? 0;
 		const debt = profile?.debt ?? 0;
+		const expenses = profile?.expenses ?? { housing: 0, loans: 0, subscriptions: 0 };
+		const totalExpenses =
+			(expenses.housing ?? 0) + (expenses.loans ?? 0) + (expenses.subscriptions ?? 0);
 
 		return [
 			{
@@ -79,6 +54,15 @@ export default function OnboardingEditIndex() {
 					: 'Add your monthly income',
 				icon: 'cash-outline' as const,
 				route: '/(onboarding)/edit/income' as const,
+			},
+			{
+				key: 'expenses' as SectionKey,
+				title: 'Expenses',
+				subtitle: totalExpenses
+					? `${currency(totalExpenses)}/mo`
+					: 'Housing, loans, subscriptions',
+				icon: 'receipt-outline' as const,
+				route: '/(onboarding)/edit/expenses' as const,
 			},
 			{
 				key: 'savings' as SectionKey,
@@ -115,40 +99,51 @@ export default function OnboardingEditIndex() {
 	const onDone = async () => {
 		await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 		setIsEditingOnboarding(false);
-		router.replace('/(tabs)/dashboard');
+		router.back();
 	};
 
 	return (
-		<View style={styles.screen}>
-			<Animated.View style={[{ flex: 1 }, animStyle]}>
+		<View style={[styles.screen, { paddingTop: insets.top }]}>
+			<Animated.View style={[styles.container, animStyle]}>
 				<View style={styles.header}>
-					<Text style={styles.title}>Review your details</Text>
-					<Text style={styles.subtitle}>
+					<AppText.Title style={styles.title}>Review your details</AppText.Title>
+					<AppText.Caption color="muted" style={styles.subtitle}>
 						Update anything below — your snapshot and health score will adjust
 						automatically.
-					</Text>
+					</AppText.Caption>
 				</View>
 
-				<View style={styles.content}>
-					{sections.map((s) => (
-						<SectionCard
-							key={s.key}
-							title={s.title}
-							subtitle={s.subtitle}
-							icon={s.icon}
-							onPress={() => router.push(s.route)}
+				<ScrollView
+					style={styles.scroll}
+					contentContainerStyle={[
+						styles.content,
+						{ paddingBottom: insets.bottom + space.xxl },
+					]}
+					showsVerticalScrollIndicator={false}
+				>
+					<AppCard padding={0} borderRadius={radius.lg}>
+						{sections.map((s, i) => (
+							<AppRow
+								key={s.key}
+								icon={s.icon}
+								iconColor={palette.primary}
+								label={s.title}
+								description={s.subtitle}
+								onPress={() => router.push(s.route)}
+								bordered={i < sections.length - 1}
+							/>
+						))}
+					</AppCard>
+
+					<View style={styles.footer}>
+						<AppButton
+							label="Done reviewing"
+							variant="primary"
+							onPress={onDone}
+							fullWidth
 						/>
-					))}
-				</View>
-
-				<View style={styles.footer}>
-					<Pressable
-						onPress={onDone}
-						style={({ pressed }) => [styles.doneBtn, pressed && { opacity: 0.9 }]}
-					>
-						<Text style={styles.doneText}>Done reviewing</Text>
-					</Pressable>
-				</View>
+					</View>
+				</ScrollView>
 			</Animated.View>
 		</View>
 	);
@@ -157,76 +152,34 @@ export default function OnboardingEditIndex() {
 const styles = StyleSheet.create({
 	screen: {
 		flex: 1,
-		backgroundColor: palette.surfaceAlt,
+		backgroundColor: palette.bg,
+	},
+	container: {
+		flex: 1,
 	},
 	header: {
-		padding: space.lg,
-		paddingTop: 60,
+		paddingHorizontal: space.lg,
+		paddingVertical: space.md,
+		borderBottomWidth: StyleSheet.hairlineWidth,
+		borderBottomColor: palette.border,
 	},
 	title: {
-		...type.titleMd,
-		color: palette.text,
+		textAlign: 'center',
 	},
 	subtitle: {
-		...type.body,
-		color: palette.textMuted,
 		marginTop: 6,
+		textAlign: 'center',
+	},
+	scroll: {
+		flex: 1,
 	},
 	content: {
-		flex: 1,
 		paddingHorizontal: space.lg,
-		gap: space.sm,
-	},
-	card: {
-		backgroundColor: palette.surface,
-		borderRadius: radius.lg,
-		padding: space.md,
-		...shadow.soft,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		borderWidth: 1,
-		borderColor: palette.border,
-	},
-	cardLeft: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: space.md,
-		flex: 1,
-	},
-	iconWrap: {
-		width: 40,
-		height: 40,
-		borderRadius: 20,
-		backgroundColor: palette.primarySubtle,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	cardTitle: {
-		...type.h2,
-		color: palette.text,
-	},
-	cardSub: {
-		...type.small,
-		color: palette.textMuted,
-		marginTop: 2,
+		paddingTop: space.lg,
+		gap: space.lg,
 	},
 	footer: {
-		padding: space.lg,
-		paddingBottom: 40,
-	},
-	doneBtn: {
-		height: 54,
-		borderRadius: radius.lg,
-		backgroundColor: palette.primary,
-		alignItems: 'center',
-		justifyContent: 'center',
-		...shadow.card,
-	},
-	doneText: {
-		...type.body,
-		fontWeight: '700',
-		color: palette.primaryTextOn,
+		marginTop: space.lg,
 	},
 });
 

@@ -511,11 +511,20 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 						);
 					}
 
+					// Merge request metadata with response so category and other edits are never lost
+					// if the server doesn't return or persist them in the response
+					const responseMetadata = response.data.metadata;
+					const requestMetadata = transactionData.metadata;
+					const mergedMetadata =
+						responseMetadata || requestMetadata
+							? { ...(responseMetadata || {}), ...(requestMetadata || {}) }
+							: undefined;
+
 					const updatedTransaction: Transaction = {
 						id: response.data._id ?? response.data.id ?? id,
 						description:
-							response.data.description ||
-							transactionData.description ||
+							response.data.description ??
+							transactionData.description ??
 							undefined,
 						amount: response.data.amount ?? transactionData.amount,
 						date: response.data.date ?? transactionData.date,
@@ -536,18 +545,10 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 										new Date().toISOString(),
 							  }
 							: undefined,
-						notes: response.data.notes,
-						source: response.data.source,
-						vendor: response.data.vendor,
-						metadata: response.data.metadata
-							? {
-									location: response.data.metadata.location,
-									paymentMethod: response.data.metadata.paymentMethod,
-									originalDescription:
-										response.data.metadata.originalDescription,
-									category: response.data.metadata.category,
-							  }
-							: undefined,
+						notes: response.data.notes ?? transactionData.notes,
+						source: response.data.source ?? transactionData.source,
+						vendor: response.data.vendor ?? transactionData.vendor,
+						metadata: mergedMetadata,
 					};
 
 					transactionContextLog.debug('Updated transaction with target data', {

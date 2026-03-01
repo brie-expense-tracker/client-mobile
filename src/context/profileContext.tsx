@@ -341,6 +341,73 @@ const clearCache = async (): Promise<void> => {
 	}
 };
 
+/** Build a minimal profile stub for local use when profile hasn't loaded yet (so updates can still persist). */
+function getDefaultProfileStub(userId: string): Profile {
+	const now = new Date().toISOString();
+	return {
+		_id: `local-${Date.now()}`,
+		userId,
+		firstName: 'User',
+		lastName: 'Name',
+		ageRange: '25-34',
+		monthlyIncome: 0,
+		financialGoal: 'Save money',
+		expenses: { housing: 0, loans: 0, subscriptions: 0 },
+		savings: 0,
+		debt: 0,
+		riskProfile: { tolerance: 'moderate', experience: 'beginner' },
+		preferences: {
+			adviceFrequency: 'weekly',
+			autoSave: { enabled: false, amount: 0 },
+			notifications: {
+				enableNotifications: true,
+				weeklySummary: true,
+				overspendingAlert: false,
+				aiSuggestion: true,
+				budgetMilestones: false,
+				monthlyFinancialCheck: true,
+				monthlySavingsTransfer: false,
+			},
+			aiInsights: {
+				enabled: true,
+				frequency: 'weekly',
+				pushNotifications: true,
+				emailAlerts: false,
+				insightTypes: {
+					budgetingTips: true,
+					expenseReduction: true,
+					incomeSuggestions: true,
+				},
+			},
+			budgetSettings: {
+				cycleType: 'monthly',
+				cycleStart: 1,
+				alertPct: 80,
+				carryOver: false,
+				autoSync: true,
+			},
+			goalSettings: {
+				defaults: { target: 1000, dueDays: 90, sortBy: 'percent', currency: 'USD' },
+				ai: { enabled: true, tone: 'friendly', frequency: 'medium', whatIf: true },
+				notifications: { milestoneAlerts: true, weeklySummary: false, offTrackAlert: true },
+				display: { showCompleted: true, autoArchive: true, rounding: '1' },
+				security: { lockEdit: false, undoWindow: 24 },
+			},
+			recurringExpenses: { enabled: false, notifications: false, autoCategorization: false },
+			assistant: {
+				mode: 'private',
+				useBudgetsGoals: false,
+				useTransactions: false,
+				showProactiveCards: false,
+				costSaver: false,
+				privacyHardStop: false,
+			},
+		},
+		createdAt: now,
+		updatedAt: now,
+	};
+}
+
 interface ProfileProviderProps {
 	children: ReactNode;
 }
@@ -385,12 +452,23 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 
 			if (response.success && response.data) {
 				const profileData = response.data.data || response.data;
-				setProfile(profileData);
-				setLastSyncTime(Date.now());
-				setIsOffline(false);
-
-				// Save to cache
-				await saveToCache(profileData);
+				// Don't overwrite with server if our cache is newer (e.g. local edits not yet synced)
+				const cacheIsNewer =
+					cachedProfile?.updatedAt &&
+					profileData?.updatedAt &&
+					new Date(cachedProfile.updatedAt).getTime() >
+						new Date(profileData.updatedAt).getTime();
+				if (cacheIsNewer) {
+					profileContextLog.debug(
+						'Keeping cached profile (newer than server); local edits preserved'
+					);
+					setLastSyncTime(Date.now());
+				} else {
+					setProfile(profileData);
+					setLastSyncTime(Date.now());
+					setIsOffline(false);
+					await saveToCache(profileData);
+				}
 			} else if (
 				response.error &&
 				response.error.includes('Profile not found')
@@ -552,69 +630,50 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 			// Store the previous state for potential rollback
 			const previousProfile = profile;
 
+			// Deep-merge expenses so partial updates don't wipe other fields
+			const mergedUpdates = { ...updates };
+			if (updates.expenses && previousProfile?.expenses) {
+				mergedUpdates.expenses = {
+					...previousProfile.expenses,
+					...updates.expenses,
+				};
+			}
+
+			// When profile is null (e.g. not loaded yet), use a stub so the update still applies and persists locally
+			const nextProfile: Profile = previousProfile
+				? { ...previousProfile, ...mergedUpdates }
+				: { ...getDefaultProfileStub(firebaseUser.uid), ...mergedUpdates };
+			nextProfile.updatedAt = new Date().toISOString();
+
 			// Optimistically update the profile state immediately
-			setProfile((prev) =>
-				prev
-					? {
-							...prev,
-							...updates,
-					  }
-					: null
-			);
+			setProfile(nextProfile);
 
 			try {
 				setError(null);
 
 				const response = await ApiService.put<any>(
 					'/api/profiles/me',
-					updates
+					mergedUpdates
 				);
 
-				// Server returns: { success: true, message: "...", data: Profile }
-				// ApiService returns: { success: true, data: { success: true, message: "...", data: Profile } }
-				const serverResponse = response.data;
-				
-				// Extract profile data - handle both nested and direct structures
-				const profileData = serverResponse?.data || 
-					(serverResponse?.success && serverResponse) || 
-					serverResponse;
-
-				// Check if we have valid profile data (has _id or userId)
-				const hasValidProfile = profileData && 
-					(profileData._id || profileData.userId || 
-					 (typeof profileData === 'object' && Object.keys(profileData).length > 0));
-
-				if (response.success && hasValidProfile) {
-					// The optimistic update was correct, no need to update again
-					profileContextLog.debug('Profile updated successfully', {
-						hasProfileData: !!profileData,
-						profileKeys: profileData ? Object.keys(profileData) : [],
-					});
+				// Treat response.success === true as success; don't require full profile in body
+				if (response.success) {
+					profileContextLog.debug('Profile updated successfully');
 					setLastSyncTime(Date.now());
 					setIsOffline(false);
-
-					// Update cache
-					if (previousProfile) {
-						const updatedProfile = { ...previousProfile, ...updates };
-						await saveToCache(updatedProfile);
-					}
+					await saveToCache(nextProfile);
 				} else {
-					// API call failed, revert to previous state
-					setProfile(previousProfile);
-					const errorMessage = response.error || 
-						serverResponse?.error || 
-						serverResponse?.message ||
-						'Failed to update profile';
-					profileContextLog.error('Profile update failed', {
-						responseSuccess: response.success,
-						hasServerResponse: !!serverResponse,
-						hasProfileData: !!profileData,
+					// API failed: persist to local cache and keep optimistic update so changes are not lost
+					try {
+						await saveToCache(nextProfile);
+					} catch (cacheErr) {
+						profileContextLog.warn('Failed to save profile to cache', cacheErr);
+					}
+					setIsOffline(true);
+					profileContextLog.warn('Profile sync failed; saved locally', {
 						responseError: response.error,
-						serverResponseError: serverResponse?.error,
-						serverResponseMessage: serverResponse?.message,
-						errorMessage,
 					});
-					throw new Error(errorMessage);
+					// Do not revert or throw — user's data is saved locally and will sync when server is available
 				}
 			} catch (err) {
 				profileContextLog.error('Error updating profile', {
@@ -624,17 +683,26 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 					errorString: String(err),
 					errorKeys: err && typeof err === 'object' ? Object.keys(err) : [],
 				});
-				// Revert to previous state on error
-				setProfile(previousProfile);
-				const errorMessage = err instanceof Error 
-					? err.message 
-					: typeof err === 'string'
-					? err
-					: err && typeof err === 'object' && 'message' in err
-					? String(err.message)
-					: 'Failed to update profile';
-				setError(errorMessage);
-				throw err instanceof Error ? err : new Error(errorMessage);
+				// Persist to local cache and keep optimistic update so changes are not lost
+				try {
+					await saveToCache(nextProfile);
+					setIsOffline(true);
+					profileContextLog.warn('Profile saved locally after network error');
+				} catch (cacheErr) {
+					profileContextLog.warn('Failed to save profile to cache', cacheErr);
+					setProfile(previousProfile);
+					const errorMessage =
+						err instanceof Error
+							? err.message
+							: typeof err === 'string'
+								? err
+								: err && typeof err === 'object' && 'message' in err
+									? String(err.message)
+									: 'Failed to update profile';
+					setError(errorMessage);
+					throw err instanceof Error ? err : new Error(errorMessage);
+				}
+				// Do not throw when we saved to cache — edit screens will complete and navigate back
 			}
 		},
 		[user, firebaseUser, profile]
