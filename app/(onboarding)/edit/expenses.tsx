@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
 	View,
 	StyleSheet,
@@ -16,30 +16,52 @@ import { palette, radius, space } from '../../../src/ui/theme';
 import { AppCard, AppText, AppButton } from '../../../src/ui/primitives';
 import { useProfile } from '../../../src/context/profileContext';
 
-const toDisplayValue = (n: number | undefined) =>
-	n == null || n === 0 ? '' : String(n);
+const defaultExpenses = {
+	housing: 0,
+	loans: 0,
+	subscriptions: 0,
+};
 
-export default function EditSavingsScreen() {
+export default function EditExpensesScreen() {
 	const router = useRouter();
 	const insets = useSafeAreaInsets();
 	const { profile, updateProfile } = useProfile();
 
-	const [savings, setSavings] = useState(() => toDisplayValue(profile?.savings));
+	const expenses = profile?.expenses ?? defaultExpenses;
+
+	const toDisplayValue = (n: number | undefined) =>
+		n == null || n === 0 ? '' : String(n);
+
+	const [housing, setHousing] = useState(() => toDisplayValue(expenses.housing));
+	const [loans, setLoans] = useState(() => toDisplayValue(expenses.loans));
+	const [subscriptions, setSubscriptions] = useState(() =>
+		toDisplayValue(expenses.subscriptions)
+	);
 	const [loading, setLoading] = useState(false);
+	const hasSyncedRef = useRef(false);
 
 	useEffect(() => {
-		if (!profile) return;
-		setSavings(toDisplayValue(profile.savings));
+		if (!profile?.expenses || hasSyncedRef.current) return;
+		hasSyncedRef.current = true;
+		setHousing(toDisplayValue(profile.expenses.housing));
+		setLoans(toDisplayValue(profile.expenses.loans));
+		setSubscriptions(toDisplayValue(profile.expenses.subscriptions));
 	}, [profile]);
 
 	const handleSave = async () => {
-		const savingsNum = parseFloat(savings) || 0;
-		if (savingsNum < 0) return;
+		const housingNum = parseFloat(housing) || 0;
+		const loansNum = parseFloat(loans) || 0;
+		const subsNum = parseFloat(subscriptions) || 0;
+		if (housingNum < 0 || loansNum < 0 || subsNum < 0) return;
 
 		setLoading(true);
 		try {
 			await updateProfile({
-				savings: savingsNum,
+				expenses: {
+					housing: housingNum,
+					loans: loansNum,
+					subscriptions: subsNum,
+				},
 			});
 			router.back();
 		} catch (error) {
@@ -60,7 +82,7 @@ export default function EditSavingsScreen() {
 					<Pressable onPress={() => router.back()} style={styles.backBtn}>
 						<Ionicons name="chevron-back" size={24} color={palette.text} />
 					</Pressable>
-					<AppText.Title style={styles.title}>Savings & Investments</AppText.Title>
+					<AppText.Title style={styles.title}>Monthly Expenses</AppText.Title>
 					<View style={styles.headerSpacer} />
 				</View>
 
@@ -74,31 +96,60 @@ export default function EditSavingsScreen() {
 					showsVerticalScrollIndicator={false}
 				>
 					<AppText.Caption color="muted" style={styles.description}>
-						Include cash, emergency funds, and brokerage accounts. This helps us
-						calculate your financial health score.
+						Enter your fixed monthly expenses. This helps us show your budget
+						and financial health.
 					</AppText.Caption>
 
 					<AppCard padding={space.lg} borderRadius={radius.xl}>
 						<AppText.Label color="subtle" style={styles.inputLabel}>
-							Total Savings
+							Housing (rent / mortgage)
 						</AppText.Label>
 						<View style={styles.inputWithIcon}>
 							<Ionicons name="logo-usd" size={18} color={palette.textSubtle} />
 							<TextInput
-								value={savings}
-								onChangeText={setSavings}
+								value={housing}
+								onChangeText={setHousing}
 								keyboardType="decimal-pad"
 								style={styles.inputWithIconText}
 								placeholder="0.00"
 								placeholderTextColor={palette.textSubtle}
-								autoFocus
+							/>
+						</View>
+
+						<AppText.Label color="subtle" style={[styles.inputLabel, styles.inputLabelTop]}>
+							Loans (car, student, etc.)
+						</AppText.Label>
+						<View style={styles.inputWithIcon}>
+							<Ionicons name="logo-usd" size={18} color={palette.textSubtle} />
+							<TextInput
+								value={loans}
+								onChangeText={setLoans}
+								keyboardType="decimal-pad"
+								style={styles.inputWithIconText}
+								placeholder="0.00"
+								placeholderTextColor={palette.textSubtle}
+							/>
+						</View>
+
+						<AppText.Label color="subtle" style={[styles.inputLabel, styles.inputLabelTop]}>
+							Subscriptions
+						</AppText.Label>
+						<View style={styles.inputWithIcon}>
+							<Ionicons name="logo-usd" size={18} color={palette.textSubtle} />
+							<TextInput
+								value={subscriptions}
+								onChangeText={setSubscriptions}
+								keyboardType="decimal-pad"
+								style={styles.inputWithIconText}
+								placeholder="0.00"
+								placeholderTextColor={palette.textSubtle}
 							/>
 						</View>
 					</AppCard>
 
 					<View style={styles.footer}>
 						<AppButton
-							label={loading ? 'Saving…' : 'Update Savings'}
+							label={loading ? 'Saving…' : 'Save Expenses'}
 							variant="primary"
 							onPress={handleSave}
 							disabled={loading}
@@ -145,6 +196,7 @@ const styles = StyleSheet.create({
 		marginBottom: space.xl,
 	},
 	inputLabel: { marginBottom: space.xs },
+	inputLabelTop: { marginTop: space.lg },
 	inputWithIcon: {
 		flexDirection: 'row',
 		alignItems: 'center',

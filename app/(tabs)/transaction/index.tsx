@@ -82,6 +82,8 @@ interface TransactionFormData {
 	date: string;
 }
 
+const DESCRIPTION_MAX_LENGTH = 120;
+
 const getLocalIsoDate = (): string => {
 	const today = new Date();
 	const year = today.getFullYear();
@@ -210,14 +212,7 @@ export default function TransactionScreenProModern() {
 		return () => task.cancel();
 	}, [datePickerOpen]);
 
-	const didMountRef = useRef(false);
-	useEffect(() => {
-		if (!didMountRef.current) {
-			didMountRef.current = true;
-			return;
-		}
-		if ((params.mode ?? 'expense') !== mode) router.setParams({ mode });
-	}, [mode, params.mode, router]);
+	// Sync URL to mode only when user taps Cash In/Cash Out (avoids setParams loop when restoring state or re-entering screen).
 
 	const {
 		control,
@@ -369,9 +364,10 @@ export default function TransactionScreenProModern() {
 			if (!isSubmitting && mode !== newMode) {
 				setMode(newMode);
 				setSelectedCategory(null);
+				router.setParams({ mode: newMode });
 			}
 		},
-		[isSubmitting, mode],
+		[isSubmitting, mode, router],
 	);
 	const onChangeAmount = useCallback(
 		(text: string) => {
@@ -735,29 +731,34 @@ export default function TransactionScreenProModern() {
 										control={control}
 										name="description"
 										render={({ field: { value, onChange, onBlur } }) => (
-											<TextInput
-												ref={noteInputRef}
-												style={[
-													styles.noteInput,
-													errors.description && styles.inputError,
-												]}
-												placeholder={
-													mode === 'income'
-														? 'e.g., Paycheck, refund…'
-														: 'e.g., Groceries, gas, subscription…'
-												}
-												placeholderTextColor={palette.textSubtle}
-												value={value}
-												onChangeText={(t) => onChange(t)}
-												onBlur={onBlur}
-												onFocus={focusNoteCentered}
-												returnKeyType="done"
-												onSubmitEditing={() => Keyboard.dismiss()}
-												accessibilityLabel="Description"
-												maxLength={120}
-												multiline
-												numberOfLines={2}
-											/>
+											<>
+												<TextInput
+													ref={noteInputRef}
+													style={[
+														styles.noteInput,
+														errors.description && styles.inputError,
+													]}
+													placeholder={
+														mode === 'income'
+															? 'e.g., Paycheck, refund…'
+															: 'e.g., Groceries, gas, subscription…'
+													}
+													placeholderTextColor={palette.textSubtle}
+													value={value}
+													onChangeText={(t) => onChange(t)}
+													onBlur={onBlur}
+													onFocus={focusNoteCentered}
+													returnKeyType="done"
+													onSubmitEditing={() => Keyboard.dismiss()}
+													accessibilityLabel="Description"
+													maxLength={DESCRIPTION_MAX_LENGTH}
+													multiline
+													numberOfLines={2}
+												/>
+												<Text style={styles.noteCharCount}>
+													{value?.length ?? 0}/{DESCRIPTION_MAX_LENGTH}
+												</Text>
+											</>
 										)}
 									/>
 									<TouchableOpacity
@@ -1143,6 +1144,11 @@ const styles = StyleSheet.create({
 		color: palette.text,
 		backgroundColor: palette.surface,
 		textAlignVertical: 'top',
+	},
+	noteCharCount: {
+		fontSize: 12,
+		color: palette.textSubtle,
+		alignSelf: 'flex-end',
 	},
 	collapseNoteBtn: {
 		alignSelf: 'flex-start',

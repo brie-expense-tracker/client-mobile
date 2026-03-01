@@ -31,17 +31,98 @@ import * as Haptics from 'expo-haptics';
 import { useNotification } from '@/src/context/notificationContext';
 import { NotificationData } from '@/src/services';
 import { router } from 'expo-router';
-import { debounce } from '@/src/utils/debounce';
+import { debounce, type DebouncedFn } from '@/src/utils/debounce';
+import { palette, space, radius, type, shadow } from '../../../src/ui/theme';
 import {
-	Page,
-	LoadingState,
-	EmptyState,
-	palette,
-	space,
-	radius,
-	type,
-	shadow,
-} from '../../../src/ui';
+	AppScreen,
+	AppText,
+	AppButton,
+} from '../../../src/ui/primitives';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ErrorBoundary } from '../../../src/components/ErrorBoundary';
+
+const AnimatedView = Animated.createAnimatedComponent(View);
+
+const loadingStateStyles = StyleSheet.create({
+	container: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		padding: space.lg,
+	},
+	label: {
+		marginTop: space.md,
+		...type.body,
+		color: palette.text,
+	},
+});
+
+const emptyStateStyles = StyleSheet.create({
+	container: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		padding: space.xl,
+	},
+	title: {
+		...type.h2,
+		color: palette.text,
+		marginTop: space.md,
+		textAlign: 'center',
+	},
+	subtitle: {
+		...type.body,
+		color: palette.textMuted,
+		marginTop: space.sm,
+		textAlign: 'center',
+	},
+	cta: {
+		marginTop: space.lg,
+	},
+});
+
+function LoadingState({ label }: { label: string }) {
+	return (
+		<View style={loadingStateStyles.container}>
+			<ActivityIndicator size="large" color={palette.primary} />
+			<AppText.Body style={loadingStateStyles.label} color="muted">
+				{label}
+			</AppText.Body>
+		</View>
+	);
+}
+
+function EmptyState({
+	icon,
+	title,
+	subtitle,
+	ctaLabel,
+	onPress,
+}: {
+	icon: string;
+	title: string;
+	subtitle: string;
+	ctaLabel?: string;
+	onPress?: () => void;
+}) {
+	return (
+		<View style={emptyStateStyles.container}>
+			<Ionicons name={icon as any} size={48} color={palette.textMuted} />
+			<AppText.Heading style={emptyStateStyles.title}>{title}</AppText.Heading>
+			<AppText.Body color="muted" style={emptyStateStyles.subtitle}>
+				{subtitle}
+			</AppText.Body>
+			{ctaLabel != null && onPress != null && (
+				<AppButton
+					label={ctaLabel}
+					variant="primary"
+					onPress={onPress}
+					style={emptyStateStyles.cta}
+				/>
+			)}
+		</View>
+	);
+}
 
 // Helper function to get notification type icon and color
 const getNotificationTypeInfo = (type?: string) => {
@@ -201,7 +282,7 @@ const NotificationItem = ({
 					router.push('/(tabs)/dashboard');
 					break;
 				case 'system':
-					router.push('/(stack)/settings');
+					router.push('/(stack)/settings' as any);
 					break;
 				case 'reminder':
 					router.push('/(tabs)/dashboard');
@@ -222,14 +303,14 @@ const NotificationItem = ({
 	return (
 		<View style={styles.txRowContainer}>
 			<View style={styles.deleteAction}>
-				<Animated.View style={trashIconStyle}>
+				<AnimatedView style={trashIconStyle}>
 					<TouchableOpacity onPress={() => onDelete(item.id!, resetAnimation)}>
 						<Ionicons name="trash-outline" size={18} color={palette.primaryTextOn} />
 					</TouchableOpacity>
-				</Animated.View>
+				</AnimatedView>
 			</View>
 			<GestureDetector gesture={panGesture}>
-				<Animated.View
+				<AnimatedView
 					style={[
 						styles.notificationItemWrapper,
 						animatedStyle,
@@ -254,19 +335,19 @@ const NotificationItem = ({
 									color={typeInfo.color}
 									style={styles.typeIcon}
 								/>
-								<Text style={[styles.title, { color: palette.text }]}>
+								<AppText.Heading style={styles.title} numberOfLines={1}>
 									{item.title}
-								</Text>
+								</AppText.Heading>
 							</View>
 							{!item.read && <View style={styles.unreadDot} />}
 						</View>
-						<Text style={[styles.message, { color: palette.text }]}>
+						<AppText.Body style={styles.message} numberOfLines={3}>
 							{item.message}
-						</Text>
+						</AppText.Body>
 						<View style={styles.footerContainer}>
-							<Text style={[styles.timestamp, { color: palette.textMuted }]}>
+							<AppText.Caption color="muted" style={styles.timestamp}>
 								{item.timeAgo || 'Just now'}
-							</Text>
+							</AppText.Caption>
 							{item.priority && (
 								<View
 									style={[
@@ -274,21 +355,24 @@ const NotificationItem = ({
 										{ backgroundColor: typeInfo.color },
 									]}
 								>
-									<Text style={styles.priorityText}>
+									<AppText.Caption
+										style={[styles.priorityText, { color: palette.primaryTextOn }]}
+									>
 										{item.priority.toUpperCase()}
-									</Text>
+									</AppText.Caption>
 								</View>
 							)}
 						</View>
 						</TouchableOpacity>
 					</View>
-				</Animated.View>
+				</AnimatedView>
 			</GestureDetector>
 		</View>
 	);
 };
 
 export default function NotificationsScreen() {
+	const insets = useSafeAreaInsets();
 	const [refreshing, setRefreshing] = useState(false);
 	const [searchQuery, setSearchQuery] = useState('');
 	const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
@@ -300,7 +384,7 @@ export default function NotificationsScreen() {
 
 	// Debounced search to prevent excessive filtering
 	const debouncedSetSearch = useMemo(
-		() =>
+		(): DebouncedFn<(query: string) => void> =>
 			debounce((query: string) => {
 				setDebouncedSearchQuery(query);
 			}, 300),
@@ -378,9 +462,11 @@ export default function NotificationsScreen() {
 	// Early return if context is not available
 	if (!notificationContext) {
 		return (
-			<Page>
-				<LoadingState label="Loading notifications..." />
-			</Page>
+			<ErrorBoundary>
+				<AppScreen scrollable={false} backgroundColor={palette.bg} edges={['left', 'right']}>
+					<LoadingState label="Loading notifications..." />
+				</AppScreen>
+			</ErrorBoundary>
 		);
 	}
 
@@ -475,18 +561,21 @@ export default function NotificationsScreen() {
 
 	if (loading && (!notifications || notifications.length === 0)) {
 		return (
-			<Page>
-				<LoadingState label="Loading notifications..." />
-			</Page>
+			<ErrorBoundary>
+				<AppScreen scrollable={false} backgroundColor={palette.bg} edges={['left', 'right']}>
+					<LoadingState label="Loading notifications..." />
+				</AppScreen>
+			</ErrorBoundary>
 		);
 	}
 
 	return (
-		<GestureHandlerRootView style={{ flex: 1 }}>
-			<Page>
-				{/* Header with search and filters */}
-				<View style={styles.headerContainer}>
-					<View style={styles.searchContainer}>
+		<ErrorBoundary>
+			<GestureHandlerRootView style={{ flex: 1 }}>
+				<AppScreen scrollable={false} backgroundColor={palette.bg} paddingTop={0} edges={['left', 'right']}>
+					{/* Search and action row */}
+					<View style={styles.headerContainer}>
+						<View style={styles.searchContainer}>
 						<Ionicons
 							name="search-outline"
 							size={18}
@@ -520,7 +609,7 @@ export default function NotificationsScreen() {
 						</TouchableOpacity>
 
 						<TouchableOpacity
-							onPress={() => router.push('/(stack)/settings/notification')}
+							onPress={() => router.push('/(stack)/settings/notification' as any)}
 							style={styles.iconButton}
 							activeOpacity={0.7}
 						>
@@ -613,7 +702,10 @@ export default function NotificationsScreen() {
 					keyExtractor={(item) =>
 						item.id || item._id || Math.random().toString()
 					}
-					contentContainerStyle={styles.listContainer}
+					contentContainerStyle={[
+						styles.listContainer,
+						{ paddingBottom: insets.bottom + space.xl },
+					]}
 					refreshControl={
 						<RefreshControl
 							refreshing={refreshing}
@@ -660,9 +752,9 @@ export default function NotificationsScreen() {
 
 				{error && (
 					<View style={styles.errorContainer}>
-						<Text style={styles.errorText}>
+						<AppText.Body color="danger" style={styles.errorText}>
 							Error: {error?.toString() || 'Unknown error'}
-						</Text>
+						</AppText.Body>
 					</View>
 				)}
 
@@ -673,11 +765,11 @@ export default function NotificationsScreen() {
 					presentationStyle="pageSheet"
 					onRequestClose={() => setShowFilterModal(false)}
 				>
-					<Page>
+					<AppScreen scrollable={false} backgroundColor={palette.bg}>
 						<View style={styles.modalHeader}>
-							<Text style={styles.modalTitle}>
+							<AppText.Title style={styles.modalTitle}>
 								Filter Notifications
-							</Text>
+							</AppText.Title>
 							<TouchableOpacity onPress={() => setShowFilterModal(false)}>
 								<Ionicons name="close" size={24} color={palette.text} />
 							</TouchableOpacity>
@@ -685,9 +777,9 @@ export default function NotificationsScreen() {
 
 						<ScrollView style={styles.modalContent}>
 							<View style={styles.filterSection}>
-								<Text style={styles.filterSectionTitle}>
+								<AppText.Heading style={styles.filterSectionTitle}>
 									Type
-								</Text>
+								</AppText.Heading>
 								{[
 									'budget',
 									'goal',
@@ -720,10 +812,10 @@ export default function NotificationsScreen() {
 													size={20}
 													color={typeInfo.color}
 												/>
-												<Text style={styles.filterOptionText}>
+												<AppText.Body style={styles.filterOptionText}>
 													{type.charAt(0).toUpperCase() +
 														type.slice(1).replace('_', ' ')}
-												</Text>
+												</AppText.Body>
 											</View>
 											{selectedType === type && (
 												<Ionicons
@@ -738,9 +830,9 @@ export default function NotificationsScreen() {
 							</View>
 
 							<View style={styles.filterSection}>
-								<Text style={styles.filterSectionTitle}>
+								<AppText.Heading style={styles.filterSectionTitle}>
 									Status
-								</Text>
+								</AppText.Heading>
 								<TouchableOpacity
 									onPress={() => setShowUnreadOnly(!showUnreadOnly)}
 									style={[
@@ -754,9 +846,9 @@ export default function NotificationsScreen() {
 											size={20}
 											color={palette.primary}
 										/>
-										<Text style={styles.filterOptionText}>
+										<AppText.Body style={styles.filterOptionText}>
 											Unread Only
-										</Text>
+										</AppText.Body>
 									</View>
 									{showUnreadOnly && (
 										<Ionicons
@@ -770,27 +862,24 @@ export default function NotificationsScreen() {
 						</ScrollView>
 
 						<View style={styles.modalFooter}>
-							<TouchableOpacity
+							<AppButton
+								label="Clear All"
+								variant="secondary"
 								onPress={clearFilters}
 								style={styles.modalButtonSecondary}
-							>
-								<Text style={styles.modalButtonTextSecondary}>
-									Clear All
-								</Text>
-							</TouchableOpacity>
-							<TouchableOpacity
+							/>
+							<AppButton
+								label="Apply Filters"
+								variant="primary"
 								onPress={() => setShowFilterModal(false)}
-								style={styles.modalButton}
-							>
-								<Text style={styles.modalButtonText}>
-									Apply Filters
-								</Text>
-							</TouchableOpacity>
+								style={styles.modalButtonPrimary}
+							/>
 						</View>
-					</Page>
+					</AppScreen>
 				</Modal>
-			</Page>
+			</AppScreen>
 		</GestureHandlerRootView>
+		</ErrorBoundary>
 	);
 }
 
@@ -799,11 +888,11 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		paddingHorizontal: space.lg,
-		paddingTop: space.md,
-		paddingBottom: space.md,
+		paddingTop: space.xs,
+		paddingBottom: space.sm,
 		borderBottomWidth: StyleSheet.hairlineWidth,
 		borderBottomColor: palette.border,
-		backgroundColor: palette.surface,
+		backgroundColor: palette.bg,
 		gap: space.md,
 	},
 	searchContainer: {
@@ -852,7 +941,7 @@ const styles = StyleSheet.create({
 		paddingVertical: space.sm,
 		borderBottomWidth: StyleSheet.hairlineWidth,
 		borderBottomColor: palette.border,
-		backgroundColor: palette.surface,
+		backgroundColor: palette.bg,
 	},
 	activeFiltersScrollContent: {
 		paddingRight: space.lg,
@@ -1063,36 +1152,13 @@ const styles = StyleSheet.create({
 		paddingVertical: space.lg,
 		borderTopWidth: StyleSheet.hairlineWidth,
 		borderTopColor: palette.border,
-		backgroundColor: palette.surface,
+		backgroundColor: palette.bg,
 		gap: space.md,
-	},
-	modalButton: {
-		flex: 1,
-		paddingVertical: space.md + 2,
-		borderRadius: radius.md,
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: palette.primary,
-		...shadow.soft,
-	},
-	modalButtonText: {
-		...type.body,
-		color: palette.primaryTextOn,
-		fontWeight: '600',
 	},
 	modalButtonSecondary: {
 		flex: 1,
-		paddingVertical: space.md + 2,
-		borderRadius: radius.md,
-		borderWidth: 1,
-		borderColor: palette.border,
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: palette.surface,
 	},
-	modalButtonTextSecondary: {
-		...type.body,
-		color: palette.text,
-		fontWeight: '600',
+	modalButtonPrimary: {
+		flex: 1,
 	},
 });

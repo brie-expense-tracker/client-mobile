@@ -1,17 +1,19 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
 	View,
-	Text,
 	StyleSheet,
 	TextInput,
 	Pressable,
 	ScrollView,
 	KeyboardAvoidingView,
 	Platform,
+	Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { palette, radius, space, type, shadow } from '../../../src/ui/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { palette, radius, space } from '../../../src/ui/theme';
+import { AppCard, AppText, AppButton } from '../../../src/ui/primitives';
 import { useProfile } from '../../../src/context/profileContext';
 
 const currency = (amount: number) =>
@@ -23,10 +25,17 @@ const currency = (amount: number) =>
 
 type Cadence = 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
 
+type InputMode = 'monthly' | 'perPaycheck';
+
 export default function EditIncomeScreen() {
 	const router = useRouter();
+	const insets = useSafeAreaInsets();
 	const { profile, updateProfile } = useProfile();
 
+	const [inputMode, setInputMode] = useState<InputMode>(() => {
+		const hasPay = profile?.pay?.cadence && (profile?.pay?.netPerPaycheck ?? 0) > 0;
+		return hasPay ? 'perPaycheck' : 'monthly';
+	});
 	const [monthlyIncome, setMonthlyIncome] = useState(
 		profile?.monthlyIncome?.toString() || ''
 	);
@@ -38,7 +47,6 @@ export default function EditIncomeScreen() {
 	);
 	const [loading, setLoading] = useState(false);
 
-	// Hydrate local state from profile
 	useEffect(() => {
 		if (!profile) return;
 		setMonthlyIncome(profile.monthlyIncome?.toString() || '');
@@ -64,128 +72,178 @@ export default function EditIncomeScreen() {
 	}, [payCadence, netPerPaycheck]);
 
 	const handleSave = async () => {
-		const income = parseFloat(monthlyIncome) || derivedMonthlyIncome;
-		if (income < 0) return;
+		const income =
+			inputMode === 'monthly'
+				? parseFloat(monthlyIncome) || 0
+				: derivedMonthlyIncome;
+		if (income <= 0) return;
 
 		setLoading(true);
 		try {
 			await updateProfile({
 				monthlyIncome: income,
-				pay: {
-					cadence: (payCadence as any) || null,
-					netPerPaycheck: parseFloat(netPerPaycheck) || 0,
-					derivedMonthlyIncome,
-					varies: false,
-				},
+				pay:
+					inputMode === 'perPaycheck'
+						? {
+								cadence: (payCadence as any) || null,
+								netPerPaycheck: parseFloat(netPerPaycheck) || 0,
+								derivedMonthlyIncome,
+								varies: false,
+							}
+						: undefined,
 			});
-			router.replace('/(tabs)/dashboard');
+			router.back();
 		} catch (error) {
-			console.error('Failed to update income:', error);
+			const message = error instanceof Error ? error.message : 'Failed to save';
+			Alert.alert('Couldn’t save', message, [{ text: 'OK' }]);
 		} finally {
 			setLoading(false);
 		}
 	};
 
+	const canSave =
+		inputMode === 'monthly'
+			? (parseFloat(monthlyIncome) || 0) > 0
+			: derivedMonthlyIncome > 0;
+
 	return (
-		<View style={styles.screen}>
+		<View style={[styles.screen, { paddingTop: insets.top }]}>
 			<KeyboardAvoidingView
 				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-				style={{ flex: 1 }}
+				style={styles.flex}
 			>
 				<View style={styles.header}>
 					<Pressable onPress={() => router.back()} style={styles.backBtn}>
-						<Ionicons name="arrow-back" size={24} color={palette.text} />
+						<Ionicons name="chevron-back" size={24} color={palette.text} />
 					</Pressable>
-					<Text style={styles.title}>Monthly Income</Text>
-					<View style={{ width: 40 }} />
+					<AppText.Title style={styles.title}>Monthly Income</AppText.Title>
+					<View style={styles.headerSpacer} />
 				</View>
 
 				<ScrollView
-					style={{ flex: 1 }}
-					contentContainerStyle={styles.content}
+					style={styles.scroll}
+					contentContainerStyle={[
+						styles.content,
+						{ paddingBottom: insets.bottom + space.xxl },
+					]}
 					keyboardShouldPersistTaps="handled"
+					showsVerticalScrollIndicator={false}
 				>
-					<View style={styles.inputGroup}>
-						<Text style={styles.label}>How do you get paid?</Text>
+					<AppCard padding={space.lg} borderRadius={radius.xl}>
+						<AppText.Label color="subtle" style={styles.inputLabel}>
+							How do you want to enter income?
+						</AppText.Label>
 						<View style={styles.chipRow}>
-							{[
-								{ k: 'weekly', label: 'Weekly' },
-								{ k: 'biweekly', label: 'Every 2 wks' },
-								{ k: 'semimonthly', label: 'Twice / mo' },
-								{ k: 'monthly', label: 'Monthly' },
-							].map((opt) => (
-								<Pressable
-									key={opt.k}
-									onPress={() => setPayCadence(opt.k as Cadence)}
-									style={[
-										styles.chip,
-										payCadence === opt.k && styles.chipSelected,
-									]}
+							<Pressable
+								onPress={() => setInputMode('monthly')}
+								style={[
+									styles.chip,
+									styles.modeChip,
+									inputMode === 'monthly' && styles.chipSelected,
+								]}
+							>
+								<AppText.Body
+									style={inputMode === 'monthly' && styles.chipTextSelected}
 								>
-									<Text
+									Monthly total
+								</AppText.Body>
+							</Pressable>
+							<Pressable
+								onPress={() => setInputMode('perPaycheck')}
+								style={[
+									styles.chip,
+									styles.modeChip,
+									inputMode === 'perPaycheck' && styles.chipSelected,
+								]}
+							>
+								<AppText.Body
+									style={inputMode === 'perPaycheck' && styles.chipTextSelected}
+								>
+									Per paycheck
+								</AppText.Body>
+							</Pressable>
+						</View>
+					</AppCard>
+
+					{inputMode === 'monthly' ? (
+						<AppCard padding={space.lg} borderRadius={radius.xl} style={styles.cardTop}>
+							<AppText.Label color="subtle" style={styles.inputLabel}>
+								Total monthly income
+							</AppText.Label>
+							<View style={styles.inputWithIcon}>
+								<Ionicons name="logo-usd" size={18} color={palette.textSubtle} />
+								<TextInput
+									value={monthlyIncome}
+									onChangeText={setMonthlyIncome}
+									keyboardType="decimal-pad"
+									style={styles.inputWithIconText}
+									placeholder="0.00"
+									placeholderTextColor={palette.textSubtle}
+								/>
+							</View>
+						</AppCard>
+					) : (
+						<AppCard padding={space.lg} borderRadius={radius.xl} style={styles.cardTop}>
+							<AppText.Label color="subtle" style={styles.inputLabel}>
+								How do you get paid?
+							</AppText.Label>
+							<View style={styles.chipRow}>
+								{[
+									{ k: 'weekly', label: 'Weekly' },
+									{ k: 'biweekly', label: 'Every 2 wks' },
+									{ k: 'semimonthly', label: 'Twice / mo' },
+									{ k: 'monthly', label: 'Monthly' },
+								].map((opt) => (
+									<Pressable
+										key={opt.k}
+										onPress={() => setPayCadence(opt.k as Cadence)}
 										style={[
-											styles.chipText,
-											payCadence === opt.k && styles.chipTextSelected,
+											styles.chip,
+											payCadence === opt.k && styles.chipSelected,
 										]}
 									>
-										{opt.label}
-									</Text>
-								</Pressable>
-							))}
-						</View>
-					</View>
+										<AppText.Body
+											style={payCadence === opt.k && styles.chipTextSelected}
+										>
+											{opt.label}
+										</AppText.Body>
+									</Pressable>
+								))}
+							</View>
 
-					<View style={styles.inputGroup}>
-						<Text style={styles.label}>Net per paycheck</Text>
-						<View style={styles.inputWithIcon}>
-							<Ionicons name="logo-usd" size={18} color={palette.textSubtle} />
-							<TextInput
-								value={netPerPaycheck}
-								onChangeText={setNetPerPaycheck}
-								keyboardType="decimal-pad"
-								style={styles.inputWithIconText}
-								placeholder="0.00"
-							/>
-						</View>
-						{derivedMonthlyIncome > 0 && (
-							<Text style={styles.helper}>
-								Estimated monthly: {currency(derivedMonthlyIncome)}
-							</Text>
-						)}
-					</View>
+							<AppText.Label color="subtle" style={[styles.inputLabel, styles.inputLabelTop]}>
+								Net per paycheck
+							</AppText.Label>
+							<View style={styles.inputWithIcon}>
+								<Ionicons name="logo-usd" size={18} color={palette.textSubtle} />
+								<TextInput
+									value={netPerPaycheck}
+									onChangeText={setNetPerPaycheck}
+									keyboardType="decimal-pad"
+									style={styles.inputWithIconText}
+									placeholder="0.00"
+									placeholderTextColor={palette.textSubtle}
+								/>
+							</View>
+							{derivedMonthlyIncome > 0 && (
+								<AppText.Caption color="success" style={styles.helper}>
+									Estimated monthly: {currency(derivedMonthlyIncome)}
+								</AppText.Caption>
+							)}
+						</AppCard>
+					)}
 
-					<View style={[styles.divider, { marginVertical: space.lg }]} />
-
-					<View style={styles.inputGroup}>
-						<Text style={styles.label}>Or enter total monthly income</Text>
-						<View style={styles.inputWithIcon}>
-							<Ionicons name="logo-usd" size={18} color={palette.textSubtle} />
-							<TextInput
-								value={monthlyIncome}
-								onChangeText={setMonthlyIncome}
-								keyboardType="decimal-pad"
-								style={styles.inputWithIconText}
-								placeholder="0.00"
-							/>
-						</View>
+					<View style={styles.footer}>
+						<AppButton
+							label={loading ? 'Saving…' : 'Save Income'}
+							variant="primary"
+							onPress={handleSave}
+							disabled={loading || !canSave}
+							loading={loading}
+							fullWidth
+						/>
 					</View>
 				</ScrollView>
-
-				<View style={styles.footer}>
-					<Pressable
-						onPress={handleSave}
-						disabled={loading}
-						style={({ pressed }) => [
-							styles.saveBtn,
-							loading && { opacity: 0.5 },
-							pressed && { opacity: 0.9 },
-						]}
-					>
-						<Text style={styles.saveText}>
-							{loading ? 'Saving...' : 'Save Income'}
-						</Text>
-					</Pressable>
-				</View>
 			</KeyboardAvoidingView>
 		</View>
 	);
@@ -194,42 +252,35 @@ export default function EditIncomeScreen() {
 const styles = StyleSheet.create({
 	screen: {
 		flex: 1,
-		backgroundColor: palette.surface,
+		backgroundColor: palette.bg,
 	},
+	flex: { flex: 1 },
 	header: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
 		paddingHorizontal: space.lg,
-		paddingTop: 60,
-		paddingBottom: space.md,
-		borderBottomWidth: 1,
+		paddingVertical: space.md,
+		borderBottomWidth: StyleSheet.hairlineWidth,
 		borderBottomColor: palette.border,
 	},
 	backBtn: {
-		width: 40,
-		height: 40,
-		borderRadius: 20,
-		alignItems: 'center',
-		justifyContent: 'center',
+		padding: 4,
+		marginRight: space.sm,
 	},
 	title: {
-		...type.h2,
-		color: palette.text,
+		flex: 1,
+		textAlign: 'center',
 	},
+	headerSpacer: { width: 40 },
+	scroll: { flex: 1 },
 	content: {
-		padding: space.lg,
+		paddingHorizontal: space.xl,
+		paddingTop: space.lg,
 	},
-	inputGroup: {
-		marginBottom: space.lg,
-	},
-	label: {
-		...type.small,
-		color: palette.textMuted,
-		marginBottom: space.xs,
-		fontWeight: '700',
-		textTransform: 'uppercase',
-	},
+	cardTop: { marginTop: space.lg },
+	inputLabel: { marginBottom: space.xs },
+	inputLabelTop: { marginTop: space.lg },
 	chipRow: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',
@@ -244,13 +295,16 @@ const styles = StyleSheet.create({
 		borderWidth: 1,
 		borderColor: palette.border,
 	},
+	modeChip: {
+		minWidth: 140,
+		paddingVertical: 12,
+		paddingHorizontal: 20,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
 	chipSelected: {
 		backgroundColor: palette.primarySubtle,
 		borderColor: palette.primary,
-	},
-	chipText: {
-		...type.small,
-		color: palette.text,
 	},
 	chipTextSelected: {
 		color: palette.primary,
@@ -259,7 +313,7 @@ const styles = StyleSheet.create({
 	inputWithIcon: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		height: 54,
+		height: 52,
 		backgroundColor: palette.surfaceAlt,
 		borderRadius: radius.md,
 		paddingHorizontal: space.md,
@@ -273,31 +327,8 @@ const styles = StyleSheet.create({
 		color: palette.text,
 	},
 	helper: {
-		...type.small,
-		color: palette.success,
 		marginTop: 6,
 		fontWeight: '600',
 	},
-	divider: {
-		height: 1,
-		backgroundColor: palette.border,
-	},
-	footer: {
-		padding: space.lg,
-		paddingBottom: 40,
-	},
-	saveBtn: {
-		height: 54,
-		borderRadius: radius.lg,
-		backgroundColor: palette.primary,
-		alignItems: 'center',
-		justifyContent: 'center',
-		...shadow.card,
-	},
-	saveText: {
-		...type.body,
-		fontWeight: '700',
-		color: palette.primaryTextOn,
-	},
+	footer: { marginTop: space.xl },
 });
-

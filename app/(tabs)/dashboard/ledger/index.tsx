@@ -42,7 +42,7 @@ const formatDate = (
 		month: 'long',
 		day: 'numeric',
 		year: 'numeric',
-	}
+	},
 ): string => {
 	// if you ever pass an empty string or nullish, treat as "All Dates"
 	if (!input) return 'All Dates';
@@ -122,11 +122,7 @@ export default function TransactionScreen() {
 
 	const { transactions, isLoading, refetch, deleteTransaction } =
 		useContext(TransactionContext);
-	const {
-		dateFilterMode,
-		transactionTypes,
-		selectedPatternId,
-	} = useFilter();
+	const { dateFilterMode, transactionTypes, selectedPatternId } = useFilter();
 
 	const handleFilterPress = () => {
 		router.push('./ledger/ledgerFilter');
@@ -310,6 +306,9 @@ export default function TransactionScreen() {
 									</View>
 								) : null
 							}
+							ItemSeparatorComponent={() => (
+								<View style={styles.itemSeparator} />
+							)}
 							renderItem={({ item }) => (
 								<TransactionRow
 									item={item}
@@ -329,7 +328,9 @@ export default function TransactionScreen() {
 											size={48}
 											color={palette.textSubtle}
 										/>
-										<Text style={styles.emptyText}>No Cash In or Cash Out yet</Text>
+										<Text style={styles.emptyText}>
+											No Cash In or Cash Out yet
+										</Text>
 									</View>
 								)
 							}
@@ -456,7 +457,8 @@ const styles = StyleSheet.create({
 		height: 200,
 	},
 	monthHeader: {
-		paddingVertical: space.sm,
+		paddingTop: space.sm,
+		paddingBottom: space.xs,
 		backgroundColor: palette.bg,
 	},
 	monthHeaderText: {
@@ -465,6 +467,11 @@ const styles = StyleSheet.create({
 		color: palette.text,
 		paddingHorizontal: space.lg,
 		letterSpacing: 0.2,
+	},
+	itemSeparator: {
+		height: 1,
+		backgroundColor: palette.subtle,
+		marginHorizontal: space.xl,
 	},
 	dateHeader: {
 		paddingTop: space.sm,

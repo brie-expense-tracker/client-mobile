@@ -156,14 +156,11 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 			.trim();
 	}, [item.description]);
 
-	// Display: category + description when category present (income or expense), else description or fallback
-	const displayDescription = useMemo(() => {
-		const category = item.metadata?.category;
-		if (category) {
-			return cleanDescription ? `${category} – ${cleanDescription}` : category;
-		}
-		return cleanDescription || item.description || (item.type === 'income' ? 'Cash In' : 'Cash Out');
-	}, [cleanDescription, item.description, item.type, item.metadata?.category]);
+	// Title: category or type fallback (never the full description)
+	const displayTitle = rowDisplay.name;
+
+	// Subtitle: description only, truncated to one line (handled via numberOfLines + ellipsizeMode)
+	const displaySubtitle = cleanDescription || '';
 
 	const triggerHaptic = useCallback(() => {
 		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -175,10 +172,6 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 		iconScale.value = withSpring(1, { damping: 15, stiffness: 150 });
 		hasHaptics.value = false;
 	}, [translateX, iconScale, hasHaptics]);
-
-	const handleDeleteJS = useCallback(() => {
-		onDelete(item.id, resetAnimation);
-	}, [item.id, onDelete, resetAnimation]);
 
 	const isPanning = useSharedValue(false);
 
@@ -207,12 +200,10 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 				.onEnd(() => {
 					isPanning.value = false;
 					if (translateX.value < TRANSLATE_THRESHOLD) {
+						// Only reveal the delete button; confirmation happens on trash icon tap
 						translateX.value = withTiming(
 							-DELETE_WIDTH,
-							{ duration: 400, easing: Easing.bezier(0.25, 0.1, 0.25, 1) },
-							() => {
-								runOnJS(handleDeleteJS)();
-							}
+							{ duration: 400, easing: Easing.bezier(0.25, 0.1, 0.25, 1) }
 						);
 					} else {
 						translateX.value = withSpring(0, { damping: 20 });
@@ -224,7 +215,6 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 			iconScale,
 			hasHaptics,
 			triggerHaptic,
-			handleDeleteJS,
 			isPanning,
 			TRANSLATE_THRESHOLD,
 			DELETE_WIDTH,
@@ -295,11 +285,17 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 					</View>
 					<View style={styles.textContainer}>
 						<View style={styles.descriptionContainer}>
-							<Text style={styles.description}>{displayDescription}</Text>
+							<Text style={styles.title}>{displayTitle}</Text>
 						</View>
-						<View style={styles.linkedDataContainer}>
-							<Text style={styles.category}>{rowDisplay.name}</Text>
-						</View>
+						{displaySubtitle ? (
+							<Text
+								style={styles.subtitle}
+								numberOfLines={1}
+								ellipsizeMode="tail"
+							>
+								{displaySubtitle}
+							</Text>
+						) : null}
 
 						{/* Transaction Details */}
 						{(item.notes ||
@@ -429,21 +425,18 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 	},
-	description: {
+	title: {
 		fontSize: 16,
 		fontWeight: '500',
 		color: palette.text,
 		flex: 1,
 	},
-	linkedDataContainer: {
-		marginTop: space.xs,
-		gap: space.xs,
-	},
-	category: {
+	subtitle: {
 		fontSize: 12,
 		color: palette.textSubtle,
 		marginTop: space.xs,
 		fontWeight: '500',
+		// Single line with ellipsis is enforced via numberOfLines + ellipsizeMode
 	},
 	amountDate: {
 		alignItems: 'flex-end',
