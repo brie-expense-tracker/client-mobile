@@ -1,17 +1,13 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState } from 'react';
 import { logger } from '../../../src/utils/logger';
 import {
 	View,
-	Text,
 	FlatList,
 	StyleSheet,
 	TouchableOpacity,
 	Alert,
 	ActivityIndicator,
 	RefreshControl,
-	TextInput,
-	Modal,
-	ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -31,7 +27,6 @@ import * as Haptics from 'expo-haptics';
 import { useNotification } from '@/src/context/notificationContext';
 import { NotificationData } from '@/src/services';
 import { router } from 'expo-router';
-import { debounce, type DebouncedFn } from '@/src/utils/debounce';
 import { palette, space, radius, type, shadow } from '../../../src/ui/theme';
 import {
 	AppScreen,
@@ -374,30 +369,6 @@ const NotificationItem = ({
 export default function NotificationsScreen() {
 	const insets = useSafeAreaInsets();
 	const [refreshing, setRefreshing] = useState(false);
-	const [searchQuery, setSearchQuery] = useState('');
-	const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
-	const [showFilterModal, setShowFilterModal] = useState(false);
-	const [selectedType, setSelectedType] = useState<
-		NotificationData['type'] | undefined
-	>();
-	const [showUnreadOnly, setShowUnreadOnly] = useState(false);
-
-	// Debounced search to prevent excessive filtering
-	const debouncedSetSearch = useMemo(
-		(): DebouncedFn<(query: string) => void> =>
-			debounce((query: string) => {
-				setDebouncedSearchQuery(query);
-			}, 300),
-		[]
-	);
-
-	// Update debounced search when searchQuery changes
-	useEffect(() => {
-		debouncedSetSearch(searchQuery);
-		return () => {
-			debouncedSetSearch.cancel();
-		};
-	}, [searchQuery, debouncedSetSearch]);
 
 	// Get notification context - will throw if not within provider
 	const notificationContext = useNotification();
@@ -413,51 +384,9 @@ export default function NotificationsScreen() {
 		deleteNotification = async () => {},
 		deleteAllNotifications = async () => {},
 		refreshUnreadCount = async () => {},
-		setFilter = () => {},
-		clearFilter = () => {},
 		loadMoreNotifications = async () => {},
 		hasMore = false,
 	} = notificationContext || {};
-
-	// Filter and search notifications
-	const filteredNotifications = useMemo(() => {
-		// Use safe array operations to prevent crashes
-		let filtered = Array.isArray(notifications) ? notifications : [];
-
-		// Apply search filter using debounced query
-		if (debouncedSearchQuery.trim()) {
-			const query = debouncedSearchQuery.toLowerCase();
-			filtered = filtered.filter(
-				(notification) =>
-					notification?.title?.toLowerCase()?.includes(query) ||
-					notification?.message?.toLowerCase()?.includes(query)
-			);
-		}
-
-		// Apply type filter
-		if (selectedType) {
-			filtered = filtered.filter(
-				(notification) => notification?.type === selectedType
-			);
-		}
-
-		// Apply unread filter
-		if (showUnreadOnly) {
-			filtered = filtered.filter((notification) => !notification?.read);
-		}
-
-		return filtered;
-	}, [notifications, debouncedSearchQuery, selectedType, showUnreadOnly]);
-
-	// Apply filters to context
-	React.useEffect(() => {
-		if (setFilter) {
-			setFilter({
-				type: selectedType,
-				read: showUnreadOnly ? false : undefined,
-			});
-		}
-	}, [selectedType, showUnreadOnly, setFilter]);
 
 	// Early return if context is not available
 	if (!notificationContext) {
@@ -550,15 +479,6 @@ export default function NotificationsScreen() {
 		}
 	};
 
-	const clearFilters = () => {
-		setSearchQuery('');
-		setSelectedType(undefined);
-		setShowUnreadOnly(false);
-		if (clearFilter) {
-			clearFilter();
-		}
-	};
-
 	if (loading && (!notifications || notifications.length === 0)) {
 		return (
 			<ErrorBoundary>
@@ -573,49 +493,9 @@ export default function NotificationsScreen() {
 		<ErrorBoundary>
 			<GestureHandlerRootView style={{ flex: 1 }}>
 				<AppScreen scrollable={false} backgroundColor={palette.bg} paddingTop={0} edges={['left', 'right']}>
-					{/* Search and action row */}
+					{/* Action row */}
 					<View style={styles.headerContainer}>
-						<View style={styles.searchContainer}>
-						<Ionicons
-							name="search-outline"
-							size={18}
-							color={palette.textMuted}
-							style={styles.searchIcon}
-						/>
-						<TextInput
-							style={styles.searchInput}
-							placeholder="Search notifications..."
-							placeholderTextColor={palette.textSubtle}
-							value={searchQuery}
-							onChangeText={setSearchQuery}
-						/>
-						{searchQuery.length > 0 && (
-							<TouchableOpacity
-								onPress={() => setSearchQuery('')}
-								style={styles.clearSearchButton}
-							>
-								<Ionicons name="close-circle" size={18} color={palette.textMuted} />
-							</TouchableOpacity>
-						)}
-					</View>
-
 					<View style={styles.headerActions}>
-						<TouchableOpacity
-							onPress={() => setShowFilterModal(true)}
-							style={styles.iconButton}
-							activeOpacity={0.7}
-						>
-							<Ionicons name="filter-outline" size={18} color={palette.text} />
-						</TouchableOpacity>
-
-						<TouchableOpacity
-							onPress={() => router.push('/(stack)/settings/notification' as any)}
-							style={styles.iconButton}
-							activeOpacity={0.7}
-						>
-							<Ionicons name="settings-outline" size={18} color={palette.text} />
-						</TouchableOpacity>
-
 						{notifications && notifications.length > 0 && (
 							<>
 								<TouchableOpacity
@@ -646,52 +526,8 @@ export default function NotificationsScreen() {
 					</View>
 				</View>
 
-				{/* Active filters display */}
-				{(selectedType || showUnreadOnly) && (
-					<View style={styles.activeFiltersContainer}>
-						<ScrollView
-							horizontal
-							showsHorizontalScrollIndicator={false}
-							contentContainerStyle={styles.activeFiltersScrollContent}
-						>
-							{selectedType && (
-								<View style={styles.filterChip}>
-									<Text style={styles.filterChipText}>
-										{selectedType.charAt(0).toUpperCase() +
-											selectedType.slice(1).replace('_', ' ')}
-									</Text>
-									<TouchableOpacity
-										onPress={() => setSelectedType(undefined)}
-										style={styles.filterChipClose}
-									>
-										<Ionicons name="close" size={14} color={palette.primary} />
-									</TouchableOpacity>
-								</View>
-							)}
-							{showUnreadOnly && (
-								<View style={styles.filterChip}>
-									<Text style={styles.filterChipText}>Unread Only</Text>
-									<TouchableOpacity
-										onPress={() => setShowUnreadOnly(false)}
-										style={styles.filterChipClose}
-									>
-										<Ionicons name="close" size={14} color={palette.primary} />
-									</TouchableOpacity>
-								</View>
-							)}
-							<TouchableOpacity
-								onPress={clearFilters}
-								style={styles.clearFiltersButton}
-								activeOpacity={0.7}
-							>
-								<Text style={styles.clearFiltersText}>Clear All</Text>
-							</TouchableOpacity>
-						</ScrollView>
-					</View>
-				)}
-
 				<FlatList
-					data={filteredNotifications}
+					data={notifications}
 					renderItem={({ item }) => (
 						<NotificationItem
 							item={item}
@@ -719,30 +555,12 @@ export default function NotificationsScreen() {
 					ListEmptyComponent={() => (
 						<EmptyState
 							icon="notifications-outline"
-							title={
-								searchQuery || selectedType || showUnreadOnly
-									? 'No matching notifications'
-									: 'No notifications'
-							}
-							subtitle={
-								searchQuery || selectedType || showUnreadOnly
-									? 'Try adjusting your filters'
-									: "You're all caught up!"
-							}
-							ctaLabel={
-								searchQuery || selectedType || showUnreadOnly
-									? 'Clear Filters'
-									: undefined
-							}
-							onPress={
-								searchQuery || selectedType || showUnreadOnly
-									? clearFilters
-									: undefined
-							}
+							title="No notifications"
+							subtitle="You're all caught up!"
 						/>
 					)}
 					ListFooterComponent={() =>
-						loading && filteredNotifications.length > 0 ? (
+						loading && notifications && notifications.length > 0 ? (
 							<View style={styles.loadingFooter}>
 								<ActivityIndicator size="small" color={palette.primary} />
 							</View>
@@ -757,126 +575,6 @@ export default function NotificationsScreen() {
 						</AppText.Body>
 					</View>
 				)}
-
-				{/* Filter Modal */}
-				<Modal
-					visible={showFilterModal}
-					animationType="slide"
-					presentationStyle="pageSheet"
-					onRequestClose={() => setShowFilterModal(false)}
-				>
-					<AppScreen scrollable={false} backgroundColor={palette.bg}>
-						<View style={styles.modalHeader}>
-							<AppText.Title style={styles.modalTitle}>
-								Filter Notifications
-							</AppText.Title>
-							<TouchableOpacity onPress={() => setShowFilterModal(false)}>
-								<Ionicons name="close" size={24} color={palette.text} />
-							</TouchableOpacity>
-						</View>
-
-						<ScrollView style={styles.modalContent}>
-							<View style={styles.filterSection}>
-								<AppText.Heading style={styles.filterSectionTitle}>
-									Type
-								</AppText.Heading>
-								{[
-									'budget',
-									'goal',
-									'transaction',
-									'ai_insight',
-									'system',
-									'reminder',
-									'marketing',
-									'promotional',
-								].map((type) => {
-									const typeInfo = getNotificationTypeInfo(type);
-									return (
-										<TouchableOpacity
-											key={type}
-											onPress={() =>
-												setSelectedType(
-													selectedType === type
-														? undefined
-														: (type as NotificationData['type'])
-												)
-											}
-											style={[
-												styles.filterOption,
-												selectedType === type && styles.filterOptionSelected,
-											]}
-										>
-											<View style={styles.filterOptionContent}>
-												<Ionicons
-													name={typeInfo.icon as any}
-													size={20}
-													color={typeInfo.color}
-												/>
-												<AppText.Body style={styles.filterOptionText}>
-													{type.charAt(0).toUpperCase() +
-														type.slice(1).replace('_', ' ')}
-												</AppText.Body>
-											</View>
-											{selectedType === type && (
-												<Ionicons
-													name="checkmark"
-													size={20}
-													color={palette.primary}
-												/>
-											)}
-										</TouchableOpacity>
-									);
-								})}
-							</View>
-
-							<View style={styles.filterSection}>
-								<AppText.Heading style={styles.filterSectionTitle}>
-									Status
-								</AppText.Heading>
-								<TouchableOpacity
-									onPress={() => setShowUnreadOnly(!showUnreadOnly)}
-									style={[
-										styles.filterOption,
-										showUnreadOnly && styles.filterOptionSelected,
-									]}
-								>
-									<View style={styles.filterOptionContent}>
-										<Ionicons
-											name="mail-unread-outline"
-											size={20}
-											color={palette.primary}
-										/>
-										<AppText.Body style={styles.filterOptionText}>
-											Unread Only
-										</AppText.Body>
-									</View>
-									{showUnreadOnly && (
-										<Ionicons
-											name="checkmark"
-											size={20}
-											color={palette.primary}
-										/>
-									)}
-								</TouchableOpacity>
-							</View>
-						</ScrollView>
-
-						<View style={styles.modalFooter}>
-							<AppButton
-								label="Clear All"
-								variant="secondary"
-								onPress={clearFilters}
-								style={styles.modalButtonSecondary}
-							/>
-							<AppButton
-								label="Apply Filters"
-								variant="primary"
-								onPress={() => setShowFilterModal(false)}
-								style={styles.modalButtonPrimary}
-							/>
-						</View>
-					</AppScreen>
-				</Modal>
 			</AppScreen>
 		</GestureHandlerRootView>
 		</ErrorBoundary>
