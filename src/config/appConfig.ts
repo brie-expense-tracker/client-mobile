@@ -14,9 +14,9 @@ export const AppConfig = Object.freeze({
 		crashConsentDefault: Env.EXPO_PUBLIC_CRASH_CONSENT === 'true',
 	},
 	telemetry: {
-		enabled: Boolean(Env.EXPO_PUBLIC_SENTRY_DSN),
-		dsn: Env.EXPO_PUBLIC_SENTRY_DSN,
-		environment: Env.EXPO_PUBLIC_SENTRY_ENVIRONMENT ?? Env.EXPO_PUBLIC_ENV,
+		/** Crashlytics only; no third-party error SDK */
+		enabled: true,
+		environment: Env.EXPO_PUBLIC_ENV,
 		tracesSampleRate: perEnv.traces,
 		profilesSampleRate: perEnv.profiles,
 		logLevel: perEnv.logLevel,

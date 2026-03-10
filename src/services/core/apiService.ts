@@ -93,13 +93,17 @@ function cacheRequest(endpoint: string, data: any): void {
 	const ttl =
 		CACHE_TTL[endpoint as keyof typeof CACHE_TTL] || CACHE_TTL.default;
 
+	const hadExisting = requestCache.has(cacheKey);
 	requestCache.set(cacheKey, {
 		data,
 		timestamp: Date.now(),
 		ttl,
 	});
 
-	apiLog.debug('Cached response', { endpoint, ttl });
+	// Avoid duplicate logs when multiple callers await the same deduped request
+	if (!hadExisting) {
+		apiLog.debug('Cached response', { endpoint, ttl });
+	}
 }
 
 // (removed unused shouldThrottleRequest and isRateLimited helpers)

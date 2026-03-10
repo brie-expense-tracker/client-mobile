@@ -43,7 +43,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
 	componentDidCatch(error: Error, errorInfo: ErrorInfo) {
 		// Log to crash reporting
-		this.crashReporting.captureError(error, {
+		void this.crashReporting.captureError(error, {
 			action: 'error_boundary',
 			additional_data: {
 				componentStack: errorInfo.componentStack,

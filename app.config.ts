@@ -139,7 +139,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 					},
 				},
 			],
-			'@sentry/react-native/expo',
 			'@react-native-firebase/app',
 			'@react-native-firebase/auth',
 			'@react-native-firebase/crashlytics',

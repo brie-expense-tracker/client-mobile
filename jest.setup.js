@@ -13,6 +13,8 @@
 process.env.EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 process.env.EXPO_PUBLIC_ENV = process.env.EXPO_PUBLIC_ENV || 'testflight';
 process.env.EXPO_PUBLIC_AI_INSIGHTS = process.env.EXPO_PUBLIC_AI_INSIGHTS || '0';
+// Logger defaults to 'warn' when __DEV__ is false (Jest); tests expect info/debug to run
+process.env.EXPO_PUBLIC_LOG_LEVEL = process.env.EXPO_PUBLIC_LOG_LEVEL || 'debug';
 
 // Note: Logger module is loaded with env vars set above
 // The logger module will work correctly now that env vars are available
