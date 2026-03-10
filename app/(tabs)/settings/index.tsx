@@ -14,6 +14,7 @@ import useAuth from '../../../src/context/AuthContext';
 import { isDevMode } from '../../../src/config/environment';
 import { palette, radius, space, type } from '../../../src/ui/theme';
 import { useProfile } from '../../../src/context/profileContext';
+import { useNotification } from '../../../src/context/notificationContext';
 import {
 	AppCard,
 	AppText,
@@ -109,6 +110,7 @@ function ProfileContent() {
 	const insets = useSafeAreaInsets();
 	const { logout, user, firebaseUser } = useAuth();
 	const { profile } = useProfile();
+	const { unreadCount } = useNotification();
 
 	const displayName = useMemo(() => {
 		if (profile?.firstName || profile?.lastName) {
@@ -221,6 +223,30 @@ function ProfileContent() {
 						</AppCard>
 					</View>
 				)}
+
+				{/* Notifications — opened from Profile instead of Dashboard */}
+				<View style={styles.section}>
+					<AppText.Label color="subtle" style={styles.sectionTitle}>
+						NOTIFICATIONS
+					</AppText.Label>
+					<AppCard padding={0} borderRadius={radius.lg}>
+						<AppRow
+							icon="notifications-outline"
+							label="Notifications"
+							right={
+								unreadCount > 0 ? (
+									<View style={styles.notificationBadge}>
+										<Text style={styles.notificationBadgeText}>
+											{unreadCount > 99 ? '99+' : unreadCount}
+										</Text>
+									</View>
+								) : undefined
+							}
+							bordered={false}
+							onPress={() => router.push('/settings/notifications')}
+						/>
+					</AppCard>
+				</View>
 
 				{/* PROFILE Section - each row goes directly to its edit screen */}
 				<View style={styles.section}>
@@ -369,6 +395,20 @@ const styles = StyleSheet.create({
 	},
 	sectionTitle: {
 		marginBottom: space.xs,
+	},
+	notificationBadge: {
+		minWidth: 20,
+		height: 20,
+		borderRadius: 10,
+		backgroundColor: palette.danger,
+		justifyContent: 'center',
+		alignItems: 'center',
+		paddingHorizontal: 6,
+	},
+	notificationBadgeText: {
+		color: palette.primaryTextOn,
+		...type.labelXs,
+		fontWeight: '700',
 	},
 	logoutContainer: {
 		marginTop: space.lg,

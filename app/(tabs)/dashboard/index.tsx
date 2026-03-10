@@ -24,7 +24,6 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TransactionContext } from '../../../src/context/transactionContext';
-import { useNotification } from '../../../src/context/notificationContext';
 import useAuth from '../../../src/context/AuthContext';
 // MVP: InsightsService, DashboardService removed - cash-only focus
 import {
@@ -49,7 +48,6 @@ const currency = new Intl.NumberFormat('en-US', {
 
 export default function DashboardPro() {
 	const { transactions, isLoading, refetch } = useContext(TransactionContext);
-	const { unreadCount } = useNotification();
 	const { firebaseUser, user } = useAuth();
 	const insets = useSafeAreaInsets();
 	const [refreshing, setRefreshing] = useState(false);
@@ -177,32 +175,6 @@ export default function DashboardPro() {
 							/>
 						</TouchableOpacity>
 
-						<View style={styles.headerButtons}>
-							<TouchableOpacity
-								onPress={() => router.push('/dashboard/notifications')}
-								style={styles.headerButton}
-								{...accessibilityProps.button}
-								accessibilityLabel={generateAccessibilityLabel.button(
-									'Open',
-									'notifications',
-								)}
-							>
-								<View>
-									<Ionicons
-										name="notifications-outline"
-										color={palette.text}
-										size={24}
-									/>
-									{unreadCount > 0 && (
-										<View style={styles.notificationBadge}>
-											<Text style={styles.notificationBadgeText}>
-												{unreadCount > 99 ? '99+' : unreadCount}
-											</Text>
-										</View>
-									)}
-								</View>
-							</TouchableOpacity>
-						</View>
 					</View>
 
 					{/* Offline Banner - Below header */}
@@ -493,37 +465,6 @@ const styles = StyleSheet.create({
 		backgroundColor: palette.surfaceAlt,
 	},
 	logo: { height: 40, width: 90 },
-	headerButtons: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-	},
-	headerButton: {
-		width: 44,
-		height: 44,
-		borderRadius: 22,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	notificationBadge: {
-		position: 'absolute',
-		top: -2,
-		right: -2,
-		minWidth: 16,
-		height: 16,
-		borderRadius: 8,
-		backgroundColor: palette.danger,
-		borderWidth: 2,
-		borderColor: palette.surface,
-		justifyContent: 'center',
-		alignItems: 'center',
-		paddingHorizontal: 4,
-	},
-	notificationBadgeText: {
-		color: palette.surface,
-		...type.labelXs,
-		textAlign: 'center',
-	},
 	// quickAddButton styles moved to AppButton primitive
 });
 
