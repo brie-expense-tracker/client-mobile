@@ -22,7 +22,7 @@ import {
 import { isDevMode } from '../config/environment';
 import { setItem, removeItem } from '../utils/safeStorage';
 import { clearLocalMigrationFlag } from '../storage/migrateLocalTransactions';
-import * as Sentry from '@sentry/react-native';
+import { crashReporting } from '../services/feature/crashReporting';
 import { UserService, User, Profile } from '../services';
 import { ApiService } from '../services/core/apiService';
 import { authService } from '../services/authService';
@@ -135,6 +135,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<AuthError | null>(null);
 	const lastProcessedUIDRef = useRef<string | null>(null);
+	/** Prevents duplicate hydrate when onAuthStateChanged fires twice before lastProcessedUIDRef is set */
+	const hydratingFirebaseUidRef = useRef<string | null>(null);
 	const processingTimeoutRef = useRef<number | null>(null);
 	const isManualLoginRef = useRef(false);
 	const isReauthInProgressRef = useRef(false);
@@ -387,7 +389,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				});
 				// Don't sign out - allow user to retry or continue with Firebase auth
 				setLoading(false);
-				Sentry.captureException(e);
+				void crashReporting.captureError(
+					e instanceof Error ? e : new Error(String(e)),
+					{ action: 'user_creation_error' }
+				);
 			}
 		};
 
@@ -420,7 +425,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 					message: 'Failed to fetch user data from database',
 					details: err,
 				});
-				Sentry.captureException(err);
+				void crashReporting.captureError(
+					err instanceof Error ? err : new Error(String(err)),
+					{ action: 'mongo_fetch_error' }
+				);
+			} finally {
+				// Clear in-flight guard so a later legitimate re-auth can hydrate again
+				if (fbUser && hydratingFirebaseUidRef.current === fbUser.uid) {
+					hydratingFirebaseUidRef.current = null;
+				}
 			}
 		};
 
@@ -455,10 +468,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				return;
 			}
 
-			// Prevent rapid successive calls
+			// Prevent rapid successive calls (before setting hydrate guard — avoid leaking ref)
 			if (processingTimeoutRef.current) {
 				authContextLog.debug('Processing timeout active, skipping rapid call');
 				return;
+			}
+
+			// Firebase can emit auth state twice before hydration finishes; avoid double fetch
+			if (fbUser && hydratingFirebaseUidRef.current === fbUser.uid) {
+				authContextLog.debug(
+					'Hydration already in progress for UID, skipping duplicate'
+				);
+				return;
+			}
+			if (fbUser) {
+				hydratingFirebaseUidRef.current = fbUser.uid;
 			}
 
 			authContextLog.debug(
@@ -470,17 +494,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			// The cleanup was too aggressive and interfered with the signup flow
 			authContextLog.debug('Calling hydrateFromFirebaseLocal');
 
-			// Add timeout protection to prevent infinite loading
-			const timeoutPromise = new Promise<void>((resolve) => {
-				setTimeout(() => {
-					authContextLog.debug('hydrateFromFirebaseLocal timeout reached');
-					resolve();
-				}, 5000); // 5 second timeout (fast fail for better UX)
+			// Timeout only to avoid hanging forever; log only if hydrate actually exceeds budget (no misleading "timeout" when hydrate already finished)
+			const HYDRATE_TIMEOUT_MS = 5000;
+			let hydrateTimeoutId: ReturnType<typeof setTimeout> | null = null;
+			const timeoutPromise = new Promise<'timeout'>((resolve) => {
+				hydrateTimeoutId = setTimeout(
+					() => resolve('timeout'),
+					HYDRATE_TIMEOUT_MS
+				);
 			});
+			const hydratePromise = hydrateFromFirebaseLocal(fbUser).then(
+				() => 'hydrate' as const
+			);
 
 			try {
-				await Promise.race([hydrateFromFirebaseLocal(fbUser), timeoutPromise]);
+				const winner = await Promise.race([hydratePromise, timeoutPromise]);
+				if (winner === 'hydrate' && hydrateTimeoutId != null) {
+					clearTimeout(hydrateTimeoutId);
+					hydrateTimeoutId = null;
+				}
+				if (winner === 'timeout') {
+					authContextLog.warn('hydrateFromFirebaseLocal exceeded timeout', {
+						ms: HYDRATE_TIMEOUT_MS,
+						code: 'AUTH_HYDRATE_TIMEOUT',
+					});
+				}
 			} catch (error) {
+				if (hydrateTimeoutId != null) {
+					clearTimeout(hydrateTimeoutId);
+					hydrateTimeoutId = null;
+				}
 				authContextLog.error('Error in hydrateFromFirebaseLocal', error);
 				// Don't throw - we still want to set loading to false
 			}
@@ -538,7 +581,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				}
 
 				authContextLog.error('Failed to refresh ID token', err);
-				Sentry.captureException(err);
+				void crashReporting.captureError(
+					err instanceof Error ? err : new Error(String(err)),
+					{ action: 'id_token_refresh_error' }
+				);
 			}
 		});
 
@@ -625,7 +671,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 						// Skip refreshUserData() - cached data is sufficient
 					}
 				} catch (err) {
-					Sentry.captureException(err);
+					void crashReporting.captureError(
+						err instanceof Error ? err : new Error(String(err)),
+						{ action: 'app_active_token_refresh_error' }
+					);
 				}
 			}
 		};

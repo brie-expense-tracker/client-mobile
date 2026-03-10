@@ -54,8 +54,7 @@ A React Native mobile application built with Expo for personal finance managemen
 - **Weekly Reflections**: Financial reflection and mood tracking
 - **Offline Support**: Works without internet connection
 - **Accessibility**: Full VoiceOver and TalkBack support
-- **Crash Reporting**: Firebase Crashlytics integration
-- **Error Monitoring**: Sentry integration for error tracking
+- **Crash Reporting**: Firebase Crashlytics (no third-party error SDK)
 
 <details>
 <summary>🏗️ Project Structure</summary>
