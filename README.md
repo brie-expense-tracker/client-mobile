@@ -1,12 +1,43 @@
-g# Brie Mobile App
+# Brie Mobile App
 
-A React Native mobile application built with Expo for personal finance management with AI-powered insights.
+Brie Mobile is your daily money operating system: one place to log spending, track goals, stay on budget, and understand what to do next.
+
+Built with React Native + Expo, the app combines practical personal-finance tools with AI-guided insights so users can move from "I think I'm doing okay" to "I know exactly where I stand."
+
+## Why Brie
+
+- **Clarity over chaos**: Money often feels fragmented across apps, notes, and memory. Brie gives users one connected place to understand what is happening.
+- **Action over anxiety**: Instead of raw numbers alone, Brie highlights what matters now and what to do next.
+- **Progress you can feel**: Small daily check-ins compound into better spending habits, stronger savings, and fewer surprises.
+- **Built for real life**: Track recurring bills, one-off purchases, debt payoff, and goals without adding complexity.
+- **Always available**: Offline support keeps the experience reliable on commutes, in stores, or anywhere signal is weak.
+- **Inclusive by design**: VoiceOver and TalkBack support are core product requirements, not an afterthought.
+
+## What Brie Helps Users Do
+
+- Understand where money is going each day, week, and month.
+- Make budget adjustments before problems grow.
+- Balance short-term spending with long-term goals.
+- Stay accountable with reflection prompts and progress visibility.
+- Build confidence through consistent routines and guided insights.
+
+## How To Use Brie
+
+1. **Create your account** and complete onboarding.
+2. **Add your first transactions** (income and spending) to establish your baseline.
+3. **Set budgets and goals** for the month (or longer-term targets).
+4. **Review your dashboard daily** for progress, trends, and priority actions.
+5. **Use AI chat + weekly reflections** to stay consistent and improve decisions over time.
+
+Brie works best as a lightweight daily habit: quick check-ins, clear progress, and fewer financial surprises.
 
 ## 📸 App Preview
 
 ![Brie dashboard preview](<./app/(tabs)/dashboard/brie-preview.png>)
 
 ## 🚀 Quick Start
+
+This section is for developers working on the mobile client.
 
 ### Prerequisites
 
@@ -45,156 +76,16 @@ A React Native mobile application built with Expo for personal finance managemen
 
 ## 📱 Features
 
-- **AI-Powered Insights**: Intelligent financial analysis and recommendations
-- **Budget Management**: Create and track budgets with visual progress
-- **Goal Setting**: Set financial goals with progress tracking
-- **Transaction Management**: Add and categorize transactions
-- **Recurring Expenses**: Track and manage recurring financial obligations
-- **Debt Tracking**: Monitor and manage debt payments
-- **Weekly Reflections**: Financial reflection and mood tracking
-- **Offline Support**: Works without internet connection
-- **Accessibility**: Full VoiceOver and TalkBack support
-- **Crash Reporting**: Firebase Crashlytics (no third-party error SDK)
-
-<details>
-<summary>🏗️ Project Structure</summary>
-
-```
-client-mobile/
-├── app/                           # Expo Router app directory (file-based routing)
-│   ├── _layout.tsx                # Root layout
-│   ├── (auth)/                    # Authentication flow
-│   │   ├── _layout.tsx
-│   │   ├── login.tsx
-│   │   ├── signup.tsx
-│   │   └── forgotPassword.tsx
-│   ├── (onboarding)/              # First-time user onboarding
-│   │   ├── _layout.tsx
-│   │   ├── profileSetup.tsx
-│   │   └── notificationSetup.tsx
-│   ├── (stack)/                   # Stack navigation screens
-│   │   ├── _layout.tsx
-│   │   ├── budgets/               # Budget management screens
-│   │   ├── debts/                 # Debt tracking screens
-│   │   ├── goals/                 # Financial goals screens
-│   │   ├── recurring/             # Recurring expenses screens
-│   │   └── settings/              # Settings & configuration
-│   │       ├── index.tsx
-│   │       ├── _layout.tsx
-│   │       ├── profile/           # User profile management
-│   │       ├── security/          # Security & login settings
-│   │       ├── privacyandsecurity/ # Privacy & data management
-│   │       ├── notification/      # Notification preferences
-│   │       ├── assistant/         # AI assistant settings
-│   │       ├── aiInsights/        # AI insights configuration
-│   │       ├── budgets/           # Budget settings
-│   │       ├── goals/             # Goal settings
-│   │       ├── recurringExpenses/ # Recurring expense settings
-│   │       ├── legal/             # Legal documents (ToS, Privacy, etc.)
-│   │       ├── about/             # About page
-│   │       ├── faq/               # Frequently asked questions
-│   │       └── upgrade/           # Subscription upgrade
-│   └── (tabs)/                    # Tab navigation screens
-│       ├── _layout.tsx
-│       ├── dashboard/             # Main dashboard with transactions
-│       │   ├── index.tsx
-│       │   ├── ledger/           # Transaction ledger & editing
-│       │   └── components/       # Dashboard widgets
-│       ├── chat/                  # AI assistant chat interface
-│       │   ├── index.tsx
-│       │   ├── _components/      # Chat UI components
-│       │   └── components/       # Chat utilities
-│       ├── wallet/               # Financial overview & management
-│       │   ├── index.tsx
-│       │   ├── budgets.tsx
-│       │   ├── goals.tsx
-│       │   ├── debts.tsx
-│       │   ├── recurring.tsx
-│       │   └── components/       # Wallet components
-│       ├── reflections/           # Weekly financial reflections
-│       │   ├── index.tsx
-│       │   ├── ReflectionWizard.tsx
-│       │   └── components/
-│       └── transaction/           # Transaction entry
-│
-├── src/                           # Source code
-│   ├── assets/                    # Static assets
-│   │   ├── fonts/                 # Custom fonts
-│   │   ├── icons/                 # App icons
-│   │   ├── images/                # Images & illustrations
-│   │   └── logos/                 # Brand logos
-│   ├── components/                # Reusable UI components
-│   │   ├── assistant/             # AI assistant UI components
-│   │   ├── budgets/               # Budget-related components
-│   │   ├── forms/                 # Form components
-│   │   └── __tests__/             # Component tests
-│   ├── config/                    # App configuration
-│   │   ├── api.ts                 # API endpoints
-│   │   ├── env.ts                 # Environment variables
-│   │   ├── features.ts            # Feature flags
-│   │   └── telemetry.ts           # Analytics configuration
-│   ├── constants/                 # App constants
-│   ├── context/                   # React Context providers
-│   │   ├── AuthContext.tsx        # Authentication state
-│   │   ├── ThemeContext.tsx       # Theme management
-│   │   ├── transactionContext.tsx # Transaction state
-│   │   └── ...                    # Other context providers
-│   ├── hooks/                     # Custom React hooks
-│   │   ├── useBudgets.ts          # Budget operations
-│   │   ├── useGoals.ts            # Goal operations
-│   │   ├── useAssistantStream.ts  # AI streaming
-│   │   └── ...                    # Other custom hooks
-│   ├── lib/                       # Core libraries
-│   │   ├── firebaseClient.ts      # Firebase initialization
-│   │   └── eventBus.ts            # Event system
-│   ├── networking/                # Network configuration
-│   ├── services/                  # Business logic & API services
-│   │   ├── assistant/             # AI assistant services
-│   │   ├── core/                  # Core services
-│   │   ├── feature/               # Feature-specific services
-│   │   ├── ml/                    # Machine learning services
-│   │   ├── resilience/            # Error handling & retry logic
-│   │   ├── security/              # Security utilities
-│   │   └── utility/               # Utility services
-│   ├── state/                     # Global state management
-│   ├── types/                     # TypeScript type definitions
-│   ├── ui/                        # UI primitives & theme
-│   │   ├── theme.ts               # Design system (colors, spacing, etc.)
-│   │   ├── Card.tsx
-│   │   ├── Page.tsx
-│   │   └── ...                    # Other UI primitives
-│   └── utils/                     # Utility functions
-│       ├── logger.ts              # Logging utilities
-│       ├── format.ts              # Formatting helpers
-│       ├── accessibility.ts       # Accessibility utilities
-│       └── ...                    # Other utilities
-│
-├── docs/                          # Documentation
-│   ├── README.md                  # Documentation index
-│   ├── workflows/                 # Workflow documentation
-│   └── *.md                       # Feature-specific docs
-│
-├── scripts/                       # Build & utility scripts
-│   ├── clear-cache-and-restart.sh
-│   └── testflight-build.sh
-│
-├── ios/                           # iOS native code
-│   ├── brie/                      # iOS app bundle
-│   └── Podfile                    # CocoaPods dependencies
-│
-├── android/                       # Android native code
-│   ├── app/                       # Android app module
-│   └── build.gradle               # Gradle build config
-│
-├── app.config.ts                  # Expo app configuration
-├── eas.json                       # EAS Build configuration
-├── babel.config.js                # Babel configuration
-├── metro.config.js                # Metro bundler config
-├── tsconfig.json                  # TypeScript configuration
-└── package.json                   # Dependencies & scripts
-```
-
-</details>
+- **AI-Powered Insights**: Personalized analysis that turns transaction history into clear recommendations.
+- **Budget Management**: Create budgets and track progress with clear visual signals before overspending happens.
+- **Goal Setting**: Turn financial goals into measurable targets with ongoing progress tracking.
+- **Transaction Management**: Quickly add, categorize, and review transactions to maintain accurate data.
+- **Recurring Expenses**: Keep fixed obligations visible so users can plan with confidence.
+- **Debt Tracking**: Monitor balances and payoff progress to support better long-term decisions.
+- **Weekly Reflections**: Reinforce awareness, habits, and behavior change through short guided prompts.
+- **Offline Support**: Core workflows remain usable without internet access.
+- **Accessibility**: Full VoiceOver and TalkBack support for inclusive navigation.
+- **Crash Reporting**: Firebase Crashlytics keeps reliability high through fast issue detection.
 
 ## 🔧 Configuration
 
