@@ -947,7 +947,8 @@ const styles = StyleSheet.create({
 		flexGrow: 1,
 		paddingHorizontal: space.xl,
 		paddingTop: space.xl,
-		alignItems: 'center',
+		// Stretch children so the header/content column doesn't look double-inset.
+		alignItems: 'stretch',
 		// No justifyContent: 'center' — keeps layout stable when keyboard opens or note expands (avoids jitter)
 	},
 	formWrap: {
