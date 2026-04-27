@@ -620,8 +620,8 @@ const styles = StyleSheet.create({
 	},
 	editModalContent: {
 		backgroundColor: palette.surface,
-		borderTopLeftRadius: 20,
-		borderTopRightRadius: 20,
+		borderTopLeftRadius: radius.shell,
+		borderTopRightRadius: radius.shell,
 		padding: 24,
 		zIndex: 1000,
 		borderTopWidth: StyleSheet.hairlineWidth,

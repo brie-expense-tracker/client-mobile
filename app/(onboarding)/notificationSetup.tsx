@@ -419,7 +419,9 @@ export default function NotificationPermissionScreen() {
 										updateConsent('core', 'transactions', value)
 									}
 									trackColor={{ false: palette.border, true: palette.primary }}
-									thumbColor={consent.core.transactions ? palette.primaryTextOn : palette.textSubtle}
+									thumbColor={
+										consent.core.transactions ? palette.textOnPrimary : palette.textSubtle
+									}
 								/>
 							</View>
 						</View>
@@ -445,7 +447,9 @@ export default function NotificationPermissionScreen() {
 									}
 									trackColor={{ false: palette.border, true: palette.primary }}
 									thumbColor={
-										consent.reminders.weeklySummary ? palette.primaryTextOn : palette.textSubtle
+										consent.reminders.weeklySummary
+											? palette.textOnPrimary
+											: palette.textSubtle
 									}
 								/>
 							</View>
@@ -464,7 +468,9 @@ export default function NotificationPermissionScreen() {
 									}
 									trackColor={{ false: palette.border, true: palette.primary }}
 									thumbColor={
-										consent.reminders.monthlyCheck ? palette.primaryTextOn : palette.textSubtle
+										consent.reminders.monthlyCheck
+											? palette.textOnPrimary
+											: palette.textSubtle
 									}
 								/>
 							</View>
@@ -494,7 +500,9 @@ export default function NotificationPermissionScreen() {
 									}}
 									trackColor={{ false: palette.border, true: palette.primary }}
 									thumbColor={
-										consent.marketing.productUpdates ? palette.primaryTextOn : palette.textSubtle
+										consent.marketing.productUpdates
+											? palette.textOnPrimary
+											: palette.textSubtle
 									}
 								/>
 							</View>
@@ -516,7 +524,9 @@ export default function NotificationPermissionScreen() {
 									}}
 									trackColor={{ false: palette.border, true: palette.primary }}
 									thumbColor={
-										consent.marketing.specialOffers ? palette.primaryTextOn : palette.textSubtle
+										consent.marketing.specialOffers
+											? palette.textOnPrimary
+											: palette.textSubtle
 									}
 								/>
 							</View>
@@ -552,7 +562,7 @@ export default function NotificationPermissionScreen() {
 					>
 						{loading ? (
 							<View style={styles.buttonLoading}>
-								<ActivityIndicator size="small" color={palette.primaryTextOn} />
+								<ActivityIndicator size="small" color={palette.textOnPrimary} />
 								<Text style={styles.primaryButtonText}>Setting up...</Text>
 							</View>
 						) : (
@@ -666,7 +676,7 @@ const styles = StyleSheet.create({
 	recommendedText: {
 		fontSize: 12,
 		fontWeight: '600',
-		color: palette.primaryTextOn,
+		color: palette.textOnPrimary,
 	},
 	customizeHeader: {
 		flexDirection: 'row',
@@ -744,7 +754,7 @@ const styles = StyleSheet.create({
 	button: {
 		paddingVertical: space.lg,
 		paddingHorizontal: space.xl,
-		borderRadius: radius.md,
+		borderRadius: radius.xl2,
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
@@ -763,7 +773,7 @@ const styles = StyleSheet.create({
 	primaryButtonText: {
 		fontSize: 16,
 		fontWeight: '600',
-		color: palette.primaryTextOn,
+		color: palette.textOnPrimary,
 	},
 	secondaryButton: {
 		backgroundColor: 'transparent',

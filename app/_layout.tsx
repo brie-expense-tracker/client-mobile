@@ -70,7 +70,7 @@ const styles = StyleSheet.create({
 		zIndex: 1000,
 	},
 	devText: {
-		color: '#6ee7b7',
+		color: palette.successStrong,
 		fontSize: 11,
 		fontWeight: '700',
 		letterSpacing: 0.6,

@@ -13,7 +13,7 @@ import {
 	type ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { palette, space } from '../ui/theme';
+import { palette, radius, space } from '../ui/theme';
 
 const formatDisplayDate = (value: string): string => {
 	if (!value || typeof value !== 'string') return '';
@@ -175,10 +175,10 @@ const styles = StyleSheet.create({
 	input: {
 		borderWidth: 1,
 		borderColor: palette.border,
-		borderRadius: 12,
-		paddingHorizontal: 12,
+		borderRadius: radius.xl2,
+		paddingHorizontal: 16,
 		paddingVertical: 12,
-		fontSize: 16,
+		fontSize: 17,
 		color: palette.text,
 		marginBottom: 16,
 	},
@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
 		flex: 1,
 		paddingVertical: 12,
 		alignItems: 'center',
-		borderRadius: 12,
+		borderRadius: radius.xl2,
 		backgroundColor: palette.surfaceAlt,
 	},
 	todayBtnText: {
@@ -202,12 +202,12 @@ const styles = StyleSheet.create({
 		flex: 1,
 		paddingVertical: 12,
 		alignItems: 'center',
-		borderRadius: 12,
+		borderRadius: radius.xl2,
 		backgroundColor: palette.primary,
 	},
 	doneBtnText: {
 		fontSize: 16,
 		fontWeight: '600',
-		color: palette.primaryTextOn,
+		color: palette.textOnPrimary,
 	},
 });

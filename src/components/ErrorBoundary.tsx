@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
 	},
 	buttonText: {
 		...type.body,
-		color: palette.primaryTextOn,
+		color: palette.textOnPrimary,
 		fontWeight: '600',
 	},
 });

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { palette, radius } from '../ui/theme';
 
 // Simple connectivity check using fetch instead of NetInfo
 export const useConnectivity = () => {
@@ -88,7 +89,7 @@ const styles = StyleSheet.create({
 		top: 0,
 		left: 0,
 		right: 0,
-		backgroundColor: '#ff6b6b',
+		backgroundColor: palette.danger,
 		padding: 12,
 		zIndex: 1000,
 		flexDirection: 'row',
@@ -96,7 +97,7 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 	},
 	text: {
-		color: 'white',
+		color: palette.text,
 		flex: 1,
 	},
 	buttonContainer: {
@@ -104,19 +105,19 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 	},
 	button: {
-		backgroundColor: 'white',
+		backgroundColor: palette.surface,
 		paddingHorizontal: 8,
 		paddingVertical: 4,
-		borderRadius: 4,
+		borderRadius: radius.sm,
 		marginRight: 8,
 	},
 	buttonText: {
-		color: '#ff6b6b',
+		color: palette.danger,
 		fontSize: 12,
 		fontWeight: 'bold',
 	},
 	queuedText: {
-		color: 'white',
+		color: palette.text,
 		fontSize: 12,
 	},
 });

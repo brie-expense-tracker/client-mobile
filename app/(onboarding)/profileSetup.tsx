@@ -1068,7 +1068,7 @@ const styles = StyleSheet.create({
 	},
 	frequencyText: {
 		fontSize: 16,
-		color: '#374151',
+		color: palette.textMuted,
 	},
 	welcomeCard: {
 		alignItems: 'center',

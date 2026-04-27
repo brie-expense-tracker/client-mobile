@@ -264,7 +264,7 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 			<View style={styles.deleteBackground}>
 				<Animated.View style={animatedIconStyle}>
 					<TouchableOpacity onPress={() => onDelete(item.id, resetAnimation)}>
-						<Ionicons name="trash-outline" size={18} color={palette.primaryTextOn} />
+						<Ionicons name="trash-outline" size={18} color={palette.text} />
 					</TouchableOpacity>
 				</Animated.View>
 			</View>

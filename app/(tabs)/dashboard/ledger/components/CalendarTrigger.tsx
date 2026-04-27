@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { palette, radius } from '../../../../../src/ui/theme';
 
 export default function CalendarTrigger({
 	dateISO,
@@ -24,9 +25,9 @@ export default function CalendarTrigger({
 
 	return (
 		<TouchableOpacity style={styles.field} onPress={onPress}>
-			<Ionicons name="calendar" size={18} color="#111827" />
+			<Ionicons name="calendar" size={18} color={palette.textMuted} />
 			<Text style={styles.text}>{display}</Text>
-			<Ionicons name="chevron-down" size={16} color="#6B7280" />
+			<Ionicons name="chevron-down" size={16} color={palette.iconMuted} />
 		</TouchableOpacity>
 	);
 }
@@ -36,8 +37,10 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 8,
-		backgroundColor: '#F3F4F6',
-		borderRadius: 12,
+		backgroundColor: palette.input,
+		borderWidth: StyleSheet.hairlineWidth,
+		borderColor: palette.border,
+		borderRadius: radius.xl2,
 		paddingHorizontal: 12,
 		height: 44,
 		flex: 1,
@@ -45,7 +48,7 @@ const styles = StyleSheet.create({
 	text: {
 		flex: 1,
 		fontSize: 15,
-		color: '#111827',
+		color: palette.text,
 		fontWeight: '500',
 	},
 });

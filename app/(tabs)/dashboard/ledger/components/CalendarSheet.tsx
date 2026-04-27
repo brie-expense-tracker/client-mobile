@@ -9,7 +9,7 @@ import {
 	Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { palette } from '../../../../../src/ui/theme';
+import { palette, radius } from '../../../../../src/ui/theme';
 
 type Props = {
 	visible: boolean;
@@ -116,7 +116,7 @@ export default function CalendarSheet({
 						style={styles.navBtn}
 						onPress={() => setViewMonth((m) => addMonths(m, -1))}
 					>
-						<Ionicons name="chevron-back" size={22} color="#111827" />
+						<Ionicons name="chevron-back" size={22} color={palette.text} />
 					</TouchableOpacity>
 
 					<Text style={styles.headerTitle}>{monthTitle}</Text>
@@ -125,7 +125,7 @@ export default function CalendarSheet({
 						style={styles.navBtn}
 						onPress={() => setViewMonth((m) => addMonths(m, 1))}
 					>
-						<Ionicons name="chevron-forward" size={22} color="#111827" />
+						<Ionicons name="chevron-forward" size={22} color={palette.text} />
 					</TouchableOpacity>
 				</View>
 
@@ -216,7 +216,8 @@ export default function CalendarSheet({
 const styles = StyleSheet.create({
 	backdrop: {
 		...StyleSheet.absoluteFillObject,
-		backgroundColor: 'rgba(0,0,0,0.25)',
+		/** Dark workspace scrim (aligned with web modal overlays). */
+		backgroundColor: 'rgba(18, 19, 21, 0.52)',
 	},
 	sheet: {
 		position: 'absolute',
@@ -227,9 +228,9 @@ const styles = StyleSheet.create({
 		paddingBottom: Platform.select({ ios: 24, android: 16 }),
 		paddingHorizontal: 16,
 		backgroundColor: palette.surface,
-		borderTopLeftRadius: 20,
-		borderTopRightRadius: 20,
-		shadowColor: '#000',
+		borderTopLeftRadius: radius.shell,
+		borderTopRightRadius: radius.shell,
+		shadowColor: palette.bg,
 		shadowOpacity: 0.12,
 		shadowRadius: 10,
 		shadowOffset: { width: 0, height: -2 },
@@ -278,7 +279,7 @@ const styles = StyleSheet.create({
 		marginVertical: 6,
 		marginHorizontal: 2,
 		height: 40,
-		borderRadius: 10,
+		borderRadius: radius.xl2,
 		justifyContent: 'center',
 		alignItems: 'center',
 	},
@@ -321,7 +322,7 @@ const styles = StyleSheet.create({
 		gap: 6,
 		paddingVertical: 8,
 		paddingHorizontal: 10,
-		borderRadius: 10,
+		borderRadius: radius.xl2,
 		backgroundColor: palette.primarySoft,
 	},
 	quickText: {

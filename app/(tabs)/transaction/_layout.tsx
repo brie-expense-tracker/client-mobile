@@ -11,7 +11,7 @@ export default function TransactionLayout() {
 			<Stack.Screen
 				name="index"
 				options={{
-					title: 'Transaction',
+					title: 'Capture',
 				}}
 			/>
 		</Stack>

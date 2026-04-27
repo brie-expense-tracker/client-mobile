@@ -68,6 +68,10 @@ const TabLayout: React.FC = () => {
 		() => createTabListener('/(tabs)/dashboard')(),
 		[createTabListener]
 	);
+	const inboxListeners = useMemo(
+		() => createTabListener('/(tabs)/inbox')(),
+		[createTabListener]
+	);
 	const transactionListeners = useMemo(
 		() => createTabListener('/(tabs)/transaction')(),
 		[createTabListener]
@@ -80,13 +84,18 @@ const TabLayout: React.FC = () => {
 	const screenOptions = useMemo(
 		() => ({
 			headerShown: false,
-			tabBarShowLabel: false,
-			tabBarActiveTintColor: palette.primaryStrong,
+			tabBarShowLabel: true,
+			tabBarActiveTintColor: palette.primary,
 			tabBarInactiveTintColor: palette.textSubtle,
+			tabBarLabelStyle: {
+				fontSize: 11,
+				fontWeight: '600',
+				marginBottom: 2,
+			},
 			tabBarStyle: {
-				paddingTop: 6,
-				height: 64,
-				paddingHorizontal: 20,
+				paddingTop: 4,
+				height: 62,
+				paddingHorizontal: 12,
 				backgroundColor: palette.shell,
 				borderTopWidth: StyleSheet.hairlineWidth,
 				borderTopColor: palette.border,
@@ -102,21 +111,32 @@ const TabLayout: React.FC = () => {
 				<Tabs.Screen
 					name="dashboard"
 					options={{
+						title: 'Home',
+						tabBarLabel: 'Home',
 						tabBarIcon: ({ color, size }) => (
-							<Ionicons name="grid-outline" color={color} size={size} />
+							<Ionicons name="home-outline" color={color} size={size} />
 						),
 					}}
 					listeners={dashboardListeners}
 				/>
 				<Tabs.Screen
+					name="inbox"
+					options={{
+						title: 'Inbox',
+						tabBarLabel: 'Inbox',
+						tabBarIcon: ({ color, size }) => (
+							<Ionicons name="mail-unread-outline" color={color} size={size} />
+						),
+					}}
+					listeners={inboxListeners}
+				/>
+				<Tabs.Screen
 					name="transaction"
 					options={{
+						title: 'Capture',
+						tabBarLabel: 'Capture',
 						tabBarIcon: ({ color, size }) => (
-							<Ionicons
-								name="add-circle-outline"
-								color={color}
-								size={size}
-							/>
+							<Ionicons name="flash-outline" color={color} size={size} />
 						),
 					}}
 					listeners={transactionListeners}
@@ -124,6 +144,8 @@ const TabLayout: React.FC = () => {
 				<Tabs.Screen
 					name="settings"
 					options={{
+						title: 'Profile',
+						tabBarLabel: 'Profile',
 						tabBarIcon: ({ color, size }) => (
 							<Ionicons name="person-outline" color={color} size={size} />
 						),

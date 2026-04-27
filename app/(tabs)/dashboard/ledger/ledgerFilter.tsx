@@ -14,7 +14,7 @@ import {
 	useFilter,
 	type DateFilterMode,
 } from '../../../../src/context/filterContext';
-import { palette, radius, space } from '../../../../src/ui/theme';
+import { palette, radius, space, type } from '../../../../src/ui/theme';
 
 export default function LedgerFilterScreen() {
 	const {
@@ -151,8 +151,7 @@ const styles = StyleSheet.create({
 		paddingBottom: 100,
 	},
 	sectionHeader: {
-		fontSize: 18,
-		fontWeight: '600',
+		...type.h2,
 		color: palette.text,
 		marginBottom: 12,
 	},
@@ -198,7 +197,7 @@ const styles = StyleSheet.create({
 		backgroundColor: palette.surfaceAlt,
 		paddingVertical: 12,
 		paddingHorizontal: space.lg,
-		borderRadius: radius.md,
+		borderRadius: radius.xl2,
 		marginRight: space.sm,
 		alignItems: 'center',
 	},
@@ -212,12 +211,12 @@ const styles = StyleSheet.create({
 		backgroundColor: palette.primary,
 		paddingVertical: 12,
 		paddingHorizontal: space.lg,
-		borderRadius: radius.md,
+		borderRadius: radius.xl2,
 		marginLeft: space.sm,
 		alignItems: 'center',
 	},
 	applyButtonText: {
-		color: palette.primaryTextOn,
+		color: palette.textOnPrimary,
 		fontSize: 16,
 		fontWeight: '600',
 	},

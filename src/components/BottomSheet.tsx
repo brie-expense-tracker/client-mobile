@@ -28,7 +28,7 @@ import Animated, {
 	withSpring,
 	withTiming,
 } from 'react-native-reanimated';
-import { palette } from '../ui/theme';
+import { palette, radius as radiusToken } from '../ui/theme';
 
 type SnapPoint = number; // fraction of screen height that the sheet should occupy (0..1)
 
@@ -41,7 +41,7 @@ type BottomSheetProps = PropsWithChildren<{
 	snapPoints?: SnapPoint[];
 	/** Start at which snap index when opened (default 0 = largest) */
 	initialSnapIndex?: number;
-	/** Corner radius (default 20) */
+	/** Corner radius (default matches web workspace chrome, `radius.shell`) */
 	radius?: number;
 	/** Backdrop opacity at fully open (default 0.35) */
 	maxBackdropOpacity?: number;
@@ -77,7 +77,7 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(
 			children,
 			snapPoints = [0.6, 0.4], // visible heights (largest first)
 			initialSnapIndex = 0,
-			radius = 20,
+			radius = radiusToken.shell,
 			maxBackdropOpacity = 0.35,
 			backdropA11yLabel = 'Close sheet',
 			header,
@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
 		position: 'absolute',
 		left: 0,
 		top: 0,
-		backgroundColor: '#000',
+		backgroundColor: palette.bg,
 	},
 	sheet: {
 		position: 'absolute',

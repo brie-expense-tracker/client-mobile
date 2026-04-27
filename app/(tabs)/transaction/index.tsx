@@ -4,6 +4,7 @@ import React, {
 	useState,
 	useContext,
 	useCallback,
+	useMemo,
 } from 'react';
 import {
 	View,
@@ -44,8 +45,24 @@ import { palette, radius, space, shadow, type } from '../../../src/ui/theme';
 import { getItem, setItem, removeItem } from '../../../src/utils/safeStorage';
 import { AppCard, AppText, AppButton } from '../../../src/ui/primitives';
 import { ErrorBoundary } from '../../../src/components/ErrorBoundary';
+import { parseCaptureLine } from '../../../src/lib/parse-capture-line';
+import {
+	loadCaptureRecentChips,
+	pushCaptureRecentChip,
+} from '../../../src/lib/captureRecentChips';
 
 const transactionScreenLog = createLogger('TransactionScreen');
+
+const PARSE_ERROR_MESSAGE =
+	'Use "description amount", e.g. coffee 5.75 or paycheck 1200.';
+
+function formatUsd(n: number) {
+	return new Intl.NumberFormat('en-US', {
+		style: 'currency',
+		currency: 'USD',
+		maximumFractionDigits: 2,
+	}).format(n);
+}
 
 const CASH_CATEGORIES = [
 	'Food',
@@ -130,6 +147,7 @@ export default function TransactionScreenProModern() {
 		mode?: 'income' | 'expense';
 	}>();
 	const amountRef = useRef<TextInput>(null);
+	const captureLineRef = useRef<TextInput>(null);
 	const noteInputRef = useRef<TextInput>(null);
 	const scrollRef = useRef<ScrollView>(null);
 	const scrollYRef = useRef(0);
@@ -163,6 +181,11 @@ export default function TransactionScreenProModern() {
 	const [mountCalendar, setMountCalendar] = useState(false);
 	const [noteExpanded, setNoteExpanded] = useState(false);
 	const [showCategoryError, setShowCategoryError] = useState(false);
+	const [captureLine, setCaptureLine] = useState('');
+	const [captureParseError, setCaptureParseError] = useState<string | null>(
+		null,
+	);
+	const [recentChips, setRecentChips] = useState<string[]>([]);
 	const categoryShakeX = useSharedValue(0);
 	const categoryShakeStyle = useAnimatedStyle(() => ({
 		transform: [{ translateX: categoryShakeX.value }],
@@ -170,11 +193,15 @@ export default function TransactionScreenProModern() {
 
 	const { addTransaction } = useContext(TransactionContext);
 
-	// Auto-focus Amount on screen open to reduce taps and keep decimal pad ready
+	useEffect(() => {
+		loadCaptureRecentChips().then(setRecentChips);
+	}, []);
+
+	// Match web /capture: focus the quick line first
 	useEffect(() => {
 		const task = InteractionManager.runAfterInteractions(() => {
 			const t = setTimeout(() => {
-				amountRef.current?.focus();
+				captureLineRef.current?.focus();
 			}, 100);
 			return () => clearTimeout(t);
 		});
@@ -236,6 +263,21 @@ export default function TransactionScreenProModern() {
 	const description = watch('description');
 	const selectedDate = watch('date');
 
+	const parsedPreview = useMemo(() => {
+		const t = captureLine.trim();
+		if (!t) return null;
+		return parseCaptureLine(t);
+	}, [captureLine]);
+
+	const parsedSummary = useMemo(() => {
+		if (!parsedPreview) return null;
+		return parsedPreview.type === 'income'
+			? `Cash in · ${parsedPreview.description} · ${formatUsd(parsedPreview.amount)}`
+			: `Cash out · ${parsedPreview.description} · ${formatUsd(
+					Math.abs(parsedPreview.amount),
+				)}`;
+	}, [parsedPreview]);
+
 	const FORM_STATE_KEY = 'transaction_form_state';
 	const [hasRestoredState, setHasRestoredState] = useState(false);
 
@@ -263,6 +305,12 @@ export default function TransactionScreenProModern() {
 					if (state.selectedCategory)
 						setSelectedCategory(state.selectedCategory);
 					if (state.description?.trim()) setNoteExpanded(true);
+					const descR = (state.description ?? '').trim();
+					const amtR =
+						typeof state.amount === 'string' ? state.amount.trim() : '';
+					if (descR && amtR && Number(amtR) > 0) {
+						setCaptureLine(`${descR} ${amtR}`);
+					}
 				}
 			} catch {
 			} finally {
@@ -369,6 +417,46 @@ export default function TransactionScreenProModern() {
 		},
 		[isSubmitting, mode, router],
 	);
+
+	/** When the quick line parses, mirror web Capture and fill the form below. */
+	const syncFormFromCaptureText = useCallback(
+		(trimmed: string) => {
+			const parsed = parseCaptureLine(trimmed);
+			if (!parsed) return;
+			const nextMode = parsed.type;
+			setValue('description', parsed.description, { shouldValidate: true });
+			setValue('amount', Math.abs(parsed.amount).toFixed(2), {
+				shouldValidate: true,
+			});
+			if (!isSubmitting && mode !== nextMode) {
+				setMode(nextMode);
+				setSelectedCategory(null);
+				router.setParams({ mode: nextMode });
+			}
+			clearErrors('amount');
+		},
+		[setValue, clearErrors, isSubmitting, mode, router],
+	);
+
+	const onCaptureLineChange = useCallback(
+		(text: string) => {
+			setCaptureLine(text);
+			setCaptureParseError(null);
+			const trimmed = text.trim();
+			if (trimmed) {
+				const parsed = parseCaptureLine(trimmed);
+				if (parsed) syncFormFromCaptureText(trimmed);
+			}
+		},
+		[syncFormFromCaptureText],
+	);
+
+	const onCaptureBlur = useCallback(() => {
+		const t = captureLine.trim();
+		if (t && !parseCaptureLine(t)) setCaptureParseError(PARSE_ERROR_MESSAGE);
+		else setCaptureParseError(null);
+	}, [captureLine]);
+
 	const onChangeAmount = useCallback(
 		(text: string) => {
 			const sanitized = sanitizeCurrency(text);
@@ -422,6 +510,14 @@ export default function TransactionScreenProModern() {
 				await addTransaction(payload);
 				await removeItem(FORM_STATE_KEY);
 
+				const chipLine =
+					captureLine.trim() ||
+					`${data.description?.trim() || 'Entry'} ${amt}`.trim();
+				await pushCaptureRecentChip(chipLine);
+				setRecentChips(await loadCaptureRecentChips());
+				setCaptureLine('');
+				setCaptureParseError(null);
+
 				Alert.alert(
 					'Success',
 					`${mode === 'income' ? 'Cash IN' : 'Cash OUT'} saved!`,
@@ -450,13 +546,20 @@ export default function TransactionScreenProModern() {
 				setIsSubmitting(false);
 			}
 		},
-		[mode, selectedCategory, addTransaction, reset, router],
+		[mode, selectedCategory, captureLine, addTransaction, reset, router],
 	);
 
 	const handleCreatePress = useCallback(() => {
 		if (isSubmitting) return;
 		clearErrors();
 		setShowCategoryError(false);
+
+		const cap = captureLine.trim();
+		if (cap && !parseCaptureLine(cap)) {
+			setCaptureParseError(PARSE_ERROR_MESSAGE);
+			Alert.alert('Check your line', PARSE_ERROR_MESSAGE);
+			return;
+		}
 
 		if (mode === 'expense' && !selectedCategory) {
 			setShowCategoryError(true);
@@ -467,6 +570,7 @@ export default function TransactionScreenProModern() {
 		isSubmitting,
 		mode,
 		selectedCategory,
+		captureLine,
 		clearErrors,
 		handleSubmit,
 		onSubmit,
@@ -501,9 +605,75 @@ export default function TransactionScreenProModern() {
 						scrollEventThrottle={16}
 					>
 						<View style={styles.formWrap}>
-							<AppText.Title style={styles.heroTitle}>
-								New transaction
-							</AppText.Title>
+							<AppText.Title style={styles.heroTitle}>Capture</AppText.Title>
+							<AppText.Caption color="muted" style={styles.heroSub}>
+								Type description then amount, same as the web app — details below
+								fill in as you type.
+							</AppText.Caption>
+
+							<AppCard
+								style={styles.captureCard}
+								padding={space.lg}
+								borderRadius={radius.xl}
+								bordered
+							>
+								<AppText.Label color="muted" style={styles.captureFieldLabel}>
+									New entry
+								</AppText.Label>
+								<TextInput
+									ref={captureLineRef}
+									style={styles.captureInput}
+									value={captureLine}
+									onChangeText={onCaptureLineChange}
+									onBlur={onCaptureBlur}
+									placeholder="Description, then amount (e.g. coffee 5.75)"
+									placeholderTextColor={palette.textSubtle}
+									accessibilityLabel="Quick capture line"
+									returnKeyType="done"
+									onSubmitEditing={() => Keyboard.dismiss()}
+									autoCapitalize="sentences"
+									autoCorrect
+								/>
+								{parsedSummary ? (
+									<View style={styles.previewPill}>
+										<Text style={styles.previewPillText}>{parsedSummary}</Text>
+									</View>
+								) : null}
+								{captureParseError ? (
+									<AppText.Caption color="danger" style={styles.captureError}>
+										{captureParseError}
+									</AppText.Caption>
+								) : null}
+								<AppText.Caption color="muted" style={styles.captureHint}>
+									Income hints: paycheck, salary, deposit, refund…
+								</AppText.Caption>
+								{recentChips.length > 0 ? (
+									<View style={styles.chipsSection}>
+										<AppText.Caption color="muted" style={styles.chipsLabel}>
+											Recent
+										</AppText.Caption>
+										<ScrollView
+											horizontal
+											showsHorizontalScrollIndicator={false}
+											contentContainerStyle={styles.chipsRow}
+										>
+											{recentChips.map((chip) => (
+												<TouchableOpacity
+													key={chip}
+													style={styles.recentChip}
+													onPress={() => onCaptureLineChange(chip)}
+												>
+													<Text style={styles.recentChipText} numberOfLines={1}>
+														{chip}
+													</Text>
+												</TouchableOpacity>
+											))}
+										</ScrollView>
+									</View>
+								) : null}
+							</AppCard>
+
+							<AppText.Heading style={styles.detailsHeading}>Details</AppText.Heading>
 
 							<AppCard
 								style={styles.amountCard}
@@ -963,7 +1133,79 @@ const styles = StyleSheet.create({
 		fontWeight: '700',
 		color: palette.text,
 		letterSpacing: -0.4,
-		marginBottom: space.xl,
+		marginBottom: space.sm,
+	},
+	heroSub: {
+		lineHeight: 20,
+		marginBottom: space.lg,
+	},
+	captureCard: {
+		marginBottom: space.md,
+	},
+	captureFieldLabel: {
+		marginBottom: space.xs,
+	},
+	captureInput: {
+		borderRadius: radius.xl2,
+		borderWidth: StyleSheet.hairlineWidth,
+		borderColor: palette.border,
+		backgroundColor: palette.input,
+		paddingHorizontal: 16,
+		paddingVertical: 14,
+		fontSize: 17,
+		color: palette.text,
+		marginTop: space.xs,
+	},
+	previewPill: {
+		alignSelf: 'flex-start',
+		marginTop: space.md,
+		paddingHorizontal: space.md,
+		paddingVertical: space.xs,
+		borderRadius: radius.pill,
+		borderWidth: 1,
+		borderColor: palette.primaryBorder,
+		backgroundColor: palette.primarySoft,
+	},
+	previewPillText: {
+		...type.bodySm,
+		color: palette.primaryStrong,
+		fontWeight: '600',
+	},
+	captureError: {
+		marginTop: space.sm,
+	},
+	captureHint: {
+		marginTop: space.sm,
+	},
+	chipsSection: {
+		marginTop: space.md,
+	},
+	chipsLabel: {
+		marginBottom: space.xs,
+	},
+	chipsRow: {
+		flexDirection: 'row',
+		gap: space.sm,
+		paddingRight: space.lg,
+	},
+	recentChip: {
+		maxWidth: 220,
+		paddingHorizontal: space.md,
+		paddingVertical: space.xs,
+		borderRadius: radius.pill,
+		borderWidth: 1,
+		borderColor: palette.border,
+		backgroundColor: palette.surfaceSunken,
+	},
+	recentChipText: {
+		...type.bodyXs,
+		color: palette.text,
+	},
+	detailsHeading: {
+		...type.h2,
+		color: palette.text,
+		marginTop: space.lg,
+		marginBottom: space.md,
 	},
 
 	amountRow: {

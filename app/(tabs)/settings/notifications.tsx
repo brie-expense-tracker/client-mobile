@@ -123,23 +123,23 @@ function EmptyState({
 const getNotificationTypeInfo = (type?: string) => {
 	switch (type) {
 		case 'budget':
-			return { icon: 'wallet-outline', color: '#ef4444' };
+			return { icon: 'wallet-outline', color: palette.danger };
 		case 'goal':
-			return { icon: 'trophy-outline', color: '#10b981' };
+			return { icon: 'trophy-outline', color: palette.success };
 		case 'transaction':
-			return { icon: 'card-outline', color: '#3b82f6' };
+			return { icon: 'card-outline', color: palette.primary };
 		case 'ai_insight':
-			return { icon: 'bulb-outline', color: '#8b5cf6' };
+			return { icon: 'bulb-outline', color: palette.primaryStrong };
 		case 'system':
-			return { icon: 'settings-outline', color: '#6b7280' };
+			return { icon: 'settings-outline', color: palette.textMuted };
 		case 'reminder':
-			return { icon: 'time-outline', color: '#f59e0b' };
+			return { icon: 'time-outline', color: palette.warning };
 		case 'marketing':
-			return { icon: 'megaphone-outline', color: '#ec4899' };
+			return { icon: 'megaphone-outline', color: palette.danger };
 		case 'promotional':
-			return { icon: 'gift-outline', color: '#f97316' };
+			return { icon: 'gift-outline', color: palette.warning };
 		default:
-			return { icon: 'notifications-outline', color: '#6b7280' };
+			return { icon: 'notifications-outline', color: palette.iconMuted };
 	}
 };
 
@@ -300,7 +300,7 @@ const NotificationItem = ({
 			<View style={styles.deleteAction}>
 				<AnimatedView style={trashIconStyle}>
 					<TouchableOpacity onPress={() => onDelete(item.id!, resetAnimation)}>
-						<Ionicons name="trash-outline" size={18} color={palette.primaryTextOn} />
+						<Ionicons name="trash-outline" size={18} color={palette.text} />
 					</TouchableOpacity>
 				</AnimatedView>
 			</View>
@@ -350,9 +350,7 @@ const NotificationItem = ({
 										{ backgroundColor: typeInfo.color },
 									]}
 								>
-									<AppText.Caption
-										style={[styles.priorityText, { color: palette.primaryTextOn }]}
-									>
+									<AppText.Caption style={styles.priorityText}>
 										{item.priority.toUpperCase()}
 									</AppText.Caption>
 								</View>
@@ -747,7 +745,7 @@ const styles = StyleSheet.create({
 	},
 	priorityText: {
 		...type.labelXs,
-		color: palette.primaryTextOn,
+		color: palette.text,
 		fontWeight: '700',
 		letterSpacing: 0.3,
 	},

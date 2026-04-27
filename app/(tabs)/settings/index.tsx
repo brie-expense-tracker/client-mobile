@@ -406,7 +406,7 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 6,
 	},
 	notificationBadgeText: {
-		color: palette.primaryTextOn,
+		color: palette.text,
 		...type.labelXs,
 		fontWeight: '700',
 	},
