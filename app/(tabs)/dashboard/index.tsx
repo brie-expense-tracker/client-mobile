@@ -462,7 +462,9 @@ const styles = StyleSheet.create({
 		paddingHorizontal: space.xl,
 		paddingTop: space.sm,
 		paddingBottom: space.sm,
-		backgroundColor: palette.surfaceAlt,
+		backgroundColor: palette.shell,
+		borderBottomWidth: StyleSheet.hairlineWidth,
+		borderBottomColor: palette.border,
 	},
 	logo: { height: 40, width: 90 },
 	// quickAddButton styles moved to AppButton primitive

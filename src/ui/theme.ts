@@ -1,81 +1,86 @@
+/** Aligned with `apps/web/src/app/globals.css` @theme tokens (dark workspace). */
 export const palette = {
-	// Base
-	bg: '#FFFFFF',
-	surface: '#FFFFFF',
-	surfaceAlt: '#F8FAFC',
-	text: '#111827',
-	textSecondary: '#333333',
-	textMuted: '#6B7280',
-	textSubtle: '#9CA3AF',
-	border: '#E5E7EB',
-	borderMuted: '#E5E5E5',
+	bg: '#121315',
+	surface: '#1b1d21',
+	surfaceAlt: '#121315',
+	surfaceRaised: '#1b1d21',
+	surfaceSunken: '#17181b',
+	text: '#f3f1ec',
+	textSecondary: 'rgba(243, 241, 236, 0.85)',
+	textMuted: 'rgba(243, 241, 236, 0.62)',
+	textSubtle: 'rgba(243, 241, 236, 0.4)',
+	border: 'rgba(255, 255, 255, 0.08)',
+	borderMuted: 'rgba(255, 255, 255, 0.06)',
+	line: 'rgba(255, 255, 255, 0.06)',
 
-	// Primary
-	primary: '#00A2FF',
-	primaryMuted: '#0EA5E9',
-	primaryStrong: '#0284C7', // slightly deeper than primaryMuted
-	primarySubtle: '#E0F2FE',
-	primarySoft: '#EFF6FF',
-	primaryBorder: '#7DD3FC', // for subtle outlines when needed
-	primaryTextOn: '#FFFFFF',
+	primary: '#6f8f8a',
+	primaryMuted: '#5a736f',
+	primaryStrong: '#95aea9',
+	primarySubtle: 'rgba(111, 143, 138, 0.22)',
+	primarySoft: 'rgba(111, 143, 138, 0.14)',
+	primaryBorder: 'rgba(111, 143, 138, 0.35)',
+	primaryTextOn: '#f3f1ec',
 
-	// Text roles
-	textOnDark: '#FFFFFF', // for dark hero cards
-	textOnPrimary: '#FFFFFF', // alias to primaryTextOn
-	textLink: '#00A2FF', // use primary, but a named role helps
+	textOnDark: '#f3f1ec',
+	textOnPrimary: '#121315',
+	textLink: '#95aea9',
 
-	// Surfaces
-	surfaceRaised: '#FFFFFF', // same as surface, but role clarifies usage
-	surfaceSunken: '#F1F5F9', // for wallet "page well" if you want it distinct (optional)
+	input: 'rgba(27, 29, 33, 0.94)',
+	shell: 'rgba(23, 24, 27, 0.92)',
 
-	// Hero
-	heroBg: '#0F172A', // dark hero background
-	heroText: '#FFFFFF', // text on hero
-	heroSubtle: 'rgba(255,255,255,0.72)', // or just use opacity in style
+	heroBg: '#121315',
+	heroText: '#f3f1ec',
+	heroSubtle: 'rgba(243, 241, 236, 0.72)',
 
-	// Dividers / hairlines
-	hairline: '#E5E7EB', // alias to borderSubtle
+	hairline: 'rgba(255, 255, 255, 0.08)',
 
-	// Semantic
-	warning: '#F59E0B',
-	danger: '#EF4444',
-	dangerSubtle: '#FEF2F2',
-	dangerSoft: '#FFF1F2',
-	dangerBorder: '#FECACA',
-	success: '#10B981',
-	successSoft: '#DCFCE7',
-	successStrong: '#166534',
-	successSubtle: '#F0FDF4',
-	info: '#00A2FF',
-	infoSubtle: '#F0F8FF',
+	warning: '#f59e0b',
+	danger: '#f87171',
+	dangerSubtle: 'rgba(248, 113, 113, 0.12)',
+	dangerSoft: 'rgba(248, 113, 113, 0.08)',
+	dangerBorder: 'rgba(248, 113, 113, 0.35)',
+	success: '#34d399',
+	successSoft: 'rgba(52, 211, 153, 0.14)',
+	successStrong: '#6ee7b7',
+	successSubtle: 'rgba(52, 211, 153, 0.1)',
+	info: '#95aea9',
+	infoSubtle: 'rgba(111, 143, 138, 0.14)',
 
-	// Track/Progress
-	track: '#EEF2F7',
+	track: 'rgba(255, 255, 255, 0.06)',
 
-	// UI Elements
-	chipBg: '#F8FAFC',
-	chipText: '#0F172A',
-	subtle: '#F3F4F6',
-	iconMuted: '#A1A1AA',
+	/** Matches web `--color-panel` / `--color-panel2` (translucent surfaces). */
+	panel: 'rgba(27, 29, 33, 0.72)',
+	panel2: 'rgba(27, 29, 33, 0.78)',
 
-	// Aliases for compatibility
-	accent: '#00A2FF', // same as primary
-	accentSoft: '#EFF6FF', // same as primarySoft
-	textStrong: '#111827', // same as text
-	onAccent: '#FFFFFF', // same as primaryTextOn
-	onPrimary: '#FFFFFF', // same as primaryTextOn
-	surfaceSubtle: '#F3F4F6', // same as subtle
-	borderSubtle: '#E5E7EB', // same as border
-	borderAccent: '#D4D4D8', // for dashed borders
-	positive: '#10B981', // same as success
-	warningStrong: '#92400E', // for warning text
+	chipBg: 'rgba(27, 29, 33, 0.72)',
+	chipText: '#f3f1ec',
+	subtle: 'rgba(27, 29, 33, 0.55)',
+	iconMuted: 'rgba(243, 241, 236, 0.45)',
+
+	accent: '#6f8f8a',
+	accentSoft: 'rgba(111, 143, 138, 0.14)',
+	textStrong: '#f3f1ec',
+	onAccent: '#f3f1ec',
+	onPrimary: '#121315',
+	surfaceSubtle: '#17181b',
+	borderSubtle: 'rgba(255, 255, 255, 0.06)',
+	borderAccent: 'rgba(111, 143, 138, 0.3)',
+	positive: '#34d399',
+	warningStrong: '#fcd34d',
 };
 
+/** Matches web `globals.css`: `--radius-xl2`, `--radius-xl3`, workspace chrome. */
 export const radius = {
 	sm: 8,
 	md: 12,
 	lg: 16,
 	xl: 20,
+	/** 0.625rem — buttons, inputs (`rounded-xl2`). */
+	xl2: 10,
+	/** 0.875rem — compact panels (`rounded-xl3`). */
+	xl3: 14,
+	/** ~1.35rem — main workspace-style surfaces. */
+	shell: 22,
 	pill: 999,
 	full: 999,
 };
@@ -89,7 +94,6 @@ export const space = {
 	xxl: 32,
 };
 
-// Helper to create shadow styles with tokenized colors
 export const makeShadow = (
 	shadowColor: string,
 	opacity: number,
@@ -105,18 +109,34 @@ export const makeShadow = (
 });
 
 export const shadow = {
-	card: makeShadow('#000', 0.06, 10, 4, 2),
-	hero: makeShadow(palette.primary, 0.3, 8, 4, 8),
-	soft: makeShadow('#000', 0.04, 8, 2, 1),
-	toolbar: makeShadow('#000', 0.05, 8, -2, 3),
+	card: makeShadow('#000000', 0.45, 24, 10, 6),
+	hero: makeShadow('#000000', 0.35, 16, 6, 8),
+	soft: makeShadow('#000000', 0.3, 12, 4, 3),
+	toolbar: makeShadow('#000000', 0.35, 10, -2, 4),
 };
 
+/** Aligned with web `@utility text-app-title`, `text-section`, `text-body`, `text-meta`. */
 export const type = {
-	h1: { fontSize: 20, fontWeight: '700' as const },
-	h2: { fontSize: 16, fontWeight: '600' as const },
-	body: { fontSize: 14, fontWeight: '400' as const },
-	bodySm: { fontSize: 13, fontWeight: '400' as const },
-	bodyXs: { fontSize: 12, fontWeight: '400' as const },
+	h1: {
+		fontSize: 22,
+		fontWeight: '600' as const,
+		lineHeight: 28,
+		letterSpacing: -0.35,
+	},
+	/** Section titles (`text-section` ~1.0625rem). */
+	h2: {
+		fontSize: 17,
+		fontWeight: '600' as const,
+		lineHeight: 23,
+		letterSpacing: -0.16,
+	},
+	body: {
+		fontSize: 16,
+		lineHeight: 24,
+		fontWeight: '400' as const,
+	},
+	bodySm: { fontSize: 14, lineHeight: 20, fontWeight: '400' as const },
+	bodyXs: { fontSize: 12, lineHeight: 17, fontWeight: '400' as const },
 	small: { fontSize: 12, fontWeight: '500' as const },
 	labelXs: {
 		fontSize: 11,

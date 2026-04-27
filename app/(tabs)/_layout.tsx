@@ -1,8 +1,9 @@
 import React, { useCallback, useMemo, useRef, useEffect } from 'react';
-import { View } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Tabs, usePathname, useRouter, useSegments } from 'expo-router';
 import type { Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { palette } from '../../src/ui/theme';
 
 // MVP: BudgetProvider, GoalProvider removed - cash-only tracking with fixed categories
 // ProfileProvider is from root app/_layout; do not duplicate here or Profile tab would read stale state
@@ -80,12 +81,15 @@ const TabLayout: React.FC = () => {
 		() => ({
 			headerShown: false,
 			tabBarShowLabel: false,
-			tabBarActiveTintColor: '#007ACC',
-			tabBarInactiveTintColor: '#000',
+			tabBarActiveTintColor: palette.primaryStrong,
+			tabBarInactiveTintColor: palette.textSubtle,
 			tabBarStyle: {
 				paddingTop: 6,
 				height: 64,
 				paddingHorizontal: 20,
+				backgroundColor: palette.shell,
+				borderTopWidth: StyleSheet.hairlineWidth,
+				borderTopColor: palette.border,
 			},
 			freezeOnBlur: !isHeavyTab,
 		}),

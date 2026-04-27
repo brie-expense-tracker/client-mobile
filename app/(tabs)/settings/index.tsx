@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
 	},
 	avatarText: {
 		...type.titleMd,
-		color: palette.primaryTextOn,
+		color: palette.textOnPrimary,
 	},
 	profileInfo: {
 		flex: 1,

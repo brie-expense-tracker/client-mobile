@@ -14,6 +14,7 @@ import auth from '@react-native-firebase/auth';
 import useAuth from '../../src/context/AuthContext';
 import { BorderlessButton, RectButton } from 'react-native-gesture-handler';
 import { logger } from '../../src/utils/logger';
+import { palette, radius } from '../../src/ui/theme';
 
 export default function ForgotPasswordScreen() {
 	const [email, setEmail] = useState('');
@@ -140,7 +141,7 @@ export default function ForgotPasswordScreen() {
 			<View style={styles.mainContainer}>
 				<View style={styles.formContainer}>
 					<View style={styles.iconContainer}>
-						<Ionicons name="lock-open-outline" size={48} color="#007AFF" />
+						<Ionicons name="lock-open-outline" size={48} color={palette.primary} />
 					</View>
 					<Text style={styles.title}>Reset Your Password</Text>
 					<Text style={styles.subtitle}>
@@ -152,7 +153,7 @@ export default function ForgotPasswordScreen() {
 					<TextInput
 						style={[styles.input]}
 						placeholder="Enter your email"
-						placeholderTextColor="#888"
+						placeholderTextColor={palette.textSubtle}
 						value={email}
 						onChangeText={handleEmailChange}
 						keyboardType="email-address"
@@ -167,7 +168,12 @@ export default function ForgotPasswordScreen() {
 							onPress={handleReset}
 							enabled={!loading && emailIsValid}
 						>
-							<Text style={styles.buttonTextT}>
+							<Text
+								style={[
+									styles.buttonTextT,
+									!emailIsValid && { color: palette.textMuted },
+								]}
+							>
 								{loading ? 'Sending...' : 'Send Reset Email'}
 							</Text>
 						</RectButton>
@@ -177,7 +183,7 @@ export default function ForgotPasswordScreen() {
 						<Ionicons
 							name="information-circle-outline"
 							size={16}
-							color="#666"
+							color={palette.textMuted}
 						/>
 						<Text style={styles.infoText}>
 							The reset link will expire in 1 hour for security reasons.
@@ -209,7 +215,7 @@ export default function ForgotPasswordScreen() {
 const styles = StyleSheet.create({
 	safeAreaContainer: {
 		flex: 1,
-		backgroundColor: '#ffffff',
+		backgroundColor: palette.bg,
 	},
 	mainContainer: {
 		flex: 1,
@@ -217,7 +223,7 @@ const styles = StyleSheet.create({
 		justifyContent: 'flex-start',
 	},
 	formContainer: {
-		backgroundColor: '#FFF',
+		backgroundColor: 'transparent',
 		marginTop: 80,
 	},
 	iconContainer: {
@@ -225,92 +231,69 @@ const styles = StyleSheet.create({
 		marginBottom: 24,
 	},
 	title: {
-		fontSize: 22,
-		fontWeight: '700',
+		fontSize: 17,
+		fontWeight: '600',
+		letterSpacing: -0.16,
+		lineHeight: 23,
 		textAlign: 'center',
-		marginBottom: 24,
-		color: '#111',
+		marginBottom: 16,
+		color: palette.text,
 	},
 	subtitle: {
-		fontSize: 16,
+		fontSize: 14,
+		lineHeight: 20,
 		textAlign: 'center',
-		color: '#666',
+		color: palette.textMuted,
 		marginBottom: 24,
 	},
 	label: {
 		fontSize: 14,
 		fontWeight: '600',
-		color: '#111',
+		color: palette.text,
 		marginBottom: 8,
 	},
 	input: {
-		height: 50,
+		minHeight: 48,
 		borderWidth: 1,
-		borderColor: '#D1D5DB',
-		borderRadius: 10,
+		borderColor: palette.border,
+		borderRadius: radius.xl2,
 		paddingHorizontal: 16,
-		backgroundColor: '#FFF',
+		paddingVertical: 12,
+		backgroundColor: palette.input,
+		color: palette.text,
+		fontSize: 17,
 		marginBottom: 16,
 	},
 	inputError: {
-		borderColor: '#FF3B30',
+		borderColor: palette.danger,
 	},
 	errorText: {
-		color: '#FF3B30',
+		color: palette.danger,
 		fontSize: 12,
 		marginTop: -12,
-		marginBottom: 16,
-	},
-	buttonContainer: {
-		backgroundColor: '#007AFF',
-		paddingVertical: 14,
-		borderRadius: 10,
-		alignItems: 'center',
 		marginBottom: 16,
 	},
 	buttonContainerT: {
 		width: '100%',
 		alignSelf: 'center',
-		shadowColor: '#000000',
-		shadowOffset: {
-			width: 0,
-			height: 4,
-		},
-		shadowOpacity: 0.2,
-		shadowRadius: 6,
-		elevation: 5,
 		marginVertical: 5,
-	},
-	button: {
-		backgroundColor: '#007AFF',
-		paddingVertical: 14,
-		borderRadius: 10,
-		alignItems: 'center',
-		width: '100%',
 	},
 	buttonT: {
 		width: '100%',
-		borderRadius: 9999,
+		borderRadius: radius.xl2,
 		overflow: 'hidden',
 		alignSelf: 'center',
-		backgroundColor: '#0095FF',
+		backgroundColor: palette.primary,
 	},
 	buttonDisabled: {
-		backgroundColor: '#aeafb1',
+		backgroundColor: palette.panel2,
 	},
-	buttonText: {
-		color: '#FFF',
-		fontWeight: '600',
-		fontSize: 16,
-		marginVertical: 18,
-	},
-
 	buttonTextT: {
-		color: 'white',
-		fontSize: 20,
+		color: palette.textOnPrimary,
+		fontSize: 15,
 		textAlign: 'center',
-		fontWeight: '700',
-		marginVertical: 18,
+		fontWeight: '600',
+		paddingVertical: 14,
 	},
 	infoContainer: {
 		flexDirection: 'row',
@@ -319,7 +302,7 @@ const styles = StyleSheet.create({
 	},
 	infoText: {
 		fontSize: 14,
-		color: '#666',
+		color: palette.textMuted,
 		marginLeft: 8,
 	},
 	backToLoginContainer: {
@@ -329,13 +312,13 @@ const styles = StyleSheet.create({
 	},
 	backToLoginText: {
 		fontSize: 14,
-		color: '#666',
+		color: palette.textMuted,
 		marginRight: 8,
 	},
 	backToLoginLink: {
 		fontSize: 14,
 		fontWeight: '600',
-		color: '#4A5568',
+		color: palette.primaryStrong,
 	},
 	backToLoginLinkPressed: {
 		opacity: 0.6,

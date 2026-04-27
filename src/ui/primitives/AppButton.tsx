@@ -6,9 +6,13 @@ import {
 	ActivityIndicator,
 	ViewStyle,
 	TextStyle,
+	Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { palette, radius, space } from '../theme';
+
+/** Web `bg-text/[0.04]` on dark workspace. */
+const secondaryFill = 'rgba(243, 241, 236, 0.04)';
 
 type AppButtonVariant = 'primary' | 'secondary' | 'ghost';
 type AppButtonSize = 'sm' | 'md' | 'lg';
@@ -66,17 +70,30 @@ export const AppButton: React.FC<AppButtonProps> = ({
 		styles.button,
 		styles[`button_${variant}`],
 		styles[`button_${size}`],
-		fullWidth && styles.buttonFullWidth,
-		disabled && styles.buttonDisabled,
-		style,
+		...(fullWidth ? [styles.buttonFullWidth] : []),
+		...(disabled ? [styles.buttonDisabled] : []),
+		...(disabled && variant === 'primary'
+			? [
+					{
+						backgroundColor: palette.panel2,
+						...(Platform.OS === 'ios'
+							? { shadowOpacity: 0 }
+							: { elevation: 0 }),
+					} as ViewStyle,
+				]
+			: []),
+		...(style ? [style] : []),
 	];
 
 	const textStyleArray: TextStyle[] = [
 		styles.text,
 		styles[`text_${variant}`],
 		styles[`text_${size}`],
-		disabled && styles.textDisabled,
-		textStyle,
+		...(disabled && variant === 'primary'
+			? [{ color: palette.textMuted } as TextStyle]
+			: []),
+		...(disabled ? [styles.textDisabled] : []),
+		...(textStyle ? [textStyle] : []),
 	];
 
 	const IconComponent = icon ? (
@@ -85,7 +102,7 @@ export const AppButton: React.FC<AppButtonProps> = ({
 			size={size === 'sm' ? 16 : size === 'lg' ? 22 : 18}
 			color={
 				variant === 'primary'
-					? palette.primaryTextOn
+					? palette.textOnPrimary
 					: variant === 'secondary'
 						? palette.text
 						: palette.textMuted
@@ -109,7 +126,7 @@ export const AppButton: React.FC<AppButtonProps> = ({
 					size="small"
 					color={
 						variant === 'primary'
-							? palette.primaryTextOn
+							? palette.textOnPrimary
 							: palette.textMuted
 					}
 				/>
@@ -129,18 +146,28 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'center',
-		borderRadius: radius.md,
+		borderRadius: radius.xl2,
+		borderWidth: 1,
 	},
 	button_primary: {
-		backgroundColor: palette.text,
+		backgroundColor: palette.primary,
+		borderColor: 'transparent',
+		...(Platform.OS === 'ios'
+			? {
+					shadowColor: palette.primary,
+					shadowOffset: { width: 0, height: 0 },
+					shadowOpacity: 0.28,
+					shadowRadius: 14,
+				}
+			: { elevation: 2 }),
 	},
 	button_secondary: {
-		backgroundColor: palette.surface,
-		borderWidth: 1,
+		backgroundColor: secondaryFill,
 		borderColor: palette.border,
 	},
 	button_ghost: {
 		backgroundColor: 'transparent',
+		borderColor: 'transparent',
 	},
 	button_sm: {
 		paddingVertical: space.xs,
@@ -161,13 +188,14 @@ const styles = StyleSheet.create({
 		width: '100%',
 	},
 	buttonDisabled: {
-		opacity: 0.5,
+		opacity: 0.55,
 	},
 	text: {
 		fontWeight: '600',
 	},
 	text_primary: {
-		color: palette.surface,
+		color: palette.textOnPrimary,
+		fontWeight: '500',
 	},
 	text_secondary: {
 		color: palette.text,

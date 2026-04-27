@@ -39,6 +39,8 @@ import * as Notifications from 'expo-notifications';
 import { ensureBgPushRegistered } from '../src/services/notifications/backgroundTaskService';
 import { useAppInit } from '../src/hooks/useAppInit';
 import { LocalMigrationRunner } from '../src/components/LocalMigrationRunner';
+import { AppShellBackground } from '../src/ui/AppShellBackground';
+import { palette } from '../src/ui/theme';
 import { DEV_MODE, isDevMode, isInternalBuild } from '../src/config/environment';
 import { useDevModeEasterEgg } from '../src/hooks/useDevModeEasterEgg';
 import { getUseLocalMode } from '../src/storage/localModeStorage';
@@ -59,16 +61,16 @@ const styles = StyleSheet.create({
 	devIndicator: {
 		position: 'absolute',
 		right: 20,
-		backgroundColor: '#FFFFFF',
+		backgroundColor: 'rgba(27, 29, 33, 0.92)',
 		paddingHorizontal: 10,
 		paddingVertical: 6,
 		borderRadius: 999,
 		borderWidth: 1,
-		borderColor: '#10B981',
+		borderColor: 'rgba(52, 211, 153, 0.45)',
 		zIndex: 1000,
 	},
 	devText: {
-		color: '#10B981',
+		color: '#6ee7b7',
 		fontSize: 11,
 		fontWeight: '700',
 		letterSpacing: 0.6,
@@ -426,11 +428,18 @@ function RootLayoutContent() {
 			layoutLog.debug('Rendering: loading screen');
 		}
 		return (
-			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-				<ActivityIndicator size="large" color="#007ACC" />
-				<Text style={{ color: '#007ACC', marginTop: 10 }}>Loading...</Text>
+			<View
+				style={{
+					flex: 1,
+					justifyContent: 'center',
+					alignItems: 'center',
+					backgroundColor: palette.bg,
+				}}
+			>
+				<ActivityIndicator size="large" color={palette.primary} />
+				<Text style={{ color: palette.textMuted, marginTop: 10 }}>Loading...</Text>
 				{loadingTimeout && (
-					<Text style={{ color: '#FF6B6B', marginTop: 10, fontSize: 12 }}>
+					<Text style={{ color: palette.danger, marginTop: 10, fontSize: 12 }}>
 						Taking longer than expected...
 					</Text>
 				)}
@@ -471,7 +480,7 @@ function RootLayoutContent() {
 									screenOptions={{
 										headerShown: false,
 										animation: 'none',
-										contentStyle: { backgroundColor: '#fff' },
+										contentStyle: { backgroundColor: 'transparent' },
 									}}
 								>
 									<Stack.Screen
@@ -497,10 +506,15 @@ function RootLayoutContent() {
 			// Fallback to basic loading screen
 			return (
 				<View
-					style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+					style={{
+						flex: 1,
+						justifyContent: 'center',
+						alignItems: 'center',
+						backgroundColor: palette.bg,
+					}}
 				>
-					<ActivityIndicator size="large" color="#007ACC" />
-					<Text style={{ color: '#007ACC', marginTop: 10 }}>Loading...</Text>
+					<ActivityIndicator size="large" color={palette.primary} />
+					<Text style={{ color: palette.textMuted, marginTop: 10 }}>Loading...</Text>
 				</View>
 			);
 		}
@@ -520,7 +534,7 @@ function RootLayoutContent() {
 							screenOptions={{
 								headerShown: false,
 								animation: 'none',
-								contentStyle: { backgroundColor: '#fff' },
+								contentStyle: { backgroundColor: 'transparent' },
 							}}
 						>
 							<Stack.Screen
@@ -553,7 +567,7 @@ function RootLayoutContent() {
 				screenOptions={{
 					headerShown: false,
 					animation: 'none',
-					contentStyle: { backgroundColor: '#fff' },
+					contentStyle: { backgroundColor: 'transparent' },
 				}}
 			>
 				<Stack.Screen
@@ -645,31 +659,43 @@ export default function RootLayout() {
 	try {
 		return (
 			<SafeAreaProvider initialMetrics={initialWindowMetrics}>
-				<QueryClientProvider client={queryClient}>
-					<ThemeProvider>
-						{/* Default status bar configuration for the entire app */}
-						<StatusBar
-							barStyle="dark-content"
-							backgroundColor="#fff"
-							translucent={false}
-						/>
-						<AuthProvider>
-							<OnboardingProvider>
-								<NotificationProvider>
-									<RootLayoutContent />
-								</NotificationProvider>
-							</OnboardingProvider>
-						</AuthProvider>
-					</ThemeProvider>
-				</QueryClientProvider>
+				<View style={{ flex: 1, backgroundColor: palette.bg }}>
+					<AppShellBackground />
+					<View style={{ flex: 1 }}>
+						<QueryClientProvider client={queryClient}>
+							<ThemeProvider>
+								{/* Match web workspace: dark shell, light status bar icons */}
+								<StatusBar
+									barStyle="light-content"
+									backgroundColor={palette.bg}
+									translucent={false}
+								/>
+								<AuthProvider>
+									<OnboardingProvider>
+										<NotificationProvider>
+											<RootLayoutContent />
+										</NotificationProvider>
+									</OnboardingProvider>
+								</AuthProvider>
+							</ThemeProvider>
+						</QueryClientProvider>
+					</View>
+				</View>
 			</SafeAreaProvider>
 		);
 	} catch (error) {
 		layoutLog.warn('Failed to render root layout:', error);
 		// Fallback to basic error screen
 		return (
-			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-				<Text style={{ color: '#FF0000', fontSize: 16, textAlign: 'center' }}>
+			<View
+				style={{
+					flex: 1,
+					justifyContent: 'center',
+					alignItems: 'center',
+					backgroundColor: palette.bg,
+				}}
+			>
+				<Text style={{ color: palette.danger, fontSize: 16, textAlign: 'center' }}>
 					Something went wrong. Please restart the app.
 				</Text>
 			</View>

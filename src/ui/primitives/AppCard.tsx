@@ -87,7 +87,7 @@ export const AppCard: React.FC<AppCardProps> = ({
 	accessibilityLabel,
 	style,
 	padding = space.lg,
-	borderRadius = radius.lg,
+	borderRadius = radius.xl,
 	elevated = true,
 	bordered = false,
 	backgroundColor = palette.surface,
@@ -104,13 +104,15 @@ export const AppCard: React.FC<AppCardProps> = ({
 			borderRadius,
 			backgroundColor,
 		},
-		elevated && styles.cardElevated,
-		bordered && styles.cardBordered,
-		style,
+		...(elevated ? [styles.cardElevated] : []),
+		...(bordered ? [styles.cardBordered] : []),
+		...(style ? [style] : []),
 	];
 
 	const content = (
-		<Animated.View style={[cardStyle, isPressable && animatedStyle]}>
+		<Animated.View
+			style={[cardStyle, ...(isPressable ? [animatedStyle] : [])]}
+		>
 			{children}
 		</Animated.View>
 	);

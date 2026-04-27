@@ -38,18 +38,18 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 // Theme factory function
 const makeColors = (isDark: boolean) => ({
 	isDark,
-	bg: isDark ? '#0b1220' : '#ffffff',
-	text: isDark ? '#e5e7eb' : '#0f172a',
-	subtext: isDark ? '#9aa4b2' : '#475569',
-	subtle: isDark ? '#6b7280' : '#94a3b8',
-	line: isDark ? '#1f2a37' : '#e2e8f0',
-	card: isDark ? '#111827' : '#ffffff',
-	tint: '#3b82f6',
-	success: '#10b981',
+	bg: isDark ? '#121315' : '#ffffff',
+	text: isDark ? '#f3f1ec' : '#0f172a',
+	subtext: isDark ? 'rgba(243, 241, 236, 0.62)' : '#475569',
+	subtle: isDark ? 'rgba(243, 241, 236, 0.4)' : '#94a3b8',
+	line: isDark ? 'rgba(255, 255, 255, 0.08)' : '#e2e8f0',
+	card: isDark ? '#1b1d21' : '#ffffff',
+	tint: isDark ? '#6f8f8a' : '#3b82f6',
+	success: '#34d399',
 	warn: '#f59e0b',
-	danger: '#ef4444',
-	slate: isDark ? '#0f172a' : '#f8fafc',
-	ringTrack: isDark ? '#1f2937' : '#e5e7eb',
+	danger: '#f87171',
+	slate: isDark ? '#121315' : '#f8fafc',
+	ringTrack: isDark ? 'rgba(255, 255, 255, 0.06)' : '#e5e7eb',
 });
 
 interface ThemeProviderProps {
@@ -58,7 +58,7 @@ interface ThemeProviderProps {
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
 	const systemColorScheme = useColorScheme();
-	const [theme, setThemeState] = useState<ThemeMode>('light');
+	const [theme, setThemeState] = useState<ThemeMode>('dark');
 
 	// Load saved theme preference on app start
 	useEffect(() => {

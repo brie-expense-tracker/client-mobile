@@ -9,6 +9,7 @@ import {
 	Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { palette } from '../../../../../src/ui/theme';
 
 type Props = {
 	visible: boolean;
@@ -192,7 +193,7 @@ export default function CalendarSheet({
 							onClose();
 						}}
 					>
-						<Ionicons name="calendar" size={16} color="#007AFF" />
+						<Ionicons name="calendar" size={16} color={palette.primary} />
 						<Text style={styles.quickText}>Today</Text>
 					</TouchableOpacity>
 
@@ -203,7 +204,7 @@ export default function CalendarSheet({
 							onClose();
 						}}
 					>
-						<Ionicons name="close-circle" size={16} color="#007AFF" />
+						<Ionicons name="close-circle" size={16} color={palette.primary} />
 						<Text style={styles.quickText}>Clear</Text>
 					</TouchableOpacity>
 				</View>
@@ -225,7 +226,7 @@ const styles = StyleSheet.create({
 		paddingTop: 8,
 		paddingBottom: Platform.select({ ios: 24, android: 16 }),
 		paddingHorizontal: 16,
-		backgroundColor: '#fff',
+		backgroundColor: palette.surface,
 		borderTopLeftRadius: 20,
 		borderTopRightRadius: 20,
 		shadowColor: '#000',
@@ -233,13 +234,15 @@ const styles = StyleSheet.create({
 		shadowRadius: 10,
 		shadowOffset: { width: 0, height: -2 },
 		elevation: 10,
+		borderTopWidth: StyleSheet.hairlineWidth,
+		borderTopColor: palette.border,
 	},
 	handle: {
 		alignSelf: 'center',
 		width: 40,
 		height: 4,
 		borderRadius: 2,
-		backgroundColor: '#E5E7EB',
+		backgroundColor: palette.border,
 		marginBottom: 8,
 	},
 	header: {
@@ -256,7 +259,7 @@ const styles = StyleSheet.create({
 		textAlign: 'center',
 		fontSize: 16,
 		fontWeight: '600',
-		color: '#111827',
+		color: palette.text,
 	},
 	weekRow: {
 		flexDirection: 'row',
@@ -268,7 +271,7 @@ const styles = StyleSheet.create({
 		paddingVertical: 6,
 		fontSize: 12,
 		fontWeight: '600',
-		color: '#6B7280',
+		color: palette.textMuted,
 	},
 	day: {
 		flex: 1,
@@ -284,27 +287,27 @@ const styles = StyleSheet.create({
 	},
 	dayToday: {
 		borderWidth: 1,
-		borderColor: '#007AFF',
+		borderColor: palette.primary,
 	},
 	daySelected: {
-		backgroundColor: '#007AFF',
+		backgroundColor: palette.primary,
 	},
 	dayDisabled: {
 		opacity: 0.3,
 	},
 	dayText: {
 		fontSize: 14,
-		color: '#111827',
+		color: palette.text,
 		fontWeight: '600',
 	},
 	dayTextOut: {
-		color: '#6B7280',
+		color: palette.textMuted,
 	},
 	dayTextSelected: {
-		color: '#fff',
+		color: palette.textOnPrimary,
 	},
 	dayTextDisabled: {
-		color: '#9CA3AF',
+		color: palette.textSubtle,
 	},
 	quickRow: {
 		flexDirection: 'row',
@@ -319,11 +322,11 @@ const styles = StyleSheet.create({
 		paddingVertical: 8,
 		paddingHorizontal: 10,
 		borderRadius: 10,
-		backgroundColor: '#F0F9FF',
+		backgroundColor: palette.primarySoft,
 	},
 	quickText: {
 		fontSize: 13,
 		fontWeight: '600',
-		color: '#007AFF',
+		color: palette.primary,
 	},
 });

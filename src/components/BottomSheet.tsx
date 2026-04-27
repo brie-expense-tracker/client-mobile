@@ -28,6 +28,7 @@ import Animated, {
 	withSpring,
 	withTiming,
 } from 'react-native-reanimated';
+import { palette } from '../ui/theme';
 
 type SnapPoint = number; // fraction of screen height that the sheet should occupy (0..1)
 
@@ -312,14 +313,14 @@ const styles = StyleSheet.create({
 		position: 'absolute',
 		left: 0,
 		top: 0,
-		backgroundColor: '#fff',
+		backgroundColor: palette.surface,
 		overflow: 'hidden',
 	},
 	handle: {
 		width: 40,
 		height: 5,
 		borderRadius: 3,
-		backgroundColor: '#E5E9EF',
+		backgroundColor: palette.border,
 		alignSelf: 'center',
 		marginTop: 8,
 		marginBottom: 8,

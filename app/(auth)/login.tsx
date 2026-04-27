@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
 	View,
 	Text,
@@ -21,6 +21,7 @@ import useAuth from '../../src/context/AuthContext';
 import { RectButton, BorderlessButton } from 'react-native-gesture-handler';
 import { createLogger } from '../../src/utils/sublogger';
 import { setUseLocalMode } from '../../src/storage/localModeStorage';
+import { palette, radius } from '../../src/ui/theme';
 
 const loginScreenLog = createLogger('LoginScreen');
 
@@ -114,22 +115,6 @@ export default function Login() {
 	const [showPassword, setShowPassword] = useState(false);
 	const [formError, setFormError] = useState<string | null>(null);
 	const { login, signInWithGoogle, error: authError, clearError } = useAuth();
-
-	const palette = useMemo(
-		() => ({
-			bg: '#FFFFFF',
-			text: '#0F172A',
-			subtext: '#475569',
-			brand: '#0A84FF',
-			brandDark: '#0060D1',
-			border: '#E2E8F0',
-			error: '#DC2626',
-			inputBg: '#FFFFFF',
-			shadow: '#0F172A',
-			divider: '#E2E8F0',
-		}),
-		[]
-	);
 
 	const isValidEmail = (val: string) =>
 		/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim().toLowerCase());
@@ -401,7 +386,7 @@ export default function Login() {
 							<Text style={[styles.title, { color: palette.text }]}>
 								Welcome back
 							</Text>
-							<Text style={[styles.subtitle, { color: palette.subtext }]}>
+							<Text style={[styles.subtitle, { color: palette.textMuted }]}>
 								Sign in to continue your financial progress.
 							</Text>
 						</View>
@@ -409,13 +394,13 @@ export default function Login() {
 						{/* Form Card */}
 						<View style={[styles.card, cardShadow]}>
 							{/* Email */}
-							<Text style={[styles.label, { color: palette.subtext }]}>
+							<Text style={[styles.label, { color: palette.textMuted }]}>
 								Email
 							</Text>
 							<TextInput
 								style={[styles.input, inputShadow]}
 								placeholder="you@example.com"
-								placeholderTextColor="#94A3B8"
+								placeholderTextColor={palette.textSubtle}
 								value={email}
 								onChangeText={(t) => setEmail(t)}
 								onBlur={onBlurEmail}
@@ -441,7 +426,7 @@ export default function Login() {
 							<Text
 								style={[
 									styles.label,
-									{ color: palette.subtext, marginTop: 16 },
+									{ color: palette.textMuted, marginTop: 16 },
 								]}
 							>
 								Password
@@ -450,7 +435,7 @@ export default function Login() {
 								<TextInput
 									style={styles.passwordInput}
 									placeholder="Enter your password"
-									placeholderTextColor="#94A3B8"
+									placeholderTextColor={palette.textSubtle}
 									value={password}
 									onChangeText={(t) => setPassword(t)}
 									onBlur={onBlurPassword}
@@ -476,7 +461,7 @@ export default function Login() {
 									<Ionicons
 										name={showPassword ? 'eye-off' : 'eye'}
 										size={22}
-										color="#64748B"
+										color={palette.iconMuted}
 									/>
 								</Pressable>
 							</View>
@@ -489,7 +474,7 @@ export default function Login() {
 							{/* Form-level error message */}
 							{!!formError && (
 								<View style={styles.formErrorContainer}>
-									<Ionicons name="alert-circle" size={18} color="#DC2626" />
+									<Ionicons name="alert-circle" size={18} color={palette.danger} />
 									<Text
 										style={styles.formErrorText}
 										accessibilityLiveRegion="polite"
@@ -503,7 +488,7 @@ export default function Login() {
 							<View style={styles.forgotPasswordContainer}>
 								<BorderlessButton
 									onPress={() => router.push('/forgotPassword')}
-									rippleColor="rgba(0,0,0,0.08)"
+									rippleColor="rgba(255,255,255,0.08)"
 								>
 									<Text style={styles.forgotPasswordText}>
 										Forgot password?
@@ -517,26 +502,40 @@ export default function Login() {
 								onPress={handleLogin}
 								style={[
 									styles.cta,
-									{ backgroundColor: canSubmit ? palette.brand : '#CBD5E1' },
+									{
+										backgroundColor: canSubmit
+											? palette.primary
+											: palette.panel2,
+									},
 								]}
 							>
 								{isLoading ? (
-									<ActivityIndicator size="small" color="#FFFFFF" />
+									<ActivityIndicator
+										size="small"
+										color={palette.textOnPrimary}
+									/>
 								) : (
-									<Text style={styles.ctaText}>Sign In</Text>
+									<Text
+										style={[
+											styles.ctaText,
+											!canSubmit && { color: palette.textMuted },
+										]}
+									>
+										Sign In
+									</Text>
 								)}
 							</RectButton>
 
 							{/* Divider */}
 							<View style={styles.dividerContainer}>
 								<View
-									style={[styles.divider, { backgroundColor: palette.divider }]}
+									style={[styles.divider, { backgroundColor: palette.border }]}
 								/>
-								<Text style={[styles.dividerText, { color: palette.subtext }]}>
+								<Text style={[styles.dividerText, { color: palette.textMuted }]}>
 									or continue with
 								</Text>
 								<View
-									style={[styles.divider, { backgroundColor: palette.divider }]}
+									style={[styles.divider, { backgroundColor: palette.border }]}
 								/>
 							</View>
 
@@ -550,7 +549,7 @@ export default function Login() {
 									{ opacity: isLoading ? 0.6 : 1 },
 								]}
 							>
-								<Ionicons name="logo-google" size={22} color="#1D4ED8" />
+								<Ionicons name="logo-google" size={22} color={palette.text} />
 								<Text style={styles.socialButtonText}>
 									{isLoading ? 'Signing in…' : 'Google'}
 								</Text>
@@ -559,12 +558,12 @@ export default function Login() {
 
 						{/* Signup prompt */}
 						<View style={styles.signupRow}>
-							<Text style={[styles.signupText, { color: palette.subtext }]}>
+							<Text style={[styles.signupText, { color: palette.textMuted }]}>
 								Don&apos;t have an account?
 							</Text>
 							<BorderlessButton
 								onPress={() => router.replace('/(auth)/signup')}
-								rippleColor="rgba(0,0,0,0.08)"
+								rippleColor="rgba(255,255,255,0.08)"
 							>
 								<Text style={styles.signupLink}>Sign Up</Text>
 							</BorderlessButton>
@@ -577,9 +576,9 @@ export default function Login() {
 								router.replace('/(tabs)/dashboard');
 							}}
 							style={styles.useLocalButton}
-							rippleColor="rgba(0,0,0,0.06)"
+							rippleColor="rgba(255,255,255,0.08)"
 						>
-							<Text style={[styles.useLocalText, { color: palette.subtext }]}>
+							<Text style={[styles.useLocalText, { color: palette.textMuted }]}>
 								Use without account (data stays on your device)
 							</Text>
 						</RectButton>
@@ -594,32 +593,32 @@ export default function Login() {
 
 const inputShadow = Platform.select({
 	ios: {
-		shadowColor: '#0F172A',
+		shadowColor: '#000000',
 		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.06,
-		shadowRadius: 6,
+		shadowOpacity: 0.35,
+		shadowRadius: 8,
 	},
 	android: { elevation: 1.5 },
 });
 
 const socialShadow = Platform.select({
 	ios: {
-		shadowColor: '#0F172A',
+		shadowColor: '#000000',
 		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.08,
-		shadowRadius: 8,
+		shadowOpacity: 0.3,
+		shadowRadius: 10,
 	},
 	android: { elevation: 2 },
 });
 
 const cardShadow = Platform.select({
 	ios: {
-		shadowColor: '#0F172A',
-		shadowOffset: { width: 0, height: 10 },
-		shadowOpacity: 0.08,
-		shadowRadius: 20,
+		shadowColor: '#000000',
+		shadowOffset: { width: 0, height: 12 },
+		shadowOpacity: 0.4,
+		shadowRadius: 24,
 	},
-	android: { elevation: 3 },
+	android: { elevation: 4 },
 });
 
 const styles = StyleSheet.create({
@@ -645,14 +644,21 @@ const styles = StyleSheet.create({
 		marginBottom: 16,
 	},
 	headingWrap: { alignItems: 'center', marginBottom: 8 },
-	title: { fontSize: 24, fontWeight: '700', letterSpacing: 0.2 },
-	subtitle: { fontSize: 14, marginTop: 6 },
+	title: {
+		fontSize: 17,
+		fontWeight: '600',
+		letterSpacing: -0.16,
+		lineHeight: 23,
+	},
+	subtitle: { fontSize: 14, lineHeight: 20, marginTop: 6 },
 	card: {
 		width: '100%',
-		backgroundColor: '#FFFFFF',
-		borderRadius: 20,
-		padding: 18,
+		backgroundColor: palette.panel2,
+		borderRadius: radius.xl3,
+		padding: 20,
 		marginTop: 16,
+		borderWidth: 1,
+		borderColor: palette.border,
 	},
 	label: {
 		fontSize: 13,
@@ -661,24 +667,26 @@ const styles = StyleSheet.create({
 	},
 	input: {
 		width: '100%',
-		paddingHorizontal: 14,
-		paddingVertical: 14,
-		borderRadius: 12,
-		backgroundColor: '#FFFFFF',
+		paddingHorizontal: 16,
+		paddingVertical: 12,
+		borderRadius: radius.xl2,
+		backgroundColor: palette.input,
 		borderWidth: StyleSheet.hairlineWidth,
-		borderColor: '#E2E8F0',
+		borderColor: palette.border,
+		color: palette.text,
+		fontSize: 17,
 	},
 	errorText: {
-		color: '#DC2626',
+		color: palette.danger,
 		fontSize: 12,
 		marginTop: 6,
 	},
 	formErrorContainer: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		backgroundColor: '#FEF2F2',
+		backgroundColor: palette.dangerSoft,
 		borderWidth: 1,
-		borderColor: '#FCA5A5',
+		borderColor: palette.dangerBorder,
 		borderRadius: 12,
 		padding: 12,
 		marginTop: 12,
@@ -686,7 +694,7 @@ const styles = StyleSheet.create({
 	},
 	formErrorText: {
 		flex: 1,
-		color: '#DC2626',
+		color: palette.danger,
 		fontSize: 13,
 		fontWeight: '600',
 		lineHeight: 18,
@@ -694,16 +702,18 @@ const styles = StyleSheet.create({
 	passwordInputContainer: {
 		position: 'relative',
 		width: '100%',
-		borderRadius: 12,
-		backgroundColor: '#FFFFFF',
+		borderRadius: radius.xl2,
+		backgroundColor: palette.input,
 		borderWidth: StyleSheet.hairlineWidth,
-		borderColor: '#E2E8F0',
+		borderColor: palette.border,
 	},
 	passwordInput: {
 		width: '100%',
-		paddingHorizontal: 14,
-		paddingVertical: 14,
-		borderRadius: 12,
+		paddingHorizontal: 16,
+		paddingVertical: 12,
+		borderRadius: radius.xl2,
+		color: palette.text,
+		fontSize: 17,
 	},
 	passwordToggle: {
 		position: 'absolute',
@@ -720,23 +730,23 @@ const styles = StyleSheet.create({
 		marginBottom: 8,
 	},
 	forgotPasswordText: {
-		color: '#0A84FF',
+		color: palette.primaryStrong,
 		fontSize: 13,
 		fontWeight: '600',
 	},
 	cta: {
 		width: '100%',
-		borderRadius: 12,
+		borderRadius: radius.xl2,
 		alignItems: 'center',
 		justifyContent: 'center',
-		paddingVertical: 14,
+		paddingVertical: 12,
 		marginTop: 12,
 		overflow: 'hidden',
 	},
 	ctaText: {
-		color: '#FFFFFF',
-		fontSize: 17,
-		fontWeight: '700',
+		color: palette.textOnPrimary,
+		fontSize: 15,
+		fontWeight: '600',
 	},
 	dividerContainer: {
 		flexDirection: 'row',
@@ -750,17 +760,17 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		gap: 10,
 		justifyContent: 'center',
-		paddingVertical: 14,
-		borderRadius: 12,
-		backgroundColor: '#FFFFFF',
-		borderWidth: StyleSheet.hairlineWidth,
-		borderColor: '#E2E8F0',
+		paddingVertical: 12,
+		borderRadius: radius.xl2,
+		backgroundColor: 'rgba(243, 241, 236, 0.04)',
+		borderWidth: 1,
+		borderColor: palette.border,
 		marginBottom: 10,
 	},
 	socialButtonText: {
-		fontSize: 15,
-		fontWeight: '600',
-		color: '#334155',
+		fontSize: 14,
+		fontWeight: '500',
+		color: palette.text,
 	},
 	useLocalButton: {
 		marginTop: 24,
@@ -786,7 +796,7 @@ const styles = StyleSheet.create({
 	signupText: { fontSize: 14 },
 	signupLink: {
 		fontSize: 14,
-		color: '#0A84FF',
+		color: palette.primaryStrong,
 		fontWeight: '800',
 	},
 });

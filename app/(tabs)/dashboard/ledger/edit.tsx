@@ -461,7 +461,7 @@ export default function LedgerEditScreen() {
 							[date]: {
 								selected: true,
 								selectedColor: palette.primary,
-								selectedTextColor: palette.primaryTextOn,
+								selectedTextColor: palette.textOnPrimary,
 							},
 						}}
 						firstDay={0}
@@ -480,7 +480,7 @@ export default function LedgerEditScreen() {
 							calendarBackground: palette.surface,
 							textSectionTitleColor: palette.textMuted,
 							selectedDayBackgroundColor: palette.primary,
-							selectedDayTextColor: palette.primaryTextOn,
+							selectedDayTextColor: palette.textOnPrimary,
 							todayTextColor: palette.primary,
 							dayTextColor: palette.text,
 							textDisabledColor: palette.border,

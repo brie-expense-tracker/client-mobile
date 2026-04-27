@@ -898,7 +898,7 @@ export default function TransactionScreenProModern() {
 								[selectedDate]: {
 									selected: true,
 									selectedColor: palette.primary,
-									selectedTextColor: palette.primaryTextOn,
+									selectedTextColor: palette.textOnPrimary,
 								},
 							}}
 							firstDay={0}
@@ -917,7 +917,7 @@ export default function TransactionScreenProModern() {
 								calendarBackground: palette.surface,
 								textSectionTitleColor: palette.textSubtle,
 								selectedDayBackgroundColor: palette.primary,
-								selectedDayTextColor: palette.primaryTextOn,
+								selectedDayTextColor: palette.textOnPrimary,
 								todayTextColor: palette.primary,
 								dayTextColor: palette.text,
 								textDisabledColor: palette.borderMuted,
