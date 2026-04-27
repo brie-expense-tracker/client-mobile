@@ -1,8 +1,8 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { AppScreen, AppText, AppButton } from '../../../src/ui/primitives';
-import { space } from '../../../src/ui/theme';
+import { AppScreen, AppText, AppButton } from '../../src/ui/primitives';
+import { space } from '../../src/ui/theme';
 
 /**
  * Web `Inbox` is the review queue for drafts. Mobile MVP routes history here;

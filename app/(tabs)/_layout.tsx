@@ -85,17 +85,22 @@ const TabLayout: React.FC = () => {
 		() => ({
 			headerShown: false,
 			tabBarShowLabel: true,
+			tabBarHideOnKeyboard: true,
 			tabBarActiveTintColor: palette.primary,
 			tabBarInactiveTintColor: palette.textSubtle,
 			tabBarLabelStyle: {
-				fontSize: 11,
+				fontSize: 10,
 				fontWeight: '600',
-				marginBottom: 2,
+				marginBottom: 0,
+			},
+			tabBarItemStyle: {
+				paddingTop: 4,
+				paddingBottom: 2,
 			},
 			tabBarStyle: {
-				paddingTop: 4,
-				height: 62,
-				paddingHorizontal: 12,
+				paddingTop: 2,
+				height: 58,
+				paddingHorizontal: 4,
 				backgroundColor: palette.shell,
 				borderTopWidth: StyleSheet.hairlineWidth,
 				borderTopColor: palette.border,
@@ -114,7 +119,7 @@ const TabLayout: React.FC = () => {
 						title: 'Home',
 						tabBarLabel: 'Home',
 						tabBarIcon: ({ color, size }) => (
-							<Ionicons name="home-outline" color={color} size={size} />
+							<Ionicons name="home-outline" color={color} size={size - 2} />
 						),
 					}}
 					listeners={dashboardListeners}
@@ -125,7 +130,7 @@ const TabLayout: React.FC = () => {
 						title: 'Inbox',
 						tabBarLabel: 'Inbox',
 						tabBarIcon: ({ color, size }) => (
-							<Ionicons name="mail-unread-outline" color={color} size={size} />
+							<Ionicons name="mail-unread-outline" color={color} size={size - 2} />
 						),
 					}}
 					listeners={inboxListeners}
@@ -136,7 +141,7 @@ const TabLayout: React.FC = () => {
 						title: 'Capture',
 						tabBarLabel: 'Capture',
 						tabBarIcon: ({ color, size }) => (
-							<Ionicons name="flash-outline" color={color} size={size} />
+							<Ionicons name="flash-outline" color={color} size={size - 2} />
 						),
 					}}
 					listeners={transactionListeners}
@@ -147,7 +152,7 @@ const TabLayout: React.FC = () => {
 						title: 'Profile',
 						tabBarLabel: 'Profile',
 						tabBarIcon: ({ color, size }) => (
-							<Ionicons name="person-outline" color={color} size={size} />
+							<Ionicons name="person-outline" color={color} size={size - 2} />
 						),
 					}}
 					listeners={settingsListeners}
