@@ -80,29 +80,18 @@ export default function DashboardPro() {
 		return balance;
 	}, [transactions]);
 
-	// Last 30 days summary (MVP)
-	// Use local date for cutoff so "last 30 days" matches user's local timezone
-	const last30Days = useMemo(() => {
+	// Match web Today panel: only aggregate in/out for current local day.
+	const todaySummary = useMemo(() => {
 		const now = new Date();
-		const cutoff = new Date(
-			now.getFullYear(),
-			now.getMonth(),
-			now.getDate() - 30,
-		);
-		const y = cutoff.getFullYear();
-		const m = String(cutoff.getMonth() + 1).padStart(2, '0');
-		const d = String(cutoff.getDate()).padStart(2, '0');
-		const cutoffIso = `${y}-${m}-${d}`;
 		const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
 		let totalIn = 0;
 		let totalOut = 0;
-		const categoryTotals: Record<string, number> = {};
 
 		for (const t of transactions) {
 			const txDate = (t.date || '').slice(0, 10);
 			if (!txDate || txDate.length < 10) continue;
-			if (txDate < cutoffIso || txDate > todayIso) continue;
+			if (txDate !== todayIso) continue;
 
 			const amt = isNaN(t.amount) ? 0 : Math.abs(t.amount);
 			const isExpense =
@@ -110,23 +99,15 @@ export default function DashboardPro() {
 
 			if (isExpense) {
 				totalOut += amt;
-				const cat = (t.metadata as any)?.category || t.description || 'Other';
-				categoryTotals[cat] = (categoryTotals[cat] || 0) + amt;
 			} else {
 				totalIn += amt;
 			}
 		}
 
-		const topCategories = Object.entries(categoryTotals)
-			.sort(([, a], [, b]) => b - a)
-			.slice(0, 3)
-			.map(([name, amt]) => ({ name, amount: amt }));
-
 		return {
 			totalIn,
 			totalOut,
 			net: totalIn - totalOut,
-			topCategories,
 		};
 	}, [transactions]);
 
@@ -239,8 +220,8 @@ export default function DashboardPro() {
 							</View>
 						</View>
 
-						{/* MVP: Last 30 days summary */}
-						<Last30DaysCard summary={last30Days} />
+						{/* Match web: Today in / Today out summary */}
+						<TodaySummaryCard summary={todaySummary} />
 
 						{/* History - recent entries with View All */}
 						<RecentTransactionsList transactions={recentTransactions} />
@@ -275,34 +256,31 @@ function CashOnMeCard({ balance, empty }: { balance: number; empty: boolean }) {
 	);
 }
 
-function Last30DaysCard({
+function TodaySummaryCard({
 	summary,
 }: {
 	summary: {
 		totalIn: number;
 		totalOut: number;
 		net: number;
-		topCategories: { name: string; amount: number }[];
 	};
 }) {
 	return (
 		<AppCard
 			onPress={() => router.push('/dashboard/ledger')}
-			accessibilityLabel="Last 30 days summary"
+			accessibilityLabel="Today summary"
 		>
 			<View style={last30Styles.header}>
-				<AppText.Heading style={last30Styles.title}>
-					Last 30 days
-				</AppText.Heading>
+				<AppText.Heading style={last30Styles.title}>Today</AppText.Heading>
 				<Ionicons name="chevron-forward" size={18} color={palette.textSubtle} />
 			</View>
 			<View style={last30Styles.row}>
-				<AppText.Body color="muted">Cash IN</AppText.Body>
-				<AppText.Body color="success">{currency(summary.totalIn)}</AppText.Body>
+				<AppText.Body color="muted">Today IN</AppText.Body>
+				<AppText.Body color="success">+{currency(summary.totalIn)}</AppText.Body>
 			</View>
 			<View style={last30Styles.row}>
-				<AppText.Body color="muted">Cash OUT</AppText.Body>
-				<AppText.Body color="danger">{currency(summary.totalOut)}</AppText.Body>
+				<AppText.Body color="muted">Today OUT</AppText.Body>
+				<AppText.Body color="danger">-{currency(summary.totalOut)}</AppText.Body>
 			</View>
 			<View style={[last30Styles.row, last30Styles.netRow]}>
 				<AppText.Body color="default">Net</AppText.Body>
@@ -314,18 +292,6 @@ function Last30DaysCard({
 					{currency(summary.net)}
 				</AppText.Body>
 			</View>
-			{summary.topCategories.length > 0 && (
-				<View style={last30Styles.categories}>
-					<AppText.Caption color="muted">Top spending</AppText.Caption>
-					<View style={last30Styles.categoryList}>
-						{summary.topCategories.map((c) => (
-							<AppText.Caption key={c.name} color="default">
-								{c.name}: {currency(c.amount)}
-							</AppText.Caption>
-						))}
-					</View>
-				</View>
-			)}
 		</AppCard>
 	);
 }
@@ -526,16 +492,6 @@ const last30Styles = StyleSheet.create({
 	},
 	netAmount: {
 		fontWeight: '700',
-	},
-	categories: {
-		marginTop: space.md,
-		paddingTop: space.sm,
-		borderTopWidth: 1,
-		borderTopColor: palette.borderSubtle,
-	},
-	categoryList: {
-		marginTop: space.xs,
-		gap: 2,
 	},
 });
 

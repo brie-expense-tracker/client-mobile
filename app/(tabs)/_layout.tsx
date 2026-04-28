@@ -3,6 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import { Tabs, usePathname, useRouter, useSegments } from 'expo-router';
 import type { Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { palette } from '../../src/ui/theme';
 
 // MVP: BudgetProvider, GoalProvider removed - cash-only tracking with fixed categories
@@ -17,6 +18,7 @@ const TabLayout: React.FC = () => {
 	const router = useRouter();
 	const pathname = usePathname();
 	const segments = useSegments();
+	const insets = useSafeAreaInsets();
 
 	// Keep pathname in a ref so tab listeners can read current value without
 	// being recreated on every pathname change (avoids "Maximum update depth exceeded"
@@ -95,11 +97,12 @@ const TabLayout: React.FC = () => {
 			},
 			tabBarItemStyle: {
 				paddingTop: 4,
-				paddingBottom: 2,
+				paddingBottom: 0,
 			},
 			tabBarStyle: {
 				paddingTop: 2,
-				height: 58,
+				height: 52 + Math.max(insets.bottom, 8),
+				paddingBottom: Math.max(insets.bottom - 2, 6),
 				paddingHorizontal: 4,
 				backgroundColor: palette.shell,
 				borderTopWidth: StyleSheet.hairlineWidth,
@@ -107,12 +110,12 @@ const TabLayout: React.FC = () => {
 			},
 			freezeOnBlur: !isHeavyTab,
 		}),
-		[isHeavyTab]
+		[insets.bottom, isHeavyTab]
 	);
 
 	return (
 		<View style={{ flex: 1 }}>
-			<Tabs screenOptions={screenOptions}>
+			<Tabs initialRouteName="transaction" screenOptions={screenOptions}>
 				<Tabs.Screen
 					name="dashboard"
 					options={{
@@ -125,17 +128,6 @@ const TabLayout: React.FC = () => {
 					listeners={dashboardListeners}
 				/>
 				<Tabs.Screen
-					name="inbox"
-					options={{
-						title: 'Inbox',
-						tabBarLabel: 'Inbox',
-						tabBarIcon: ({ color, size }) => (
-							<Ionicons name="mail-unread-outline" color={color} size={size - 2} />
-						),
-					}}
-					listeners={inboxListeners}
-				/>
-				<Tabs.Screen
 					name="transaction"
 					options={{
 						title: 'Capture',
@@ -145,6 +137,17 @@ const TabLayout: React.FC = () => {
 						),
 					}}
 					listeners={transactionListeners}
+				/>
+				<Tabs.Screen
+					name="inbox"
+					options={{
+						title: 'Inbox',
+						tabBarLabel: 'Inbox',
+						tabBarIcon: ({ color, size }) => (
+							<Ionicons name="mail-unread-outline" color={color} size={size - 2} />
+						),
+					}}
+					listeners={inboxListeners}
 				/>
 				<Tabs.Screen
 					name="settings"
