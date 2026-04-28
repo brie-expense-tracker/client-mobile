@@ -350,16 +350,16 @@ function RootLayoutContent() {
 					if (inTabsGroup) return;
 					if (isReviewOrEditRoute || isEditingOnboarding) return;
 
-					logState('nav-effect:redirecting-to-dashboard');
+					logState('nav-effect:redirecting-to-capture');
 					if (isDevMode) {
 						layoutLog.debug(
-							'User completed onboarding, redirecting to dashboard'
+							'User completed onboarding, redirecting to capture'
 						);
 					}
 					try {
-						router.replace('/(tabs)/dashboard');
+						router.replace('/(tabs)/transaction');
 					} catch (error) {
-						layoutLog.warn('Failed to navigate to dashboard:', error);
+						layoutLog.warn('Failed to navigate to capture:', error);
 					}
 					return;
 				}
@@ -368,16 +368,16 @@ function RootLayoutContent() {
 				if (hasSeenOnboarding === null && loadingTimeout) {
 					if (isReviewOrEditRoute || isEditingOnboarding) return;
 
-					logState('nav-effect:timeout-redirect');
+					logState('nav-effect:timeout-redirect-to-capture');
 					if (isDevMode) {
 						layoutLog.debug(
-							'Timeout reached with null onboarding status, redirecting to dashboard'
+							'Timeout reached with null onboarding status, redirecting to capture'
 						);
 					}
 					try {
-						router.replace('/(tabs)/dashboard');
+						router.replace('/(tabs)/transaction');
 					} catch (error) {
-						layoutLog.warn('Failed to navigate to dashboard:', error);
+						layoutLog.warn('Failed to navigate to capture:', error);
 					}
 					return;
 				}
