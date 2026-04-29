@@ -243,6 +243,9 @@ export default function DashboardPro() {
 						{/* Match web: Today in / Today out summary */}
 						<TodaySummaryCard summary={todaySummary} />
 
+						{/* Web parity: /week — 7-day rollups + category split */}
+						<WeekPulseCard />
+
 						{/* History - recent entries with View All */}
 						<RecentTransactionsList transactions={recentTransactions} />
 					</ScrollView>
@@ -276,6 +279,27 @@ function CashOnMeCard({ balance, empty }: { balance: number; empty: boolean }) {
 	);
 }
 
+function WeekPulseCard() {
+	return (
+		<AppCard
+			onPress={() => router.push('/(tabs)/dashboard/week')}
+			accessibilityLabel="This week analytics"
+		>
+			<View style={weekPulseStyles.header}>
+				<View style={weekPulseStyles.copy}>
+					<AppText.Label color="muted">Weekly pulse</AppText.Label>
+					<AppText.Heading style={weekPulseStyles.title}>This week</AppText.Heading>
+					<AppText.Caption color="muted" style={weekPulseStyles.sub}>
+						Seven-day in, out, net, and spending by category — same window as
+						web Week.
+					</AppText.Caption>
+				</View>
+				<Ionicons name="chevron-forward" size={18} color={palette.textSubtle} />
+			</View>
+		</AppCard>
+	);
+}
+
 function TodaySummaryCard({
 	summary,
 }: {
@@ -287,7 +311,7 @@ function TodaySummaryCard({
 }) {
 	return (
 		<AppCard
-			onPress={() => router.push('/dashboard/ledger')}
+			onPress={() => router.push('/(tabs)/dashboard/ledger')}
 			accessibilityLabel="Today summary"
 		>
 			<View style={last30Styles.header}>
@@ -360,7 +384,9 @@ function RecentTransactionsList({
 		<AppCard>
 			<View style={recentStyles.header}>
 				<AppText.Heading style={recentStyles.title}>History</AppText.Heading>
-				<TouchableOpacity onPress={() => router.push('/dashboard/ledger')}>
+				<TouchableOpacity
+					onPress={() => router.push('/(tabs)/dashboard/ledger')}
+				>
 					<AppText.Body color="primary" style={recentStyles.viewAll}>
 						View All
 					</AppText.Body>
@@ -384,7 +410,7 @@ function RecentTransactionsList({
 						onPress={() => {
 							if (transactionId) {
 								router.push({
-									pathname: '/dashboard/ledger/edit',
+									pathname: '/(tabs)/dashboard/ledger/edit',
 									params: { id: transactionId },
 								});
 							}
@@ -532,6 +558,23 @@ const quickAddStyles = StyleSheet.create({
 	halfButton: {
 		flex: 1,
 		minWidth: 0,
+	},
+});
+
+const weekPulseStyles = StyleSheet.create({
+	header: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		gap: space.md,
+	},
+	copy: { flex: 1, minWidth: 0 },
+	title: {
+		marginTop: space.xs,
+		marginBottom: space.xs,
+	},
+	sub: {
+		lineHeight: 18,
 	},
 });
 

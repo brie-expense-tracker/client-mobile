@@ -5,6 +5,7 @@ export default function DashboardLayout() {
 	return (
 		<Stack>
 			<Stack.Screen name="index" options={{ headerShown: false }} />
+			<Stack.Screen name="week" options={{ headerShown: false }} />
 			<Stack.Screen name="ledger" options={{ headerShown: false }} />
 		</Stack>
 	);
