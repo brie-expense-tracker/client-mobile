@@ -16,6 +16,7 @@ import {
 	RefreshControl,
 	ActivityIndicator,
 	Image,
+	Platform,
 } from 'react-native';
 import {
 	SafeAreaView,
@@ -140,22 +141,41 @@ export default function DashboardPro() {
 		<ErrorBoundary>
 			<SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
 				<View style={styles.screenContent}>
-					{/* ---------- Sticky Header ---------- */}
+					{/* ---------- Page header (matches web WorkspacePage / PageHeader) ---------- */}
 					<View style={styles.stickyHeader}>
-						<TouchableOpacity
-							onPress={handleLogoTap}
-							activeOpacity={0.7}
-							style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
-						>
-							<Image
-								source={require('../../../src/assets/logos/brie-logo.png')}
-								style={styles.logo}
-								resizeMode="contain"
-								accessibilityRole="image"
-								accessibilityLabel="Brie app logo"
-							/>
-						</TouchableOpacity>
-
+						<View style={styles.pageHeaderRow}>
+							<View style={styles.pageHeaderCopy}>
+								<Text style={styles.pageHeaderKicker}>Live pulse</Text>
+								<View style={styles.pageHeaderTitleRow}>
+									<View style={styles.pageHeaderTitleAccent} />
+									<AppText.Title
+										style={styles.pageHeaderTitle}
+										accessibilityRole="header"
+									>
+										Today
+									</AppText.Title>
+								</View>
+								<AppText.Body color="muted" style={styles.pageHeaderDescription}>
+									What&apos;s moving right now: cash, flow, and fresh entries.
+								</AppText.Body>
+							</View>
+							<TouchableOpacity
+								onPress={handleLogoTap}
+								activeOpacity={0.7}
+								style={styles.logoTap}
+								accessibilityRole="button"
+								accessibilityLabel="Brie"
+								hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+							>
+								<Image
+									source={require('../../../src/assets/logos/brie-logo.png')}
+									style={styles.logoCompact}
+									resizeMode="contain"
+									accessibilityRole="image"
+									accessibilityLabel="Brie app logo"
+								/>
+							</TouchableOpacity>
+						</View>
 					</View>
 
 					{/* Offline Banner - Below header */}
@@ -422,17 +442,65 @@ const styles = StyleSheet.create({
 		gap: 20,
 	},
 	stickyHeader: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
 		paddingHorizontal: space.xl,
-		paddingTop: space.sm,
-		paddingBottom: space.sm,
+		paddingTop: space.md,
+		paddingBottom: space.lg,
 		backgroundColor: palette.shell,
 		borderBottomWidth: StyleSheet.hairlineWidth,
 		borderBottomColor: palette.border,
 	},
-	logo: { height: 40, width: 90 },
+	pageHeaderRow: {
+		flexDirection: 'row',
+		alignItems: 'flex-start',
+		gap: space.md,
+	},
+	pageHeaderCopy: {
+		flex: 1,
+		minWidth: 0,
+	},
+	pageHeaderKicker: {
+		fontSize: 11,
+		fontWeight: '600',
+		textTransform: 'uppercase',
+		letterSpacing: 1.54,
+		color: palette.primaryStrong,
+	},
+	pageHeaderTitleRow: {
+		flexDirection: 'row',
+		alignItems: 'stretch',
+		marginTop: space.xs,
+		gap: space.sm,
+	},
+	pageHeaderTitleAccent: {
+		width: 4,
+		alignSelf: 'stretch',
+		minHeight: 26,
+		borderRadius: 2,
+		backgroundColor: palette.primary,
+		...Platform.select({
+			ios: {
+				shadowColor: palette.primary,
+				shadowOffset: { width: 0, height: 0 },
+				shadowOpacity: 0.45,
+				shadowRadius: 9,
+			},
+			android: { elevation: 2 },
+		}),
+	},
+	pageHeaderTitle: {
+		flex: 1,
+		paddingRight: space.xs,
+	},
+	pageHeaderDescription: {
+		...type.bodySm,
+		marginTop: space.sm,
+		lineHeight: 20,
+	},
+	logoTap: {
+		paddingTop: 2,
+		justifyContent: 'center',
+	},
+	logoCompact: { height: 30, width: 76 },
 	// quickAddButton styles moved to AppButton primitive
 });
 
