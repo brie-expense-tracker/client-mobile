@@ -14,35 +14,18 @@ import {
 	Alert,
 	ScrollView,
 	TouchableOpacity,
-	Pressable,
-	FlatList,
 	Platform,
 	Keyboard,
 	KeyboardAvoidingView,
-	InteractionManager,
-	Dimensions,
 	StatusBar,
+	InteractionManager,
 } from 'react-native';
-import Animated, {
-	useSharedValue,
-	useAnimatedStyle,
-	withSequence,
-	withTiming,
-} from 'react-native-reanimated';
-import { useForm, Controller } from 'react-hook-form';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import {
-	SafeAreaView,
-	useSafeAreaInsets,
-} from 'react-native-safe-area-context';
-import { Calendar } from 'react-native-calendars';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TransactionContext } from '../../../src/context/transactionContext';
-import BottomSheet from '../../../src/components/BottomSheet';
 import { isDevMode } from '../../../src/config/environment';
 import { createLogger } from '../../../src/utils/sublogger';
 import { palette, radius, space, shadow, type } from '../../../src/ui/theme';
-import { getItem, setItem, removeItem } from '../../../src/utils/safeStorage';
+import { removeItem } from '../../../src/utils/safeStorage';
 import { AppCard, AppText, AppButton } from '../../../src/ui/primitives';
 import { ErrorBoundary } from '../../../src/components/ErrorBoundary';
 import { parseCaptureLine } from '../../../src/lib/parse-capture-line';
@@ -56,6 +39,9 @@ const transactionScreenLog = createLogger('TransactionScreen');
 const PARSE_ERROR_MESSAGE =
 	'Use "description amount", e.g. coffee 5.75 or paycheck 1200.';
 
+/** Clears any legacy draft from the old multi-field Capture screen. */
+const LEGACY_FORM_STATE_KEY = 'transaction_form_state';
+
 function formatUsd(n: number) {
 	return new Intl.NumberFormat('en-US', {
 		style: 'currency',
@@ -64,97 +50,11 @@ function formatUsd(n: number) {
 	}).format(n);
 }
 
-const CASH_CATEGORIES = [
-	'Food',
-	'Groceries',
-	'Drinks',
-	'Transportation',
-	'Entertainment',
-	'Shopping',
-	'Personal care',
-	'Bills & utilities',
-	'Household',
-	'Health',
-	'Gifts & donations',
-	'Other',
-] as const;
-
-const INCOME_CATEGORIES = [
-	'Paycheck',
-	'Freelance',
-	'Bonus',
-	'Refund',
-	'Interest',
-	'Investment',
-	'Gift',
-	'Other',
-] as const;
-
-type ExpenseCategory = (typeof CASH_CATEGORIES)[number];
-type IncomeCategory = (typeof INCOME_CATEGORIES)[number];
-
-interface TransactionFormData {
-	description: string;
-	amount: string;
-	date: string;
-}
-
-const DESCRIPTION_MAX_LENGTH = 120;
-
-const getLocalIsoDate = (): string => {
-	const today = new Date();
-	const year = today.getFullYear();
-	const month = String(today.getMonth() + 1).padStart(2, '0');
-	const day = String(today.getDate()).padStart(2, '0');
-	return `${year}-${month}-${day}`;
-};
-
-const sanitizeCurrency = (value: string): string => {
-	const cleaned = value.replace(/[^0-9.]/g, '');
-	if (!cleaned) return '';
-	const [int, ...rest] = cleaned.split('.');
-	const decimals = rest.join('');
-	const two = decimals.slice(0, 2);
-	const normalizedInt = int.replace(/^0+(?=\d)/, '') || '0';
-	const result = rest.length > 0 ? `${normalizedInt}.${two}` : normalizedInt;
-
-	return result;
-};
-
-const formatDateString = (dateString: string): string => {
-	if (!dateString || typeof dateString !== 'string') return '';
-	const datePart = dateString.slice(0, 10);
-	if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return dateString;
-	const [year, month, day] = datePart.split('-').map(Number);
-	const date = new Date(year, month - 1, day);
-	return date.toLocaleDateString();
-};
-
-const isToday = (dateString: string): boolean => {
-	const today = getLocalIsoDate();
-	return !!dateString && dateString.slice(0, 10) === today;
-};
-
-const formatDateWithHint = (dateString: string): string => {
-	const formatted = formatDateString(dateString);
-	if (!formatted) return '';
-	return isToday(dateString) ? `Today, ${formatted}` : formatted;
-};
-
 export default function TransactionScreenProModern() {
-	const router = useRouter();
-	const params = useLocalSearchParams<{
-		mode?: 'income' | 'expense';
-	}>();
-	const amountRef = useRef<TextInput>(null);
 	const captureLineRef = useRef<TextInput>(null);
-	const noteInputRef = useRef<TextInput>(null);
 	const scrollRef = useRef<ScrollView>(null);
-	const scrollYRef = useRef(0);
 	const [keyboardHeight, setKeyboardHeight] = useState(0);
 	const insets = useSafeAreaInsets();
-	// Stable top inset from first frame to avoid "content pops down" jitter when
-	// safe area is applied after initial layout (use fallback when insets not yet available)
 	const topInset =
 		insets.top > 0
 			? insets.top
@@ -162,34 +62,13 @@ export default function TransactionScreenProModern() {
 				? (StatusBar.currentHeight ?? 24)
 				: 44;
 
-	const [mode, setMode] = useState<'income' | 'expense'>(
-		params.mode === 'income' ? 'income' : 'expense',
-	);
-	const [selectedCategory, setSelectedCategory] = useState<
-		ExpenseCategory | IncomeCategory | null
-	>(null);
-
-	useEffect(() => {
-		if (params.mode === 'income' || params.mode === 'expense') {
-			setMode(params.mode);
-			if (params.mode === 'income') setSelectedCategory(null);
-		}
-	}, [params.mode]);
-	const [isSubmitting, setIsSubmitting] = useState(false);
-	const [pickerOpen, setPickerOpen] = useState(false);
-	const [datePickerOpen, setDatePickerOpen] = useState(false);
-	const [mountCalendar, setMountCalendar] = useState(false);
-	const [noteExpanded, setNoteExpanded] = useState(false);
-	const [showCategoryError, setShowCategoryError] = useState(false);
 	const [captureLine, setCaptureLine] = useState('');
 	const [captureParseError, setCaptureParseError] = useState<string | null>(
 		null,
 	);
 	const [recentChips, setRecentChips] = useState<string[]>([]);
-	const categoryShakeX = useSharedValue(0);
-	const categoryShakeStyle = useAnimatedStyle(() => ({
-		transform: [{ translateX: categoryShakeX.value }],
-	}));
+	const [savedLines, setSavedLines] = useState<string[]>([]);
+	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	const { addTransaction } = useContext(TransactionContext);
 
@@ -197,7 +76,10 @@ export default function TransactionScreenProModern() {
 		loadCaptureRecentChips().then(setRecentChips);
 	}, []);
 
-	// Match web /capture: focus the quick line first
+	useEffect(() => {
+		void removeItem(LEGACY_FORM_STATE_KEY);
+	}, []);
+
 	useEffect(() => {
 		const task = InteractionManager.runAfterInteractions(() => {
 			const t = setTimeout(() => {
@@ -209,7 +91,7 @@ export default function TransactionScreenProModern() {
 	}, []);
 
 	useEffect(() => {
-		const onShow = (e: any) =>
+		const onShow = (e: { endCoordinates?: { height?: number } }) =>
 			setKeyboardHeight(e?.endCoordinates?.height ?? 0);
 		const onHide = () => setKeyboardHeight(0);
 
@@ -228,41 +110,6 @@ export default function TransactionScreenProModern() {
 		};
 	}, []);
 
-	useEffect(() => {
-		if (!datePickerOpen) {
-			setMountCalendar(false);
-			return;
-		}
-		const task = InteractionManager.runAfterInteractions(() => {
-			setMountCalendar(true);
-		});
-		return () => task.cancel();
-	}, [datePickerOpen]);
-
-	// Sync URL to mode only when user taps Cash In/Cash Out (avoids setParams loop when restoring state or re-entering screen).
-
-	const {
-		control,
-		handleSubmit,
-		setValue,
-		watch,
-		trigger,
-		formState: { errors },
-		clearErrors,
-		reset,
-	} = useForm<TransactionFormData>({
-		defaultValues: {
-			description: '',
-			amount: '',
-			date: getLocalIsoDate(),
-		},
-		mode: 'onTouched',
-	});
-
-	const amount = watch('amount');
-	const description = watch('description');
-	const selectedDate = watch('date');
-
 	const parsedPreview = useMemo(() => {
 		const t = captureLine.trim();
 		if (!t) return null;
@@ -272,184 +119,16 @@ export default function TransactionScreenProModern() {
 	const parsedSummary = useMemo(() => {
 		if (!parsedPreview) return null;
 		return parsedPreview.type === 'income'
-			? `Cash in · ${parsedPreview.description} · ${formatUsd(parsedPreview.amount)}`
-			: `Cash out · ${parsedPreview.description} · ${formatUsd(
+			? `Income · ${parsedPreview.description} · ${formatUsd(parsedPreview.amount)}`
+			: `Expense · ${parsedPreview.description} · ${formatUsd(
 					Math.abs(parsedPreview.amount),
 				)}`;
 	}, [parsedPreview]);
 
-	const FORM_STATE_KEY = 'transaction_form_state';
-	const [hasRestoredState, setHasRestoredState] = useState(false);
-
-	useEffect(() => {
-		let isMounted = true;
-
-		(async () => {
-			try {
-				const saved = await getItem(FORM_STATE_KEY);
-
-				if (!isMounted) return;
-
-				if (saved) {
-					const state = JSON.parse(saved);
-					const restoredAmount =
-						typeof state.amount === 'string' ? state.amount.trim() : '';
-
-					setValue(
-						'amount',
-						restoredAmount && Number(restoredAmount) > 0 ? restoredAmount : '',
-					);
-					setValue('description', state.description ?? '');
-					setValue('date', state.date ?? getLocalIsoDate());
-					if (state.mode) setMode(state.mode);
-					if (state.selectedCategory)
-						setSelectedCategory(state.selectedCategory);
-					if (state.description?.trim()) setNoteExpanded(true);
-					const descR = (state.description ?? '').trim();
-					const amtR =
-						typeof state.amount === 'string' ? state.amount.trim() : '';
-					if (descR && amtR && Number(amtR) > 0) {
-						setCaptureLine(`${descR} ${amtR}`);
-					}
-				}
-			} catch {
-			} finally {
-				if (isMounted) setHasRestoredState(true);
-			}
-		})();
-
-		return () => {
-			isMounted = false;
-		};
-	}, [setValue]);
-
-	useEffect(() => {
-		if (!hasRestoredState) return;
-
-		const saveState = async () => {
-			try {
-				const amountHasValue = Number(amount) > 0;
-
-				const stateToSave = {
-					amount: amountHasValue ? amount : '',
-					description,
-					date: selectedDate,
-					mode,
-					selectedCategory,
-				};
-
-				const hasData = amountHasValue || !!description || !!selectedCategory;
-
-				if (hasData) {
-					await setItem(FORM_STATE_KEY, JSON.stringify(stateToSave));
-				} else {
-					await removeItem(FORM_STATE_KEY);
-				}
-			} catch (err) {
-				if (isDevMode) {
-					transactionScreenLog.error('Failed to save form state', err);
-				}
-			}
-		};
-
-		const timeoutId = setTimeout(saveState, 500);
-		return () => clearTimeout(timeoutId);
-	}, [
-		amount,
-		description,
-		selectedDate,
-		mode,
-		selectedCategory,
-		hasRestoredState,
-	]);
-
-	useEffect(() => {
-		if (amountRef.current) {
-			const len = amount?.length ?? 0;
-			amountRef.current.setNativeProps({ selection: { start: len, end: len } });
-		}
-	}, [amount]);
-
-	// Nudge Category cell (shake) when user taps Create with missing category
-	useEffect(() => {
-		if (!showCategoryError || mode !== 'expense') return;
-		categoryShakeX.value = withSequence(
-			withTiming(-8, { duration: 50 }),
-			withTiming(8, { duration: 50 }),
-			withTiming(-6, { duration: 50 }),
-			withTiming(6, { duration: 50 }),
-			withTiming(-4, { duration: 40 }),
-			withTiming(4, { duration: 40 }),
-			withTiming(0, { duration: 40 }),
-		);
-	}, [showCategoryError, mode, categoryShakeX]);
-
-	const focusNoteCentered = useCallback(() => {
-		noteInputRef.current?.focus();
-		requestAnimationFrame(() => {
-			setTimeout(
-				() => {
-					if (!noteInputRef.current || !scrollRef.current) return;
-
-					noteInputRef.current.measureInWindow((_x, y, _w, h) => {
-						const screenH = Dimensions.get('window').height;
-						const visibleH = Math.max(0, screenH - keyboardHeight);
-						const targetCenterY = visibleH / 2;
-						const inputCenterY = y + h / 2;
-						const delta = inputCenterY - targetCenterY;
-						scrollRef.current?.scrollTo({
-							y: Math.max(0, (scrollYRef.current ?? 0) + delta),
-							animated: true,
-						});
-					});
-				},
-				Platform.OS === 'ios' ? 80 : 120,
-			);
-		});
-	}, [keyboardHeight]);
-	const handleModeChange = useCallback(
-		(newMode: 'income' | 'expense') => {
-			if (!isSubmitting && mode !== newMode) {
-				setMode(newMode);
-				setSelectedCategory(null);
-				router.setParams({ mode: newMode });
-			}
-		},
-		[isSubmitting, mode, router],
-	);
-
-	/** When the quick line parses, mirror web Capture and fill the form below. */
-	const syncFormFromCaptureText = useCallback(
-		(trimmed: string) => {
-			const parsed = parseCaptureLine(trimmed);
-			if (!parsed) return;
-			const nextMode = parsed.type;
-			setValue('description', parsed.description, { shouldValidate: true });
-			setValue('amount', Math.abs(parsed.amount).toFixed(2), {
-				shouldValidate: true,
-			});
-			if (!isSubmitting && mode !== nextMode) {
-				setMode(nextMode);
-				setSelectedCategory(null);
-				router.setParams({ mode: nextMode });
-			}
-			clearErrors('amount');
-		},
-		[setValue, clearErrors, isSubmitting, mode, router],
-	);
-
-	const onCaptureLineChange = useCallback(
-		(text: string) => {
-			setCaptureLine(text);
-			setCaptureParseError(null);
-			const trimmed = text.trim();
-			if (trimmed) {
-				const parsed = parseCaptureLine(trimmed);
-				if (parsed) syncFormFromCaptureText(trimmed);
-			}
-		},
-		[syncFormFromCaptureText],
-	);
+	const onCaptureLineChange = useCallback((text: string) => {
+		setCaptureLine(text);
+		setCaptureParseError(null);
+	}, []);
 
 	const onCaptureBlur = useCallback(() => {
 		const t = captureLine.trim();
@@ -457,124 +136,49 @@ export default function TransactionScreenProModern() {
 		else setCaptureParseError(null);
 	}, [captureLine]);
 
-	const onChangeAmount = useCallback(
-		(text: string) => {
-			const sanitized = sanitizeCurrency(text);
-			if (Number(sanitized) > 999999.99) return;
-			setValue('amount', sanitized, { shouldValidate: true });
-		},
-		[setValue],
-	);
-
-	const onBlurAmount = useCallback(() => {
-		const n = Number(amount);
-		if (isFinite(n) && n > 0)
-			setValue('amount', n.toFixed(2), { shouldValidate: true });
-		trigger('amount');
-	}, [amount, setValue, trigger]);
-
-	const selectCategory = useCallback(
-		(cat: ExpenseCategory | IncomeCategory) => {
-			setSelectedCategory(cat);
-			setShowCategoryError(false);
-			setPickerOpen(false);
-		},
-		[],
-	);
-
-	const onSubmit = useCallback(
-		async (data: TransactionFormData) => {
-			if (!data.amount?.trim())
-				return Alert.alert('Missing amount', 'Please enter an amount.');
-
-			try {
-				setIsSubmitting(true);
-
-				const amt = Number(data.amount);
-				if (!isFinite(amt) || amt <= 0)
-					return Alert.alert(
-						'Invalid amount',
-						'Enter an amount greater than 0.',
-					);
-
-				const payload: any = {
-					description: data.description?.trim() || undefined,
-					amount: mode === 'income' ? Math.abs(amt) : -Math.abs(amt),
-					date: data.date,
-					type: mode,
-				};
-
-				if (selectedCategory) {
-					payload.metadata = { category: selectedCategory };
-				}
-				await addTransaction(payload);
-				await removeItem(FORM_STATE_KEY);
-
-				const chipLine =
-					captureLine.trim() ||
-					`${data.description?.trim() || 'Entry'} ${amt}`.trim();
-				await pushCaptureRecentChip(chipLine);
-				setRecentChips(await loadCaptureRecentChips());
-				setCaptureLine('');
-				setCaptureParseError(null);
-
-				Alert.alert(
-					'Success',
-					`${mode === 'income' ? 'Cash IN' : 'Cash OUT'} saved!`,
-					[
-						{
-							text: 'OK',
-							onPress: () => {
-								reset({
-									description: '',
-									amount: '',
-									date: getLocalIsoDate(),
-								});
-								setSelectedCategory(null);
-								if (router.canGoBack()) router.back();
-								else router.replace('/(tabs)/dashboard');
-							},
-						},
-					],
-				);
-			} catch (e) {
-				if (isDevMode) {
-					transactionScreenLog.error('Save transaction error', e);
-				}
-				Alert.alert('Error', 'Failed to save. Please try again.');
-			} finally {
-				setIsSubmitting(false);
-			}
-		},
-		[mode, selectedCategory, captureLine, addTransaction, reset, router],
-	);
-
-	const handleCreatePress = useCallback(() => {
+	const saveEntry = useCallback(async () => {
 		if (isSubmitting) return;
-		clearErrors();
-		setShowCategoryError(false);
+		const line = captureLine.trim();
+		if (!line) {
+			queueMicrotask(() => captureLineRef.current?.focus());
+			return;
+		}
 
-		const cap = captureLine.trim();
-		if (cap && !parseCaptureLine(cap)) {
+		const parsed = parseCaptureLine(line);
+		if (!parsed) {
 			setCaptureParseError(PARSE_ERROR_MESSAGE);
 			Alert.alert('Check your line', PARSE_ERROR_MESSAGE);
+			queueMicrotask(() => captureLineRef.current?.focus());
 			return;
 		}
 
-		if (mode === 'expense' && !selectedCategory) {
-			setShowCategoryError(true);
-			return;
+		setCaptureParseError(null);
+		setIsSubmitting(true);
+		try {
+			await addTransaction({
+				description: parsed.description,
+				amount: parsed.amount,
+				date: new Date().toISOString(),
+				type: parsed.type,
+				source: 'manual',
+			});
+
+			setSavedLines((prev) => [line, ...prev].slice(0, 8));
+			await pushCaptureRecentChip(line);
+			setRecentChips(await loadCaptureRecentChips());
+			setCaptureLine('');
+			queueMicrotask(() => captureLineRef.current?.focus());
+		} catch (e) {
+			if (isDevMode) {
+				transactionScreenLog.error('Save transaction error', e);
+			}
+			Alert.alert('Error', 'Failed to save. Please try again.');
+		} finally {
+			setIsSubmitting(false);
 		}
-		handleSubmit(onSubmit)();
-	}, [
-		isSubmitting,
-		mode,
-		selectedCategory,
-		captureLine,
-		clearErrors,
-		handleSubmit,
-		onSubmit,
-	]);
+	}, [isSubmitting, captureLine, addTransaction]);
+
+	const canSave = !!parsedPreview;
 
 	return (
 		<ErrorBoundary>
@@ -597,371 +201,115 @@ export default function TransactionScreenProModern() {
 						}
 						automaticallyAdjustContentInsets={false}
 						contentInsetAdjustmentBehavior="never"
-						automaticallyAdjustKeyboardInsets={false}
 						showsVerticalScrollIndicator={false}
-						onScroll={(e) => {
-							scrollYRef.current = e.nativeEvent.contentOffset.y;
-						}}
-						scrollEventThrottle={16}
 					>
-						<View style={styles.formWrap}>
-							<AppText.Title style={styles.heroTitle}>Capture</AppText.Title>
-							<AppText.Caption color="muted" style={styles.heroSub}>
-								Type description then amount, same as the web app — details below
-								fill in as you type.
-							</AppText.Caption>
-
-							<AppCard
-								style={styles.captureCard}
-								padding={space.lg}
-								borderRadius={radius.xl}
-								bordered
-							>
-								<AppText.Label color="muted" style={styles.captureFieldLabel}>
-									New entry
-								</AppText.Label>
-								<TextInput
-									ref={captureLineRef}
-									style={styles.captureInput}
-									value={captureLine}
-									onChangeText={onCaptureLineChange}
-									onBlur={onCaptureBlur}
-									placeholder="Description, then amount (e.g. coffee 5.75)"
-									placeholderTextColor={palette.textSubtle}
-									accessibilityLabel="Quick capture line"
-									returnKeyType="done"
-									onSubmitEditing={() => Keyboard.dismiss()}
-									autoCapitalize="sentences"
-									autoCorrect
-								/>
-								{parsedSummary ? (
-									<View style={styles.previewPill}>
-										<Text style={styles.previewPillText}>{parsedSummary}</Text>
-									</View>
-								) : null}
-								{captureParseError ? (
-									<AppText.Caption color="danger" style={styles.captureError}>
-										{captureParseError}
-									</AppText.Caption>
-								) : null}
-								<AppText.Caption color="muted" style={styles.captureHint}>
-									Income hints: paycheck, salary, deposit, refund…
-								</AppText.Caption>
-								{recentChips.length > 0 ? (
-									<View style={styles.chipsSection}>
-										<AppText.Caption color="muted" style={styles.chipsLabel}>
-											Recent
-										</AppText.Caption>
-										<ScrollView
-											horizontal
-											showsHorizontalScrollIndicator={false}
-											contentContainerStyle={styles.chipsRow}
-										>
-											{recentChips.map((chip) => (
-												<TouchableOpacity
-													key={chip}
-													style={styles.recentChip}
-													onPress={() => onCaptureLineChange(chip)}
-												>
-													<Text style={styles.recentChipText} numberOfLines={1}>
-														{chip}
-													</Text>
-												</TouchableOpacity>
-											))}
-										</ScrollView>
-									</View>
-								) : null}
-							</AppCard>
-
-							<AppText.Heading style={styles.detailsHeading}>Details</AppText.Heading>
-
-							<AppCard
-								style={styles.amountCard}
-								padding={space.lg}
-								borderRadius={radius.xl}
-							>
-								<View style={styles.amountRow}>
-									<Pressable
-										style={styles.amountInputContainer}
-										onPress={() => amountRef.current?.focus()}
-									>
-										<Text style={styles.dollar}>$</Text>
-										<Controller
-											control={control}
-											name="amount"
-											rules={{
-												required: 'Amount is required',
-												validate: (v) =>
-													Number(v) > 0 || 'Enter an amount greater than 0',
-											}}
-											render={({ field: { value, onBlur } }) => (
-												<TextInput
-													ref={amountRef}
-													style={styles.amountInput}
-													placeholder="0"
-													placeholderTextColor={palette.textSubtle}
-													keyboardType="decimal-pad"
-													value={value}
-													onChangeText={onChangeAmount}
-													onBlur={() => {
-														onBlur();
-														onBlurAmount();
-													}}
-													returnKeyType="next"
-													accessibilityLabel="Amount"
-													maxLength={9}
-												/>
-											)}
-										/>
-									</Pressable>
-								</View>
-								<View style={styles.amountUnderline} />
-
-								<View style={styles.errorContainer}>
-									{errors.amount && (
-										<AppText.Caption color="danger" style={styles.errorText}>
-											{String(errors.amount.message)}
-										</AppText.Caption>
-									)}
-								</View>
-
-								<View style={styles.segmentedCompact}>
-									{(['expense', 'income'] as const).map((m) => {
-										const active = mode === m;
-										const label = m.charAt(0).toUpperCase() + m.slice(1);
-										return (
-											<Pressable
-												key={m}
-												style={({ pressed }) => [
-													styles.segBtnCompact,
-													m === 'expense' && styles.segBtnLeft,
-													m === 'income' && styles.segBtnRight,
-													active && styles.segBtnActive,
-													{
-														backgroundColor: active
-															? palette.surface
-															: 'transparent',
-														opacity: pressed ? 0.7 : 1,
-													},
-												]}
-												onPress={() => handleModeChange(m)}
-												accessibilityRole="button"
-												accessibilityState={{ selected: active }}
-											>
-												<AppText.Body
-													style={styles.segTextCompact}
-													color={active ? 'default' : 'muted'}
-												>
-													{label}
-												</AppText.Body>
-											</Pressable>
-										);
-									})}
-								</View>
-							</AppCard>
-						</View>
+					<View style={styles.formWrap}>
+						<AppText.Caption color="muted" style={styles.kicker}>
+							Immediate capture
+						</AppText.Caption>
+						<AppText.Title style={styles.heroTitle}>Capture</AppText.Title>
+						<AppText.Caption color="muted" style={styles.heroSub}>
+							Type one entry and save instantly.
+						</AppText.Caption>
 
 						<AppCard
-							style={styles.section}
-							padding={0}
+							style={styles.captureCard}
+							padding={space.lg}
 							borderRadius={radius.xl}
+							bordered
 						>
-							{/* Category row — full width */}
-							<Animated.View
-								style={[
-									styles.metadataRowSingle,
-									showCategoryError &&
-										mode === 'expense' &&
-										!selectedCategory && [
-											styles.metadataCellError,
-											styles.metadataCellErrorSpacing,
-										],
-									categoryShakeStyle,
-								]}
-							>
-								<TouchableOpacity
-									style={styles.metadataRowTouchable}
-									onPress={() => {
-										Keyboard.dismiss();
-										setPickerOpen(true);
-									}}
-									activeOpacity={0.6}
-									hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-									accessibilityLabel="Select category"
-									accessibilityRole="button"
-								>
-									<Ionicons
-										name="pricetag-outline"
-										size={22}
-										color={
-											showCategoryError &&
-											mode === 'expense' &&
-											!selectedCategory
-												? palette.danger
-												: palette.primary
-										}
-										style={styles.metadataRowIcon}
-									/>
-									<View style={styles.metadataRowContent}>
-										<Text style={styles.metadataLabel}>Category</Text>
-										<Text
-											style={[
-												styles.metadataValueCategory,
-												showCategoryError &&
-													mode === 'expense' &&
-													!selectedCategory &&
-													styles.metadataValueRequired,
-												!selectedCategory
-													? showCategoryError && mode === 'expense'
-														? { color: palette.danger }
-														: { color: palette.textMuted }
-													: { color: palette.text },
-											]}
-											numberOfLines={1}
-											ellipsizeMode="tail"
-										>
-											{selectedCategory
-												? selectedCategory
-												: mode === 'expense'
-													? 'Required'
-													: 'Optional'}
-										</Text>
-									</View>
-									<Ionicons
-										name="chevron-forward"
-										size={20}
-										color={palette.textSubtle}
-									/>
-								</TouchableOpacity>
-							</Animated.View>
-
-							<View style={styles.metadataDivider} />
-
-							{/* Date row — full width */}
-							<TouchableOpacity
-								style={styles.metadataRowSingle}
-								onPress={() => setDatePickerOpen(true)}
-								activeOpacity={0.6}
-								hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-								accessibilityLabel="Select date"
-								accessibilityRole="button"
-							>
-								<Ionicons
-									name="calendar-outline"
-									size={22}
-									color={palette.primary}
-									style={styles.metadataRowIcon}
-								/>
-								<View style={styles.metadataRowContent}>
-									<Text style={styles.metadataLabel}>Date</Text>
-									<Text
-										style={styles.metadataValue}
-										numberOfLines={1}
-										ellipsizeMode="tail"
-									>
-										{formatDateWithHint(selectedDate)}
+							<AppText.Label color="muted" style={styles.captureFieldLabel}>
+								New entry
+							</AppText.Label>
+							<TextInput
+								ref={captureLineRef}
+								style={styles.captureInput}
+								value={captureLine}
+								onChangeText={onCaptureLineChange}
+								onBlur={onCaptureBlur}
+								placeholder="Description, then amount (e.g. coffee 5.75)"
+								placeholderTextColor={palette.textSubtle}
+								accessibilityLabel="Quick capture line"
+								returnKeyType="done"
+								onSubmitEditing={() => {
+									if (canSave) void saveEntry();
+									else Keyboard.dismiss();
+								}}
+								autoCapitalize="sentences"
+								autoCorrect
+							/>
+							{parsedSummary ? (
+								<View style={styles.previewSummary}>
+									<Text style={styles.previewSummaryText}>
+										{parsedSummary}
 									</Text>
 								</View>
-								<Ionicons
-									name="chevron-forward"
-									size={20}
-									color={palette.textSubtle}
-								/>
-							</TouchableOpacity>
-						</AppCard>
-
-						<View style={styles.noteSection}>
-							{!noteExpanded ? (
-								<TouchableOpacity
-									style={styles.addNoteChip}
-									onPress={() => {
-										setNoteExpanded(true);
-										setTimeout(() => noteInputRef.current?.focus(), 100);
-									}}
-									activeOpacity={0.6}
-									hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-									accessibilityLabel={description ? 'Edit note' : 'Add note'}
-									accessibilityRole="button"
-								>
-									<Ionicons
-										name={description ? 'create-outline' : 'add-circle-outline'}
-										size={18}
-										color={palette.primary}
-										style={{ marginRight: space.xs }}
-									/>
-									<AppText.Body color="primary" style={styles.addNoteChipText}>
-										{description?.trim()
-											? `Note: ${description.trim().slice(0, 24)}${description.trim().length > 24 ? '…' : ''}`
-											: 'Add note'}
-									</AppText.Body>
-								</TouchableOpacity>
-							) : (
-								<View style={styles.noteExpandedContainer}>
-									<Controller
-										control={control}
-										name="description"
-										render={({ field: { value, onChange, onBlur } }) => (
-											<>
-												<TextInput
-													ref={noteInputRef}
-													style={[
-														styles.noteInput,
-														errors.description && styles.inputError,
-													]}
-													placeholder={
-														mode === 'income'
-															? 'e.g., Paycheck, refund…'
-															: 'e.g., Groceries, gas, subscription…'
-													}
-													placeholderTextColor={palette.textSubtle}
-													value={value}
-													onChangeText={(t) => onChange(t)}
-													onBlur={onBlur}
-													onFocus={focusNoteCentered}
-													returnKeyType="done"
-													onSubmitEditing={() => Keyboard.dismiss()}
-													accessibilityLabel="Description"
-													maxLength={DESCRIPTION_MAX_LENGTH}
-													multiline
-													numberOfLines={2}
-												/>
-												<Text style={styles.noteCharCount}>
-													{value?.length ?? 0}/{DESCRIPTION_MAX_LENGTH}
-												</Text>
-											</>
-										)}
-									/>
-									<TouchableOpacity
-										style={styles.collapseNoteBtn}
-										onPress={() => setNoteExpanded(false)}
-									>
-										<AppText.Caption color="muted">Hide note</AppText.Caption>
-									</TouchableOpacity>
-								</View>
-							)}
-						</View>
-
-						<View style={styles.createButtonSection}>
-							<AppButton
-								label={isSubmitting ? 'Saving…' : 'Create Transaction'}
-								variant="primary"
-								icon={isSubmitting ? undefined : 'add'}
-								onPress={handleCreatePress}
-								disabled={isSubmitting}
-								loading={isSubmitting}
-								fullWidth
-								style={styles.createButton}
-								accessibilityLabel={`Create ${mode}`}
-							/>
-							{showCategoryError && mode === 'expense' && (
-								<AppText.Caption
-									color="danger"
-									style={styles.createButtonError}
-								>
-									Please choose a category
+							) : null}
+							{captureParseError ? (
+								<AppText.Caption color="danger" style={styles.captureError}>
+									{captureParseError}
 								</AppText.Caption>
-							)}
-						</View>
+							) : null}
+							{isSubmitting ? (
+								<AppText.Caption color="muted" style={styles.savingHint}>
+									Saving…
+								</AppText.Caption>
+							) : null}
+							{recentChips.length > 0 ? (
+								<View style={styles.chipsSection}>
+									<AppText.Caption color="muted" style={styles.chipsLabel}>
+										Recent
+									</AppText.Caption>
+									<ScrollView
+										horizontal
+										showsHorizontalScrollIndicator={false}
+										contentContainerStyle={styles.chipsRow}
+									>
+										{recentChips.map((chip) => (
+											<TouchableOpacity
+												key={chip}
+												style={styles.recentChip}
+												onPress={() => onCaptureLineChange(chip)}
+											>
+												<Text style={styles.recentChipText} numberOfLines={1}>
+													{chip}
+												</Text>
+											</TouchableOpacity>
+										))}
+									</ScrollView>
+								</View>
+							) : null}
+							{savedLines.length > 0 ? (
+								<View style={styles.savedSection}>
+									<AppText.Caption color="muted" style={styles.savedHeading}>
+										Just captured
+									</AppText.Caption>
+									{savedLines.map((line, i) => (
+										<View key={`${line}-${i}`} style={styles.savedRow}>
+											<AppText.Caption color="default">{line}</AppText.Caption>
+										</View>
+									))}
+								</View>
+							) : null}
+							<View style={styles.saveSection}>
+								<AppButton
+									label={isSubmitting ? 'Saving…' : 'Save entry'}
+									variant="primary"
+									icon={isSubmitting ? undefined : 'checkmark-outline'}
+									onPress={() => void saveEntry()}
+									disabled={isSubmitting || !canSave}
+									loading={isSubmitting}
+									fullWidth
+									style={styles.saveButton}
+									accessibilityLabel="Save capture entry"
+								/>
+							</View>
+							<AppText.Caption color="muted" style={styles.footerHint}>
+								Save clears the line. Income hints: paycheck, salary, deposit,
+								refund…
+							</AppText.Caption>
+						</AppCard>
+					</View>
 
 						<View
 							style={{
@@ -970,139 +318,6 @@ export default function TransactionScreenProModern() {
 						/>
 					</ScrollView>
 				</KeyboardAvoidingView>
-
-				<BottomSheet
-					isOpen={pickerOpen}
-					onClose={() => setPickerOpen(false)}
-					snapPoints={[0.6, 0.4]}
-					initialSnapIndex={0}
-					header={
-						<View style={styles.sheetHeader}>
-							<Ionicons
-								name="pricetag-outline"
-								size={20}
-								color={palette.primary}
-								style={{ marginRight: space.sm }}
-							/>
-							<AppText.Heading style={styles.sheetTitle}>
-								Select Category
-							</AppText.Heading>
-							<TouchableOpacity onPress={() => setPickerOpen(false)}>
-								<Ionicons name="close" size={24} color={palette.textMuted} />
-							</TouchableOpacity>
-						</View>
-					}
-				>
-					<FlatList
-						data={
-							mode === 'expense' ? [...CASH_CATEGORIES] : [...INCOME_CATEGORIES]
-						}
-						keyExtractor={(item) => item}
-						initialNumToRender={12}
-						windowSize={6}
-						maxToRenderPerBatch={12}
-						getItemLayout={(_, i) => ({ length: 48, offset: 48 * i, index: i })}
-						contentContainerStyle={{
-							paddingBottom: insets.bottom + 64 + space.md,
-						}}
-						renderItem={({ item }) => (
-							<TouchableOpacity
-								style={styles.sheetRow}
-								onPress={() =>
-									selectCategory(item as ExpenseCategory | IncomeCategory)
-								}
-							>
-								<Ionicons
-									name="pricetag-outline"
-									size={18}
-									color={palette.text}
-									style={{ marginRight: space.sm }}
-								/>
-								<AppText.Body>{item}</AppText.Body>
-							</TouchableOpacity>
-						)}
-					/>
-				</BottomSheet>
-
-				<BottomSheet
-					isOpen={datePickerOpen}
-					onClose={() => setDatePickerOpen(false)}
-					snapPoints={[0.7, 0.5]}
-					initialSnapIndex={0}
-					header={
-						<View style={styles.sheetHeader}>
-							<Ionicons
-								name="calendar-outline"
-								size={20}
-								color={palette.primary}
-								style={{ marginRight: space.sm }}
-							/>
-							<AppText.Heading style={styles.sheetTitle}>
-								Select Date
-							</AppText.Heading>
-							<TouchableOpacity onPress={() => setDatePickerOpen(false)}>
-								<Ionicons name="close" size={24} color={palette.textMuted} />
-							</TouchableOpacity>
-						</View>
-					}
-				>
-					<View style={styles.quickActions}>
-						<TouchableOpacity
-							style={styles.quickActionBtn}
-							onPress={() => {
-								setValue('date', getLocalIsoDate(), { shouldValidate: false });
-								setDatePickerOpen(false);
-							}}
-						>
-							<AppText.Body style={styles.quickActionText}>Today</AppText.Body>
-						</TouchableOpacity>
-					</View>
-
-					{datePickerOpen && mountCalendar ? (
-						<Calendar
-							onDayPress={(day) => {
-								setValue('date', day.dateString, { shouldValidate: false });
-								setDatePickerOpen(false);
-							}}
-							markedDates={{
-								[selectedDate]: {
-									selected: true,
-									selectedColor: palette.primary,
-									selectedTextColor: palette.textOnPrimary,
-								},
-							}}
-							firstDay={0}
-							enableSwipeMonths
-							renderArrow={(direction) => (
-								<Ionicons
-									name={
-										direction === 'left' ? 'chevron-back' : 'chevron-forward'
-									}
-									size={18}
-									color={palette.text}
-								/>
-							)}
-							theme={{
-								backgroundColor: palette.surface,
-								calendarBackground: palette.surface,
-								textSectionTitleColor: palette.textSubtle,
-								selectedDayBackgroundColor: palette.primary,
-								selectedDayTextColor: palette.textOnPrimary,
-								todayTextColor: palette.primary,
-								dayTextColor: palette.text,
-								textDisabledColor: palette.borderMuted,
-								monthTextColor: palette.text,
-								arrowColor: palette.text,
-								textDayFontWeight: '500',
-								textMonthFontWeight: '700',
-								textDayHeaderFontWeight: '600',
-								textDayFontSize: 14,
-								textMonthFontSize: 16,
-								textDayHeaderFontSize: 12,
-							}}
-						/>
-					) : null}
-				</BottomSheet>
 			</SafeAreaView>
 		</ErrorBoundary>
 	);
@@ -1117,16 +332,19 @@ const styles = StyleSheet.create({
 		flexGrow: 1,
 		paddingHorizontal: space.xl,
 		paddingTop: space.xl,
-		// Stretch children so the header/content column doesn't look double-inset.
 		alignItems: 'stretch',
-		// No justifyContent: 'center' — keeps layout stable when keyboard opens or note expands (avoids jitter)
 	},
 	formWrap: {
 		width: '100%',
 		maxWidth: FORM_MAX_WIDTH,
 		alignSelf: 'center',
 	},
-
+	kicker: {
+		textTransform: 'uppercase',
+		letterSpacing: 0.8,
+		fontWeight: '600',
+		marginBottom: space.xs,
+	},
 	heroTitle: {
 		...type.titleMd,
 		fontSize: 20,
@@ -1156,17 +374,18 @@ const styles = StyleSheet.create({
 		color: palette.text,
 		marginTop: space.xs,
 	},
-	previewPill: {
+	previewSummary: {
 		alignSelf: 'flex-start',
 		marginTop: space.md,
-		paddingHorizontal: space.md,
-		paddingVertical: space.xs,
-		borderRadius: radius.pill,
+		maxWidth: '100%',
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		borderRadius: radius.xl2,
 		borderWidth: 1,
-		borderColor: palette.primaryBorder,
-		backgroundColor: palette.primarySoft,
+		borderColor: palette.borderAccent,
+		backgroundColor: palette.accentSoft,
 	},
-	previewPillText: {
+	previewSummaryText: {
 		...type.bodySm,
 		color: palette.primaryStrong,
 		fontWeight: '600',
@@ -1174,7 +393,7 @@ const styles = StyleSheet.create({
 	captureError: {
 		marginTop: space.sm,
 	},
-	captureHint: {
+	savingHint: {
 		marginTop: space.sm,
 	},
 	chipsSection: {
@@ -1201,297 +420,38 @@ const styles = StyleSheet.create({
 		...type.bodyXs,
 		color: palette.text,
 	},
-	detailsHeading: {
-		...type.h2,
-		color: palette.text,
+	savedSection: {
 		marginTop: space.lg,
-		marginBottom: space.md,
+		paddingTop: space.md,
+		borderTopWidth: StyleSheet.hairlineWidth,
+		borderTopColor: palette.border,
 	},
-
-	amountRow: {
-		flexDirection: 'row',
-		alignItems: 'flex-end',
-		justifyContent: 'center',
-		gap: space.sm,
-	},
-	amountInputContainer: {
-		flexDirection: 'row',
-		alignItems: 'flex-end',
-		flex: 1,
-		justifyContent: 'center',
-	},
-	dollar: {
-		fontSize: 32,
+	savedHeading: {
 		fontWeight: '600',
-		color: palette.textMuted,
-		marginBottom: 4,
+		marginBottom: space.sm,
 	},
-	amountInput: {
-		flexGrow: 0,
-		flexShrink: 1,
-		fontSize: 40,
-		fontWeight: '700',
-		color: palette.text,
-		textAlign: 'center',
-		minWidth: 48,
-		paddingHorizontal: 0,
-		letterSpacing: -0.5,
-	},
-	amountUnderline: {
-		marginTop: space.xs,
-		height: 1,
-		backgroundColor: palette.border,
-		opacity: 0.8,
-	},
-	errorContainer: {
-		alignItems: 'center',
-		marginTop: space.xs,
-		minHeight: 20,
-	},
-	errorText: {
-		color: palette.danger,
-		fontSize: 12,
-		fontWeight: '500',
-	},
-	segmentedCompact: {
-		backgroundColor: palette.subtle,
-		borderRadius: radius.pill,
-		padding: 4,
-		flexDirection: 'row',
-	},
-	segBtnCompact: {
-		flex: 1,
-		minHeight: 40,
-		paddingVertical: 10,
-		alignItems: 'center',
-		justifyContent: 'center',
-		borderRadius: radius.pill,
-	},
-	segBtnLeft: {
-		borderTopLeftRadius: radius.pill,
-		borderBottomLeftRadius: radius.pill,
-	},
-	segBtnRight: {
-		borderTopRightRadius: radius.pill,
-		borderBottomRightRadius: radius.pill,
-	},
-	segBtnActive: {
-		backgroundColor: palette.surface,
-		...shadow.soft,
+	savedRow: {
+		borderRadius: radius.xl2,
 		borderWidth: 1,
 		borderColor: palette.border,
-	},
-	segText: {
-		fontSize: 14,
-		fontWeight: '600',
-	},
-	segTextCompact: {
-		fontSize: 14,
-		fontWeight: '600',
-	},
-	metadataRowSingle: {
-		width: '100%',
-		flexDirection: 'row',
-		alignItems: 'center',
-		minHeight: 64,
-		paddingVertical: space.md,
-		paddingHorizontal: space.lg,
-		justifyContent: 'center',
-	},
-	metadataRowTouchable: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		flex: 1,
-		width: '100%',
-		paddingVertical: space.xs,
-		minWidth: 0,
-	},
-	metadataRowIcon: {
-		marginRight: space.md,
-	},
-	metadataRowContent: {
-		flex: 1,
-		minWidth: 0,
-		justifyContent: 'center',
-		alignItems: 'flex-start',
-		paddingRight: space.sm,
-	},
-	metadataDivider: {
-		height: 1,
-		backgroundColor: palette.border,
-		marginHorizontal: space.lg,
-	},
-	metadataCellError: {
-		backgroundColor: palette.dangerSubtle,
-		borderWidth: 2,
-		borderColor: palette.danger,
-		borderRadius: radius.md,
-		marginTop: space.sm,
+		backgroundColor: palette.surfaceSunken,
+		paddingHorizontal: space.md,
+		paddingVertical: space.sm,
 		marginBottom: space.xs,
-		marginHorizontal: 4,
 	},
-	metadataCellErrorSpacing: {},
-	metadataLabel: {
-		fontSize: 11,
-		fontWeight: '600',
-		textTransform: 'uppercase',
-		letterSpacing: 0.8,
-		color: palette.textMuted,
-		marginBottom: 2,
+	footerHint: {
+		marginTop: space.md,
+		lineHeight: 18,
 	},
-	metadataValue: {
-		fontSize: 16,
-		fontWeight: '600',
-		color: palette.text,
-	},
-	metadataValueCategory: {
-		fontSize: 16,
-		fontWeight: '600',
-	},
-	metadataValueRequired: {
-		color: palette.danger,
-	},
-	noteSection: {
-		marginTop: space.lg,
+	saveSection: {
+		marginTop: space.md,
 		alignSelf: 'stretch',
 	},
-	addNoteChip: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingVertical: space.md,
-		paddingHorizontal: space.lg,
-		borderRadius: radius.lg,
-		backgroundColor: palette.surface,
-		borderWidth: 1,
-		borderColor: palette.border,
-		alignSelf: 'stretch',
-		...shadow.soft,
-	},
-	addNoteChipText: {
-		fontWeight: '600',
-		fontSize: 15,
-	},
-	noteExpandedContainer: {
-		gap: space.sm,
-		alignSelf: 'stretch',
-	},
-	noteInput: {
-		minHeight: 72,
-		width: '100%',
-		borderRadius: radius.lg,
-		borderWidth: 1,
-		borderColor: palette.border,
-		paddingHorizontal: space.lg,
-		paddingVertical: space.md,
-		fontSize: 16,
-		color: palette.text,
-		backgroundColor: palette.surface,
-		textAlignVertical: 'top',
-	},
-	noteCharCount: {
-		fontSize: 12,
-		color: palette.textSubtle,
-		alignSelf: 'flex-end',
-	},
-	collapseNoteBtn: {
-		alignSelf: 'flex-start',
-		paddingVertical: space.xs,
-	},
-	createButtonSection: {
-		marginTop: space.xl,
-		gap: space.sm,
-		alignSelf: 'stretch',
-	},
-	createButton: {
+	saveButton: {
 		alignSelf: 'stretch',
 		width: '100%',
 		minHeight: 52,
 		borderRadius: radius.xl,
-	},
-	createButtonError: {
-		textAlign: 'center',
-		fontSize: 12,
-		fontWeight: '500',
-	},
-
-	inputLabel: {
-		marginBottom: space.sm,
-	},
-	input: {
-		height: 48,
-		borderRadius: radius.md,
-		borderWidth: 1,
-		borderColor: palette.border,
-		paddingHorizontal: space.md,
-		fontSize: 16,
-		color: palette.text,
-		backgroundColor: palette.surface,
-	},
-	inputError: { borderColor: palette.danger, borderWidth: 1.5 },
-
-	section: {
-		marginTop: space.lg,
-		backgroundColor: palette.surface,
-		borderWidth: 0,
-		overflow: 'hidden',
 		...shadow.soft,
-	},
-	amountCard: {
-		marginTop: 0,
-		backgroundColor: palette.surface,
-		borderWidth: 0,
-		...shadow.soft,
-	},
-
-	inlineCtaWrap: {
-		marginTop: space.lg,
-		paddingTop: space.xs,
-	},
-	inlineCtaHint: {
-		marginTop: space.sm,
-		textAlign: 'center',
-	},
-	miniSummary: {
-		textAlign: 'center',
-		marginBottom: space.md,
-	},
-
-	sheetHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingHorizontal: space.lg,
-		paddingBottom: space.sm,
-	},
-	sheetTitle: {
-		flex: 1,
-		color: palette.text,
-	},
-	sheetRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingVertical: 14,
-		borderBottomWidth: StyleSheet.hairlineWidth,
-		borderBottomColor: palette.border,
-		paddingHorizontal: space.lg,
-	},
-
-	quickActions: {
-		flexDirection: 'row',
-		gap: space.sm,
-		paddingHorizontal: space.lg,
-		paddingBottom: space.sm,
-	},
-	quickActionBtn: {
-		flex: 1,
-		paddingVertical: space.sm,
-		borderRadius: radius.md,
-		borderWidth: 1,
-		borderColor: palette.border,
-		alignItems: 'center',
-		backgroundColor: palette.surface,
-	},
-	quickActionText: {
-		color: palette.text,
-		fontWeight: '600',
 	},
 });
