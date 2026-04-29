@@ -266,8 +266,11 @@ const NotificationItem = ({
 					router.push('/(tabs)/dashboard');
 					break;
 				case 'transaction':
-					if (entityId) {
-						router.push(`/dashboard/ledger/edit?id=${entityId}` as any);
+					if (entityId && typeof entityId === 'string') {
+						router.push({
+							pathname: '/(tabs)/dashboard/ledger/edit',
+							params: { id: entityId },
+						});
 					} else {
 						router.push('/(tabs)/transaction');
 					}
@@ -277,7 +280,7 @@ const NotificationItem = ({
 					router.push('/(tabs)/dashboard');
 					break;
 				case 'system':
-					router.push('/(stack)/settings' as any);
+					router.push('/(tabs)/settings');
 					break;
 				case 'reminder':
 					router.push('/(tabs)/dashboard');

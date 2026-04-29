@@ -1080,8 +1080,11 @@ class NotificationService {
 						router.push('/(tabs)/dashboard');
 						break;
 					case 'transaction':
-						if (entityId) {
-							router.push(`/dashboard/ledger/edit?id=${entityId}` as any);
+						if (entityId && typeof entityId === 'string') {
+							router.push({
+								pathname: '/(tabs)/dashboard/ledger/edit',
+								params: { id: entityId },
+							});
 						} else {
 							router.push('/(tabs)/transaction');
 						}
@@ -1090,7 +1093,7 @@ class NotificationService {
 						router.push('/(tabs)/dashboard');
 						break;
 					case 'system':
-						router.push('/(stack)/settings');
+						router.push('/(tabs)/settings');
 						break;
 					case 'reminder':
 						router.push('/(tabs)/dashboard');
@@ -1098,11 +1101,11 @@ class NotificationService {
 					case 'marketing':
 					case 'promotional':
 						// For marketing/promotional notifications, just show the notifications screen
-						router.push('/(tabs)/dashboard/notifications');
+						router.push('/(tabs)/settings/notifications');
 						break;
 					default:
 						// Navigate to notifications screen
-						router.push('/(tabs)/dashboard/notifications');
+						router.push('/(tabs)/settings/notifications');
 						break;
 				}
 			});
