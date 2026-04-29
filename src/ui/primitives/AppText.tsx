@@ -6,7 +6,14 @@ export type AppTextProps = TextProps & {
 	/** Text variant */
 	variant?: 'title' | 'heading' | 'body' | 'label' | 'caption' | 'subtitle';
 	/** Text color variant */
-	color?: 'default' | 'muted' | 'subtle' | 'primary' | 'success' | 'danger';
+	color?:
+		| 'default'
+		| 'muted'
+		| 'subtle'
+		| 'primary'
+		| 'success'
+		| 'danger'
+		| 'warning';
 	children: React.ReactNode;
 };
 
@@ -44,7 +51,9 @@ const AppTextBase: React.FC<AppTextProps> = ({
 						? palette.success
 						: color === 'danger'
 							? palette.danger
-							: palette.text;
+							: color === 'warning'
+								? palette.warningStrong
+								: palette.text;
 
 	const variantStyle =
 		variant === 'title'

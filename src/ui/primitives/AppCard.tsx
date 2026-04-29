@@ -87,7 +87,8 @@ export const AppCard: React.FC<AppCardProps> = ({
 	accessibilityLabel,
 	style,
 	padding = space.lg,
-	borderRadius = radius.xl,
+	/** Default matches web compact panels (`rounded-xl3`). */
+	borderRadius = radius.xl3,
 	elevated = true,
 	bordered = false,
 	backgroundColor = palette.surface,
