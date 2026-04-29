@@ -77,6 +77,19 @@ function SignInView() {
 				]}
 				showsVerticalScrollIndicator={false}
 			>
+				<View style={styles.section}>
+					<AppText.Label color="subtle" style={styles.sectionTitle}>
+						WORKSPACE
+					</AppText.Label>
+					<AppCard padding={0} borderRadius={radius.lg}>
+						<AppRow
+							icon="download-outline"
+							label="Export data"
+							bordered={false}
+							onPress={() => router.push('/(tabs)/settings/export')}
+						/>
+					</AppCard>
+				</View>
 				<AppCard onPress={handleSignInToSync}>
 					<View style={styles.signInPrompt}>
 						<Ionicons
@@ -223,6 +236,21 @@ function ProfileContent() {
 						</AppCard>
 					</View>
 				)}
+
+				{/* Workspace tools — parity with web sidebar (Week lives on Home) */}
+				<View style={styles.section}>
+					<AppText.Label color="subtle" style={styles.sectionTitle}>
+						WORKSPACE
+					</AppText.Label>
+					<AppCard padding={0} borderRadius={radius.lg}>
+						<AppRow
+							icon="download-outline"
+							label="Export data"
+							bordered={false}
+							onPress={() => router.push('/(tabs)/settings/export')}
+						/>
+					</AppCard>
+				</View>
 
 				{/* Notifications — opened from Profile instead of Dashboard */}
 				<View style={styles.section}>

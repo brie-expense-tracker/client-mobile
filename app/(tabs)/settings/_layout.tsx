@@ -67,6 +67,45 @@ export default function SettingsLayout() {
 					),
 				}}
 			/>
+			<Stack.Screen
+				name="export"
+				options={{
+					headerShown: true,
+					headerBackButtonDisplayMode: 'minimal',
+					headerTitle: 'Export',
+					headerShadowVisible: false,
+					headerTitleStyle: {
+						fontSize: 20,
+						fontWeight: '600',
+						color: palette.text,
+					},
+					headerStyle: {
+						backgroundColor: palette.bg,
+					},
+					headerLeft: () => (
+						<Animated.View style={animatedButtonStyle}>
+							<BorderlessButton
+								onPress={() => router.back()}
+								onActiveStateChange={setIsPressed}
+								style={{ width: 50 }}
+								{...accessibilityProps.button}
+								accessibilityLabel={generateAccessibilityLabel.button(
+									'Go back'
+								)}
+								accessibilityHint={voiceOverHints.navigate}
+							>
+								<Ionicons
+									name="chevron-back"
+									size={24}
+									color={palette.text}
+									accessibilityRole="image"
+									accessibilityLabel="Back arrow"
+								/>
+							</BorderlessButton>
+						</Animated.View>
+					),
+				}}
+			/>
 		</Stack>
 	);
 }
