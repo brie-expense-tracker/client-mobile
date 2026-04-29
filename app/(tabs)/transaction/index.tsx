@@ -252,7 +252,7 @@ export default function TransactionScreenProModern() {
 							) : null}
 							{isSubmitting ? (
 								<AppText.Caption color="muted" style={styles.savingHint}>
-									Saving…
+									Saving to server…
 								</AppText.Caption>
 							) : null}
 							{recentChips.length > 0 ? (
@@ -293,7 +293,7 @@ export default function TransactionScreenProModern() {
 							) : null}
 							<View style={styles.saveSection}>
 								<AppButton
-									label={isSubmitting ? 'Saving…' : 'Save entry'}
+									label={isSubmitting ? 'Saving to server…' : 'Save entry'}
 									variant="primary"
 									icon={isSubmitting ? undefined : 'checkmark-outline'}
 									onPress={() => void saveEntry()}

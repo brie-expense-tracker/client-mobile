@@ -8,6 +8,7 @@ import {
 	Alert,
 	TextInput,
 	SectionList,
+	ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -219,7 +220,7 @@ export default function TransactionScreen() {
 	// Edit modal handlers
 	const showEditModal = (transaction: Transaction) => {
 		router.push({
-			pathname: '/dashboard/ledger/edit',
+			pathname: '/(tabs)/dashboard/ledger/edit',
 			params: { id: transaction.id },
 		});
 	};
@@ -319,7 +320,13 @@ export default function TransactionScreen() {
 							ListEmptyComponent={
 								isLoading ? (
 									<View style={styles.loadingContainer}>
-										<Text style={styles.loadingText}>Loading…</Text>
+										<ActivityIndicator
+											size="small"
+											color={palette.primary}
+										/>
+										<Text style={styles.loadingText}>
+											Loading transactions…
+										</Text>
 									</View>
 								) : (
 									<View style={styles.emptyContainer}>
@@ -413,6 +420,7 @@ const styles = StyleSheet.create({
 	loadingText: {
 		color: palette.textMuted,
 		fontSize: 16,
+		marginTop: space.md,
 	},
 	empty: {
 		alignItems: 'center',
