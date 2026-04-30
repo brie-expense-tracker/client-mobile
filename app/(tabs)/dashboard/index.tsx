@@ -140,7 +140,8 @@ export default function DashboardPro() {
 
 	return (
 		<ErrorBoundary>
-			<SafeAreaView style={styles.safeArea} edges={['left', 'right', 'top']}>
+			<SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
+				<View style={[styles.statusBarFill, { height: insets.top }]} />
 				<View style={styles.screenContent}>
 					{/* ---------- Page header (matches web WorkspacePage / PageHeader) ---------- */}
 					<View style={styles.stickyHeader}>
@@ -470,7 +471,8 @@ function RecentTransactionsList({
 
 const styles = StyleSheet.create({
 	safeArea: { flex: 1, backgroundColor: palette.surfaceAlt },
-	screenContent: { flex: 1 },
+	statusBarFill: { backgroundColor: palette.shell },
+	screenContent: { flex: 1, backgroundColor: palette.surfaceAlt },
 	loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 	loadingText: {
 		marginTop: 16,
