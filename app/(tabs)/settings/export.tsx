@@ -20,7 +20,7 @@ import {
 	type ExportableTransaction,
 } from '../../../src/lib/transactions-export';
 import { palette, radius, space, type } from '../../../src/ui/theme';
-import { AppCard, AppText, AppButton } from '../../../src/ui/primitives';
+import { AppCard, AppText, AppButton, AppReveal } from '../../../src/ui/primitives';
 
 export default function ExportScreen() {
 	const insets = useSafeAreaInsets();
@@ -115,80 +115,86 @@ export default function ExportScreen() {
 				keyboardShouldPersistTaps="handled"
 				showsVerticalScrollIndicator={false}
 			>
-				<AppText.Caption color="muted" style={styles.kicker}>
-					Download
-				</AppText.Caption>
-				<AppText.Body color="muted" style={styles.intro}>
-					CSV opens cleanly in Excel and Sheets; JSON is the raw list from your
-					workspace. On mobile, exports open the system share sheet.
-				</AppText.Body>
-
-				<View style={styles.refreshRow}>
-					<AppButton
-						label="Refresh"
-						variant="ghost"
-						size="sm"
-						disabled={busy}
-						onPress={() => void refetch()}
-					/>
-				</View>
-
-				<AppCard padding={space.lg}>
-					<View style={styles.dateGrid}>
-						<View style={styles.dateField}>
-							<AppText.Label color="muted" style={styles.dateLabel}>
-								From
-							</AppText.Label>
-							<TextInput
-								style={styles.dateInput}
-								value={fromYmd}
-								onChangeText={setFromYmd}
-								placeholder="YYYY-MM-DD"
-								placeholderTextColor={palette.textSubtle}
-								editable={!busy}
-								autoCapitalize="none"
-								autoCorrect={false}
-							/>
-						</View>
-						<View style={styles.dateField}>
-							<AppText.Label color="muted" style={styles.dateLabel}>
-								To
-							</AppText.Label>
-							<TextInput
-								style={styles.dateInput}
-								value={toYmd}
-								onChangeText={setToYmd}
-								placeholder="YYYY-MM-DD"
-								placeholderTextColor={palette.textSubtle}
-								editable={!busy}
-								autoCapitalize="none"
-								autoCorrect={false}
-							/>
-						</View>
-					</View>
-
-					<AppText.Caption color="muted" style={styles.status}>
-						{statusLine}
+				<AppReveal delayMs={30} distance={8}>
+					<AppText.Caption color="muted" style={styles.kicker}>
+						Download
 					</AppText.Caption>
+					<AppText.Body color="muted" style={styles.intro}>
+						CSV opens cleanly in Excel and Sheets; JSON is the raw list from your
+						workspace. On mobile, exports open the system share sheet.
+					</AppText.Body>
+				</AppReveal>
 
-					<View style={styles.actions}>
+				<AppReveal delayMs={80}>
+					<View style={styles.refreshRow}>
 						<AppButton
-							label="Share CSV"
-							variant="primary"
-							disabled={busy || filtered.length === 0 || sharing}
-							loading={sharing}
-							onPress={onCsv}
-							fullWidth
-						/>
-						<AppButton
-							label="Share JSON"
-							variant="secondary"
-							disabled={busy || filtered.length === 0 || sharing}
-							onPress={onJson}
-							fullWidth
+							label="Refresh"
+							variant="ghost"
+							size="sm"
+							disabled={busy}
+							onPress={() => void refetch()}
 						/>
 					</View>
-				</AppCard>
+				</AppReveal>
+
+				<AppReveal delayMs={130}>
+					<AppCard padding={space.lg}>
+						<View style={styles.dateGrid}>
+							<View style={styles.dateField}>
+								<AppText.Label color="muted" style={styles.dateLabel}>
+									From
+								</AppText.Label>
+								<TextInput
+									style={styles.dateInput}
+									value={fromYmd}
+									onChangeText={setFromYmd}
+									placeholder="YYYY-MM-DD"
+									placeholderTextColor={palette.textSubtle}
+									editable={!busy}
+									autoCapitalize="none"
+									autoCorrect={false}
+								/>
+							</View>
+							<View style={styles.dateField}>
+								<AppText.Label color="muted" style={styles.dateLabel}>
+									To
+								</AppText.Label>
+								<TextInput
+									style={styles.dateInput}
+									value={toYmd}
+									onChangeText={setToYmd}
+									placeholder="YYYY-MM-DD"
+									placeholderTextColor={palette.textSubtle}
+									editable={!busy}
+									autoCapitalize="none"
+									autoCorrect={false}
+								/>
+							</View>
+						</View>
+
+						<AppText.Caption color="muted" style={styles.status}>
+							{statusLine}
+						</AppText.Caption>
+
+						<View style={styles.actions}>
+							<AppButton
+								label="Share CSV"
+								variant="primary"
+								disabled={busy || filtered.length === 0 || sharing}
+								loading={sharing}
+								onPress={onCsv}
+								fullWidth
+							/>
+							<AppButton
+								label="Share JSON"
+								variant="secondary"
+								disabled={busy || filtered.length === 0 || sharing}
+								onPress={onJson}
+								fullWidth
+							/>
+						</View>
+					</AppCard>
+				</AppReveal>
 			</ScrollView>
 		</View>
 	);

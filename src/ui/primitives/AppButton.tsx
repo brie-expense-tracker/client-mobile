@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useRef } from 'react';
 import {
 	TouchableOpacity,
 	Text,
@@ -7,6 +7,7 @@ import {
 	ViewStyle,
 	TextStyle,
 	Platform,
+	Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { palette, radius, space } from '../theme';
@@ -66,6 +67,24 @@ export const AppButton: React.FC<AppButtonProps> = ({
 	fullWidth = false,
 	accessibilityLabel,
 }) => {
+	const scale = useRef(new Animated.Value(1)).current;
+	const handlePressIn = useCallback(() => {
+		Animated.spring(scale, {
+			toValue: 0.98,
+			speed: 26,
+			bounciness: 5,
+			useNativeDriver: true,
+		}).start();
+	}, [scale]);
+	const handlePressOut = useCallback(() => {
+		Animated.spring(scale, {
+			toValue: 1,
+			speed: 24,
+			bounciness: 7,
+			useNativeDriver: true,
+		}).start();
+	}, [scale]);
+
 	const buttonStyle: ViewStyle[] = [
 		styles.button,
 		styles[`button_${variant}`],
@@ -112,32 +131,36 @@ export const AppButton: React.FC<AppButtonProps> = ({
 	) : null;
 
 	return (
-		<TouchableOpacity
-			style={buttonStyle}
-			onPress={onPress}
-			disabled={disabled || loading}
-			activeOpacity={0.7}
-			accessibilityRole="button"
-			accessibilityLabel={accessibilityLabel || label}
-			accessibilityState={{ disabled: disabled || loading }}
-		>
-			{loading ? (
-				<ActivityIndicator
-					size="small"
-					color={
-						variant === 'primary'
-							? palette.textOnPrimary
-							: palette.textMuted
-					}
-				/>
-			) : (
-				<>
-					{iconPosition === 'left' && IconComponent}
-					<Text style={textStyleArray}>{label}</Text>
-					{iconPosition === 'right' && IconComponent}
-				</>
-			)}
-		</TouchableOpacity>
+		<Animated.View style={{ transform: [{ scale }] }}>
+			<TouchableOpacity
+				style={buttonStyle}
+				onPress={onPress}
+				onPressIn={handlePressIn}
+				onPressOut={handlePressOut}
+				disabled={disabled || loading}
+				activeOpacity={0.9}
+				accessibilityRole="button"
+				accessibilityLabel={accessibilityLabel || label}
+				accessibilityState={{ disabled: disabled || loading }}
+			>
+				{loading ? (
+					<ActivityIndicator
+						size="small"
+						color={
+							variant === 'primary'
+								? palette.textOnPrimary
+								: palette.textMuted
+						}
+					/>
+				) : (
+					<>
+						{iconPosition === 'left' && IconComponent}
+						<Text style={textStyleArray}>{label}</Text>
+						{iconPosition === 'right' && IconComponent}
+					</>
+				)}
+			</TouchableOpacity>
+		</Animated.View>
 	);
 };
 

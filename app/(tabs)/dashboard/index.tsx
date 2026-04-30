@@ -38,6 +38,7 @@ import {
 	AppCard,
 	AppText,
 	AppButton,
+	AppReveal,
 } from '../../../src/ui/primitives';
 import { ErrorBoundary } from '../../../src/components/ErrorBoundary';
 import { useConnectivity } from '../../../src/utils/connectivity';
@@ -143,39 +144,41 @@ export default function DashboardPro() {
 				<View style={styles.screenContent}>
 					{/* ---------- Page header (matches web WorkspacePage / PageHeader) ---------- */}
 					<View style={styles.stickyHeader}>
-						<View style={styles.pageHeaderRow}>
-							<View style={styles.pageHeaderCopy}>
-								<Text style={styles.pageHeaderKicker}>Live pulse</Text>
-								<View style={styles.pageHeaderTitleRow}>
-									<View style={styles.pageHeaderTitleAccent} />
-									<AppText.Title
-										style={styles.pageHeaderTitle}
-										accessibilityRole="header"
-									>
-										Today
-									</AppText.Title>
+						<AppReveal durationMs={320} distance={8}>
+							<View style={styles.pageHeaderRow}>
+								<View style={styles.pageHeaderCopy}>
+									<Text style={styles.pageHeaderKicker}>Live pulse</Text>
+									<View style={styles.pageHeaderTitleRow}>
+										<View style={styles.pageHeaderTitleAccent} />
+										<AppText.Title
+											style={styles.pageHeaderTitle}
+											accessibilityRole="header"
+										>
+											Today
+										</AppText.Title>
+									</View>
+									<AppText.Body color="muted" style={styles.pageHeaderDescription}>
+										What&apos;s moving right now: cash, flow, and fresh entries.
+									</AppText.Body>
 								</View>
-								<AppText.Body color="muted" style={styles.pageHeaderDescription}>
-									What&apos;s moving right now: cash, flow, and fresh entries.
-								</AppText.Body>
+								<TouchableOpacity
+									onPress={handleLogoTap}
+									activeOpacity={0.7}
+									style={styles.logoTap}
+									accessibilityRole="button"
+									accessibilityLabel="Brie"
+									hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+								>
+									<Image
+										source={require('../../../src/assets/logos/brie-logo-light.png')}
+										style={styles.logoCompact}
+										resizeMode="contain"
+										accessibilityRole="image"
+										accessibilityLabel="Brie app logo"
+									/>
+								</TouchableOpacity>
 							</View>
-							<TouchableOpacity
-								onPress={handleLogoTap}
-								activeOpacity={0.7}
-								style={styles.logoTap}
-								accessibilityRole="button"
-								accessibilityLabel="Brie"
-								hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-							>
-								<Image
-									source={require('../../../src/assets/logos/brie-logo.png')}
-									style={styles.logoCompact}
-									resizeMode="contain"
-									accessibilityRole="image"
-									accessibilityLabel="Brie app logo"
-								/>
-							</TouchableOpacity>
-						</View>
+						</AppReveal>
 					</View>
 
 					{/* Offline Banner - Below header */}
@@ -213,41 +216,55 @@ export default function DashboardPro() {
 						keyboardShouldPersistTaps="handled"
 					>
 						{/* MVP: Cash on Me - prominent at top */}
-						<CashOnMeCard
-							balance={totalBalance}
-							empty={transactions.length === 0}
-						/>
+						<AppReveal delayMs={40}>
+							<CashOnMeCard
+								balance={totalBalance}
+								empty={transactions.length === 0}
+							/>
+						</AppReveal>
 
 						{/* MVP: Primary actions - one tap to log */}
-						<View style={quickAddStyles.rowWrapper}>
-							<View style={quickAddStyles.row}>
-								<AppButton
-									label="Cash In"
-								variant="primary"
-								icon="add"
-								iconPosition="left"
-								onPress={() => router.push('/(tabs)/transaction?mode=income')}
-								style={quickAddStyles.halfButton}
-							/>
-							<AppButton
-								label="Cash Out"
-								variant="secondary"
-								icon="remove"
-								iconPosition="left"
-								onPress={() => router.push('/(tabs)/transaction?mode=expense')}
-								style={quickAddStyles.halfButton}
-							/>
+						<AppReveal delayMs={90}>
+							<View style={quickAddStyles.rowWrapper}>
+								<View style={quickAddStyles.row}>
+									<AppButton
+										label="Cash In"
+										variant="primary"
+										icon="add"
+										iconPosition="left"
+										onPress={() =>
+											router.push('/(tabs)/transaction?mode=income')
+										}
+										style={quickAddStyles.halfButton}
+									/>
+									<AppButton
+										label="Cash Out"
+										variant="secondary"
+										icon="remove"
+										iconPosition="left"
+										onPress={() =>
+											router.push('/(tabs)/transaction?mode=expense')
+										}
+										style={quickAddStyles.halfButton}
+									/>
+								</View>
 							</View>
-						</View>
+						</AppReveal>
 
 						{/* Match web: Today in / Today out summary */}
-						<TodaySummaryCard summary={todaySummary} />
+						<AppReveal delayMs={140}>
+							<TodaySummaryCard summary={todaySummary} />
+						</AppReveal>
 
 						{/* Web parity: /week — 7-day rollups + category split */}
-						<WeekPulseCard />
+						<AppReveal delayMs={190}>
+							<WeekPulseCard />
+						</AppReveal>
 
 						{/* History - recent entries with View All */}
-						<RecentTransactionsList transactions={recentTransactions} />
+						<AppReveal delayMs={240}>
+							<RecentTransactionsList transactions={recentTransactions} />
+						</AppReveal>
 					</ScrollView>
 				</View>
 			</SafeAreaView>

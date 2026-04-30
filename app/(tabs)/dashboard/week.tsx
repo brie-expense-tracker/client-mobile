@@ -15,7 +15,7 @@ import { BorderlessButton } from 'react-native-gesture-handler';
 import { TransactionContext } from '../../../src/context/transactionContext';
 import { summarizeWeekTransactions } from '../../../src/lib/week-analytics';
 import { palette, radius, space, type } from '../../../src/ui/theme';
-import { AppCard, AppText, AppButton } from '../../../src/ui/primitives';
+import { AppCard, AppText, AppButton, AppReveal } from '../../../src/ui/primitives';
 
 const currency = new Intl.NumberFormat('en-US', {
 	style: 'currency',
@@ -96,80 +96,90 @@ export default function WeekScreen() {
 					/>
 				}
 			>
-				<AppText.Caption color="muted" style={styles.kicker}>
-					Last 7 days · rolling window
-				</AppText.Caption>
+				<AppReveal delayMs={30} distance={8}>
+					<AppText.Caption color="muted" style={styles.kicker}>
+						Last 7 days · rolling window
+					</AppText.Caption>
+				</AppReveal>
 
-				<View style={styles.totalsRow}>
-					<WeekStatCard
-						label="7-day in"
-						value={`+${currency(totals.in)}`}
-						tone="in"
-					/>
-					<WeekStatCard
-						label="7-day out"
-						value={`−${currency(totals.out)}`}
-						tone="out"
-					/>
-					<WeekStatCard
-						label="Net"
-						value={`${totals.net >= 0 ? '+' : '−'}${currency(Math.abs(totals.net))}`}
-						tone={totals.net >= 0 ? 'in' : 'out'}
-					/>
-				</View>
+				<AppReveal delayMs={80}>
+					<View style={styles.totalsRow}>
+						<WeekStatCard
+							label="7-day in"
+							value={`+${currency(totals.in)}`}
+							tone="in"
+						/>
+						<WeekStatCard
+							label="7-day out"
+							value={`−${currency(totals.out)}`}
+							tone="out"
+						/>
+						<WeekStatCard
+							label="Net"
+							value={`${totals.net >= 0 ? '+' : '−'}${currency(Math.abs(totals.net))}`}
+							tone={totals.net >= 0 ? 'in' : 'out'}
+						/>
+					</View>
+				</AppReveal>
 
-				<AppCard style={styles.sectionCard} padding={space.lg}>
-					<AppText.Heading style={styles.sectionTitle}>
-						Spending by category
-					</AppText.Heading>
-					{categories.length === 0 ? (
-						<AppText.Body color="muted" style={styles.emptyCats}>
-							No spending in the last 7 days — category splits appear when you
-							log cash out.
+				<AppReveal delayMs={130}>
+					<AppCard style={styles.sectionCard} padding={space.lg}>
+						<AppText.Heading style={styles.sectionTitle}>
+							Spending by category
+						</AppText.Heading>
+						{categories.length === 0 ? (
+							<AppText.Body color="muted" style={styles.emptyCats}>
+								No spending in the last 7 days — category splits appear when you
+								log cash out.
+							</AppText.Body>
+						) : (
+							categories.map((slice) => (
+								<View key={slice.category} style={styles.catRow}>
+									<View style={styles.catLabelRow}>
+										<AppText.Body style={styles.catName} numberOfLines={1}>
+											{slice.category}
+										</AppText.Body>
+										<AppText.Body color="muted">{slice.pct}%</AppText.Body>
+									</View>
+									<View style={styles.barTrack}>
+										<View
+											style={[
+												styles.barFill,
+												{ width: `${Math.min(100, slice.pct)}%` },
+											]}
+										/>
+									</View>
+									<AppText.Caption color="subtle" style={styles.catAmt}>
+										{currency(slice.amount)}
+									</AppText.Caption>
+								</View>
+							))
+						)}
+					</AppCard>
+				</AppReveal>
+
+				<AppReveal delayMs={180}>
+					<AppCard style={styles.sectionCard} padding={space.lg} bordered>
+						<AppText.Heading style={styles.confidenceTitle}>
+							Confidence
+						</AppText.Heading>
+						<AppText.Body color="muted" style={styles.confidenceBody}>
+							Week totals assume inbox drafts are confirmed. Anything still in
+							Inbox is excluded from category splits until you confirm.
 						</AppText.Body>
-					) : (
-						categories.map((slice) => (
-							<View key={slice.category} style={styles.catRow}>
-								<View style={styles.catLabelRow}>
-									<AppText.Body style={styles.catName} numberOfLines={1}>
-										{slice.category}
-									</AppText.Body>
-									<AppText.Body color="muted">{slice.pct}%</AppText.Body>
-								</View>
-								<View style={styles.barTrack}>
-									<View
-										style={[
-											styles.barFill,
-											{ width: `${Math.min(100, slice.pct)}%` },
-										]}
-									/>
-								</View>
-								<AppText.Caption color="subtle" style={styles.catAmt}>
-									{currency(slice.amount)}
-								</AppText.Caption>
-							</View>
-						))
-					)}
-				</AppCard>
+					</AppCard>
+				</AppReveal>
 
-				<AppCard style={styles.sectionCard} padding={space.lg} bordered>
-					<AppText.Heading style={styles.confidenceTitle}>
-						Confidence
-					</AppText.Heading>
-					<AppText.Body color="muted" style={styles.confidenceBody}>
-						Week totals assume inbox drafts are confirmed. Anything still in
-						Inbox is excluded from category splits until you confirm.
-					</AppText.Body>
-				</AppCard>
-
-				<AppButton
-					label="Open history"
-					variant="secondary"
-					icon="list-outline"
-					iconPosition="left"
-					fullWidth
-					onPress={() => router.push('/(tabs)/dashboard/ledger')}
-				/>
+				<AppReveal delayMs={230}>
+					<AppButton
+						label="Open history"
+						variant="secondary"
+						icon="list-outline"
+						iconPosition="left"
+						fullWidth
+						onPress={() => router.push('/(tabs)/dashboard/ledger')}
+					/>
+				</AppReveal>
 			</ScrollView>
 		</View>
 	);
