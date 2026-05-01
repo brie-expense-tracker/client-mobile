@@ -35,7 +35,7 @@ export default function Signup() {
 		{
 			email: false,
 			password: false,
-		}
+		},
 	);
 	const [isLoading, setIsLoading] = useState(false);
 	const [showPassword, setShowPassword] = useState(false);
@@ -164,7 +164,7 @@ export default function Signup() {
 					<View style={styles.mainContainer}>
 						{/* Brand / Logo */}
 						<Image
-							source={require('../../src/assets/logos/brie-logo.png')}
+							source={require('../../src/assets/logos/brie-logo-light.png')}
 							style={styles.logo}
 							resizeMode="contain"
 							accessible
@@ -265,7 +265,11 @@ export default function Signup() {
 							{/* Form-level error message */}
 							{!!formError && (
 								<View style={styles.formErrorContainer}>
-									<Ionicons name="alert-circle" size={18} color={palette.danger} />
+									<Ionicons
+										name="alert-circle"
+										size={18}
+										color={palette.danger}
+									/>
 									<Text
 										style={styles.formErrorText}
 										accessibilityLiveRegion="polite"
@@ -312,7 +316,9 @@ export default function Signup() {
 								<View
 									style={[styles.divider, { backgroundColor: palette.border }]}
 								/>
-								<Text style={[styles.dividerText, { color: palette.textMuted }]}>
+								<Text
+									style={[styles.dividerText, { color: palette.textMuted }]}
+								>
 									or continue with
 								</Text>
 								<View

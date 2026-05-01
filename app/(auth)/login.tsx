@@ -109,7 +109,7 @@ export default function Login() {
 		{
 			email: false,
 			password: false,
-		}
+		},
 	);
 	const [isLoading, setIsLoading] = useState(false);
 	const [showPassword, setShowPassword] = useState(false);
@@ -192,7 +192,7 @@ export default function Login() {
 					const errorMessage =
 						'No account found with this email. Please sign up to create an account.';
 					await Haptics.notificationAsync(
-						Haptics.NotificationFeedbackType.Error
+						Haptics.NotificationFeedbackType.Error,
 					);
 					loginScreenLog.warn('Login error - user not found', {
 						email: emailTrimmed,
@@ -228,7 +228,7 @@ export default function Login() {
 					}
 
 					await Haptics.notificationAsync(
-						Haptics.NotificationFeedbackType.Error
+						Haptics.NotificationFeedbackType.Error,
 					);
 					loginScreenLog.warn('Login error - wrong sign-in method', {
 						email: emailTrimmed,
@@ -246,7 +246,7 @@ export default function Login() {
 			// Firebase will return the correct error if password is wrong or user doesn't exist
 			const userCredential = await auth().signInWithEmailAndPassword(
 				emailTrimmed,
-				password.trim()
+				password.trim(),
 			);
 
 			// Pass the Firebase user to the auth context to handle backend verification
@@ -319,9 +319,8 @@ export default function Login() {
 					if (email) {
 						try {
 							// Check what sign-in methods are available for this email
-							const signInMethods = await auth().fetchSignInMethodsForEmail(
-								email
-							);
+							const signInMethods =
+								await auth().fetchSignInMethodsForEmail(email);
 							if (signInMethods.includes('password')) {
 								errorMessage =
 									'This account was created using email and password. Please use email and password to sign in.';
@@ -374,7 +373,7 @@ export default function Login() {
 					<View style={styles.mainContainer}>
 						{/* Brand / Logo */}
 						<Image
-							source={require('../../src/assets/logos/brie-logo.png')}
+							source={require('../../src/assets/logos/brie-logo-light.png')}
 							style={styles.logo}
 							resizeMode="contain"
 							accessible
@@ -474,7 +473,11 @@ export default function Login() {
 							{/* Form-level error message */}
 							{!!formError && (
 								<View style={styles.formErrorContainer}>
-									<Ionicons name="alert-circle" size={18} color={palette.danger} />
+									<Ionicons
+										name="alert-circle"
+										size={18}
+										color={palette.danger}
+									/>
 									<Text
 										style={styles.formErrorText}
 										accessibilityLiveRegion="polite"
@@ -531,7 +534,9 @@ export default function Login() {
 								<View
 									style={[styles.divider, { backgroundColor: palette.border }]}
 								/>
-								<Text style={[styles.dividerText, { color: palette.textMuted }]}>
+								<Text
+									style={[styles.dividerText, { color: palette.textMuted }]}
+								>
 									or continue with
 								</Text>
 								<View
