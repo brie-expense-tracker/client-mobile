@@ -150,7 +150,8 @@ export const type = {
 	},
 	titleMd: { fontSize: 20, fontWeight: '600' as const },
 	titleSm: { fontSize: 17, fontWeight: '700' as const },
-	num2xl: { fontSize: 32, fontWeight: '700' as const },
+	/** Display figures; always set lineHeight ≥ fontSize (body default 24px line would ghost on iOS). */
+	num2xl: { fontSize: 32, lineHeight: 40, fontWeight: '700' as const },
 	numLg: { fontSize: 18, fontWeight: '700' as const },
 	numMd: { fontSize: 16, fontWeight: '600' as const },
 };
