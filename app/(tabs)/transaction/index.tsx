@@ -67,7 +67,9 @@ export default function TransactionScreenProModern() {
 		null,
 	);
 	const [recentChips, setRecentChips] = useState<string[]>([]);
-	const [savedLines, setSavedLines] = useState<string[]>([]);
+	const [lastCapturedLine, setLastCapturedLine] = useState<string | null>(
+		null,
+	);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	const { addTransaction } = useContext(TransactionContext);
@@ -163,7 +165,7 @@ export default function TransactionScreenProModern() {
 				source: 'manual',
 			});
 
-			setSavedLines((prev) => [line, ...prev].slice(0, 8));
+			setLastCapturedLine(line);
 			await pushCaptureRecentChip(line);
 			setRecentChips(await loadCaptureRecentChips());
 			setCaptureLine('');
@@ -279,16 +281,16 @@ export default function TransactionScreenProModern() {
 									</ScrollView>
 								</View>
 							) : null}
-							{savedLines.length > 0 ? (
+							{lastCapturedLine ? (
 								<View style={styles.savedSection}>
 									<AppText.Caption color="muted" style={styles.savedHeading}>
 										Just captured
 									</AppText.Caption>
-									{savedLines.map((line, i) => (
-										<View key={`${line}-${i}`} style={styles.savedRow}>
-											<AppText.Caption color="default">{line}</AppText.Caption>
-										</View>
-									))}
+									<View style={styles.savedRow}>
+										<AppText.Caption color="default">
+											{lastCapturedLine}
+										</AppText.Caption>
+									</View>
 								</View>
 							) : null}
 							<View style={styles.saveSection}>
