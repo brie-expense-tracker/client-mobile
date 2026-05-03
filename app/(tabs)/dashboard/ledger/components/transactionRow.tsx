@@ -14,6 +14,7 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 import { normalizeIconName } from '../../../../../src/constants/uiConstants';
 import type { Transaction } from '../../../../../src/context/transactionContext';
+import { getLedgerCategoryVisual } from '../../../../../src/lib/ledgerCategoryIcons';
 import { palette, radius, space } from '../../../../../src/ui/theme';
 
 // Helper function to format date without time
@@ -135,15 +136,20 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 	// MVP: fixed category from metadata; show category when present for both income and expense
 	const rowDisplay = useMemo(() => {
 		const category = item.metadata?.category;
+		const fromCategory =
+			category != null && category !== ''
+				? getLedgerCategoryVisual(item.type, category)
+				: null;
 		const smartFallback = getSmartFallback(
 			item.description ?? category,
 			item.type
 		);
+		const visual = fromCategory ?? smartFallback;
 		const fallbackLabel = item.type === 'income' ? 'Cash In' : 'Cash Out';
 		return {
 			name: category ?? fallbackLabel,
-			icon: normalizeIconName(smartFallback.icon),
-			color: smartFallback.color,
+			icon: normalizeIconName(visual.icon),
+			color: visual.color,
 		};
 	}, [item.type, item.description, item.metadata?.category]);
 

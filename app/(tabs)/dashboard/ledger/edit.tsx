@@ -23,37 +23,18 @@ import {
 	type Transaction,
 } from '../../../../src/context/transactionContext';
 import BottomSheet from '../../../../src/components/BottomSheet';
+import {
+	CASH_CATEGORIES,
+	INCOME_CATEGORIES,
+	getLedgerCategoryVisual,
+	type LedgerExpenseCategory,
+	type LedgerIncomeCategory,
+} from '../../../../src/lib/ledgerCategoryIcons';
 import { palette, radius, space, shadow, type } from '../../../../src/ui/theme';
 import { AppCard, AppText, AppButton } from '../../../../src/ui/primitives';
 
-const CASH_CATEGORIES = [
-	'Food',
-	'Groceries',
-	'Drinks',
-	'Transportation',
-	'Entertainment',
-	'Shopping',
-	'Personal care',
-	'Bills & utilities',
-	'Household',
-	'Health',
-	'Gifts & donations',
-	'Other',
-] as const;
-
-const INCOME_CATEGORIES = [
-	'Paycheck',
-	'Freelance',
-	'Bonus',
-	'Refund',
-	'Interest',
-	'Investment',
-	'Gift',
-	'Other',
-] as const;
-
-type ExpenseCategory = (typeof CASH_CATEGORIES)[number];
-type IncomeCategory = (typeof INCOME_CATEGORIES)[number];
+type ExpenseCategory = LedgerExpenseCategory;
+type IncomeCategory = LedgerIncomeCategory;
 
 const DESCRIPTION_MAX_LENGTH = 120;
 
@@ -378,9 +359,19 @@ export default function LedgerEditScreen() {
 								accessibilityRole="button"
 							>
 								<Ionicons
-									name="pricetag-outline"
+									name={
+										category
+											? (getLedgerCategoryVisual(type, category)?.icon ??
+												'pricetag-outline')
+											: 'pricetag-outline'
+									}
 									size={22}
-									color={palette.primary}
+									color={
+										category
+											? (getLedgerCategoryVisual(type, category)?.color ??
+												palette.primary)
+											: palette.primary
+									}
 									style={styles.metadataRowIcon}
 								/>
 								<View style={styles.metadataRowContent}>
@@ -517,23 +508,26 @@ export default function LedgerEditScreen() {
 						data={type === 'expense' ? [...CASH_CATEGORIES] : [...INCOME_CATEGORIES]}
 						keyExtractor={(item) => item}
 						contentContainerStyle={{ paddingBottom: insets.bottom + 64 + space.md }}
-						renderItem={({ item }) => (
-							<TouchableOpacity
-								style={styles.sheetRow}
-								onPress={() => {
-									setCategory(item as ExpenseCategory | IncomeCategory);
-									setPickerOpen(false);
-								}}
-							>
-								<Ionicons
-									name="pricetag-outline"
-									size={18}
-									color={palette.text}
-									style={{ marginRight: space.sm }}
-								/>
-								<AppText.Body>{item}</AppText.Body>
-							</TouchableOpacity>
-						)}
+						renderItem={({ item }) => {
+							const visual = getLedgerCategoryVisual(type, item);
+							return (
+								<TouchableOpacity
+									style={styles.sheetRow}
+									onPress={() => {
+										setCategory(item as ExpenseCategory | IncomeCategory);
+										setPickerOpen(false);
+									}}
+								>
+									<Ionicons
+										name={visual?.icon ?? 'pricetag-outline'}
+										size={18}
+										color={visual?.color ?? palette.text}
+										style={{ marginRight: space.sm }}
+									/>
+									<AppText.Body>{item}</AppText.Body>
+								</TouchableOpacity>
+							);
+						}}
 					/>
 				</BottomSheet>
 		</SafeAreaView>
