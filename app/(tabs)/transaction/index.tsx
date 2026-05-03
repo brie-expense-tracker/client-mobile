@@ -155,6 +155,7 @@ export default function TransactionScreenProModern() {
 		}
 
 		setCaptureParseError(null);
+		Keyboard.dismiss();
 		setIsSubmitting(true);
 		try {
 			await addTransaction({
