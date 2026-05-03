@@ -160,10 +160,6 @@ export default function LedgerEditScreen() {
 			Alert.alert('Invalid amount', 'Enter an amount greater than 0.');
 			return;
 		}
-		if (type === 'expense' && !category) {
-			Alert.alert('Category required', 'Please select a category for Cash Out.');
-			return;
-		}
 		try {
 			setIsSubmitting(true);
 			const payload: Partial<Transaction> = {
@@ -397,7 +393,7 @@ export default function LedgerEditScreen() {
 										numberOfLines={1}
 										ellipsizeMode="tail"
 									>
-										{category ?? (type === 'expense' ? 'Required' : 'Optional')}
+										{category ?? 'Optional'}
 									</Text>
 								</View>
 								<Ionicons name="chevron-forward" size={20} color={palette.textSubtle} />
