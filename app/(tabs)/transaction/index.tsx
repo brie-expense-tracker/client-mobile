@@ -19,6 +19,7 @@ import {
 	KeyboardAvoidingView,
 	StatusBar,
 	InteractionManager,
+	Animated,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TransactionContext } from '../../../src/context/transactionContext';
@@ -71,6 +72,7 @@ export default function TransactionScreenProModern() {
 		null,
 	);
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const saveFeedbackAnim = useRef(new Animated.Value(0)).current;
 
 	const { addTransaction } = useContext(TransactionContext);
 
@@ -138,6 +140,24 @@ export default function TransactionScreenProModern() {
 		else setCaptureParseError(null);
 	}, [captureLine]);
 
+	const animateSaveFeedback = useCallback(() => {
+		saveFeedbackAnim.stopAnimation();
+		saveFeedbackAnim.setValue(0);
+		Animated.sequence([
+			Animated.timing(saveFeedbackAnim, {
+				toValue: 1,
+				duration: 180,
+				useNativeDriver: true,
+			}),
+			Animated.delay(700),
+			Animated.timing(saveFeedbackAnim, {
+				toValue: 0,
+				duration: 220,
+				useNativeDriver: true,
+			}),
+		]).start();
+	}, [saveFeedbackAnim]);
+
 	const saveEntry = useCallback(async () => {
 		if (isSubmitting) return;
 		const line = captureLine.trim();
@@ -170,6 +190,7 @@ export default function TransactionScreenProModern() {
 			await pushCaptureRecentChip(line);
 			setRecentChips(await loadCaptureRecentChips());
 			setCaptureLine('');
+			animateSaveFeedback();
 		} catch (e) {
 			if (isDevMode) {
 				transactionScreenLog.error('Save transaction error', e);
@@ -178,7 +199,7 @@ export default function TransactionScreenProModern() {
 		} finally {
 			setIsSubmitting(false);
 		}
-	}, [isSubmitting, captureLine, addTransaction]);
+	}, [isSubmitting, captureLine, addTransaction, animateSaveFeedback]);
 
 	const canSave = !!parsedPreview;
 
@@ -257,6 +278,27 @@ export default function TransactionScreenProModern() {
 									Saving to server…
 								</AppText.Caption>
 							) : null}
+							<Animated.View
+								pointerEvents="none"
+								style={[
+									styles.savedToast,
+									{
+										opacity: saveFeedbackAnim,
+										transform: [
+											{
+												translateY: saveFeedbackAnim.interpolate({
+													inputRange: [0, 1],
+													outputRange: [6, 0],
+												}),
+											},
+										],
+									},
+								]}
+							>
+								<AppText.Caption style={styles.savedToastText}>
+									Saved
+								</AppText.Caption>
+							</Animated.View>
 							{recentChips.length > 0 ? (
 								<View style={styles.chipsSection}>
 									<AppText.Caption color="muted" style={styles.chipsLabel}>
@@ -397,6 +439,19 @@ const styles = StyleSheet.create({
 	},
 	savingHint: {
 		marginTop: space.sm,
+	},
+	savedToast: {
+		alignSelf: 'flex-start',
+		marginTop: space.sm,
+		paddingHorizontal: space.sm,
+		paddingVertical: 6,
+		borderRadius: radius.pill,
+		backgroundColor: palette.successSoft,
+	},
+	savedToastText: {
+		...type.bodyXs,
+		color: palette.successStrong,
+		fontWeight: '600',
 	},
 	chipsSection: {
 		marginTop: space.md,
