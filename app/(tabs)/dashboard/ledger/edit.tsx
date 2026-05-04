@@ -1,5 +1,11 @@
 // Ledger edit screen – MVP: edit Cash In / Cash Out with fixed categories
-import React, { useContext, useState, useCallback, useEffect, useRef } from 'react';
+import React, {
+	useContext,
+	useState,
+	useCallback,
+	useEffect,
+	useRef,
+} from 'react';
 import {
 	View,
 	Text,
@@ -16,7 +22,10 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
+import {
+	useSafeAreaInsets,
+	SafeAreaView,
+} from 'react-native-safe-area-context';
 import { Calendar } from 'react-native-calendars';
 import {
 	TransactionContext,
@@ -27,6 +36,7 @@ import {
 	CASH_CATEGORIES,
 	INCOME_CATEGORIES,
 	getLedgerCategoryVisual,
+	resolveCanonicalLedgerCategory,
 	type LedgerExpenseCategory,
 	type LedgerIncomeCategory,
 } from '../../../../src/lib/ledgerCategoryIcons';
@@ -85,7 +95,9 @@ export default function LedgerEditScreen() {
 	const [amount, setAmount] = useState('');
 	const [date, setDate] = useState(getLocalIsoDate());
 	const [type, setType] = useState<'income' | 'expense'>('expense');
-	const [category, setCategory] = useState<ExpenseCategory | IncomeCategory | null>(null);
+	const [category, setCategory] = useState<
+		ExpenseCategory | IncomeCategory | null
+	>(null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [datePickerOpen, setDatePickerOpen] = useState(false);
 	const [mountCalendar, setMountCalendar] = useState(false);
@@ -111,13 +123,11 @@ export default function LedgerEditScreen() {
 		setDate(tx.date?.slice(0, 10) ?? getLocalIsoDate());
 		setType(tx.type);
 		const cat = tx.metadata?.category;
-		if (cat && (CASH_CATEGORIES as readonly string[]).includes(cat)) {
-			setCategory(cat as ExpenseCategory);
-		} else if (cat && (INCOME_CATEGORIES as readonly string[]).includes(cat)) {
-			setCategory(cat as IncomeCategory);
-		} else {
-			setCategory(null);
-		}
+		const canonical =
+			cat != null && String(cat).trim() !== ''
+				? resolveCanonicalLedgerCategory(tx.type, cat)
+				: null;
+		setCategory(canonical);
 	}, [id, tx]);
 
 	useEffect(() => {
@@ -169,7 +179,10 @@ export default function LedgerEditScreen() {
 		return (
 			<SafeAreaView style={styles.container} edges={['top']}>
 				<View style={styles.header}>
-					<TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+					<TouchableOpacity
+						onPress={() => router.back()}
+						style={styles.backBtn}
+					>
 						<Ionicons name="chevron-back" size={24} color={palette.text} />
 					</TouchableOpacity>
 					<AppText.Title style={styles.headerTitle}>Edit</AppText.Title>
@@ -182,17 +195,25 @@ export default function LedgerEditScreen() {
 	}
 
 	return (
-		<SafeAreaView style={[styles.container, { paddingTop: topInset }]} edges={[]}>
+		<SafeAreaView
+			style={[styles.container, { paddingTop: topInset }]}
+			edges={[]}
+		>
 			<KeyboardAvoidingView
 				style={{ flex: 1 }}
 				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
 				keyboardVerticalOffset={topInset}
 			>
 				<View style={styles.header}>
-					<TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+					<TouchableOpacity
+						onPress={() => router.back()}
+						style={styles.backBtn}
+					>
 						<Ionicons name="chevron-back" size={24} color={palette.text} />
 					</TouchableOpacity>
-					<AppText.Title style={styles.headerTitle}>Edit transaction</AppText.Title>
+					<AppText.Title style={styles.headerTitle}>
+						Edit transaction
+					</AppText.Title>
 				</View>
 
 				<ScrollView
@@ -240,16 +261,30 @@ export default function LedgerEditScreen() {
 												m === 'income' && styles.segBtnRight,
 												active && styles.segBtnActive,
 												{
-													backgroundColor: active ? palette.surface : 'transparent',
+													backgroundColor: active
+														? palette.surface
+														: 'transparent',
 													opacity: pressed ? 0.7 : 1,
 												},
 											]}
 											onPress={() => {
 												setType(m);
-												if (m === 'income' && category && !(INCOME_CATEGORIES as readonly string[]).includes(category)) {
+												if (
+													m === 'income' &&
+													category &&
+													!(INCOME_CATEGORIES as readonly string[]).includes(
+														category,
+													)
+												) {
 													setCategory(null);
 												}
-												if (m === 'expense' && category && !(CASH_CATEGORIES as readonly string[]).includes(category)) {
+												if (
+													m === 'expense' &&
+													category &&
+													!(CASH_CATEGORIES as readonly string[]).includes(
+														category,
+													)
+												) {
 													setCategory(null);
 												}
 											}}
@@ -268,7 +303,11 @@ export default function LedgerEditScreen() {
 							</View>
 						</AppCard>
 
-						<AppCard style={styles.section} padding={0} borderRadius={radius.xl}>
+						<AppCard
+							style={styles.section}
+							padding={0}
+							borderRadius={radius.xl}
+						>
 							{/* Note row */}
 							{!noteExpanded ? (
 								<TouchableOpacity
@@ -290,7 +329,10 @@ export default function LedgerEditScreen() {
 									<View style={styles.metadataRowContent}>
 										<Text style={styles.metadataLabel}>Note</Text>
 										<Text
-											style={[styles.metadataValue, !description && { color: palette.textMuted }]}
+											style={[
+												styles.metadataValue,
+												!description && { color: palette.textMuted },
+											]}
 											numberOfLines={1}
 											ellipsizeMode="tail"
 										>
@@ -299,7 +341,11 @@ export default function LedgerEditScreen() {
 												: 'Add note'}
 										</Text>
 									</View>
-									<Ionicons name="chevron-forward" size={20} color={palette.textSubtle} />
+									<Ionicons
+										name="chevron-forward"
+										size={20}
+										color={palette.textSubtle}
+									/>
 								</TouchableOpacity>
 							) : (
 								<View style={styles.noteExpandedContainer}>
@@ -341,11 +387,19 @@ export default function LedgerEditScreen() {
 								/>
 								<View style={styles.metadataRowContent}>
 									<Text style={styles.metadataLabel}>Date</Text>
-									<Text style={styles.metadataValue} numberOfLines={1} ellipsizeMode="tail">
+									<Text
+										style={styles.metadataValue}
+										numberOfLines={1}
+										ellipsizeMode="tail"
+									>
 										{formatDateWithHint(date)}
 									</Text>
 								</View>
-								<Ionicons name="chevron-forward" size={20} color={palette.textSubtle} />
+								<Ionicons
+									name="chevron-forward"
+									size={20}
+									color={palette.textSubtle}
+								/>
 							</TouchableOpacity>
 
 							<View style={styles.metadataDivider} />
@@ -387,7 +441,11 @@ export default function LedgerEditScreen() {
 										{category ?? 'Optional'}
 									</Text>
 								</View>
-								<Ionicons name="chevron-forward" size={20} color={palette.textSubtle} />
+								<Ionicons
+									name="chevron-forward"
+									size={20}
+									color={palette.textSubtle}
+								/>
 							</TouchableOpacity>
 						</AppCard>
 
@@ -419,7 +477,9 @@ export default function LedgerEditScreen() {
 							color={palette.primary}
 							style={{ marginRight: space.sm }}
 						/>
-						<AppText.Heading style={styles.sheetTitle}>Select Date</AppText.Heading>
+						<AppText.Heading style={styles.sheetTitle}>
+							Select Date
+						</AppText.Heading>
 						<TouchableOpacity onPress={() => setDatePickerOpen(false)}>
 							<Ionicons name="close" size={24} color={palette.textMuted} />
 						</TouchableOpacity>
@@ -455,9 +515,7 @@ export default function LedgerEditScreen() {
 						enableSwipeMonths
 						renderArrow={(direction) => (
 							<Ionicons
-								name={
-									direction === 'left' ? 'chevron-back' : 'chevron-forward'
-								}
+								name={direction === 'left' ? 'chevron-back' : 'chevron-forward'}
 								size={18}
 								color={palette.text}
 							/>
@@ -484,52 +542,58 @@ export default function LedgerEditScreen() {
 				) : null}
 			</BottomSheet>
 
-				<BottomSheet
-					isOpen={pickerOpen}
-					onClose={() => setPickerOpen(false)}
-					snapPoints={[0.6, 0.4]}
-					initialSnapIndex={0}
-					header={
-						<View style={styles.sheetHeader}>
-							<Ionicons
-								name="pricetag-outline"
-								size={20}
-								color={palette.primary}
-								style={{ marginRight: space.sm }}
-							/>
-							<AppText.Heading style={styles.sheetTitle}>Select Category</AppText.Heading>
-							<TouchableOpacity onPress={() => setPickerOpen(false)}>
-								<Ionicons name="close" size={24} color={palette.textMuted} />
-							</TouchableOpacity>
-						</View>
+			<BottomSheet
+				isOpen={pickerOpen}
+				onClose={() => setPickerOpen(false)}
+				snapPoints={[0.6, 0.4]}
+				initialSnapIndex={0}
+				header={
+					<View style={styles.sheetHeader}>
+						<Ionicons
+							name="pricetag-outline"
+							size={20}
+							color={palette.primary}
+							style={{ marginRight: space.sm }}
+						/>
+						<AppText.Heading style={styles.sheetTitle}>
+							Select Category
+						</AppText.Heading>
+						<TouchableOpacity onPress={() => setPickerOpen(false)}>
+							<Ionicons name="close" size={24} color={palette.textMuted} />
+						</TouchableOpacity>
+					</View>
+				}
+			>
+				<FlatList
+					data={
+						type === 'expense' ? [...CASH_CATEGORIES] : [...INCOME_CATEGORIES]
 					}
-				>
-					<FlatList
-						data={type === 'expense' ? [...CASH_CATEGORIES] : [...INCOME_CATEGORIES]}
-						keyExtractor={(item) => item}
-						contentContainerStyle={{ paddingBottom: insets.bottom + 64 + space.md }}
-						renderItem={({ item }) => {
-							const visual = getLedgerCategoryVisual(type, item);
-							return (
-								<TouchableOpacity
-									style={styles.sheetRow}
-									onPress={() => {
-										setCategory(item as ExpenseCategory | IncomeCategory);
-										setPickerOpen(false);
-									}}
-								>
-									<Ionicons
-										name={visual?.icon ?? 'pricetag-outline'}
-										size={18}
-										color={visual?.color ?? palette.text}
-										style={{ marginRight: space.sm }}
-									/>
-									<AppText.Body>{item}</AppText.Body>
-								</TouchableOpacity>
-							);
-						}}
-					/>
-				</BottomSheet>
+					keyExtractor={(item) => item}
+					contentContainerStyle={{
+						paddingBottom: insets.bottom + 64 + space.md,
+					}}
+					renderItem={({ item }) => {
+						const visual = getLedgerCategoryVisual(type, item);
+						return (
+							<TouchableOpacity
+								style={styles.sheetRow}
+								onPress={() => {
+									setCategory(item as ExpenseCategory | IncomeCategory);
+									setPickerOpen(false);
+								}}
+							>
+								<Ionicons
+									name={visual?.icon ?? 'pricetag-outline'}
+									size={18}
+									color={visual?.color ?? palette.text}
+									style={{ marginRight: space.sm }}
+								/>
+								<AppText.Body>{item}</AppText.Body>
+							</TouchableOpacity>
+						);
+					}}
+				/>
+			</BottomSheet>
 		</SafeAreaView>
 	);
 }

@@ -68,19 +68,68 @@ const INCOME_CATEGORY_VISUAL: Record<
 	Other: { icon: 'ellipse-outline', color: palette.textMuted },
 };
 
-/** Resolved style for a known MVP category, or null if the string is not a fixed category. */
+/** Normalize API / storage values (e.g. "Income", undefined) to ledger buckets. */
+export function normalizeLedgerType(
+	type: string | undefined | null,
+): 'income' | 'expense' {
+	return String(type ?? '')
+		.trim()
+		.toLowerCase() === 'income'
+		? 'income'
+		: 'expense';
+}
+
+function lookupCategoryKeys(trimmed: string): {
+	expense?: LedgerExpenseCategory;
+	income?: LedgerIncomeCategory;
+} {
+	const expense = (CASH_CATEGORIES as readonly string[]).find(
+		(c) => c.toLowerCase() === trimmed.toLowerCase(),
+	) as LedgerExpenseCategory | undefined;
+	const income = (INCOME_CATEGORIES as readonly string[]).find(
+		(c) => c.toLowerCase() === trimmed.toLowerCase(),
+	) as LedgerIncomeCategory | undefined;
+	return { expense, income };
+}
+
+/**
+ * Canonical picker label for a stored category string, or null if unknown.
+ * Prefer matching the expense vs income list by label; use `type` only when both lists have the same name ("Other").
+ */
+export function resolveCanonicalLedgerCategory(
+	type: string | undefined | null,
+	raw: string | undefined | null,
+): LedgerExpenseCategory | LedgerIncomeCategory | null {
+	const trimmed = typeof raw === 'string' ? raw.trim() : '';
+	if (!trimmed) return null;
+	const { expense, income } = lookupCategoryKeys(trimmed);
+
+	if (expense && !income) return expense;
+	if (income && !expense) return income;
+	if (expense && income) {
+		return normalizeLedgerType(type) === 'income' ? income : expense;
+	}
+	return null;
+}
+
+/**
+ * Icon + color for a known MVP category, or null.
+ * Labels that exist only on the expense list (e.g. "Entertainment") still resolve even if `type` from the server is wrong.
+ */
 export function getLedgerCategoryVisual(
-	type: 'income' | 'expense',
+	type: string | undefined | null,
 	category: string,
 ): { icon: IconName; color: string } | null {
-	if (type === 'expense') {
-		if ((CASH_CATEGORIES as readonly string[]).includes(category)) {
-			return EXPENSE_CATEGORY_VISUAL[category as LedgerExpenseCategory];
-		}
-		return null;
-	}
-	if ((INCOME_CATEGORIES as readonly string[]).includes(category)) {
-		return INCOME_CATEGORY_VISUAL[category as LedgerIncomeCategory];
+	const trimmed = typeof category === 'string' ? category.trim() : '';
+	if (!trimmed) return null;
+	const { expense, income } = lookupCategoryKeys(trimmed);
+
+	if (expense && !income) return EXPENSE_CATEGORY_VISUAL[expense];
+	if (income && !expense) return INCOME_CATEGORY_VISUAL[income];
+	if (expense && income) {
+		return normalizeLedgerType(type) === 'income'
+			? INCOME_CATEGORY_VISUAL[income]
+			: EXPENSE_CATEGORY_VISUAL[expense];
 	}
 	return null;
 }

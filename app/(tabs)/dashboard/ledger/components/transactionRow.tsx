@@ -110,7 +110,12 @@ const getSmartFallback = (description: string | undefined, type: 'income' | 'exp
 	if (desc.includes('subscription') || desc.includes('netflix') || desc.includes('spotify') || desc.includes('premium')) {
 		return { icon: 'card-outline' as keyof typeof Ionicons.glyphMap, color: palette.primaryMuted };
 	}
-	if (desc.includes('insurance') || desc.includes('tax') || desc.includes('fee')) {
+	// Whole words only — substring "fee" matches inside "coffee", "tax" inside "taxi", etc.
+	if (
+		/\binsurance\b/.test(desc) ||
+		/\btax(?:es)?\b/.test(desc) ||
+		/\bfee(?:s)?\b/.test(desc)
+	) {
 		return { icon: 'shield-outline' as keyof typeof Ionicons.glyphMap, color: palette.textMuted };
 	}
 	return { icon: 'trending-down-outline' as keyof typeof Ionicons.glyphMap, color: palette.danger };
@@ -135,11 +140,12 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 
 	// MVP: fixed category from metadata; show category when present for both income and expense
 	const rowDisplay = useMemo(() => {
-		const category = item.metadata?.category;
+		const category =
+			item.metadata?.category != null && String(item.metadata.category).trim() !== ''
+				? String(item.metadata.category).trim()
+				: undefined;
 		const fromCategory =
-			category != null && category !== ''
-				? getLedgerCategoryVisual(item.type, category)
-				: null;
+			category != null ? getLedgerCategoryVisual(item.type, category) : null;
 		const smartFallback = getSmartFallback(
 			item.description ?? category,
 			item.type

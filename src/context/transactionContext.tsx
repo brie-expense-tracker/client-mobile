@@ -127,12 +127,18 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 						}
 					}
 
+					const rawType = tx.type ?? 'expense';
+					const normalizedType =
+						String(rawType).trim().toLowerCase() === 'income'
+							? 'income'
+							: 'expense';
+
 					const transaction = {
 						id: tx._id ?? tx.id,
 						description: tx.description || undefined,
 						amount: amount,
 						date: tx.date ?? new Date().toISOString().split('T')[0],
-						type: tx.type ?? 'expense',
+						type: normalizedType,
 						target: targetId,
 						targetModel: targetModel,
 						updatedAt: tx.updatedAt ?? tx.createdAt ?? new Date().toISOString(),
