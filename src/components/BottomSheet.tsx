@@ -4,10 +4,12 @@ import React, {
 	useImperativeHandle,
 	useMemo,
 	useRef,
+	useState,
 	forwardRef,
 } from 'react';
 import {
 	Dimensions,
+	Modal,
 	StyleSheet,
 	TouchableWithoutFeedback,
 	View,
@@ -92,6 +94,8 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(
 		},
 		ref
 	) {
+		const [isMounted, setIsMounted] = useState(isOpen);
+
 		// Convert visible-height fractions to translateY positions (in px)
 		const snapsY = useMemo(() => {
 			const clamped = snapPoints
@@ -128,6 +132,7 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(
 		// open/close via prop
 		useEffect(() => {
 			if (isOpen) {
+				setIsMounted(true);
 				const initial =
 					snapsY[Math.min(Math.max(initialSnapIndex, 0), snapsY.length - 1)] ??
 					minY;
@@ -136,6 +141,12 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(
 				y.value = withTiming(closedY, { duration: 200 });
 			}
 		}, [isOpen, initialSnapIndex, snapsY, closedY, minY, y]);
+
+		useEffect(() => {
+			if (isOpen) return;
+			const timer = setTimeout(() => setIsMounted(false), 220);
+			return () => clearTimeout(timer);
+		}, [isOpen]);
 
 		// Backdrop opacity based on sheet position
 		const backdropStyle = useAnimatedStyle(() => {
@@ -278,36 +289,36 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(
 			});
 		};
 
-		// Hide the whole tree from touch/semantics when fully closed
-		const rootStyle = useAnimatedStyle(() => {
-			const display = y.value >= closedY - 1 ? 'none' : 'flex';
-			return { display };
-		});
-
 		return (
-			<GestureHandlerRootView style={StyleSheet.absoluteFill}>
-				<Animated.View
-					style={[StyleSheet.absoluteFill, rootStyle]}
-					pointerEvents="box-none"
-				>
-					{/* Backdrop */}
-					<TouchableWithoutFeedback
-						accessibilityLabel={backdropA11yLabel}
-						onPress={handleBackdropPress}
-					>
-						<Animated.View
-							style={[styles.backdrop, { width: W, height: H }, backdropStyle]}
-						/>
-					</TouchableWithoutFeedback>
+			<Modal
+				visible={isMounted}
+				transparent
+				animationType="none"
+				onRequestClose={onClose}
+				statusBarTranslucent
+				presentationStyle="overFullScreen"
+			>
+				<GestureHandlerRootView style={StyleSheet.absoluteFill}>
+					<Animated.View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+						{/* Backdrop */}
+						<TouchableWithoutFeedback
+							accessibilityLabel={backdropA11yLabel}
+							onPress={handleBackdropPress}
+						>
+							<Animated.View
+								style={[styles.backdrop, { width: W, height: H }, backdropStyle]}
+							/>
+						</TouchableWithoutFeedback>
 
-					{/* Sheet */}
-					{enablePanGesture ? (
-						<GestureDetector gesture={pan}>{sheetInner}</GestureDetector>
-					) : (
-						sheetInner
-					)}
-				</Animated.View>
-			</GestureHandlerRootView>
+						{/* Sheet */}
+						{enablePanGesture ? (
+							<GestureDetector gesture={pan}>{sheetInner}</GestureDetector>
+						) : (
+							sheetInner
+						)}
+					</Animated.View>
+				</GestureHandlerRootView>
+			</Modal>
 		);
 	}
 );
