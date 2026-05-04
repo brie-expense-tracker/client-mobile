@@ -170,7 +170,6 @@ export default function TransactionScreenProModern() {
 			await pushCaptureRecentChip(line);
 			setRecentChips(await loadCaptureRecentChips());
 			setCaptureLine('');
-			queueMicrotask(() => captureLineRef.current?.focus());
 		} catch (e) {
 			if (isDevMode) {
 				transactionScreenLog.error('Save transaction error', e);
