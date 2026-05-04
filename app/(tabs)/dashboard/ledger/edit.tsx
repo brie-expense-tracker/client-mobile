@@ -471,17 +471,24 @@ export default function LedgerEditScreen() {
 				initialSnapIndex={0}
 				header={
 					<View style={styles.sheetHeader}>
-						<Ionicons
-							name="calendar-outline"
-							size={20}
-							color={palette.primary}
-							style={{ marginRight: space.sm }}
-						/>
-						<AppText.Heading style={styles.sheetTitle}>
+						<View style={styles.sheetHeaderLeading} accessibilityElementsHidden>
+							<Ionicons
+								name="calendar-outline"
+								size={20}
+								color={palette.primary}
+							/>
+						</View>
+						<AppText.Heading style={styles.sheetTitle} numberOfLines={1}>
 							Select Date
 						</AppText.Heading>
-						<TouchableOpacity onPress={() => setDatePickerOpen(false)}>
-							<Ionicons name="close" size={24} color={palette.textMuted} />
+						<TouchableOpacity
+							onPress={() => setDatePickerOpen(false)}
+							style={styles.sheetCloseHit}
+							hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+							accessibilityLabel="Close"
+							accessibilityRole="button"
+						>
+							<Ionicons name="close" size={22} color={palette.textMuted} />
 						</TouchableOpacity>
 					</View>
 				}
@@ -545,21 +552,31 @@ export default function LedgerEditScreen() {
 			<BottomSheet
 				isOpen={pickerOpen}
 				onClose={() => setPickerOpen(false)}
-				snapPoints={[0.6, 0.4]}
+				closeOnBackdropPress={false}
+				closeOnPanDown={false}
+				enablePanGesture={false}
+				snapPoints={[0.6]}
 				initialSnapIndex={0}
 				header={
 					<View style={styles.sheetHeader}>
-						<Ionicons
-							name="pricetag-outline"
-							size={20}
-							color={palette.primary}
-							style={{ marginRight: space.sm }}
-						/>
-						<AppText.Heading style={styles.sheetTitle}>
+						<View style={styles.sheetHeaderLeading} accessibilityElementsHidden>
+							<Ionicons
+								name="pricetag-outline"
+								size={20}
+								color={palette.primary}
+							/>
+						</View>
+						<AppText.Heading style={styles.sheetTitle} numberOfLines={1}>
 							Select Category
 						</AppText.Heading>
-						<TouchableOpacity onPress={() => setPickerOpen(false)}>
-							<Ionicons name="close" size={24} color={palette.textMuted} />
+						<TouchableOpacity
+							onPress={() => setPickerOpen(false)}
+							style={styles.sheetCloseHit}
+							hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+							accessibilityLabel="Close"
+							accessibilityRole="button"
+						>
+							<Ionicons name="close" size={22} color={palette.textMuted} />
 						</TouchableOpacity>
 					</View>
 				}
@@ -579,7 +596,6 @@ export default function LedgerEditScreen() {
 								style={styles.sheetRow}
 								onPress={() => {
 									setCategory(item as ExpenseCategory | IncomeCategory);
-									setPickerOpen(false);
 								}}
 							>
 								<Ionicons
@@ -794,11 +810,36 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		paddingHorizontal: space.lg,
-		paddingBottom: space.sm,
+		paddingVertical: space.md,
+		minHeight: 56,
+		borderBottomWidth: StyleSheet.hairlineWidth,
+		borderBottomColor: palette.border,
+	},
+	sheetHeaderLeading: {
+		width: 40,
+		height: 40,
+		borderRadius: radius.md,
+		backgroundColor: palette.primarySoft,
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginRight: space.md,
 	},
 	sheetTitle: {
 		flex: 1,
+		minWidth: 0,
+		...type.h2,
+		fontSize: 18,
+		fontWeight: '700',
+		letterSpacing: -0.28,
+		lineHeight: 24,
 		color: palette.text,
+	},
+	sheetCloseHit: {
+		width: 44,
+		height: 44,
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginLeft: space.sm,
 	},
 	sheetRow: {
 		flexDirection: 'row',

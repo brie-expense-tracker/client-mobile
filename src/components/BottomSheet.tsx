@@ -25,7 +25,6 @@ import Animated, {
 	runOnJS,
 	useAnimatedStyle,
 	useSharedValue,
-	withSpring,
 	withTiming,
 } from 'react-native-reanimated';
 import { palette, radius as radiusToken } from '../ui/theme';
@@ -49,6 +48,12 @@ type BottomSheetProps = PropsWithChildren<{
 	backdropA11yLabel?: string;
 	/** Optional header area (e.g., title bar) */
 	header?: React.ReactNode;
+	/** Whether tapping backdrop should close the sheet (default true) */
+	closeOnBackdropPress?: boolean;
+	/** Whether pan-down gesture can close the sheet (default true) */
+	closeOnPanDown?: boolean;
+	/** When false, the sheet does not move with vertical drags (header/list scroll still works). Default true. */
+	enablePanGesture?: boolean;
 }>;
 
 export type BottomSheetRef = {
@@ -81,6 +86,9 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(
 			maxBackdropOpacity = 0.35,
 			backdropA11yLabel = 'Close sheet',
 			header,
+			closeOnBackdropPress = true,
+			closeOnPanDown = true,
+			enablePanGesture = true,
 		},
 		ref
 	) {
@@ -195,7 +203,7 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(
 				}
 				
 				// if flicking down fast, close
-				if (velocity > 1200) {
+				if (closeOnPanDown && velocity > 1200) {
 					y.value = withTiming(closedY, { duration: 200 }, (finished) => {
 						'worklet';
 						if (finished) runOnJS(onClose)();
@@ -204,7 +212,7 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(
 				}
 
 				// otherwise, snap to the nearest point
-				const points = [...snapsY, closedY];
+				const points = closeOnPanDown ? [...snapsY, closedY] : [...snapsY];
 				let nearest = points[0];
 				let minDist = Math.abs(y.value - points[0]);
 				for (let i = 1; i < points.length; i++) {
@@ -227,8 +235,43 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(
 			})
 			.simultaneousWithExternalGesture(contentGestureRef as any);
 
+		const sheetInner = (
+			<Animated.View
+				style={[
+					styles.sheet,
+					{
+						borderTopLeftRadius: radius,
+						borderTopRightRadius: radius,
+						width: W,
+						height: H,
+					},
+					sheetStyle,
+				]}
+			>
+				{/* Drag handle (hidden when sheet position is fixed) */}
+				{enablePanGesture ? <View style={styles.handle} /> : null}
+
+				{/* Optional header (e.g., title + close) */}
+				{header}
+
+				{/* Content area */}
+				<NativeViewGestureHandler ref={contentGestureRef}>
+					<Animated.View
+						style={[styles.contentContainer, contentStyle]}
+						renderToHardwareTextureAndroid
+						{...(Platform.OS === 'ios'
+							? { shouldRasterizeIOS: true }
+							: {})}
+					>
+						{children}
+					</Animated.View>
+				</NativeViewGestureHandler>
+			</Animated.View>
+		);
+
 		// Backdrop tap closes
 		const handleBackdropPress = () => {
+			if (!closeOnBackdropPress) return;
 			y.value = withTiming(closedY, { duration: 200 }, (finished) => {
 				'worklet';
 				if (finished) runOnJS(onClose)();
@@ -258,42 +301,11 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(
 					</TouchableWithoutFeedback>
 
 					{/* Sheet */}
-					<GestureDetector gesture={pan}>
-						<Animated.View
-							style={[
-								styles.sheet,
-								{
-									borderTopLeftRadius: radius,
-									borderTopRightRadius: radius,
-									width: W,
-									height: H,
-								},
-								sheetStyle,
-							]}
-						>
-							{/* Drag handle */}
-							<View style={styles.handle} />
-
-							{/* Optional header (e.g., title + close) */}
-							{header}
-
-							{/* Content area */}
-							<NativeViewGestureHandler ref={contentGestureRef}>
-								<Animated.View
-									style={[
-										styles.contentContainer,
-										contentStyle,
-									]}
-									renderToHardwareTextureAndroid
-									{...(Platform.OS === 'ios'
-										? { shouldRasterizeIOS: true }
-										: {})}
-								>
-									{children}
-								</Animated.View>
-							</NativeViewGestureHandler>
-						</Animated.View>
-					</GestureDetector>
+					{enablePanGesture ? (
+						<GestureDetector gesture={pan}>{sheetInner}</GestureDetector>
+					) : (
+						sheetInner
+					)}
 				</Animated.View>
 			</GestureHandlerRootView>
 		);
