@@ -72,6 +72,7 @@ export default function TransactionScreenProModern() {
 		null,
 	);
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [isSaveFeedbackVisible, setIsSaveFeedbackVisible] = useState(false);
 	const saveFeedbackAnim = useRef(new Animated.Value(0)).current;
 
 	const { addTransaction } = useContext(TransactionContext);
@@ -142,6 +143,7 @@ export default function TransactionScreenProModern() {
 
 	const animateSaveFeedback = useCallback(() => {
 		saveFeedbackAnim.stopAnimation();
+		setIsSaveFeedbackVisible(true);
 		saveFeedbackAnim.setValue(0);
 		Animated.sequence([
 			Animated.timing(saveFeedbackAnim, {
@@ -155,7 +157,9 @@ export default function TransactionScreenProModern() {
 				duration: 220,
 				useNativeDriver: true,
 			}),
-		]).start();
+		]).start(({ finished }) => {
+			if (finished) setIsSaveFeedbackVisible(false);
+		});
 	}, [saveFeedbackAnim]);
 
 	const saveEntry = useCallback(async () => {
@@ -278,27 +282,29 @@ export default function TransactionScreenProModern() {
 									Saving to server…
 								</AppText.Caption>
 							) : null}
-							<Animated.View
-								pointerEvents="none"
-								style={[
-									styles.savedToast,
-									{
-										opacity: saveFeedbackAnim,
-										transform: [
-											{
-												translateY: saveFeedbackAnim.interpolate({
-													inputRange: [0, 1],
-													outputRange: [6, 0],
-												}),
-											},
-										],
-									},
-								]}
-							>
-								<AppText.Caption style={styles.savedToastText}>
-									Saved
-								</AppText.Caption>
-							</Animated.View>
+							{isSaveFeedbackVisible ? (
+								<Animated.View
+									pointerEvents="none"
+									style={[
+										styles.savedToast,
+										{
+											opacity: saveFeedbackAnim,
+											transform: [
+												{
+													translateY: saveFeedbackAnim.interpolate({
+														inputRange: [0, 1],
+														outputRange: [6, 0],
+													}),
+												},
+											],
+										},
+									]}
+								>
+									<AppText.Caption style={styles.savedToastText}>
+										Saved
+									</AppText.Caption>
+								</Animated.View>
+							) : null}
 							{recentChips.length > 0 ? (
 								<View style={styles.chipsSection}>
 									<AppText.Caption color="muted" style={styles.chipsLabel}>
