@@ -1,10 +1,14 @@
 # Brie Mobile App
 
-Brie Mobile is your daily money operating system: one place to log spending, track goals, stay on budget, and understand what to do next.
+Brie Mobile is your personal money co-pilot: one place to track spending, plan ahead, and make smarter daily decisions with confidence.
 
-Built with React Native + Expo, the app combines practical personal-finance tools with AI-guided insights so users can move from "I think I'm doing okay" to "I know exactly where I stand."
+Most people do not need more spreadsheets. They need a clear next step. Brie helps users move from "I hope I am okay" to "I know exactly where my money is going, and what to do next."
 
-## Why Brie
+## Purpose
+
+Brie exists to make money management feel simple, actionable, and consistent. The app is built around one goal: help users build better financial habits through quick daily check-ins, real-time visibility, and practical guidance.
+
+## Why Users Choose Brie
 
 - **Clarity over chaos**: Money often feels fragmented across apps, notes, and memory. Brie gives users one connected place to understand what is happening.
 - **Action over anxiety**: Instead of raw numbers alone, Brie highlights what matters now and what to do next.
@@ -12,6 +16,17 @@ Built with React Native + Expo, the app combines practical personal-finance tool
 - **Built for real life**: Track recurring bills, one-off purchases, debt payoff, and goals without adding complexity.
 - **Always available**: Offline support keeps the experience reliable on commutes, in stores, or anywhere signal is weak.
 - **Inclusive by design**: VoiceOver and TalkBack support are core product requirements, not an afterthought.
+
+## What Users Should Look Out For
+
+When using Brie, these are the signals that matter most:
+
+- **Budget status indicators**: See early warnings before overspending happens.
+- **Spending trends**: Spot categories that are rising week over week.
+- **Goal progress bars**: Track whether savings and debt targets are on pace.
+- **Recurring expense reminders**: Stay ahead of bills and fixed monthly costs.
+- **AI recommendations**: Review suggestions for quick, practical next actions.
+- **Weekly reflection prompts**: Catch patterns and improve decisions over time.
 
 ## What Brie Helps Users Do
 
@@ -21,15 +36,23 @@ Built with React Native + Expo, the app combines practical personal-finance tool
 - Stay accountable with reflection prompts and progress visibility.
 - Build confidence through consistent routines and guided insights.
 
-## How To Use Brie
+## How To Use Brie (Quick Path)
 
-1. **Create your account** and complete onboarding.
-2. **Add your first transactions** (income and spending) to establish your baseline.
-3. **Set budgets and goals** for the month (or longer-term targets).
-4. **Review your dashboard daily** for progress, trends, and priority actions.
-5. **Use AI chat + weekly reflections** to stay consistent and improve decisions over time.
+1. **Create your account** and finish onboarding.
+2. **Log income and spending** for your first few days to build your baseline.
+3. **Set monthly budgets** and define at least one goal (savings or debt payoff).
+4. **Check your dashboard daily** for alerts, trends, and recommended actions.
+5. **Use AI insights and weekly reflections** to adjust and improve each week.
 
-Brie works best as a lightweight daily habit: quick check-ins, clear progress, and fewer financial surprises.
+Brie works best as a lightweight daily habit: 2-5 minutes per day, consistent updates, and small weekly adjustments.
+
+## Best Practices For Users
+
+- **Log transactions quickly**: Enter spending close to when it happens.
+- **Review once a day**: A short daily check prevents end-of-month surprises.
+- **React to warnings early**: Adjust spending as soon as a category drifts.
+- **Set realistic goals first**: Build momentum before increasing targets.
+- **Reflect weekly**: Use prompts to reinforce what is working.
 
 ## 📸 App Preview
 
