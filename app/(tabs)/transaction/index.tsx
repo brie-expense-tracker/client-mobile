@@ -68,9 +68,6 @@ export default function TransactionScreenProModern() {
 		null,
 	);
 	const [recentChips, setRecentChips] = useState<string[]>([]);
-	const [lastCapturedLine, setLastCapturedLine] = useState<string | null>(
-		null,
-	);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [isSaveFeedbackVisible, setIsSaveFeedbackVisible] = useState(false);
 	const saveFeedbackAnim = useRef(new Animated.Value(0)).current;
@@ -190,7 +187,6 @@ export default function TransactionScreenProModern() {
 				source: 'manual',
 			});
 
-			setLastCapturedLine(line);
 			await pushCaptureRecentChip(line);
 			setRecentChips(await loadCaptureRecentChips());
 			setCaptureLine('');
@@ -327,18 +323,6 @@ export default function TransactionScreenProModern() {
 											</TouchableOpacity>
 										))}
 									</ScrollView>
-								</View>
-							) : null}
-							{lastCapturedLine ? (
-								<View style={styles.savedSection}>
-									<AppText.Caption color="muted" style={styles.savedHeading}>
-										Just captured
-									</AppText.Caption>
-									<View style={styles.savedRow}>
-										<AppText.Caption color="default">
-											{lastCapturedLine}
-										</AppText.Caption>
-									</View>
 								</View>
 							) : null}
 							<View style={styles.saveSection}>
@@ -482,25 +466,6 @@ const styles = StyleSheet.create({
 	recentChipText: {
 		...type.bodyXs,
 		color: palette.text,
-	},
-	savedSection: {
-		marginTop: space.lg,
-		paddingTop: space.md,
-		borderTopWidth: StyleSheet.hairlineWidth,
-		borderTopColor: palette.border,
-	},
-	savedHeading: {
-		fontWeight: '600',
-		marginBottom: space.sm,
-	},
-	savedRow: {
-		borderRadius: radius.xl2,
-		borderWidth: 1,
-		borderColor: palette.border,
-		backgroundColor: palette.surfaceSunken,
-		paddingHorizontal: space.md,
-		paddingVertical: space.sm,
-		marginBottom: space.xs,
 	},
 	footerHint: {
 		marginTop: space.md,
