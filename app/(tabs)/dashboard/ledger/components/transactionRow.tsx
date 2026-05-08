@@ -420,69 +420,18 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 							</Text>
 						) : null}
 
-						{/* Transaction Details */}
-						{(item.notes ||
-							item.source ||
-							item.metadata?.location ||
-							item.metadata?.paymentMethod) && (
+						{item.notes ? (
 							<View style={styles.detailsContainer}>
-								{item.notes && (
-									<View style={styles.detailRow}>
-										<Ionicons
-											name="document-text-outline"
-											size={12}
-											color={palette.textMuted}
-										/>
-										<Text style={styles.detailText}>{item.notes}</Text>
-									</View>
-								)}
-								<View style={styles.detailsRow}>
-									{item.metadata?.location && (
-										<View style={styles.detailBadge}>
-											<Ionicons
-												name="location-outline"
-												size={10}
-												color={palette.textMuted}
-											/>
-											<Text style={styles.detailBadgeText}>
-												{item.metadata.location}
-											</Text>
-										</View>
-									)}
-									{item.metadata?.paymentMethod && (
-										<View style={styles.detailBadge}>
-											<Ionicons
-												name="card-outline"
-												size={10}
-												color={palette.textMuted}
-											/>
-											<Text style={styles.detailBadgeText}>
-												{item.metadata.paymentMethod}
-											</Text>
-										</View>
-									)}
-									{item.source && item.source !== 'manual' && (
-										<View style={styles.detailBadge}>
-											<Ionicons
-												name={
-													item.source === 'plaid'
-														? 'link-outline'
-														: item.source === 'ai'
-															? 'sparkles-outline'
-															: 'download-outline'
-												}
-												size={10}
-												color={palette.textMuted}
-											/>
-											<Text style={styles.detailBadgeText}>
-												{item.source.charAt(0).toUpperCase() +
-													item.source.slice(1)}
-											</Text>
-										</View>
-									)}
+								<View style={styles.detailRow}>
+									<Ionicons
+										name="document-text-outline"
+										size={12}
+										color={palette.textMuted}
+									/>
+									<Text style={styles.detailText}>{item.notes}</Text>
 								</View>
 							</View>
-						)}
+						) : null}
 					</View>
 					<View style={styles.amountDate}>
 						<Text
@@ -566,6 +515,7 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		fontWeight: '500',
 		color: palette.text,
+
 	},
 	subtitle: {
 		fontSize: 12,
@@ -593,7 +543,7 @@ const styles = StyleSheet.create({
 		marginTop: space.xs,
 	},
 	detailsContainer: {
-
+		marginTop: space.sm,
 		gap: space.xs,
 	},
 	detailRow: {
@@ -607,25 +557,5 @@ const styles = StyleSheet.create({
 		color: palette.textMuted,
 		flex: 1,
 		lineHeight: 14,
-	},
-	detailsRow: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
-		gap: space.sm,
-		marginTop: 2,
-	},
-	detailBadge: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: space.xs,
-		paddingHorizontal: space.sm,
-		paddingVertical: 2,
-		backgroundColor: palette.subtle,
-		borderRadius: radius.sm,
-	},
-	detailBadgeText: {
-		fontSize: 10,
-		color: palette.textMuted,
-		fontWeight: '500',
 	},
 });
