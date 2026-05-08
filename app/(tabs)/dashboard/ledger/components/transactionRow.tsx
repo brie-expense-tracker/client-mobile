@@ -57,58 +57,162 @@ const formatDateWithoutTime = (dateString: string): string => {
 };
 
 // Infer icon and color from description/category; uses theme palette
-const getSmartFallback = (description: string | undefined, type: 'income' | 'expense') => {
+const getSmartFallback = (
+	description: string | undefined,
+	type: 'income' | 'expense',
+) => {
 	if (!description || typeof description !== 'string') {
 		if (type === 'income') {
-			return { icon: 'trending-up-outline' as keyof typeof Ionicons.glyphMap, color: palette.success };
+			return {
+				icon: 'trending-up-outline' as keyof typeof Ionicons.glyphMap,
+				color: palette.success,
+			};
 		}
-		return { icon: 'trending-down-outline' as keyof typeof Ionicons.glyphMap, color: palette.danger };
+		return {
+			icon: 'trending-down-outline' as keyof typeof Ionicons.glyphMap,
+			color: palette.danger,
+		};
 	}
 	const desc = description.toLowerCase();
 
 	if (type === 'income') {
-		if (desc.includes('salary') || desc.includes('payroll') || desc.includes('wage')) {
-			return { icon: 'briefcase-outline' as keyof typeof Ionicons.glyphMap, color: palette.success };
+		if (
+			desc.includes('salary') ||
+			desc.includes('payroll') ||
+			desc.includes('wage')
+		) {
+			return {
+				icon: 'briefcase-outline' as keyof typeof Ionicons.glyphMap,
+				color: palette.success,
+			};
 		}
-		if (desc.includes('freelance') || desc.includes('contract') || desc.includes('gig')) {
-			return { icon: 'laptop-outline' as keyof typeof Ionicons.glyphMap, color: palette.primary };
+		if (
+			desc.includes('freelance') ||
+			desc.includes('contract') ||
+			desc.includes('gig')
+		) {
+			return {
+				icon: 'laptop-outline' as keyof typeof Ionicons.glyphMap,
+				color: palette.primary,
+			};
 		}
-		if (desc.includes('investment') || desc.includes('dividend') || desc.includes('stock')) {
-			return { icon: 'trending-up-outline' as keyof typeof Ionicons.glyphMap, color: palette.primaryMuted };
+		if (
+			desc.includes('investment') ||
+			desc.includes('dividend') ||
+			desc.includes('stock')
+		) {
+			return {
+				icon: 'trending-up-outline' as keyof typeof Ionicons.glyphMap,
+				color: palette.primaryMuted,
+			};
 		}
 		if (desc.includes('refund') || desc.includes('rebate')) {
-			return { icon: 'arrow-back-outline' as keyof typeof Ionicons.glyphMap, color: palette.success };
+			return {
+				icon: 'arrow-back-outline' as keyof typeof Ionicons.glyphMap,
+				color: palette.success,
+			};
 		}
 		if (desc.includes('gift') || desc.includes('bonus')) {
-			return { icon: 'gift-outline' as keyof typeof Ionicons.glyphMap, color: palette.warning };
+			return {
+				icon: 'gift-outline' as keyof typeof Ionicons.glyphMap,
+				color: palette.warning,
+			};
 		}
-		return { icon: 'trending-up-outline' as keyof typeof Ionicons.glyphMap, color: palette.success };
+		return {
+			icon: 'trending-up-outline' as keyof typeof Ionicons.glyphMap,
+			color: palette.success,
+		};
 	}
 
 	// Expense (Cash Out) – map to theme
-	if (desc.includes('food') || desc.includes('restaurant') || desc.includes('grocery') || desc.includes('dining')) {
-		return { icon: 'restaurant-outline' as keyof typeof Ionicons.glyphMap, color: palette.warning };
+	if (
+		desc.includes('food') ||
+		desc.includes('restaurant') ||
+		desc.includes('grocery') ||
+		desc.includes('dining')
+	) {
+		return {
+			icon: 'restaurant-outline' as keyof typeof Ionicons.glyphMap,
+			color: palette.warning,
+		};
 	}
-	if (desc.includes('gas') || desc.includes('fuel') || desc.includes('transport') || desc.includes('uber') || desc.includes('lyft')) {
-		return { icon: 'car-outline' as keyof typeof Ionicons.glyphMap, color: palette.primary };
+	if (
+		desc.includes('gas') ||
+		desc.includes('fuel') ||
+		desc.includes('transport') ||
+		desc.includes('uber') ||
+		desc.includes('lyft')
+	) {
+		return {
+			icon: 'car-outline' as keyof typeof Ionicons.glyphMap,
+			color: palette.primary,
+		};
 	}
-	if (desc.includes('rent') || desc.includes('mortgage') || desc.includes('housing') || desc.includes('utilities')) {
-		return { icon: 'home-outline' as keyof typeof Ionicons.glyphMap, color: palette.primaryMuted };
+	if (
+		desc.includes('rent') ||
+		desc.includes('mortgage') ||
+		desc.includes('housing') ||
+		desc.includes('utilities')
+	) {
+		return {
+			icon: 'home-outline' as keyof typeof Ionicons.glyphMap,
+			color: palette.primaryMuted,
+		};
 	}
-	if (desc.includes('shopping') || desc.includes('store') || desc.includes('amazon') || desc.includes('retail')) {
-		return { icon: 'bag-outline' as keyof typeof Ionicons.glyphMap, color: palette.danger };
+	if (
+		desc.includes('shopping') ||
+		desc.includes('store') ||
+		desc.includes('amazon') ||
+		desc.includes('retail')
+	) {
+		return {
+			icon: 'bag-outline' as keyof typeof Ionicons.glyphMap,
+			color: palette.danger,
+		};
 	}
-	if (desc.includes('entertainment') || desc.includes('movie') || desc.includes('game') || desc.includes('streaming')) {
-		return { icon: 'game-controller-outline' as keyof typeof Ionicons.glyphMap, color: palette.primaryMuted };
+	if (
+		desc.includes('entertainment') ||
+		desc.includes('movie') ||
+		desc.includes('game') ||
+		desc.includes('streaming')
+	) {
+		return {
+			icon: 'game-controller-outline' as keyof typeof Ionicons.glyphMap,
+			color: palette.primaryMuted,
+		};
 	}
-	if (desc.includes('health') || desc.includes('medical') || desc.includes('doctor') || desc.includes('pharmacy')) {
-		return { icon: 'medical-outline' as keyof typeof Ionicons.glyphMap, color: palette.danger };
+	if (
+		desc.includes('health') ||
+		desc.includes('medical') ||
+		desc.includes('doctor') ||
+		desc.includes('pharmacy')
+	) {
+		return {
+			icon: 'medical-outline' as keyof typeof Ionicons.glyphMap,
+			color: palette.danger,
+		};
 	}
-	if (desc.includes('education') || desc.includes('school') || desc.includes('course') || desc.includes('book')) {
-		return { icon: 'school-outline' as keyof typeof Ionicons.glyphMap, color: palette.primary };
+	if (
+		desc.includes('education') ||
+		desc.includes('school') ||
+		desc.includes('course') ||
+		desc.includes('book')
+	) {
+		return {
+			icon: 'school-outline' as keyof typeof Ionicons.glyphMap,
+			color: palette.primary,
+		};
 	}
-	if (desc.includes('subscription') || desc.includes('netflix') || desc.includes('spotify') || desc.includes('premium')) {
-		return { icon: 'card-outline' as keyof typeof Ionicons.glyphMap, color: palette.primaryMuted };
+	if (
+		desc.includes('subscription') ||
+		desc.includes('netflix') ||
+		desc.includes('spotify') ||
+		desc.includes('premium')
+	) {
+		return {
+			icon: 'card-outline' as keyof typeof Ionicons.glyphMap,
+			color: palette.primaryMuted,
+		};
 	}
 	// Whole words only — substring "fee" matches inside "coffee", "tax" inside "taxi", etc.
 	if (
@@ -116,9 +220,15 @@ const getSmartFallback = (description: string | undefined, type: 'income' | 'exp
 		/\btax(?:es)?\b/.test(desc) ||
 		/\bfee(?:s)?\b/.test(desc)
 	) {
-		return { icon: 'shield-outline' as keyof typeof Ionicons.glyphMap, color: palette.textMuted };
+		return {
+			icon: 'shield-outline' as keyof typeof Ionicons.glyphMap,
+			color: palette.textMuted,
+		};
 	}
-	return { icon: 'trending-down-outline' as keyof typeof Ionicons.glyphMap, color: palette.danger };
+	return {
+		icon: 'trending-down-outline' as keyof typeof Ionicons.glyphMap,
+		color: palette.danger,
+	};
 };
 
 interface TransactionRowProps {
@@ -141,14 +251,15 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 	// MVP: fixed category from metadata; show category when present for both income and expense
 	const rowDisplay = useMemo(() => {
 		const category =
-			item.metadata?.category != null && String(item.metadata.category).trim() !== ''
+			item.metadata?.category != null &&
+			String(item.metadata.category).trim() !== ''
 				? String(item.metadata.category).trim()
 				: undefined;
 		const fromCategory =
 			category != null ? getLedgerCategoryVisual(item.type, category) : null;
 		const smartFallback = getSmartFallback(
 			item.description ?? category,
-			item.type
+			item.type,
 		);
 		const visual = fromCategory ?? smartFallback;
 		const fallbackLabel = item.type === 'income' ? 'Cash In' : 'Cash Out';
@@ -163,9 +274,7 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 	const cleanDescription = useMemo(() => {
 		if (!item.description) return '';
 		// Remove " - Bill" (case insensitive)
-		return item.description
-			.replace(/\s*-\s*Bill/gi, '')
-			.trim();
+		return item.description.replace(/\s*-\s*Bill/gi, '').trim();
 	}, [item.description]);
 
 	// Title: category or type fallback (never the full description)
@@ -213,10 +322,10 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 					isPanning.value = false;
 					if (translateX.value < TRANSLATE_THRESHOLD) {
 						// Only reveal the delete button; confirmation happens on trash icon tap
-						translateX.value = withTiming(
-							-DELETE_WIDTH,
-							{ duration: 400, easing: Easing.bezier(0.25, 0.1, 0.25, 1) }
-						);
+						translateX.value = withTiming(-DELETE_WIDTH, {
+							duration: 400,
+							easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+						});
 					} else {
 						translateX.value = withSpring(0, { damping: 20 });
 						iconScale.value = withSpring(1, { damping: 15, stiffness: 150 });
@@ -230,7 +339,7 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 			isPanning,
 			TRANSLATE_THRESHOLD,
 			DELETE_WIDTH,
-		]
+		],
 	);
 
 	const tapGesture = useMemo(
@@ -248,12 +357,12 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 						runOnJS(onEdit)(item);
 					}
 				}),
-		[onEdit, item, isPanning]
+		[onEdit, item, isPanning],
 	);
 
 	const combinedGesture = useMemo(
 		() => Gesture.Race(panGesture, tapGesture),
-		[panGesture, tapGesture]
+		[panGesture, tapGesture],
 	);
 
 	const animatedRowStyle = useAnimatedStyle(() => ({
@@ -290,7 +399,9 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 						]}
 					>
 						<Ionicons
-							name={rowDisplay.icon as React.ComponentProps<typeof Ionicons>['name']}
+							name={
+								rowDisplay.icon as React.ComponentProps<typeof Ionicons>['name']
+							}
 							size={20}
 							color={rowDisplay.color}
 						/>
@@ -328,14 +439,26 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 								<View style={styles.detailsRow}>
 									{item.metadata?.location && (
 										<View style={styles.detailBadge}>
-											<Ionicons name="location-outline" size={10} color={palette.textMuted} />
-											<Text style={styles.detailBadgeText}>{item.metadata.location}</Text>
+											<Ionicons
+												name="location-outline"
+												size={10}
+												color={palette.textMuted}
+											/>
+											<Text style={styles.detailBadgeText}>
+												{item.metadata.location}
+											</Text>
 										</View>
 									)}
 									{item.metadata?.paymentMethod && (
 										<View style={styles.detailBadge}>
-											<Ionicons name="card-outline" size={10} color={palette.textMuted} />
-											<Text style={styles.detailBadgeText}>{item.metadata.paymentMethod}</Text>
+											<Ionicons
+												name="card-outline"
+												size={10}
+												color={palette.textMuted}
+											/>
+											<Text style={styles.detailBadgeText}>
+												{item.metadata.paymentMethod}
+											</Text>
 										</View>
 									)}
 									{item.source && item.source !== 'manual' && (
@@ -345,14 +468,15 @@ const TransactionRowComponent: React.FC<TransactionRowProps> = ({
 													item.source === 'plaid'
 														? 'link-outline'
 														: item.source === 'ai'
-														? 'sparkles-outline'
-														: 'download-outline'
+															? 'sparkles-outline'
+															: 'download-outline'
 												}
 												size={10}
 												color={palette.textMuted}
 											/>
 											<Text style={styles.detailBadgeText}>
-												{item.source.charAt(0).toUpperCase() + item.source.slice(1)}
+												{item.source.charAt(0).toUpperCase() +
+													item.source.slice(1)}
 											</Text>
 										</View>
 									)}
@@ -393,10 +517,11 @@ export const TransactionRow = React.memo(
 			prevProps.item.source === nextProps.item.source &&
 			prevProps.item.target === nextProps.item.target &&
 			prevProps.item.targetModel === nextProps.item.targetModel &&
-			prevProps.item.recurringPattern?.patternId === nextProps.item.recurringPattern?.patternId;
+			prevProps.item.recurringPattern?.patternId ===
+				nextProps.item.recurringPattern?.patternId;
 
 		return shouldUpdate;
-	}
+	},
 );
 
 // Default export for React Router compatibility
@@ -435,13 +560,12 @@ const styles = StyleSheet.create({
 	},
 	descriptionContainer: {
 		flexDirection: 'row',
-		alignItems: 'center',
+		alignItems: 'flex-start',
 	},
 	title: {
 		fontSize: 16,
 		fontWeight: '500',
 		color: palette.text,
-		flex: 1,
 	},
 	subtitle: {
 		fontSize: 12,
@@ -469,7 +593,7 @@ const styles = StyleSheet.create({
 		marginTop: space.xs,
 	},
 	detailsContainer: {
-		marginTop: space.sm,
+
 		gap: space.xs,
 	},
 	detailRow: {
