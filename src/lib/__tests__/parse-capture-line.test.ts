@@ -30,6 +30,14 @@ describe('parseCaptureLine', () => {
 			type: 'income',
 			amount: 12.5,
 		});
+		expect(parseCaptureLine('Tips 20')).toMatchObject({
+			type: 'income',
+			amount: 20,
+		});
+		expect(parseCaptureLine('TIPS 20')).toMatchObject({
+			type: 'income',
+			amount: 20,
+		});
 	});
 
 	it('does not treat stipend as tip income', () => {
