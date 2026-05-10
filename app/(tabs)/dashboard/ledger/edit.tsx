@@ -467,8 +467,12 @@ export default function LedgerEditScreen() {
 			<BottomSheet
 				isOpen={datePickerOpen}
 				onClose={() => setDatePickerOpen(false)}
-				snapPoints={[0.7, 0.5]}
+				snapPoints={[0.7]}
 				initialSnapIndex={0}
+				enablePanGesture={false}
+				closeOnPanDown={false}
+				closeOnBackdropPress={false}
+				dismissOnHardwareBack={false}
 				header={
 					<View style={styles.sheetHeader}>
 						<View style={styles.sheetHeaderLeading} accessibilityElementsHidden>
