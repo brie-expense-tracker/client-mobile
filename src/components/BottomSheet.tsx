@@ -56,6 +56,8 @@ type BottomSheetProps = PropsWithChildren<{
 	closeOnPanDown?: boolean;
 	/** When false, the sheet does not move with vertical drags (header/list scroll still works). Default true. */
 	enablePanGesture?: boolean;
+	/** When false, Android hardware back does not dismiss the sheet (default true). */
+	dismissOnHardwareBack?: boolean;
 }>;
 
 export type BottomSheetRef = {
@@ -91,6 +93,7 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(
 			closeOnBackdropPress = true,
 			closeOnPanDown = true,
 			enablePanGesture = true,
+			dismissOnHardwareBack = true,
 		},
 		ref
 	) {
@@ -294,7 +297,7 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(
 				visible={isMounted}
 				transparent
 				animationType="none"
-				onRequestClose={onClose}
+				onRequestClose={dismissOnHardwareBack ? onClose : () => {}}
 				statusBarTranslucent
 				presentationStyle="overFullScreen"
 			>

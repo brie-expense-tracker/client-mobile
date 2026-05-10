@@ -1,15 +1,14 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-	Modal,
 	View,
 	Text,
 	TouchableOpacity,
-	Pressable,
 	StyleSheet,
 	Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { palette, radius } from '../../../../../src/ui/theme';
+import BottomSheet from '../../../../../src/components/BottomSheet';
+import { palette, radius, space } from '../../../../../src/ui/theme';
 
 type Props = {
 	visible: boolean;
@@ -58,6 +57,11 @@ export default function CalendarSheet({
 		selected ? startOfMonth(selected) : startOfMonth(today)
 	);
 
+	useEffect(() => {
+		if (!visible) return;
+		setViewMonth(selected ? startOfMonth(selected) : startOfMonth(today));
+	}, [visible, value, selected, today]);
+
 	const monthMatrix = useMemo(() => {
 		// Build 6x7 grid (Sun–Sat)
 		const first = startOfMonth(viewMonth);
@@ -97,38 +101,54 @@ export default function CalendarSheet({
 	const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 	return (
-		<Modal
-			visible={visible}
-			animationType="fade"
-			transparent
-			onRequestClose={onClose}
-		>
-			{/* Tap outside to close */}
-			<Pressable style={styles.backdrop} onPress={onClose} />
-
-			{/* Bottom sheet */}
-			<View style={styles.sheet}>
-				<View style={styles.handle} />
-
-				{/* Header */}
-				<View style={styles.header}>
+		<BottomSheet
+			isOpen={visible}
+			onClose={onClose}
+			snapPoints={[0.58]}
+			initialSnapIndex={0}
+			enablePanGesture={false}
+			closeOnBackdropPress={false}
+			closeOnPanDown={false}
+			dismissOnHardwareBack={false}
+			maxBackdropOpacity={0.52}
+			backdropA11yLabel="Calendar overlay"
+			header={
+				<View style={styles.sheetHeader}>
 					<TouchableOpacity
 						style={styles.navBtn}
 						onPress={() => setViewMonth((m) => addMonths(m, -1))}
+						accessibilityRole="button"
+						accessibilityLabel="Previous month"
 					>
 						<Ionicons name="chevron-back" size={22} color={palette.text} />
 					</TouchableOpacity>
 
-					<Text style={styles.headerTitle}>{monthTitle}</Text>
+					<Text style={styles.headerTitle} numberOfLines={1}>
+						{monthTitle}
+					</Text>
 
 					<TouchableOpacity
 						style={styles.navBtn}
 						onPress={() => setViewMonth((m) => addMonths(m, 1))}
+						accessibilityRole="button"
+						accessibilityLabel="Next month"
 					>
 						<Ionicons name="chevron-forward" size={22} color={palette.text} />
 					</TouchableOpacity>
-				</View>
 
+					<TouchableOpacity
+						onPress={onClose}
+						style={styles.closeHit}
+						hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+						accessibilityLabel="Close calendar"
+						accessibilityRole="button"
+					>
+						<Ionicons name="close" size={22} color={palette.textMuted} />
+					</TouchableOpacity>
+				</View>
+			}
+		>
+			<View style={styles.sheetBody}>
 				{/* Weekday labels */}
 				<View style={styles.weekRow}>
 					{weekDays.map((w) => (
@@ -209,58 +229,41 @@ export default function CalendarSheet({
 					</TouchableOpacity>
 				</View>
 			</View>
-		</Modal>
+		</BottomSheet>
 	);
 }
 
 const styles = StyleSheet.create({
-	backdrop: {
-		...StyleSheet.absoluteFillObject,
-		/** Dark workspace scrim (aligned with web modal overlays). */
-		backgroundColor: 'rgba(18, 19, 21, 0.52)',
-	},
-	sheet: {
-		position: 'absolute',
-		left: 0,
-		right: 0,
-		bottom: 0,
-		paddingTop: 8,
-		paddingBottom: Platform.select({ ios: 24, android: 16 }),
-		paddingHorizontal: 16,
-		backgroundColor: palette.surface,
-		borderTopLeftRadius: radius.shell,
-		borderTopRightRadius: radius.shell,
-		shadowColor: palette.bg,
-		shadowOpacity: 0.12,
-		shadowRadius: 10,
-		shadowOffset: { width: 0, height: -2 },
-		elevation: 10,
-		borderTopWidth: StyleSheet.hairlineWidth,
-		borderTopColor: palette.border,
-	},
-	handle: {
-		alignSelf: 'center',
-		width: 40,
-		height: 4,
-		borderRadius: 2,
-		backgroundColor: palette.border,
-		marginBottom: 8,
-	},
-	header: {
+	sheetHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		paddingHorizontal: 4,
-		marginBottom: 8,
+		paddingHorizontal: space.lg,
+		paddingVertical: space.sm,
+		minHeight: 52,
+		borderBottomWidth: StyleSheet.hairlineWidth,
+		borderBottomColor: palette.border,
 	},
 	navBtn: {
 		padding: 4,
 	},
 	headerTitle: {
 		flex: 1,
+		minWidth: 0,
 		textAlign: 'center',
 		fontSize: 16,
 		fontWeight: '600',
 		color: palette.text,
+	},
+	closeHit: {
+		width: 44,
+		height: 44,
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginLeft: 4,
+	},
+	sheetBody: {
+		paddingTop: 4,
+		paddingBottom: Platform.select({ ios: 8, android: 0 }),
 	},
 	weekRow: {
 		flexDirection: 'row',
