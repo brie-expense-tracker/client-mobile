@@ -21,7 +21,10 @@ import {
 	InteractionManager,
 	Animated,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+	SafeAreaView,
+	useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import { TransactionContext } from '../../../src/context/transactionContext';
 import { isDevMode } from '../../../src/config/environment';
 import { createLogger } from '../../../src/utils/sublogger';
@@ -38,7 +41,7 @@ import {
 const transactionScreenLog = createLogger('TransactionScreen');
 
 const PARSE_ERROR_MESSAGE =
-	'Use "description amount", e.g. coffee 5.75 or paycheck 1200.';
+	'Use "description amount", e.g. coffee 5.75, paycheck 1200, or tip 45.';
 
 /** Clears any legacy draft from the old multi-field Capture screen. */
 const LEGACY_FORM_STATE_KEY = 'transaction_form_state';
@@ -226,124 +229,124 @@ export default function TransactionScreenProModern() {
 						contentInsetAdjustmentBehavior="never"
 						showsVerticalScrollIndicator={false}
 					>
-					<View style={styles.formWrap}>
-						<AppText.Caption color="muted" style={styles.kicker}>
-							Immediate capture
-						</AppText.Caption>
-						<AppText.Title style={styles.heroTitle}>Capture</AppText.Title>
-						<AppText.Caption color="muted" style={styles.heroSub}>
-							Type one entry and save instantly.
-						</AppText.Caption>
-
-						<AppCard
-							style={styles.captureCard}
-							padding={space.lg}
-							borderRadius={radius.xl}
-							bordered
-						>
-							<AppText.Label color="muted" style={styles.captureFieldLabel}>
-								New entry
-							</AppText.Label>
-							<TextInput
-								ref={captureLineRef}
-								style={styles.captureInput}
-								value={captureLine}
-								onChangeText={onCaptureLineChange}
-								onBlur={onCaptureBlur}
-								placeholder="Description, then amount (e.g. coffee 5.75)"
-								placeholderTextColor={palette.textSubtle}
-								accessibilityLabel="Quick capture line"
-								returnKeyType="done"
-								onSubmitEditing={() => {
-									if (canSave) void saveEntry();
-									else Keyboard.dismiss();
-								}}
-								autoCapitalize="sentences"
-								autoCorrect
-							/>
-							{parsedSummary ? (
-								<View style={styles.previewSummary}>
-									<Text style={styles.previewSummaryText}>
-										{parsedSummary}
-									</Text>
-								</View>
-							) : null}
-							{captureParseError ? (
-								<AppText.Caption color="danger" style={styles.captureError}>
-									{captureParseError}
-								</AppText.Caption>
-							) : null}
-							{isSubmitting ? (
-								<AppText.Caption color="muted" style={styles.savingHint}>
-									Saving to server…
-								</AppText.Caption>
-							) : null}
-							{isSaveFeedbackVisible ? (
-								<Animated.View
-									pointerEvents="none"
-									style={[
-										styles.savedToast,
-										{
-											opacity: saveFeedbackAnim,
-											transform: [
-												{
-													translateY: saveFeedbackAnim.interpolate({
-														inputRange: [0, 1],
-														outputRange: [6, 0],
-													}),
-												},
-											],
-										},
-									]}
-								>
-									<AppText.Caption style={styles.savedToastText}>
-										Saved
-									</AppText.Caption>
-								</Animated.View>
-							) : null}
-							{recentChips.length > 0 ? (
-								<View style={styles.chipsSection}>
-									<AppText.Caption color="muted" style={styles.chipsLabel}>
-										Recent
-									</AppText.Caption>
-									<ScrollView
-										horizontal
-										showsHorizontalScrollIndicator={false}
-										contentContainerStyle={styles.chipsRow}
-									>
-										{recentChips.map((chip) => (
-											<TouchableOpacity
-												key={chip}
-												style={styles.recentChip}
-												onPress={() => onCaptureLineChange(chip)}
-											>
-												<Text style={styles.recentChipText} numberOfLines={1}>
-													{chip}
-												</Text>
-											</TouchableOpacity>
-										))}
-									</ScrollView>
-								</View>
-							) : null}
-							<View style={styles.saveSection}>
-								<AppButton
-									label={isSubmitting ? 'Saving to server…' : 'Save entry'}
-									variant="primary"
-									icon={isSubmitting ? undefined : 'checkmark-outline'}
-									onPress={() => void saveEntry()}
-									disabled={isSubmitting || !canSave}
-									loading={isSubmitting}
-									fullWidth
-									style={styles.saveButton}
-									accessibilityLabel="Save capture entry"
-								/>
-							</View>
-							<AppText.Caption color="muted" style={styles.footerHint}>
-								Save clears the line. Income hints: paycheck, salary, deposit,
-								refund…
+						<View style={styles.formWrap}>
+							<AppText.Caption color="muted" style={styles.kicker}>
+								Immediate capture
 							</AppText.Caption>
-						</AppCard>
-					</View>
+							<AppText.Title style={styles.heroTitle}>Capture</AppText.Title>
+							<AppText.Caption color="muted" style={styles.heroSub}>
+								Type one entry and save instantly.
+							</AppText.Caption>
+
+							<AppCard
+								style={styles.captureCard}
+								padding={space.lg}
+								borderRadius={radius.xl}
+								bordered
+							>
+								<AppText.Label color="muted" style={styles.captureFieldLabel}>
+									New entry
+								</AppText.Label>
+								<TextInput
+									ref={captureLineRef}
+									style={styles.captureInput}
+									value={captureLine}
+									onChangeText={onCaptureLineChange}
+									onBlur={onCaptureBlur}
+									placeholder="Description, then amount (e.g. tip 45 or coffee 5.75)"
+									placeholderTextColor={palette.textSubtle}
+									accessibilityLabel="Quick capture line"
+									returnKeyType="done"
+									onSubmitEditing={() => {
+										if (canSave) void saveEntry();
+										else Keyboard.dismiss();
+									}}
+									autoCapitalize="sentences"
+									autoCorrect
+								/>
+								{parsedSummary ? (
+									<View style={styles.previewSummary}>
+										<Text style={styles.previewSummaryText}>
+											{parsedSummary}
+										</Text>
+									</View>
+								) : null}
+								{captureParseError ? (
+									<AppText.Caption color="danger" style={styles.captureError}>
+										{captureParseError}
+									</AppText.Caption>
+								) : null}
+								{isSubmitting ? (
+									<AppText.Caption color="muted" style={styles.savingHint}>
+										Saving to server…
+									</AppText.Caption>
+								) : null}
+								{isSaveFeedbackVisible ? (
+									<Animated.View
+										pointerEvents="none"
+										style={[
+											styles.savedToast,
+											{
+												opacity: saveFeedbackAnim,
+												transform: [
+													{
+														translateY: saveFeedbackAnim.interpolate({
+															inputRange: [0, 1],
+															outputRange: [6, 0],
+														}),
+													},
+												],
+											},
+										]}
+									>
+										<AppText.Caption style={styles.savedToastText}>
+											Saved
+										</AppText.Caption>
+									</Animated.View>
+								) : null}
+								{recentChips.length > 0 ? (
+									<View style={styles.chipsSection}>
+										<AppText.Caption color="muted" style={styles.chipsLabel}>
+											Recent
+										</AppText.Caption>
+										<ScrollView
+											horizontal
+											showsHorizontalScrollIndicator={false}
+											contentContainerStyle={styles.chipsRow}
+										>
+											{recentChips.map((chip) => (
+												<TouchableOpacity
+													key={chip}
+													style={styles.recentChip}
+													onPress={() => onCaptureLineChange(chip)}
+												>
+													<Text style={styles.recentChipText} numberOfLines={1}>
+														{chip}
+													</Text>
+												</TouchableOpacity>
+											))}
+										</ScrollView>
+									</View>
+								) : null}
+								<View style={styles.saveSection}>
+									<AppButton
+										label={isSubmitting ? 'Saving to server…' : 'Save entry'}
+										variant="primary"
+										icon={isSubmitting ? undefined : 'checkmark-outline'}
+										onPress={() => void saveEntry()}
+										disabled={isSubmitting || !canSave}
+										loading={isSubmitting}
+										fullWidth
+										style={styles.saveButton}
+										accessibilityLabel="Save capture entry"
+									/>
+								</View>
+								<AppText.Caption color="muted" style={styles.footerHint}>
+									Save clears the line. Income hints: tip, paycheck, salary,
+									deposit, refund…
+								</AppText.Caption>
+							</AppCard>
+						</View>
 
 						<View
 							style={{

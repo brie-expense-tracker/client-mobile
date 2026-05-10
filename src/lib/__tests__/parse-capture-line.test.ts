@@ -19,6 +19,28 @@ describe('parseCaptureLine', () => {
 		});
 	});
 
+	it('parses tips as income for service workers', () => {
+		expect(parseCaptureLine('tip 45')).toEqual({
+			description: 'tip',
+			type: 'income',
+			amount: 45,
+		});
+		expect(parseCaptureLine('tips 12.50')).toEqual({
+			description: 'tips',
+			type: 'income',
+			amount: 12.5,
+		});
+	});
+
+	it('does not treat stipend as tip income', () => {
+		const r = parseCaptureLine('stipend 500');
+		expect(r).toEqual({
+			description: 'stipend',
+			type: 'expense',
+			amount: -500,
+		});
+	});
+
 	it('returns null without amount', () => {
 		expect(parseCaptureLine('just text')).toBeNull();
 	});

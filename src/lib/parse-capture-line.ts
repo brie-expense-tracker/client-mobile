@@ -2,7 +2,8 @@
  * Parse a single capture line like `coffee 5.75` or `paycheck 1200`.
  * Keep in sync with `apps/web/src/lib/parse-capture-line.ts`.
  */
-const INCOME_HINT = /paycheck|salary|deposit|income|paid me|reimbursement|refund/i;
+const INCOME_HINT =
+	/paycheck|salary|deposit|income|paid me|reimbursement|refund|\b(?:tips?|gratuity)\b/i;
 const NUMBER_IN_TEXT = /-?\$?\d[\d,]*(?:[.,]\d+)?/;
 
 export function parseCaptureLine(line: string): {
