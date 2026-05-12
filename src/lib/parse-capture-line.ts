@@ -34,3 +34,18 @@ export function parseCaptureLine(line: string): {
 	}
 	return { description, type: 'expense', amount: -Math.abs(n) };
 }
+
+/** Normalize display order to `description amount` regardless of input order. */
+export function formatCaptureLine(line: string): string {
+	const trimmed = line.trim();
+	if (!trimmed) return trimmed;
+
+	const parsed = parseCaptureLine(trimmed);
+	if (!parsed) return trimmed;
+
+	const amountMatch = trimmed.match(NUMBER_IN_TEXT);
+	const amountText =
+		amountMatch?.[0].replace(/^\$/, '') ?? String(Math.abs(parsed.amount));
+
+	return `${parsed.description} ${amountText}`;
+}

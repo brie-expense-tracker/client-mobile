@@ -1,3 +1,4 @@
+import { formatCaptureLine } from './parse-capture-line';
 import { getItem, setItem } from '../utils/safeStorage';
 
 const STORAGE_KEY = 'capture_recent_chips';
@@ -9,14 +10,17 @@ export async function loadCaptureRecentChips(): Promise<string[]> {
 		if (!raw) return [];
 		const parsed = JSON.parse(raw) as unknown;
 		if (!Array.isArray(parsed)) return [];
-		return parsed.filter((x): x is string => typeof x === 'string').slice(0, MAX);
+		return parsed
+			.filter((x): x is string => typeof x === 'string')
+			.map(formatCaptureLine)
+			.slice(0, MAX);
 	} catch {
 		return [];
 	}
 }
 
 export async function pushCaptureRecentChip(line: string): Promise<void> {
-	const trimmed = line.trim();
+	const trimmed = formatCaptureLine(line);
 	if (!trimmed) return;
 	try {
 		const prev = await loadCaptureRecentChips();

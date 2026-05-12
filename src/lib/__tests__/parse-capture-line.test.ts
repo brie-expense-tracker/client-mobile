@@ -1,4 +1,4 @@
-import { parseCaptureLine } from '../parse-capture-line';
+import { formatCaptureLine, parseCaptureLine } from '../parse-capture-line';
 
 describe('parseCaptureLine', () => {
 	it('parses expense description then amount', () => {
@@ -51,5 +51,13 @@ describe('parseCaptureLine', () => {
 
 	it('returns null without amount', () => {
 		expect(parseCaptureLine('just text')).toBeNull();
+	});
+
+	it('formats capture lines with description before amount', () => {
+		expect(formatCaptureLine('coffee 5.75')).toBe('coffee 5.75');
+		expect(formatCaptureLine('5.75 coffee')).toBe('coffee 5.75');
+		expect(formatCaptureLine('230 tips')).toBe('tips 230');
+		expect(formatCaptureLine('tips 230')).toBe('tips 230');
+		expect(formatCaptureLine('  $12.50 tip  ')).toBe('tip 12.50');
 	});
 });
