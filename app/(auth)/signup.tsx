@@ -17,7 +17,6 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import useAuth from '../../src/context/AuthContext';
 import { RectButton, BorderlessButton } from 'react-native-gesture-handler';
-import { AppleButton } from '@invertase/react-native-apple-authentication';
 import { createLogger } from '../../src/utils/sublogger';
 import {
 	isAppleSignInAvailable,
@@ -347,7 +346,7 @@ export default function Signup() {
 								<Text
 									style={[styles.dividerText, { color: palette.textMuted }]}
 								>
-									or continue with
+									or
 								</Text>
 								<View
 									style={[styles.divider, { backgroundColor: palette.border }]}
@@ -356,13 +355,20 @@ export default function Signup() {
 
 							{/* Socials */}
 							{showAppleSignIn && (
-								<AppleButton
-									buttonStyle={AppleButton.Style.WHITE}
-									buttonType={AppleButton.Type.SIGN_UP}
-									cornerRadius={radius.xl2}
-									style={styles.appleButton}
+								<RectButton
 									onPress={handleAppleSignUp}
-								/>
+									enabled={!isLoading}
+									style={[
+										styles.socialButton,
+										socialShadow,
+										{ opacity: isLoading ? 0.6 : 1 },
+									]}
+								>
+									<Ionicons name="logo-apple" size={22} color={palette.text} />
+									<Text style={styles.socialButtonText}>
+										{isLoading ? 'Creating account…' : 'Sign up with Apple'}
+									</Text>
+								</RectButton>
 							)}
 							<RectButton
 								onPress={handleGoogleSignUp}
@@ -375,7 +381,7 @@ export default function Signup() {
 							>
 								<Ionicons name="logo-google" size={22} color={palette.text} />
 								<Text style={styles.socialButtonText}>
-									{isLoading ? 'Creating account…' : 'Google'}
+									{isLoading ? 'Creating account…' : 'Sign up with Google'}
 								</Text>
 							</RectButton>
 						</View>
@@ -557,11 +563,6 @@ const styles = StyleSheet.create({
 	},
 	divider: { flex: 1, height: StyleSheet.hairlineWidth },
 	dividerText: { marginHorizontal: 10, fontSize: 13 },
-	appleButton: {
-		width: '100%',
-		height: 48,
-		marginBottom: 10,
-	},
 	socialButton: {
 		flexDirection: 'row',
 		alignItems: 'center',

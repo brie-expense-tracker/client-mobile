@@ -19,7 +19,6 @@ import auth from '@react-native-firebase/auth';
 import * as Haptics from 'expo-haptics';
 import useAuth from '../../src/context/AuthContext';
 import { RectButton, BorderlessButton } from 'react-native-gesture-handler';
-import { AppleButton } from '@invertase/react-native-apple-authentication';
 import {
 	isAppleSignInAvailable,
 	isAppleSignInCancelled,
@@ -577,7 +576,7 @@ export default function Login() {
 								<Text
 									style={[styles.dividerText, { color: palette.textMuted }]}
 								>
-									or continue with
+									or
 								</Text>
 								<View
 									style={[styles.divider, { backgroundColor: palette.border }]}
@@ -586,13 +585,20 @@ export default function Login() {
 
 							{/* Socials */}
 							{showAppleSignIn && (
-								<AppleButton
-									buttonStyle={AppleButton.Style.WHITE}
-									buttonType={AppleButton.Type.SIGN_IN}
-									cornerRadius={radius.xl2}
-									style={styles.appleButton}
+								<RectButton
 									onPress={handleAppleSignIn}
-								/>
+									enabled={!isLoading}
+									style={[
+										styles.socialButton,
+										socialShadow,
+										{ opacity: isLoading ? 0.6 : 1 },
+									]}
+								>
+									<Ionicons name="logo-apple" size={22} color={palette.text} />
+									<Text style={styles.socialButtonText}>
+										{isLoading ? 'Signing in…' : 'Sign in with Apple'}
+									</Text>
+								</RectButton>
 							)}
 							<RectButton
 								onPress={handleGoogleSignIn}
@@ -605,7 +611,7 @@ export default function Login() {
 							>
 								<Ionicons name="logo-google" size={22} color={palette.text} />
 								<Text style={styles.socialButtonText}>
-									{isLoading ? 'Signing in…' : 'Google'}
+									{isLoading ? 'Signing in…' : 'Sign in with Google'}
 								</Text>
 							</RectButton>
 						</View>
@@ -809,11 +815,6 @@ const styles = StyleSheet.create({
 	},
 	divider: { flex: 1, height: StyleSheet.hairlineWidth },
 	dividerText: { marginHorizontal: 10, fontSize: 13 },
-	appleButton: {
-		width: '100%',
-		height: 48,
-		marginBottom: 10,
-	},
 	socialButton: {
 		flexDirection: 'row',
 		alignItems: 'center',
