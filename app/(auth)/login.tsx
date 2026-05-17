@@ -19,6 +19,11 @@ import auth from '@react-native-firebase/auth';
 import * as Haptics from 'expo-haptics';
 import useAuth from '../../src/context/AuthContext';
 import { RectButton, BorderlessButton } from 'react-native-gesture-handler';
+import { AppleButton } from '@invertase/react-native-apple-authentication';
+import {
+	isAppleSignInAvailable,
+	isAppleSignInCancelled,
+} from '../../src/services/appleSignIn';
 import { createLogger } from '../../src/utils/sublogger';
 import { setUseLocalMode } from '../../src/storage/localModeStorage';
 import { palette, radius } from '../../src/ui/theme';
@@ -114,7 +119,14 @@ export default function Login() {
 	const [isLoading, setIsLoading] = useState(false);
 	const [showPassword, setShowPassword] = useState(false);
 	const [formError, setFormError] = useState<string | null>(null);
-	const { login, signInWithGoogle, error: authError, clearError } = useAuth();
+	const {
+		login,
+		signInWithGoogle,
+		signInWithApple,
+		error: authError,
+		clearError,
+	} = useAuth();
+	const showAppleSignIn = isAppleSignInAvailable();
 
 	const isValidEmail = (val: string) =>
 		/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim().toLowerCase());
@@ -351,6 +363,34 @@ export default function Login() {
 		}
 	}, [isLoading, signInWithGoogle, authError, clearError]);
 
+	const handleAppleSignIn = useCallback(async () => {
+		if (isLoading) return;
+
+		setFormError(null);
+		if (authError) {
+			clearError();
+		}
+
+		setIsLoading(true);
+		try {
+			await signInWithApple();
+			await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+		} catch (error: unknown) {
+			if (isAppleSignInCancelled(error)) {
+				return;
+			}
+			const err = error as { code?: string; message?: string };
+			const errorMessage =
+				err?.message || 'Apple Sign-In failed. Please try again.';
+			loginScreenLog.warn('Apple Sign-In error', error);
+			await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+			setFormError(errorMessage);
+			Alert.alert('Sign In Failed', errorMessage, [{ text: 'OK' }]);
+		} finally {
+			setIsLoading(false);
+		}
+	}, [isLoading, signInWithApple, authError, clearError]);
+
 	const onBlurEmail = () => setTouched((t) => ({ ...t, email: true }));
 	const onBlurPassword = () => setTouched((t) => ({ ...t, password: true }));
 
@@ -545,6 +585,15 @@ export default function Login() {
 							</View>
 
 							{/* Socials */}
+							{showAppleSignIn && (
+								<AppleButton
+									buttonStyle={AppleButton.Style.WHITE}
+									buttonType={AppleButton.Type.SIGN_IN}
+									cornerRadius={radius.xl2}
+									style={styles.appleButton}
+									onPress={handleAppleSignIn}
+								/>
+							)}
 							<RectButton
 								onPress={handleGoogleSignIn}
 								enabled={!isLoading}
@@ -760,6 +809,11 @@ const styles = StyleSheet.create({
 	},
 	divider: { flex: 1, height: StyleSheet.hairlineWidth },
 	dividerText: { marginHorizontal: 10, fontSize: 13 },
+	appleButton: {
+		width: '100%',
+		height: 48,
+		marginBottom: 10,
+	},
 	socialButton: {
 		flexDirection: 'row',
 		alignItems: 'center',

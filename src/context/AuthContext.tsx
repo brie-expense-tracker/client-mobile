@@ -28,6 +28,10 @@ import { ApiService } from '../services/core/apiService';
 import { authService } from '../services/authService';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { configureGoogleSignIn } from '../config/googleSignIn';
+import {
+	getAppleAuthCredential,
+	isAppleSignInCancelled,
+} from '../services/appleSignIn';
 import { createLogger } from '../utils/sublogger';
 
 const authContextLog = createLogger('AuthContext');
@@ -78,6 +82,10 @@ export type AuthContextType = {
 	signInWithGoogle: () => Promise<void>;
 	signUpWithGoogle: () => Promise<void>;
 
+	// Apple Sign-In methods (iOS)
+	signInWithApple: () => Promise<void>;
+	signUpWithApple: () => Promise<void>;
+
 	// Account linking
 	linkPassword: (email: string, password: string) => Promise<void>;
 
@@ -92,6 +100,7 @@ export type AuthContextType = {
 	deleteAccountFlow: (options?: DeleteAccountOptions) => Promise<void>;
 	reauthWithPassword: (password: string) => Promise<void>;
 	reauthWithGoogle: () => Promise<void>;
+	reauthWithApple: () => Promise<void>;
 	refreshUserData: () => Promise<void>;
 
 	// Security features
@@ -919,6 +928,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		}
 	}, []);
 
+	const reauthWithApple = useCallback(async () => {
+		try {
+			setError(null);
+			isReauthInProgressRef.current = true;
+
+			const currentUser = getAuth().currentUser;
+			if (!currentUser) {
+				throw Object.assign(new Error('No authenticated user'), {
+					code: 'auth/no-current-user',
+				});
+			}
+
+			authContextLog.debug('Starting Apple reauthentication');
+			const { credential } = await getAppleAuthCredential();
+			await currentUser.reauthenticateWithCredential(credential);
+			await currentUser.reload();
+			authContextLog.info('Apple reauthentication successful');
+		} catch (error: any) {
+			if (isAppleSignInCancelled(error)) {
+				throw Object.assign(new Error('Apple Sign-In was cancelled.'), {
+					code: 'auth/cancelled',
+				});
+			}
+			authContextLog.error('Apple reauthentication error', error);
+			const normalized = {
+				code: error?.code || 'auth/reauth-failed',
+				message: error?.message || 'Failed to reauthenticate.',
+				details: error,
+			};
+			setError(normalized);
+			throw Object.assign(new Error(normalized.message), {
+				code: normalized.code,
+			});
+		} finally {
+			isReauthInProgressRef.current = false;
+		}
+	}, []);
+
 	const logout = useCallback(async () => {
 		try {
 			await signOut(getAuth());
@@ -1233,6 +1280,73 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			}, 1000);
 		}
 	}, [login]);
+
+	const signInWithApple = useCallback(async () => {
+		try {
+			authContextLog.debug('Starting Apple Sign-In flow');
+			isManualLoginRef.current = true;
+			setLoading(true);
+			setError(null);
+
+			const { credential, displayName } = await getAppleAuthCredential();
+			const { signInWithCredential } = await import(
+				'@react-native-firebase/auth'
+			);
+			const userCredential = await signInWithCredential(getAuth(), credential);
+			const fbUser = userCredential.user;
+
+			if (displayName && !fbUser.displayName) {
+				try {
+					await fbUser.updateProfile({ displayName });
+				} catch {
+					// non-fatal
+				}
+			}
+
+			authContextLog.info('Firebase Apple auth successful', {
+				uid: fbUser.uid.substring(0, 12) + '...',
+			});
+			await login(fbUser);
+		} catch (error: any) {
+			if (isAppleSignInCancelled(error)) {
+				authContextLog.debug('Apple Sign-In cancelled by user');
+				setLoading(false);
+				return;
+			}
+
+			authContextLog.error('ERROR in signInWithApple', {
+				code: error.code,
+				message: error.message,
+			});
+
+			if (error?.code === 'auth/account-exists-with-different-credential') {
+				setError({
+					code: 'ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL',
+					message:
+						'This email is already using a different sign-in method. Sign in with that method first.',
+					details: error,
+				});
+				setLoading(false);
+				return;
+			}
+
+			setError({
+				code: 'APPLE_SIGNIN_ERROR',
+				message: 'Failed to sign in with Apple',
+				details: error,
+			});
+			setLoading(false);
+			throw error;
+		} finally {
+			setTimeout(() => {
+				isManualLoginRef.current = false;
+			}, 1000);
+		}
+	}, [login]);
+
+	const signUpWithApple = useCallback(async () => {
+		await signInWithApple();
+	}, [signInWithApple]);
 
 	const signUpWithGoogle = useCallback(async () => {
 		try {
@@ -1651,9 +1765,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 						'deleteAccountFlow: Reauthenticating with Google'
 					);
 					await reauthWithGoogle();
+				} else if (providerId === 'apple.com') {
+					authContextLog.debug(
+						'deleteAccountFlow: Reauthenticating with Apple'
+					);
+					await reauthWithApple();
 				} else {
-					// For other providers (apple.com, etc.), we might not need reauth
-					// or handle them differently. For now, log a warning.
 					authContextLog.warn(
 						'deleteAccountFlow: Unknown providerId, skipping reauth',
 						{ providerId }
@@ -1681,6 +1798,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			firebaseUser,
 			reauthWithPassword,
 			reauthWithGoogle,
+			reauthWithApple,
 			deleteAccountAfterReauth,
 		]
 	);
@@ -1779,6 +1897,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			signInWithGoogle,
 			signUpWithGoogle,
 
+			// Apple Sign-In methods
+			signInWithApple,
+			signUpWithApple,
+
 			// Account linking
 			linkPassword,
 
@@ -1793,6 +1915,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			deleteAccountFlow,
 			reauthWithPassword,
 			reauthWithGoogle,
+			reauthWithApple,
 			refreshUserData,
 
 			// Security features
@@ -1818,6 +1941,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			createUserInMongoDB,
 			signInWithGoogle,
 			signUpWithGoogle,
+			signInWithApple,
+			signUpWithApple,
 			linkPassword,
 			sendPasswordResetEmailToUser,
 			confirmPasswordResetCode,
@@ -1827,6 +1952,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			deleteAccountFlow,
 			reauthWithPassword,
 			reauthWithGoogle,
+			reauthWithApple,
 			refreshUserData,
 			checkSessionValidity,
 			extendSession,

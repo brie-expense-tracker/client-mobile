@@ -63,6 +63,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 		newArchEnabled: true, // Enable New Architecture for all builds for better performance
 		ios: {
 			supportsTablet: true,
+			usesAppleSignIn: true,
 			bundleIdentifier: 'com.brie.mobile',
 			// Let EAS handle buildNumber via autoIncrement in eas.json
 			googleServicesFile:

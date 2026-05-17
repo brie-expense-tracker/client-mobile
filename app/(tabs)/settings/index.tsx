@@ -5,7 +5,6 @@ import {
 	ScrollView,
 	TouchableOpacity,
 	Text,
-	Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -325,13 +324,7 @@ function ProfileContent() {
 					/>
 					<TouchableOpacity
 						style={styles.deleteAccountButton}
-						onPress={() =>
-							Alert.alert(
-								'Delete account',
-								'Account deletion is not available yet. Contact support if you need help.',
-								[{ text: 'OK' }],
-							)
-						}
+						onPress={() => router.push('/settings/deleteAccount')}
 						activeOpacity={0.8}
 					>
 						<Text style={styles.deleteAccountText}>Delete account</Text>

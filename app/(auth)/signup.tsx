@@ -17,7 +17,12 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import useAuth from '../../src/context/AuthContext';
 import { RectButton, BorderlessButton } from 'react-native-gesture-handler';
+import { AppleButton } from '@invertase/react-native-apple-authentication';
 import { createLogger } from '../../src/utils/sublogger';
+import {
+	isAppleSignInAvailable,
+	isAppleSignInCancelled,
+} from '../../src/services/appleSignIn';
 import { palette, radius } from '../../src/ui/theme';
 
 const signupScreenLog = createLogger('SignupScreen');
@@ -40,7 +45,8 @@ export default function Signup() {
 	const [isLoading, setIsLoading] = useState(false);
 	const [showPassword, setShowPassword] = useState(false);
 	const [formError, setFormError] = useState<string | null>(null);
-	const { signup, signUpWithGoogle } = useAuth();
+	const { signup, signUpWithGoogle, signUpWithApple } = useAuth();
+	const showAppleSignIn = isAppleSignInAvailable();
 
 	const isValidEmail = (val: string) =>
 		/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim().toLowerCase());
@@ -141,6 +147,28 @@ export default function Signup() {
 			setIsLoading(false);
 		}
 	}, [isLoading, signUpWithGoogle]);
+
+	const handleAppleSignUp = useCallback(async () => {
+		if (isLoading) return;
+		setFormError(null);
+		setIsLoading(true);
+		try {
+			await signUpWithApple();
+			await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+		} catch (error: unknown) {
+			if (isAppleSignInCancelled(error)) {
+				return;
+			}
+			const err = error as { message?: string };
+			const errorMessage =
+				err?.message || 'Apple Sign-In failed. Please try again.';
+			signupScreenLog.warn('Apple Sign-Up error', error);
+			setFormError(errorMessage);
+			await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+		} finally {
+			setIsLoading(false);
+		}
+	}, [isLoading, signUpWithApple]);
 
 	const onBlurEmail = () => setTouched((t) => ({ ...t, email: true }));
 	const onBlurPassword = () => setTouched((t) => ({ ...t, password: true }));
@@ -327,6 +355,15 @@ export default function Signup() {
 							</View>
 
 							{/* Socials */}
+							{showAppleSignIn && (
+								<AppleButton
+									buttonStyle={AppleButton.Style.WHITE}
+									buttonType={AppleButton.Type.SIGN_UP}
+									cornerRadius={radius.xl2}
+									style={styles.appleButton}
+									onPress={handleAppleSignUp}
+								/>
+							)}
 							<RectButton
 								onPress={handleGoogleSignUp}
 								enabled={!isLoading}
@@ -520,6 +557,11 @@ const styles = StyleSheet.create({
 	},
 	divider: { flex: 1, height: StyleSheet.hairlineWidth },
 	dividerText: { marginHorizontal: 10, fontSize: 13 },
+	appleButton: {
+		width: '100%',
+		height: 48,
+		marginBottom: 10,
+	},
 	socialButton: {
 		flexDirection: 'row',
 		alignItems: 'center',
