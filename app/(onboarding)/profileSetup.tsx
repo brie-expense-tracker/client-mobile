@@ -185,7 +185,11 @@ const OnboardingScreen = () => {
 	if (touched.lastName && !isValidName(lastName)) {
 		errors.lastName = 'Last name must be at least 2 characters.';
 	}
-	if (touched.monthlyIncome && monthlyIncome && !isValidCurrency(monthlyIncome)) {
+	if (
+		touched.monthlyIncome &&
+		monthlyIncome &&
+		!isValidCurrency(monthlyIncome)
+	) {
 		errors.monthlyIncome = 'Enter a valid amount.';
 	}
 
@@ -205,21 +209,37 @@ const OnboardingScreen = () => {
 
 	// MVP: Only name + monthly income required
 	const isFieldRequired = useCallback((fieldName: string) => {
-		return fieldName === 'firstName' || fieldName === 'lastName' || fieldName === 'monthlyIncome';
+		return (
+			fieldName === 'firstName' ||
+			fieldName === 'lastName' ||
+			fieldName === 'monthlyIncome'
+		);
 	}, []);
 
 	const shouldShowErrorAsterisk = useCallback(
 		(fieldName: string) => {
 			if (currentIndex !== 1) return false;
-			if (fieldName === 'firstName' && touched.firstName && !isValidName(firstName))
+			if (
+				fieldName === 'firstName' &&
+				touched.firstName &&
+				!isValidName(firstName)
+			)
 				return true;
-			if (fieldName === 'lastName' && touched.lastName && !isValidName(lastName))
+			if (
+				fieldName === 'lastName' &&
+				touched.lastName &&
+				!isValidName(lastName)
+			)
 				return true;
-			if (fieldName === 'monthlyIncome' && touched.monthlyIncome && !isValidCurrency(monthlyIncome))
+			if (
+				fieldName === 'monthlyIncome' &&
+				touched.monthlyIncome &&
+				!isValidCurrency(monthlyIncome)
+			)
 				return true;
 			return false;
 		},
-		[currentIndex, touched, firstName, lastName, monthlyIncome]
+		[currentIndex, touched, firstName, lastName, monthlyIncome],
 	);
 
 	// Currency input handlers
@@ -230,7 +250,7 @@ const OnboardingScreen = () => {
 				setter(formatted);
 			}
 		},
-		[]
+		[],
 	);
 
 	const onBlurField = useCallback((field: keyof typeof touched) => {
@@ -291,7 +311,7 @@ const OnboardingScreen = () => {
 				Alert.alert(
 					'Invalid First Name',
 					'Please enter at least 2 characters for your first name.',
-					[{ text: 'OK' }]
+					[{ text: 'OK' }],
 				);
 				throw new Error('First name must be at least 2 characters long');
 			}
@@ -299,7 +319,7 @@ const OnboardingScreen = () => {
 				Alert.alert(
 					'Invalid Last Name',
 					'Please enter at least 2 characters for your last name.',
-					[{ text: 'OK' }]
+					[{ text: 'OK' }],
 				);
 				throw new Error('Last name must be at least 2 characters long');
 			}
@@ -315,7 +335,11 @@ const OnboardingScreen = () => {
 				firstName: trimmedFirstName,
 				lastName: trimmedLastName,
 				monthlyIncome: monthlyIncomeNumber,
-				expenses: { housing: housingNum, loans: loansNum, subscriptions: subsNum },
+				expenses: {
+					housing: housingNum,
+					loans: loansNum,
+					subscriptions: subsNum,
+				},
 				savings: savingsNum,
 				debt: debtNum,
 			});
@@ -366,7 +390,7 @@ const OnboardingScreen = () => {
 				errorMessage.includes('Last name')
 			) {
 				logger.error(
-					'⚠️ [ProfileSetup] Validation error, staying on current screen'
+					'⚠️ [ProfileSetup] Validation error, staying on current screen',
 				);
 				// Don't navigate away on validation errors (Alert already shown above)
 				return;
@@ -376,26 +400,26 @@ const OnboardingScreen = () => {
 			Alert.alert(
 				'Error Saving Profile',
 				`We encountered an issue: ${errorMessage}. You can continue setup and try again later in Settings.`,
-				[{ text: 'OK' }]
+				[{ text: 'OK' }],
 			);
 
 			// For other errors, try to continue to notification setup
 			logger.debug(
-				'⚠️ [ProfileSetup] Non-validation error, attempting to continue...'
+				'⚠️ [ProfileSetup] Non-validation error, attempting to continue...',
 			);
 			try {
 				router.push('/(onboarding)/notificationSetup');
 			} catch (onboardingError) {
 				logger.error(
 					'❌ [ProfileSetup] Error navigating to notification setup:',
-					onboardingError
+					onboardingError,
 				);
 				// Fallback to dashboard if navigation fails
 				router.replace('/(tabs)/dashboard');
 			}
 		} finally {
 			logger.debug(
-				'🏁 [ProfileSetup] Submission complete, resetting submitting flag'
+				'🏁 [ProfileSetup] Submission complete, resetting submitting flag',
 			);
 			setSubmitting(false);
 		}
@@ -447,12 +471,8 @@ const OnboardingScreen = () => {
 										color={palette.primary}
 									/>
 								</View>
-								<Text style={styles.welcomeTitle}>
-									Welcome to Brie
-								</Text>
-								<Text style={styles.welcomeSubtitle}>
-									Track your cash
-								</Text>
+								<Text style={styles.welcomeTitle}>Welcome to Brie</Text>
+								<Text style={styles.welcomeSubtitle}>Track your cash</Text>
 								<Text style={styles.welcomeDescription}>
 									A few quick details to personalize your experience. You can
 									change everything later in Profile.
@@ -476,13 +496,11 @@ const OnboardingScreen = () => {
 							keyboardShouldPersistTaps="handled"
 							keyboardDismissMode="interactive"
 						>
-							<Text style={styles.title}>
-								Let&apos;s get to know you
-							</Text>
+							<Text style={styles.title}>Let&apos;s get to know you</Text>
 							<Text style={styles.subtitle}>
 								Fields marked
-								<Text style={styles.requiredMark}> *</Text> are required.
-								You can change everything later in Profile.
+								<Text style={styles.requiredMark}> *</Text> are required. You
+								can change everything later in Profile.
 							</Text>
 							<View style={styles.inputContainer}>
 								<Text style={styles.label}>
@@ -586,7 +604,11 @@ const OnboardingScreen = () => {
 								</Text>
 								<View style={[styles.inputWithIcon, inputShadow]}>
 									<View style={styles.inputIcon}>
-										<Ionicons name="logo-usd" size={18} color={palette.textMuted} />
+										<Ionicons
+											name="logo-usd"
+											size={18}
+											color={palette.textMuted}
+										/>
 									</View>
 									<TextInput
 										ref={monthlyIncomeRef}
@@ -633,20 +655,20 @@ const OnboardingScreen = () => {
 							keyboardShouldPersistTaps="handled"
 							keyboardDismissMode="interactive"
 						>
-							<Text style={styles.title}>
-								Money snapshot
-							</Text>
+							<Text style={styles.title}>Money snapshot</Text>
 							<Text style={styles.subtitle}>
 								Optional. Helps personalize your experience. Enter 0 to skip any
 								field—you can update these anytime in Profile.
 							</Text>
 							<View style={styles.inputContainer}>
-								<Text style={styles.label}>
-									Monthly housing
-								</Text>
+								<Text style={styles.label}>Monthly housing</Text>
 								<View style={[styles.inputWithIcon, inputShadow]}>
 									<View style={styles.inputIcon}>
-										<Ionicons name="logo-usd" size={18} color={palette.textMuted} />
+										<Ionicons
+											name="logo-usd"
+											size={18}
+											color={palette.textMuted}
+										/>
 									</View>
 									<TextInput
 										ref={housingRef}
@@ -668,12 +690,14 @@ const OnboardingScreen = () => {
 								</View>
 							</View>
 							<View style={styles.inputContainer}>
-								<Text style={styles.label}>
-									Monthly loans
-								</Text>
+								<Text style={styles.label}>Monthly loans</Text>
 								<View style={[styles.inputWithIcon, inputShadow]}>
 									<View style={styles.inputIcon}>
-										<Ionicons name="logo-usd" size={18} color={palette.textMuted} />
+										<Ionicons
+											name="logo-usd"
+											size={18}
+											color={palette.textMuted}
+										/>
 									</View>
 									<TextInput
 										ref={loansRef}
@@ -695,12 +719,14 @@ const OnboardingScreen = () => {
 								</View>
 							</View>
 							<View style={styles.inputContainer}>
-								<Text style={styles.label}>
-									Monthly subscriptions
-								</Text>
+								<Text style={styles.label}>Monthly subscriptions</Text>
 								<View style={[styles.inputWithIcon, inputShadow]}>
 									<View style={styles.inputIcon}>
-										<Ionicons name="logo-usd" size={18} color={palette.textMuted} />
+										<Ionicons
+											name="logo-usd"
+											size={18}
+											color={palette.textMuted}
+										/>
 									</View>
 									<TextInput
 										ref={subscriptionsRef}
@@ -722,19 +748,19 @@ const OnboardingScreen = () => {
 								</View>
 							</View>
 							<View style={styles.inputContainer}>
-								<Text style={styles.label}>
-									Savings
-								</Text>
+								<Text style={styles.label}>Savings</Text>
 								<View style={[styles.inputWithIcon, inputShadow]}>
 									<View style={styles.inputIcon}>
-										<Ionicons name="logo-usd" size={18} color={palette.textMuted} />
+										<Ionicons
+											name="logo-usd"
+											size={18}
+											color={palette.textMuted}
+										/>
 									</View>
 									<TextInput
 										ref={savingsRef}
 										value={savings}
-										onChangeText={(t) =>
-											handleCurrencyInput(t, setSavings)
-										}
+										onChangeText={(t) => handleCurrencyInput(t, setSavings)}
 										onSubmitEditing={() => debtRef.current?.focus()}
 										keyboardType={
 											Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'
@@ -749,19 +775,19 @@ const OnboardingScreen = () => {
 								</View>
 							</View>
 							<View style={styles.inputContainer}>
-								<Text style={styles.label}>
-									Debt
-								</Text>
+								<Text style={styles.label}>Debt</Text>
 								<View style={[styles.inputWithIcon, inputShadow]}>
 									<View style={styles.inputIcon}>
-										<Ionicons name="logo-usd" size={18} color={palette.textMuted} />
+										<Ionicons
+											name="logo-usd"
+											size={18}
+											color={palette.textMuted}
+										/>
 									</View>
 									<TextInput
 										ref={debtRef}
 										value={debt}
-										onChangeText={(t) =>
-											handleCurrencyInput(t, setDebt)
-										}
+										onChangeText={(t) => handleCurrencyInput(t, setDebt)}
 										onSubmitEditing={() => Keyboard.dismiss()}
 										keyboardType={
 											Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'
@@ -820,7 +846,7 @@ const OnboardingScreen = () => {
 					<View style={styles.logoContainer}>
 						<Image
 							style={styles.logoImage}
-							source={require('../../src/assets/logos/brie-logo.png')}
+							source={require('../../src/assets/logos/brie-logo-light.png')}
 						/>
 					</View>
 					<Pressable
@@ -869,7 +895,9 @@ const OnboardingScreen = () => {
 							{ opacity: stepValid && !submitting ? 1 : 0.6 },
 						]}
 						disabled={!stepValid || submitting}
-						accessibilityLabel={currentIndex < 2 ? 'Continue' : 'Complete setup'}
+						accessibilityLabel={
+							currentIndex < 2 ? 'Continue' : 'Complete setup'
+						}
 						accessibilityRole="button"
 					>
 						{submitting && currentIndex === 2 ? (
