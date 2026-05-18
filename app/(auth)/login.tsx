@@ -63,7 +63,7 @@ const getAuthErrorMessage = (error: any): string => {
 			return 'Network error. Please check your internet connection and try again.';
 
 		case 'auth/operation-not-allowed':
-			return 'This sign-in method is not enabled. Please try a different method.';
+			return 'This sign-in method is not enabled in Firebase. An admin must turn on Apple under Authentication → Sign-in methods in the Firebase console.';
 
 		case 'auth/requires-recent-login':
 			return 'For security, please sign out and sign back in, then try again.';
@@ -382,7 +382,7 @@ export default function Login() {
 			const err = error as { code?: string; message?: string };
 			const errorMessage =
 				getAppleSignInErrorMessage(error) ||
-				err?.message ||
+				getAuthErrorMessage(err) ||
 				'Apple Sign-In failed. Please try again.';
 			loginScreenLog.warn('Apple Sign-In error', error);
 			await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);

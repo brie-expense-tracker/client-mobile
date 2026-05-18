@@ -52,6 +52,9 @@ export function getAppleSignInErrorMessage(error: unknown): string | null {
 	}
 
 	const code = String((error as { code?: string | number })?.code ?? '');
+	if (code === 'auth/operation-not-allowed') {
+		return 'Apple Sign-In is not enabled in Firebase. Turn on Apple under Authentication → Sign-in methods in the Firebase console.';
+	}
 	if (
 		code === 'ERR_APPLE_AUTHENTICATION_UNAVAILABLE' ||
 		code === 'APPLE_SIGNIN_UNAVAILABLE' ||
