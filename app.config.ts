@@ -126,7 +126,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 			output: 'static',
 		},
 		plugins: [
+			'./plugins/withFmtXcode26Fix.js',
 			'expo-router',
+			'expo-apple-authentication',
 			[
 				'expo-build-properties',
 				{

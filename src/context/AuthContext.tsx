@@ -30,6 +30,7 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { configureGoogleSignIn } from '../config/googleSignIn';
 import {
 	getAppleAuthCredential,
+	getAppleSignInErrorMessage,
 	isAppleSignInCancelled,
 } from '../services/appleSignIn';
 import { createLogger } from '../utils/sublogger';
@@ -1332,7 +1333,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 			setError({
 				code: 'APPLE_SIGNIN_ERROR',
-				message: 'Failed to sign in with Apple',
+				message:
+					getAppleSignInErrorMessage(error) ||
+					'Failed to sign in with Apple. Please try again.',
 				details: error,
 			});
 			setLoading(false);

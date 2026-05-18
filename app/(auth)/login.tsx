@@ -20,6 +20,7 @@ import * as Haptics from 'expo-haptics';
 import useAuth from '../../src/context/AuthContext';
 import { RectButton, BorderlessButton } from 'react-native-gesture-handler';
 import {
+	getAppleSignInErrorMessage,
 	isAppleSignInAvailable,
 	isAppleSignInCancelled,
 } from '../../src/services/appleSignIn';
@@ -380,7 +381,9 @@ export default function Login() {
 			}
 			const err = error as { code?: string; message?: string };
 			const errorMessage =
-				err?.message || 'Apple Sign-In failed. Please try again.';
+				getAppleSignInErrorMessage(error) ||
+				err?.message ||
+				'Apple Sign-In failed. Please try again.';
 			loginScreenLog.warn('Apple Sign-In error', error);
 			await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 			setFormError(errorMessage);
