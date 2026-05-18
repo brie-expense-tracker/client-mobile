@@ -983,6 +983,7 @@ const styles = StyleSheet.create({
 		paddingHorizontal: space.md,
 		paddingVertical: space.md,
 		fontSize: 16,
+		color: palette.text,
 		borderWidth: StyleSheet.hairlineWidth,
 		borderColor: palette.border,
 		marginBottom: space.sm,
@@ -1010,6 +1011,7 @@ const styles = StyleSheet.create({
 		padding: space.md,
 		paddingHorizontal: space.md,
 		fontSize: 16,
+		color: palette.text,
 	},
 	inputIcon: {
 		paddingLeft: space.md,
