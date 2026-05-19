@@ -6,7 +6,6 @@ import {
 	SafeAreaView,
 	ScrollView,
 	TouchableOpacity,
-	Switch,
 	Alert,
 	ActivityIndicator,
 } from 'react-native';
@@ -21,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type PresetKey = 'essential' | 'quiet';
 
-// MVP: Cash-only. No insights (EXPO_PUBLIC_AI_INSIGHTS=0). Transactions + weekly summary only.
+// MVP: weekly summary + transaction alerts only (no marketing, AI, or monthly digests in UI).
 const PRESETS: Record<PresetKey, NotificationConsent> = {
 	essential: {
 		core: { budget: false, goals: false, transactions: true, system: true },
@@ -41,17 +40,17 @@ const PRESETS: Record<PresetKey, NotificationConsent> = {
 		reminders: {
 			enabled: true,
 			weeklySummary: true,
-			monthlyCheck: true,
-			overspendingAlerts: true,
+			monthlyCheck: false,
+			overspendingAlerts: false,
 		},
 	},
 	quiet: {
 		core: { budget: false, goals: false, transactions: false, system: true },
 		aiInsights: {
-			enabled: true,
+			enabled: false,
 			frequency: 'weekly',
 			pushNotifications: false,
-			emailAlerts: true,
+			emailAlerts: false,
 		},
 		marketing: {
 			enabled: false,
@@ -63,11 +62,37 @@ const PRESETS: Record<PresetKey, NotificationConsent> = {
 		reminders: {
 			enabled: true,
 			weeklySummary: true,
-			monthlyCheck: true,
+			monthlyCheck: false,
 			overspendingAlerts: false,
 		},
 	},
 };
+
+const preferencesFromConsent = (
+	consent: NotificationConsent,
+	enableNotifications: boolean
+) => ({
+	notifications: {
+		enableNotifications,
+		weeklySummary: consent.reminders.weeklySummary,
+		overspendingAlert: false,
+		aiSuggestion: false,
+		budgetMilestones: false,
+		monthlyFinancialCheck: false,
+		monthlySavingsTransfer: false,
+	},
+	aiInsights: {
+		enabled: false,
+		frequency: 'weekly' as const,
+		pushNotifications: false,
+		emailAlerts: false,
+		insightTypes: {
+			budgetingTips: false,
+			expenseReduction: false,
+			incomeSuggestions: false,
+		},
+	},
+});
 
 export default function NotificationPermissionScreen() {
 	const router = useRouter();
@@ -80,7 +105,6 @@ export default function NotificationPermissionScreen() {
 	const [consent, setConsent] = useState<NotificationConsent>(
 		PRESETS.essential
 	);
-	const [showCustomize, setShowCustomize] = useState(false);
 	const [loading, setLoading] = useState(false);
 
 	const applyPreset = (presetKey: PresetKey) => {
@@ -88,75 +112,49 @@ export default function NotificationPermissionScreen() {
 		setConsent(PRESETS[presetKey]);
 	};
 
+	const finishOnboarding = async () => {
+		await markOnboardingComplete();
+		router.replace('/(tabs)/dashboard');
+	};
+
 	const handleContinue = async () => {
 		logger.debug('🚀 [NotificationSetup] handleContinue called');
 		setLoading(true);
 		try {
-			// Only ask for OS permission when user explicitly continues
-			// This will trigger the native OS permission popup
 			logger.debug(
 				'📱 [NotificationSetup] Requesting notification permissions...'
 			);
-			// Call notificationService directly to get the push token and trigger OS popup
-			const result = await notificationService.initialize(); // triggers OS prompt
-			// Set up listeners only (no permission request)
+			const result = await notificationService.initialize();
 			notificationService.setupNotificationListeners();
 
 			const granted = result.granted;
 
 			if (granted) {
 				logger.debug('✅ [NotificationSetup] Permissions granted successfully');
-			} else {
+			} else if (!result.canAskAgain) {
 				logger.debug('⚠️ [NotificationSetup] Permissions denied');
-				// Optional: guide user if they denied
-				if (!result.canAskAgain) {
-					Alert.alert(
-						'Notifications are off',
-						'You can enable notifications later in Settings.',
-						[{ text: 'OK' }]
-					);
-				}
+				Alert.alert(
+					'Notifications are off',
+					'You can enable notifications later in Settings.',
+					[{ text: 'OK' }]
+				);
 			}
 
 			logger.debug('💾 [NotificationSetup] Saving notification preferences...');
-			await updatePreferences({
-				notifications: {
-					enableNotifications: granted,
-					weeklySummary: consent.reminders.weeklySummary,
-					overspendingAlert: consent.reminders.overspendingAlerts,
-					aiSuggestion: consent.aiInsights.enabled,
-					budgetMilestones: consent.core.budget,
-					monthlyFinancialCheck: consent.reminders.monthlyCheck,
-					monthlySavingsTransfer: false,
-				},
-				aiInsights: {
-					enabled: consent.aiInsights.enabled,
-					frequency: consent.aiInsights.frequency,
-					pushNotifications: consent.aiInsights.pushNotifications && granted,
-					emailAlerts: consent.aiInsights.emailAlerts,
-					insightTypes: {
-						budgetingTips: true,
-						expenseReduction: true,
-						incomeSuggestions: true,
-					},
-				},
-			});
+			await updatePreferences(
+				preferencesFromConsent(consent, granted)
+			);
 			logger.debug('✅ [NotificationSetup] Preferences saved successfully');
 
-			logger.debug(
-				'🎉 [NotificationSetup] Marking onboarding complete and navigating to dashboard...'
-			);
-			await markOnboardingComplete();
-			router.replace('/(tabs)/dashboard');
+			await finishOnboarding();
 
-			// Send one welcome notification after navigation (only if permissions granted)
 			if (granted) {
 				setTimeout(async () => {
 					logger.debug('🔔 [NotificationSetup] Sending welcome notification');
 					try {
 						await notificationService.sendNotification(
 							'Notifications Enabled ✅',
-							"You're all set! You'll receive weekly cash summaries and important alerts.",
+							"You're all set! You'll get a weekly cash summary and important alerts.",
 							'system',
 							undefined,
 							'high'
@@ -168,7 +166,7 @@ export default function NotificationPermissionScreen() {
 							notifError
 						);
 					}
-				}, 1000); // Delay to ensure navigation completes
+				}, 1000);
 			}
 		} catch (error) {
 			logger.error(
@@ -176,7 +174,6 @@ export default function NotificationPermissionScreen() {
 				error
 			);
 
-			// Extract error message
 			let errorMessage = 'Unknown error occurred';
 			if (error instanceof Error) {
 				errorMessage = error.message;
@@ -192,18 +189,13 @@ export default function NotificationPermissionScreen() {
 						text: 'Continue Anyway',
 						onPress: async () => {
 							try {
-								logger.debug(
-									'⚠️ [NotificationSetup] Continuing despite error, marking onboarding complete...'
-								);
-								await markOnboardingComplete();
-								router.replace('/(tabs)/dashboard');
+								await finishOnboarding();
 							} catch (fallbackError) {
 								logger.error(
 									'❌ [NotificationSetup] Error in fallback:',
 									fallbackError
 								);
-								await markOnboardingComplete();
-								router.replace('/(tabs)/dashboard');
+								await finishOnboarding();
 							}
 						},
 					},
@@ -223,69 +215,23 @@ export default function NotificationPermissionScreen() {
 		logger.debug('🚀 [NotificationSetup] handleSkip called');
 		setLoading(true);
 		try {
-			// Store preferences but with notifications disabled
 			logger.debug(
 				'💾 [NotificationSetup] Saving preferences with notifications disabled...'
 			);
-			await updatePreferences({
-				notifications: {
-					enableNotifications: false,
-					weeklySummary: consent.reminders.weeklySummary,
-					overspendingAlert: consent.reminders.overspendingAlerts,
-					aiSuggestion: consent.aiInsights.enabled,
-					budgetMilestones: consent.core.budget,
-					monthlyFinancialCheck: consent.reminders.monthlyCheck,
-					monthlySavingsTransfer: false,
-				},
-				aiInsights: {
-					enabled: consent.aiInsights.enabled,
-					frequency: consent.aiInsights.frequency,
-					pushNotifications: false, // Disabled since no system permission
-					emailAlerts: consent.aiInsights.emailAlerts,
-					insightTypes: {
-						budgetingTips: true,
-						expenseReduction: true,
-						incomeSuggestions: true,
-					},
-				},
-			});
+			await updatePreferences(preferencesFromConsent(consent, false));
 			logger.debug('✅ [NotificationSetup] Preferences saved successfully');
-
-			logger.debug(
-				'🎉 [NotificationSetup] Marking onboarding complete and navigating to dashboard...'
-			);
-			await markOnboardingComplete();
-			router.replace('/(tabs)/dashboard');
+			await finishOnboarding();
 		} catch (error) {
 			logger.error('❌ [NotificationSetup] Error in skip handler:', error);
-
-			// Extract error message
 			if (error instanceof Error) {
 				logger.error('❌ [NotificationSetup] Error message:', error.message);
 				logger.error('❌ [NotificationSetup] Error stack:', error.stack);
 			}
-
-			// Even on error, mark complete and navigate to dashboard
-			await markOnboardingComplete();
-			router.replace('/(tabs)/dashboard');
+			await finishOnboarding();
 		} finally {
 			logger.debug('🏁 [NotificationSetup] Skip handler complete');
 			setLoading(false);
 		}
-	};
-
-	const updateConsent = (
-		section: keyof NotificationConsent,
-		key: string,
-		value: boolean
-	) => {
-		setConsent((prev) => ({
-			...prev,
-			[section]: {
-				...prev[section],
-				[key]: value,
-			},
-		}));
 	};
 
 	return (
@@ -304,16 +250,15 @@ export default function NotificationPermissionScreen() {
 				]}
 				showsVerticalScrollIndicator={false}
 			>
-				{/* Header */}
 				<View style={styles.header}>
 					<Ionicons name="notifications-outline" size={48} color={palette.primary} />
 					<Text style={styles.title}>Stay on top of your cash</Text>
 					<Text style={styles.subtitle}>
-						Get weekly summaries and important alerts so you always know where your money is.
+						Get a weekly summary and alerts when you log cash — so you always know
+						where your money is.
 					</Text>
 				</View>
 
-				{/* Value Props */}
 				<View style={styles.valueProps}>
 					<View style={styles.valuePropItem}>
 						<Ionicons name="checkmark-circle" size={20} color={palette.success} />
@@ -321,15 +266,10 @@ export default function NotificationPermissionScreen() {
 					</View>
 					<View style={styles.valuePropItem}>
 						<Ionicons name="checkmark-circle" size={20} color={palette.success} />
-						<Text style={styles.valuePropText}>Transaction activity</Text>
-					</View>
-					<View style={styles.valuePropItem}>
-						<Ionicons name="checkmark-circle" size={20} color={palette.success} />
-						<Text style={styles.valuePropText}>Monthly check-in</Text>
+						<Text style={styles.valuePropText}>Cash entry alerts</Text>
 					</View>
 				</View>
 
-				{/* Preset Options */}
 				<View style={styles.presetSection}>
 					<Text style={styles.presetSectionTitle}>Choose your preference:</Text>
 					<View style={styles.presetContainer}>
@@ -339,7 +279,7 @@ export default function NotificationPermissionScreen() {
 								selectedPreset === 'essential' && styles.presetCardSelected,
 							]}
 							onPress={() => applyPreset('essential')}
-							accessibilityLabel="Essential: transactions and weekly summary, recommended"
+							accessibilityLabel="Essential: weekly summary and cash alerts, recommended"
 							accessibilityRole="button"
 						>
 							<View style={styles.recommendedBadge}>
@@ -354,7 +294,7 @@ export default function NotificationPermissionScreen() {
 								Essential
 							</Text>
 							<Text style={styles.presetDescription}>
-								Transactions & weekly summary; no marketing
+								Weekly summary & cash alerts
 							</Text>
 						</TouchableOpacity>
 
@@ -364,7 +304,7 @@ export default function NotificationPermissionScreen() {
 								selectedPreset === 'quiet' && styles.presetCardSelected,
 							]}
 							onPress={() => applyPreset('quiet')}
-							accessibilityLabel="Quiet mode: email summaries only"
+							accessibilityLabel="Quiet mode: weekly summary only"
 							accessibilityRole="button"
 						>
 							<Text
@@ -376,165 +316,12 @@ export default function NotificationPermissionScreen() {
 								Quiet mode
 							</Text>
 							<Text style={styles.presetDescription}>
-								Email summaries only; no push
+								Weekly summary only; no cash alerts
 							</Text>
 						</TouchableOpacity>
 					</View>
 				</View>
 
-				{/* Customize Section */}
-				<TouchableOpacity
-					style={styles.customizeHeader}
-					onPress={() => setShowCustomize(!showCustomize)}
-					accessibilityLabel={showCustomize ? 'Hide customization options' : 'Show customization options'}
-					accessibilityRole="button"
-				>
-					<Text style={styles.customizeTitle}>Customize</Text>
-					<Ionicons
-						name={showCustomize ? 'chevron-up' : 'chevron-down'}
-						size={20}
-						color={palette.textMuted}
-					/>
-				</TouchableOpacity>
-
-				{showCustomize && (
-					<View style={styles.customizeContent}>
-						{/* Core Notifications - MVP: transactions only, no budget/goals */}
-						<View style={styles.section}>
-							<Text style={styles.sectionTitle}>Essential Updates</Text>
-							<Text style={styles.sectionDescription}>
-								Keep track of your cash flow
-							</Text>
-
-							<View style={styles.settingRow}>
-								<View style={styles.settingInfo}>
-									<Text style={styles.settingLabel}>Transaction Alerts</Text>
-									<Text style={styles.settingDescription}>
-										Important updates about your cash entries
-									</Text>
-								</View>
-								<Switch
-									value={consent.core.transactions}
-									onValueChange={(value) =>
-										updateConsent('core', 'transactions', value)
-									}
-									trackColor={{ false: palette.border, true: palette.primary }}
-									thumbColor={
-										consent.core.transactions ? palette.textOnPrimary : palette.textSubtle
-									}
-								/>
-							</View>
-						</View>
-
-						{/* Reminders */}
-						<View style={styles.section}>
-							<Text style={styles.sectionTitle}>Reminders</Text>
-							<Text style={styles.sectionDescription}>
-								Regular summaries of your cash flow
-							</Text>
-
-							<View style={styles.settingRow}>
-								<View style={styles.settingInfo}>
-									<Text style={styles.settingLabel}>Weekly Summary</Text>
-									<Text style={styles.settingDescription}>
-										Weekly overview of your cash in and out
-									</Text>
-								</View>
-								<Switch
-									value={consent.reminders.weeklySummary}
-									onValueChange={(value) =>
-										updateConsent('reminders', 'weeklySummary', value)
-									}
-									trackColor={{ false: palette.border, true: palette.primary }}
-									thumbColor={
-										consent.reminders.weeklySummary
-											? palette.textOnPrimary
-											: palette.textSubtle
-									}
-								/>
-							</View>
-
-							<View style={styles.settingRow}>
-								<View style={styles.settingInfo}>
-									<Text style={styles.settingLabel}>Monthly Check-in</Text>
-									<Text style={styles.settingDescription}>
-										Monthly snapshot of your cash
-									</Text>
-								</View>
-								<Switch
-									value={consent.reminders.monthlyCheck}
-									onValueChange={(value) =>
-										updateConsent('reminders', 'monthlyCheck', value)
-									}
-									trackColor={{ false: palette.border, true: palette.primary }}
-									thumbColor={
-										consent.reminders.monthlyCheck
-											? palette.textOnPrimary
-											: palette.textSubtle
-									}
-								/>
-							</View>
-						</View>
-
-						{/* Marketing - Explicit Opt-in */}
-						<View style={styles.section}>
-							<Text style={styles.sectionTitle}>Marketing & Updates</Text>
-							<Text style={styles.sectionDescription}>
-								Optional updates about new features
-							</Text>
-
-							<View style={styles.settingRow}>
-								<View style={styles.settingInfo}>
-									<Text style={styles.settingLabel}>Product Updates</Text>
-									<Text style={styles.settingDescription}>
-										New features and improvements
-									</Text>
-								</View>
-								<Switch
-									value={consent.marketing.productUpdates}
-									onValueChange={(value) => {
-										updateConsent('marketing', 'productUpdates', value);
-										if (value) {
-											updateConsent('marketing', 'enabled', true);
-										}
-									}}
-									trackColor={{ false: palette.border, true: palette.primary }}
-									thumbColor={
-										consent.marketing.productUpdates
-											? palette.textOnPrimary
-											: palette.textSubtle
-									}
-								/>
-							</View>
-
-							<View style={styles.settingRow}>
-								<View style={styles.settingInfo}>
-									<Text style={styles.settingLabel}>Special Offers</Text>
-									<Text style={styles.settingDescription}>
-										Exclusive deals and promotions
-									</Text>
-								</View>
-								<Switch
-									value={consent.marketing.specialOffers}
-									onValueChange={(value) => {
-										updateConsent('marketing', 'specialOffers', value);
-										if (value) {
-											updateConsent('marketing', 'enabled', true);
-										}
-									}}
-									trackColor={{ false: palette.border, true: palette.primary }}
-									thumbColor={
-										consent.marketing.specialOffers
-											? palette.textOnPrimary
-											: palette.textSubtle
-									}
-								/>
-							</View>
-						</View>
-					</View>
-				)}
-
-				{/* Important Note */}
 				<View style={styles.noteContainer}>
 					<Ionicons
 						name="information-circle-outline"
@@ -542,12 +329,11 @@ export default function NotificationPermissionScreen() {
 						color={palette.textMuted}
 					/>
 					<Text style={styles.noteText}>
-						You can change these settings anytime in Profile. Cash tracking works
-						without notifications.
+						You can change these anytime in Profile. Cash tracking works without
+						notifications.
 					</Text>
 				</View>
 
-				{/* Action Buttons */}
 				<View style={styles.buttonContainer}>
 					<TouchableOpacity
 						style={[
@@ -677,61 +463,6 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		fontWeight: '600',
 		color: palette.textOnPrimary,
-	},
-	customizeHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		paddingVertical: space.lg,
-		borderBottomWidth: 1,
-		borderBottomColor: palette.border,
-		marginBottom: space.lg,
-	},
-	customizeTitle: {
-		fontSize: 16,
-		fontWeight: '600',
-		color: palette.textMuted,
-	},
-	customizeContent: {
-		marginBottom: space.xl,
-	},
-	section: {
-		marginBottom: space.xl,
-	},
-	sectionTitle: {
-		fontSize: 20,
-		fontWeight: '600',
-		color: palette.text,
-		marginBottom: space.sm,
-	},
-	sectionDescription: {
-		fontSize: 14,
-		color: palette.textMuted,
-		marginBottom: space.lg,
-		lineHeight: 20,
-	},
-	settingRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		paddingVertical: space.lg,
-		borderBottomWidth: 1,
-		borderBottomColor: palette.subtle,
-	},
-	settingInfo: {
-		flex: 1,
-		marginRight: space.lg,
-	},
-	settingLabel: {
-		fontSize: 16,
-		fontWeight: '500',
-		color: palette.text,
-		marginBottom: space.sm,
-	},
-	settingDescription: {
-		fontSize: 14,
-		color: palette.textMuted,
-		lineHeight: 20,
 	},
 	noteContainer: {
 		flexDirection: 'row',
