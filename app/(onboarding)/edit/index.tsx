@@ -4,7 +4,12 @@ import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { palette, radius, space } from '../../../src/ui/theme';
-import { AppCard, AppText, AppButton, AppRow } from '../../../src/ui/primitives';
+import {
+	AppCard,
+	AppText,
+	AppButton,
+	AppRow,
+} from '../../../src/ui/primitives';
 import Animated, {
 	useSharedValue,
 	withTiming,
@@ -32,9 +37,15 @@ export default function OnboardingEditIndex() {
 		const monthlyIncome = profile?.monthlyIncome ?? 0;
 		const savings = profile?.savings ?? 0;
 		const debt = profile?.debt ?? 0;
-		const expenses = profile?.expenses ?? { housing: 0, loans: 0, subscriptions: 0 };
+		const expenses = profile?.expenses ?? {
+			housing: 0,
+			loans: 0,
+			subscriptions: 0,
+		};
 		const totalExpenses =
-			(expenses.housing ?? 0) + (expenses.loans ?? 0) + (expenses.subscriptions ?? 0);
+			(expenses.housing ?? 0) +
+			(expenses.loans ?? 0) +
+			(expenses.subscriptions ?? 0);
 
 		return [
 			{
@@ -106,9 +117,11 @@ export default function OnboardingEditIndex() {
 		<View style={[styles.screen, { paddingTop: insets.top }]}>
 			<Animated.View style={[styles.container, animStyle]}>
 				<View style={styles.header}>
-					<AppText.Title style={styles.title}>Review your details</AppText.Title>
+					<AppText.Title style={styles.title}>
+						Review your details
+					</AppText.Title>
 					<AppText.Caption color="muted" style={styles.subtitle}>
-						Update anything below — your snapshot and health score will adjust
+						Update anything below, your snapshot and health score will adjust
 						automatically.
 					</AppText.Caption>
 				</View>
@@ -182,4 +195,3 @@ const styles = StyleSheet.create({
 		marginTop: space.lg,
 	},
 });
-

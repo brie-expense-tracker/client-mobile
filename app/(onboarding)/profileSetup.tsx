@@ -657,8 +657,8 @@ const OnboardingScreen = () => {
 						>
 							<Text style={styles.title}>Money snapshot</Text>
 							<Text style={styles.subtitle}>
-								Optional. Helps personalize your experience. Enter 0 to skip any
-								field—you can update these anytime in Profile.
+								Helps personalize your experience. Enter 0 to skip any
+								field, you can update these anytime in Profile.
 							</Text>
 							<View style={styles.inputContainer}>
 								<Text style={styles.label}>Monthly housing</Text>
