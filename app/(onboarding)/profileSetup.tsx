@@ -594,8 +594,7 @@ const OnboardingScreen = () => {
 												},
 											]}
 										>
-											{' '}
-											*
+
 										</Text>
 									)}
 								</Text>
