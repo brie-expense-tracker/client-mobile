@@ -593,14 +593,10 @@ const OnboardingScreen = () => {
 													fontWeight: '700',
 												},
 											]}
-										>
-
-										</Text>
+										></Text>
 									)}
 								</Text>
-								<Text style={styles.subtext}>
-									Take-home per month. Enter 0 to skip.
-								</Text>
+								<Text style={styles.subtext}>Take-home per month.</Text>
 								<View style={[styles.inputWithIcon, inputShadow]}>
 									<View style={styles.inputIcon}>
 										<Ionicons
@@ -656,8 +652,8 @@ const OnboardingScreen = () => {
 						>
 							<Text style={styles.title}>Money snapshot</Text>
 							<Text style={styles.subtitle}>
-								Helps personalize your experience. Enter 0 to skip any
-								field, you can update these anytime in Profile.
+								Optional. Helps personalize your experience. You can update
+								these anytime in Profile.
 							</Text>
 							<View style={styles.inputContainer}>
 								<Text style={styles.label}>Monthly housing</Text>
