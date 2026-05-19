@@ -27,34 +27,6 @@ const currency = new Intl.NumberFormat('en-US', {
 	currency: 'USD',
 }).format;
 
-/* ---------------------------- Profile Completion ---------------------------- */
-
-function getProfileCompletion(
-	profile: {
-		firstName?: string;
-		lastName?: string;
-		phone?: string;
-		monthlyIncome?: number;
-		expenses?: { housing?: number; loans?: number; subscriptions?: number };
-	} | null,
-	email?: string,
-): { percent: number; fieldsLeft: number } {
-	if (!profile) return { percent: 0, fieldsLeft: 5 };
-
-	const fields = [
-		!!(profile.firstName && profile.firstName.trim()),
-		!!(profile.lastName && profile.lastName.trim()),
-		!!email?.trim(),
-		!!profile.phone?.trim(),
-		typeof profile.monthlyIncome === 'number' && profile.monthlyIncome > 0,
-	];
-	const filled = fields.filter(Boolean).length;
-	const total = 5;
-	const fieldsLeft = total - filled;
-	const percent = total > 0 ? Math.round((filled / total) * 100) : 0;
-	return { percent, fieldsLeft };
-}
-
 /* ---------------------------- Sign-in view (no ProfileProvider) ---------------------------- */
 
 function SignInView() {
@@ -143,11 +115,6 @@ function ProfileContent() {
 		return displayName.slice(0, 2).toUpperCase();
 	}, [displayName]);
 
-	const completion = useMemo(
-		() => getProfileCompletion(profile, email),
-		[profile, email],
-	);
-
 	// Go to profile review hub (Review your details) or direct edit
 	const handleEditName = () => router.push('/(onboarding)/edit');
 	const handleEditFinancial = () => router.push('/(onboarding)/edit');
@@ -206,9 +173,6 @@ function ProfileContent() {
 							<AppText.Heading>{displayName}</AppText.Heading>
 							<AppText.Caption color="muted" style={styles.profileEmail}>
 								{email || 'No email'}
-							</AppText.Caption>
-							<AppText.Caption color="primary" style={styles.completionText}>
-								{completion.percent}% • {completion.fieldsLeft} fields left
 							</AppText.Caption>
 						</View>
 					</View>
@@ -408,9 +372,6 @@ const styles = StyleSheet.create({
 	},
 	profileEmail: {
 		marginTop: 2,
-	},
-	completionText: {
-		marginTop: 4,
 	},
 	section: {
 		marginTop: 0,
