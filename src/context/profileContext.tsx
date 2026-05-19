@@ -9,7 +9,11 @@ import React, {
 } from 'react';
 import { ApiService } from '../services';
 import useAuth from './AuthContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+	clearProfileCacheStorage,
+	loadProfileFromCache,
+	saveProfileToCache,
+} from '../storage/profileCache';
 import {
 	AppEvents,
 	EVT_AI_INSIGHTS_CHANGED,
@@ -291,56 +295,6 @@ const validatePreferences = (
 	return errors;
 };
 
-// Cache utilities
-const CACHE_KEY = 'profile_cache';
-const CACHE_TIMESTAMP_KEY = 'profile_cache_timestamp';
-const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
-
-const saveToCache = async (profile: Profile): Promise<void> => {
-	try {
-		await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(profile));
-		await AsyncStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
-	} catch (error) {
-		profileContextLog.warn('Failed to save profile to cache', error);
-	}
-};
-
-const loadFromCache = async (): Promise<Profile | null> => {
-	try {
-		const [cachedProfile, timestamp] = await Promise.all([
-			AsyncStorage.getItem(CACHE_KEY),
-			AsyncStorage.getItem(CACHE_TIMESTAMP_KEY),
-		]);
-
-		if (!cachedProfile || !timestamp) {
-			return null;
-		}
-
-		const cacheAge = Date.now() - parseInt(timestamp, 10);
-		if (cacheAge > CACHE_EXPIRY_MS) {
-			// Cache expired, clear it
-			await clearCache();
-			return null;
-		}
-
-		return JSON.parse(cachedProfile);
-	} catch (error) {
-		profileContextLog.warn('Failed to load profile from cache', error);
-		return null;
-	}
-};
-
-const clearCache = async (): Promise<void> => {
-	try {
-		await Promise.all([
-			AsyncStorage.removeItem(CACHE_KEY),
-			AsyncStorage.removeItem(CACHE_TIMESTAMP_KEY),
-		]);
-	} catch (error) {
-		profileContextLog.warn('Failed to clear profile cache', error);
-	}
-};
-
 /** Build a minimal profile stub for local use when profile hasn't loaded yet (so updates can still persist). */
 function getDefaultProfileStub(userId: string): Profile {
 	const now = new Date().toISOString();
@@ -439,8 +393,8 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 			setError(null);
 			setIsOffline(false);
 
-			// Try to load from cache first
-			const cachedProfile = await loadFromCache();
+			// Try to load from cache first (must match current user)
+			const cachedProfile = await loadProfileFromCache(user._id);
 			if (cachedProfile) {
 				setProfile(cachedProfile);
 				setLastSyncTime(Date.now());
@@ -467,7 +421,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 					setProfile(profileData);
 					setLastSyncTime(Date.now());
 					setIsOffline(false);
-					await saveToCache(profileData);
+					await saveProfileToCache(profileData);
 				}
 			} else if (
 				response.error &&
@@ -661,11 +615,11 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 					profileContextLog.debug('Profile updated successfully');
 					setLastSyncTime(Date.now());
 					setIsOffline(false);
-					await saveToCache(nextProfile);
+					await saveProfileToCache(nextProfile);
 				} else {
 					// API failed: persist to local cache and keep optimistic update so changes are not lost
 					try {
-						await saveToCache(nextProfile);
+						await saveProfileToCache(nextProfile);
 					} catch (cacheErr) {
 						profileContextLog.warn('Failed to save profile to cache', cacheErr);
 					}
@@ -685,7 +639,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 				});
 				// Persist to local cache and keep optimistic update so changes are not lost
 				try {
-					await saveToCache(nextProfile);
+					await saveProfileToCache(nextProfile);
 					setIsOffline(true);
 					profileContextLog.warn('Profile saved locally after network error');
 				} catch (cacheErr) {
@@ -1219,7 +1173,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 	}, [user, firebaseUser]);
 
 	const clearCache = useCallback(async () => {
-		await clearCache();
+		await clearProfileCacheStorage();
 		setProfile(null);
 		setLastSyncTime(null);
 	}, []);
@@ -1325,6 +1279,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
 			// Also fetch income estimate when profile loads
 			fetchIncomeEstimate();
 		} else {
+			void clearProfileCacheStorage().catch(() => undefined);
 			// Only update state when not already cleared to avoid re-render loops
 			// (e.g. in local mode when tapping Cash Out and navigating to transaction tab)
 			setProfile((prev) => (prev === null ? prev : null));

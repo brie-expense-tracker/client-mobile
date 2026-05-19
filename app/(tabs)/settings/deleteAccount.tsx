@@ -16,7 +16,7 @@ import { AppCard, AppText, AppButton } from '../../../src/ui/primitives';
 export default function DeleteAccountScreen() {
 	const router = useRouter();
 	const insets = useSafeAreaInsets();
-	const { authProviderId, deleteAccountFlow, logout } = useAuth();
+	const { authProviderId, deleteAccountFlow } = useAuth();
 	const [password, setPassword] = useState('');
 	const [isDeleting, setIsDeleting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -36,11 +36,6 @@ export default function DeleteAccountScreen() {
 			await deleteAccountFlow(
 				needsPassword ? { password: password.trim() } : undefined
 			);
-			try {
-				await logout();
-			} catch {
-				// account already removed
-			}
 			router.replace('/(auth)/login');
 		} catch (e: unknown) {
 			const err = e as { code?: string; message?: string };
@@ -63,7 +58,7 @@ export default function DeleteAccountScreen() {
 		} finally {
 			setIsDeleting(false);
 		}
-	}, [needsPassword, password, deleteAccountFlow, logout, router]);
+	}, [needsPassword, password, deleteAccountFlow, router]);
 
 	const confirmDelete = useCallback(() => {
 		Alert.alert(

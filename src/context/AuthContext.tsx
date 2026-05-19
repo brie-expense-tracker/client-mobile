@@ -22,6 +22,7 @@ import {
 import { isDevMode } from '../config/environment';
 import { setItem, removeItem } from '../utils/safeStorage';
 import { clearLocalMigrationFlag } from '../storage/migrateLocalTransactions';
+import { clearUserSessionLocalData } from '../storage/profileCache';
 import { crashReporting } from '../services/feature/crashReporting';
 import { UserService, User, Profile } from '../services';
 import { ApiService } from '../services/core/apiService';
@@ -362,6 +363,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 							}
 						} finally {
 							// Always clear local state regardless of signOut result
+							await clearUserSessionLocalData().catch(() => undefined);
 							setUser(null);
 							setProfile(null);
 							setFirebaseUser(null);
@@ -422,6 +424,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 					// Ensure user exists in MongoDB (auto-provision)
 					await ensureUserExistsLocal(fbUser);
 				} else {
+					await clearUserSessionLocalData().catch(() => undefined);
 					await removeItem(UID_KEY).catch(() => undefined);
 					setUser(null);
 					setProfile(null);
@@ -970,18 +973,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const logout = useCallback(async () => {
 		try {
 			await signOut(getAuth());
-			setUser(null);
-			setProfile(null);
-			setFirebaseUser(null);
-			lastProcessedUIDRef.current = null;
-			setError(null); // Clear any existing errors
-			if (processingTimeoutRef.current) {
-				clearTimeout(processingTimeoutRef.current);
-				processingTimeoutRef.current = null;
-			}
-			await removeItem(UID_KEY);
-			// Reset migration flag so local data can migrate to the next account on sign-in
-			await clearLocalMigrationFlag().catch(() => undefined);
+			setError(null);
 		} catch (error) {
 			authContextLog.error('Error during logout', error);
 			setError({
@@ -989,6 +981,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				message: 'Failed to complete logout process',
 				details: error,
 			});
+		} finally {
+			setUser(null);
+			setProfile(null);
+			setFirebaseUser(null);
+			lastProcessedUIDRef.current = null;
+			if (processingTimeoutRef.current) {
+				clearTimeout(processingTimeoutRef.current);
+				processingTimeoutRef.current = null;
+			}
+			await removeItem(UID_KEY).catch(() => undefined);
+			await clearUserSessionLocalData().catch(() => undefined);
+			await clearLocalMigrationFlag().catch(() => undefined);
 		}
 	}, []);
 
@@ -1595,6 +1599,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 			// Clear AsyncStorage and context state
 			await removeItem(UID_KEY);
+			await clearUserSessionLocalData().catch(() => undefined);
 			await clearLocalMigrationFlag().catch(() => undefined);
 			setUser(null);
 			setProfile(null);
@@ -1707,6 +1712,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 			// Local cleanup
 			await removeItem(UID_KEY);
+			await clearUserSessionLocalData().catch(() => undefined);
 			await clearLocalMigrationFlag().catch(() => undefined);
 			setUser(null);
 			setProfile(null);
